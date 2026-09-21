@@ -42,6 +42,7 @@ import helium314.keyboard.accessibility.AccessibilityUtils;
 import helium314.keyboard.keyboard.KeyboardTypeface;
 import helium314.keyboard.latin.PunctuationSuggestions;
 import helium314.keyboard.latin.R;
+import helium314.keyboard.latin.Suggest;
 import helium314.keyboard.latin.SuggestedWords;
 import helium314.keyboard.latin.SuggestedWords.SuggestedWordInfo;
 import helium314.keyboard.latin.common.ColorType;
@@ -65,6 +66,12 @@ final class SuggestionStripLayoutHelper {
     private static final int DEFAULT_MAX_MORE_SUGGESTIONS_ROW = 2;
     private static final int PUNCTUATIONS_IN_STRIP = 5;
     private static final float MIN_TEXT_XSCALE = 0.70f;
+    // min width of a word view = this + both paddings, equals config_suggestion_min_width at the default padding
+    private static final int MIN_WORD_TEXT_WIDTH_DP = 26;
+    // the suggestions should fill the visible part of the strip this many times
+    private static final int STRIP_FILL_SCREENS = 2;
+    private static final float QUIP_TEXT_SIZE_DP = 14f;
+    private static final float QUIP_ALPHA = 0.6f;
 
     public final int mPadding;
     public final int mDividerWidth;
@@ -75,6 +82,9 @@ final class SuggestionStripLayoutHelper {
     public final float mMinMoreSuggestionsWidth;
     public final int mMoreSuggestionsBottomGap;
     private boolean mMoreSuggestionsAvailable;
+    private TextView mQuipView;
+    private String[] mQuips;
+    private int mQuipIndex;
 
     // The index of these {@link ArrayList} is the position in the suggestion strip. The indices
     // increase towards the right for LTR scripts and the left for RTL scripts, starting with 0.
@@ -341,17 +351,24 @@ final class SuggestionStripLayoutHelper {
                     (PunctuationSuggestions)suggestedWords, stripView);
         }
 
+        final int countInStrip = mWordViews.size();
         final int startIndexOfMoreSuggestions = setupWordViewsAndReturnStartIndexOfMoreSuggestions(
-                suggestedWords, mSuggestionsCountInStrip);
+                suggestedWords, countInStrip);
 
-        // Scrollable strip: all candidates shown with natural widths, no weight-based layout.
+        // Scrollable strip: candidates shown with natural widths, no weight-based layout.
+        // Words are added until they fill the visible strip width twice, the rest is dropped.
         mMoreSuggestionsAvailable = false;
-        final int countInStrip = mSuggestionsCountInStrip;
+        final int viewportWidth = getViewportWidth(stripView);
+        final int unspecified = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+        int wordsWidth = 0;
+        int wordsShown = 0;
         for (int positionInStrip = 0; positionInStrip < countInStrip; positionInStrip++) {
             final TextView wordView = mWordViews.get(positionInStrip);
             if (TextUtils.isEmpty(wordView.getText())) continue;
+            if (wordsWidth >= STRIP_FILL_SCREENS * viewportWidth) break;
             if (stripView.getChildCount() > 0) {
                 addDivider(stripView, mDividerViews.get(positionInStrip));
+                wordsWidth += mDividerWidth;
             }
             // Pass unlimited width so text is never ellipsized; clear the more-suggestions hint.
             layoutWord(context, positionInStrip, Integer.MAX_VALUE / 2);
@@ -359,8 +376,53 @@ final class SuggestionStripLayoutHelper {
             stripView.addView(wordView);
             wordView.setLayoutParams(new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            wordView.measure(unspecified, unspecified);
+            wordsWidth += wordView.getMeasuredWidth();
+            wordsShown++;
+        }
+        if (wordsShown > 0) {
+            // tell Suggest how many words it takes to fill the strip at the current text size and spacing
+            final int wordsToFill = STRIP_FILL_SCREENS * viewportWidth * wordsShown / wordsWidth + 2;
+            Suggest.setStripFillTarget(Math.min(wordsToFill, SuggestedWords.MAX_SUGGESTIONS));
+            addQuip(stripView, Math.max(viewportWidth / 2, STRIP_FILL_SCREENS * viewportWidth - wordsWidth));
         }
         return startIndexOfMoreSuggestions;
+    }
+
+    private static int getViewportWidth(final ViewGroup stripView) {
+        final int width = stripView.getParent() instanceof View parent ? parent.getWidth() : 0;
+        return width > 0 ? width : stripView.getResources().getDisplayMetrics().widthPixels;
+    }
+
+    /**
+     * The easter egg past the end of the suggestions: a grumpy remark that types nothing,
+     * starting <code>gap</code> pixels after the last word. Tapping it shows another one.
+     */
+    private void addQuip(final ViewGroup stripView, final int gap) {
+        if (mQuipView == null) {
+            final Context context = stripView.getContext();
+            mQuips = context.getResources().getStringArray(R.array.suggestion_strip_quips);
+            mQuipView = new TextView(context);
+            mQuipView.setGravity(Gravity.CENTER_VERTICAL);
+            mQuipView.setSingleLine(true);
+            mQuipView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, QUIP_TEXT_SIZE_DP);
+            mQuipView.setTypeface(Typeface.DEFAULT, Typeface.ITALIC);
+            mQuipView.setTextColor(applyAlpha(mColorSuggested, QUIP_ALPHA));
+            mQuipView.setOnClickListener(v -> showNextQuip());
+        }
+        showNextQuip();
+        if (mQuipView.getParent() instanceof ViewGroup oldParent) oldParent.removeView(mQuipView);
+        mQuipView.setPaddingRelative(gap, 0, mQuipView.getResources().getDimensionPixelSize(
+                R.dimen.config_suggestion_text_horizontal_padding) * 2, 0);
+        stripView.addView(mQuipView, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    }
+
+    private void showNextQuip() {
+        if (mQuips.length == 0) return;
+        // random, but never the same one twice in a row
+        mQuipIndex = (mQuipIndex + 1 + (int) (Math.random() * (mQuips.length - 1))) % mQuips.length;
+        mQuipView.setText(mQuips[mQuipIndex]);
     }
 
     /**
@@ -535,8 +597,12 @@ final class SuggestionStripLayoutHelper {
             wordView.setPaintFlags(wordView.getPaintFlags() & ~Paint.UNDERLINE_TEXT_FLAG);
         }
 
-        final int paddingPx = (int) (paddingDp * context.getResources().getDisplayMetrics().density);
+        final float density = context.getResources().getDisplayMetrics().density;
+        final int paddingPx = (int) (paddingDp * density);
         wordView.setPadding(paddingPx, 0, paddingPx, 0);
+        // The style's fixed 46dp min width would keep short words wide no matter how small the
+        // spacing is. Let it follow the spacing instead: unchanged at the default 10dp, 26dp at 0.
+        wordView.setMinWidth(paddingPx * 2 + (int) (MIN_WORD_TEXT_WIDTH_DP * density));
     }
 
     private static float getTextScaleX(@Nullable final CharSequence text, final int maxWidth, final TextPaint paint) {

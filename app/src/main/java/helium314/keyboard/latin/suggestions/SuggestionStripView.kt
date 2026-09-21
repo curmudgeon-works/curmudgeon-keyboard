@@ -24,6 +24,7 @@ import android.view.View.OnLongClickListener
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityEvent
 import android.widget.ImageButton
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.RelativeLayout
 import android.widget.TextView
@@ -255,6 +256,8 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             context, suggestedWords, suggestionsStrip, this
         )
         isExternalSuggestionVisible = false
+        // new words start at the beginning, not wherever the previous list was scrolled to
+        (suggestionsStrip.parent as? HorizontalScrollView)?.scrollTo(0, 0)
         updateKeys()
     }
 

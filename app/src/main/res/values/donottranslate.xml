@@ -74,4 +74,16 @@
     <!-- App slogan-->
     <string name="app_slogan" translatable="false">100% FOSS keyboard, based on AOSP.</string>
 
+    <!-- Easter egg: shown past the end of the suggestions when scrolling the strip all the way. Tapping shows another. -->
+    <string-array name="suggestion_strip_quips">
+        <item>That\'s all I\'ve got.</item>
+        <item>Still scrolling? Just type it.</item>
+        <item>There is nothing over here.</item>
+        <item>The word you want is not this far right.</item>
+        <item>Back in my day we got three suggestions.</item>
+        <item>I\'m a keyboard, not a thesaurus.</item>
+        <item>Fine. Keep going. See if I care.</item>
+        <item>Turn around.</item>
+        <item>Hmph.</item>
+    </string-array>
 </resources>
