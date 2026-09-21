@@ -104,6 +104,10 @@ class KeyboardParser(private val params: KeyboardParams, private val context: Co
         addNumberRowOrPopupKeys(baseKeys, numberRow)
         if (params.mId.isAlphabetKeyboard)
             addSymbolPopupKeys(baseKeys)
+        // only the hint drawn on the key goes away, long-press still gives the same popup keys
+        // (before the number row is added, that one has its own setting)
+        if (params.mId.isAlphabetKeyboard && !Settings.getValues().mShowLetterHints)
+            baseKeys.forEach { row -> row.replaceAll { it.copy(newLabelFlags = it.labelFlags or Key.LABEL_FLAGS_DISABLE_HINT_LABEL) } }
         if (params.mId.isAlphaOrSymbolKeyboard && params.mId.mNumberRowEnabled) {
             val newLabelFlags = defaultLabelFlags or
                     if (Settings.getValues().mShowNumberRowHints) 0 else Key.LABEL_FLAGS_DISABLE_HINT_LABEL

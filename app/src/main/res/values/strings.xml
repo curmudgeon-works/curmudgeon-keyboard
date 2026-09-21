@@ -302,6 +302,9 @@
     <string name="localized_number_row_summary">Prefer localized over latin numbers</string>
     <!-- Title of the setting to enable number row hints -->
     <string name="number_row_hints">Show hints on number row</string>
+    <!-- Title and description of the setting to show long-press hints on the letter keys -->
+    <string name="letter_hints">Show hints on letter keys</string>
+    <string name="letter_hints_summary">Long-press types the same characters when hidden</string>
     <!-- Title of the setting to save subtype per app -->
     <string name="save_subtype_per_app">Remember language per app</string>
     <!-- Title of the setting to show key hints -->
