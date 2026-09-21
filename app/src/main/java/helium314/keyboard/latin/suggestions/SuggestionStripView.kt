@@ -257,7 +257,9 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         )
         isExternalSuggestionVisible = false
         // new words start at the beginning, not wherever the previous list was scrolled to
-        (suggestionsStrip.parent as? HorizontalScrollView)?.scrollTo(0, 0)
+        val scrollView = suggestionsStrip.parent as? HorizontalScrollView
+        if (isRtlLanguage) scrollView?.post { scrollView.fullScroll(FOCUS_RIGHT) } // the beginning is the right end, known after layout
+        else scrollView?.scrollTo(0, 0)
         updateKeys()
     }
 

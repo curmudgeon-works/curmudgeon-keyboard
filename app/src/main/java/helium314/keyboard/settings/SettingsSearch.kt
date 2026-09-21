@@ -49,14 +49,15 @@ object SettingsSearch {
     }
 
     private class Words(val title: List<String>, val description: List<String>, val key: List<String>)
-    private val wordsOfSetting = HashMap<String, Words>()
+    // per Setting object: they are recreated when the app language changes, and with them the titles
+    private val wordsOfSetting = java.util.WeakHashMap<Setting, Words>()
 
     /** @return [settings] that match [query], best match first */
     fun search(query: String, settings: List<Setting>): List<Setting> {
         val queryWords = splitWords(query).filterNot { it in fillerWords }.ifEmpty { splitWords(query) }
         if (queryWords.isEmpty()) return emptyList()
         return settings.mapNotNull { setting ->
-            val words = wordsOfSetting.getOrPut(setting.key) {
+            val words = wordsOfSetting.getOrPut(setting) {
                 Words(splitWords(setting.title), splitWords(setting.description ?: ""), splitWords(setting.key))
             }
             val scores = queryWords.map { score(it, words) }
