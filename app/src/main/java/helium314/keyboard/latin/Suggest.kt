@@ -345,13 +345,6 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
             )
         }
 
-        // a swipe has no typed word, so the looser matches are words that start like the best guess
-        // only once the swipe is finished, the lookups would slow down the updates while still swiping
-        val best = suggestionsContainer.firstOrNull()
-        if (best != null && inputStyle == SuggestedWords.INPUT_STYLE_TAIL_BATCH)
-            fillWithLooserMatches(suggestionsContainer, best.mWord, ngramContext, keyboard, settingsValuesForSuggestion) { results ->
-                results.map { capitalizeInfo(it) }
-            }
         useDefaultEmojiSkinTone(suggestionsContainer)
 
         // In the batch input mode, the most relevant suggested word should act as a "typed word"
@@ -362,6 +355,19 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
             suggestionsContainer.firstOrNull(),
             suggestionsContainer, getNextWordSuggestions(ngramContext, keyboard, inputStyle, settingsValuesForSuggestion), rejected
         )
+        // A swipe has no typed word, so the looser matches are words that start like the best guess.
+        // Only after the word to commit is chosen above: the fillers come with dictionary scores on a different
+        // scale than the decoder's and must never be picked. And only once the swipe is finished, the lookups
+        // would slow down the updates while still swiping.
+        val best = suggestionsContainer.firstOrNull()
+        if (best != null && inputStyle == SuggestedWords.INPUT_STYLE_TAIL_BATCH) {
+            val sizeBefore = suggestionsContainer.size
+            fillWithLooserMatches(suggestionsContainer, best.mWord, ngramContext, keyboard, settingsValuesForSuggestion) { results ->
+                results.map { capitalizeInfo(it) }
+            }
+            for (i in sizeBefore until suggestionsContainer.size)
+                suggestionsContainer[i] = useDefaultEmojiSkinTone(suggestionsContainer[i])
+        }
         val suggestionsList = if (SuggestionStripView.DEBUG_SUGGESTIONS && suggestionsContainer.isNotEmpty()) {
             // firstOrNull: own-decoder results can be empty while its vocabulary is still building
             getSuggestionsInfoListWithDebugInfo(suggestionResults.firstOrNull()?.mWord ?: "", suggestionsContainer)

@@ -516,6 +516,8 @@ final class SuggestionStripLayoutHelper {
         // (index 1), then other suggestions in order. No center-weighted remap.
         int positionInStrip = 0;
         int indexInSuggestedWords;
+        // looked up once, not per word: finding the preferences is the slow part
+        final SharedPreferences prefs = KtxKt.prefs(mWordViews.get(0).getContext());
         for (indexInSuggestedWords = 0; indexInSuggestedWords < suggestedWords.size()
                 && positionInStrip < maxSuggestionInStrip; indexInSuggestedWords++) {
             final TextView wordView = mWordViews.get(positionInStrip);
@@ -523,7 +525,7 @@ final class SuggestionStripLayoutHelper {
             wordView.setText(getStyledSuggestedWord(suggestedWords, indexInSuggestedWords));
             wordView.setTextColor(SUGGESTION_STRIP_ORANGE);
             KeyboardTypeface.applyToTextView(wordView);
-            applyCustomSuggestionStyle(wordView);
+            applyCustomSuggestionStyle(wordView, prefs);
             if (SuggestionStripView.DEBUG_SUGGESTIONS) {
                 mDebugInfoViews.get(positionInStrip).setText(suggestedWords.getDebugString(indexInSuggestedWords));
             }
@@ -573,9 +575,8 @@ final class SuggestionStripLayoutHelper {
      * suggestion-strip word view. Reads the preferences fresh each layout pass so changes take
      * effect on the next suggestion update without restarting the IME.
      */
-    private void applyCustomSuggestionStyle(final TextView wordView) {
+    private void applyCustomSuggestionStyle(final TextView wordView, final SharedPreferences prefs) {
         final Context context = wordView.getContext();
-        final SharedPreferences prefs = KtxKt.prefs(context);
         final int textSizeDp = prefs.getInt(Settings.PREF_SUGGESTION_TEXT_SIZE, Defaults.PREF_SUGGESTION_TEXT_SIZE);
         final boolean bold = prefs.getBoolean(Settings.PREF_SUGGESTION_BOLD, Defaults.PREF_SUGGESTION_BOLD);
         final boolean italic = prefs.getBoolean(Settings.PREF_SUGGESTION_ITALIC, Defaults.PREF_SUGGESTION_ITALIC);
