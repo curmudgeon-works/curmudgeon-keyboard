@@ -101,7 +101,7 @@ android {
                     // keep the historical name for the normal flavor, distinct names for lab and play
                     output.outputFileName = when (variant.flavorName) {
                         "lab" -> "HeliBoard_Lab_${defaultConfig.versionName}-${variant.buildType}.apk"
-                        "play" -> "Curmudgeon_Keyboard_0.1.0-${variant.buildType}.apk"
+                        "play" -> "Curmudgeon_Keyboard_${output.versionName.get()}-${variant.buildType}.apk"
                         else -> "HeliBoard_${defaultConfig.versionName}-${variant.buildType}.apk"
                     }
                 }
@@ -131,8 +131,9 @@ android {
         create("play") {
             dimension = "distribution"
             applicationId = "app.curmudgeon.keyboard"
-            versionCode = 1
-            versionName = "0.1.0"
+            // versionName major.minor.build, build always 3 digits; versionCode = minor * 1000 + build (+ major * 100000)
+            versionCode = 1001
+            versionName = "0.1.001"
             buildConfigField("boolean", "USE_OWN_GESTURE_DECODER", "true")
             if (playKeyProps.isNotEmpty()) signingConfig = signingConfigs.getByName("play")
         }

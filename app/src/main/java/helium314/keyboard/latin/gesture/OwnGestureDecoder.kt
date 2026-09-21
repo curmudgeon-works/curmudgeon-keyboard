@@ -4,10 +4,12 @@ package helium314.keyboard.latin.gesture
 import android.os.SystemClock
 import helium314.keyboard.gesture.GestureDecoder
 import helium314.keyboard.gesture.GesturePoint
+import helium314.keyboard.gesture.GesturePreprocessor
 import helium314.keyboard.gesture.HybridScorer
 import helium314.keyboard.gesture.KeyInfo
 import helium314.keyboard.gesture.KeyboardGeometry
 import helium314.keyboard.gesture.KushlerScorer
+import helium314.keyboard.gesture.PreprocessorConfig
 import helium314.keyboard.gesture.Scorer
 import helium314.keyboard.gesture.Shark2Scorer
 import helium314.keyboard.keyboard.Keyboard
@@ -41,7 +43,19 @@ object OwnGestureDecoder {
     private const val MAX_RESULTS = 10
 
     private val scorers: List<Scorer> = listOf(HybridScorer(), KushlerScorer(), Shark2Scorer())
-    private val decoder = GestureDecoder(HybridScorer()) // ctor scorer unused by decodeWithScorers
+    // the caps height is part of the immutable preprocessor config, so the decoder is rebuilt when the setting changes
+    private var decoderCapsHeight = Float.NaN
+    private var decoder = GestureDecoder(HybridScorer()) // ctor scorer unused by decodeWithScorers
+
+    @Synchronized
+    private fun decoderFor(capsHeight: Float): GestureDecoder {
+        if (capsHeight != decoderCapsHeight) {
+            decoder = GestureDecoder(HybridScorer(),
+                preprocessor = GesturePreprocessor(PreprocessorConfig(excursionMinHeightKeyHeights = capsHeight)))
+            decoderCapsHeight = capsHeight
+        }
+        return decoder
+    }
 
     // keyboard geometry cache — keyboards change with layout/rotation, so cache per instance
     private var cachedKeyboardRef: WeakReference<Keyboard>? = null
@@ -60,6 +74,7 @@ object OwnGestureDecoder {
         keyboard: Keyboard,
         locale: Locale,
         activeScorerPref: String?,
+        capsHeight: Float,
     ): SuggestionResults {
         val results = SuggestionResults(SuggestedWords.MAX_SUGGESTIONS, false, false)
         val points = adaptPointers(composedData)
@@ -72,7 +87,7 @@ object OwnGestureDecoder {
         }
 
         val start = SystemClock.elapsedRealtime()
-        val all = decoder.decodeWithScorers(points, geometry, vocabulary, scorers, MAX_RESULTS)
+        val all = decoderFor(capsHeight).decodeWithScorers(points, geometry, vocabulary, scorers, MAX_RESULTS)
         val elapsed = SystemClock.elapsedRealtime() - start
 
         val activeName = if (activeScorerPref != null && all.containsKey(activeScorerPref)) activeScorerPref

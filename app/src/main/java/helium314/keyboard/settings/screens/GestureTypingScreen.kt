@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import helium314.keyboard.keyboard.KeyboardSwitcher
+import helium314.keyboard.latin.BuildConfig
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
@@ -44,8 +45,11 @@ fun GestureTypingScreen(
             Settings.PREF_GESTURE_FLOATING_PREVIEW_TEXT else null,
         if (gestureEnabled && gestureFloatingPreviewEnabled)
             Settings.PREF_GESTURE_FLOATING_PREVIEW_DYNAMIC else null,
-        if (gestureEnabled)
+        // phrase gesture is a feature of the native gesture library, the own decoder ignores it
+        if (gestureEnabled && !BuildConfig.USE_OWN_GESTURE_DECODER)
             Settings.PREF_GESTURE_SPACE_AWARE else null,
+        if (gestureEnabled && BuildConfig.USE_OWN_GESTURE_DECODER)
+            Settings.PREF_GESTURE_CAPS_HEIGHT else null,
         if (gestureEnabled)
             Settings.PREF_GESTURE_FAST_TYPING_COOLDOWN else null,
         if (gestureEnabled &&
@@ -90,6 +94,16 @@ fun createGestureTypingSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_GESTURE_SPACE_AWARE, R.string.gesture_space_aware, R.string.gesture_space_aware_summary) {
         SwitchPreference(it, Defaults.PREF_GESTURE_SPACE_AWARE)
+    },
+    Setting(context, Settings.PREF_GESTURE_CAPS_HEIGHT, R.string.gesture_caps_height, R.string.gesture_caps_height_summary) { def ->
+        SliderPreference(
+            name = def.title,
+            key = def.key,
+            default = Defaults.PREF_GESTURE_CAPS_HEIGHT,
+            range = 25f..250f,
+            stepSize = 25,
+            description = { stringResource(R.string.gesture_caps_height_value, (it / 100f).toString()) }
+        )
     },
     Setting(context, Settings.PREF_GESTURE_FAST_TYPING_COOLDOWN, R.string.gesture_fast_typing_cooldown) { def ->
         SliderPreference(

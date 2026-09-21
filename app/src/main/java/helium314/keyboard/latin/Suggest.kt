@@ -39,7 +39,12 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
     private val nextWordSuggestionsCache = HashMap<NgramContext, SuggestionResults>()
 
     // cache cleared whenever LatinIME.loadSettings is called, notably on changing layout and switching input fields
-    fun clearNextWordSuggestionsCache() = nextWordSuggestionsCache.clear()
+    fun clearNextWordSuggestionsCache() {
+        nextWordSuggestionsCache.clear()
+        looserMatchesCache.clear()
+    }
+    // results of the prefix queries in fillWithLooserMatches, the same short prefixes come up again with every letter typed
+    private val looserMatchesCache = HashMap<String, SuggestionResults>()
 
     /**
      * Set the normalized-score threshold for a suggestion to be considered strong enough that we
@@ -142,6 +147,11 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
                 )
             }
         }
+        if (!resultsArePredictions)
+            fillWithLooserMatches(suggestionsList, typedWordString.dropLast(trailingSingleQuotesCount), ngramContext, keyboard,
+                settingsValuesForSuggestion) {
+                getTransformedSuggestedWordInfoList(wordComposer, it, trailingSingleQuotesCount, mDictionaryFacilitator.mainLocale, keyboard)
+            }
         val isTypedWordValid = firstOccurrenceOfTypedWordInSuggestions > -1 || (!resultsArePredictions && !allowsToBeAutoCorrected)
         return SuggestedWords(suggestionsList, suggestionResults.mRawSuggestions,
             typedWordInfo, isTypedWordValid, hasAutoCorrection, false, inputStyle, sequenceNumber)
@@ -274,7 +284,8 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
         // (constant-false flag in the normal flavor, so R8 keeps the native path only)
         val suggestionResults = if (BuildConfig.USE_OWN_GESTURE_DECODER)
             OwnGestureDecoder.getSuggestionResults(wordComposer.composedDataSnapshot, keyboard,
-                mDictionaryFacilitator.mainLocale, Settings.getValues().mGestureDecoderScorer)
+                mDictionaryFacilitator.mainLocale, Settings.getValues().mGestureDecoderScorer,
+                Settings.getValues().mGestureCapsHeight)
         else mDictionaryFacilitator.getSuggestionResults(
             wordComposer.composedDataSnapshot, ngramContext, keyboard,
             settingsValuesForSuggestion, SESSION_ID_GESTURE, inputStyle
@@ -293,16 +304,15 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
             || keyboardShiftMode == WordComposer.CAPS_MODE_MANUAL_SHIFTED
         val shouldMakeSuggestionsAllUpperCase = wordComposer.isAllUpperCase
             || keyboardShiftMode == WordComposer.CAPS_MODE_MANUAL_SHIFT_LOCKED
-        if (shouldMakeSuggestionsOnlyFirstCharCapitalized || shouldMakeSuggestionsAllUpperCase) {
-            for (i in 0 until suggestionsCount) {
-                val wordInfo = suggestionsContainer[i]
-                val wordLocale = wordInfo!!.mSourceDict.mLocale
-                val transformedWordInfo = getTransformedSuggestedWordInfo(
-                    wordInfo, wordLocale ?: locale, shouldMakeSuggestionsAllUpperCase,
+        fun capitalizeInfo(wordInfo: SuggestedWordInfo) =
+            if (shouldMakeSuggestionsOnlyFirstCharCapitalized || shouldMakeSuggestionsAllUpperCase)
+                getTransformedSuggestedWordInfo(
+                    wordInfo, wordInfo.mSourceDict.mLocale ?: locale, shouldMakeSuggestionsAllUpperCase,
                     shouldMakeSuggestionsOnlyFirstCharCapitalized, 0
                 )
-                suggestionsContainer[i] = transformedWordInfo
-            }
+            else wordInfo
+        for (i in 0 until suggestionsCount) {
+            suggestionsContainer[i] = capitalizeInfo(suggestionsContainer[i]!!)
         }
         val rejected: SuggestedWordInfo?
         if (SHOULD_REMOVE_PREVIOUSLY_REJECTED_SUGGESTION && suggestionsContainer.size > 1 && TextUtils.equals(
@@ -335,6 +345,13 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
             )
         }
 
+        // a swipe has no typed word, so the looser matches are words that start like the best guess
+        // only once the swipe is finished, the lookups would slow down the updates while still swiping
+        val best = suggestionsContainer.firstOrNull()
+        if (best != null && inputStyle == SuggestedWords.INPUT_STYLE_TAIL_BATCH)
+            fillWithLooserMatches(suggestionsContainer, best.mWord, ngramContext, keyboard, settingsValuesForSuggestion) { results ->
+                results.map { capitalizeInfo(it) }
+            }
         useDefaultEmojiSkinTone(suggestionsContainer)
 
         // In the batch input mode, the most relevant suggested word should act as a "typed word"
@@ -361,6 +378,36 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
         }
     }
 
+    /**
+     * The scrollable suggestion strip wants [stripFillTarget] words. When the dictionaries don't have that many
+     * matches for [word], append looser ones: what the dictionaries suggest for ever shorter beginnings of [word].
+     * They go after everything else, so they are only seen when scrolling the strip and never affect auto-correction.
+     */
+    private fun fillWithLooserMatches(
+        suggestions: ArrayList<SuggestedWordInfo>, word: String, ngramContext: NgramContext, keyboard: Keyboard,
+        settingsValuesForSuggestion: SettingsValuesForSuggestion, transform: (SuggestionResults) -> List<SuggestedWordInfo>
+    ) {
+        val target = min(stripFillTarget, SuggestedWords.MAX_SUGGESTIONS)
+        if (suggestions.size >= target) return
+        val length = word.codePointCount(0, word.length)
+        val seen = suggestions.mapTo(HashSet()) { it.mWord }
+        // a few lengths only, each one is a full dictionary lookup: close to the word first, then short enough to surely fill
+        val prefixLengths = listOf(length - 1, length - 2, length / 2, 2, 1).filter { it in 1 until length }.distinct()
+        for (prefixLength in prefixLengths) {
+            val prefix = word.substring(0, word.offsetByCodePoints(0, prefixLength))
+            if (looserMatchesCache.size > LOOSER_MATCHES_CACHE_SIZE) looserMatchesCache.clear()
+            val results = looserMatchesCache.getOrPut(prefix) {
+                mDictionaryFacilitator.getSuggestionResults(ComposedData.createForWord(prefix), ngramContext, keyboard,
+                    settingsValuesForSuggestion, SESSION_ID_TYPING, SuggestedWords.INPUT_STYLE_TYPING)
+            }
+            for (info in transform(results)) {
+                if (info.mScore < SUPPRESS_SUGGEST_THRESHOLD || !seen.add(info.mWord)) continue
+                suggestions.add(info)
+                if (suggestions.size >= target) return
+            }
+        }
+    }
+
     /** get suggestions based on the current ngram context, with an empty typed word (that's what next word suggestions do)  */
     private fun getNextWordSuggestions(ngramContext: NgramContext, keyboard: Keyboard, inputStyle: Int,
                                        settingsValuesForSuggestion: SettingsValuesForSuggestion): SuggestionResults {
@@ -382,6 +429,11 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
 
         // Close to -2**31
         private const val SUPPRESS_SUGGEST_THRESHOLD = -2000000000
+
+        private const val LOOSER_MATCHES_CACHE_SIZE = 40
+
+        /** How many words the suggestion strip needs to fill its width twice, kept up to date by SuggestionStripLayoutHelper. */
+        @JvmStatic @Volatile var stripFillTarget = 24
 
         private const val MAXIMUM_AUTO_CORRECT_LENGTH_FOR_GERMAN = 12
         // TODO: should we add Finnish here?

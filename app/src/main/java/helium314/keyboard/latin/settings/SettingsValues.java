@@ -105,6 +105,7 @@ public class SettingsValues {
     public final boolean mSuggestPunctuation;
     public final boolean mCenterSuggestionTextToEnter;
     public final boolean mGestureInputEnabled;
+    public final float mGestureCapsHeight; // in key heights, see Defaults.PREF_GESTURE_CAPS_HEIGHT
     public final String mGestureDecoderScorer; // scorer of the in-tree gesture decoder (lab flavor): hybrid | kushler | shark2
     public final boolean mGestureTrailEnabled;
     public final boolean mGestureFloatingPreviewTextEnabled;
@@ -250,6 +251,7 @@ public class SettingsValues {
         mGestureInputEnabled = (JniUtils.sHaveGestureLib || BuildConfig.USE_OWN_GESTURE_DECODER)
                 && prefs.getBoolean(Settings.PREF_GESTURE_INPUT, Defaults.PREF_GESTURE_INPUT);
         mGestureDecoderScorer = prefs.getString(DebugSettings.PREF_GESTURE_DECODER_SCORER, Defaults.PREF_GESTURE_DECODER_SCORER);
+        mGestureCapsHeight = prefs.getInt(Settings.PREF_GESTURE_CAPS_HEIGHT, Defaults.PREF_GESTURE_CAPS_HEIGHT) / 100f;
         mGestureTrailEnabled = prefs.getBoolean(Settings.PREF_GESTURE_PREVIEW_TRAIL, Defaults.PREF_GESTURE_PREVIEW_TRAIL);
         mGestureFloatingPreviewTextEnabled = !mInputAttributes.mDisableGestureFloatingPreviewText
                 && prefs.getBoolean(Settings.PREF_GESTURE_FLOATING_PREVIEW_TEXT, Defaults.PREF_GESTURE_FLOATING_PREVIEW_TEXT);

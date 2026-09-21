@@ -192,6 +192,11 @@
     <string name="gesture_space_aware">Phrase gesture</string>
     <!-- Description for "gesture_space_aware" option. The user can input multiple words by gliding through the space key during a gesture input.-->
     <string name="gesture_space_aware_summary">Input spaces during gestures by gliding to the space key</string>
+    <!-- Title of the setting for how far a swipe has to leave the keyboard upwards to capitalize a letter -->
+    <string name="gesture_caps_height">Swipe-up capitalization strictness</string>
+    <string name="gesture_caps_height_summary">How far above the keyboard a swipe has to go to capitalize the letter it left from</string>
+    <!-- Value of the swipe-up capitalization strictness setting, %s is a number like 0.75 -->
+    <string name="gesture_caps_height_value">%s key heights</string>
     <!-- Title of the setting to adjust the fast-typing gesture cooldown-->
     <string name="gesture_fast_typing_cooldown">Rapid typing cooldown</string>
     <!-- The text that represents no cooldown-->

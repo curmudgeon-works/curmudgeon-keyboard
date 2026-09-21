@@ -366,7 +366,7 @@ fun createAppearanceSettings(context: Context) = listOf(
             name = setting.title,
             key = setting.key,
             default = Defaults.PREF_SUGGESTION_WORD_PADDING,
-            range = 2f..30f,
+            range = 0f..30f,
             description = { "$it dp" }
         )
     },
