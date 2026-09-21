@@ -71,6 +71,7 @@ public class SettingsValues {
     public final boolean mLocalizedNumberRow;
     public final boolean mShowNumberRowHints;
     public final boolean mShowsHints;
+    public final boolean mShowLetterHints;
     public final boolean mShowsPopupHints;
     public final boolean mShowTldPopupKeys;
     public final boolean mRecordGestureCorpus; // opt-in local JSONL log of real swipes (M4 tuning data)
@@ -203,6 +204,7 @@ public class SettingsValues {
         mLocalizedNumberRow = SubtypeUtilsKt.getHasLocalizedNumberRow(selectedSubtype, prefs);
         mShowNumberRowHints = prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW_HINTS, Defaults.PREF_SHOW_NUMBER_ROW_HINTS);
         mShowsHints = prefs.getBoolean(Settings.PREF_SHOW_HINTS, Defaults.PREF_SHOW_HINTS);
+        mShowLetterHints = prefs.getBoolean(Settings.PREF_SHOW_LETTER_HINTS, Defaults.PREF_SHOW_LETTER_HINTS);
         mShowsPopupHints = prefs.getBoolean(Settings.PREF_SHOW_POPUP_HINTS, Defaults.PREF_SHOW_POPUP_HINTS);
         mShowTldPopupKeys = prefs.getBoolean(Settings.PREF_SHOW_TLD_POPUP_KEYS, Defaults.PREF_SHOW_TLD_POPUP_KEYS);
         mRecordGestureCorpus = prefs.getBoolean(Settings.PREF_RECORD_GESTURE_CORPUS, Defaults.PREF_RECORD_GESTURE_CORPUS);
