@@ -614,6 +614,16 @@ abstract public class ExpandableBinaryDictionary extends Dictionary {
      * Returns dictionary content required for syncing.
      */
     public WordProperty[] getWordPropertiesForSyncing() {
+        // Concurrent walks over the same dictionary interleave and return truncated or duplicated lists
+        // (observed: 5722 / 2817 / 8836 words for one store), so only one dump runs at a time.
+        synchronized (sWordPropertiesDumpLock) {
+            return getWordPropertiesForSyncingLocked();
+        }
+    }
+
+    private static final Object sWordPropertiesDumpLock = new Object();
+
+    private WordProperty[] getWordPropertiesForSyncingLocked() {
         reloadDictionaryIfRequired();
         final AsyncResultHolder<WordProperty[]> result =
                 new AsyncResultHolder<>("WordPropertiesForSync");
