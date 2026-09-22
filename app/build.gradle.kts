@@ -87,15 +87,7 @@ android {
                 variant.proguardFiles.add(project.layout.buildDirectory.file(project.buildFile.parent + "/dontoptimize.pro"))
                 variant.proguardFiles.add(project.layout.buildDirectory.file(project.buildFile.parent + "/proguard-rules.pro"))
             }
-            if (variant.flavorName == "play") {
-                // Play ships en-US only (docs/dictionary-plan.md, phase 0); drop the other 17 bundled dictionaries
-                variant.androidResources.ignoreAssetsPatterns = listOf(
-                    "main_bg.dict", "main_bn.dict", "main_de.dict", "main_el.dict", "main_en-GB.dict",
-                    "main_es.dict", "main_fr.dict", "main_hu.dict", "main_it.dict", "main_nl.dict",
-                    "main_pl.dict", "main_pt-BR.dict", "main_pt-PT.dict", "main_ro.dict", "main_ru.dict",
-                    "main_sv.dict", "main_tr.dict"
-                )
-            }
+            // the play flavor ships all bundled dictionaries, like upstream (~40 MB APK; en-US only was ~9 MB)
             variant.outputs.forEach { output ->
                 if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
                     // keep the historical name for the normal flavor, distinct names for lab and play
