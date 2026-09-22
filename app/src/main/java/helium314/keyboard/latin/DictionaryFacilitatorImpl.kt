@@ -31,6 +31,7 @@ import helium314.keyboard.latin.permissions.PermissionsUtil
 import helium314.keyboard.latin.personalization.UserHistoryDictionary
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsValuesForSuggestion
+import helium314.keyboard.latin.utils.LanguagePriority
 import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.SuggestionResults
@@ -109,6 +110,8 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
     override fun getMainLocale(): Locale {
         return dictionaryGroups[0].locale
     }
+
+    override fun getLocales(): List<Locale> = dictionaryGroups.map { it.locale }
 
     override fun getCurrentLocale(): Locale {
         return currentlyPreferredDictionaryGroup.locale
@@ -521,9 +524,15 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         proximityInfoHandle: Long, weightOfLangModelVsSpatialModel: FloatArray, dictGroup: DictionaryGroup
     ): List<SuggestedWordInfo> {
         val suggestions = ArrayList<SuggestedWordInfo>()
-        val weightForLocale = dictGroup.getWeightForLocale(dictionaryGroups, composedData.mIsBatchMode)
+        val prefs = Settings.getCurrentContext()?.prefs()
+        // the user's fixed priority for the language, on top of the automatic confidence
+        val groupWeight = dictGroup.getWeightForLocale(dictionaryGroups, composedData.mIsBatchMode) *
+                (prefs?.let { LanguagePriority.factor(it, dictGroup.locale) } ?: 1f)
+        val historyShared = prefs?.let { LanguagePriority.sharesUserHistory(it, dictGroup.locale) } ?: false
         for (dictType in DictionaryFacilitator.ALL_DICTIONARY_TYPES) {
             val dictionary = dictGroup.getDict(dictType) ?: continue
+            // words learned in a language that shares them count like the highest priority language
+            val weightForLocale = if (historyShared && dictType == Dictionary.TYPE_USER_HISTORY) 1f else groupWeight
             val dictionarySuggestions = dictionary.getSuggestions(composedData, ngramContext, proximityInfoHandle,
                 settingsValuesForSuggestion, sessionId, weightForLocale, weightOfLangModelVsSpatialModel
             ) ?: continue
@@ -644,7 +653,9 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         }
 
         private fun getUsedLocales(mainLocale: Locale, context: Context): Collection<Locale> {
-            val locales = hashSetOf(mainLocale)
+            // insertion order matters: the first locale becomes dictionaryGroups[0], the main one; with a HashSet a
+            // secondary locale could end up there, so e.g. the own gesture decoder swiped in hi-Latn on an en-US subtype
+            val locales = linkedSetOf(mainLocale)
             // adding secondary locales is a bit tricky since they depend on the subtype
             // but usually this is called with the selected subtype locale
             val selectedSubtype = SubtypeSettings.getSelectedSubtype(context.prefs())

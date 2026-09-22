@@ -50,6 +50,41 @@ object GestureDecoderVocabulary {
 
     private val cache = ConcurrentHashMap<String, Vocabulary>()
     private val building = ConcurrentHashMap.newKeySet<String>()
+    // main-dict entries per locale, kept so multilingual vocabularies can be merged from them
+    private val mainEntries = ConcurrentHashMap<String, List<Pair<String, Int>>>()
+    private val merged = ConcurrentHashMap<String, Vocabulary>()
+
+    /** One language of a multilingual keyboard: its score factor from the priority setting, and whether its learned words count for every language. */
+    class LocaleSpec(val locale: Locale, val factor: Float, val sharesHistory: Boolean) {
+        val key get() = "${locale.toLanguageTag()}*$factor*$sharesHistory"
+    }
+
+    /**
+     * Vocabulary for a multilingual keyboard: the per-locale vocabularies merged, each locale's words
+     * scaled by its [LocaleSpec.factor]. Learned words are scaled the same way unless the locale shares
+     * them. Null (and per-locale builds kicked off) until every locale's vocabulary exists.
+     */
+    fun getOrBuildAsync(specs: List<LocaleSpec>): Vocabulary? {
+        if (specs.size == 1 && specs[0].factor == 1f) return getOrBuildAsync(specs[0].locale)
+        val key = specs.joinToString("|") { it.key }
+        merged[key]?.let { return it }
+        var allReady = true
+        for (spec in specs) if (getOrBuildAsync(spec.locale) == null) allReady = false
+        if (!allReady) return null
+        val context = Settings.getCurrentContext() ?: return null
+        val vocab = Vocabulary(emptyList())
+        for (spec in specs) {
+            val entries = mainEntries[spec.locale.toLanguageTag()] ?: continue
+            for ((word, freq) in entries) vocab.add(word, (freq * spec.factor).toInt().coerceAtLeast(MIN_PROBABILITY))
+            val historyFactor = if (spec.sharesHistory) 1f else spec.factor
+            for ((word, freq) in historyEntries(context, spec.locale, retries = 0))
+                vocab.add(word, (freq * historyFactor).toInt().coerceAtLeast(MIN_PROBABILITY))
+        }
+        if (vocab.size == 0) return null
+        Log.d(TAG, "merged vocabulary for $key: ${vocab.size} words")
+        merged[key] = vocab
+        return vocab
+    }
 
     /** Cached vocabulary for [locale], or null (and an async build is kicked off). */
     fun getOrBuildAsync(locale: Locale): Vocabulary? {
@@ -76,7 +111,10 @@ object GestureDecoderVocabulary {
      * live on every load, so e.g. a backup restore's words appear on the next reload
      * without a dead-swipe window.
      */
-    fun clear() = cache.clear()
+    fun clear() {
+        cache.clear()
+        merged.clear()
+    }
 
     private fun loadOrBuild(locale: Locale, key: String) {
         val context = Settings.getCurrentContext() ?: return
@@ -118,9 +156,14 @@ object GestureDecoderVocabulary {
     /** Build the trie from the main-dict entries, merge live user history, publish it. Returns merged count. */
     private fun publishNow(key: String, locale: Locale, context: Context, mainEntries: List<Pair<String, Int>>): Int {
         val vocab = Vocabulary(mainEntries)
-        val merged = mergeUserHistory(context, locale, vocab)
-        if (vocab.size > 0) cache[key] = vocab
-        return merged
+        val history = historyEntries(context, locale, HISTORY_RETRIES)
+        for ((word, freq) in history) vocab.add(word, freq)
+        if (vocab.size > 0) {
+            cache[key] = vocab
+            this.mainEntries[key] = mainEntries
+            merged.clear() // multilingual vocabularies containing this locale are rebuilt on the next swipe
+        }
+        return history.size
     }
 
     /**
@@ -142,28 +185,26 @@ object GestureDecoderVocabulary {
      * are never evicted by the cap. [Vocabulary.add] keeps the higher frequency, so
      * this is a max-merge.
      */
-    private fun mergeUserHistory(context: Context, locale: Locale, vocab: Vocabulary): Int {
+    private fun historyEntries(context: Context, locale: Locale, retries: Int): List<Pair<String, Int>> {
         try {
             val history = PersonalizationHelper.getUserHistoryDictionary(context, locale)
             var props = history.wordPropertiesForSyncing
             var attempts = 0
-            while (props.isEmpty() && attempts++ < HISTORY_RETRIES) {
+            while (props.isEmpty() && attempts++ < retries) {
                 Thread.sleep(HISTORY_RETRY_DELAY_MS)
                 props = history.wordPropertiesForSyncing
             }
-            var merged = 0
+            val entries = ArrayList<Pair<String, Int>>(props.size)
             for (wp in props) {
                 val word = wp.mWord ?: continue
                 if (!isDecodableWord(word)) continue
-                val boosted = (wp.probability + USER_HISTORY_BOOST).coerceIn(1, 255)
-                vocab.add(word, boosted)
-                merged++
+                entries.add(word to (wp.probability + USER_HISTORY_BOOST).coerceIn(1, 255))
             }
-            Log.d(TAG, "merged $merged user-history words for $locale (after $attempts empty reads)")
-            return merged
+            Log.d(TAG, "read ${entries.size} user-history words for $locale (after $attempts empty reads)")
+            return entries
         } catch (t: Throwable) {
-            Log.w(TAG, "could not merge user history for $locale", t)
-            return 0
+            Log.w(TAG, "could not read user history for $locale", t)
+            return emptyList()
         }
     }
 

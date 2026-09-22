@@ -284,7 +284,7 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
         // (constant-false flag in the normal flavor, so R8 keeps the native path only)
         val suggestionResults = if (BuildConfig.USE_OWN_GESTURE_DECODER)
             OwnGestureDecoder.getSuggestionResults(wordComposer.composedDataSnapshot, keyboard,
-                mDictionaryFacilitator.mainLocale, Settings.getValues().mGestureDecoderScorer,
+                mDictionaryFacilitator.locales, Settings.getValues().mGestureDecoderScorer,
                 Settings.getValues().mGestureCapsHeight)
         else mDictionaryFacilitator.getSuggestionResults(
             wordComposer.composedDataSnapshot, ngramContext, keyboard,

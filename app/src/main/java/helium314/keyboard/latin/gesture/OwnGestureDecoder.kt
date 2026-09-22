@@ -19,9 +19,12 @@ import helium314.keyboard.latin.SuggestedWords.SuggestedWordInfo
 import helium314.keyboard.latin.common.ComposedData
 import helium314.keyboard.latin.dictionary.Dictionary
 import helium314.keyboard.latin.settings.Defaults
+import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsValuesForSuggestion
+import helium314.keyboard.latin.utils.LanguagePriority
 import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.SuggestionResults
+import helium314.keyboard.latin.utils.prefs
 import java.lang.ref.WeakReference
 import java.util.Locale
 
@@ -72,17 +75,24 @@ object OwnGestureDecoder {
     fun getSuggestionResults(
         composedData: ComposedData,
         keyboard: Keyboard,
-        locale: Locale,
+        locales: List<Locale>,
         activeScorerPref: String?,
         capsHeight: Float,
     ): SuggestionResults {
         val results = SuggestionResults(SuggestedWords.MAX_SUGGESTIONS, false, false)
+        val locale = locales.first()
         val points = adaptPointers(composedData)
         if (points.size < 2) return results
         val geometry = geometryFor(keyboard) ?: return results
-        val vocabulary = GestureDecoderVocabulary.getOrBuildAsync(locale)
+        val prefs = Settings.getCurrentContext()?.prefs()
+        val specs = locales.map {
+            GestureDecoderVocabulary.LocaleSpec(it,
+                prefs?.let { p -> LanguagePriority.factor(p, it) } ?: 1f,
+                prefs?.let { p -> LanguagePriority.sharesUserHistory(p, it) } ?: false)
+        }
+        val vocabulary = GestureDecoderVocabulary.getOrBuildAsync(specs)
         if (vocabulary == null) {
-            Log.d(TAG, "vocabulary for $locale not ready yet, no gesture results")
+            Log.d(TAG, "vocabulary for $locales not ready yet, no gesture results")
             return results
         }
 

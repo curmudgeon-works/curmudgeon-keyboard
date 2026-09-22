@@ -98,6 +98,8 @@ class SingleDictionaryFacilitator(private val dict: Dictionary) : DictionaryFaci
 
     override fun getMainLocale(): Locale = dict.mLocale
 
+    override fun getLocales(): List<Locale> = listOf(dict.mLocale)
+
     override fun getCurrentLocale(): Locale = mainLocale
 
     override fun usesSameSettings(locales: List<Locale>, contacts: Boolean, apps: Boolean, personalization: Boolean): Boolean {
