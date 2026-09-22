@@ -102,7 +102,9 @@ fun MainSettingsScreen(
                     onClick = onClickLayouts,
                     icon = R.drawable.ic_ime_switcher
                 ) { NextScreenIcon() }
-                Preference(
+                // per-language dictionaries are managed from the languages list; this screen keeps the
+                // dictionaries for all languages (emoji etc.), so advanced only
+                if (advanced) Preference(
                     name = stringResource(R.string.dictionary_settings_category),
                     onClick = onClickDictionaries,
                     icon = R.drawable.ic_dictionary
