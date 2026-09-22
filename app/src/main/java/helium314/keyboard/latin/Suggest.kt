@@ -24,6 +24,7 @@ import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsValuesForSuggestion
 import helium314.keyboard.latin.suggestions.SuggestionStripView
 import helium314.keyboard.latin.utils.AutoCorrectionUtils
+import helium314.keyboard.latin.utils.FrequentLongWords
 import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.SuggestionResults
 import java.util.Locale
@@ -145,6 +146,20 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
                     SuggestedWordInfo(capitalizedTypedWord, "", 0, SuggestedWordInfo.KIND_TYPED,
                         Dictionary.DICTIONARY_USER_TYPED, SuggestedWordInfo.NOT_AN_INDEX, SuggestedWordInfo.NOT_A_CONFIDENCE)
                 )
+            }
+        }
+        if (!resultsArePredictions) {
+            // often typed long words / addresses that start with what was typed: an early slot, right after the
+            // typed word and the best suggestion, since the engine's per-character completion cost keeps them late
+            val context = Settings.getCurrentContext()
+            if (context != null) {
+                val frequent = FrequentLongWords.matching(context, mDictionaryFacilitator.locales, wordComposer.typedWord)
+                var slot = min(2, suggestionsList.size)
+                for (info in frequent) {
+                    suggestionsList.removeAll { it.mWord == info.mWord } // already there further down: move it up
+                    suggestionsList.add(min(slot, suggestionsList.size), info)
+                    slot++
+                }
             }
         }
         if (!resultsArePredictions)
