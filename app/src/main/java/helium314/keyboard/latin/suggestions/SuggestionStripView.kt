@@ -25,8 +25,11 @@ import android.view.ViewGroup
 import android.view.accessibility.AccessibilityEvent
 import android.widget.ImageButton
 import android.widget.HorizontalScrollView
+import android.graphics.Typeface
+import android.widget.ImageView
+import android.widget.PopupWindow
+import android.view.Gravity
 import android.widget.LinearLayout
-import android.widget.PopupMenu
 import android.widget.RelativeLayout
 import android.widget.TextView
 import androidx.core.view.doOnLayout
@@ -411,15 +414,59 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         // the word as typed can't be removed from anything
         if (info.mSourceDict == Dictionary.DICTIONARY_USER_TYPED || info.mSourceDict == Dictionary.DICTIONARY_HARDCODED)
             return false
-        // a menu instead of upstream's bin icon that needed a second, precise tap
-        val menu = PopupMenu(context, wordView)
-        menu.menu.add(context.getString(R.string.remove_suggestion, info.word)).setOnMenuItemClickListener {
-            removeSuggestion(wordView)
-            true
-        }
-        menu.setOnDismissListener { wordView.isPressed = false }
-        menu.show()
+        // a card above the strip instead of upstream's bin icon that needed a second, precise tap
+        showRemoveSuggestionCard(wordView, info.word)
         return true
+    }
+
+    /** Keyboard-themed card floating above the strip: the word, a bin icon and Remove / Cancel. */
+    private fun showRemoveSuggestionCard(wordView: TextView, word: String) {
+        val colors = Settings.getValues().mColors
+        val density = resources.displayMetrics.density
+        fun dp(v: Int) = (v * density).toInt()
+        val card = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(16), dp(10), dp(8), dp(10))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(14).toFloat()
+                setColor(colors.get(ColorType.MORE_SUGGESTIONS_BACKGROUND))
+            }
+            elevation = dp(6).toFloat()
+        }
+        val icon = ImageView(context).apply {
+            setImageDrawable(KeyboardIconsSet.instance.getNewDrawable(KeyboardIconsSet.NAME_BIN, context))
+            colors.setColor(this, ColorType.REMOVE_SUGGESTION_ICON)
+            layoutParams = LinearLayout.LayoutParams(dp(22), dp(22)).apply { marginEnd = dp(10) }
+        }
+        val label = TextView(context).apply {
+            text = context.getString(R.string.remove_suggestion, word)
+            setTextColor(colors.get(ColorType.KEY_TEXT))
+            textSize = 15f
+            maxWidth = dp(220)
+        }
+        fun button(textId: Int, accent: Boolean, onClick: () -> Unit) = TextView(context).apply {
+            text = context.getString(textId).uppercase()
+            setTextColor(colors.get(if (accent) ColorType.SUGGESTION_AUTO_CORRECT else ColorType.KEY_TEXT))
+            textSize = 14f
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            setOnClickListener { onClick() }
+        }
+        val popup = PopupWindow(card, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, true)
+        card.addView(icon)
+        card.addView(label)
+        card.addView(button(android.R.string.cancel, false) { popup.dismiss() })
+        card.addView(button(R.string.remove, true) { removeSuggestion(wordView); popup.dismiss() })
+        popup.isOutsideTouchable = true
+        popup.setOnDismissListener { wordView.isPressed = false }
+        card.measure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.AT_MOST), MeasureSpec.UNSPECIFIED)
+        // centred over the word, just above the strip; clamped to the keyboard's width
+        val location = IntArray(2).also { wordView.getLocationInWindow(it) }
+        val stripLocation = IntArray(2).also { getLocationInWindow(it) }
+        val x = (location[0] + wordView.width / 2 - card.measuredWidth / 2).coerceIn(stripLocation[0], stripLocation[0] + width - card.measuredWidth)
+        val y = stripLocation[1] - card.measuredHeight - dp(6)
+        popup.showAtLocation(this, Gravity.NO_GRAVITY, x, y)
     }
 
     private fun showMoreSuggestions(): Boolean {
