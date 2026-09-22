@@ -29,10 +29,12 @@ import helium314.keyboard.latin.utils.LanguageList
 import helium314.keyboard.latin.utils.LanguagePriority
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.settings.SearchScreen
+import helium314.keyboard.settings.SettingsDestination
+import helium314.keyboard.settings.SettingsMode
 import java.util.Locale
 
 /**
- * Simple-mode Languages screen: one row per language, Off / Low / Medium / High priority and whether its learned
+ * Languages screen (both modes): one row per language, Off / Low / Medium / High priority and whether its learned
  * words count for every language. Keyboards (subtypes) are derived from it by [LanguageList]; advanced mode
  * keeps the per-keyboard [LanguageScreen].
  */
@@ -43,8 +45,11 @@ fun LanguageListScreen(
     val ctx = LocalContext.current
     var generation by remember { mutableIntStateOf(0) } // bumped after every change so the list re-sorts
     val languages = remember(generation) { LanguageList.languages(ctx) }
+    val advanced by SettingsMode.state(ctx)
     SearchScreen(
         onClickBack = onClickBack,
+        // layouts, popup order and the other per-keyboard settings live on the keyboard screens
+        menu = if (advanced) listOf(stringResource(R.string.keyboards_title) to { SettingsDestination.navigateTo(SettingsDestination.Keyboards) }) else null,
         title = {
             Column {
                 Text(stringResource(R.string.language_and_layouts_title))

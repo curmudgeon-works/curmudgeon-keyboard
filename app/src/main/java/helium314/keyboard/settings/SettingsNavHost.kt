@@ -124,10 +124,11 @@ fun SettingsNavHost(
             PersonalDictionariesScreen(onClickBack = ::goBack)
         }
         composable(SettingsDestination.Languages) {
-            // simple mode: one flat list of languages with priorities; advanced: the per-keyboard screens
-            val advanced by SettingsMode.state(LocalContext.current)
-            if (advanced) LanguageScreen(onClickBack = ::goBack)
-            else LanguageListScreen(onClickBack = ::goBack)
+            LanguageListScreen(onClickBack = ::goBack)
+        }
+        composable(SettingsDestination.Keyboards) {
+            // the per-keyboard (subtype) screens: layouts, popup order etc., reached from the languages list in advanced mode
+            LanguageScreen(onClickBack = ::goBack)
         }
         composable(SettingsDestination.Dictionaries) {
             DictionaryScreen(onClickBack = ::goBack)
@@ -166,6 +167,7 @@ object SettingsDestination {
     const val PersonalDictionaries = "personal_dictionaries"
     const val PersonalDictionary = "personal_dictionary/"
     const val Languages = "languages"
+    const val Keyboards = "keyboards"
     const val Subtype = "subtype/"
     const val Layouts = "layouts"
     const val Dictionaries = "dictionaries"
