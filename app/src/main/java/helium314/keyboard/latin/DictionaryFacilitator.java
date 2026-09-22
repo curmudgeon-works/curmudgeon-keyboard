@@ -83,6 +83,9 @@ public interface DictionaryFacilitator {
     /** the locale provided in resetDictionaries */
     @NonNull Locale getMainLocale();
 
+    /** Locales of all loaded dictionary groups, main locale first. */
+    @NonNull List<Locale> getLocales();
+
     /** the most "trusted" locale, differs from getMainLocale only if multilingual typing is used */
     @NonNull Locale getCurrentLocale();
 

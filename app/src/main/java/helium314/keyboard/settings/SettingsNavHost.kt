@@ -23,6 +23,8 @@ import helium314.keyboard.settings.screens.ColorsScreen
 import helium314.keyboard.settings.screens.DebugScreen
 import helium314.keyboard.settings.screens.DictionaryScreen
 import helium314.keyboard.settings.screens.GestureTypingScreen
+import androidx.compose.runtime.getValue
+import helium314.keyboard.settings.screens.LanguageListScreen
 import helium314.keyboard.settings.screens.LanguageScreen
 import helium314.keyboard.settings.screens.MainSettingsScreen
 import helium314.keyboard.settings.screens.PersonalDictionariesScreen
@@ -122,7 +124,10 @@ fun SettingsNavHost(
             PersonalDictionariesScreen(onClickBack = ::goBack)
         }
         composable(SettingsDestination.Languages) {
-            LanguageScreen(onClickBack = ::goBack)
+            // simple mode: one flat list of languages with priorities; advanced: the per-keyboard screens
+            val advanced by SettingsMode.state(LocalContext.current)
+            if (advanced) LanguageScreen(onClickBack = ::goBack)
+            else LanguageListScreen(onClickBack = ::goBack)
         }
         composable(SettingsDestination.Dictionaries) {
             DictionaryScreen(onClickBack = ::goBack)
