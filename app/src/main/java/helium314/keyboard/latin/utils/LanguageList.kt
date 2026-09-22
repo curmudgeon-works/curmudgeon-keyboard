@@ -44,6 +44,12 @@ object LanguageList {
     private fun setActivationOrder(context: Context, order: List<String>) =
         context.prefs().edit().putString(PREF_ACTIVATION_ORDER, order.joinToString(",")).apply()
 
+    /** The enabled keyboard (subtype) [locale] is the main or a secondary language of, if any. */
+    fun keyboardFor(locale: Locale): SettingsSubtype? =
+        SubtypeSettings.getEnabledSubtypes(true).firstOrNull { subtype ->
+            subtype.locale() == locale || locale in getSecondaryLocales(subtype.extraValue)
+        }?.toSettingsSubtype()
+
     fun hasDictionary(context: Context, locale: Locale) = locale in getDictionaryLocales(context)
 
     /** [LanguagePriority] of an enabled language, [OFF] if it is in no enabled keyboard. */

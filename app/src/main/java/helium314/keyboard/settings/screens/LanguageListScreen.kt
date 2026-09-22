@@ -32,10 +32,10 @@ import helium314.keyboard.latin.utils.prefs
 import androidx.compose.foundation.clickable
 import helium314.keyboard.latin.dictionary.Dictionary
 import helium314.keyboard.latin.utils.DictionaryInfoUtils
-import helium314.keyboard.settings.dialogs.DictionaryDialog
+import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
+import helium314.keyboard.latin.utils.SubtypeUtilsAdditional
 import helium314.keyboard.settings.SearchScreen
 import helium314.keyboard.settings.SettingsDestination
-import helium314.keyboard.settings.SettingsMode
 import java.util.Locale
 
 /**
@@ -50,11 +50,10 @@ fun LanguageListScreen(
     val ctx = LocalContext.current
     var generation by remember { mutableIntStateOf(0) } // bumped after every change so the list re-sorts
     val languages = remember(generation) { LanguageList.languages(ctx) }
-    val advanced by SettingsMode.state(ctx)
     SearchScreen(
         onClickBack = onClickBack,
         // layouts, popup order and the other per-keyboard settings live on the keyboard screens
-        menu = if (advanced) listOf(stringResource(R.string.keyboards_title) to { SettingsDestination.navigateTo(SettingsDestination.Keyboards) }) else null,
+        menu = listOf(stringResource(R.string.keyboards_title) to { SettingsDestination.navigateTo(SettingsDestination.Keyboards) }),
         title = {
             Column {
                 Text(stringResource(R.string.language_and_layouts_title))
@@ -81,10 +80,8 @@ private fun LanguageRow(locale: Locale, onChanged: () -> Unit) {
     var priority by remember(locale) { mutableIntStateOf(LanguageList.priority(ctx, locale)) }
     var shared by remember(locale) { mutableStateOf(LanguagePriority.sharesUserHistory(ctx.prefs(), locale)) }
     var showNoDictDialog by remember { mutableStateOf(false) }
-    var dictGeneration by remember { mutableIntStateOf(0) }
-    var showDictionaryDialog by remember { mutableStateOf(false) }
     // which dictionaries the language has: built-in main, added main, add-ons (emoji, symbols, ...)
-    val dictionaryTypes = remember(locale, dictGeneration) {
+    val dictionaryTypes = remember(locale) {
         val (dicts, hasInternal) = getUserAndInternalDictionaries(ctx, locale)
         val types = dicts.mapTo(mutableListOf()) { it.name.substringBefore("_${DictionaryInfoUtils.USER_DICTIONARY_SUFFIX}") }
         if (hasInternal && !types.contains(Dictionary.TYPE_MAIN)) types.add(0, ctx.getString(R.string.internal_dictionary_summary))
@@ -95,8 +92,11 @@ private fun LanguageRow(locale: Locale, onChanged: () -> Unit) {
     val nameColor = if (hasDictionary) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp, horizontal = 16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            // tapping the name manages the language's dictionaries (the same dialog as the Dictionaries screen)
-            Column(modifier = Modifier.weight(1f).clickable { showDictionaryDialog = true }) {
+            // tapping the name opens the language's keyboard screen (layouts, dictionaries, popup order, ...) like the old list did
+            Column(modifier = Modifier.weight(1f).clickable {
+                val keyboard = LanguageList.keyboardFor(locale) ?: SubtypeUtilsAdditional.createDefaultSubtype(locale).toSettingsSubtype()
+                SettingsDestination.navigateTo(SettingsDestination.Subtype + keyboard.toPref())
+            }) {
                 Text(locale.localizedDisplayName(ctx.resources), style = MaterialTheme.typography.bodyLarge, color = nameColor)
                 Text(
                     if (hasDictionary) dictionaryTypes.joinToString(", ") else stringResource(R.string.no_dictionary_short),
@@ -131,8 +131,6 @@ private fun LanguageRow(locale: Locale, onChanged: () -> Unit) {
         }
         if (showNoDictDialog)
             MissingDictionaryDialog({ showNoDictDialog = false }, locale)
-        if (showDictionaryDialog)
-            DictionaryDialog({ showDictionaryDialog = false; dictGeneration++; onChanged() }, locale)
         if (priority != LanguageList.OFF) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Text(
