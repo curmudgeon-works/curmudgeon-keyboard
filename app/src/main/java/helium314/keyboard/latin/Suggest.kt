@@ -25,6 +25,7 @@ import helium314.keyboard.latin.settings.SettingsValuesForSuggestion
 import helium314.keyboard.latin.suggestions.SuggestionStripView
 import helium314.keyboard.latin.utils.AutoCorrectionUtils
 import helium314.keyboard.latin.utils.FrequentLongWords
+import helium314.keyboard.latin.utils.HotWords
 import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.SuggestionResults
 import java.util.Locale
@@ -159,6 +160,14 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
                     suggestionsList.removeAll { it.mWord == info.mWord } // already there further down: move it up
                     suggestionsList.add(min(slot, suggestionsList.size), info)
                     slot++
+                }
+                // words typed several times just now: right after the typed word, ahead of everything the dictionaries say
+                val hotSource = suggestionsList.firstOrNull()?.mSourceDict ?: typedWordInfo.mSourceDict
+                var hotSlot = min(1, suggestionsList.size)
+                for (info in HotWords.matching(wordComposer.typedWord, hotSource)) {
+                    suggestionsList.removeAll { it.mWord == info.mWord }
+                    suggestionsList.add(min(hotSlot, suggestionsList.size), info)
+                    hotSlot++
                 }
             }
         }
