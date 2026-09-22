@@ -29,6 +29,10 @@ import helium314.keyboard.latin.utils.LanguageList
 import helium314.keyboard.latin.utils.LanguagePriority
 import helium314.keyboard.latin.utils.MissingDictionaryDialog
 import helium314.keyboard.latin.utils.prefs
+import androidx.compose.foundation.clickable
+import helium314.keyboard.latin.dictionary.Dictionary
+import helium314.keyboard.latin.utils.DictionaryInfoUtils
+import helium314.keyboard.settings.dialogs.DictionaryDialog
 import helium314.keyboard.settings.SearchScreen
 import helium314.keyboard.settings.SettingsDestination
 import helium314.keyboard.settings.SettingsMode
@@ -77,19 +81,28 @@ private fun LanguageRow(locale: Locale, onChanged: () -> Unit) {
     var priority by remember(locale) { mutableIntStateOf(LanguageList.priority(ctx, locale)) }
     var shared by remember(locale) { mutableStateOf(LanguagePriority.sharesUserHistory(ctx.prefs(), locale)) }
     var showNoDictDialog by remember { mutableStateOf(false) }
+    var dictGeneration by remember { mutableIntStateOf(0) }
+    var showDictionaryDialog by remember { mutableStateOf(false) }
+    // which dictionaries the language has: built-in main, added main, add-ons (emoji, symbols, ...)
+    val dictionaryTypes = remember(locale, dictGeneration) {
+        val (dicts, hasInternal) = getUserAndInternalDictionaries(ctx, locale)
+        val types = dicts.mapTo(mutableListOf()) { it.name.substringBefore("_${DictionaryInfoUtils.USER_DICTIONARY_SUFFIX}") }
+        if (hasInternal && !types.contains(Dictionary.TYPE_MAIN)) types.add(0, ctx.getString(R.string.internal_dictionary_summary))
+        types
+    }
     // no dictionary = no suggestions for it: faded, at the bottom of the list
-    val hasDictionary = remember(locale) { LanguageList.hasDictionary(ctx, locale) }
+    val hasDictionary = dictionaryTypes.isNotEmpty()
     val nameColor = if (hasDictionary) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp, horizontal = 16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.weight(1f)) {
+            // tapping the name manages the language's dictionaries (the same dialog as the Dictionaries screen)
+            Column(modifier = Modifier.weight(1f).clickable { showDictionaryDialog = true }) {
                 Text(locale.localizedDisplayName(ctx.resources), style = MaterialTheme.typography.bodyLarge, color = nameColor)
-                if (!hasDictionary)
-                    Text(
-                        stringResource(R.string.no_dictionary_short),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = nameColor
-                    )
+                Text(
+                    if (hasDictionary) dictionaryTypes.joinToString(", ") else stringResource(R.string.no_dictionary_short),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = nameColor
+                )
             }
             val options = listOf(
                 LanguageList.OFF to stringResource(R.string.language_priority_off),
@@ -118,6 +131,8 @@ private fun LanguageRow(locale: Locale, onChanged: () -> Unit) {
         }
         if (showNoDictDialog)
             MissingDictionaryDialog({ showNoDictDialog = false }, locale)
+        if (showDictionaryDialog)
+            DictionaryDialog({ showDictionaryDialog = false; dictGeneration++; onChanged() }, locale)
         if (priority != LanguageList.OFF) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Text(
