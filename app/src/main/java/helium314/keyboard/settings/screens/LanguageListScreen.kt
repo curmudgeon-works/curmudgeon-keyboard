@@ -77,13 +77,20 @@ private fun LanguageRow(locale: Locale, onChanged: () -> Unit) {
     var priority by remember(locale) { mutableIntStateOf(LanguageList.priority(ctx, locale)) }
     var shared by remember(locale) { mutableStateOf(LanguagePriority.sharesUserHistory(ctx.prefs(), locale)) }
     var showNoDictDialog by remember { mutableStateOf(false) }
+    // no dictionary = no suggestions for it: faded, at the bottom of the list
+    val hasDictionary = remember(locale) { LanguageList.hasDictionary(ctx, locale) }
+    val nameColor = if (hasDictionary) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp, horizontal = 16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text(
-                locale.localizedDisplayName(ctx.resources),
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f)
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(locale.localizedDisplayName(ctx.resources), style = MaterialTheme.typography.bodyLarge, color = nameColor)
+                if (!hasDictionary)
+                    Text(
+                        stringResource(R.string.no_dictionary_short),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = nameColor
+                    )
+            }
             val options = listOf(
                 LanguageList.OFF to stringResource(R.string.language_priority_off),
                 LanguagePriority.LOW to stringResource(R.string.language_priority_low),
