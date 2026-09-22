@@ -23,6 +23,8 @@ object FrequentLongWords {
     private const val MIN_PROBABILITY = 40 // ~ level 3 of the forgetting curve: typed about three times
     private const val REFRESH_MS = 60_000L
     const val MAX_IN_STRIP = 2
+    private const val READ_ATTEMPTS = 10
+    private const val READ_RETRY_DELAY_MS = 300L
 
     private class Entry(val word: String, val lower: String, val probability: Int, val dict: Dictionary)
     private class Cache(val entries: List<Entry>, val time: Long)
@@ -57,10 +59,15 @@ object FrequentLongWords {
         Thread({
             try {
                 val history = PersonalizationHelper.getUserHistoryDictionary(context, locale)
-                val props = history.wordPropertiesForSyncing
-                // the dictionary loads asynchronously and answers with nothing until then: don't cache that, ask again next time
+                // the dump gives up after 100 ms and answers with nothing, which a big store misses on the first tries
+                var props = history.wordPropertiesForSyncing
+                var attempts = 0
+                while (props.isEmpty() && attempts++ < READ_ATTEMPTS) {
+                    Thread.sleep(READ_RETRY_DELAY_MS)
+                    props = history.wordPropertiesForSyncing
+                }
                 if (props.isEmpty()) {
-                    Log.i(TAG, "user history for $key empty (not loaded yet?), will retry")
+                    Log.i(TAG, "user history for $key still empty after $attempts attempts, will retry later")
                     return@Thread
                 }
                 val entries = props.mapNotNull { wp ->

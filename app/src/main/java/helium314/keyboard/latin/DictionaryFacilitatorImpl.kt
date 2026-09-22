@@ -31,6 +31,7 @@ import helium314.keyboard.latin.permissions.PermissionsUtil
 import helium314.keyboard.latin.personalization.UserHistoryDictionary
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsValuesForSuggestion
+import helium314.keyboard.latin.utils.HotWords
 import helium314.keyboard.latin.utils.LanguagePriority
 import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.SubtypeSettings
@@ -301,6 +302,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         putWordIntoValidSpellingWordCache("addToUserHistory", suggestion)
 
         val words = suggestion.splitOnWhitespace().dropLastWhile { it.isEmpty() }
+        words.forEach { HotWords.onWordCommitted(it) }
 
         // increase / decrease confidence
         if (words.size == 1) // ignore if more than a single word, which only happens with (badly working) spaceAwareGesture
