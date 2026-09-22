@@ -294,6 +294,7 @@
     <string name="keyboards_title">Keyboards &amp; layouts</string>
     <!-- Long-press menu on a suggestion, %s is the word -->
     <string name="remove_suggestion">Remove \"%s\" from suggestions?</string>
+    <string name="no_dictionary_short">No dictionary</string>
     <string name="language_list_summary">Higher priority languages win when matches are close</string>
     <string name="language_priority_off">Off</string>
     <string name="language_priority_low">L</string>
