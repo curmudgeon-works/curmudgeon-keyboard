@@ -29,9 +29,20 @@ object LanguageList {
         val withDictionary = getDictionaryLocales(context)
         locales.addAll(withDictionary)
         locales.addAll(SubtypeSettings.getAvailableSubtypeLocales())
-        return locales.sortedWith(compareBy({ priority(context, it) == OFF }, { it !in withDictionary },
-            { it.localizedDisplayName(context.resources) }))
+        // active languages in the order they were turned on, then the rest alphabetically
+        val order = activationOrder(context)
+        return locales.sortedWith(compareBy({ priority(context, it) == OFF },
+            { order.indexOf(it.toLanguageTag()).let { i -> if (i < 0) Int.MAX_VALUE else i } },
+            { it !in withDictionary }, { it.localizedDisplayName(context.resources) }))
     }
+
+    private const val PREF_ACTIVATION_ORDER = "language_activation_order"
+
+    private fun activationOrder(context: Context): List<String> =
+        context.prefs().getString(PREF_ACTIVATION_ORDER, "")!!.split(",").filter { it.isNotEmpty() }
+
+    private fun setActivationOrder(context: Context, order: List<String>) =
+        context.prefs().edit().putString(PREF_ACTIVATION_ORDER, order.joinToString(",")).apply()
 
     fun hasDictionary(context: Context, locale: Locale) = locale in getDictionaryLocales(context)
 
@@ -46,10 +57,19 @@ object LanguageList {
     fun setPriority(context: Context, locale: Locale, priority: Int) {
         val prefs = context.prefs()
         val on = languages(context).filter { priority(context, it) != OFF }.toMutableSet()
-        if (priority == OFF) on.remove(locale) else {
+        val order = activationOrder(context).toMutableList()
+        val tag = locale.toLanguageTag()
+        if (priority == OFF) {
+            on.remove(locale)
+            order.remove(tag)
+        } else {
             LanguagePriority.set(prefs, locale, priority)
             on.add(locale)
+            if (tag !in order) order.add(tag) // a newly turned-on language goes last among the active ones
         }
+        // languages that were active before this list existed keep their current order
+        on.map { it.toLanguageTag() }.filter { it !in order }.sorted().forEach { order.add(order.size - (if (tag in order && priority != OFF) 1 else 0), it) }
+        setActivationOrder(context, order)
         applyToSubtypes(context, on)
     }
 
