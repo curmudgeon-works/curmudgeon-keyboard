@@ -291,6 +291,7 @@
     <!-- Title for input language & layout selection screen -->
     <string name="language_and_layouts_title">Languages &amp; Layouts</string>
     <!-- Simple-mode languages list -->
+    <string name="keyboards_title">Keyboards &amp; layouts</string>
     <string name="language_list_summary">Higher priority languages win when matches are close</string>
     <string name="language_priority_off">Off</string>
     <string name="language_priority_low">L</string>
