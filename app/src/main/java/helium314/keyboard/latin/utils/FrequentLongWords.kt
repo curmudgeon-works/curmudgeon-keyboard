@@ -18,8 +18,9 @@ import java.util.concurrent.ConcurrentHashMap
  * background at most every [REFRESH_MS]; the first lookup after a start returns nothing.
  */
 object FrequentLongWords {
+    private const val TAG = "FrequentLongWords"
     private const val MIN_LENGTH = 8
-    private const val MIN_PROBABILITY = 60 // ~ level 4 of the forgetting curve: typed at least a handful of times
+    private const val MIN_PROBABILITY = 40 // ~ level 3 of the forgetting curve: typed about three times
     private const val REFRESH_MS = 60_000L
     const val MAX_IN_STRIP = 2
 
@@ -56,14 +57,22 @@ object FrequentLongWords {
         Thread({
             try {
                 val history = PersonalizationHelper.getUserHistoryDictionary(context, locale)
-                val entries = history.wordPropertiesForSyncing.mapNotNull { wp ->
+                val props = history.wordPropertiesForSyncing
+                // the dictionary loads asynchronously and answers with nothing until then: don't cache that, ask again next time
+                if (props.isEmpty()) {
+                    Log.i(TAG, "user history for $key empty (not loaded yet?), will retry")
+                    return@Thread
+                }
+                val entries = props.mapNotNull { wp ->
                     val word = wp.mWord ?: return@mapNotNull null
                     if (wp.probability < MIN_PROBABILITY || !qualifies(word)) null
                     else Entry(word, word.lowercase(), wp.probability, history)
                 }
                 caches[key] = Cache(entries, SystemClock.elapsedRealtime())
+                Log.i(TAG, "$key: ${entries.size} frequent long words of ${props.size} history words, " +
+                        "top: " + entries.sortedByDescending { it.probability }.take(5).joinToString { "${it.word}=${it.probability}" })
             } catch (t: Throwable) {
-                Log.w("FrequentLongWords", "could not read user history for $key", t)
+                Log.w(TAG, "could not read user history for $key", t)
             } finally {
                 refreshing.remove(key)
             }
