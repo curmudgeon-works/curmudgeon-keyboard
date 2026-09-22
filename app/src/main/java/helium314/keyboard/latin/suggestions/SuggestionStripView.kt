@@ -26,6 +26,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.widget.ImageButton
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
+import android.widget.PopupMenu
 import android.widget.RelativeLayout
 import android.widget.TextView
 import androidx.core.view.doOnLayout
@@ -63,7 +64,6 @@ import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.removeFirst
 import helium314.keyboard.latin.utils.removePinnedKey
 import helium314.keyboard.latin.utils.setToolbarButtonsActivatedStateOnPrefChange
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
 import kotlin.math.min
 import androidx.core.view.isGone
@@ -400,48 +400,26 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         }
     }
 
-    @SuppressLint("ClickableViewAccessibility") // no need for View#performClick, we only return false mostly anyway
     private fun onLongClickSuggestion(wordView: TextView): Boolean {
-        var showIcon = true
-        if (wordView.tag is Int) {
-            val index = wordView.tag as Int
-            val type = suggestedWords.getInfo(index).mSourceDict
-            if (type == Dictionary.DICTIONARY_USER_TYPED || type == Dictionary.DICTIONARY_HARDCODED)
-                showIcon = false
-        }
-        if (showIcon) {
-            val icon = KeyboardIconsSet.instance.getNewDrawable(KeyboardIconsSet.NAME_BIN, context)!!
-            Settings.getValues().mColors.setColor(icon, ColorType.REMOVE_SUGGESTION_ICON)
-            val w = icon.intrinsicWidth
-            val h = icon.intrinsicHeight
-            wordView.setCompoundDrawablesWithIntrinsicBounds(icon, null, null, null)
-            wordView.ellipsize = TextUtils.TruncateAt.END
-            val downOk = AtomicBoolean(false)
-            wordView.setOnTouchListener { _, motionEvent ->
-                if (motionEvent.action == MotionEvent.ACTION_UP && downOk.get()) {
-                    val x = motionEvent.x
-                    val y = motionEvent.y
-                    if (0 < x && x < w && 0 < y && y < h) {
-                        removeSuggestion(wordView)
-                        wordView.cancelLongPress()
-                        wordView.isPressed = false
-                        return@setOnTouchListener true
-                    }
-                } else if (motionEvent.action == MotionEvent.ACTION_DOWN) {
-                    val x = motionEvent.x
-                    val y = motionEvent.y
-                    if (0 < x && x < w && 0 < y && y < h) {
-                        downOk.set(true)
-                    }
-                }
-                false
-            }
-        }
+        val index = wordView.tag as? Int ?: return false
+        if (index >= suggestedWords.size()) return false
+        val info = suggestedWords.getInfo(index)
         if (DebugFlags.DEBUG_ENABLED && (isShowingMoreSuggestionPanel || !showMoreSuggestions())) {
             showSourceDict(wordView)
             return true
         }
-        return showMoreSuggestions()
+        // the word as typed can't be removed from anything
+        if (info.mSourceDict == Dictionary.DICTIONARY_USER_TYPED || info.mSourceDict == Dictionary.DICTIONARY_HARDCODED)
+            return false
+        // a menu instead of upstream's bin icon that needed a second, precise tap
+        val menu = PopupMenu(context, wordView)
+        menu.menu.add(context.getString(R.string.remove_suggestion, info.word)).setOnMenuItemClickListener {
+            removeSuggestion(wordView)
+            true
+        }
+        menu.setOnDismissListener { wordView.isPressed = false }
+        menu.show()
+        return true
     }
 
     private fun showMoreSuggestions(): Boolean {
