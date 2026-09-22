@@ -74,9 +74,9 @@ object FrequentLongWords {
                     val word = wp.mWord ?: return@mapNotNull null
                     if (wp.probability < MIN_PROBABILITY || !qualifies(word)) null
                     else Entry(word, word.lowercase(), wp.probability, history)
-                }
+                }.distinctBy { it.word }
                 caches[key] = Cache(entries, SystemClock.elapsedRealtime())
-                Log.i(TAG, "$key: ${entries.size} frequent long words of ${props.size} history words, " +
+                Log.i(TAG, "$key: ${entries.size} frequent long words of ${props.size} history words (${props.distinctBy { it.mWord }.size} distinct), " +
                         "top: " + entries.sortedByDescending { it.probability }.take(5).joinToString { "${it.word}=${it.probability}" })
             } catch (t: Throwable) {
                 Log.w(TAG, "could not read user history for $key", t)
