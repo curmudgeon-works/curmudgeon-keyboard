@@ -3,6 +3,7 @@ package helium314.keyboard.latin.utils
 
 import android.content.Context
 import helium314.keyboard.latin.common.Constants.Separators
+import helium314.keyboard.latin.common.LocaleUtils.localizedDisplayName
 import helium314.keyboard.latin.common.Constants.Subtype.ExtraValue
 import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
@@ -18,16 +19,21 @@ import java.util.Locale
 object LanguageList {
     const val OFF = 0
 
-    /** All languages the list offers: those with a dictionary plus whatever is enabled already. */
+    /** All languages the list offers: enabled ones first, then those with a dictionary, then every language with a layout. */
     fun languages(context: Context): List<Locale> {
         val locales = LinkedHashSet<Locale>()
         SubtypeSettings.getEnabledSubtypes(true).forEach { subtype ->
             locales.add(subtype.locale())
             locales.addAll(getSecondaryLocales(subtype.extraValue))
         }
-        locales.addAll(getDictionaryLocales(context))
-        return locales.sortedWith(compareBy({ priority(context, it) == OFF }, { it.toLanguageTag() }))
+        val withDictionary = getDictionaryLocales(context)
+        locales.addAll(withDictionary)
+        locales.addAll(SubtypeSettings.getAvailableSubtypeLocales())
+        return locales.sortedWith(compareBy({ priority(context, it) == OFF }, { it !in withDictionary },
+            { it.localizedDisplayName(context.resources) }))
     }
+
+    fun hasDictionary(context: Context, locale: Locale) = locale in getDictionaryLocales(context)
 
     /** [LanguagePriority] of an enabled language, [OFF] if it is in no enabled keyboard. */
     fun priority(context: Context, locale: Locale): Int {
