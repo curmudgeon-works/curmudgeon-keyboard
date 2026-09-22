@@ -67,6 +67,9 @@ import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.SubtypeUtilsAdditional
 import helium314.keyboard.latin.utils.getActivity
 import helium314.keyboard.latin.utils.getDictionaryLocales
+import helium314.keyboard.settings.dialogs.DictionaryDialog
+import helium314.keyboard.latin.dictionary.Dictionary
+import helium314.keyboard.latin.utils.DictionaryInfoUtils
 import helium314.keyboard.latin.utils.getSecondaryLocales
 import helium314.keyboard.latin.utils.getStringResourceOrName
 import helium314.keyboard.latin.utils.htmlToAnnotated
@@ -131,6 +134,7 @@ fun SubtypeScreen(
 
     val availableLocalesForScript = getAvailableSecondaryLocales(ctx, currentSubtype.locale).sortedBy { it.toLanguageTag() }
     var showSecondaryLocaleDialog by remember { mutableStateOf(false) }
+    var dictionaryDialogLocale: Locale? by remember { mutableStateOf(null) }
     var showKeyOrderDialog by remember { mutableStateOf(false) }
     var showHintOrderDialog by remember { mutableStateOf(false) }
     var showMorePopupsDialog by remember { mutableStateOf(false) }
@@ -166,6 +170,24 @@ fun SubtypeScreen(
                                 .weight(1f)
                                 .padding(start = 10.dp)
                             )
+                        }
+                    }
+                }
+                // the dictionaries of this keyboard's languages, managed here so the Dictionaries screen isn't needed for them
+                WithSmallTitle(stringResource(R.string.dictionary_settings_category)) {
+                    for (locale in listOf(currentSubtype.locale) + getSecondaryLocales(currentSubtype.extraValues)) {
+                        ActionRow(onClick = { dictionaryDialogLocale = locale }) {
+                            val (dicts, hasInternal) = getUserAndInternalDictionaries(ctx, locale)
+                            val types = dicts.mapTo(mutableListOf()) { it.name.substringBefore("_${DictionaryInfoUtils.USER_DICTIONARY_SUFFIX}") }
+                            if (hasInternal && !types.contains(Dictionary.TYPE_MAIN)) types.add(0, stringResource(R.string.internal_dictionary_summary))
+                            Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
+                                Text(locale.localizedDisplayName(ctx.resources))
+                                Text(
+                                    types.joinToString(", ").ifEmpty { stringResource(R.string.no_dictionary_short) },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
@@ -290,6 +312,7 @@ fun SubtypeScreen(
                 }
             }
         }
+        dictionaryDialogLocale?.let { DictionaryDialog({ dictionaryDialogLocale = null }, it) }
         if (showSecondaryLocaleDialog)
             MultiListPickerDialog(
                 onDismissRequest = { showSecondaryLocaleDialog = false },
