@@ -27,6 +27,7 @@ import helium314.keyboard.latin.common.LocaleUtils.localizedDisplayName
 import helium314.keyboard.latin.common.splitOnWhitespace
 import helium314.keyboard.latin.utils.LanguageList
 import helium314.keyboard.latin.utils.LanguagePriority
+import helium314.keyboard.latin.utils.MissingDictionaryDialog
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.settings.SearchScreen
 import helium314.keyboard.settings.SettingsDestination
@@ -75,6 +76,7 @@ private fun LanguageRow(locale: Locale, onChanged: () -> Unit) {
     val ctx = LocalContext.current
     var priority by remember(locale) { mutableIntStateOf(LanguageList.priority(ctx, locale)) }
     var shared by remember(locale) { mutableStateOf(LanguagePriority.sharesUserHistory(ctx.prefs(), locale)) }
+    var showNoDictDialog by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp, horizontal = 16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text(
@@ -94,6 +96,8 @@ private fun LanguageRow(locale: Locale, onChanged: () -> Unit) {
                         selected = priority == value,
                         onClick = {
                             if (priority != value) {
+                                if (priority == LanguageList.OFF && !LanguageList.hasDictionary(ctx, locale))
+                                    showNoDictDialog = true
                                 priority = value
                                 LanguageList.setPriority(ctx, locale, value)
                                 onChanged()
@@ -105,6 +109,8 @@ private fun LanguageRow(locale: Locale, onChanged: () -> Unit) {
                 }
             }
         }
+        if (showNoDictDialog)
+            MissingDictionaryDialog({ showNoDictDialog = false }, locale)
         if (priority != LanguageList.OFF) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Text(
