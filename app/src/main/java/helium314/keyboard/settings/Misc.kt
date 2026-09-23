@@ -54,6 +54,19 @@ fun WithSmallTitle(
     }
 }
 
+/** A section with a prominent heading, for the main sections of a screen. */
+@Composable
+fun WithBigTitle(
+    title: String,
+    content: @Composable () -> Unit,
+) {
+    Column {
+        Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
+        content()
+    }
+}
+
 @Composable
 fun ActionRow(
     modifier: Modifier = Modifier,
