@@ -3,6 +3,7 @@ package helium314.keyboard.settings.preferences
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -50,6 +51,7 @@ fun PreferenceCategory(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun Preference(
     name: String,
@@ -57,12 +59,13 @@ fun Preference(
     modifier: Modifier = Modifier,
     description: String? = null,
     @DrawableRes icon: Int? = null,
+    onLongClick: (() -> Unit)? = null,
     value: @Composable (RowScope.() -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .combinedClickable(onClick = { onClick() }, onLongClick = onLongClick)
             .heightIn(min = 44.dp)
             .padding(vertical = 10.dp, horizontal = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
