@@ -61,7 +61,7 @@ object SubtypeSettings {
 
         if (newSubtype !in enabledSubtypes) {
             enabledSubtypes.add(newSubtype)
-            enabledSubtypes.sortBy { it.locale().toLanguageTag() } // for consistent order
+            // order = the order keyboards were added (also the switching order); the pref string keeps it across restarts
             RichInputMethodManager.getInstance().refreshSubtypeCaches()
         }
     }
