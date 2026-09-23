@@ -70,6 +70,10 @@ import helium314.keyboard.latin.utils.getDictionaryLocales
 import helium314.keyboard.settings.dialogs.DictionaryDialog
 import helium314.keyboard.latin.dictionary.Dictionary
 import helium314.keyboard.latin.utils.DictionaryInfoUtils
+import helium314.keyboard.latin.utils.LanguagePriority
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import helium314.keyboard.latin.utils.getSecondaryLocales
 import helium314.keyboard.latin.utils.getStringResourceOrName
 import helium314.keyboard.latin.utils.htmlToAnnotated
@@ -142,8 +146,8 @@ fun SubtypeScreen(
     val customMainLayouts = LayoutUtilsCustom.getLayoutFiles(LayoutType.MAIN, ctx, currentSubtype.locale).map { it.name }
     SearchScreen(
         onClickBack = onClickBack,
-        icon = { if (currentSubtype.isAdditionalSubtype(prefs)) DeleteButton {
-            SubtypeUtilsAdditional.removeAdditionalSubtype(ctx, currentSubtype.toAdditionalSubtype())
+        icon = { if (SubtypeSettings.getEnabledSubtypes(true).size > 1 && SubtypeSettings.isEnabled(currentSubtype.toAdditionalSubtype())) DeleteButton {
+            if (currentSubtype.isAdditionalSubtype(prefs)) SubtypeUtilsAdditional.removeAdditionalSubtype(ctx, currentSubtype.toAdditionalSubtype())
             SubtypeSettings.removeEnabledSubtype(ctx, currentSubtype.toAdditionalSubtype())
             onClickBack()
         } },
@@ -160,18 +164,19 @@ fun SubtypeScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) }
-                if (availableLocalesForScript.size > 1) {
-                    WithSmallTitle(stringResource(R.string.secondary_locale)) {
-                        ActionRow(onClick = { showSecondaryLocaleDialog = true }) {
-                            val text = getSecondaryLocales(currentSubtype.extraValues).joinToString(", ") {
-                                it.localizedDisplayName(ctx.resources)
-                            }.ifEmpty { stringResource(R.string.action_none) }
-                            Text(text, modifier = Modifier
-                                .weight(1f)
-                                .padding(start = 10.dp)
-                            )
+                // the keyboard's languages: main = highest priority, the others multilingual-typing secondaries
+                WithSmallTitle(stringResource(R.string.keyboard_languages)) {
+                    val languages = listOf(currentSubtype.locale) + getSecondaryLocales(currentSubtype.extraValues)
+                    for (locale in languages) {
+                        KeyboardLanguageRow(locale, canRemove = languages.size > 1) { newPriority ->
+                            setCurrentSubtype(withLanguagePriority(ctx, currentSubtype, locale, newPriority))
                         }
                     }
+                    if (availableLocalesForScript.size > 1)
+                        ActionRow(onClick = { showSecondaryLocaleDialog = true }) {
+                            Icon(painterResource(R.drawable.ic_plus), null, modifier = Modifier.padding(start = 10.dp))
+                            Text(stringResource(R.string.add_language), modifier = Modifier.padding(start = 10.dp))
+                        }
                 }
                 // the dictionaries of this keyboard's languages, managed here so the Dictionaries screen isn't needed for them
                 WithSmallTitle(stringResource(R.string.dictionary_settings_category)) {
@@ -314,20 +319,17 @@ fun SubtypeScreen(
         }
         dictionaryDialogLocale?.let { DictionaryDialog({ dictionaryDialogLocale = null }, it) }
         if (showSecondaryLocaleDialog)
-            MultiListPickerDialog(
+            ListPickerDialog(
                 onDismissRequest = { showSecondaryLocaleDialog = false },
-                onConfirmed = { locales ->
-                    val newValue = locales.joinToString(Separators.KV) { it.toLanguageTag() }
-                    setCurrentSubtype(
-                        if (newValue.isEmpty()) currentSubtype.without(ExtraValue.SECONDARY_LOCALES)
-                        else currentSubtype.with(ExtraValue.SECONDARY_LOCALES, newValue)
-                    )
+                onItemSelected = { locale ->
+                    LanguagePriority.set(prefs, locale, LanguagePriority.MEDIUM)
+                    val secondaries = getSecondaryLocales(currentSubtype.extraValues) + locale
+                    setCurrentSubtype(currentSubtype.with(ExtraValue.SECONDARY_LOCALES, secondaries.joinToString(Separators.KV) { it.toLanguageTag() }))
                 },
-                title = { Text(stringResource(R.string.locales_with_dict)) },
-                items = availableLocalesForScript,
-                initialSelection = currentSubtype.getExtraValueOf(ExtraValue.SECONDARY_LOCALES)
-                    ?.split(Separators.KV)?.map { it.constructLocale() }.orEmpty(),
-                getItemName = { it.localizedDisplayName(ctx.resources) }
+                title = { Text(stringResource(R.string.add_language)) },
+                items = availableLocalesForScript.filter { it != currentSubtype.locale && it !in getSecondaryLocales(currentSubtype.extraValues) },
+                getItemName = { it.localizedDisplayName(ctx.resources) },
+                showRadioButtons = false,
             )
         if (showKeyOrderDialog) {
             val setting = currentSubtype.getExtraValueOf(ExtraValue.POPUP_ORDER)
@@ -539,4 +541,59 @@ private fun Preview() {
             SubtypeScreen(SettingsSubtype(Locale.ENGLISH, "")) { }
         }
     }
+}
+
+/** One language of a keyboard: name, Off (= remove from this keyboard) / L / M / H, and the share-learned-words switch. */
+@Composable
+private fun KeyboardLanguageRow(locale: Locale, canRemove: Boolean, onPriority: (Int) -> Unit) {
+    val ctx = LocalContext.current
+    val prefs = ctx.prefs()
+    var shared by remember(locale) { mutableStateOf(LanguagePriority.sharesUserHistory(prefs, locale)) }
+    val priority = LanguagePriority.get(prefs, locale)
+    Column(modifier = Modifier.fillMaxWidth().padding(start = 10.dp, top = 4.dp, bottom = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(locale.localizedDisplayName(ctx.resources), modifier = Modifier.weight(1f))
+            val options = listOfNotNull(
+                if (canRemove) 0 to stringResource(R.string.language_priority_off) else null,
+                LanguagePriority.LOW to stringResource(R.string.language_priority_low),
+                LanguagePriority.MEDIUM to stringResource(R.string.language_priority_medium),
+                LanguagePriority.HIGH to stringResource(R.string.language_priority_high),
+            )
+            SingleChoiceSegmentedButtonRow {
+                options.forEachIndexed { index, (value, label) ->
+                    SegmentedButton(
+                        selected = priority == value,
+                        onClick = { if (priority != value) onPriority(value) },
+                        shape = SegmentedButtonDefaults.itemShape(index, options.size),
+                        label = { Text(label) }
+                    )
+                }
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                stringResource(R.string.share_user_history),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            Switch(checked = shared, onCheckedChange = { shared = it; LanguagePriority.setSharesUserHistory(prefs, locale, it) })
+        }
+    }
+}
+
+/**
+ * Apply a priority change to a keyboard: 0 removes the language; otherwise the priority is stored and the
+ * keyboard's main language becomes the highest-priority one (ties keep the current main).
+ */
+private fun withLanguagePriority(context: Context, subtype: SettingsSubtype, locale: Locale, priority: Int): SettingsSubtype {
+    val prefs = context.prefs()
+    val languages = (listOf(subtype.locale) + getSecondaryLocales(subtype.extraValues)).toMutableList()
+    if (priority == 0) languages.remove(locale) else LanguagePriority.set(prefs, locale, priority)
+    val main = languages.maxWithOrNull(compareBy({ LanguagePriority.get(prefs, it) }, { it == subtype.locale })) ?: subtype.locale
+    val secondaries = languages.filter { it != main }
+    val withSecondaries = if (secondaries.isEmpty()) subtype.without(ExtraValue.SECONDARY_LOCALES)
+        else subtype.with(ExtraValue.SECONDARY_LOCALES, secondaries.joinToString(Separators.KV) { it.toLanguageTag() })
+    return if (main == subtype.locale) withSecondaries
+        else SettingsSubtype(main, withSecondaries.extraValues) // the layout and other extras travel with the keyboard
 }

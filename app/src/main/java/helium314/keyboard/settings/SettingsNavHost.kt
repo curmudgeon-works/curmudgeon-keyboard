@@ -24,7 +24,6 @@ import helium314.keyboard.settings.screens.DebugScreen
 import helium314.keyboard.settings.screens.DictionaryScreen
 import helium314.keyboard.settings.screens.GestureTypingScreen
 import androidx.compose.runtime.getValue
-import helium314.keyboard.settings.screens.LanguageListScreen
 import helium314.keyboard.settings.screens.LanguageScreen
 import helium314.keyboard.settings.screens.MainSettingsScreen
 import helium314.keyboard.settings.screens.PersonalDictionariesScreen
@@ -124,10 +123,7 @@ fun SettingsNavHost(
             PersonalDictionariesScreen(onClickBack = ::goBack)
         }
         composable(SettingsDestination.Languages) {
-            LanguageListScreen(onClickBack = ::goBack)
-        }
-        composable(SettingsDestination.Keyboards) {
-            // the per-keyboard (subtype) screens: layouts, popup order etc., reached from the languages list in advanced mode
+            // the list of all keyboards incl. disabled ones; the main screen shows the enabled ones as entries
             LanguageScreen(onClickBack = ::goBack)
         }
         composable(SettingsDestination.Dictionaries) {
@@ -167,7 +163,6 @@ object SettingsDestination {
     const val PersonalDictionaries = "personal_dictionaries"
     const val PersonalDictionary = "personal_dictionary/"
     const val Languages = "languages"
-    const val Keyboards = "keyboards"
     const val Subtype = "subtype/"
     const val Layouts = "layouts"
     const val Dictionaries = "dictionaries"

@@ -14,6 +14,20 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import helium314.keyboard.settings.dialogs.ListPickerDialog
+import helium314.keyboard.latin.utils.SubtypeUtilsAdditional
+import helium314.keyboard.latin.utils.getSecondaryLocales
+import helium314.keyboard.latin.utils.mainLayoutName
+import helium314.keyboard.latin.utils.getStringResourceOrName
+import helium314.keyboard.latin.utils.prefs
+import helium314.keyboard.latin.utils.locale
+import helium314.keyboard.latin.common.LocaleUtils.localizedDisplayName
+import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
+import helium314.keyboard.settings.SettingsDestination
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.Text
 import helium314.keyboard.settings.SettingsMode
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -47,7 +61,8 @@ fun MainSettingsScreen(
     onClickDictionaries: () -> Unit,
     onClickBack: () -> Unit,
 ) {
-    val advanced by SettingsMode.state(LocalContext.current)
+    val ctx = LocalContext.current
+    val advanced by SettingsMode.state(ctx)
     SearchSettingsScreen(
         onClickBack = onClickBack,
         title = stringResource(R.string.ime_settings),
@@ -58,9 +73,41 @@ fun MainSettingsScreen(
             Column(
                 Modifier.verticalScroll(rememberScrollState()).then(Modifier.padding(innerPadding))
             ) {
+                // one entry per keyboard: its languages, then its layout; plus adding one
+                for (subtype in enabledSubtypes) {
+                    val languages = (listOf(subtype.locale()) + getSecondaryLocales(subtype.extraValue))
+                        .joinToString(" + ") { it.localizedDisplayName(ctx.resources) }
+                    Preference(
+                        name = languages,
+                        description = subtype.mainLayoutName()?.let { it.getStringResourceOrName("layout_", ctx) } ?: "",
+                        onClick = { SettingsDestination.navigateTo(SettingsDestination.Subtype + subtype.toSettingsSubtype().toPref()) },
+                        icon = R.drawable.ic_settings_languages
+                    ) { NextScreenIcon() }
+                }
+                var showAddKeyboard by remember { mutableStateOf(false) }
                 Preference(
-                    name = stringResource(R.string.language_and_layouts_title),
-                    description = enabledSubtypes.joinToString(", ") { it.displayName() },
+                    name = stringResource(R.string.add_keyboard),
+                    onClick = { showAddKeyboard = true },
+                    icon = R.drawable.ic_plus
+                ) { NextScreenIcon() }
+                if (showAddKeyboard)
+                    ListPickerDialog(
+                        onDismissRequest = { showAddKeyboard = false },
+                        onItemSelected = { locale ->
+                            val subtype = SubtypeUtilsAdditional.createDefaultSubtype(locale)
+                            val settingsSubtype = subtype.toSettingsSubtype()
+                            SubtypeUtilsAdditional.changeAdditionalSubtype(settingsSubtype, settingsSubtype, ctx) // registers it unless it equals a built-in one
+                            SubtypeSettings.addEnabledSubtype(ctx.prefs(), settingsSubtype.toAdditionalSubtype())
+                            SettingsDestination.navigateTo(SettingsDestination.Subtype + settingsSubtype.toPref())
+                        },
+                        title = { Text(stringResource(R.string.add_keyboard)) },
+                        items = SubtypeSettings.getAvailableSubtypeLocales().sortedBy { it.localizedDisplayName(ctx.resources) },
+                        getItemName = { it.localizedDisplayName(ctx.resources) },
+                        showRadioButtons = false,
+                    )
+                // upstream's full list: every built-in keyboard with an on/off switch, incl. disabled ones
+                if (advanced) Preference(
+                    name = stringResource(R.string.keyboards_title),
                     onClick = onClickLanguage,
                     icon = R.drawable.ic_settings_languages
                 ) { NextScreenIcon() }
