@@ -132,7 +132,8 @@ fun KeyboardsScreen(
             ) {
                 var dragOffset by remember { mutableFloatStateOf(0f) }
                 fun persistOrder() {
-                    ctx.prefs().edit { putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(order)) }
+                    val value = SubtypeSettings.createPrefSubtypes(order)
+                    ctx.prefs().edit { putString(Settings.PREF_ENABLED_SUBTYPES, value) }
                     SubtypeSettings.reloadEnabledSubtypes(ctx)
                     generation++
                 }
@@ -167,7 +168,7 @@ fun KeyboardsScreen(
                     ) {
                         if (order.size > 1)
                             Text("\u2261", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(end = 12.dp).pointerInput(keyboard) {
+                                modifier = Modifier.padding(end = 12.dp).pointerInput(keyboard, order) { // rebuilt with the list, or the gesture keeps a stale one
                                     // the grip takes the press the moment the finger lands: no hold, and the row's
                                     // press-and-hold (delete) and the page scroll never see it
                                     awaitEachGesture {
