@@ -13,6 +13,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Switch
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -110,6 +111,13 @@ fun KeyboardsScreen(
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
                 if (!separate)
                     KeyboardSettingsEntries(SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype(), showLanguages = false)
+                else
+                    Text(
+                        stringResource(R.string.separate_settings_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
                 Preference(
                     name = stringResource(R.string.settings_screen_about),
                     onClick = onClickAbout,
@@ -120,7 +128,11 @@ fun KeyboardsScreen(
                 fun toggle(on: Boolean) {
                     if (on) {
                         if (enabled.any { KeyboardProfiles.hasOwnSettings(real, it.toSettingsSubtype()) }) askEnable = true
-                        else { KeyboardProfiles.enable(real, enabled.map { it.toSettingsSubtype() }, keepExisting = true); separate = true }
+                        else {
+                            KeyboardProfiles.enable(real, enabled.map { it.toSettingsSubtype() }, keepExisting = true)
+                            separate = true
+                            expanded = SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype() // show where the sections went
+                        }
                     } else askDisable = true
                     KeyboardProfiles.refreshImeId(real)
                 }
@@ -136,8 +148,8 @@ fun KeyboardsScreen(
         if (askEnable)
             ConfirmationDialog(
                 onDismissRequest = { askEnable = false },
-                onConfirmed = { KeyboardProfiles.enable(real, enabledNow, keepExisting = true); KeyboardProfiles.refreshImeId(real); separate = true; askEnable = false },
-                onNeutral = { KeyboardProfiles.enable(real, enabledNow, keepExisting = false); KeyboardProfiles.refreshImeId(real); separate = true; askEnable = false },
+                onConfirmed = { KeyboardProfiles.enable(real, enabledNow, keepExisting = true); KeyboardProfiles.refreshImeId(real); separate = true; askEnable = false; expanded = SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype() },
+                onNeutral = { KeyboardProfiles.enable(real, enabledNow, keepExisting = false); KeyboardProfiles.refreshImeId(real); separate = true; askEnable = false; expanded = SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype() },
                 title = { Text(stringResource(R.string.separate_settings_per_keyboard)) },
                 content = { Text(stringResource(R.string.separate_settings_enable_message)) },
                 confirmButtonText = stringResource(R.string.separate_settings_keep),
