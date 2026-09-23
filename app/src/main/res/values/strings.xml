@@ -302,7 +302,14 @@
     <string name="delete_keyboard_title">Delete this keyboard?</string>
     <string name="delete_keyboard_message">\"%s\" will be removed, with its languages, their priorities and its layout choice. This cannot be undone. Learned words and dictionaries are kept.</string>
     <string name="separate_settings_per_keyboard">Separate settings per keyboard</string>
-    <string name="separate_settings_per_keyboard_summary">Off: the settings below apply to every keyboard. On: each keyboard gets its own (coming soon)</string>
+    <string name="separate_settings_per_keyboard_summary">Off: the settings above apply to every keyboard. On: each keyboard has its own, starting from a copy of the shared ones</string>
+    <string name="separate_settings_enable_message">Some keyboards still have settings of their own from before. Keep those, or reset every keyboard to the shared settings?</string>
+    <string name="separate_settings_keep">Keep</string>
+    <string name="separate_settings_reset">Reset all</string>
+    <string name="separate_settings_disable_title">Back to shared settings</string>
+    <string name="separate_settings_disable_message">Which settings should every keyboard use? Each keyboard\'s own settings stay saved for the next time. Current keyboard: %s</string>
+    <string name="separate_settings_use_current">Current keyboard\'s</string>
+    <string name="separate_settings_keep_shared">Previous shared</string>
     <string name="language_list_summary">Higher priority languages win when matches are close</string>
     <string name="language_priority_off">Off</string>
     <string name="language_priority_low">L</string>

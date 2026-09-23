@@ -8,6 +8,9 @@ package helium314.keyboard.latin.utils;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+
+import helium314.keyboard.latin.settings.KeyboardProfiles;
+import helium314.keyboard.latin.settings.ProfilePreferences;
 import android.os.Build;
 
 import java.io.File;
@@ -16,8 +19,22 @@ public final class DeviceProtectedUtils {
 
     static final String TAG = DeviceProtectedUtils.class.getSimpleName();
     private static SharedPreferences prefs;
+    // views on the same file: the keyboard in use (IME) and the keyboard being edited (settings activity)
+    private static SharedPreferences imePrefs;
+    private static SharedPreferences editingPrefs;
 
     public static SharedPreferences getSharedPreferences(final Context context) {
+        final SharedPreferences real = getRealSharedPreferences(context);
+        if (KtxKt.getActivity(context) != null) {
+            if (editingPrefs == null) editingPrefs = new ProfilePreferences(real, KeyboardProfiles.INSTANCE::getEditingId);
+            return editingPrefs;
+        }
+        if (imePrefs == null) imePrefs = new ProfilePreferences(real, KeyboardProfiles.INSTANCE::getImeId);
+        return imePrefs;
+    }
+
+    /** The preferences file itself, all profiles included: for backup and the profile bookkeeping. */
+    public static SharedPreferences getRealSharedPreferences(final Context context) {
         if (prefs != null)
             return prefs;
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {

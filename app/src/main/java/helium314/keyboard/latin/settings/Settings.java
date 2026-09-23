@@ -295,6 +295,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
 
     public void loadSettings(final Context context, final Locale locale,
                              @NonNull final InputAttributes inputAttributes) {
+        KeyboardProfiles.INSTANCE.refreshImeId(DeviceProtectedUtils.getRealSharedPreferences(context));
         mSettingsValuesLock.lock();
         mContext = context;
         try {

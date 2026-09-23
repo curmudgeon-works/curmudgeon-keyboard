@@ -90,6 +90,9 @@ fun Context.getActivity(): ComponentActivity? {
  *  They should not be used to store sensitive data! */
 fun Context.prefs(): SharedPreferences = DeviceProtectedUtils.getSharedPreferences(this)
 
+/** The preferences file with every keyboard's settings in it: backup/restore and profile bookkeeping only. */
+fun Context.realPrefs(): SharedPreferences = DeviceProtectedUtils.getRealSharedPreferences(this)
+
 /** The "default" preferences that are only accessible after the device has been unlocked. */
 fun Context.protectedPrefs(): SharedPreferences = getSharedPreferences("${packageName}_preferences", Context.MODE_PRIVATE)
 

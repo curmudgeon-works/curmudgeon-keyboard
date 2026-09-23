@@ -87,7 +87,7 @@ fun keyboardName(keyboard: SettingsSubtype, ctx: Context): String =
 
 /** The sections of one keyboard's settings, as menu entries. Used by the keyboard's own screen and inline under the keyboards list. */
 @Composable
-fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modifier, showLanguages: Boolean = true) {
+fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modifier, showLanguages: Boolean = true, onEnter: () -> Unit = {}) {
     val ctx = LocalContext.current
     val advanced by SettingsMode.state(ctx)
     Column(modifier) {
@@ -95,55 +95,55 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
     if (showLanguages) Preference(
         name = stringResource(R.string.language_and_layouts_title),
         description = keyboardName(keyboard, ctx),
-        onClick = { SettingsDestination.navigateTo(SettingsDestination.Languages + keyboard.toPref()) },
+        onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Languages + keyboard.toPref()) },
         icon = R.drawable.ic_settings_languages
     ) { NextScreenIcon() }
     Preference(
         name = stringResource(R.string.settings_screen_preferences),
-        onClick = { SettingsDestination.navigateTo(SettingsDestination.Preferences) },
+        onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Preferences) },
         icon = R.drawable.ic_settings_preferences
     ) { NextScreenIcon() }
     Preference(
         name = stringResource(R.string.settings_screen_appearance),
-        onClick = { SettingsDestination.navigateTo(SettingsDestination.Appearance) },
+        onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Appearance) },
         icon = R.drawable.ic_settings_appearance
     ) { NextScreenIcon() }
     if (advanced) Preference(
         name = stringResource(R.string.settings_screen_toolbar),
-        onClick = { SettingsDestination.navigateTo(SettingsDestination.Toolbar) },
+        onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Toolbar) },
         icon = R.drawable.ic_settings_toolbar
     ) { NextScreenIcon() }
     if (JniUtils.sHaveGestureLib || BuildConfig.USE_OWN_GESTURE_DECODER)
         Preference(
             name = stringResource(R.string.settings_screen_gesture),
-            onClick = { SettingsDestination.navigateTo(SettingsDestination.GestureTyping) },
+            onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.GestureTyping) },
             icon = R.drawable.ic_settings_gesture
         ) { NextScreenIcon() }
     // we don't even show the menu if data gathering phase ended more than 2 weeks ago
     if (JniUtils.sHaveGestureLib && System.currentTimeMillis() < END_DATE_EPOCH_MILLIS + TWO_WEEKS_IN_MILLIS)
         Preference(
             name = stringResource(R.string.gesture_data_screen),
-            onClick = { SettingsDestination.navigateTo(SettingsDestination.DataGathering) },
+            onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.DataGathering) },
             icon = R.drawable.ic_settings_gesture
         ) { NextScreenIcon() }
     Preference(
         name = stringResource(R.string.settings_screen_correction),
-        onClick = { SettingsDestination.navigateTo(SettingsDestination.TextCorrection) },
+        onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.TextCorrection) },
         icon = R.drawable.ic_settings_correction
     ) { NextScreenIcon() }
     if (advanced) Preference(
         name = stringResource(R.string.settings_screen_secondary_layouts),
-        onClick = { SettingsDestination.navigateTo(SettingsDestination.Layouts) },
+        onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Layouts) },
         icon = R.drawable.ic_ime_switcher
     ) { NextScreenIcon() }
     Preference(
         name = stringResource(R.string.dictionary_settings_category),
-        onClick = { SettingsDestination.navigateTo(SettingsDestination.Dictionaries) },
+        onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Dictionaries) },
         icon = R.drawable.ic_dictionary
     ) { NextScreenIcon() }
     Preference(
         name = stringResource(R.string.settings_screen_advanced),
-        onClick = { SettingsDestination.navigateTo(SettingsDestination.Advanced) },
+        onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Advanced) },
         icon = R.drawable.ic_settings_advanced
     ) { NextScreenIcon() }
     }
