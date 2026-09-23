@@ -120,7 +120,8 @@ fun KeyboardsScreen(
                     val settingsSubtype = SubtypeUtilsAdditional.createDefaultSubtype(locale).toSettingsSubtype()
                     SubtypeUtilsAdditional.changeAdditionalSubtype(settingsSubtype, settingsSubtype, ctx) // registers it unless it equals a built-in one
                     SubtypeSettings.addEnabledSubtype(ctx.prefs(), settingsSubtype.toAdditionalSubtype())
-                    SettingsDestination.navigateTo(SettingsDestination.Subtype + settingsSubtype.toPref())
+                    showAddKeyboard = false
+                    generation++ // stays on this screen, the new keyboard appears at the end of the list
                 },
                 title = { Text(stringResource(R.string.add_keyboard)) },
                 items = SubtypeSettings.getAvailableSubtypeLocales().sortedBy { it.localizedDisplayName(ctx.resources) },
