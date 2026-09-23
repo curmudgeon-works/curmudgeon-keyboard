@@ -10,9 +10,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Icon
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.draw.rotate
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,7 +42,6 @@ import helium314.keyboard.settings.preferences.Preference
  */
 @Composable
 fun KeyboardsScreen(
-    onClickKeyboard: (String) -> Unit,
     onClickAllKeyboards: () -> Unit,
     onClickAbout: () -> Unit,
     onClickBack: () -> Unit,
@@ -65,19 +62,13 @@ fun KeyboardsScreen(
             ) {
                 for (subtype in SubtypeSettings.getEnabledSubtypes(true)) {
                     val keyboard = subtype.toSettingsSubtype()
-                    // a drop-down: the keyboard's sections unfold underneath its entry
-                    var expanded by remember(keyboard) { mutableStateOf(false) }
+                    // all keyboards share their settings (for now): the entry goes straight to languages & layout
                     Preference(
                         name = keyboardName(keyboard, ctx),
                         description = subtype.mainLayoutName()?.getStringResourceOrName("layout_", ctx) ?: "",
-                        onClick = { expanded = !expanded },
+                        onClick = { SettingsDestination.navigateTo(SettingsDestination.Subtype + keyboard.toPref()) },
                         icon = R.drawable.ic_settings_languages
-                    ) {
-                        // the next-screen arrow, turned to point down (collapsed) or up (expanded)
-                        Icon(painterResource(R.drawable.ic_arrow_left), null, Modifier.rotate(if (expanded) 90f else -90f))
-                    }
-                    if (expanded)
-                        KeyboardSettingsEntries(keyboard, Modifier.padding(start = 24.dp))
+                    ) { NextScreenIcon() }
                 }
                 Preference(
                     name = stringResource(R.string.add_keyboard),
@@ -90,6 +81,9 @@ fun KeyboardsScreen(
                     onClick = onClickAllKeyboards,
                     icon = R.drawable.ic_settings_languages
                 ) { NextScreenIcon() }
+                // the sections shared by all keyboards
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                KeyboardSettingsEntries(SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype(), showLanguages = false)
                 Preference(
                     name = stringResource(R.string.settings_screen_about),
                     onClick = onClickAbout,

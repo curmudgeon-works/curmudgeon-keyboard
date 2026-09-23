@@ -87,12 +87,12 @@ fun keyboardName(keyboard: SettingsSubtype, ctx: Context): String =
 
 /** The sections of one keyboard's settings, as menu entries. Used by the keyboard's own screen and inline under the keyboards list. */
 @Composable
-fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modifier) {
+fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modifier, showLanguages: Boolean = true) {
     val ctx = LocalContext.current
     val advanced by SettingsMode.state(ctx)
     Column(modifier) {
     // this keyboard's languages, layout, dictionaries, popup order ...
-    Preference(
+    if (showLanguages) Preference(
         name = stringResource(R.string.language_and_layouts_title),
         description = keyboardName(keyboard, ctx),
         onClick = { SettingsDestination.navigateTo(SettingsDestination.Subtype + keyboard.toPref()) },
