@@ -27,6 +27,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.mutableIntStateOf
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -126,11 +127,16 @@ fun SubtypeScreen(
     val b = (LocalContext.current.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
     if ((b?.value ?: 0) < 0)
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
+    var previewHeight by remember { mutableIntStateOf(0) }
+    var holdSpace by remember { mutableStateOf(false) }
+    LaunchedEffect(holdSpace) { if (holdSpace) { delay(700); holdSpace = false } }
+    val reservedBottom = if (holdSpace) previewHeight else 0
     var currentSubtypeString by rememberSaveable { mutableStateOf(initialSubtype.toPref()) }
     val currentSubtype = currentSubtypeString.toSettingsSubtype()
     fun setCurrentSubtype(subtype: SettingsSubtype) {
         SubtypeUtilsAdditional.changeAdditionalSubtype(currentSubtype, subtype, ctx)
         currentSubtypeString = subtype.toPref()
+        holdSpace = true
         // the live keyboard runs the changed definition right away (the try-it preview)
         if (RichInputMethodManager.isInitialized())
             KeyboardSwitcher.getInstance().switchToSubtype(subtype.toAdditionalSubtype())
@@ -158,10 +164,9 @@ fun SubtypeScreen(
 
     val availableLocalesForScript = getAvailableSecondaryLocales(ctx, currentSubtype.locale).sortedBy { it.toLanguageTag() }
     var showSecondaryLocaleDialog by remember { mutableStateOf(false) }
-    // the position survives the rebuild a change causes: the space the preview keyboard takes stays reserved
-    // while it reloads (otherwise the content is short again, maxValue drops to 0 and the position is lost)
+    // the position survives the rebuild a change causes: the space the preview keyboard takes is held for a
+    // moment while it reloads (otherwise the content is short again, maxValue drops to 0 and the position is lost)
     val scrollState = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) }
-    var reservedBottom by remember { mutableIntStateOf(0) }
     val tryIt = remember { TryItState() }
     val customMainLayouts = LayoutUtilsCustom.getLayoutFiles(LayoutType.MAIN, ctx, currentSubtype.locale).map { it.name }
     SearchScreen(
@@ -179,7 +184,7 @@ fun SubtypeScreen(
         Scaffold(
             contentWindowInsets = WindowInsets(0),
             bottomBar = {
-                Box(Modifier.onSizeChanged { if (it.height > reservedBottom) reservedBottom = it.height }) {
+                Box(Modifier.onSizeChanged { if (it.height > previewHeight) previewHeight = it.height }) {
                     TryItBar(currentSubtype, tryIt)
                 }
             }
@@ -219,10 +224,10 @@ fun SubtypeScreen(
                 }
                 // ---- number row and hints, in one place
                 WithBigTitle(stringResource(R.string.number_row_and_hints)) {
-                    PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW, R.string.number_row_summary) { reloadPreview() }
+                    PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW, R.string.number_row_summary) { holdSpace = true; reloadPreview() }
                     // two independent hint switches; the popups behind long-press stay either way
-                    PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW_HINTS, Defaults.PREF_SHOW_NUMBER_ROW_HINTS, R.string.hints_number_row) { reloadPreview() }
-                    PrefSwitchRow(Settings.PREF_SHOW_HINTS, Defaults.PREF_SHOW_HINTS, R.string.hints_other_keys) { reloadPreview() }
+                    PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW_HINTS, Defaults.PREF_SHOW_NUMBER_ROW_HINTS, R.string.hints_number_row) { holdSpace = true; reloadPreview() }
+                    PrefSwitchRow(Settings.PREF_SHOW_HINTS, Defaults.PREF_SHOW_HINTS, R.string.hints_other_keys) { holdSpace = true; reloadPreview() }
                 }
                 // ---- the layout, with the other layouts of this keyboard under it
                 WithBigTitle(stringResource(R.string.keyboard_layout_set)) {
@@ -497,3 +502,6 @@ private fun PrefSwitchRow(key: String, default: Boolean, titleId: Int, onChanged
 }
 
 private fun reloadPreview() = KeyboardSwitcher.getInstance().setThemeNeedsReload()
+
+/** Hold the preview's space for a moment, so a reload doesn't shorten the list and lose the scroll position. */
+private fun holdPreviewSpace(set: (Boolean) -> Unit) = set(true)
