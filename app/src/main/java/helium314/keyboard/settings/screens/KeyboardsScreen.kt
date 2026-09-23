@@ -112,18 +112,23 @@ fun KeyboardsScreen(
                     val keyboard = subtype.toSettingsSubtype()
                     // tap: languages & layout of the keyboard (with separate settings: unfold all its sections);
                     // press and hold: delete it (while another remains)
-                    val isExpanded = separate && expanded == keyboard
+                    // a single keyboard has nothing to fold: its sections are listed below like the shared ones
+                    val folding = separate && enabled.size > 1
+                    val isExpanded = folding && expanded == keyboard
                     Preference(
                         name = keyboardName(keyboard, ctx),
                         description = subtype.mainLayoutName()?.getStringResourceOrName("layout_", ctx) ?: "",
                         onClick = {
-                            if (separate) expanded = if (isExpanded) null else keyboard
-                            else SettingsDestination.navigateTo(SettingsDestination.Languages + keyboard.toPref())
+                            if (folding) expanded = if (isExpanded) null else keyboard
+                            else {
+                                if (separate) KeyboardProfiles.editingId = KeyboardProfiles.idFor(real, keyboard)
+                                SettingsDestination.navigateTo(SettingsDestination.Languages + keyboard.toPref())
+                            }
                         },
                         icon = R.drawable.ic_settings_languages,
                         onLongClick = if (enabled.size > 1) ({ keyboardToDelete = keyboard }) else null,
                     ) {
-                        if (separate) Icon(painterResource(R.drawable.ic_arrow_left), null, Modifier.rotate(if (isExpanded) 90f else -90f))
+                        if (folding) Icon(painterResource(R.drawable.ic_arrow_left), null, Modifier.rotate(if (isExpanded) 90f else -90f))
                         else NextScreenIcon()
                     }
                     if (isExpanded)
@@ -139,6 +144,9 @@ fun KeyboardsScreen(
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
                 if (!separate)
                     KeyboardSettingsEntries(SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype(), showLanguages = false)
+                else if (enabled.size == 1)
+                    KeyboardSettingsEntries(enabled[0].toSettingsSubtype(), showLanguages = false,
+                        onEnter = { KeyboardProfiles.editingId = KeyboardProfiles.idFor(real, enabled[0].toSettingsSubtype()) })
                 else
                     Text(
                         stringResource(R.string.separate_settings_hint),
