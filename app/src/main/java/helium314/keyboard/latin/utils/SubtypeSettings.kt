@@ -199,8 +199,9 @@ object SubtypeSettings {
             else it.toSettingsSubtype()
         }
 
+    // order is kept: it is the order of the keyboards list and the switching order (upstream sorted here)
     fun createPrefSubtypes(subtypes: Collection<SettingsSubtype>): String =
-        subtypes.map { it.toPref() }.toSortedSet().joinToString(Separators.SETS)
+        subtypes.map { it.toPref() }.distinct().joinToString(Separators.SETS)
 
     fun init(context: Context) {
         SubtypeLocaleUtils.init(context) // necessary to get the correct getKeyboardLayoutSetName
