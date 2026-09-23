@@ -34,6 +34,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -155,16 +158,10 @@ fun SubtypeScreen(
 
     val availableLocalesForScript = getAvailableSecondaryLocales(ctx, currentSubtype.locale).sortedBy { it.toLanguageTag() }
     var showSecondaryLocaleDialog by remember { mutableStateOf(false) }
-    // the position survives the rebuild a change causes; restored after the new content is laid out
+    // the position survives the rebuild a change causes: the space the preview keyboard takes stays reserved
+    // while it reloads (otherwise the content is short again, maxValue drops to 0 and the position is lost)
     val scrollState = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) }
-    var keptScroll by rememberSaveable { mutableIntStateOf(0) }
-    LaunchedEffect(scrollState.value) { if (scrollState.value != 0) keptScroll = scrollState.value }
-    LaunchedEffect(currentSubtypeString, keptScroll) {
-        if (keptScroll != 0 && scrollState.value != keptScroll) {
-            snapshotFlow { scrollState.maxValue }.first { it >= keptScroll }
-            scrollState.scrollTo(keptScroll)
-        }
-    }
+    var reservedBottom by remember { mutableIntStateOf(0) }
     val tryIt = remember { TryItState() }
     val customMainLayouts = LayoutUtilsCustom.getLayoutFiles(LayoutType.MAIN, ctx, currentSubtype.locale).map { it.name }
     SearchScreen(
@@ -181,11 +178,16 @@ fun SubtypeScreen(
     ) {
         Scaffold(
             contentWindowInsets = WindowInsets(0),
-            bottomBar = { TryItBar(currentSubtype, tryIt) }
+            bottomBar = {
+                Box(Modifier.onSizeChanged { if (it.height > reservedBottom) reservedBottom = it.height }) {
+                    TryItBar(currentSubtype, tryIt)
+                }
+            }
         ) { innerPadding ->
             Column(
                 modifier = Modifier.verticalScroll(scrollState).padding(horizontal = 12.dp)
-                    .then(Modifier.padding(innerPadding)),
+                    .then(Modifier.padding(innerPadding))
+                    .padding(bottom = with(LocalDensity.current) { reservedBottom.toDp() }),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 WithBigTitle(stringResource(R.string.key_popups_title)) {
