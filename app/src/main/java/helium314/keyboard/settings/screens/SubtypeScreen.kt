@@ -214,9 +214,14 @@ fun SubtypeScreen(
                 }
                 // ---- the other layouts of this keyboard, each with its own treatment
                 WithBigTitle(stringResource(R.string.settings_screen_secondary_layouts)) {
-                    // bottom row: normal / tablet (khipro only for Bengali), plus custom files
-                    SecondaryLayoutRow(currentSubtype, LayoutType.FUNCTIONAL, ::setCurrentSubtype,
-                        builtIns = { all -> all.filter { it != "functional_keys_khipro" || currentSubtype.locale.script() == ScriptUtils.SCRIPT_BENGALI } })
+                    // bottom row: a tablet switch when that is the only alternative; the full choice for Bengali (khipro) or custom files
+                    if (currentSubtype.locale.script() != ScriptUtils.SCRIPT_BENGALI && LayoutUtilsCustom.getLayoutFiles(LayoutType.FUNCTIONAL, ctx).isEmpty())
+                        SwitchRow(stringResource(R.string.bottom_row_tablet), currentSubtype.layoutName(LayoutType.FUNCTIONAL) == "functional_keys_tablet") { on ->
+                            setCurrentSubtype(if (on) currentSubtype.withLayout(LayoutType.FUNCTIONAL, "functional_keys_tablet") else currentSubtype.withoutLayout(LayoutType.FUNCTIONAL))
+                        }
+                    else
+                        SecondaryLayoutRow(currentSubtype, LayoutType.FUNCTIONAL, ::setCurrentSubtype,
+                            builtIns = { all -> all.filter { it != "functional_keys_khipro" || currentSubtype.locale.script() == ScriptUtils.SCRIPT_BENGALI } })
                     // number pad: portrait and landscape together; the try-it field shows it
                     FoldableLayoutGroup(R.string.layout_group_numpad, onOpen = { tryIt.show(TryItMode.NUMBER) }) {
                         SecondaryLayoutRow(currentSubtype, LayoutType.NUMPAD, ::setCurrentSubtype)
