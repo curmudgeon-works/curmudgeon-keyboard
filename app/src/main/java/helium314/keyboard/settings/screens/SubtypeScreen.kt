@@ -78,6 +78,10 @@ import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.SettingsDestination
 import helium314.keyboard.latin.utils.NextScreenIcon
+import androidx.compose.ui.draw.rotate
+import androidx.core.content.edit
+import helium314.keyboard.keyboard.KeyboardSwitcher
+import androidx.compose.foundation.clickable
 import helium314.keyboard.latin.utils.getSecondaryLocales
 import helium314.keyboard.latin.utils.getStringResourceOrName
 import helium314.keyboard.latin.utils.htmlToAnnotated
@@ -144,6 +148,7 @@ fun SubtypeScreen(
     val availableLocalesForScript = getAvailableSecondaryLocales(ctx, currentSubtype.locale).sortedBy { it.toLanguageTag() }
     var showSecondaryLocaleDialog by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
+    val tryIt = remember { TryItState() }
     val customMainLayouts = LayoutUtilsCustom.getLayoutFiles(LayoutType.MAIN, ctx, currentSubtype.locale).map { it.name }
     SearchScreen(
         onClickBack = onClickBack,
@@ -159,7 +164,7 @@ fun SubtypeScreen(
     ) {
         Scaffold(
             contentWindowInsets = WindowInsets(0),
-            bottomBar = { TryItBar(currentSubtype) }
+            bottomBar = { TryItBar(currentSubtype, tryIt) }
         ) { innerPadding ->
             Column(
                 modifier = Modifier.verticalScroll(scrollState).padding(horizontal = 12.dp)
@@ -194,60 +199,46 @@ fun SubtypeScreen(
                         }
                     }
                 }
-                HorizontalDivider()
-                Text(
-                    stringResource(R.string.settings_screen_secondary_layouts),
-                    style = MaterialTheme.typography.titleMedium
-                )
-                LayoutType.entries.forEach { type ->
-                    // the symbols page is covered by the long-press popup editor; its script variant follows the language
-                    if (type == LayoutType.MAIN || type == LayoutType.SYMBOLS) return@forEach
-                    WithSmallTitle(stringResource(type.displayNameId)) {
-                        val explicitLayout = currentSubtype.layoutName(type)
-                        val layout = explicitLayout ?: Settings.readDefaultLayoutName(type, prefs)
-                        val defaultLayouts = LayoutUtils.getAvailableLayouts(type, ctx)
-                        val customLayouts = LayoutUtilsCustom.getLayoutFiles(type, ctx).map { it.name }
-                        DropDownField(
-                            items = defaultLayouts + customLayouts,
-                            selectedItem = layout,
-                            onSelected = {
-                                setCurrentSubtype(currentSubtype.withLayout(type, it))
-                            },
-                            extraButton = {
-                                DefaultButton(explicitLayout == null) {
-                                    setCurrentSubtype(currentSubtype.withoutLayout(type))
-                                }
-                            },
-                        ) {
-                            val displayName =
-                                if (LayoutUtilsCustom.isCustomLayout(it)) LayoutUtilsCustom.getDisplayName(it)
-                                else it.getStringResourceOrName("layout_", ctx)
-                            var showLayoutEditDialog by remember { mutableStateOf(false) }
-                            Row(
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(displayName)
-                                if (LayoutUtilsCustom.isCustomLayout(it))
-                                    IconButton({
-                                        showLayoutEditDialog = true
-                                    }) {
-                                        Icon(
-                                            painterResource(R.drawable.ic_edit),
-                                            stringResource(R.string.edit_layout)
-                                        )
-                                    }
-                            }
-                            if (showLayoutEditDialog)
-                                LayoutEditDialog(
-                                    onDismissRequest = { showLayoutEditDialog = false },
-                                    layoutType = type,
-                                    initialLayoutName = it,
-                                    isNameValid = null
-                                )
-                        }
+                // ---- number row and hints, in one place
+                WithBigTitle(stringResource(R.string.number_row)) {
+                    PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW, R.string.number_row_summary) { reloadPreview() }
+                    if (prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW))
+                        PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW_HINTS, Defaults.PREF_SHOW_NUMBER_ROW_HINTS, R.string.number_row_hints) { reloadPreview() }
+                    else
+                        PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS, Defaults.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS, R.string.number_row_in_symbols) { reloadPreview() }
+                }
+                WithBigTitle(stringResource(R.string.show_hints)) {
+                    PrefSwitchRow(Settings.PREF_SHOW_HINTS, Defaults.PREF_SHOW_HINTS, R.string.show_hints_summary) { reloadPreview() }
+                    if (prefs.getBoolean(Settings.PREF_SHOW_HINTS, Defaults.PREF_SHOW_HINTS))
+                        PrefSwitchRow(Settings.PREF_SHOW_LETTER_HINTS, Defaults.PREF_SHOW_LETTER_HINTS, R.string.letter_hints) { reloadPreview() }
+                }
+                // ---- the other layouts of this keyboard, each with its own treatment
+                WithBigTitle(stringResource(R.string.settings_screen_secondary_layouts)) {
+                    // bottom row: normal / tablet (khipro only for Bengali), plus custom files
+                    SecondaryLayoutRow(currentSubtype, LayoutType.FUNCTIONAL, ::setCurrentSubtype,
+                        builtIns = { all -> all.filter { it != "functional_keys_khipro" || currentSubtype.locale.script() == ScriptUtils.SCRIPT_BENGALI } })
+                    // number pad: portrait and landscape together; the try-it field shows it
+                    FoldableLayoutGroup(R.string.layout_group_numpad, onOpen = { tryIt.show(TryItMode.NUMBER) }) {
+                        SecondaryLayoutRow(currentSubtype, LayoutType.NUMPAD, ::setCurrentSubtype)
+                        SecondaryLayoutRow(currentSubtype, LayoutType.NUMPAD_LANDSCAPE, ::setCurrentSubtype)
                     }
+                    // phone pad and its symbols page together; the try-it field shows it
+                    FoldableLayoutGroup(R.string.layout_group_phone, onOpen = { tryIt.show(TryItMode.PHONE) }) {
+                        SecondaryLayoutRow(currentSubtype, LayoutType.PHONE, ::setCurrentSubtype)
+                        SecondaryLayoutRow(currentSubtype, LayoutType.PHONE_SYMBOLS, ::setCurrentSubtype)
+                    }
+                    // the send/enter key on the rows under the emoji and clipboard panels: one switch for both
+                    val withAction = currentSubtype.layoutName(LayoutType.EMOJI_BOTTOM) == "emoji_bottom_row_with_action"
+                    SwitchRow(stringResource(R.string.bottom_rows_action_key), withAction) { on ->
+                        setCurrentSubtype(
+                            if (on) currentSubtype.withLayout(LayoutType.EMOJI_BOTTOM, "emoji_bottom_row_with_action").withLayout(LayoutType.CLIPBOARD_BOTTOM, "clip_bottom_row_with_action")
+                            else currentSubtype.withoutLayout(LayoutType.EMOJI_BOTTOM).withoutLayout(LayoutType.CLIPBOARD_BOTTOM)
+                        )
+                    }
+                    // everything else only when there is a choice (a custom layout file exists)
+                    for (type in listOf(LayoutType.MORE_SYMBOLS, LayoutType.NUMBER, LayoutType.NUMBER_ROW))
+                        if (LayoutUtilsCustom.getLayoutFiles(type, ctx).isNotEmpty())
+                            SecondaryLayoutRow(currentSubtype, type, ::setCurrentSubtype)
                 }
             }
         }
@@ -427,3 +418,72 @@ private fun Preview() {
         }
     }
 }
+
+/** One secondary layout: a drop-down of the built-in variants (filtered) and custom files, with edit and default. */
+@Composable
+private fun SecondaryLayoutRow(
+    currentSubtype: SettingsSubtype,
+    type: LayoutType,
+    setCurrentSubtype: (SettingsSubtype) -> Unit,
+    builtIns: (List<String>) -> List<String> = { it },
+) {
+    val ctx = LocalContext.current
+    val prefs = ctx.prefs()
+    WithSmallTitle(stringResource(type.displayNameId)) {
+        val explicitLayout = currentSubtype.layoutName(type)
+        val layout = explicitLayout ?: Settings.readDefaultLayoutName(type, prefs)
+        val defaultLayouts = builtIns(LayoutUtils.getAvailableLayouts(type, ctx).toList())
+        val customLayouts = LayoutUtilsCustom.getLayoutFiles(type, ctx).map { it.name }
+        DropDownField(
+            items = defaultLayouts + customLayouts,
+            selectedItem = layout,
+            onSelected = { setCurrentSubtype(currentSubtype.withLayout(type, it)) },
+            extraButton = { DefaultButton(explicitLayout == null) { setCurrentSubtype(currentSubtype.withoutLayout(type)) } },
+        ) {
+            val displayName = if (LayoutUtilsCustom.isCustomLayout(it)) LayoutUtilsCustom.getDisplayName(it)
+                else it.getStringResourceOrName("layout_", ctx)
+            var showLayoutEditDialog by remember { mutableStateOf(false) }
+            Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text(displayName)
+                if (LayoutUtilsCustom.isCustomLayout(it))
+                    IconButton({ showLayoutEditDialog = true }) { Icon(painterResource(R.drawable.ic_edit), stringResource(R.string.edit_layout)) }
+            }
+            if (showLayoutEditDialog)
+                LayoutEditDialog(onDismissRequest = { showLayoutEditDialog = false }, layoutType = type, initialLayoutName = it, isNameValid = null)
+        }
+    }
+}
+
+/** A folding group of layout rows; opening it can bring up the matching pad in the try-it field. */
+@Composable
+private fun FoldableLayoutGroup(titleId: Int, onOpen: () -> Unit, content: @Composable () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Row(verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().clickable { open = !open; if (open) onOpen() }.padding(vertical = 8.dp)) {
+        Text(stringResource(titleId), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Icon(painterResource(R.drawable.ic_arrow_left), null, Modifier.rotate(if (open) 90f else -90f))
+    }
+    if (open) Column(Modifier.padding(start = 12.dp)) { content() }
+}
+
+@Composable
+private fun SwitchRow(title: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onChange(!checked) }.padding(vertical = 4.dp)) {
+        Text(title, modifier = Modifier.weight(1f).padding(start = 10.dp))
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+/** A switch bound to a boolean preference (per keyboard when settings are separate). */
+@Composable
+private fun PrefSwitchRow(key: String, default: Boolean, titleId: Int, onChanged: () -> Unit) {
+    val prefs = LocalContext.current.prefs()
+    var checked by remember(key) { mutableStateOf(prefs.getBoolean(key, default)) }
+    SwitchRow(stringResource(titleId), checked) {
+        checked = it
+        prefs.edit { putBoolean(key, it) }
+        onChanged()
+    }
+}
+
+private fun reloadPreview() = KeyboardSwitcher.getInstance().setThemeNeedsReload()
