@@ -95,7 +95,7 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
     if (showLanguages) Preference(
         name = stringResource(R.string.language_and_layouts_title),
         description = keyboardName(keyboard, ctx),
-        onClick = { SettingsDestination.navigateTo(SettingsDestination.Subtype + keyboard.toPref()) },
+        onClick = { SettingsDestination.navigateTo(SettingsDestination.Languages + keyboard.toPref()) },
         icon = R.drawable.ic_settings_languages
     ) { NextScreenIcon() }
     Preference(

@@ -25,6 +25,7 @@ import helium314.keyboard.settings.screens.DictionaryScreen
 import helium314.keyboard.settings.screens.GestureTypingScreen
 import androidx.compose.runtime.getValue
 import helium314.keyboard.settings.screens.KeyboardsScreen
+import helium314.keyboard.settings.screens.LanguageListScreen
 import helium314.keyboard.settings.screens.LanguageScreen
 import helium314.keyboard.settings.screens.MainSettingsScreen
 import helium314.keyboard.settings.screens.PersonalDictionariesScreen
@@ -68,10 +69,13 @@ fun SettingsNavHost(
     ) {
         composable(SettingsDestination.Keyboards) {
             KeyboardsScreen(
-                onClickAllKeyboards = { navController.navigate(SettingsDestination.Languages) },
+                onClickAllKeyboards = { navController.navigate(SettingsDestination.AllKeyboards) },
                 onClickAbout = { navController.navigate(SettingsDestination.About) },
                 onClickBack = ::goBack,
             )
+        }
+        composable(SettingsDestination.Languages + "{keyboard}") {
+            LanguageListScreen(initialKeyboard = it.arguments?.getString("keyboard")!!.toSettingsSubtype(), onClickBack = ::goBack)
         }
         composable(SettingsDestination.Settings + "{keyboard}") {
             MainSettingsScreen(
@@ -120,8 +124,8 @@ fun SettingsNavHost(
         composable(SettingsDestination.PersonalDictionaries) {
             PersonalDictionariesScreen(onClickBack = ::goBack)
         }
-        composable(SettingsDestination.Languages) {
-            // the list of all keyboards incl. disabled ones; the main screen shows the enabled ones as entries
+        composable(SettingsDestination.AllKeyboards) {
+            // the list of all keyboards incl. disabled ones; the keyboards screen shows the enabled ones as entries
             LanguageScreen(onClickBack = ::goBack)
         }
         composable(SettingsDestination.Dictionaries) {
@@ -161,7 +165,8 @@ object SettingsDestination {
     const val ColorsNight = "colors_night/"
     const val PersonalDictionaries = "personal_dictionaries"
     const val PersonalDictionary = "personal_dictionary/"
-    const val Languages = "languages"
+    const val Languages = "languages/"
+    const val AllKeyboards = "all_keyboards"
     const val Subtype = "subtype/"
     const val Layouts = "layouts"
     const val Dictionaries = "dictionaries"
