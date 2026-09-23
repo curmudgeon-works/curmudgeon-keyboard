@@ -202,15 +202,13 @@ fun SubtypeScreen(
                 // ---- number row and hints, in one place
                 WithBigTitle(stringResource(R.string.number_row)) {
                     PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW, R.string.number_row_summary) { reloadPreview() }
-                    if (prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW))
-                        PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW_HINTS, Defaults.PREF_SHOW_NUMBER_ROW_HINTS, R.string.number_row_hints) { reloadPreview() }
-                    else
+                    if (!prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW))
                         PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS, Defaults.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS, R.string.number_row_in_symbols) { reloadPreview() }
                 }
-                WithBigTitle(stringResource(R.string.show_hints)) {
-                    PrefSwitchRow(Settings.PREF_SHOW_HINTS, Defaults.PREF_SHOW_HINTS, R.string.show_hints_summary) { reloadPreview() }
-                    if (prefs.getBoolean(Settings.PREF_SHOW_HINTS, Defaults.PREF_SHOW_HINTS))
-                        PrefSwitchRow(Settings.PREF_SHOW_LETTER_HINTS, Defaults.PREF_SHOW_LETTER_HINTS, R.string.letter_hints) { reloadPreview() }
+                // two independent switches; the popups behind long-press stay either way
+                WithBigTitle(stringResource(R.string.hints_title)) {
+                    PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW_HINTS, Defaults.PREF_SHOW_NUMBER_ROW_HINTS, R.string.hints_number_row) { reloadPreview() }
+                    PrefSwitchRow(Settings.PREF_SHOW_HINTS, Defaults.PREF_SHOW_HINTS, R.string.hints_other_keys) { reloadPreview() }
                 }
                 // ---- the other layouts of this keyboard, each with its own treatment
                 WithBigTitle(stringResource(R.string.settings_screen_secondary_layouts)) {
