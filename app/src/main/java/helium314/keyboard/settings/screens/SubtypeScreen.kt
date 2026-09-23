@@ -81,6 +81,7 @@ import helium314.keyboard.latin.utils.NextScreenIcon
 import androidx.compose.ui.draw.rotate
 import androidx.core.content.edit
 import helium314.keyboard.keyboard.KeyboardSwitcher
+import helium314.keyboard.latin.RichInputMethodManager
 import androidx.compose.foundation.clickable
 import helium314.keyboard.latin.utils.getSecondaryLocales
 import helium314.keyboard.latin.utils.getStringResourceOrName
@@ -124,6 +125,10 @@ fun SubtypeScreen(
     fun setCurrentSubtype(subtype: SettingsSubtype) {
         SubtypeUtilsAdditional.changeAdditionalSubtype(currentSubtype, subtype, ctx)
         currentSubtypeString = subtype.toPref()
+        // the live keyboard runs the changed definition right away (the try-it preview)
+        if (RichInputMethodManager.isInitialized())
+            KeyboardSwitcher.getInstance().switchToSubtype(subtype.toAdditionalSubtype())
+        reloadPreview()
     }
     LaunchedEffect(currentSubtypeString) {
         if (ScriptUtils.scriptSupportsUppercase(currentSubtype.locale)) return@LaunchedEffect
