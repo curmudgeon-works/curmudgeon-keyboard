@@ -34,6 +34,11 @@ import helium314.keyboard.latin.utils.NextScreenIcon
 import helium314.keyboard.settings.SearchSettingsScreen
 import helium314.keyboard.settings.SettingsDestination
 import helium314.keyboard.settings.SettingsMode
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.runtime.mutableIntStateOf
+import helium314.keyboard.latin.settings.SettingsSubtype
+import helium314.keyboard.settings.dialogs.ConfirmationDialog
 import helium314.keyboard.settings.dialogs.ListPickerDialog
 import helium314.keyboard.settings.preferences.Preference
 
@@ -50,6 +55,8 @@ fun KeyboardsScreen(
     val ctx = LocalContext.current
     val advanced by SettingsMode.state(ctx)
     var showAddKeyboard by remember { mutableStateOf(false) }
+    var keyboardToDelete: SettingsSubtype? by remember { mutableStateOf(null) }
+    var generation by remember { mutableIntStateOf(0) } // re-read the keyboards after a delete
     SearchSettingsScreen(
         onClickBack = onClickBack,
         title = stringResource(R.string.ime_settings),
@@ -61,14 +68,19 @@ fun KeyboardsScreen(
                     .verticalScroll(rememberScrollState())
                     .then(Modifier.padding(innerPadding))
             ) {
-                for (subtype in SubtypeSettings.getEnabledSubtypes(true)) {
+                @Suppress("UNUSED_EXPRESSION") generation
+                val enabled = SubtypeSettings.getEnabledSubtypes(true)
+                for (subtype in enabled) {
                     val keyboard = subtype.toSettingsSubtype()
-                    // all keyboards share their settings (for now): the entry goes straight to languages & layout
+                    // tap: languages & layout of the keyboard; press and hold: delete it (while another remains)
                     Preference(
                         name = keyboardName(keyboard, ctx),
                         description = subtype.mainLayoutName()?.getStringResourceOrName("layout_", ctx) ?: "",
                         onClick = { SettingsDestination.navigateTo(SettingsDestination.Languages + keyboard.toPref()) },
-                        icon = R.drawable.ic_settings_languages
+                        icon = R.drawable.ic_settings_languages,
+                        modifier = Modifier.pointerInput(keyboard) {
+                            detectTapGestures(onLongPress = { if (enabled.size > 1) keyboardToDelete = keyboard })
+                        }
                     ) { NextScreenIcon() }
                 }
                 Preference(
@@ -100,6 +112,19 @@ fun KeyboardsScreen(
                     icon = R.drawable.ic_settings_preferences
                 ) { Switch(checked = false, onCheckedChange = null, enabled = false) }
             }
+        }
+        keyboardToDelete?.let { keyboard ->
+            ConfirmationDialog(
+                onDismissRequest = { keyboardToDelete = null },
+                onConfirmed = {
+                    if (keyboard.isAdditionalSubtype(ctx.prefs())) SubtypeUtilsAdditional.removeAdditionalSubtype(ctx, keyboard.toAdditionalSubtype())
+                    SubtypeSettings.removeEnabledSubtype(ctx, keyboard.toAdditionalSubtype())
+                    keyboardToDelete = null
+                    generation++
+                },
+                title = { Text(stringResource(R.string.delete_confirmation, keyboardName(keyboard, ctx))) },
+                confirmButtonText = stringResource(R.string.delete),
+            )
         }
         if (showAddKeyboard)
             ListPickerDialog(
