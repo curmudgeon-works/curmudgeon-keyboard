@@ -299,6 +299,8 @@
     <string name="language_other_script">Different script, needs its own keyboard</string>
     <string name="add_language">Add language</string>
     <string name="add_keyboard">Add keyboard</string>
+    <string name="delete_keyboard_title">Delete this keyboard?</string>
+    <string name="delete_keyboard_message">\"%s\" will be removed, with its languages, their priorities and its layout choice. This cannot be undone. Learned words and dictionaries are kept.</string>
     <string name="separate_settings_per_keyboard">Separate settings per keyboard</string>
     <string name="separate_settings_per_keyboard_summary">Off: the settings below apply to every keyboard. On: each keyboard gets its own (coming soon)</string>
     <string name="language_list_summary">Higher priority languages win when matches are close</string>
