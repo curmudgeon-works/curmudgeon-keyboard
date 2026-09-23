@@ -31,6 +31,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -98,7 +100,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
     var showAccentsDialog by remember { mutableStateOf(false) }
     val groups = remember(keyboard, generation) { keysWithPopups(ctx, keyboard) }
     val overrides = remember(generation) { KeyPopupOverrides.load(prefs) }
-    val unfolded = remember { mutableStateListOf<String>() }
+    val unfolded = rememberSaveable(saver = listSaver(save = { it.toList() }, restore = { mutableStateListOf(*it.toTypedArray()) })) { mutableStateListOf<String>() }
     Column {
         Text(
             stringResource(R.string.key_popups_summary),
