@@ -68,7 +68,6 @@ fun SettingsNavHost(
     ) {
         composable(SettingsDestination.Keyboards) {
             KeyboardsScreen(
-                onClickKeyboard = { navController.navigate(SettingsDestination.Settings + it) },
                 onClickAllKeyboards = { navController.navigate(SettingsDestination.Languages) },
                 onClickAbout = { navController.navigate(SettingsDestination.About) },
                 onClickBack = ::goBack,
