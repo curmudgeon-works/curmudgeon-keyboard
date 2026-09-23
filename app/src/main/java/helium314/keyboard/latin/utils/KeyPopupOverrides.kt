@@ -1,0 +1,52 @@
+// SPDX-License-Identifier: GPL-3.0-only
+package helium314.keyboard.latin.utils
+
+import android.content.SharedPreferences
+import helium314.keyboard.keyboard.internal.KeySpecParser
+import org.json.JSONArray
+import org.json.JSONObject
+
+/**
+ * Per-key long-press popups the user rearranged: key label -> the popup labels to show, in order. Keys without
+ * an entry keep the generated popups. Stored per keyboard (a plain pref, so per profile with separate settings).
+ */
+object KeyPopupOverrides {
+    const val PREF = "key_popups"
+
+    fun load(prefs: SharedPreferences): Map<String, List<String>> {
+        val json = prefs.getString(PREF, null) ?: return emptyMap()
+        return try {
+            val obj = JSONObject(json)
+            obj.keys().asSequence().associateWith { key ->
+                val arr = obj.getJSONArray(key)
+                List(arr.length()) { arr.getString(it) }
+            }
+        } catch (e: Exception) { emptyMap() }
+    }
+
+    fun save(prefs: SharedPreferences, overrides: Map<String, List<String>>) {
+        if (overrides.isEmpty()) { prefs.edit().remove(PREF).apply(); return }
+        val obj = JSONObject()
+        for ((key, labels) in overrides) obj.put(key, JSONArray(labels))
+        prefs.edit().putString(PREF, obj.toString()).apply()
+    }
+
+    fun set(prefs: SharedPreferences, keyLabel: String, labels: List<String>?) {
+        val all = load(prefs).toMutableMap()
+        if (labels == null) all.remove(keyLabel) else all[keyLabel] = labels
+        save(prefs, all)
+    }
+
+    /**
+     * The generated popup specs of a key, rearranged as the user wants: the chosen labels in their order, dropping
+     * everything else. Null when the key has no override. Matching is by the spec's label.
+     */
+    @JvmStatic
+    fun apply(overrides: Map<String, List<String>>, keyLabel: String?, specs: Array<String>?): Array<String>? {
+        if (keyLabel == null || specs == null) return null
+        val wanted = overrides[keyLabel] ?: return null
+        val byLabel = LinkedHashMap<String, String>()
+        for (spec in specs) byLabel.putIfAbsent(KeySpecParser.getLabel(spec) ?: spec, spec)
+        return wanted.mapNotNull { byLabel[it] }.toTypedArray()
+    }
+}

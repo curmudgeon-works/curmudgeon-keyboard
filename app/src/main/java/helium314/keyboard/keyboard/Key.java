@@ -21,6 +21,7 @@ import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode;
 import helium314.keyboard.keyboard.internal.keyboard_parser.floris.PopupSet;
 import helium314.keyboard.latin.common.Constants;
 import helium314.keyboard.latin.common.StringUtils;
+import helium314.keyboard.latin.utils.KeyPopupOverrides;
 import helium314.keyboard.latin.utils.PopupKeysUtilsKt;
 import helium314.keyboard.latin.utils.ToolbarKey;
 import helium314.keyboard.latin.utils.ToolbarUtilsKt;
@@ -1095,7 +1096,10 @@ public class Key implements Comparable<Key> {
             // popupKeys
             final String[] popupKeys = PopupKeysUtilsKt.createPopupKeysArray(popupSet, mKeyboardParams, label != null ? label : keySpec);
             mPopupKeysColumnAndFlags = getPopupKeysColumnAndFlagsAndSetNullInArray(params, popupKeys);
-            final String[] finalPopupKeys = popupKeys == null ? null : PopupKeySpec.filterOutEmptyString(popupKeys);
+            String[] finalPopupKeys = popupKeys == null ? null : PopupKeySpec.filterOutEmptyString(popupKeys);
+            // the user's own arrangement for this key, if any (letters and digits: the label is the same in both cases)
+            final String[] overridden = KeyPopupOverrides.apply(params.mKeyPopupOverrides, label, finalPopupKeys);
+            if (overridden != null) finalPopupKeys = overridden.length == 0 ? null : overridden;
             if (finalPopupKeys != null) {
                 actionFlags |= ACTION_FLAGS_ENABLE_LONG_PRESS;
                 mPopupKeys = new PopupKeySpec[finalPopupKeys.length];
@@ -1111,7 +1115,10 @@ public class Key implements Comparable<Key> {
                 mHintLabel = null;
             } else {
                 // maybe also always null for comma and period keys
-                final String hintLabel = PopupKeysUtilsKt.getHintLabel(popupSet, params, keySpec);
+                // with an own arrangement the hint is its first popup, otherwise the first of the generated ones
+                final String hintLabel = overridden != null
+                        ? (overridden.length == 0 ? null : KeySpecParser.getLabel(overridden[0]))
+                        : PopupKeysUtilsKt.getHintLabel(popupSet, params, keySpec);
                 mHintLabel = needsToUpcase
                         ? StringUtils.toTitleCaseOfKeyLabel(hintLabel, localeForUpcasing)
                         : hintLabel;

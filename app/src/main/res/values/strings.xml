@@ -296,6 +296,15 @@
     <string name="remove_suggestion">Remove \"%s\" from suggestions?</string>
     <string name="no_dictionary_short">No dictionary</string>
     <string name="keyboard_languages">Languages</string>
+    <string name="key_popups_title">Long-press popups</string>
+    <string name="key_popups_summary">What holding a key offers. Switch popups off or drag them into the order you want; the first one is shown as the key\'s hint.</string>
+    <string name="key_popups_letters">Letters and numbers</string>
+    <string name="key_popups_contextual">Keys that change with the text field</string>
+    <string name="key_popups_variant_text">text</string>
+    <string name="key_popups_variant_url">web address</string>
+    <string name="key_popups_variant_email">email</string>
+    <string name="key_popups_none">No popups</string>
+    <string name="key_popups_accents">Accented letters offered</string>
     <string name="language_other_script">Different script, needs its own keyboard</string>
     <string name="add_language">Add language</string>
     <string name="add_keyboard">Add keyboard</string>

@@ -1,0 +1,283 @@
+// SPDX-License-Identifier: GPL-3.0-only
+package helium314.keyboard.settings.screens
+
+import android.content.Context
+import android.text.InputType
+import android.view.inputmethod.EditorInfo
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import helium314.keyboard.keyboard.Key
+import helium314.keyboard.keyboard.KeyboardId
+import helium314.keyboard.keyboard.KeyboardLayoutSet
+import helium314.keyboard.latin.R
+import helium314.keyboard.latin.RichInputMethodSubtype
+import helium314.keyboard.latin.settings.Defaults
+import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.settings.SettingsSubtype
+import helium314.keyboard.latin.utils.KeyPopupOverrides
+import helium314.keyboard.latin.utils.ResourceUtils
+import helium314.keyboard.latin.utils.prefs
+import helium314.keyboard.keyboard.internal.keyboard_parser.morePopupKeysResId
+import helium314.keyboard.keyboard.internal.keyboard_parser.POPUP_KEYS_ALL
+import helium314.keyboard.keyboard.internal.keyboard_parser.POPUP_KEYS_MAIN
+import helium314.keyboard.keyboard.internal.keyboard_parser.POPUP_KEYS_MORE
+import helium314.keyboard.keyboard.internal.keyboard_parser.POPUP_KEYS_NORMAL
+import helium314.keyboard.latin.common.Constants.Subtype.ExtraValue
+import helium314.keyboard.latin.utils.NextScreenIcon
+import helium314.keyboard.latin.utils.SubtypeUtilsAdditional
+import helium314.keyboard.settings.dialogs.ListPickerDialog
+import helium314.keyboard.settings.SearchSettingsScreen
+import kotlin.math.roundToInt
+
+/**
+ * Every key of a keyboard with its long-press popups, each popup switchable and draggable. The first enabled
+ * popup is the key's hint. Two folding groups: letters and digits, and the keys that change with the text
+ * field (comma, period, ... in plain text, web address and email fields), each variant on its own.
+ */
+@Composable
+fun KeyPopupsScreen(initialKeyboard: SettingsSubtype, onClickBack: () -> Unit) {
+    val ctx = LocalContext.current
+    val prefs = ctx.prefs()
+    var keyboard by remember { mutableStateOf(initialKeyboard) }
+    var generation by remember { mutableIntStateOf(0) }
+    var showAccentsDialog by remember { mutableStateOf(false) }
+    val groups = remember(keyboard, generation) { keysWithPopups(ctx, keyboard) }
+    val overrides = remember(generation) { KeyPopupOverrides.load(prefs) }
+    val unfolded = remember { mutableStateListOf<String>() }
+    SearchSettingsScreen(
+        onClickBack = onClickBack,
+        title = stringResource(R.string.key_popups_title),
+        settings = emptyList(),
+    ) {
+        Scaffold(contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)) { innerPadding ->
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(innerPadding).padding(horizontal = 12.dp)) {
+                Text(
+                    stringResource(R.string.key_popups_summary),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+                // which accented letters exist in the pool at all (upstream's "more letters with diacritics")
+                val accentsValue = keyboard.getExtraValueOf(ExtraValue.MORE_POPUPS)
+                    ?: prefs.getString(Settings.PREF_MORE_POPUP_KEYS, Defaults.PREF_MORE_POPUP_KEYS)!!
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().clickable { showAccentsDialog = true }.padding(vertical = 10.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.key_popups_accents), style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(morePopupKeysResId(accentsValue)), style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    NextScreenIcon()
+                }
+                if (showAccentsDialog)
+                    ListPickerDialog(
+                        onDismissRequest = { showAccentsDialog = false },
+                        items = listOf(POPUP_KEYS_NORMAL, POPUP_KEYS_MAIN, POPUP_KEYS_MORE, POPUP_KEYS_ALL),
+                        getItemName = { stringResource(morePopupKeysResId(it)) },
+                        selectedItem = accentsValue,
+                        onItemSelected = {
+                            val changed = keyboard.with(ExtraValue.MORE_POPUPS, it)
+                            SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, changed, ctx)
+                            keyboard = changed
+                            generation++
+                        }
+                    )
+                for ((groupTitle, keys) in groups) {
+                    val groupId = "group:$groupTitle"
+                    FoldRow(title = stringResource(groupTitle), unfolded = groupId in unfolded, style = MaterialTheme.typography.titleMedium) {
+                        if (groupId in unfolded) unfolded.remove(groupId) else unfolded.add(groupId)
+                    }
+                    if (groupId !in unfolded) continue
+                    for (keyInfo in keys) key(groupTitle, keyInfo.label) {
+                        val id = "$groupTitle:${keyInfo.label}"
+                        val override = overrides[keyInfo.label]
+                        val summary = (override ?: keyInfo.popups).joinToString(" ")
+                        FoldRow(
+                            title = keyInfo.title,
+                            subtitle = summary.ifEmpty { stringResource(R.string.key_popups_none) },
+                            unfolded = id in unfolded,
+                            changed = override != null,
+                            modifier = Modifier.padding(start = 12.dp),
+                        ) { if (id in unfolded) unfolded.remove(id) else unfolded.add(id) }
+                        if (id in unfolded)
+                            PopupEditor(
+                                allPopups = keyInfo.popups,
+                                enabledInOrder = override ?: keyInfo.popups,
+                                onChanged = { KeyPopupOverrides.set(prefs, keyInfo.label, it); generation++ },
+                                onReset = { KeyPopupOverrides.set(prefs, keyInfo.label, null); generation++ },
+                                modifier = Modifier.padding(start = 24.dp),
+                            )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private class KeyInfo(val label: String, val title: String, val popups: List<String>)
+
+/** Builds the keyboard for plain text, web address and email fields and collects each key's popups. */
+private fun keysWithPopups(ctx: Context, keyboard: SettingsSubtype): List<Pair<Int, List<KeyInfo>>> {
+    val prefs = ctx.prefs()
+    val width = ResourceUtils.getKeyboardWidth(ctx, Settings.getValues())
+    val numberRow = prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW)
+    fun keysFor(inputType: Int, variant: Int?): List<Key> {
+        val editorInfo = EditorInfo().apply { this.inputType = inputType }
+        val layoutSet = KeyboardLayoutSet.Builder(ctx, editorInfo)
+            .setSubtype(RichInputMethodSubtype.get(keyboard.toAdditionalSubtype()))
+            .setKeyboardGeometry(width, width) // height doesn't matter for the popups
+            .setNumberRowEnabled(numberRow)
+            .build()
+        return layoutSet.getKeyboard(KeyboardId.ELEMENT_ALPHABET).sortedKeys.filter { it.code > 0 && it.label != null }
+    }
+    fun popupsOf(key: Key) = key.popupKeys?.mapNotNull { it.mLabel ?: it.mOutputText }?.filter { it.isNotBlank() }.orEmpty()
+
+    val plain = keysFor(InputType.TYPE_CLASS_TEXT, null)
+    val letters = plain.filter { Character.isLetterOrDigit(it.code) }.map { KeyInfo(it.label!!, it.label!!, popupsOf(it)) }
+    // the other keys, in every text field variant they show up in
+    val contextual = LinkedHashMap<String, KeyInfo>()
+    val variants = listOf(
+        R.string.key_popups_variant_text to InputType.TYPE_CLASS_TEXT,
+        R.string.key_popups_variant_url to (InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI),
+        R.string.key_popups_variant_email to (InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS),
+    )
+    for ((variantName, inputType) in variants) {
+        for (key in keysFor(inputType, null).filter { !Character.isLetterOrDigit(it.code) }) {
+            val label = key.label!!
+            if (label in contextual) continue
+            val popups = popupsOf(key)
+            if (popups.isEmpty()) continue
+            contextual[label] = KeyInfo(label, "$label  (${ctx.getString(variantName)})", popups)
+        }
+    }
+    return listOf(R.string.key_popups_letters to letters, R.string.key_popups_contextual to contextual.values.toList())
+}
+
+@Composable
+private fun FoldRow(
+    title: String,
+    unfolded: Boolean,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    changed: Boolean = false,
+    style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.bodyLarge,
+    onClick: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier.fillMaxWidth().clickable { onClick() }.padding(vertical = 10.dp)
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title + if (changed) " •" else "", style = style)
+            if (subtitle != null)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Icon(painterResource(R.drawable.ic_arrow_left), null, Modifier.rotate(if (unfolded) 90f else -90f))
+    }
+}
+
+/** The popups of one key: switch on/off, drag the grip to reorder; the first enabled one is the hint. */
+@Composable
+private fun PopupEditor(
+    allPopups: List<String>,
+    enabledInOrder: List<String>,
+    onChanged: (List<String>) -> Unit,
+    onReset: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // enabled ones in their order, then the disabled ones
+    val items = remember(allPopups, enabledInOrder) {
+        mutableStateListOf(*(enabledInOrder.filter { it in allPopups } + allPopups.filter { it !in enabledInOrder }).toTypedArray())
+    }
+    val enabled = remember(enabledInOrder) { mutableStateListOf(*enabledInOrder.toTypedArray()) }
+    val heights = remember { mutableStateMapOf<String, Int>() }
+    var dragging: String? by remember { mutableStateOf(null) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    fun commit() = onChanged(items.filter { it in enabled })
+    Column(modifier) {
+        for (popup in items) key(popup) {
+            val isDragged = dragging == popup
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onSizeChanged { heights[popup] = it.height }
+                    .offset { IntOffset(0, if (isDragged) dragOffset.roundToInt() else 0) }
+                    .zIndex(if (isDragged) 1f else 0f)
+            ) {
+                Text("≡", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(end = 16.dp).pointerInput(popup, items) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            down.consume()
+                            dragging = popup
+                            dragOffset = 0f
+                            drag(down.id) { change ->
+                                val dy = change.positionChange().y
+                                change.consume()
+                                dragOffset += dy
+                                val index = items.indexOf(popup)
+                                if (dy > 0 && index < items.lastIndex) {
+                                    val below = heights[items[index + 1]] ?: 0
+                                    if (dragOffset > below / 2f) { items.add(index + 1, items.removeAt(index)); dragOffset -= below }
+                                } else if (dy < 0 && index > 0) {
+                                    val above = heights[items[index - 1]] ?: 0
+                                    if (dragOffset < -above / 2f) { items.add(index - 1, items.removeAt(index)); dragOffset += above }
+                                }
+                            }
+                            dragging = null
+                            dragOffset = 0f
+                            commit()
+                        }
+                    })
+                Text(popup, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Switch(checked = popup in enabled, onCheckedChange = { on ->
+                    if (on) enabled.add(popup) else enabled.remove(popup)
+                    commit()
+                })
+            }
+        }
+        TextButton(onClick = onReset, modifier = Modifier.align(Alignment.End)) { Text(stringResource(R.string.button_default)) }
+    }
+}

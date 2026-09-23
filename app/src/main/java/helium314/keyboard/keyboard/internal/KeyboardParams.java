@@ -88,6 +88,8 @@ public class KeyboardParams {
     public final List<Locale> mSecondaryLocales = Settings.getValues().mSecondaryLocales;
     public final ArrayList<String> mPopupKeyTypes = new ArrayList<>();
     public final ArrayList<String> mPopupKeyLabelSources = new ArrayList<>();
+    // the user's per-key popup arrangement (key label -> popup labels in order), see KeyPopupOverrides
+    public java.util.Map<String, java.util.List<String>> mKeyPopupOverrides = java.util.Collections.emptyMap();
 
     @NonNull
     private final UniqueKeysCache mUniqueKeysCache;
