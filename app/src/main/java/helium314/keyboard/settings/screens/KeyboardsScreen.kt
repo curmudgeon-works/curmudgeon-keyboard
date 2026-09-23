@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -65,7 +66,7 @@ fun KeyboardsScreen(
     var separate by remember { mutableStateOf(KeyboardProfiles.isSeparate(real)) }
     var askEnable by remember { mutableStateOf(false) } // some keyboards have an older set: keep or reset?
     var askDisable by remember { mutableStateOf(false) } // which set becomes the shared one?
-    var expanded: SettingsSubtype? by remember { mutableStateOf(null) }
+    val expanded = remember { mutableStateListOf<SettingsSubtype>() } // several keyboards can be unfolded at once
     // the settings screens edit the shared set unless a keyboard's own section was entered
     KeyboardProfiles.editingId = KeyboardProfiles.SHARED
     var generation by remember { mutableIntStateOf(0) } // re-read the keyboards after a delete
@@ -86,7 +87,7 @@ fun KeyboardsScreen(
                             else {
                                 KeyboardProfiles.enable(real, keyboards, keepExisting = true)
                                 separate = true
-                                expanded = SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype() // show where the sections went
+                                expanded.add(SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype()) // show where the sections went
                             }
                         } else askDisable = true
                         KeyboardProfiles.refreshImeId(real)
@@ -114,12 +115,12 @@ fun KeyboardsScreen(
                     // press and hold: delete it (while another remains)
                     // a single keyboard has nothing to fold: its sections are listed below like the shared ones
                     val folding = separate && enabled.size > 1
-                    val isExpanded = folding && expanded == keyboard
+                    val isExpanded = folding && keyboard in expanded
                     Preference(
                         name = keyboardName(keyboard, ctx),
                         description = subtype.mainLayoutName()?.getStringResourceOrName("layout_", ctx) ?: "",
                         onClick = {
-                            if (folding) expanded = if (isExpanded) null else keyboard
+                            if (folding) { if (isExpanded) expanded.remove(keyboard) else expanded.add(keyboard) }
                             else {
                                 if (separate) KeyboardProfiles.editingId = KeyboardProfiles.idFor(real, keyboard)
                                 SettingsDestination.navigateTo(SettingsDestination.Languages + keyboard.toPref())
@@ -165,8 +166,8 @@ fun KeyboardsScreen(
         if (askEnable)
             ConfirmationDialog(
                 onDismissRequest = { askEnable = false },
-                onConfirmed = { KeyboardProfiles.enable(real, enabledNow, keepExisting = true); KeyboardProfiles.refreshImeId(real); separate = true; askEnable = false; expanded = SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype() },
-                onNeutral = { KeyboardProfiles.enable(real, enabledNow, keepExisting = false); KeyboardProfiles.refreshImeId(real); separate = true; askEnable = false; expanded = SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype() },
+                onConfirmed = { KeyboardProfiles.enable(real, enabledNow, keepExisting = true); KeyboardProfiles.refreshImeId(real); separate = true; askEnable = false; expanded.add(SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype()) },
+                onNeutral = { KeyboardProfiles.enable(real, enabledNow, keepExisting = false); KeyboardProfiles.refreshImeId(real); separate = true; askEnable = false; expanded.add(SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype()) },
                 title = { Text(stringResource(R.string.separate_settings_per_keyboard)) },
                 content = { Text(stringResource(R.string.separate_settings_enable_message)) },
                 confirmButtonText = stringResource(R.string.separate_settings_keep),
