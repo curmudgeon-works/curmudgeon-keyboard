@@ -2,6 +2,7 @@
 package helium314.keyboard.latin.utils
 
 import android.content.SharedPreferences
+import helium314.keyboard.keyboard.KeyboardId
 import helium314.keyboard.keyboard.internal.KeySpecParser
 import org.json.JSONArray
 import org.json.JSONObject
@@ -41,10 +42,18 @@ object KeyPopupOverrides {
      * The generated popup specs of a key, rearranged as the user wants: the chosen labels in their order, dropping
      * everything else. Null when the key has no override. Matching is by the spec's label.
      */
+    /** Override key for a key: symbol-page keys are kept apart from same-looking keys of the letter page. */
     @JvmStatic
-    fun apply(overrides: Map<String, List<String>>, keyLabel: String?, specs: Array<String>?): Array<String>? {
+    fun overrideKey(elementId: Int, keyLabel: String): String = when (elementId) {
+        KeyboardId.ELEMENT_SYMBOLS -> "symbols:$keyLabel"
+        KeyboardId.ELEMENT_SYMBOLS_SHIFTED -> "symbols_shifted:$keyLabel"
+        else -> keyLabel
+    }
+
+    @JvmStatic
+    fun apply(overrides: Map<String, List<String>>, elementId: Int, keyLabel: String?, specs: Array<String>?): Array<String>? {
         if (keyLabel == null) return null
-        val wanted = overrides[keyLabel] ?: return null
+        val wanted = overrides[overrideKey(elementId, keyLabel)] ?: return null
         val byLabel = LinkedHashMap<String, String>()
         for (spec in specs.orEmpty()) byLabel.putIfAbsent(KeySpecParser.getLabel(spec) ?: spec, spec)
         // a label the generator didn't produce (from the full accent pool, or the user's own) becomes a plain key spec

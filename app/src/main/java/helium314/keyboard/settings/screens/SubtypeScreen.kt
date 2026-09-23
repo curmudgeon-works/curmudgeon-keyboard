@@ -201,7 +201,8 @@ fun SubtypeScreen(
                     style = MaterialTheme.typography.titleMedium
                 )
                 LayoutType.entries.forEach { type ->
-                    if (type == LayoutType.MAIN) return@forEach
+                    // the symbols page is covered by the long-press popup editor; its script variant follows the language
+                    if (type == LayoutType.MAIN || type == LayoutType.SYMBOLS) return@forEach
                     WithSmallTitle(stringResource(type.displayNameId)) {
                         val explicitLayout = currentSubtype.layoutName(type)
                         val layout = explicitLayout ?: Settings.readDefaultLayoutName(type, prefs)

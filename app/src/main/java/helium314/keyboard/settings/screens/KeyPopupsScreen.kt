@@ -130,9 +130,9 @@ fun KeyPopupsScreen(initialKeyboard: SettingsSubtype, onClickBack: () -> Unit) {
                         if (groupId in unfolded) unfolded.remove(groupId) else unfolded.add(groupId)
                     }
                     if (groupId !in unfolded) continue
-                    for (keyInfo in keys) key(groupTitle, keyInfo.label) {
-                        val id = "$groupTitle:${keyInfo.label}"
-                        val override = overrides[keyInfo.label]
+                    for (keyInfo in keys) key(groupTitle, keyInfo.overrideKey) {
+                        val id = "$groupTitle:${keyInfo.overrideKey}"
+                        val override = overrides[keyInfo.overrideKey]
                         val summary = (override ?: keyInfo.popups).joinToString(" ")
                         FoldRow(
                             title = keyInfo.title,
@@ -145,8 +145,8 @@ fun KeyPopupsScreen(initialKeyboard: SettingsSubtype, onClickBack: () -> Unit) {
                             PopupEditor(
                                 allPopups = (keyInfo.pool + override.orEmpty()).distinct(), // the user's own additions too
                                 enabledInOrder = override ?: keyInfo.popups,
-                                onChanged = { KeyPopupOverrides.set(prefs, keyInfo.label, it); generation++ },
-                                onReset = { KeyPopupOverrides.set(prefs, keyInfo.label, null); generation++ },
+                                onChanged = { KeyPopupOverrides.set(prefs, keyInfo.overrideKey, it); generation++ },
+                                onReset = { KeyPopupOverrides.set(prefs, keyInfo.overrideKey, null); generation++ },
                                 modifier = Modifier.padding(start = 24.dp),
                             )
                     }
@@ -157,21 +157,21 @@ fun KeyPopupsScreen(initialKeyboard: SettingsSubtype, onClickBack: () -> Unit) {
 }
 
 /** [popups] = what the key offers by default; [pool] = everything relevant to it (defaults first), for adding. */
-private class KeyInfo(val label: String, val title: String, val popups: List<String>, val pool: List<String>)
+private class KeyInfo(val label: String, val title: String, val popups: List<String>, val pool: List<String>, val overrideKey: String = label)
 
 /** Builds the keyboard for plain text, web address and email fields and collects each key's popups. */
 private fun keysWithPopups(ctx: Context, keyboard: SettingsSubtype): List<Pair<Int, List<KeyInfo>>> {
     val prefs = ctx.prefs()
     val width = ResourceUtils.getKeyboardWidth(ctx, Settings.getValues())
     val numberRow = prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW)
-    fun keysFor(inputType: Int, subtype: SettingsSubtype = keyboard): List<Key> {
+    fun keysFor(inputType: Int, subtype: SettingsSubtype = keyboard, element: Int = KeyboardId.ELEMENT_ALPHABET): List<Key> {
         val editorInfo = EditorInfo().apply { this.inputType = inputType }
         val layoutSet = KeyboardLayoutSet.Builder(ctx, editorInfo)
             .setSubtype(RichInputMethodSubtype.get(subtype.toAdditionalSubtype()))
             .setKeyboardGeometry(width, width) // height doesn't matter for the popups
             .setNumberRowEnabled(numberRow)
             .build()
-        return layoutSet.getKeyboard(KeyboardId.ELEMENT_ALPHABET).sortedKeys.filter { it.code > 0 && it.label != null }
+        return layoutSet.getKeyboard(element).sortedKeys.filter { it.code > 0 && it.label != null }
     }
     fun popupsOf(key: Key) = key.popupKeys?.mapNotNull { it.mLabel ?: it.mOutputText }?.filter { it.isNotBlank() }.orEmpty()
 
@@ -199,7 +199,17 @@ private fun keysWithPopups(ctx: Context, keyboard: SettingsSubtype): List<Pair<I
             contextual[label] = KeyInfo(label, "$label  (${ctx.getString(variantName)})", popups, popups)
         }
     }
-    return listOf(R.string.key_popups_letters to letters, R.string.key_popups_contextual to contextual.values.toList())
+    // the two symbol pages: every key with popups, kept apart from same-looking keys of the letter page
+    fun symbolPage(element: Int) = keysFor(InputType.TYPE_CLASS_TEXT, element = element)
+        .filter { !Character.isLetterOrDigit(it.code) }
+        .map { KeyInfo(it.label!!, it.label!!, popupsOf(it), popupsOf(it), KeyPopupOverrides.overrideKey(element, it.label!!)) }
+        .filter { it.popups.isNotEmpty() || true }
+    return listOf(
+        R.string.key_popups_letters to letters,
+        R.string.key_popups_contextual to contextual.values.toList(),
+        R.string.key_popups_symbols to symbolPage(KeyboardId.ELEMENT_SYMBOLS),
+        R.string.key_popups_more_symbols to symbolPage(KeyboardId.ELEMENT_SYMBOLS_SHIFTED),
+    )
 }
 
 @Composable

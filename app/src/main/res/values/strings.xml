@@ -304,6 +304,8 @@
     <string name="key_popups_variant_url">web address</string>
     <string name="key_popups_variant_email">email</string>
     <string name="key_popups_none">No popups</string>
+    <string name="key_popups_symbols">Symbols page</string>
+    <string name="key_popups_more_symbols">More symbols page</string>
     <string name="key_popups_accents">Accented letters on by default</string>
     <string name="key_popups_add">Add your own</string>
     <string name="key_popups_add_button">Add</string>
