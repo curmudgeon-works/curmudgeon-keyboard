@@ -306,7 +306,12 @@
     <string name="key_popups_none">No popups</string>
     <string name="key_popups_symbols">Symbols page</string>
     <string name="key_popups_more_symbols">More symbols page</string>
-    <string name="key_popups_accents">Accented letters on by default</string>
+    <string name="key_popups_presets">Popup defaults</string>
+    <string name="key_popups_preset_standard">Standard</string>
+    <string name="key_popups_preset_main">Main accented letters</string>
+    <string name="key_popups_preset_more">More accented letters</string>
+    <string name="key_popups_preset_all">All accented letters</string>
+    <string name="key_popups_preset_arabic">Arabic-script symbols</string>
     <string name="key_popups_add">Add your own</string>
     <string name="key_popups_add_button">Add</string>
     <string name="language_other_script">Different script, needs its own keyboard</string>
