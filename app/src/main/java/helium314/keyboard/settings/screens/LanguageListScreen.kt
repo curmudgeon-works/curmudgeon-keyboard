@@ -79,21 +79,24 @@ fun LanguageListScreen(
                 )
             }
         },
+        // the layout row is the first list item (a content block would replace the list)
         filteredItems = { term ->
-            languages.filter { locale ->
+            val matching = languages.filter { locale ->
                 locale.localizedDisplayName(ctx.resources).replace("(", "")
                     .splitOnWhitespace().any { it.startsWith(term, true) }
             }
+            if (term.isBlank()) listOf<Any>(LayoutRowMarker) + matching else matching
         },
-        itemContent = { LanguageRow(it, keyboard, ::setKeyboard) },
-        content = {
-            Preference(
-                name = stringResource(R.string.keyboard_layout_set),
-                description = keyboard.mainLayoutName()?.getStringResourceOrName("layout_", ctx) ?: "",
-                onClick = { SettingsDestination.navigateTo(SettingsDestination.Subtype + keyboard.toPref()) },
-                icon = R.drawable.ic_settings_languages
-            ) { NextScreenIcon() }
-        }
+        itemContent = { item ->
+            if (item === LayoutRowMarker)
+                Preference(
+                    name = stringResource(R.string.keyboard_layout_set),
+                    description = keyboard.mainLayoutName()?.getStringResourceOrName("layout_", ctx) ?: "",
+                    onClick = { SettingsDestination.navigateTo(SettingsDestination.Subtype + keyboard.toPref()) },
+                    icon = R.drawable.ic_settings_languages
+                ) { NextScreenIcon() }
+            else LanguageRow(item as Locale, keyboard, ::setKeyboard)
+        },
     )
 }
 
@@ -187,6 +190,7 @@ private fun LanguageRow(locale: Locale, keyboard: SettingsSubtype, setKeyboard: 
 }
 
 private const val OFF = 0
+private object LayoutRowMarker
 
 /**
  * Apply a priority change to a keyboard: [OFF] removes the language, a priority adds it if needed and stores it;
