@@ -157,7 +157,8 @@ fun SubtypeScreen(
         filteredItems = { emptyList<String>() }
     ) {
         Scaffold(
-            contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
+            contentWindowInsets = WindowInsets(0),
+            bottomBar = { TryItBar(currentSubtype) }
         ) { innerPadding ->
             Column(
                 modifier = Modifier.verticalScroll(scrollState).padding(horizontal = 12.dp)
@@ -166,10 +167,7 @@ fun SubtypeScreen(
             ) {
                 MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) }
                 WithSmallTitle(stringResource(R.string.key_popups_title)) {
-                    ActionRow(onClick = { SettingsDestination.navigateTo(SettingsDestination.KeyPopups + currentSubtype.toPref()) }) {
-                        Text(stringResource(R.string.key_popups_summary), modifier = Modifier.weight(1f).padding(start = 10.dp))
-                        NextScreenIcon()
-                    }
+                    KeyPopupsSection(currentSubtype) { setCurrentSubtype(it) }
                 }
                 if (hasLocalizedNumberRow(currentSubtype.locale, ctx)) {
                     val checked = currentSubtype.getExtraValueOf(ExtraValue.LOCALIZED_NUMBER_ROW)?.toBoolean()

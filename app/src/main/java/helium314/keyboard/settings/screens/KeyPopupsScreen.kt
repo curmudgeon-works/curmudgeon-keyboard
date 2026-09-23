@@ -17,12 +17,9 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.drag
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -74,7 +71,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.focus.onFocusChanged
 import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.latin.RichInputMethodManager
-import helium314.keyboard.settings.SearchSettingsScreen
 import kotlin.math.roundToInt
 
 /**
@@ -82,113 +78,106 @@ import kotlin.math.roundToInt
  * popup is the key's hint. Two folding groups: letters and digits, and the keys that change with the text
  * field (comma, period, ... in plain text, web address and email fields), each variant on its own.
  */
+/** The long-press popups of a keyboard as an inline section: the presets row, then the key groups, foldable. */
 @Composable
-fun KeyPopupsScreen(initialKeyboard: SettingsSubtype, onClickBack: () -> Unit) {
+fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubtype) -> Unit) {
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
-    var keyboard by remember { mutableStateOf(initialKeyboard) }
     var generation by remember { mutableIntStateOf(0) }
     var showAccentsDialog by remember { mutableStateOf(false) }
     val groups = remember(keyboard, generation) { keysWithPopups(ctx, keyboard) }
     val overrides = remember(generation) { KeyPopupOverrides.load(prefs) }
     val unfolded = remember { mutableStateListOf<String>() }
-    SearchSettingsScreen(
-        onClickBack = onClickBack,
-        title = stringResource(R.string.key_popups_title),
-        settings = emptyList(),
-    ) {
-        val tryItBar: @Composable () -> Unit = {
-            var tryText by remember { mutableStateOf("") }
-            Surface(tonalElevation = 3.dp, shadowElevation = 8.dp) {
-                OutlinedTextField(
-                    value = tryText, onValueChange = { tryText = it },
-                    label = { Text(stringResource(R.string.key_popups_try)) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
-                        .onFocusChanged { if (it.isFocused) showKeyboardForPreview(keyboard) }
-                )
+    Column {
+        Text(
+            stringResource(R.string.key_popups_summary),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(vertical = 8.dp)
+        )
+        // presets: the generated defaults for every key at once (the user's own per-key edits stay on top)
+        val presets = listOf(
+            Preset(R.string.key_popups_preset_standard, POPUP_KEYS_NORMAL, null),
+            Preset(R.string.key_popups_preset_main, POPUP_KEYS_MAIN, null),
+            Preset(R.string.key_popups_preset_more, POPUP_KEYS_MORE, null),
+            Preset(R.string.key_popups_preset_all, POPUP_KEYS_ALL, null),
+            Preset(R.string.key_popups_preset_arabic, POPUP_KEYS_NORMAL, "symbols_arabic"),
+        )
+        val accentsValue = keyboard.getExtraValueOf(ExtraValue.MORE_POPUPS)
+            ?: prefs.getString(Settings.PREF_MORE_POPUP_KEYS, Defaults.PREF_MORE_POPUP_KEYS)!!
+        val symbolsLayout = keyboard.layoutName(LayoutType.SYMBOLS)
+        val current = presets.firstOrNull { it.morePopups == accentsValue && it.symbolsLayout == symbolsLayout } ?: presets[0]
+        Row(verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().clickable { showAccentsDialog = true }.padding(vertical = 10.dp)) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.key_popups_presets), style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(current.name), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            NextScreenIcon()
         }
-        Scaffold(contentWindowInsets = WindowInsets(0), bottomBar = tryItBar) { innerPadding ->
-            Column(Modifier.verticalScroll(rememberScrollState()).padding(innerPadding).padding(horizontal = 12.dp)) {
-                Text(
-                    stringResource(R.string.key_popups_summary),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-                // presets: the generated defaults for every key at once (the user's own per-key edits stay on top)
-                val presets = listOf(
-                    Preset(R.string.key_popups_preset_standard, POPUP_KEYS_NORMAL, null),
-                    Preset(R.string.key_popups_preset_main, POPUP_KEYS_MAIN, null),
-                    Preset(R.string.key_popups_preset_more, POPUP_KEYS_MORE, null),
-                    Preset(R.string.key_popups_preset_all, POPUP_KEYS_ALL, null),
-                    Preset(R.string.key_popups_preset_arabic, POPUP_KEYS_NORMAL, "symbols_arabic"),
-                )
-                val accentsValue = keyboard.getExtraValueOf(ExtraValue.MORE_POPUPS)
-                    ?: prefs.getString(Settings.PREF_MORE_POPUP_KEYS, Defaults.PREF_MORE_POPUP_KEYS)!!
-                val symbolsLayout = keyboard.layoutName(LayoutType.SYMBOLS)
-                val current = presets.firstOrNull { it.morePopups == accentsValue && it.symbolsLayout == symbolsLayout } ?: presets[0]
-                Row(verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().clickable { showAccentsDialog = true }.padding(vertical = 10.dp)) {
-                    Column(Modifier.weight(1f)) {
-                        Text(stringResource(R.string.key_popups_presets), style = MaterialTheme.typography.bodyLarge)
-                        Text(stringResource(current.name), style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    NextScreenIcon()
+        if (showAccentsDialog)
+            ListPickerDialog(
+                onDismissRequest = { showAccentsDialog = false },
+                items = presets,
+                getItemName = { stringResource(it.name) },
+                selectedItem = current,
+                onItemSelected = { preset ->
+                    var changed = keyboard.with(ExtraValue.MORE_POPUPS, preset.morePopups)
+                    changed = if (preset.symbolsLayout == null) changed.withoutLayout(LayoutType.SYMBOLS)
+                        else changed.withLayout(LayoutType.SYMBOLS, preset.symbolsLayout)
+                    onKeyboardChanged(changed)
+                    generation++
+                    reloadPreview()
                 }
-                if (showAccentsDialog)
-                    ListPickerDialog(
-                        onDismissRequest = { showAccentsDialog = false },
-                        items = presets,
-                        getItemName = { stringResource(it.name) },
-                        selectedItem = current,
-                        onItemSelected = { preset ->
-                            var changed = keyboard.with(ExtraValue.MORE_POPUPS, preset.morePopups)
-                            changed = if (preset.symbolsLayout == null) changed.withoutLayout(LayoutType.SYMBOLS)
-                                else changed.withLayout(LayoutType.SYMBOLS, preset.symbolsLayout)
-                            SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, changed, ctx)
-                            keyboard = changed
-                            generation++
-                            reloadPreview()
-                        }
+            )
+        for ((groupTitle, keys) in groups) {
+            val groupId = "group:$groupTitle"
+            FoldRow(title = stringResource(groupTitle), unfolded = groupId in unfolded, style = MaterialTheme.typography.titleMedium) {
+                if (groupId in unfolded) unfolded.remove(groupId) else unfolded.add(groupId)
+            }
+            if (groupId !in unfolded) continue
+            for (keyInfo in keys) key(groupTitle, keyInfo.overrideKey) {
+                val id = "$groupTitle:${keyInfo.overrideKey}"
+                val override = overrides[keyInfo.overrideKey]
+                val summary = (override ?: keyInfo.popups).joinToString(" ")
+                FoldRow(
+                    title = keyInfo.title,
+                    subtitle = summary.ifEmpty { stringResource(R.string.key_popups_none) },
+                    unfolded = id in unfolded,
+                    changed = override != null,
+                    modifier = Modifier.padding(start = 12.dp),
+                ) { if (id in unfolded) unfolded.remove(id) else unfolded.add(id) }
+                if (id in unfolded)
+                    PopupEditor(
+                        allPopups = (keyInfo.pool + override.orEmpty()).distinct(), // the user's own additions too
+                        enabledInOrder = override ?: keyInfo.popups,
+                        onChanged = { KeyPopupOverrides.set(prefs, keyInfo.overrideKey, it); generation++; reloadPreview() },
+                        onReset = { KeyPopupOverrides.set(prefs, keyInfo.overrideKey, null); generation++; reloadPreview() },
+                        modifier = Modifier.padding(start = 24.dp),
                     )
-                for ((groupTitle, keys) in groups) {
-                    val groupId = "group:$groupTitle"
-                    FoldRow(title = stringResource(groupTitle), unfolded = groupId in unfolded, style = MaterialTheme.typography.titleMedium) {
-                        if (groupId in unfolded) unfolded.remove(groupId) else unfolded.add(groupId)
-                    }
-                    if (groupId !in unfolded) continue
-                    for (keyInfo in keys) key(groupTitle, keyInfo.overrideKey) {
-                        val id = "$groupTitle:${keyInfo.overrideKey}"
-                        val override = overrides[keyInfo.overrideKey]
-                        val summary = (override ?: keyInfo.popups).joinToString(" ")
-                        FoldRow(
-                            title = keyInfo.title,
-                            subtitle = summary.ifEmpty { stringResource(R.string.key_popups_none) },
-                            unfolded = id in unfolded,
-                            changed = override != null,
-                            modifier = Modifier.padding(start = 12.dp),
-                        ) { if (id in unfolded) unfolded.remove(id) else unfolded.add(id) }
-                        if (id in unfolded)
-                            PopupEditor(
-                                allPopups = (keyInfo.pool + override.orEmpty()).distinct(), // the user's own additions too
-                                enabledInOrder = override ?: keyInfo.popups,
-                                onChanged = { KeyPopupOverrides.set(prefs, keyInfo.overrideKey, it); generation++; reloadPreview() },
-                                onReset = { KeyPopupOverrides.set(prefs, keyInfo.overrideKey, null); generation++; reloadPreview() },
-                                modifier = Modifier.padding(start = 24.dp),
-                            )
-                    }
-                }
             }
         }
     }
 }
 
-/** [popups] = what the key offers by default; [pool] = everything relevant to it (defaults first), for adding. */
+/** A text field to try the keyboard being edited: focusing it opens that keyboard, changes rebuild it live. */
+@Composable
+fun TryItBar(keyboard: SettingsSubtype) {
+    var tryText by remember { mutableStateOf("") }
+    Surface(tonalElevation = 3.dp, shadowElevation = 8.dp) {
+        OutlinedTextField(
+            value = tryText, onValueChange = { tryText = it },
+            label = { Text(stringResource(R.string.key_popups_try)) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                .onFocusChanged { if (it.isFocused) showKeyboardForPreview(keyboard) }
+        )
+    }
+}
+
 private class Preset(val name: Int, val morePopups: String, val symbolsLayout: String?)
 
 private class KeyInfo(val label: String, val title: String, val popups: List<String>, val pool: List<String>, val overrideKey: String = label)
