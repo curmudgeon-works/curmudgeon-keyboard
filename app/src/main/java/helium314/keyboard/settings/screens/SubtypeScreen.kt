@@ -74,6 +74,8 @@ import helium314.keyboard.latin.utils.LanguagePriority
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.latin.utils.getSecondaryLocales
 import helium314.keyboard.latin.utils.getStringResourceOrName
 import helium314.keyboard.latin.utils.htmlToAnnotated
@@ -148,6 +150,7 @@ fun SubtypeScreen(
         icon = { if (SubtypeSettings.getEnabledSubtypes(true).size > 1 && SubtypeSettings.isEnabled(currentSubtype.toAdditionalSubtype())) DeleteButton {
             if (currentSubtype.isAdditionalSubtype(prefs)) SubtypeUtilsAdditional.removeAdditionalSubtype(ctx, currentSubtype.toAdditionalSubtype())
             SubtypeSettings.removeEnabledSubtype(ctx, currentSubtype.toAdditionalSubtype())
+            KeyboardProfiles.onKeyboardDeleted(ctx.realPrefs(), currentSubtype)
             onClickBack()
         } },
         title = { Text(currentSubtype.toAdditionalSubtype().displayName()) },

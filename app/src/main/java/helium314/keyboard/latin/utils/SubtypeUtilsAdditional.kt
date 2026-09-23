@@ -11,6 +11,7 @@ import helium314.keyboard.latin.common.Constants.Separators
 import helium314.keyboard.latin.common.Constants.Subtype.ExtraValue
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Defaults.default
+import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
@@ -78,6 +79,7 @@ object SubtypeUtilsAdditional {
     @SuppressLint("UseKtx") // easier to understand
     fun changeAdditionalSubtype(from: SettingsSubtype, to: SettingsSubtype, context: Context) {
         val prefs = context.prefs()
+        KeyboardProfiles.onKeyboardChanged(context.realPrefs(), from, to)
         // read now because there may be an intermediate state where the subtype is invalid and thus removed
         val isSelected = prefs.getString(Settings.PREF_SELECTED_SUBTYPE, Defaults.PREF_SELECTED_SUBTYPE)!!.toSettingsSubtype() == from
         val isEnabled = prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!.split(Separators.SETS)

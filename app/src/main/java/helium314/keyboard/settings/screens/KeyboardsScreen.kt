@@ -37,6 +37,11 @@ import helium314.keyboard.settings.SettingsMode
 import androidx.compose.runtime.mutableIntStateOf
 import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.settings.dialogs.ConfirmationDialog
+import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.latin.utils.realPrefs
+import androidx.compose.material3.Icon
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.draw.rotate
 import helium314.keyboard.settings.dialogs.ListPickerDialog
 import helium314.keyboard.settings.preferences.Preference
 
@@ -53,6 +58,13 @@ fun KeyboardsScreen(
     val advanced by SettingsMode.state(ctx)
     var showAddKeyboard by remember { mutableStateOf(false) }
     var keyboardToDelete: SettingsSubtype? by remember { mutableStateOf(null) }
+    val real = ctx.realPrefs()
+    var separate by remember { mutableStateOf(KeyboardProfiles.isSeparate(real)) }
+    var askEnable by remember { mutableStateOf(false) } // some keyboards have an older set: keep or reset?
+    var askDisable by remember { mutableStateOf(false) } // which set becomes the shared one?
+    var expanded: SettingsSubtype? by remember { mutableStateOf(null) }
+    // the settings screens edit the shared set unless a keyboard's own section was entered
+    KeyboardProfiles.editingId = KeyboardProfiles.SHARED
     var generation by remember { mutableIntStateOf(0) } // re-read the keyboards after a delete
     SearchSettingsScreen(
         onClickBack = onClickBack,
@@ -69,14 +81,25 @@ fun KeyboardsScreen(
                 val enabled = SubtypeSettings.getEnabledSubtypes(true)
                 for (subtype in enabled) {
                     val keyboard = subtype.toSettingsSubtype()
-                    // tap: languages & layout of the keyboard; press and hold: delete it (while another remains)
+                    // tap: languages & layout of the keyboard (with separate settings: unfold all its sections);
+                    // press and hold: delete it (while another remains)
+                    val isExpanded = separate && expanded == keyboard
                     Preference(
                         name = keyboardName(keyboard, ctx),
                         description = subtype.mainLayoutName()?.getStringResourceOrName("layout_", ctx) ?: "",
-                        onClick = { SettingsDestination.navigateTo(SettingsDestination.Languages + keyboard.toPref()) },
+                        onClick = {
+                            if (separate) expanded = if (isExpanded) null else keyboard
+                            else SettingsDestination.navigateTo(SettingsDestination.Languages + keyboard.toPref())
+                        },
                         icon = R.drawable.ic_settings_languages,
                         onLongClick = if (enabled.size > 1) ({ keyboardToDelete = keyboard }) else null,
-                    ) { NextScreenIcon() }
+                    ) {
+                        if (separate) Icon(painterResource(R.drawable.ic_arrow_left), null, Modifier.rotate(if (isExpanded) 90f else -90f))
+                        else NextScreenIcon()
+                    }
+                    if (isExpanded)
+                        KeyboardSettingsEntries(keyboard, Modifier.padding(start = 24.dp),
+                            onEnter = { KeyboardProfiles.editingId = KeyboardProfiles.idFor(real, keyboard) })
                 }
                 Preference(
                     name = stringResource(R.string.add_keyboard),
@@ -85,22 +108,52 @@ fun KeyboardsScreen(
                 ) { NextScreenIcon() }
                 // the sections shared by all keyboards
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                KeyboardSettingsEntries(SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype(), showLanguages = false)
+                if (!separate)
+                    KeyboardSettingsEntries(SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype(), showLanguages = false)
                 Preference(
                     name = stringResource(R.string.settings_screen_about),
                     onClick = onClickAbout,
                     icon = R.drawable.ic_settings_about
                 ) { NextScreenIcon() }
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                // off = one set of settings for every keyboard (the sections below); on = each keyboard its own
-                // (not available yet: the switch is shown so the screen has its final shape)
+                // off = one set of settings for every keyboard (the sections above); on = each keyboard its own
+                fun toggle(on: Boolean) {
+                    if (on) {
+                        if (enabled.any { KeyboardProfiles.hasOwnSettings(real, it.toSettingsSubtype()) }) askEnable = true
+                        else { KeyboardProfiles.enable(real, enabled.map { it.toSettingsSubtype() }, keepExisting = true); separate = true }
+                    } else askDisable = true
+                    KeyboardProfiles.refreshImeId(real)
+                }
                 Preference(
                     name = stringResource(R.string.separate_settings_per_keyboard),
                     description = stringResource(R.string.separate_settings_per_keyboard_summary),
-                    onClick = {},
+                    onClick = { toggle(!separate) },
                     icon = R.drawable.ic_settings_preferences
-                ) { Switch(checked = false, onCheckedChange = null, enabled = false) }
+                ) { Switch(checked = separate, onCheckedChange = { toggle(it) }) }
             }
+        }
+        val enabledNow = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }
+        if (askEnable)
+            ConfirmationDialog(
+                onDismissRequest = { askEnable = false },
+                onConfirmed = { KeyboardProfiles.enable(real, enabledNow, keepExisting = true); KeyboardProfiles.refreshImeId(real); separate = true; askEnable = false },
+                onNeutral = { KeyboardProfiles.enable(real, enabledNow, keepExisting = false); KeyboardProfiles.refreshImeId(real); separate = true; askEnable = false },
+                title = { Text(stringResource(R.string.separate_settings_per_keyboard)) },
+                content = { Text(stringResource(R.string.separate_settings_enable_message)) },
+                confirmButtonText = stringResource(R.string.separate_settings_keep),
+                neutralButtonText = stringResource(R.string.separate_settings_reset),
+            )
+        if (askDisable) {
+            val current = SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype()
+            ConfirmationDialog(
+                onDismissRequest = { askDisable = false },
+                onConfirmed = { KeyboardProfiles.disable(real, current); KeyboardProfiles.refreshImeId(real); separate = false; askDisable = false },
+                onNeutral = { KeyboardProfiles.disable(real, null); KeyboardProfiles.refreshImeId(real); separate = false; askDisable = false },
+                title = { Text(stringResource(R.string.separate_settings_disable_title)) },
+                content = { Text(stringResource(R.string.separate_settings_disable_message, keyboardName(current, ctx))) },
+                confirmButtonText = stringResource(R.string.separate_settings_use_current),
+                neutralButtonText = stringResource(R.string.separate_settings_keep_shared),
+            )
         }
         keyboardToDelete?.let { keyboard ->
             ConfirmationDialog(
@@ -108,6 +161,7 @@ fun KeyboardsScreen(
                 onConfirmed = {
                     if (keyboard.isAdditionalSubtype(ctx.prefs())) SubtypeUtilsAdditional.removeAdditionalSubtype(ctx, keyboard.toAdditionalSubtype())
                     SubtypeSettings.removeEnabledSubtype(ctx, keyboard.toAdditionalSubtype())
+                    KeyboardProfiles.onKeyboardDeleted(real, keyboard)
                     keyboardToDelete = null
                     generation++
                 },
@@ -123,6 +177,9 @@ fun KeyboardsScreen(
                     val settingsSubtype = SubtypeUtilsAdditional.createDefaultSubtype(locale).toSettingsSubtype()
                     SubtypeUtilsAdditional.changeAdditionalSubtype(settingsSubtype, settingsSubtype, ctx) // registers it unless it equals a built-in one
                     SubtypeSettings.addEnabledSubtype(ctx.prefs(), settingsSubtype.toAdditionalSubtype())
+                    if (separate) // a new keyboard starts as a copy of the one in use
+                        KeyboardProfiles.copy(real, KeyboardProfiles.idFor(real, SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype()),
+                            KeyboardProfiles.idFor(real, settingsSubtype))
                     showAddKeyboard = false
                     generation++ // stays on this screen, the new keyboard appears at the end of the list
                 },

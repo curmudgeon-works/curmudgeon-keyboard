@@ -22,6 +22,8 @@ import helium314.keyboard.latin.utils.SubtypeLocaleUtils
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.getSecondaryLocales
 import helium314.keyboard.latin.utils.locale
+import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.latin.utils.prefs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -113,6 +115,7 @@ class RichInputMethodManager private constructor() {
 
     fun onSubtypeChanged(newSubtype: InputMethodSubtype) {
         SubtypeSettings.setSelectedSubtype(context.prefs(), newSubtype)
+        KeyboardProfiles.refreshImeId(context.realPrefs()) // the new keyboard's own settings, if it has any
         currentRichInputMethodSubtype = RichInputMethodSubtype.get(newSubtype)
         scope.launch { updateShortcutIme() }
         if (DEBUG) {

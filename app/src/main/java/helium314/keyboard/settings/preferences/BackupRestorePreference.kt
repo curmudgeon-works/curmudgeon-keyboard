@@ -32,6 +32,7 @@ import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.getActivity
 import helium314.keyboard.latin.utils.prefs
+import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.latin.utils.protectedPrefs
 import helium314.keyboard.settings.Setting
 import helium314.keyboard.settings.SettingsActivity
@@ -149,7 +150,7 @@ private fun backupLauncher(onError: (String) -> Unit): ManagedActivityResultLaun
                         zipStream.closeEntry()
                     }
                     zipStream.putNextEntry(ZipEntry(PREFS_FILE_NAME))
-                    settingsToJsonStream(ctx.prefs().all, zipStream)
+                    settingsToJsonStream(ctx.realPrefs().all, zipStream) // every keyboard's set, not just the edited one
                     zipStream.closeEntry()
                     zipStream.putNextEntry(ZipEntry(PROTECTED_PREFS_FILE_NAME))
                     settingsToJsonStream(ctx.protectedPrefs().all, zipStream)
