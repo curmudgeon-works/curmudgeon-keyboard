@@ -304,7 +304,9 @@
     <string name="key_popups_variant_url">web address</string>
     <string name="key_popups_variant_email">email</string>
     <string name="key_popups_none">No popups</string>
-    <string name="key_popups_accents">Accented letters offered</string>
+    <string name="key_popups_accents">Accented letters on by default</string>
+    <string name="key_popups_add">Add your own</string>
+    <string name="key_popups_add_button">Add</string>
     <string name="language_other_script">Different script, needs its own keyboard</string>
     <string name="add_language">Add language</string>
     <string name="add_keyboard">Add keyboard</string>
