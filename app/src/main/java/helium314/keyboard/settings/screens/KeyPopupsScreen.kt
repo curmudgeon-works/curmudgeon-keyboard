@@ -69,6 +69,11 @@ import helium314.keyboard.latin.common.Constants.Subtype.ExtraValue
 import helium314.keyboard.latin.utils.NextScreenIcon
 import helium314.keyboard.latin.utils.SubtypeUtilsAdditional
 import helium314.keyboard.settings.dialogs.ListPickerDialog
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.focus.onFocusChanged
+import helium314.keyboard.keyboard.KeyboardSwitcher
+import helium314.keyboard.latin.RichInputMethodManager
 import helium314.keyboard.settings.SearchSettingsScreen
 import kotlin.math.roundToInt
 
@@ -92,7 +97,21 @@ fun KeyPopupsScreen(initialKeyboard: SettingsSubtype, onClickBack: () -> Unit) {
         title = stringResource(R.string.key_popups_title),
         settings = emptyList(),
     ) {
-        Scaffold(contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)) { innerPadding ->
+        val tryItBar: @Composable () -> Unit = {
+            var tryText by remember { mutableStateOf("") }
+            Surface(tonalElevation = 3.dp, shadowElevation = 8.dp) {
+                OutlinedTextField(
+                    value = tryText, onValueChange = { tryText = it },
+                    label = { Text(stringResource(R.string.key_popups_try)) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                        .onFocusChanged { if (it.isFocused) showKeyboardForPreview(keyboard) }
+                )
+            }
+        }
+        Scaffold(contentWindowInsets = WindowInsets(0), bottomBar = tryItBar) { innerPadding ->
             Column(Modifier.verticalScroll(rememberScrollState()).padding(innerPadding).padding(horizontal = 12.dp)) {
                 Text(
                     stringResource(R.string.key_popups_summary),
@@ -134,6 +153,7 @@ fun KeyPopupsScreen(initialKeyboard: SettingsSubtype, onClickBack: () -> Unit) {
                             SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, changed, ctx)
                             keyboard = changed
                             generation++
+                            reloadPreview()
                         }
                     )
                 for ((groupTitle, keys) in groups) {
@@ -157,8 +177,8 @@ fun KeyPopupsScreen(initialKeyboard: SettingsSubtype, onClickBack: () -> Unit) {
                             PopupEditor(
                                 allPopups = (keyInfo.pool + override.orEmpty()).distinct(), // the user's own additions too
                                 enabledInOrder = override ?: keyInfo.popups,
-                                onChanged = { KeyPopupOverrides.set(prefs, keyInfo.overrideKey, it); generation++ },
-                                onReset = { KeyPopupOverrides.set(prefs, keyInfo.overrideKey, null); generation++ },
+                                onChanged = { KeyPopupOverrides.set(prefs, keyInfo.overrideKey, it); generation++; reloadPreview() },
+                                onReset = { KeyPopupOverrides.set(prefs, keyInfo.overrideKey, null); generation++; reloadPreview() },
                                 modifier = Modifier.padding(start = 24.dp),
                             )
                     }
@@ -217,9 +237,15 @@ private fun keysWithPopups(ctx: Context, keyboard: SettingsSubtype): List<Pair<I
     val numpad = keysFor(InputType.TYPE_CLASS_NUMBER, element = KeyboardId.ELEMENT_NUMPAD)
         .map { KeyInfo(it.label!!, it.label!!, popupsOf(it), popupsOf(it), KeyPopupOverrides.overrideKey(KeyboardId.ELEMENT_NUMPAD, it.label!!)) }
         .filter { it.popups.isNotEmpty() }
+    // the two symbol pages: every key with popups, kept apart from same-looking keys of the letter page
+    fun symbolPage(element: Int) = keysFor(InputType.TYPE_CLASS_TEXT, element = element)
+        .filter { !Character.isLetterOrDigit(it.code) }
+        .map { KeyInfo(it.label!!, it.label!!, popupsOf(it), popupsOf(it), KeyPopupOverrides.overrideKey(element, it.label!!)) }
     return listOf(
         R.string.key_popups_letters to letters,
         R.string.key_popups_contextual to contextual.values.toList(),
+        R.string.key_popups_symbols to symbolPage(KeyboardId.ELEMENT_SYMBOLS),
+        R.string.key_popups_more_symbols to symbolPage(KeyboardId.ELEMENT_SYMBOLS_SHIFTED),
         R.string.key_popups_numpad to numpad,
     )
 }
@@ -324,4 +350,17 @@ private fun PopupEditor(
             TextButton(onClick = onReset) { Text(stringResource(R.string.button_default)) }
         }
     }
+}
+
+/** The keyboard shown for the try-it field is the one being edited: switch to it if another is in use. */
+private fun showKeyboardForPreview(keyboard: SettingsSubtype) {
+    if (!RichInputMethodManager.isInitialized()) return
+    val subtype = keyboard.toAdditionalSubtype()
+    if (RichInputMethodManager.getInstance().currentSubtype.rawSubtype != subtype)
+        KeyboardSwitcher.getInstance().switchToSubtype(subtype)
+}
+
+/** Rebuild the live keyboard so the hint and long-press popups show the change immediately. */
+private fun reloadPreview() {
+    KeyboardSwitcher.getInstance().setThemeNeedsReload()
 }
