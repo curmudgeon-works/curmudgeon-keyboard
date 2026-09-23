@@ -82,14 +82,6 @@ fun KeyboardsScreen(
                     onClick = onClickAllKeyboards,
                     icon = R.drawable.ic_settings_languages
                 ) { NextScreenIcon() }
-                // off = one set of settings for every keyboard (the sections below); on = each keyboard its own
-                // (not available yet: the switch is shown so the screen has its final shape)
-                Preference(
-                    name = stringResource(R.string.separate_settings_per_keyboard),
-                    description = stringResource(R.string.separate_settings_per_keyboard_summary),
-                    onClick = {},
-                    icon = R.drawable.ic_settings_preferences
-                ) { Switch(checked = false, onCheckedChange = null, enabled = false) }
                 // the sections shared by all keyboards
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
                 KeyboardSettingsEntries(SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype(), showLanguages = false)
@@ -98,6 +90,15 @@ fun KeyboardsScreen(
                     onClick = onClickAbout,
                     icon = R.drawable.ic_settings_about
                 ) { NextScreenIcon() }
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                // off = one set of settings for every keyboard (the sections below); on = each keyboard its own
+                // (not available yet: the switch is shown so the screen has its final shape)
+                Preference(
+                    name = stringResource(R.string.separate_settings_per_keyboard),
+                    description = stringResource(R.string.separate_settings_per_keyboard_summary),
+                    onClick = {},
+                    icon = R.drawable.ic_settings_preferences
+                ) { Switch(checked = false, onCheckedChange = null, enabled = false) }
             }
         }
         if (showAddKeyboard)
