@@ -47,6 +47,7 @@ object KeyPopupOverrides {
     fun overrideKey(elementId: Int, keyLabel: String): String = when (elementId) {
         KeyboardId.ELEMENT_SYMBOLS -> "symbols:$keyLabel"
         KeyboardId.ELEMENT_SYMBOLS_SHIFTED -> "symbols_shifted:$keyLabel"
+        KeyboardId.ELEMENT_NUMPAD -> "numpad:$keyLabel"
         else -> keyLabel
     }
 

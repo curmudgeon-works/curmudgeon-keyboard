@@ -213,16 +213,14 @@ private fun keysWithPopups(ctx: Context, keyboard: SettingsSubtype): List<Pair<I
             contextual[label] = KeyInfo(label, "$label  (${ctx.getString(variantName)})", popups, popups)
         }
     }
-    // the two symbol pages: every key with popups, kept apart from same-looking keys of the letter page
-    fun symbolPage(element: Int) = keysFor(InputType.TYPE_CLASS_TEXT, element = element)
-        .filter { !Character.isLetterOrDigit(it.code) }
-        .map { KeyInfo(it.label!!, it.label!!, popupsOf(it), popupsOf(it), KeyPopupOverrides.overrideKey(element, it.label!!)) }
-        .filter { it.popups.isNotEmpty() || true }
+    // the number pad (numeric fields): its operator keys have popups; kept apart from same-looking keys elsewhere
+    val numpad = keysFor(InputType.TYPE_CLASS_NUMBER, element = KeyboardId.ELEMENT_NUMPAD)
+        .map { KeyInfo(it.label!!, it.label!!, popupsOf(it), popupsOf(it), KeyPopupOverrides.overrideKey(KeyboardId.ELEMENT_NUMPAD, it.label!!)) }
+        .filter { it.popups.isNotEmpty() }
     return listOf(
         R.string.key_popups_letters to letters,
         R.string.key_popups_contextual to contextual.values.toList(),
-        R.string.key_popups_symbols to symbolPage(KeyboardId.ELEMENT_SYMBOLS),
-        R.string.key_popups_more_symbols to symbolPage(KeyboardId.ELEMENT_SYMBOLS_SHIFTED),
+        R.string.key_popups_numpad to numpad,
     )
 }
 
