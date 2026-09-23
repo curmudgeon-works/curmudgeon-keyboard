@@ -206,14 +206,14 @@ fun SubtypeScreen(
                 // ---- number row and hints, in one place
                 WithBigTitle(stringResource(R.string.number_row_and_hints)) {
                     PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW, R.string.number_row_summary) { reloadPreview() }
-                    if (!prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW))
-                        PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS, Defaults.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS, R.string.number_row_in_symbols) { reloadPreview() }
                     // two independent hint switches; the popups behind long-press stay either way
                     PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW_HINTS, Defaults.PREF_SHOW_NUMBER_ROW_HINTS, R.string.hints_number_row) { reloadPreview() }
                     PrefSwitchRow(Settings.PREF_SHOW_HINTS, Defaults.PREF_SHOW_HINTS, R.string.hints_other_keys) { reloadPreview() }
                 }
+                // ---- the layout, with the other layouts of this keyboard under it
+                WithBigTitle(stringResource(R.string.keyboard_layout_set)) {
+                    MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) }
                 // ---- the other layouts of this keyboard, each with its own treatment
-                WithBigTitle(stringResource(R.string.settings_screen_secondary_layouts)) {
                     // bottom row: a tablet switch when that is the only alternative; the full choice for Bengali (khipro) or custom files
                     if (currentSubtype.locale.script() != ScriptUtils.SCRIPT_BENGALI && LayoutUtilsCustom.getLayoutFiles(LayoutType.FUNCTIONAL, ctx).isEmpty())
                         SwitchRow(stringResource(R.string.bottom_row_tablet), currentSubtype.layoutName(LayoutType.FUNCTIONAL) == "functional_keys_tablet") { on ->
@@ -235,10 +235,6 @@ fun SubtypeScreen(
                     for (type in listOf(LayoutType.MORE_SYMBOLS, LayoutType.NUMBER, LayoutType.NUMBER_ROW, LayoutType.NUMPAD, LayoutType.NUMPAD_LANDSCAPE, LayoutType.PHONE, LayoutType.PHONE_SYMBOLS))
                         if (LayoutUtilsCustom.getLayoutFiles(type, ctx).isNotEmpty())
                             SecondaryLayoutRow(currentSubtype, type, ::setCurrentSubtype)
-                }
-                // ---- the layout itself, last
-                WithBigTitle(stringResource(R.string.keyboard_layout_set)) {
-                    MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) }
                 }
             }
         }
@@ -306,7 +302,7 @@ private fun MainLayoutRow(
     setCurrentSubtype: (SettingsSubtype) -> Unit,
 ) {
     val ctx = LocalContext.current
-    WithBigTitle(stringResource(R.string.keyboard_layout_set)) {
+    Column {
         val appLayouts = LayoutUtils.getAvailableLayouts(LayoutType.MAIN, ctx, currentSubtype.locale)
         var showAddLayoutDialog by remember { mutableStateOf(false) }
         var showLayoutEditDialog: Pair<String, String?>? by remember { mutableStateOf(null) }
