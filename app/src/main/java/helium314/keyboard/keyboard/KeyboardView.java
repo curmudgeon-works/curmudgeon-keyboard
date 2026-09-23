@@ -282,7 +282,7 @@ public class KeyboardView extends View {
             return;
         }
 
-        mShowsHints = Settings.getValues().mShowsHints;
+        mShowsHints = Settings.getValues().mShowsHints || Settings.getValues().mShowNumberRowHints; // flags decide per key
         final float scale = Settings.getValues().mKeyboardHeightScale;
         mIconScaleFactor = scale < 0.8f ? scale + 0.2f : 1f;
         final Paint paint = mPaint;
