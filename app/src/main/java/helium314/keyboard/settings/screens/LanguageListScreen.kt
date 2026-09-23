@@ -105,10 +105,14 @@ fun LanguageListScreen(
 private fun languagesFor(ctx: android.content.Context, keyboard: SettingsSubtype): List<Locale> {
     val prefs = ctx.prefs()
     val own = listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)
-    val withDictionary = getDictionaryLocales(ctx)
-    val others = (SubtypeSettings.getAvailableSubtypeLocales() + withDictionary).distinct().filter { it !in own }
+    val others = (SubtypeSettings.getAvailableSubtypeLocales() + getDictionaryLocales(ctx)).distinct().filter { it !in own }
+    // the same test the rows use for fading (a language-level dictionary counts, e.g. English (India) has English's)
+    fun hasDictionary(locale: Locale): Boolean {
+        val (dicts, hasInternal) = getUserAndInternalDictionaries(ctx, locale)
+        return hasInternal || dicts.isNotEmpty()
+    }
     return own.sortedByDescending { LanguagePriority.get(prefs, it) } +
-        others.sortedWith(compareBy({ it.script() != keyboard.locale.script() }, { it !in withDictionary },
+        others.sortedWith(compareBy({ it.script() != keyboard.locale.script() }, { !hasDictionary(it) },
             { it.localizedDisplayName(ctx.resources) }))
 }
 
