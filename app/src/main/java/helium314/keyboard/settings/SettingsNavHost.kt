@@ -24,6 +24,7 @@ import helium314.keyboard.settings.screens.DebugScreen
 import helium314.keyboard.settings.screens.DictionaryScreen
 import helium314.keyboard.settings.screens.GestureTypingScreen
 import androidx.compose.runtime.getValue
+import helium314.keyboard.settings.screens.KeyPopupsScreen
 import helium314.keyboard.settings.screens.KeyboardsScreen
 import helium314.keyboard.settings.screens.LanguageListScreen
 import helium314.keyboard.settings.screens.LanguageScreen
@@ -139,6 +140,9 @@ fun SettingsNavHost(
         composable(SettingsDestination.ColorsNight + "{theme}") {
             ColorsScreen(isNight = true, theme = it.arguments?.getString("theme"), onClickBack = ::goBack)
         }
+        composable(SettingsDestination.KeyPopups + "{subtype}") {
+            KeyPopupsScreen(initialKeyboard = it.arguments?.getString("subtype")!!.toSettingsSubtype(), onClickBack = ::goBack)
+        }
         composable(SettingsDestination.Subtype + "{subtype}") {
             SubtypeScreen(initialSubtype = it.arguments?.getString("subtype")!!.toSettingsSubtype(), onClickBack = ::goBack)
         }
@@ -149,6 +153,7 @@ fun SettingsNavHost(
 
 object SettingsDestination {
     const val Keyboards = "keyboards"
+    const val KeyPopups = "key_popups/"
     const val Settings = "settings/"
     const val About = "about"
     const val TextCorrection = "text_correction"

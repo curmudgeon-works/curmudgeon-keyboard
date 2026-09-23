@@ -76,6 +76,8 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.utils.realPrefs
+import helium314.keyboard.settings.SettingsDestination
+import helium314.keyboard.latin.utils.NextScreenIcon
 import helium314.keyboard.latin.utils.getSecondaryLocales
 import helium314.keyboard.latin.utils.getStringResourceOrName
 import helium314.keyboard.latin.utils.htmlToAnnotated
@@ -140,8 +142,6 @@ fun SubtypeScreen(
 
     val availableLocalesForScript = getAvailableSecondaryLocales(ctx, currentSubtype.locale).sortedBy { it.toLanguageTag() }
     var showSecondaryLocaleDialog by remember { mutableStateOf(false) }
-    var showKeyOrderDialog by remember { mutableStateOf(false) }
-    var showMorePopupsDialog by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
     val customMainLayouts = LayoutUtilsCustom.getLayoutFiles(LayoutType.MAIN, ctx, currentSubtype.locale).map { it.name }
     SearchScreen(
@@ -165,35 +165,10 @@ fun SubtypeScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) }
-                WithSmallTitle(stringResource(R.string.popup_order)) {
-                    ActionRow(onClick = { showKeyOrderDialog = true }) {
-                        Text(stringResource(R.string.popup_order),
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(start = 10.dp)
-                        )
-                        DefaultButton(currentSubtype.getExtraValueOf(ExtraValue.POPUP_ORDER) == null) {
-                            setCurrentSubtype(currentSubtype.without(ExtraValue.POPUP_ORDER))
-                        }
-                    }
-                }
-                if (currentSubtype.locale.script() == ScriptUtils.SCRIPT_LATIN) {
-                    WithSmallTitle(stringResource(R.string.show_popup_keys_title)) {
-                        val explicitValue = currentSubtype.getExtraValueOf(ExtraValue.MORE_POPUPS)
-                        val value = explicitValue ?: prefs.getString(
-                            Settings.PREF_MORE_POPUP_KEYS,
-                            Defaults.PREF_MORE_POPUP_KEYS
-                        )!!
-                        ActionRow(onClick = { showMorePopupsDialog = true }) {
-                            Text(stringResource(morePopupKeysResId(value)),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(start = 10.dp)
-                            )
-                            DefaultButton(explicitValue == null) {
-                                setCurrentSubtype(currentSubtype.without(ExtraValue.MORE_POPUPS))
-                            }
-                        }
+                WithSmallTitle(stringResource(R.string.key_popups_title)) {
+                    ActionRow(onClick = { SettingsDestination.navigateTo(SettingsDestination.KeyPopups + currentSubtype.toPref()) }) {
+                        Text(stringResource(R.string.key_popups_summary), modifier = Modifier.weight(1f).padding(start = 10.dp))
+                        NextScreenIcon()
                     }
                 }
                 if (hasLocalizedNumberRow(currentSubtype.locale, ctx)) {
@@ -289,36 +264,6 @@ fun SubtypeScreen(
                 getItemName = { it.localizedDisplayName(ctx.resources) },
                 showRadioButtons = false,
             )
-        if (showKeyOrderDialog) {
-            val setting = currentSubtype.getExtraValueOf(ExtraValue.POPUP_ORDER)
-            PopupOrderDialog(
-                onDismissRequest = { showKeyOrderDialog = false },
-                initialValue = setting ?: prefs.getString(
-                    Settings.PREF_POPUP_KEYS_ORDER,
-                    Defaults.PREF_POPUP_KEYS_ORDER
-                )!!,
-                title = stringResource(R.string.popup_order),
-                showDefault = setting != null,
-                onConfirmed = {
-                    setCurrentSubtype(
-                        if (it == null) currentSubtype.without(ExtraValue.POPUP_ORDER)
-                        else currentSubtype.with(ExtraValue.POPUP_ORDER, it)
-                    )
-                }
-            )
-        }
-        if (showMorePopupsDialog) {
-            val items = listOf(POPUP_KEYS_NORMAL, POPUP_KEYS_MAIN, POPUP_KEYS_MORE, POPUP_KEYS_ALL)
-            val explicitValue = currentSubtype.getExtraValueOf(ExtraValue.MORE_POPUPS)
-            val value = explicitValue ?: prefs.getString(Settings.PREF_MORE_POPUP_KEYS, Defaults.PREF_MORE_POPUP_KEYS)
-            ListPickerDialog(
-                onDismissRequest = { showMorePopupsDialog = false },
-                items = items,
-                getItemName = { stringResource(morePopupKeysResId(it)) },
-                selectedItem = value,
-                onItemSelected = { setCurrentSubtype(currentSubtype.with(ExtraValue.MORE_POPUPS, it)) }
-            )
-        }
     }
 }
 

@@ -20,6 +20,8 @@ import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.common.Constants
 import helium314.keyboard.latin.define.DebugFlags
+import helium314.keyboard.latin.utils.KeyPopupOverrides
+import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.sumOf
@@ -72,6 +74,7 @@ open class KeyboardBuilder<KP : KeyboardParams>(protected val mContext: Context,
 
         addLocaleKeyTextsToParams(mContext, mParams, sv.mShowMorePopupKeys)
         mParams.mPopupKeyTypes.addAll(sv.mPopupKeyTypes)
+        mParams.mKeyPopupOverrides = KeyPopupOverrides.load(mContext.prefs())
         // add label source only if popup key type enabled
         sv.mPopupKeyLabelSources.forEach { if (it in sv.mPopupKeyTypes) mParams.mPopupKeyLabelSources.add(it) }
     }
