@@ -59,6 +59,9 @@ object KeyPopupOverrides {
         prefs.edit().putString(PREF_SETS, arr.toString()).apply()
     }
 
+    /** Name of the user set the keyboard's arrangement belongs to, null = a built-in set (per keyboard). */
+    const val PREF_SELECTED_SET = "key_popup_set_selected"
+
     fun set(prefs: SharedPreferences, keyLabel: String, labels: List<String>?) {
         val all = load(prefs).toMutableMap()
         if (labels == null) all.remove(keyLabel) else all[keyLabel] = labels

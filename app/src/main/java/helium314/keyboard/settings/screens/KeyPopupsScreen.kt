@@ -101,6 +101,10 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
         )
         // presets: the generated defaults for every key at once (the user's own per-key edits stay on top)
         val userSets = remember(generation) { KeyPopupOverrides.loadSets(ctx.realPrefs()) }
+        val selectedUserSet = prefs.getString(KeyPopupOverrides.PREF_SELECTED_SET, null)?.let { name -> userSets.firstOrNull { it.name == name } }
+        // a change made while a built-in set is selected is held here until the user names a set for it
+        var pendingChange: Pair<String, List<String>?>? by remember { mutableStateOf(null) }
+        var showSaveAsDialog by remember { mutableStateOf(false) }
         val presets = listOf(
             Preset(R.string.key_popups_preset_standard, POPUP_KEYS_NORMAL, null, symbolMap = Defaults.PREF_SYMBOL_POPUP_MAP),
             Preset(R.string.key_popups_preset_heliboard, POPUP_KEYS_NORMAL, null, symbolMap = ""),
@@ -115,13 +119,25 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
         val accentsValue = keyboard.getExtraValueOf(ExtraValue.MORE_POPUPS)
             ?: prefs.getString(Settings.PREF_MORE_POPUP_KEYS, Defaults.PREF_MORE_POPUP_KEYS)!!
         val symbolsLayout = keyboard.layoutName(LayoutType.SYMBOLS)
-        // a saved set counts as current while its arrangement is still in place
         val symbolMap = prefs.getString(Settings.PREF_SYMBOL_POPUP_MAP, Defaults.PREF_SYMBOL_POPUP_MAP)!!
-        val current = presets.firstOrNull { it.userName != null && it.overrides == overrides && it.morePopups == accentsValue && it.symbolsLayout == symbolsLayout }
+        val current = presets.firstOrNull { it.userName != null && it.userName == selectedUserSet?.name }
             ?: presets.firstOrNull { it.userName == null && it.morePopups == accentsValue && it.symbolsLayout == symbolsLayout && (it.symbolMap == null || it.symbolMap == symbolMap) }
             ?: presets[0]
+        // every arrangement belongs to a set of the user's own: into the selected one, or into a new one to be named
+        fun storeInSet(name: String, all: Map<String, List<String>>) {
+            val set = KeyPopupOverrides.UserSet(name, accentsValue, symbolsLayout, all)
+            KeyPopupOverrides.saveSets(ctx.realPrefs(), userSets.filter { it.name != name } + set)
+            KeyPopupOverrides.save(prefs, all)
+            prefs.edit().putString(KeyPopupOverrides.PREF_SELECTED_SET, name).apply()
+            generation++
+            reloadPreview()
+        }
+        fun applyChange(overrideKey: String, labels: List<String>?) {
+            val all = overrides.toMutableMap().also { if (labels == null) it.remove(overrideKey) else it[overrideKey] = labels }
+            if (selectedUserSet != null) storeInSet(selectedUserSet.name, all)
+            else { pendingChange = overrideKey to labels; showSaveAsDialog = true }
+        }
         @Composable fun presetName(p: Preset) = p.userName ?: stringResource(p.name)
-        var showSaveDialog by remember { mutableStateOf(false) }
         Row(verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().clickable { showAccentsDialog = true }.padding(vertical = 10.dp)) {
             Column(Modifier.weight(1f)) {
@@ -132,22 +148,28 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
             NextScreenIcon()
         }
         Row(modifier = Modifier.fillMaxWidth().padding(start = 12.dp)) {
-            TextButton(onClick = { showSaveDialog = true }) { Text(stringResource(R.string.key_popups_save_set)) }
-            if (current.userName != null)
+            if (current.userName != null) {
+                TextButton(onClick = { pendingChange = null; showSaveAsDialog = true }) { Text(stringResource(R.string.key_popups_save_as_new)) }
                 TextButton(onClick = {
                     KeyPopupOverrides.saveSets(ctx.realPrefs(), userSets.filter { it.name != current.userName })
+                    KeyPopupOverrides.save(prefs, emptyMap())
+                    prefs.edit().remove(KeyPopupOverrides.PREF_SELECTED_SET).apply()
                     generation++
+                    reloadPreview()
                 }) { Text(stringResource(R.string.key_popups_delete_set)) }
+            }
         }
-        if (showSaveDialog)
+        if (showSaveAsDialog)
             TextInputDialog(
-                onDismissRequest = { showSaveDialog = false },
+                onDismissRequest = { showSaveAsDialog = false; pendingChange = null }, // cancel = the change is dropped
                 onConfirmed = { name ->
-                    val set = KeyPopupOverrides.UserSet(name.trim(), accentsValue, symbolsLayout, overrides)
-                    KeyPopupOverrides.saveSets(ctx.realPrefs(), userSets.filter { it.name != set.name } + set)
-                    generation++
+                    val all = overrides.toMutableMap()
+                    pendingChange?.let { (k, v) -> if (v == null) all.remove(k) else all[k] = v }
+                    storeInSet(name.trim(), all)
+                    pendingChange = null
                 },
-                title = { Text(stringResource(R.string.key_popups_save_set)) },
+                title = { Text(stringResource(if (pendingChange != null) R.string.key_popups_save_change_title else R.string.key_popups_save_as_new)) },
+                initialText = if (current.userName != null) "" else stringResource(R.string.key_popups_my_set),
                 checkTextValid = { it.isNotBlank() },
             )
         if (showAccentsDialog)
@@ -160,8 +182,12 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                     var changed = keyboard.with(ExtraValue.MORE_POPUPS, preset.morePopups)
                     changed = if (preset.symbolsLayout == null) changed.withoutLayout(LayoutType.SYMBOLS)
                         else changed.withLayout(LayoutType.SYMBOLS, preset.symbolsLayout)
-                    if (preset.overrides != null) KeyPopupOverrides.save(prefs, preset.overrides) // a saved set brings its arrangement
-                    if (preset.symbolMap != null) prefs.edit().putString(Settings.PREF_SYMBOL_POPUP_MAP, preset.symbolMap).apply()
+                    // a saved set brings its arrangement; a built-in has none
+                    KeyPopupOverrides.save(prefs, preset.overrides ?: emptyMap())
+                    prefs.edit().apply {
+                        if (preset.userName != null) putString(KeyPopupOverrides.PREF_SELECTED_SET, preset.userName) else remove(KeyPopupOverrides.PREF_SELECTED_SET)
+                        if (preset.symbolMap != null) putString(Settings.PREF_SYMBOL_POPUP_MAP, preset.symbolMap)
+                    }.apply()
                     onKeyboardChanged(changed)
                     generation++
                     reloadPreview()
@@ -195,8 +221,8 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                     PopupEditor(
                         allPopups = (keyInfo.pool + override.orEmpty()).distinct(), // the user's own additions too
                         enabledInOrder = override ?: keyInfo.popups,
-                        onChanged = { KeyPopupOverrides.set(prefs, keyInfo.overrideKey, it); generation++; reloadPreview() },
-                        onReset = { KeyPopupOverrides.set(prefs, keyInfo.overrideKey, null); generation++; reloadPreview() },
+                        onChanged = { applyChange(keyInfo.overrideKey, it) },
+                        onReset = { applyChange(keyInfo.overrideKey, null) },
                         modifier = Modifier.padding(start = 36.dp),
                     )
             }
