@@ -305,7 +305,7 @@
     <string name="key_popups_variant_email">email</string>
     <string name="key_popups_none">No popups</string>
     <string name="key_popups_numpad">Number pad</string>
-    <string name="key_popups_try">Try it here: hold a key</string>
+    <string name="key_popups_try">Try it here</string>
     <string name="key_popups_symbols">Symbols page</string>
     <string name="key_popups_more_symbols">More symbols page</string>
     <string name="key_popups_presets">Commonly used popup sets</string>
