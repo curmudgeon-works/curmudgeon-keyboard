@@ -14,6 +14,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Switch
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -72,7 +74,33 @@ fun KeyboardsScreen(
         title = stringResource(R.string.ime_settings),
         settings = emptyList(),
     ) {
-        Scaffold(contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)) { innerPadding ->
+        // the switch stays visible at the bottom, the list scrolls above it
+        val toggleBar: @Composable () -> Unit = {
+            Surface(tonalElevation = 3.dp, shadowElevation = 8.dp) {
+                Column(Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))) {
+                    // off = one set of settings for every keyboard (the sections above); on = each keyboard its own
+                    fun toggle(on: Boolean) {
+                        if (on) {
+                            val keyboards = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }
+                            if (keyboards.any { KeyboardProfiles.hasOwnSettings(real, it) }) askEnable = true
+                            else {
+                                KeyboardProfiles.enable(real, keyboards, keepExisting = true)
+                                separate = true
+                                expanded = SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype() // show where the sections went
+                            }
+                        } else askDisable = true
+                        KeyboardProfiles.refreshImeId(real)
+                    }
+                    Preference(
+                        name = stringResource(R.string.separate_settings_per_keyboard),
+                        description = stringResource(R.string.separate_settings_per_keyboard_summary),
+                        onClick = { toggle(!separate) },
+                        icon = R.drawable.ic_settings_preferences
+                    ) { Switch(checked = separate, onCheckedChange = { toggle(it) }) }
+                }
+            }
+        }
+        Scaffold(contentWindowInsets = WindowInsets(0), bottomBar = toggleBar) { innerPadding ->
             Column(
                 Modifier
                     .verticalScroll(rememberScrollState())
@@ -123,25 +151,6 @@ fun KeyboardsScreen(
                     onClick = onClickAbout,
                     icon = R.drawable.ic_settings_about
                 ) { NextScreenIcon() }
-                HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                // off = one set of settings for every keyboard (the sections above); on = each keyboard its own
-                fun toggle(on: Boolean) {
-                    if (on) {
-                        if (enabled.any { KeyboardProfiles.hasOwnSettings(real, it.toSettingsSubtype()) }) askEnable = true
-                        else {
-                            KeyboardProfiles.enable(real, enabled.map { it.toSettingsSubtype() }, keepExisting = true)
-                            separate = true
-                            expanded = SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype() // show where the sections went
-                        }
-                    } else askDisable = true
-                    KeyboardProfiles.refreshImeId(real)
-                }
-                Preference(
-                    name = stringResource(R.string.separate_settings_per_keyboard),
-                    description = stringResource(R.string.separate_settings_per_keyboard_summary),
-                    onClick = { toggle(!separate) },
-                    icon = R.drawable.ic_settings_preferences
-                ) { Switch(checked = separate, onCheckedChange = { toggle(it) }) }
             }
         }
         val enabledNow = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }
