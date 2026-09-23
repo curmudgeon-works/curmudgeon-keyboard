@@ -46,6 +46,17 @@ import helium314.keyboard.latin.utils.realPrefs
 import androidx.compose.material3.Icon
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.draw.rotate
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.offset
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.zIndex
+import androidx.core.content.edit
+import helium314.keyboard.latin.settings.Settings
+import kotlin.math.roundToInt
 import helium314.keyboard.settings.dialogs.ListPickerDialog
 import helium314.keyboard.settings.preferences.Preference
 
@@ -109,14 +120,29 @@ fun KeyboardsScreen(
             ) {
                 @Suppress("UNUSED_EXPRESSION") generation
                 val enabled = SubtypeSettings.getEnabledSubtypes(true)
-                for (subtype in enabled) {
-                    val keyboard = subtype.toSettingsSubtype()
+                // drag-to-reorder by the grip: the dragged row follows the finger and swaps with its neighbours
+                val order = remember(generation) { mutableStateListOf(*enabled.map { it.toSettingsSubtype() }.toTypedArray()) }
+                val rowHeights = remember { mutableStateMapOf<SettingsSubtype, Int>() }
+                var dragging: SettingsSubtype? by remember { mutableStateOf(null) }
+                var dragOffset by remember { mutableFloatStateOf(0f) }
+                fun persistOrder() {
+                    ctx.prefs().edit { putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(order)) }
+                    SubtypeSettings.reloadEnabledSubtypes(ctx)
+                    generation++
+                }
+                for (keyboard in order) {
+                    val subtype = keyboard.toAdditionalSubtype()
+                    val isDragged = dragging == keyboard
                     // tap: languages & layout of the keyboard (with separate settings: unfold all its sections);
                     // press and hold: delete it (while another remains)
                     // a single keyboard has nothing to fold: its sections are listed below like the shared ones
                     val folding = separate && enabled.size > 1
                     val isExpanded = folding && keyboard in expanded
                     Preference(
+                        modifier = Modifier
+                            .onSizeChanged { rowHeights[keyboard] = it.height }
+                            .offset { IntOffset(0, if (isDragged) dragOffset.roundToInt() else 0) }
+                            .zIndex(if (isDragged) 1f else 0f),
                         name = keyboardName(keyboard, ctx),
                         description = subtype.mainLayoutName()?.getStringResourceOrName("layout_", ctx) ?: "",
                         onClick = {
@@ -129,6 +155,27 @@ fun KeyboardsScreen(
                         icon = R.drawable.ic_settings_languages,
                         onLongClick = if (enabled.size > 1) ({ keyboardToDelete = keyboard }) else null,
                     ) {
+                        if (order.size > 1)
+                            Text("\u2261", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(end = 12.dp).pointerInput(keyboard) {
+                                    detectDragGestures(
+                                        onDragStart = { dragging = keyboard; dragOffset = 0f },
+                                        onDragEnd = { dragging = null; dragOffset = 0f; persistOrder() },
+                                        onDragCancel = { dragging = null; dragOffset = 0f },
+                                    ) { change, delta ->
+                                        change.consume()
+                                        dragOffset += delta.y
+                                        val index = order.indexOf(keyboard)
+                                        // moved past half of the neighbour: swap places and keep the row under the finger
+                                        if (delta.y > 0 && index < order.lastIndex) {
+                                            val below = rowHeights[order[index + 1]] ?: 0
+                                            if (dragOffset > below / 2f) { order.add(index + 1, order.removeAt(index)); dragOffset -= below }
+                                        } else if (delta.y < 0 && index > 0) {
+                                            val above = rowHeights[order[index - 1]] ?: 0
+                                            if (dragOffset < -above / 2f) { order.add(index - 1, order.removeAt(index)); dragOffset += above }
+                                        }
+                                    }
+                                })
                         if (folding) Icon(painterResource(R.drawable.ic_arrow_left), null, Modifier.rotate(if (isExpanded) 90f else -90f))
                         else NextScreenIcon()
                     }
