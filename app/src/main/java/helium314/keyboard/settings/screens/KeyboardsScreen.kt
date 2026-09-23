@@ -34,8 +34,6 @@ import helium314.keyboard.latin.utils.NextScreenIcon
 import helium314.keyboard.settings.SearchSettingsScreen
 import helium314.keyboard.settings.SettingsDestination
 import helium314.keyboard.settings.SettingsMode
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.mutableIntStateOf
 import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.settings.dialogs.ConfirmationDialog
@@ -48,7 +46,6 @@ import helium314.keyboard.settings.preferences.Preference
  */
 @Composable
 fun KeyboardsScreen(
-    onClickAllKeyboards: () -> Unit,
     onClickAbout: () -> Unit,
     onClickBack: () -> Unit,
 ) {
@@ -78,9 +75,7 @@ fun KeyboardsScreen(
                         description = subtype.mainLayoutName()?.getStringResourceOrName("layout_", ctx) ?: "",
                         onClick = { SettingsDestination.navigateTo(SettingsDestination.Languages + keyboard.toPref()) },
                         icon = R.drawable.ic_settings_languages,
-                        modifier = Modifier.pointerInput(keyboard) {
-                            detectTapGestures(onLongPress = { if (enabled.size > 1) keyboardToDelete = keyboard })
-                        }
+                        onLongClick = if (enabled.size > 1) ({ keyboardToDelete = keyboard }) else null,
                     ) { NextScreenIcon() }
                 }
                 Preference(
@@ -88,15 +83,6 @@ fun KeyboardsScreen(
                     onClick = { showAddKeyboard = true },
                     icon = R.drawable.ic_plus
                 ) { NextScreenIcon() }
-                // upstream's full list: every built-in keyboard with an on/off switch, incl. disabled ones
-                if (advanced) Preference(
-                    name = stringResource(R.string.keyboards_title),
-                    onClick = onClickAllKeyboards,
-                    icon = R.drawable.ic_settings_languages
-                ) { NextScreenIcon() }
-                // the sections shared by all keyboards
-                HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                KeyboardSettingsEntries(SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype(), showLanguages = false)
                 Preference(
                     name = stringResource(R.string.settings_screen_about),
                     onClick = onClickAbout,
