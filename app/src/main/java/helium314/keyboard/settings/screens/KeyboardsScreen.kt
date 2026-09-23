@@ -122,7 +122,8 @@ fun KeyboardsScreen(
                     keyboardToDelete = null
                     generation++
                 },
-                title = { Text(stringResource(R.string.delete_confirmation, keyboardName(keyboard, ctx))) },
+                title = { Text(stringResource(R.string.delete_keyboard_title)) },
+                content = { Text(stringResource(R.string.delete_keyboard_message, keyboardName(keyboard, ctx))) },
                 confirmButtonText = stringResource(R.string.delete),
             )
         }
