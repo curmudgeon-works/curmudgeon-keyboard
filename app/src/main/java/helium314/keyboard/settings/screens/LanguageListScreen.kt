@@ -41,6 +41,7 @@ import helium314.keyboard.latin.utils.getDictionaryLocales
 import helium314.keyboard.latin.utils.getSecondaryLocales
 import helium314.keyboard.latin.utils.getStringResourceOrName
 import helium314.keyboard.latin.utils.prefs
+import helium314.keyboard.settings.dialogs.DictionaryDialog
 import helium314.keyboard.settings.SearchScreen
 import helium314.keyboard.settings.SettingsDestination
 import helium314.keyboard.settings.preferences.Preference
@@ -119,7 +120,9 @@ private fun LanguageRow(locale: Locale, keyboard: SettingsSubtype, setKeyboard: 
     val priority = if (locale in own) LanguagePriority.get(prefs, locale) else OFF
     var shared by remember(locale) { mutableStateOf(LanguagePriority.sharesUserHistory(prefs, locale)) }
     var showNoDictDialog by remember { mutableStateOf(false) }
-    val dictionaryTypes = remember(locale) {
+    var showDictionaryDialog by remember { mutableStateOf(false) }
+    var dictGeneration by remember { mutableIntStateOf(0) }
+    val dictionaryTypes = remember(locale, dictGeneration) {
         val (dicts, hasInternal) = getUserAndInternalDictionaries(ctx, locale)
         val types = dicts.mapTo(mutableListOf()) { it.name.substringBefore("_${DictionaryInfoUtils.USER_DICTIONARY_SUFFIX}") }
         if (hasInternal && !types.contains(Dictionary.TYPE_MAIN)) types.add(0, ctx.getString(R.string.internal_dictionary_summary))
@@ -132,7 +135,8 @@ private fun LanguageRow(locale: Locale, keyboard: SettingsSubtype, setKeyboard: 
         else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp, horizontal = 16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.weight(1f)) {
+            // tapping the language manages its dictionaries
+            Column(modifier = Modifier.weight(1f).clickable { showDictionaryDialog = true }) {
                 Text(locale.localizedDisplayName(ctx.resources), style = MaterialTheme.typography.bodyLarge, color = nameColor)
                 Text(
                     when {
@@ -169,6 +173,8 @@ private fun LanguageRow(locale: Locale, keyboard: SettingsSubtype, setKeyboard: 
         }
         if (showNoDictDialog)
             MissingDictionaryDialog({ showNoDictDialog = false }, locale)
+        if (showDictionaryDialog)
+            DictionaryDialog({ showDictionaryDialog = false; dictGeneration++ }, locale)
         if (priority != OFF) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Text(
