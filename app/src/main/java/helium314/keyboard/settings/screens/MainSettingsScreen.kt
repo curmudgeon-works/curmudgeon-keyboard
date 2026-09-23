@@ -98,6 +98,12 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
         onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Languages + keyboard.toPref()) },
         icon = R.drawable.ic_settings_languages
     ) { NextScreenIcon() }
+    // the keyboard's layout, popups, number row and hints
+    if (showLanguages) Preference(
+        name = stringResource(R.string.layout_title),
+        onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Subtype + keyboard.toPref()) },
+        icon = R.drawable.ic_settings_layout
+    ) { NextScreenIcon() }
     Preference(
         name = stringResource(R.string.settings_screen_preferences),
         onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Preferences) },
