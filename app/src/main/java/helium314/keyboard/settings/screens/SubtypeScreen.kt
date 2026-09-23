@@ -141,7 +141,6 @@ fun SubtypeScreen(
     val availableLocalesForScript = getAvailableSecondaryLocales(ctx, currentSubtype.locale).sortedBy { it.toLanguageTag() }
     var showSecondaryLocaleDialog by remember { mutableStateOf(false) }
     var showKeyOrderDialog by remember { mutableStateOf(false) }
-    var showHintOrderDialog by remember { mutableStateOf(false) }
     var showMorePopupsDialog by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
     val customMainLayouts = LayoutUtilsCustom.getLayoutFiles(LayoutType.MAIN, ctx, currentSubtype.locale).map { it.name }
@@ -166,7 +165,7 @@ fun SubtypeScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) }
-                WithSmallTitle(stringResource(R.string.popup_order_and_hint_source)) {
+                WithSmallTitle(stringResource(R.string.popup_order)) {
                     ActionRow(onClick = { showKeyOrderDialog = true }) {
                         Text(stringResource(R.string.popup_order),
                             modifier = Modifier
@@ -175,16 +174,6 @@ fun SubtypeScreen(
                         )
                         DefaultButton(currentSubtype.getExtraValueOf(ExtraValue.POPUP_ORDER) == null) {
                             setCurrentSubtype(currentSubtype.without(ExtraValue.POPUP_ORDER))
-                        }
-                    }
-                    ActionRow(onClick = { showHintOrderDialog = true }) {
-                        Text(stringResource(R.string.hint_source),
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(start = 10.dp)
-                        )
-                        DefaultButton(currentSubtype.getExtraValueOf(ExtraValue.HINT_ORDER) == null) {
-                            setCurrentSubtype(currentSubtype.without(ExtraValue.HINT_ORDER))
                         }
                     }
                 }
@@ -314,24 +303,6 @@ fun SubtypeScreen(
                     setCurrentSubtype(
                         if (it == null) currentSubtype.without(ExtraValue.POPUP_ORDER)
                         else currentSubtype.with(ExtraValue.POPUP_ORDER, it)
-                    )
-                }
-            )
-        }
-        if (showHintOrderDialog) {
-            val setting = currentSubtype.getExtraValueOf(ExtraValue.HINT_ORDER)
-            PopupOrderDialog(
-                onDismissRequest = { showHintOrderDialog = false },
-                initialValue = setting ?: prefs.getString(
-                    Settings.PREF_POPUP_KEYS_LABELS_ORDER,
-                    Defaults.PREF_POPUP_KEYS_LABELS_ORDER
-                )!!,
-                title = stringResource(R.string.hint_source),
-                showDefault = setting != null,
-                onConfirmed = {
-                    setCurrentSubtype(
-                        if (it == null) currentSubtype.without(ExtraValue.HINT_ORDER)
-                        else currentSubtype.with(ExtraValue.HINT_ORDER, it)
                     )
                 }
             )
