@@ -78,11 +78,8 @@ fun getPopupKeyTypes(subtype: InputMethodSubtype, prefs: SharedPreferences): Lis
     return getEnabledPopupKeys(string)
 }
 
-fun getPopupKeyLabelSources(subtype: InputMethodSubtype, prefs: SharedPreferences): List<String> {
-    val string = subtype.getExtraValueOf(ExtraValue.HINT_ORDER)
-        ?: prefs.getString(Settings.PREF_POPUP_KEYS_LABELS_ORDER, Defaults.PREF_POPUP_KEYS_LABELS_ORDER)!!
-    return getEnabledPopupKeys(string)
-}
+/** The hint on a key is always the first character of its long-press popup, so the label sources are the popup order. */
+fun getPopupKeyLabelSources(subtype: InputMethodSubtype, prefs: SharedPreferences): List<String> = getPopupKeyTypes(subtype, prefs)
 
 fun getMoreKeys(subtype: InputMethodSubtype, prefs: SharedPreferences): String =
     subtype.getExtraValueOf(ExtraValue.MORE_POPUPS)
