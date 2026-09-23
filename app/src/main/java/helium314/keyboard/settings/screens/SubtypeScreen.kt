@@ -25,6 +25,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.mutableIntStateOf
+import kotlinx.coroutines.flow.first
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -152,7 +155,16 @@ fun SubtypeScreen(
 
     val availableLocalesForScript = getAvailableSecondaryLocales(ctx, currentSubtype.locale).sortedBy { it.toLanguageTag() }
     var showSecondaryLocaleDialog by remember { mutableStateOf(false) }
-    val scrollState = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) } // keep the position across changes
+    // the position survives the rebuild a change causes; restored after the new content is laid out
+    val scrollState = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) }
+    var keptScroll by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(scrollState.value) { if (scrollState.value != 0) keptScroll = scrollState.value }
+    LaunchedEffect(currentSubtypeString, keptScroll) {
+        if (keptScroll != 0 && scrollState.value != keptScroll) {
+            snapshotFlow { scrollState.maxValue }.first { it >= keptScroll }
+            scrollState.scrollTo(keptScroll)
+        }
+    }
     val tryIt = remember { TryItState() }
     val customMainLayouts = LayoutUtilsCustom.getLayoutFiles(LayoutType.MAIN, ctx, currentSubtype.locale).map { it.name }
     SearchScreen(

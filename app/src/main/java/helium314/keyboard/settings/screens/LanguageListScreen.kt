@@ -94,7 +94,7 @@ fun LanguageListScreen(
                     name = stringResource(R.string.keyboard_layout_set),
                     description = keyboard.mainLayoutName()?.getStringResourceOrName("layout_", ctx) ?: "",
                     onClick = { SettingsDestination.navigateTo(SettingsDestination.Subtype + keyboard.toPref()) },
-                    icon = R.drawable.ic_settings_languages
+                    icon = R.drawable.ic_settings_layout
                 ) { NextScreenIcon() }
             else LanguageRow(item as Locale, keyboard, ::setKeyboard)
         },
