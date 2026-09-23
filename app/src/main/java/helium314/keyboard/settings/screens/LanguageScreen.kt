@@ -64,7 +64,7 @@ fun LanguageScreen(
         onClickBack = onClickBack,
         title = {
             Column {
-                Text(stringResource(R.string.keyboards_title))
+                Text(stringResource(R.string.language_and_layouts_title))
                 Text(stringResource(
                     R.string.text_tap_languages),
                     style = MaterialTheme.typography.bodyMedium,
