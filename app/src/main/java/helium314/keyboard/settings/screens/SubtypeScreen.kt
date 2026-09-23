@@ -163,7 +163,7 @@ fun SubtypeScreen(
             KeyboardProfiles.onKeyboardDeleted(ctx.realPrefs(), currentSubtype)
             onClickBack()
         } },
-        title = { Text(currentSubtype.toAdditionalSubtype().displayName()) },
+        title = { Text(keyboardName(currentSubtype, ctx)) }, // the same name as in the keyboards list
         itemContent = { },
         filteredItems = { emptyList<String>() }
     ) {
