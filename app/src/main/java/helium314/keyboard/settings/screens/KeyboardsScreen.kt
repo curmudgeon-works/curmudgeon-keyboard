@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -46,7 +47,10 @@ import helium314.keyboard.latin.utils.realPrefs
 import androidx.compose.material3.Icon
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.draw.rotate
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -115,24 +119,24 @@ fun KeyboardsScreen(
             }
         }
         Scaffold(contentWindowInsets = WindowInsets(0), bottomBar = toggleBar) { innerPadding ->
+            @Suppress("UNUSED_EXPRESSION") generation
+            val enabled = SubtypeSettings.getEnabledSubtypes(true)
+            // drag-to-reorder by the grip: the dragged row follows the finger and swaps with its neighbours
+            val order = remember(generation) { mutableStateListOf(*enabled.map { it.toSettingsSubtype() }.toTypedArray()) }
+            val rowHeights = remember { mutableStateMapOf<SettingsSubtype, Int>() }
+            var dragging: SettingsSubtype? by remember { mutableStateOf(null) }
             Column(
                 Modifier
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(rememberScrollState(), enabled = dragging == null)
                     .then(Modifier.padding(innerPadding))
             ) {
-                @Suppress("UNUSED_EXPRESSION") generation
-                val enabled = SubtypeSettings.getEnabledSubtypes(true)
-                // drag-to-reorder by the grip: the dragged row follows the finger and swaps with its neighbours
-                val order = remember(generation) { mutableStateListOf(*enabled.map { it.toSettingsSubtype() }.toTypedArray()) }
-                val rowHeights = remember { mutableStateMapOf<SettingsSubtype, Int>() }
-                var dragging: SettingsSubtype? by remember { mutableStateOf(null) }
                 var dragOffset by remember { mutableFloatStateOf(0f) }
                 fun persistOrder() {
                     ctx.prefs().edit { putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(order)) }
                     SubtypeSettings.reloadEnabledSubtypes(ctx)
                     generation++
                 }
-                for (keyboard in order) {
+                for (keyboard in order) key(keyboard) { // stable identity: a reorder moves the block instead of recreating it (which killed the drag)
                     val subtype = keyboard.toAdditionalSubtype()
                     val isDragged = dragging == keyboard
                     // tap: languages & layout of the keyboard (with separate settings: unfold all its sections);
@@ -140,13 +144,15 @@ fun KeyboardsScreen(
                     // a single keyboard has nothing to fold: its sections are listed below like the shared ones
                     val folding = separate && enabled.size > 1
                     val isExpanded = folding && keyboard in expanded
-                    Preference(
-                        modifier = Modifier
-                            .onSizeChanged { rowHeights[keyboard] = it.height }
+                    Column(
+                        Modifier
+                            .onSizeChanged { rowHeights[keyboard] = it.height } // the row with its unfolded sections
                             .offset { IntOffset(0, if (isDragged) dragOffset.roundToInt() else 0) }
                             .zIndex(if (isDragged) 1f else 0f)
-                            // the picked-up row: lifted, opaque, so it visibly slides over the others
-                            .then(if (isDragged) Modifier.shadow(8.dp).background(MaterialTheme.colorScheme.surfaceContainerHigh) else Modifier),
+                            // the picked-up block: lifted, opaque, so it visibly slides over the others
+                            .then(if (isDragged) Modifier.shadow(8.dp).background(MaterialTheme.colorScheme.surfaceContainerHigh) else Modifier)
+                    ) {
+                    Preference(
                         name = keyboardName(keyboard, ctx),
                         description = subtype.mainLayoutName()?.getStringResourceOrName("layout_", ctx) ?: "",
                         onClick = {
@@ -162,22 +168,30 @@ fun KeyboardsScreen(
                         if (order.size > 1)
                             Text("\u2261", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(end = 12.dp).pointerInput(keyboard) {
-                                    detectDragGestures(
-                                        onDragStart = { dragging = keyboard; dragOffset = 0f },
-                                        onDragEnd = { dragging = null; dragOffset = 0f; persistOrder() },
-                                        onDragCancel = { dragging = null; dragOffset = 0f },
-                                    ) { change, delta ->
-                                        change.consume()
-                                        dragOffset += delta.y
-                                        val index = order.indexOf(keyboard)
-                                        // moved past half of the neighbour: swap places and keep the row under the finger
-                                        if (delta.y > 0 && index < order.lastIndex) {
-                                            val below = rowHeights[order[index + 1]] ?: 0
-                                            if (dragOffset > below / 2f) { order.add(index + 1, order.removeAt(index)); dragOffset -= below }
-                                        } else if (delta.y < 0 && index > 0) {
-                                            val above = rowHeights[order[index - 1]] ?: 0
-                                            if (dragOffset < -above / 2f) { order.add(index - 1, order.removeAt(index)); dragOffset += above }
+                                    // the grip takes the press the moment the finger lands: no hold, and the row's
+                                    // press-and-hold (delete) and the page scroll never see it
+                                    awaitEachGesture {
+                                        val down = awaitFirstDown(requireUnconsumed = false)
+                                        down.consume()
+                                        dragging = keyboard
+                                        dragOffset = 0f
+                                        drag(down.id) { change ->
+                                            val dy = change.positionChange().y
+                                            change.consume()
+                                            dragOffset += dy
+                                            val index = order.indexOf(keyboard)
+                                            // moved past half of the neighbour: swap places and keep the block under the finger
+                                            if (dy > 0 && index < order.lastIndex) {
+                                                val below = rowHeights[order[index + 1]] ?: 0
+                                                if (dragOffset > below / 2f) { order.add(index + 1, order.removeAt(index)); dragOffset -= below }
+                                            } else if (dy < 0 && index > 0) {
+                                                val above = rowHeights[order[index - 1]] ?: 0
+                                                if (dragOffset < -above / 2f) { order.add(index - 1, order.removeAt(index)); dragOffset += above }
+                                            }
                                         }
+                                        dragging = null
+                                        dragOffset = 0f
+                                        persistOrder()
                                     }
                                 })
                         if (folding) Icon(painterResource(R.drawable.ic_arrow_left), null, Modifier.rotate(if (isExpanded) 90f else -90f))
@@ -186,6 +200,7 @@ fun KeyboardsScreen(
                     if (isExpanded)
                         KeyboardSettingsEntries(keyboard, Modifier.padding(start = 24.dp),
                             onEnter = { KeyboardProfiles.editingId = KeyboardProfiles.idFor(real, keyboard) })
+                    }
                 }
                 Preference(
                     name = stringResource(R.string.add_keyboard),
