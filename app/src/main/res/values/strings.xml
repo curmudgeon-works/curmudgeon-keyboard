@@ -308,7 +308,8 @@
     <string name="key_popups_try">Try it here: hold a key</string>
     <string name="key_popups_symbols">Symbols page</string>
     <string name="key_popups_more_symbols">More symbols page</string>
-    <string name="key_popups_presets">Popup defaults</string>
+    <string name="key_popups_presets">Commonly used popup sets</string>
+    <string name="key_popups_full">Full popup customization</string>
     <string name="key_popups_preset_standard">Standard</string>
     <string name="key_popups_preset_main">Main accented letters</string>
     <string name="key_popups_preset_more">More accented letters</string>

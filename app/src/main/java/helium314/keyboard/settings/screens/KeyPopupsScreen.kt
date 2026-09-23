@@ -131,9 +131,16 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                     reloadPreview()
                 }
             )
+        // everything per key, behind one fold
+        val fullId = "full"
+        FoldRow(title = stringResource(R.string.key_popups_full), unfolded = fullId in unfolded, style = MaterialTheme.typography.bodyLarge) {
+            if (fullId in unfolded) unfolded.remove(fullId) else unfolded.add(fullId)
+        }
         for ((groupTitle, keys) in groups) {
+            if (fullId !in unfolded) break
             val groupId = "group:$groupTitle"
-            FoldRow(title = stringResource(groupTitle), unfolded = groupId in unfolded, style = MaterialTheme.typography.titleMedium) {
+            FoldRow(title = stringResource(groupTitle), unfolded = groupId in unfolded, style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(start = 12.dp)) {
                 if (groupId in unfolded) unfolded.remove(groupId) else unfolded.add(groupId)
             }
             if (groupId !in unfolded) continue
@@ -146,7 +153,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                     subtitle = summary.ifEmpty { stringResource(R.string.key_popups_none) },
                     unfolded = id in unfolded,
                     changed = override != null,
-                    modifier = Modifier.padding(start = 12.dp),
+                    modifier = Modifier.padding(start = 24.dp),
                 ) { if (id in unfolded) unfolded.remove(id) else unfolded.add(id) }
                 if (id in unfolded)
                     PopupEditor(
@@ -154,7 +161,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                         enabledInOrder = override ?: keyInfo.popups,
                         onChanged = { KeyPopupOverrides.set(prefs, keyInfo.overrideKey, it); generation++; reloadPreview() },
                         onReset = { KeyPopupOverrides.set(prefs, keyInfo.overrideKey, null); generation++; reloadPreview() },
-                        modifier = Modifier.padding(start = 24.dp),
+                        modifier = Modifier.padding(start = 36.dp),
                     )
             }
         }

@@ -92,6 +92,7 @@ import helium314.keyboard.settings.SearchScreen
 import helium314.keyboard.settings.SettingsActivity
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.latin.utils.previewDark
+import helium314.keyboard.settings.WithBigTitle
 import helium314.keyboard.settings.WithSmallTitle
 import helium314.keyboard.settings.dialogs.ConfirmationDialog
 import helium314.keyboard.settings.dialogs.LayoutEditDialog
@@ -166,7 +167,7 @@ fun SubtypeScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) }
-                WithSmallTitle(stringResource(R.string.key_popups_title)) {
+                WithBigTitle(stringResource(R.string.key_popups_title)) {
                     KeyPopupsSection(currentSubtype) { setCurrentSubtype(it) }
                 }
                 if (hasLocalizedNumberRow(currentSubtype.locale, ctx)) {
@@ -314,7 +315,7 @@ private fun MainLayoutRow(
     setCurrentSubtype: (SettingsSubtype) -> Unit,
 ) {
     val ctx = LocalContext.current
-    WithSmallTitle(stringResource(R.string.keyboard_layout_set)) {
+    WithBigTitle(stringResource(R.string.keyboard_layout_set)) {
         val appLayouts = LayoutUtils.getAvailableLayouts(LayoutType.MAIN, ctx, currentSubtype.locale)
         var showAddLayoutDialog by remember { mutableStateOf(false) }
         var showLayoutEditDialog: Pair<String, String?>? by remember { mutableStateOf(null) }
