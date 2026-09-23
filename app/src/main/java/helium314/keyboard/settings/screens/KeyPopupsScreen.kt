@@ -100,7 +100,8 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
         // presets: the generated defaults for every key at once (the user's own per-key edits stay on top)
         val userSets = remember(generation) { KeyPopupOverrides.loadSets(ctx.realPrefs()) }
         val presets = listOf(
-            Preset(R.string.key_popups_preset_standard, POPUP_KEYS_NORMAL, null),
+            Preset(R.string.key_popups_preset_standard, POPUP_KEYS_NORMAL, null, symbolMap = Defaults.PREF_SYMBOL_POPUP_MAP),
+            Preset(R.string.key_popups_preset_heliboard, POPUP_KEYS_NORMAL, null, symbolMap = ""),
             Preset(R.string.key_popups_preset_main, POPUP_KEYS_MAIN, null),
             Preset(R.string.key_popups_preset_more, POPUP_KEYS_MORE, null),
             Preset(R.string.key_popups_preset_all, POPUP_KEYS_ALL, null),
@@ -110,8 +111,10 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
             ?: prefs.getString(Settings.PREF_MORE_POPUP_KEYS, Defaults.PREF_MORE_POPUP_KEYS)!!
         val symbolsLayout = keyboard.layoutName(LayoutType.SYMBOLS)
         // a saved set counts as current while its arrangement is still in place
+        val symbolMap = prefs.getString(Settings.PREF_SYMBOL_POPUP_MAP, Defaults.PREF_SYMBOL_POPUP_MAP)!!
         val current = presets.firstOrNull { it.userName != null && it.overrides == overrides && it.morePopups == accentsValue && it.symbolsLayout == symbolsLayout }
-            ?: presets.firstOrNull { it.userName == null && it.morePopups == accentsValue && it.symbolsLayout == symbolsLayout } ?: presets[0]
+            ?: presets.firstOrNull { it.userName == null && it.morePopups == accentsValue && it.symbolsLayout == symbolsLayout && (it.symbolMap == null || it.symbolMap == symbolMap) }
+            ?: presets[0]
         @Composable fun presetName(p: Preset) = p.userName ?: stringResource(p.name)
         var showSaveDialog by remember { mutableStateOf(false) }
         Row(verticalAlignment = Alignment.CenterVertically,
@@ -153,6 +156,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                     changed = if (preset.symbolsLayout == null) changed.withoutLayout(LayoutType.SYMBOLS)
                         else changed.withLayout(LayoutType.SYMBOLS, preset.symbolsLayout)
                     if (preset.overrides != null) KeyPopupOverrides.save(prefs, preset.overrides) // a saved set brings its arrangement
+                    if (preset.symbolMap != null) prefs.edit().putString(Settings.PREF_SYMBOL_POPUP_MAP, preset.symbolMap).apply()
                     onKeyboardChanged(changed)
                     generation++
                     reloadPreview()
@@ -214,7 +218,8 @@ fun TryItBar(keyboard: SettingsSubtype) {
 
 /** A built-in set ([name] resource) or one the user saved ([userName], with its per-key arrangement). */
 private class Preset(val name: Int, val morePopups: String, val symbolsLayout: String?,
-                     val userName: String? = null, val overrides: Map<String, List<String>>? = null)
+                     val userName: String? = null, val overrides: Map<String, List<String>>? = null,
+                     val symbolMap: String? = null) // the letter -> symbols map; null = the Curmudgeon one, "" = none (HeliBoard)
 
 private class KeyInfo(val label: String, val title: String, val popups: List<String>, val pool: List<String>, val overrideKey: String = label)
 
