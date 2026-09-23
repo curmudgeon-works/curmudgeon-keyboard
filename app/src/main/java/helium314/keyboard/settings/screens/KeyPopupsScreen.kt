@@ -65,6 +65,8 @@ import helium314.keyboard.keyboard.internal.keyboard_parser.POPUP_KEYS_NORMAL
 import helium314.keyboard.latin.common.Constants.Subtype.ExtraValue
 import helium314.keyboard.latin.utils.NextScreenIcon
 import helium314.keyboard.latin.utils.SubtypeUtilsAdditional
+import helium314.keyboard.settings.dialogs.TextInputDialog
+import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.dialogs.ListPickerDialog
 import androidx.compose.material3.Surface
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -96,36 +98,61 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
             modifier = Modifier.padding(vertical = 8.dp)
         )
         // presets: the generated defaults for every key at once (the user's own per-key edits stay on top)
+        val userSets = remember(generation) { KeyPopupOverrides.loadSets(ctx.realPrefs()) }
         val presets = listOf(
             Preset(R.string.key_popups_preset_standard, POPUP_KEYS_NORMAL, null),
             Preset(R.string.key_popups_preset_main, POPUP_KEYS_MAIN, null),
             Preset(R.string.key_popups_preset_more, POPUP_KEYS_MORE, null),
             Preset(R.string.key_popups_preset_all, POPUP_KEYS_ALL, null),
             Preset(R.string.key_popups_preset_arabic, POPUP_KEYS_NORMAL, "symbols_arabic"),
-        )
+        ) + userSets.map { Preset(0, it.morePopups, it.symbolsLayout, it.name, it.overrides) }
         val accentsValue = keyboard.getExtraValueOf(ExtraValue.MORE_POPUPS)
             ?: prefs.getString(Settings.PREF_MORE_POPUP_KEYS, Defaults.PREF_MORE_POPUP_KEYS)!!
         val symbolsLayout = keyboard.layoutName(LayoutType.SYMBOLS)
-        val current = presets.firstOrNull { it.morePopups == accentsValue && it.symbolsLayout == symbolsLayout } ?: presets[0]
+        // a saved set counts as current while its arrangement is still in place
+        val current = presets.firstOrNull { it.userName != null && it.overrides == overrides && it.morePopups == accentsValue && it.symbolsLayout == symbolsLayout }
+            ?: presets.firstOrNull { it.userName == null && it.morePopups == accentsValue && it.symbolsLayout == symbolsLayout } ?: presets[0]
+        @Composable fun presetName(p: Preset) = p.userName ?: stringResource(p.name)
+        var showSaveDialog by remember { mutableStateOf(false) }
         Row(verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().clickable { showAccentsDialog = true }.padding(vertical = 10.dp)) {
             Column(Modifier.weight(1f)) {
                 Text(stringResource(R.string.key_popups_presets), style = MaterialTheme.typography.bodyLarge)
-                Text(stringResource(current.name), style = MaterialTheme.typography.bodySmall,
+                Text(presetName(current), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             NextScreenIcon()
         }
+        Row(modifier = Modifier.fillMaxWidth().padding(start = 12.dp)) {
+            TextButton(onClick = { showSaveDialog = true }) { Text(stringResource(R.string.key_popups_save_set)) }
+            if (current.userName != null)
+                TextButton(onClick = {
+                    KeyPopupOverrides.saveSets(ctx.realPrefs(), userSets.filter { it.name != current.userName })
+                    generation++
+                }) { Text(stringResource(R.string.key_popups_delete_set)) }
+        }
+        if (showSaveDialog)
+            TextInputDialog(
+                onDismissRequest = { showSaveDialog = false },
+                onConfirmed = { name ->
+                    val set = KeyPopupOverrides.UserSet(name.trim(), accentsValue, symbolsLayout, overrides)
+                    KeyPopupOverrides.saveSets(ctx.realPrefs(), userSets.filter { it.name != set.name } + set)
+                    generation++
+                },
+                title = { Text(stringResource(R.string.key_popups_save_set)) },
+                checkTextValid = { it.isNotBlank() },
+            )
         if (showAccentsDialog)
             ListPickerDialog(
                 onDismissRequest = { showAccentsDialog = false },
                 items = presets,
-                getItemName = { stringResource(it.name) },
+                getItemName = { presetName(it) },
                 selectedItem = current,
                 onItemSelected = { preset ->
                     var changed = keyboard.with(ExtraValue.MORE_POPUPS, preset.morePopups)
                     changed = if (preset.symbolsLayout == null) changed.withoutLayout(LayoutType.SYMBOLS)
                         else changed.withLayout(LayoutType.SYMBOLS, preset.symbolsLayout)
+                    if (preset.overrides != null) KeyPopupOverrides.save(prefs, preset.overrides) // a saved set brings its arrangement
                     onKeyboardChanged(changed)
                     generation++
                     reloadPreview()
@@ -185,7 +212,9 @@ fun TryItBar(keyboard: SettingsSubtype) {
     }
 }
 
-private class Preset(val name: Int, val morePopups: String, val symbolsLayout: String?)
+/** A built-in set ([name] resource) or one the user saved ([userName], with its per-key arrangement). */
+private class Preset(val name: Int, val morePopups: String, val symbolsLayout: String?,
+                     val userName: String? = null, val overrides: Map<String, List<String>>? = null)
 
 private class KeyInfo(val label: String, val title: String, val popups: List<String>, val pool: List<String>, val overrideKey: String = label)
 
