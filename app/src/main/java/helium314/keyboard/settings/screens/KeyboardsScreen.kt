@@ -53,6 +53,8 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.zIndex
 import androidx.core.content.edit
 import helium314.keyboard.latin.settings.Settings
@@ -142,7 +144,9 @@ fun KeyboardsScreen(
                         modifier = Modifier
                             .onSizeChanged { rowHeights[keyboard] = it.height }
                             .offset { IntOffset(0, if (isDragged) dragOffset.roundToInt() else 0) }
-                            .zIndex(if (isDragged) 1f else 0f),
+                            .zIndex(if (isDragged) 1f else 0f)
+                            // the picked-up row: lifted, opaque, so it visibly slides over the others
+                            .then(if (isDragged) Modifier.shadow(8.dp).background(MaterialTheme.colorScheme.surfaceContainerHigh) else Modifier),
                         name = keyboardName(keyboard, ctx),
                         description = subtype.mainLayoutName()?.getStringResourceOrName("layout_", ctx) ?: "",
                         onClick = {
