@@ -24,6 +24,7 @@ import helium314.keyboard.settings.screens.DebugScreen
 import helium314.keyboard.settings.screens.DictionaryScreen
 import helium314.keyboard.settings.screens.GestureTypingScreen
 import androidx.compose.runtime.getValue
+import helium314.keyboard.settings.screens.KeyboardsScreen
 import helium314.keyboard.settings.screens.LanguageScreen
 import helium314.keyboard.settings.screens.MainSettingsScreen
 import helium314.keyboard.settings.screens.PersonalDictionariesScreen
@@ -59,15 +60,23 @@ fun SettingsNavHost(
 
     NavHost(
         navController = navController,
-        startDestination = startDestination ?: SettingsDestination.Settings,
+        startDestination = startDestination ?: SettingsDestination.Keyboards,
         enterTransition = { slideInHorizontally(initialOffsetX = { +it * dir }, animationSpec = animation) },
         exitTransition = { slideOutHorizontally(targetOffsetX = { -it * dir }, animationSpec = animation) },
         popEnterTransition = { slideInHorizontally(initialOffsetX = { -it * dir }, animationSpec = animation) },
         popExitTransition = { slideOutHorizontally(targetOffsetX = { +it * dir }, animationSpec = animation) }
     ) {
-        composable(SettingsDestination.Settings) {
-            MainSettingsScreen(
+        composable(SettingsDestination.Keyboards) {
+            KeyboardsScreen(
+                onClickKeyboard = { navController.navigate(SettingsDestination.Settings + it) },
+                onClickAllKeyboards = { navController.navigate(SettingsDestination.Languages) },
                 onClickAbout = { navController.navigate(SettingsDestination.About) },
+                onClickBack = ::goBack,
+            )
+        }
+        composable(SettingsDestination.Settings + "{keyboard}") {
+            MainSettingsScreen(
+                keyboard = it.arguments?.getString("keyboard")!!.toSettingsSubtype(),
                 onClickTextCorrection = { navController.navigate(SettingsDestination.TextCorrection) },
                 onClickPreferences = { navController.navigate(SettingsDestination.Preferences) },
                 onClickToolbar = { navController.navigate(SettingsDestination.Toolbar) },
@@ -142,12 +151,13 @@ fun SettingsNavHost(
             SubtypeScreen(initialSubtype = it.arguments?.getString("subtype")!!.toSettingsSubtype(), onClickBack = ::goBack)
         }
     }
-    if (target.value != SettingsDestination.Settings/* && target.value != navController.currentBackStackEntry?.destination?.route*/)
+    if (target.value != SettingsDestination.Keyboards/* && target.value != navController.currentBackStackEntry?.destination?.route*/)
         navController.navigate(route = target.value)
 }
 
 object SettingsDestination {
-    const val Settings = "settings"
+    const val Keyboards = "keyboards"
+    const val Settings = "settings/"
     const val About = "about"
     const val TextCorrection = "text_correction"
     const val Preferences = "preferences"
@@ -166,16 +176,16 @@ object SettingsDestination {
     const val Subtype = "subtype/"
     const val Layouts = "layouts"
     const val Dictionaries = "dictionaries"
-    val navTarget = MutableStateFlow(Settings)
+    val navTarget = MutableStateFlow(Keyboards)
 
     private val navScope = CoroutineScope(Dispatchers.Default)
     fun navigateTo(target: String) {
         if (navTarget.value == target) {
             // triggers recompose twice, but that's ok as it's a rare event
-            navTarget.value = Settings
+            navTarget.value = Keyboards
             navScope.launch { delay(10); navTarget.value = target }
         } else
             navTarget.value = target
-        navScope.launch { delay(50); navTarget.value = Settings }
+        navScope.launch { delay(50); navTarget.value = Keyboards }
     }
 }

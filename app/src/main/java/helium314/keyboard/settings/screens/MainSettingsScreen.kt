@@ -28,6 +28,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.Text
+import helium314.keyboard.latin.settings.SettingsSubtype
+import android.content.Context
 import helium314.keyboard.settings.SettingsMode
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -48,7 +50,7 @@ import helium314.keyboard.settings.screens.gesturedata.TWO_WEEKS_IN_MILLIS
 
 @Composable
 fun MainSettingsScreen(
-    onClickAbout: () -> Unit,
+    keyboard: SettingsSubtype,
     onClickTextCorrection: () -> Unit,
     onClickPreferences: () -> Unit,
     onClickToolbar: () -> Unit,
@@ -65,50 +67,18 @@ fun MainSettingsScreen(
     val advanced by SettingsMode.state(ctx)
     SearchSettingsScreen(
         onClickBack = onClickBack,
-        title = stringResource(R.string.ime_settings),
+        title = keyboardName(keyboard, ctx),
         settings = emptyList(),
     ) {
-        val enabledSubtypes = SubtypeSettings.getEnabledSubtypes(true)
         Scaffold(contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)) { innerPadding ->
             Column(
                 Modifier.verticalScroll(rememberScrollState()).then(Modifier.padding(innerPadding))
             ) {
-                // one entry per keyboard: its languages, then its layout; plus adding one
-                for (subtype in enabledSubtypes) {
-                    val languages = (listOf(subtype.locale()) + getSecondaryLocales(subtype.extraValue))
-                        .joinToString(" + ") { it.localizedDisplayName(ctx.resources) }
-                    Preference(
-                        name = languages,
-                        description = subtype.mainLayoutName()?.let { it.getStringResourceOrName("layout_", ctx) } ?: "",
-                        onClick = { SettingsDestination.navigateTo(SettingsDestination.Subtype + subtype.toSettingsSubtype().toPref()) },
-                        icon = R.drawable.ic_settings_languages
-                    ) { NextScreenIcon() }
-                }
-                var showAddKeyboard by remember { mutableStateOf(false) }
+                // this keyboard's languages, layout, dictionaries, popup order ...
                 Preference(
-                    name = stringResource(R.string.add_keyboard),
-                    onClick = { showAddKeyboard = true },
-                    icon = R.drawable.ic_plus
-                ) { NextScreenIcon() }
-                if (showAddKeyboard)
-                    ListPickerDialog(
-                        onDismissRequest = { showAddKeyboard = false },
-                        onItemSelected = { locale ->
-                            val subtype = SubtypeUtilsAdditional.createDefaultSubtype(locale)
-                            val settingsSubtype = subtype.toSettingsSubtype()
-                            SubtypeUtilsAdditional.changeAdditionalSubtype(settingsSubtype, settingsSubtype, ctx) // registers it unless it equals a built-in one
-                            SubtypeSettings.addEnabledSubtype(ctx.prefs(), settingsSubtype.toAdditionalSubtype())
-                            SettingsDestination.navigateTo(SettingsDestination.Subtype + settingsSubtype.toPref())
-                        },
-                        title = { Text(stringResource(R.string.add_keyboard)) },
-                        items = SubtypeSettings.getAvailableSubtypeLocales().sortedBy { it.localizedDisplayName(ctx.resources) },
-                        getItemName = { it.localizedDisplayName(ctx.resources) },
-                        showRadioButtons = false,
-                    )
-                // upstream's full list: every built-in keyboard with an on/off switch, incl. disabled ones
-                if (advanced) Preference(
-                    name = stringResource(R.string.keyboards_title),
-                    onClick = onClickLanguage,
+                    name = stringResource(R.string.language_and_layouts_title),
+                    description = keyboardName(keyboard, ctx),
+                    onClick = { SettingsDestination.navigateTo(SettingsDestination.Subtype + keyboard.toPref()) },
                     icon = R.drawable.ic_settings_languages
                 ) { NextScreenIcon() }
                 Preference(
@@ -159,11 +129,6 @@ fun MainSettingsScreen(
                     onClick = onClickAdvanced,
                     icon = R.drawable.ic_settings_advanced
                 ) { NextScreenIcon() }
-                Preference(
-                    name = stringResource(R.string.settings_screen_about),
-                    onClick = onClickAbout,
-                    icon = R.drawable.ic_settings_about
-                ) { NextScreenIcon() }
             }
         }
     }
@@ -175,7 +140,11 @@ private fun PreviewScreen() {
     initPreview(LocalContext.current)
     Theme(previewDark) {
         Surface {
-            MainSettingsScreen({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+            MainSettingsScreen(SettingsSubtype(java.util.Locale.ENGLISH, ""), {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
         }
     }
 }
+
+/** "English (US) + Hinglish" */
+fun keyboardName(keyboard: SettingsSubtype, ctx: Context): String =
+    (listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)).joinToString(" + ") { it.localizedDisplayName(ctx.resources) }
