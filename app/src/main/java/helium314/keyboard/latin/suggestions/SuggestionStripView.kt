@@ -229,7 +229,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         else {
             newLayoutDirection = if (isRtlLanguage) LAYOUT_DIRECTION_RTL else LAYOUT_DIRECTION_LTR
             direction = if (isRtlLanguage) -1 else 1
-            toolbarExpandKey.scaleX = (if (toolbarContainer.visibility != VISIBLE) 1f else -1f) * direction
+            setExpandKeyDirection(toolbarContainer.visibility == VISIBLE)
         }
         layoutDirection = newLayoutDirection
         suggestionsStrip.layoutDirection = newLayoutDirection
@@ -238,9 +238,21 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     fun setToolbarVisibility(toolbarVisible: Boolean) {
         // avoid showing toolbar keys when locked
         val locked = isDeviceLocked(context)
-        pinnedKeys.isVisible = !locked && !toolbarVisible
-        suggestionsStrip.isVisible = locked || !toolbarVisible
-        toolbarContainer.isVisible = !locked && toolbarVisible
+        val show = !locked && toolbarVisible
+        // the toolbar slides up above the suggestions, which stay where they are
+        if (show && !toolbarContainer.isVisible) {
+            toolbarContainer.isVisible = true
+            toolbarContainer.translationY = toolbarContainer.layoutParams.height.toFloat()
+            toolbarContainer.alpha = 0f
+            toolbarContainer.animate().translationY(0f).alpha(1f).setDuration(120).start()
+        } else if (!show) {
+            toolbarContainer.animate().cancel()
+            toolbarContainer.translationY = 0f
+            toolbarContainer.alpha = 1f
+            toolbarContainer.isVisible = false
+        }
+        pinnedKeys.isVisible = !locked
+        suggestionsStrip.isVisible = true
 
         if (DEBUG_SUGGESTIONS) {
             for (view in debugInfoViews) {
@@ -248,7 +260,13 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             }
         }
 
-        toolbarExpandKey.scaleX = (if (toolbarVisible && !locked) -1f else 1f) * direction
+        setExpandKeyDirection(show)
+    }
+
+    /** The expand key's arrow points up while the toolbar is hidden, down while it is shown above the suggestions. */
+    private fun setExpandKeyDirection(toolbarShown: Boolean) {
+        toolbarExpandKey.scaleX = 1f
+        toolbarExpandKey.rotation = if (toolbarShown) 90f else -90f
     }
 
     fun setSuggestions(suggestions: SuggestedWords, isRtlLanguage: Boolean) {
