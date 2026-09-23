@@ -282,7 +282,8 @@ public class KeyboardView extends View {
             return;
         }
 
-        mShowsHints = Settings.getValues().mShowsHints || Settings.getValues().mShowNumberRowHints; // flags decide per key
+        // hints are switched off per key at parse time (LABEL_FLAGS_DISABLE_HINT_LABEL), not here
+        mShowsHints = true;
         final float scale = Settings.getValues().mKeyboardHeightScale;
         mIconScaleFactor = scale < 0.8f ? scale + 0.2f : 1f;
         final Paint paint = mPaint;
