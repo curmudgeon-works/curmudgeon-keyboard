@@ -72,6 +72,10 @@ import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.dialogs.ListPickerDialog
 import androidx.compose.material3.Surface
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.latin.RichInputMethodManager
@@ -231,17 +235,32 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
 }
 
 /** A text field to try the keyboard being edited: focusing it opens that keyboard, changes rebuild it live. */
+enum class TryItMode { TEXT, NUMBER, PHONE }
+
+/** What the try-it field asks the keyboard for; items on the screen set it (e.g. the number pad item) and focus the field. */
+class TryItState {
+    var mode by mutableStateOf(TryItMode.TEXT)
+    val focusRequester = FocusRequester()
+    fun show(mode: TryItMode) { this.mode = mode; runCatching { focusRequester.requestFocus() } }
+}
+
 @Composable
-fun TryItBar(keyboard: SettingsSubtype) {
+fun TryItBar(keyboard: SettingsSubtype, state: TryItState) {
     var tryText by remember { mutableStateOf("") }
     Surface(tonalElevation = 3.dp, shadowElevation = 8.dp) {
         OutlinedTextField(
             value = tryText, onValueChange = { tryText = it },
             label = { Text(stringResource(R.string.key_popups_try)) },
+            keyboardOptions = KeyboardOptions(keyboardType = when (state.mode) {
+                TryItMode.NUMBER -> KeyboardType.Number
+                TryItMode.PHONE -> KeyboardType.Phone
+                else -> KeyboardType.Text
+            }),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 8.dp)
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                .focusRequester(state.focusRequester)
                 .onFocusChanged { if (it.isFocused) showKeyboardForPreview(keyboard) }
         )
     }

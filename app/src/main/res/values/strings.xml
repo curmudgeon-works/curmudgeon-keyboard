@@ -306,6 +306,9 @@
     <string name="key_popups_none">No popups</string>
     <string name="key_popups_numpad">Number pad</string>
     <string name="key_popups_try">Try it here</string>
+    <string name="layout_group_numpad">Number pad</string>
+    <string name="layout_group_phone">Phone pad</string>
+    <string name="bottom_rows_action_key">Send key on the emoji and clipboard rows</string>
     <string name="key_popups_symbols">Symbols page</string>
     <string name="key_popups_more_symbols">More symbols page</string>
     <string name="key_popups_presets">Commonly used popup sets</string>
