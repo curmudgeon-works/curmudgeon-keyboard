@@ -43,10 +43,11 @@ object KeyPopupOverrides {
      */
     @JvmStatic
     fun apply(overrides: Map<String, List<String>>, keyLabel: String?, specs: Array<String>?): Array<String>? {
-        if (keyLabel == null || specs == null) return null
+        if (keyLabel == null) return null
         val wanted = overrides[keyLabel] ?: return null
         val byLabel = LinkedHashMap<String, String>()
-        for (spec in specs) byLabel.putIfAbsent(KeySpecParser.getLabel(spec) ?: spec, spec)
-        return wanted.mapNotNull { byLabel[it] }.toTypedArray()
+        for (spec in specs.orEmpty()) byLabel.putIfAbsent(KeySpecParser.getLabel(spec) ?: spec, spec)
+        // a label the generator didn't produce (from the full accent pool, or the user's own) becomes a plain key spec
+        return wanted.map { byLabel[it] ?: it.replace("\\", "\\\\").replace("|", "\\|") }.toTypedArray()
     }
 }

@@ -21,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -142,7 +143,7 @@ fun KeyPopupsScreen(initialKeyboard: SettingsSubtype, onClickBack: () -> Unit) {
                         ) { if (id in unfolded) unfolded.remove(id) else unfolded.add(id) }
                         if (id in unfolded)
                             PopupEditor(
-                                allPopups = keyInfo.popups,
+                                allPopups = (keyInfo.pool + override.orEmpty()).distinct(), // the user's own additions too
                                 enabledInOrder = override ?: keyInfo.popups,
                                 onChanged = { KeyPopupOverrides.set(prefs, keyInfo.label, it); generation++ },
                                 onReset = { KeyPopupOverrides.set(prefs, keyInfo.label, null); generation++ },
@@ -155,17 +156,18 @@ fun KeyPopupsScreen(initialKeyboard: SettingsSubtype, onClickBack: () -> Unit) {
     }
 }
 
-private class KeyInfo(val label: String, val title: String, val popups: List<String>)
+/** [popups] = what the key offers by default; [pool] = everything relevant to it (defaults first), for adding. */
+private class KeyInfo(val label: String, val title: String, val popups: List<String>, val pool: List<String>)
 
 /** Builds the keyboard for plain text, web address and email fields and collects each key's popups. */
 private fun keysWithPopups(ctx: Context, keyboard: SettingsSubtype): List<Pair<Int, List<KeyInfo>>> {
     val prefs = ctx.prefs()
     val width = ResourceUtils.getKeyboardWidth(ctx, Settings.getValues())
     val numberRow = prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW)
-    fun keysFor(inputType: Int, variant: Int?): List<Key> {
+    fun keysFor(inputType: Int, subtype: SettingsSubtype = keyboard): List<Key> {
         val editorInfo = EditorInfo().apply { this.inputType = inputType }
         val layoutSet = KeyboardLayoutSet.Builder(ctx, editorInfo)
-            .setSubtype(RichInputMethodSubtype.get(keyboard.toAdditionalSubtype()))
+            .setSubtype(RichInputMethodSubtype.get(subtype.toAdditionalSubtype()))
             .setKeyboardGeometry(width, width) // height doesn't matter for the popups
             .setNumberRowEnabled(numberRow)
             .build()
@@ -173,8 +175,14 @@ private fun keysWithPopups(ctx: Context, keyboard: SettingsSubtype): List<Pair<I
     }
     fun popupsOf(key: Key) = key.popupKeys?.mapNotNull { it.mLabel ?: it.mOutputText }?.filter { it.isNotBlank() }.orEmpty()
 
-    val plain = keysFor(InputType.TYPE_CLASS_TEXT, null)
-    val letters = plain.filter { Character.isLetterOrDigit(it.code) }.map { KeyInfo(it.label!!, it.label!!, popupsOf(it)) }
+    val plain = keysFor(InputType.TYPE_CLASS_TEXT)
+    // the full pool: the keyboard built with every accented letter the languages know
+    val poolByLabel = keysFor(InputType.TYPE_CLASS_TEXT, keyboard.with(ExtraValue.MORE_POPUPS, POPUP_KEYS_ALL))
+        .associate { it.label!! to popupsOf(it) }
+    val letters = plain.filter { Character.isLetterOrDigit(it.code) }.map {
+        val defaults = popupsOf(it)
+        KeyInfo(it.label!!, it.label!!, defaults, (defaults + poolByLabel[it.label!!].orEmpty()).distinct())
+    }
     // the other keys, in every text field variant they show up in
     val contextual = LinkedHashMap<String, KeyInfo>()
     val variants = listOf(
@@ -183,12 +191,12 @@ private fun keysWithPopups(ctx: Context, keyboard: SettingsSubtype): List<Pair<I
         R.string.key_popups_variant_email to (InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS),
     )
     for ((variantName, inputType) in variants) {
-        for (key in keysFor(inputType, null).filter { !Character.isLetterOrDigit(it.code) }) {
+        for (key in keysFor(inputType).filter { !Character.isLetterOrDigit(it.code) }) {
             val label = key.label!!
             if (label in contextual) continue
             val popups = popupsOf(key)
             if (popups.isEmpty()) continue
-            contextual[label] = KeyInfo(label, "$label  (${ctx.getString(variantName)})", popups)
+            contextual[label] = KeyInfo(label, "$label  (${ctx.getString(variantName)})", popups, popups)
         }
     }
     return listOf(R.string.key_popups_letters to letters, R.string.key_popups_contextual to contextual.values.toList())
@@ -278,6 +286,20 @@ private fun PopupEditor(
                 })
             }
         }
-        TextButton(onClick = onReset, modifier = Modifier.align(Alignment.End)) { Text(stringResource(R.string.button_default)) }
+        // anything the pool lacks
+        var custom by remember { mutableStateOf("") }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = custom, onValueChange = { custom = it }, singleLine = true,
+                label = { Text(stringResource(R.string.key_popups_add)) },
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(enabled = custom.isNotBlank() && custom.trim() !in items, onClick = {
+                val value = custom.trim()
+                items.add(value); enabled.add(value); custom = ""
+                commit()
+            }) { Text(stringResource(R.string.key_popups_add_button)) }
+            TextButton(onClick = onReset) { Text(stringResource(R.string.button_default)) }
+        }
     }
 }
