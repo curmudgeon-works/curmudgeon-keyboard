@@ -310,7 +310,9 @@
     <string name="key_popups_more_symbols">More symbols page</string>
     <string name="key_popups_presets">Commonly used popup sets</string>
     <string name="key_popups_full">Full popup customization</string>
-    <string name="key_popups_save_set">Save current as a set</string>
+    <string name="key_popups_save_as_new">Save as new set</string>
+    <string name="key_popups_save_change_title">Save this change to a set of your own</string>
+    <string name="key_popups_my_set">My popups</string>
     <string name="key_popups_delete_set">Delete this set</string>
     <string name="key_popups_preset_standard">Curmudgeon default</string>
     <string name="key_popups_preset_heliboard">HeliBoard default</string>
