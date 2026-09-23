@@ -176,7 +176,6 @@ fun SubtypeScreen(
                     .then(Modifier.padding(innerPadding)),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) }
                 WithBigTitle(stringResource(R.string.key_popups_title)) {
                     KeyPopupsSection(currentSubtype) { setCurrentSubtype(it) }
                 }
@@ -205,13 +204,11 @@ fun SubtypeScreen(
                     }
                 }
                 // ---- number row and hints, in one place
-                WithBigTitle(stringResource(R.string.number_row)) {
+                WithBigTitle(stringResource(R.string.number_row_and_hints)) {
                     PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW, R.string.number_row_summary) { reloadPreview() }
                     if (!prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW))
                         PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS, Defaults.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS, R.string.number_row_in_symbols) { reloadPreview() }
-                }
-                // two independent switches; the popups behind long-press stay either way
-                WithBigTitle(stringResource(R.string.hints_title)) {
+                    // two independent hint switches; the popups behind long-press stay either way
                     PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW_HINTS, Defaults.PREF_SHOW_NUMBER_ROW_HINTS, R.string.hints_number_row) { reloadPreview() }
                     PrefSwitchRow(Settings.PREF_SHOW_HINTS, Defaults.PREF_SHOW_HINTS, R.string.hints_other_keys) { reloadPreview() }
                 }
@@ -225,16 +222,6 @@ fun SubtypeScreen(
                     else
                         SecondaryLayoutRow(currentSubtype, LayoutType.FUNCTIONAL, ::setCurrentSubtype,
                             builtIns = { all -> all.filter { it != "functional_keys_khipro" || currentSubtype.locale.script() == ScriptUtils.SCRIPT_BENGALI } })
-                    // number pad: portrait and landscape together; the try-it field shows it
-                    FoldableLayoutGroup(R.string.layout_group_numpad, onOpen = { tryIt.show(TryItMode.NUMBER) }) {
-                        SecondaryLayoutRow(currentSubtype, LayoutType.NUMPAD, ::setCurrentSubtype)
-                        SecondaryLayoutRow(currentSubtype, LayoutType.NUMPAD_LANDSCAPE, ::setCurrentSubtype)
-                    }
-                    // phone pad and its symbols page together; the try-it field shows it
-                    FoldableLayoutGroup(R.string.layout_group_phone, onOpen = { tryIt.show(TryItMode.PHONE) }) {
-                        SecondaryLayoutRow(currentSubtype, LayoutType.PHONE, ::setCurrentSubtype)
-                        SecondaryLayoutRow(currentSubtype, LayoutType.PHONE_SYMBOLS, ::setCurrentSubtype)
-                    }
                     // the send/enter key on the rows under the emoji and clipboard panels: one switch for both
                     val withAction = currentSubtype.layoutName(LayoutType.EMOJI_BOTTOM) == "emoji_bottom_row_with_action"
                     SwitchRow(stringResource(R.string.bottom_rows_action_key), withAction) { on ->
@@ -244,9 +231,14 @@ fun SubtypeScreen(
                         )
                     }
                     // everything else only when there is a choice (a custom layout file exists)
-                    for (type in listOf(LayoutType.MORE_SYMBOLS, LayoutType.NUMBER, LayoutType.NUMBER_ROW))
+                    // (the number pad's popups are in the popup editor; these rows only pick layout files)
+                    for (type in listOf(LayoutType.MORE_SYMBOLS, LayoutType.NUMBER, LayoutType.NUMBER_ROW, LayoutType.NUMPAD, LayoutType.NUMPAD_LANDSCAPE, LayoutType.PHONE, LayoutType.PHONE_SYMBOLS))
                         if (LayoutUtilsCustom.getLayoutFiles(type, ctx).isNotEmpty())
                             SecondaryLayoutRow(currentSubtype, type, ::setCurrentSubtype)
+                }
+                // ---- the layout itself, last
+                WithBigTitle(stringResource(R.string.keyboard_layout_set)) {
+                    MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) }
                 }
             }
         }

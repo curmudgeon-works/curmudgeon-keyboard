@@ -70,6 +70,9 @@ import helium314.keyboard.latin.utils.SubtypeUtilsAdditional
 import helium314.keyboard.settings.dialogs.TextInputDialog
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.dialogs.ListPickerDialog
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.text.KeyboardOptions
@@ -248,21 +251,39 @@ class TryItState {
 fun TryItBar(keyboard: SettingsSubtype, state: TryItState) {
     var tryText by remember { mutableStateOf("") }
     Surface(tonalElevation = 3.dp, shadowElevation = 8.dp) {
-        OutlinedTextField(
-            value = tryText, onValueChange = { tryText = it },
-            label = { Text(stringResource(R.string.key_popups_try)) },
-            keyboardOptions = KeyboardOptions(keyboardType = when (state.mode) {
-                TryItMode.NUMBER -> KeyboardType.Number
-                TryItMode.PHONE -> KeyboardType.Phone
-                else -> KeyboardType.Text
-            }),
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 8.dp)
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
-                .focusRequester(state.focusRequester)
-                .onFocusChanged { if (it.isFocused) showKeyboardForPreview(keyboard) }
-        )
+        ) {
+            OutlinedTextField(
+                value = tryText, onValueChange = { tryText = it },
+                label = { Text(stringResource(R.string.key_popups_try)) },
+                keyboardOptions = KeyboardOptions(keyboardType = when (state.mode) {
+                    TryItMode.NUMBER -> KeyboardType.Number
+                    TryItMode.PHONE -> KeyboardType.Phone
+                    else -> KeyboardType.Text
+                }),
+                modifier = Modifier
+                    .weight(1f)
+                    .focusRequester(state.focusRequester)
+                    .onFocusChanged { if (it.isFocused) showKeyboardForPreview(keyboard) }
+            )
+            // which keyboard the preview shows: letters, the number pad, the phone pad
+            SingleChoiceSegmentedButtonRow(Modifier.padding(start = 8.dp)) {
+                val modes = listOf(TryItMode.TEXT to "ABC", TryItMode.NUMBER to "123", TryItMode.PHONE to "\u260E")
+                modes.forEachIndexed { index, (mode, label) ->
+                    SegmentedButton(
+                        selected = state.mode == mode,
+                        onClick = { state.show(mode) },
+                        shape = SegmentedButtonDefaults.itemShape(index, modes.size),
+                        label = { Text(label) }
+                    )
+                }
+            }
+        }
     }
 }
 
