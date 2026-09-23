@@ -57,6 +57,7 @@ import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.utils.KeyPopupOverrides
+import helium314.keyboard.latin.utils.LayoutType
 import helium314.keyboard.latin.utils.ResourceUtils
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.keyboard.internal.keyboard_parser.morePopupKeysResId
@@ -99,14 +100,23 @@ fun KeyPopupsScreen(initialKeyboard: SettingsSubtype, onClickBack: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
-                // which accented letters exist in the pool at all (upstream's "more letters with diacritics")
+                // presets: the generated defaults for every key at once (the user's own per-key edits stay on top)
+                val presets = listOf(
+                    Preset(R.string.key_popups_preset_standard, POPUP_KEYS_NORMAL, null),
+                    Preset(R.string.key_popups_preset_main, POPUP_KEYS_MAIN, null),
+                    Preset(R.string.key_popups_preset_more, POPUP_KEYS_MORE, null),
+                    Preset(R.string.key_popups_preset_all, POPUP_KEYS_ALL, null),
+                    Preset(R.string.key_popups_preset_arabic, POPUP_KEYS_NORMAL, "symbols_arabic"),
+                )
                 val accentsValue = keyboard.getExtraValueOf(ExtraValue.MORE_POPUPS)
                     ?: prefs.getString(Settings.PREF_MORE_POPUP_KEYS, Defaults.PREF_MORE_POPUP_KEYS)!!
+                val symbolsLayout = keyboard.layoutName(LayoutType.SYMBOLS)
+                val current = presets.firstOrNull { it.morePopups == accentsValue && it.symbolsLayout == symbolsLayout } ?: presets[0]
                 Row(verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth().clickable { showAccentsDialog = true }.padding(vertical = 10.dp)) {
                     Column(Modifier.weight(1f)) {
-                        Text(stringResource(R.string.key_popups_accents), style = MaterialTheme.typography.bodyLarge)
-                        Text(stringResource(morePopupKeysResId(accentsValue)), style = MaterialTheme.typography.bodySmall,
+                        Text(stringResource(R.string.key_popups_presets), style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(current.name), style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     NextScreenIcon()
@@ -114,11 +124,13 @@ fun KeyPopupsScreen(initialKeyboard: SettingsSubtype, onClickBack: () -> Unit) {
                 if (showAccentsDialog)
                     ListPickerDialog(
                         onDismissRequest = { showAccentsDialog = false },
-                        items = listOf(POPUP_KEYS_NORMAL, POPUP_KEYS_MAIN, POPUP_KEYS_MORE, POPUP_KEYS_ALL),
-                        getItemName = { stringResource(morePopupKeysResId(it)) },
-                        selectedItem = accentsValue,
-                        onItemSelected = {
-                            val changed = keyboard.with(ExtraValue.MORE_POPUPS, it)
+                        items = presets,
+                        getItemName = { stringResource(it.name) },
+                        selectedItem = current,
+                        onItemSelected = { preset ->
+                            var changed = keyboard.with(ExtraValue.MORE_POPUPS, preset.morePopups)
+                            changed = if (preset.symbolsLayout == null) changed.withoutLayout(LayoutType.SYMBOLS)
+                                else changed.withLayout(LayoutType.SYMBOLS, preset.symbolsLayout)
                             SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, changed, ctx)
                             keyboard = changed
                             generation++
@@ -157,6 +169,8 @@ fun KeyPopupsScreen(initialKeyboard: SettingsSubtype, onClickBack: () -> Unit) {
 }
 
 /** [popups] = what the key offers by default; [pool] = everything relevant to it (defaults first), for adding. */
+private class Preset(val name: Int, val morePopups: String, val symbolsLayout: String?)
+
 private class KeyInfo(val label: String, val title: String, val popups: List<String>, val pool: List<String>, val overrideKey: String = label)
 
 /** Builds the keyboard for plain text, web address and email fields and collects each key's popups. */
