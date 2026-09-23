@@ -51,16 +51,6 @@ import helium314.keyboard.settings.screens.gesturedata.TWO_WEEKS_IN_MILLIS
 @Composable
 fun MainSettingsScreen(
     keyboard: SettingsSubtype,
-    onClickTextCorrection: () -> Unit,
-    onClickPreferences: () -> Unit,
-    onClickToolbar: () -> Unit,
-    onClickGestureTyping: () -> Unit,
-    onClickDataGathering: () -> Unit,
-    onClickAdvanced: () -> Unit,
-    onClickAppearance: () -> Unit,
-    onClickLanguage: () -> Unit,
-    onClickLayouts: () -> Unit,
-    onClickDictionaries: () -> Unit,
     onClickBack: () -> Unit,
 ) {
     val ctx = LocalContext.current
@@ -74,61 +64,7 @@ fun MainSettingsScreen(
             Column(
                 Modifier.verticalScroll(rememberScrollState()).then(Modifier.padding(innerPadding))
             ) {
-                // this keyboard's languages, layout, dictionaries, popup order ...
-                Preference(
-                    name = stringResource(R.string.language_and_layouts_title),
-                    description = keyboardName(keyboard, ctx),
-                    onClick = { SettingsDestination.navigateTo(SettingsDestination.Subtype + keyboard.toPref()) },
-                    icon = R.drawable.ic_settings_languages
-                ) { NextScreenIcon() }
-                Preference(
-                    name = stringResource(R.string.settings_screen_preferences),
-                    onClick = onClickPreferences,
-                    icon = R.drawable.ic_settings_preferences
-                ) { NextScreenIcon() }
-                Preference(
-                    name = stringResource(R.string.settings_screen_appearance),
-                    onClick = onClickAppearance,
-                    icon = R.drawable.ic_settings_appearance
-                ) { NextScreenIcon() }
-                if (advanced) Preference(
-                    name = stringResource(R.string.settings_screen_toolbar),
-                    onClick = onClickToolbar,
-                    icon = R.drawable.ic_settings_toolbar
-                ) { NextScreenIcon() }
-                if (JniUtils.sHaveGestureLib || BuildConfig.USE_OWN_GESTURE_DECODER)
-                    Preference(
-                        name = stringResource(R.string.settings_screen_gesture),
-                        onClick = onClickGestureTyping,
-                        icon = R.drawable.ic_settings_gesture
-                    ) { NextScreenIcon() }
-                // we don't even show the menu if data gathering phase ended more than 2 weeks ago
-                if (JniUtils.sHaveGestureLib && System.currentTimeMillis() < END_DATE_EPOCH_MILLIS + TWO_WEEKS_IN_MILLIS)
-                    Preference(
-                        name = stringResource(R.string.gesture_data_screen),
-                        onClick = onClickDataGathering,
-                        icon = R.drawable.ic_settings_gesture
-                    ) { NextScreenIcon() }
-                Preference(
-                    name = stringResource(R.string.settings_screen_correction),
-                    onClick = onClickTextCorrection,
-                    icon = R.drawable.ic_settings_correction
-                ) { NextScreenIcon() }
-                if (advanced) Preference(
-                    name = stringResource(R.string.settings_screen_secondary_layouts),
-                    onClick = onClickLayouts,
-                    icon = R.drawable.ic_ime_switcher
-                ) { NextScreenIcon() }
-                Preference(
-                    name = stringResource(R.string.dictionary_settings_category),
-                    onClick = onClickDictionaries,
-                    icon = R.drawable.ic_dictionary
-                ) { NextScreenIcon() }
-                Preference(
-                    name = stringResource(R.string.settings_screen_advanced),
-                    onClick = onClickAdvanced,
-                    icon = R.drawable.ic_settings_advanced
-                ) { NextScreenIcon() }
+                KeyboardSettingsEntries(keyboard)
             }
         }
     }
@@ -140,7 +76,7 @@ private fun PreviewScreen() {
     initPreview(LocalContext.current)
     Theme(previewDark) {
         Surface {
-            MainSettingsScreen(SettingsSubtype(java.util.Locale.ENGLISH, ""), {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+            MainSettingsScreen(SettingsSubtype(java.util.Locale.ENGLISH, "")) {}
         }
     }
 }
@@ -148,3 +84,67 @@ private fun PreviewScreen() {
 /** "English (US) + Hinglish" */
 fun keyboardName(keyboard: SettingsSubtype, ctx: Context): String =
     (listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)).joinToString(" + ") { it.localizedDisplayName(ctx.resources) }
+
+/** The sections of one keyboard's settings, as menu entries. Used by the keyboard's own screen and inline under the keyboards list. */
+@Composable
+fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modifier) {
+    val ctx = LocalContext.current
+    val advanced by SettingsMode.state(ctx)
+    Column(modifier) {
+    // this keyboard's languages, layout, dictionaries, popup order ...
+    Preference(
+        name = stringResource(R.string.language_and_layouts_title),
+        description = keyboardName(keyboard, ctx),
+        onClick = { SettingsDestination.navigateTo(SettingsDestination.Subtype + keyboard.toPref()) },
+        icon = R.drawable.ic_settings_languages
+    ) { NextScreenIcon() }
+    Preference(
+        name = stringResource(R.string.settings_screen_preferences),
+        onClick = { SettingsDestination.navigateTo(SettingsDestination.Preferences) },
+        icon = R.drawable.ic_settings_preferences
+    ) { NextScreenIcon() }
+    Preference(
+        name = stringResource(R.string.settings_screen_appearance),
+        onClick = { SettingsDestination.navigateTo(SettingsDestination.Appearance) },
+        icon = R.drawable.ic_settings_appearance
+    ) { NextScreenIcon() }
+    if (advanced) Preference(
+        name = stringResource(R.string.settings_screen_toolbar),
+        onClick = { SettingsDestination.navigateTo(SettingsDestination.Toolbar) },
+        icon = R.drawable.ic_settings_toolbar
+    ) { NextScreenIcon() }
+    if (JniUtils.sHaveGestureLib || BuildConfig.USE_OWN_GESTURE_DECODER)
+        Preference(
+            name = stringResource(R.string.settings_screen_gesture),
+            onClick = { SettingsDestination.navigateTo(SettingsDestination.GestureTyping) },
+            icon = R.drawable.ic_settings_gesture
+        ) { NextScreenIcon() }
+    // we don't even show the menu if data gathering phase ended more than 2 weeks ago
+    if (JniUtils.sHaveGestureLib && System.currentTimeMillis() < END_DATE_EPOCH_MILLIS + TWO_WEEKS_IN_MILLIS)
+        Preference(
+            name = stringResource(R.string.gesture_data_screen),
+            onClick = { SettingsDestination.navigateTo(SettingsDestination.DataGathering) },
+            icon = R.drawable.ic_settings_gesture
+        ) { NextScreenIcon() }
+    Preference(
+        name = stringResource(R.string.settings_screen_correction),
+        onClick = { SettingsDestination.navigateTo(SettingsDestination.TextCorrection) },
+        icon = R.drawable.ic_settings_correction
+    ) { NextScreenIcon() }
+    if (advanced) Preference(
+        name = stringResource(R.string.settings_screen_secondary_layouts),
+        onClick = { SettingsDestination.navigateTo(SettingsDestination.Layouts) },
+        icon = R.drawable.ic_ime_switcher
+    ) { NextScreenIcon() }
+    Preference(
+        name = stringResource(R.string.dictionary_settings_category),
+        onClick = { SettingsDestination.navigateTo(SettingsDestination.Dictionaries) },
+        icon = R.drawable.ic_dictionary
+    ) { NextScreenIcon() }
+    Preference(
+        name = stringResource(R.string.settings_screen_advanced),
+        onClick = { SettingsDestination.navigateTo(SettingsDestination.Advanced) },
+        icon = R.drawable.ic_settings_advanced
+    ) { NextScreenIcon() }
+    }
+}

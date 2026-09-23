@@ -10,6 +10,10 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Icon
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -61,12 +65,19 @@ fun KeyboardsScreen(
             ) {
                 for (subtype in SubtypeSettings.getEnabledSubtypes(true)) {
                     val keyboard = subtype.toSettingsSubtype()
+                    // a drop-down: the keyboard's sections unfold underneath its entry
+                    var expanded by remember(keyboard) { mutableStateOf(false) }
                     Preference(
                         name = keyboardName(keyboard, ctx),
                         description = subtype.mainLayoutName()?.getStringResourceOrName("layout_", ctx) ?: "",
-                        onClick = { onClickKeyboard(keyboard.toPref()) },
+                        onClick = { expanded = !expanded },
                         icon = R.drawable.ic_settings_languages
-                    ) { NextScreenIcon() }
+                    ) {
+                        // the next-screen arrow, turned to point down (collapsed) or up (expanded)
+                        Icon(painterResource(R.drawable.ic_arrow_left), null, Modifier.rotate(if (expanded) 90f else -90f))
+                    }
+                    if (expanded)
+                        KeyboardSettingsEntries(keyboard, Modifier.padding(start = 24.dp))
                 }
                 Preference(
                     name = stringResource(R.string.add_keyboard),
