@@ -83,6 +83,9 @@ fun KeyboardsScreen(
                     onClick = { showAddKeyboard = true },
                     icon = R.drawable.ic_plus
                 ) { NextScreenIcon() }
+                // the sections shared by all keyboards
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                KeyboardSettingsEntries(SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype(), showLanguages = false)
                 Preference(
                     name = stringResource(R.string.settings_screen_about),
                     onClick = onClickAbout,
