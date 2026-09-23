@@ -1098,7 +1098,7 @@ public class Key implements Comparable<Key> {
             mPopupKeysColumnAndFlags = getPopupKeysColumnAndFlagsAndSetNullInArray(params, popupKeys);
             String[] finalPopupKeys = popupKeys == null ? null : PopupKeySpec.filterOutEmptyString(popupKeys);
             // the user's own arrangement for this key, if any (letters and digits: the label is the same in both cases)
-            final String[] overridden = KeyPopupOverrides.apply(params.mKeyPopupOverrides, label, finalPopupKeys);
+            final String[] overridden = KeyPopupOverrides.apply(params.mKeyPopupOverrides, params.mId.mElementId, label, finalPopupKeys);
             if (overridden != null) finalPopupKeys = overridden.length == 0 ? null : overridden;
             if (finalPopupKeys != null) {
                 actionFlags |= ACTION_FLAGS_ENABLE_LONG_PRESS;
