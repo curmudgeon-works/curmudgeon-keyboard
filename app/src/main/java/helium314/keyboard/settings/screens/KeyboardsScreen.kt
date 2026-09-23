@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -66,7 +67,7 @@ fun KeyboardsScreen(
                     Preference(
                         name = keyboardName(keyboard, ctx),
                         description = subtype.mainLayoutName()?.getStringResourceOrName("layout_", ctx) ?: "",
-                        onClick = { SettingsDestination.navigateTo(SettingsDestination.Subtype + keyboard.toPref()) },
+                        onClick = { SettingsDestination.navigateTo(SettingsDestination.Languages + keyboard.toPref()) },
                         icon = R.drawable.ic_settings_languages
                     ) { NextScreenIcon() }
                 }
@@ -81,6 +82,14 @@ fun KeyboardsScreen(
                     onClick = onClickAllKeyboards,
                     icon = R.drawable.ic_settings_languages
                 ) { NextScreenIcon() }
+                // off = one set of settings for every keyboard (the sections below); on = each keyboard its own
+                // (not available yet: the switch is shown so the screen has its final shape)
+                Preference(
+                    name = stringResource(R.string.separate_settings_per_keyboard),
+                    description = stringResource(R.string.separate_settings_per_keyboard_summary),
+                    onClick = {},
+                    icon = R.drawable.ic_settings_preferences
+                ) { Switch(checked = false, onCheckedChange = null, enabled = false) }
                 // the sections shared by all keyboards
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
                 KeyboardSettingsEntries(SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype(), showLanguages = false)
