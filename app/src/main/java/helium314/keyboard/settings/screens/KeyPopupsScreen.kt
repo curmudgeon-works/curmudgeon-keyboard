@@ -56,6 +56,8 @@ import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.utils.KeyPopupOverrides
 import helium314.keyboard.latin.utils.LayoutType
 import helium314.keyboard.latin.utils.ResourceUtils
+import helium314.keyboard.latin.utils.ScriptUtils
+import helium314.keyboard.latin.utils.ScriptUtils.script
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.keyboard.internal.keyboard_parser.morePopupKeysResId
 import helium314.keyboard.keyboard.internal.keyboard_parser.POPUP_KEYS_ALL
@@ -105,8 +107,11 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
             Preset(R.string.key_popups_preset_main, POPUP_KEYS_MAIN, null),
             Preset(R.string.key_popups_preset_more, POPUP_KEYS_MORE, null),
             Preset(R.string.key_popups_preset_all, POPUP_KEYS_ALL, null),
-            Preset(R.string.key_popups_preset_arabic, POPUP_KEYS_NORMAL, "symbols_arabic"),
-        ) + userSets.map { Preset(0, it.morePopups, it.symbolsLayout, it.name, it.overrides) }
+        ).let { builtIn ->
+            // the Arabic-script symbols page only makes sense for keyboards of that script
+            if (keyboard.locale.script() == ScriptUtils.SCRIPT_ARABIC) builtIn + Preset(R.string.key_popups_preset_arabic, POPUP_KEYS_NORMAL, "symbols_arabic")
+            else builtIn
+        } + userSets.map { Preset(0, it.morePopups, it.symbolsLayout, it.name, it.overrides) }
         val accentsValue = keyboard.getExtraValueOf(ExtraValue.MORE_POPUPS)
             ?: prefs.getString(Settings.PREF_MORE_POPUP_KEYS, Defaults.PREF_MORE_POPUP_KEYS)!!
         val symbolsLayout = keyboard.layoutName(LayoutType.SYMBOLS)
