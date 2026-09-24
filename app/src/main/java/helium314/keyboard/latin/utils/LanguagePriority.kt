@@ -25,10 +25,11 @@ object LanguagePriority {
     fun set(prefs: SharedPreferences, locale: Locale, priority: Int) =
         prefs.edit().putInt(PREF_PRIORITY_PREFIX + locale.toLanguageTag(), priority.coerceIn(LOW, HIGH)).apply()
 
-    /** Score factor for a priority: high 1, medium 0.85, low 0.7 (about one / two confidence steps of the auto-detection). */
+    /** Score factor for a priority: high 1, medium 0.65, low 0.4. 0.85 / 0.7 (one / two confidence steps of the
+     *  auto-detection) still let common Hinglish words beat English ones, so medium / low now demote clearly. */
     fun factor(priority: Int): Float = when (priority) {
-        LOW -> 0.7f
-        MEDIUM -> 0.85f
+        LOW -> 0.4f
+        MEDIUM -> 0.65f
         else -> 1f
     }
 

@@ -108,7 +108,8 @@ class KeyboardParser(private val params: KeyboardParams, private val context: Co
         // key goes away, long-press still gives the same popup keys. (Number row is added below with its own flag.)
         if (params.mId.isAlphabetKeyboard && !Settings.getValues().mShowsHints)
             baseKeys.forEach { row -> row.replaceAll { it.copy(newLabelFlags = it.labelFlags or Key.LABEL_FLAGS_DISABLE_HINT_LABEL) } }
-        if (params.mId.isAlphaOrSymbolKeyboard && params.mId.mNumberRowEnabled) {
+        val hasNumberRow = params.mId.isAlphaOrSymbolKeyboard && params.mId.mNumberRowEnabled
+        if (hasNumberRow) {
             val newLabelFlags = defaultLabelFlags or
                     if (Settings.getValues().mShowNumberRowHints) 0 else Key.LABEL_FLAGS_DISABLE_HINT_LABEL
             baseKeys.add(0, numberRow.mapTo(mutableListOf()) { it.copy(newLabelFlags = newLabelFlags) })
@@ -149,8 +150,9 @@ class KeyboardParser(private val params: KeyboardParams, private val context: Co
                     else 0
                 if (DebugFlags.DEBUG_ENABLED)
                     Log.d(TAG, "adding key ${key.label}, ${key.code}")
+                // the number row (row 0) already carries its own hint flag, the other-keys switch must not touch it
                 key.toKeyParams(params, defaultLabelFlags or extraFlags or
-                        if (!Settings.getValues().mShowsHints) Key.LABEL_FLAGS_DISABLE_HINT_LABEL else 0)
+                        if (!Settings.getValues().mShowsHints && !(hasNumberRow && i == 0)) Key.LABEL_FLAGS_DISABLE_HINT_LABEL else 0)
             }
         }
         return setReasonableWidths(baseKeyParams, functionalKeys)
