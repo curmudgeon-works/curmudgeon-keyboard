@@ -2,6 +2,7 @@
 package helium314.keyboard.settings.screens
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.media.AudioManager
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -50,8 +51,19 @@ fun PreferencesScreen(
     val b = (LocalContext.current.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
     if ((b?.value ?: 0) < 0)
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
+    val items = preferencesItems(prefs)
+    SearchSettingsScreen(
+        onClickBack = onClickBack,
+        title = stringResource(R.string.settings_screen_preferences),
+        settings = items,
+        simpleModeKeys = preferencesSimpleModeKeys,
+    )
+}
+
+/** The Preferences screen's items; the keyboard's Layout screen shows the same list at its end. */
+fun preferencesItems(prefs: SharedPreferences): List<Any?> {
     val clipboardHistoryEnabled = prefs.getBoolean(Settings.PREF_ENABLE_CLIPBOARD_HISTORY, Defaults.PREF_ENABLE_CLIPBOARD_HISTORY)
-    val items = listOf(
+    return listOf(
         R.string.settings_category_input,
         Settings.PREF_SHOW_HINTS,
         Settings.PREF_POPUP_KEYS_ORDER,
@@ -87,17 +99,13 @@ fun PreferencesScreen(
         if (clipboardHistoryEnabled) Settings.PREF_CLIPBOARD_HISTORY_RETENTION_TIME else null,
         if (clipboardHistoryEnabled) Settings.PREF_CLIPBOARD_HISTORY_PINNED_FIRST else null
     )
-    SearchSettingsScreen(
-        onClickBack = onClickBack,
-        title = stringResource(R.string.settings_screen_preferences),
-        settings = items,
-        simpleModeKeys = setOf(
-            Settings.PREF_SHOW_HINTS, Settings.PREF_SYMBOL_POPUP_MAP, Settings.PREF_POPUP_ON,
-            Settings.PREF_VIBRATE_ON, Settings.PREF_SOUND_ON, Settings.PREF_SHOW_NUMBER_ROW,
-            Settings.PREF_SHOW_EMOJI_KEY, Settings.PREF_ENABLE_CLIPBOARD_HISTORY,
-        ),
-    )
 }
+
+val preferencesSimpleModeKeys = setOf(
+    Settings.PREF_SHOW_HINTS, Settings.PREF_SYMBOL_POPUP_MAP, Settings.PREF_POPUP_ON,
+    Settings.PREF_VIBRATE_ON, Settings.PREF_SOUND_ON, Settings.PREF_SHOW_NUMBER_ROW,
+    Settings.PREF_SHOW_EMOJI_KEY, Settings.PREF_ENABLE_CLIPBOARD_HISTORY,
+)
 
 fun createPreferencesSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_SAVE_SUBTYPE_PER_APP, R.string.save_subtype_per_app) {

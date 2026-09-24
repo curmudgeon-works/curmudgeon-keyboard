@@ -102,6 +102,8 @@ import helium314.keyboard.latin.utils.DeleteButton
 import helium314.keyboard.settings.DropDownField
 import helium314.keyboard.settings.SearchScreen
 import helium314.keyboard.settings.SettingsActivity
+import helium314.keyboard.settings.SettingsMode
+import helium314.keyboard.settings.preferences.PreferenceCategory
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.latin.utils.previewDark
 import helium314.keyboard.settings.WithBigTitle
@@ -254,6 +256,14 @@ fun SubtypeScreen(
                     for (type in listOf(LayoutType.MORE_SYMBOLS, LayoutType.NUMBER, LayoutType.NUMBER_ROW, LayoutType.NUMPAD, LayoutType.NUMPAD_LANDSCAPE, LayoutType.PHONE, LayoutType.PHONE_SYMBOLS))
                         if (LayoutUtilsCustom.getLayoutFiles(type, ctx).isNotEmpty())
                             SecondaryLayoutRow(currentSubtype, type, ::setCurrentSubtype)
+                }
+                // ---- every preference, the same list (and simple-mode filter) as the Preferences screen
+                WithBigTitle(stringResource(R.string.settings_screen_preferences)) {
+                    val advanced by SettingsMode.state(ctx)
+                    SettingsMode.filter(preferencesItems(prefs), preferencesSimpleModeKeys, advanced).forEach {
+                        if (it is Int) PreferenceCategory(stringResource(it))
+                        else if (it is String) SettingsActivity.settingsContainer[it]?.Preference()
+                    }
                 }
             }
         }
