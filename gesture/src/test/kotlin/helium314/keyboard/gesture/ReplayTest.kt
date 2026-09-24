@@ -28,10 +28,10 @@ class ReplayTest {
     private class Variant(val name: String, val decode: (Swipe, Vocabulary) -> List<ScoredWord>, val learnedFreq: Int = 0)
 
     private class Tally {
-        var runs = 0; var top1 = 0; var top3 = 0
-        fun add(rank: Int) { runs++; if (rank == 0) top1++; if (rank in 0..2) top3++ }
+        var runs = 0; var top1 = 0; var top3 = 0; var top8 = 0
+        fun add(rank: Int) { runs++; if (rank == 0) top1++; if (rank in 0..2) top3++; if (rank in 0..7) top8++ }
         fun pct(n: Int) = if (runs == 0) 0.0 else 100.0 * n / runs
-        override fun toString() = String.format("top1 %5.1f%%  top3 %5.1f%%  (n=%d)", pct(top1), pct(top3), runs)
+        override fun toString() = String.format("top1 %5.1f%%  top3 %5.1f%%  top8 %5.1f%%  (n=%d)", pct(top1), pct(top3), pct(top8), runs)
     }
 
     private fun dataDir(): File? {
@@ -75,38 +75,43 @@ class ReplayTest {
     }
 
     private fun variants(): List<Variant> {
-        fun decoder(kushlerWeight: Float = 0.5f, pauseConfidence: Float = 0.9f, pauseDt: Float = 2.5f,
-                    slowdown: Float = 0.5f, turnScale: Float = 1f, endpointRadius: Float = 1.6f) =
+        fun decoder(endpointRadius: Float = 1.6f, penUp: Float? = null, endPenalty: Float = 0f, endFree: Float = 0.4f, startShare: Float = 1f, cap: Int = 512) =
             GestureDecoder(
-                HybridScorer(kushlerWeight = kushlerWeight, shark2Weight = 1f - kushlerWeight),
-                DecoderConfig(endpointRadiusKeyWidths = endpointRadius),
-                GesturePreprocessor(PreprocessorConfig(pauseConfidence = pauseConfidence, pauseDtFactor = pauseDt,
-                    slowdownConfidence = slowdown, turnConfidenceScale = turnScale)),
+                HybridScorer(),
+                DecoderConfig(endpointRadiusKeyWidths = endpointRadius, penUpRadiusKeyWidths = penUp,
+                    endpointPenaltyPerKeyWidth = endPenalty, endpointFreeKeyWidths = endFree, startPenaltyShare = startShare, maxCandidates = cap),
+                GesturePreprocessor(PreprocessorConfig(pauseConfidence = 0.9f, pauseDtFactor = 2.5f, slowdownConfidence = 0.5f)),
             )
         fun plain(d: GestureDecoder): (Swipe, Vocabulary) -> List<ScoredWord> = { s, v -> d.decode(s.points, s.geometry, v, 10) }
-        /** Hybrid's list, but the top word of each pure scorer is guaranteed a slot (3 for kushler, 4 for shark2). */
-        fun merged(d: GestureDecoder, kushlerSlot: Int = 2, sharkSlot: Int = 3): (Swipe, Vocabulary) -> List<ScoredWord> = { s, v ->
-            val all = d.decodeWithScorers(s.points, s.geometry, v, listOf(HybridScorer(), KushlerScorer(), Shark2Scorer()), 10)
-            val out = (all["hybrid"] ?: emptyList()).toMutableList()
-            fun ensure(list: List<ScoredWord>?, slot: Int) {
-                val top = list?.firstOrNull() ?: return
-                if (out.none { it.word == top.word }) out.add(minOf(slot, out.size), top)
-            }
-            ensure(all["kushler"], kushlerSlot)
-            ensure(all["shark2"], sharkSlot)
-            out
-        }
-        val phone = decoder() // pause 0.9 dt 2.5, slowdown 0.5: what the next build ships by default
         val history = (System.getenv("GESTURE_REPLAY_HISTORY") ?: "").split(',').mapNotNull { it.trim().toIntOrNull() }
         if (history.isNotEmpty())
-            return listOf(Variant("new defaults, no learned words", plain(phone))) +
-                history.map { Variant("new defaults, learned words at $it", plain(phone), learnedFreq = it) }
+            return listOf(Variant("phone (new defaults), no learned words", plain(decoder()))) +
+                history.map { Variant("phone, learned words at $it", plain(decoder()), learnedFreq = it) }
+        /** The normal top [keep], then the strict-ends ranking's words not yet listed, then the rest of the normal list. */
+        fun merged(base: GestureDecoder, strict: GestureDecoder, keep: Int = 3): (Swipe, Vocabulary) -> List<ScoredWord> = { s, v ->
+            val b = base.decode(s.points, s.geometry, v, 10)
+            val st = strict.decode(s.points, s.geometry, v, 10)
+            val out = b.take(keep).toMutableList()
+            for (w in st) if (out.none { it.word == w.word }) out.add(w)
+            for (w in b) if (out.none { it.word == w.word }) out.add(w)
+            out
+        }
         return listOf(
-            Variant("old defaults (phone today)", plain(decoder(pauseConfidence = 0.7f, pauseDt = 3.5f, slowdown = 0f))),
-            Variant("new defaults", plain(phone)),
-            Variant("new defaults, kushler 0.8", plain(decoder(kushlerWeight = 0.8f))),
-            Variant("new defaults, endpoint 1.0", plain(decoder(endpointRadius = 1f))),
-            Variant("new defaults + kushler#1 at 3, shark#1 at 4", merged(phone)),
+            Variant("phone (new defaults)", plain(decoder())),
+            Variant("candidate cap 1024", plain(decoder(cap = 1024))),
+            Variant("candidate cap 2048", plain(decoder(cap = 2048))),
+            Variant("candidate cap 4096", plain(decoder(cap = 4096))),
+            Variant("candidate cap 16384", plain(decoder(cap = 16384))),
+            Variant("top 3 normal, then strict pen-up 1.1", merged(decoder(), decoder(penUp = 1.1f))),
+            Variant("top 3 normal, then strict pen-up 1.3", merged(decoder(), decoder(penUp = 1.3f))),
+            Variant("top 2 normal, then strict pen-up 1.1", merged(decoder(), decoder(penUp = 1.1f), keep = 2)),
+            Variant("pen-up radius 1.3", plain(decoder(penUp = 1.3f))),
+            Variant("pen-up radius 1.1", plain(decoder(penUp = 1.1f))),
+            Variant("end-only penalty 0.5 free 0.4", plain(decoder(endPenalty = 0.5f, startShare = 0f))),
+            Variant("end-only penalty 1.0 free 0.4", plain(decoder(endPenalty = 1f, startShare = 0f))),
+            Variant("end-only penalty 1.0 free 0.6", plain(decoder(endPenalty = 1f, endFree = 0.6f, startShare = 0f))),
+            Variant("end-only penalty 0.5 + pen-up 1.3", plain(decoder(endPenalty = 0.5f, startShare = 0f, penUp = 1.3f))),
+            Variant("start share 0.3, penalty 0.5", plain(decoder(endPenalty = 0.5f, startShare = 0.3f))),
         )
     }
 
@@ -131,10 +136,18 @@ class ReplayTest {
             val missList = mutableListOf<String>()
             // a learned-words model needs its own vocabulary, grown as the replay goes
             val vocabForVariant = if (v.learnedFreq > 0) vocabulary(dir, mapOf("en-US" to 1f, "hi-Latn" to hiFactor)) else vocab
+            var nanos = 0L
             for (s in swipes) {
+                val t0 = System.nanoTime()
                 val results = v.decode(s, vocabForVariant)
+                nanos += System.nanoTime() - t0
                 if (v.learnedFreq > 0 && (s.labelSource == "kept" || s.labelSource == "pick"))
                     vocabForVariant.add(s.label, maxOf(vocabForVariant.frequencyOf(s.label), v.learnedFreq))
+                if (s.label == "?") { // outcome unknown: shown when watched, never tallied
+                    if (s.phoneGot in watch) details.add(String.format("%-44s #%-4d label=?         phone=%-9s -> %s", v.name, s.id, s.phoneGot,
+                        results.take(10).joinToString(", ") { it.word }))
+                    continue
+                }
                 if (s.label in watch || s.phoneGot in watch)
                     details.add(String.format("%-44s #%-4d label=%-9s phone=%-9s -> %s", v.name, s.id, s.label, s.phoneGot,
                         results.take(6).joinToString(", ") { it.word }))
@@ -143,12 +156,12 @@ class ReplayTest {
                 bySource.getOrPut(s.labelSource) { Tally() }.add(rank)
                 if (rank != 0) missList.add("#${s.id} ${s.label} -> ${results.take(3).joinToString(",") { it.word }} (rank ${if (rank < 0) "-" else rank + 1})")
             }
-            println(String.format("%-42s %s   %s", v.name, all, bySource.entries.joinToString("  ") { "${it.key}: ${String.format("%.1f", it.value.pct(it.value.top1))}" }))
+            println(String.format("%-42s %s   %s   %.1f ms/swipe", v.name, all, bySource.entries.joinToString("  ") { "${it.key}: ${String.format("%.1f", it.value.pct(it.value.top1))}" }, nanos / 1e6 / swipes.size))
             misses[v.name] = missList
         }
         if (details.isNotEmpty()) { println("\n--- watched words ---"); details.sortedBy { it.substringAfter('#').substringBefore(' ').toInt() }.forEach { println(it) } }
         for ((name, list) in misses) {
-            if (name != "old defaults (phone today)") continue
+            if (name != "phone (new defaults)") continue
             println("\n--- misses, $name (${list.size}) ---")
             list.forEach { println(it) }
         }
