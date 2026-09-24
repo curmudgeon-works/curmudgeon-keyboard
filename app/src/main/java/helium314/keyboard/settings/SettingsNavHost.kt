@@ -33,6 +33,7 @@ import helium314.keyboard.settings.screens.PersonalDictionaryScreen
 import helium314.keyboard.settings.screens.PreferencesScreen
 import helium314.keyboard.settings.screens.SecondaryLayoutScreen
 import helium314.keyboard.settings.screens.SubtypeScreen
+import helium314.keyboard.settings.screens.SwipeTuningScreen
 import helium314.keyboard.settings.screens.TextCorrectionScreen
 import helium314.keyboard.settings.screens.ToolbarScreen
 import helium314.keyboard.settings.screens.gesturedata.GestureDataScreen
@@ -142,6 +143,9 @@ fun SettingsNavHost(
         composable(SettingsDestination.Subtype + "{subtype}") {
             SubtypeScreen(initialSubtype = it.arguments?.getString("subtype")!!.toSettingsSubtype(), onClickBack = ::goBack)
         }
+        composable(SettingsDestination.SwipeTuning + "{subtype}") {
+            SwipeTuningScreen(keyboard = it.arguments?.getString("subtype")!!.toSettingsSubtype(), onClickBack = ::goBack)
+        }
     }
     if (target.value != SettingsDestination.Keyboards/* && target.value != navController.currentBackStackEntry?.destination?.route*/)
         navController.navigate(route = target.value)
@@ -167,6 +171,7 @@ object SettingsDestination {
     const val Languages = "languages/"
     const val AllKeyboards = "all_keyboards"
     const val Subtype = "subtype/"
+    const val SwipeTuning = "swipe_tuning/"
     const val Layouts = "layouts"
     const val Dictionaries = "dictionaries"
     val navTarget = MutableStateFlow(Keyboards)

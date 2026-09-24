@@ -142,6 +142,11 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_GESTURE_DYNAMIC_PREVIEW_FOLLOW_SYSTEM = "gesture_dynamic_preview_follow_system";
     public static final String PREF_GESTURE_SPACE_AWARE = "gesture_space_aware";
     public static final String PREF_GESTURE_CAPS_HEIGHT = "gesture_caps_height";
+    public static final String PREF_GESTURE_TURN_WEIGHT = "gesture_turn_weight";
+    public static final String PREF_GESTURE_PAUSE_WEIGHT = "gesture_pause_weight";
+    public static final String PREF_GESTURE_SLOWDOWN_WEIGHT = "gesture_slowdown_weight";
+    public static final String PREF_GESTURE_KUSHLER_WEIGHT = "gesture_kushler_weight";
+    public static final String PREF_GESTURE_HISTORY_BOOST = "gesture_history_boost";
     public static final String PREF_GESTURE_FAST_TYPING_COOLDOWN = "gesture_fast_typing_cooldown";
     public static final String PREF_GESTURE_TRAIL_FADEOUT_DURATION = "gesture_trail_fadeout_duration";
     public static final String PREF_SHOW_SETUP_WIZARD_ICON = "show_setup_wizard_icon";

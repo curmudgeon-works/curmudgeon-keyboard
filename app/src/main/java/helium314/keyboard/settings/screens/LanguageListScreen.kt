@@ -44,6 +44,8 @@ import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.settings.dialogs.DictionaryDialog
 import helium314.keyboard.settings.SearchScreen
 import helium314.keyboard.settings.SettingsDestination
+import helium314.keyboard.latin.BuildConfig
+import helium314.keyboard.latin.gesture.OwnGestureDecoder
 import helium314.keyboard.settings.preferences.Preference
 import helium314.keyboard.latin.utils.NextScreenIcon
 import java.util.Locale
@@ -86,7 +88,7 @@ fun LanguageListScreen(
                 locale.localizedDisplayName(ctx.resources).replace("(", "")
                     .splitOnWhitespace().any { it.startsWith(term, true) }
             }
-            if (term.isBlank()) listOf<Any>(LayoutRowMarker) + matching else matching
+            if (term.isBlank()) listOf<Any>(LayoutRowMarker, SwipeTuningRowMarker) + matching else matching
         },
         itemContent = { item ->
             if (item === LayoutRowMarker)
@@ -96,6 +98,14 @@ fun LanguageListScreen(
                     onClick = { SettingsDestination.navigateTo(SettingsDestination.Subtype + keyboard.toPref()) },
                     icon = R.drawable.ic_settings_layout
                 ) { NextScreenIcon() }
+            else if (item === SwipeTuningRowMarker) {
+                if (BuildConfig.USE_OWN_GESTURE_DECODER) Preference(
+                    name = stringResource(R.string.swipe_tuning),
+                    description = OwnGestureDecoder.Tuning.read(ctx.prefs()).key,
+                    onClick = { SettingsDestination.navigateTo(SettingsDestination.SwipeTuning + keyboard.toPref()) },
+                    icon = R.drawable.ic_settings_gesture
+                ) { NextScreenIcon() }
+            }
             else LanguageRow(item as Locale, keyboard, ::setKeyboard)
         },
     )
@@ -201,6 +211,7 @@ private fun LanguageRow(locale: Locale, keyboard: SettingsSubtype, setKeyboard: 
 
 private const val OFF = 0
 private object LayoutRowMarker
+private object SwipeTuningRowMarker
 
 /**
  * Apply a priority change to a keyboard: [OFF] removes the language, a priority adds it if needed and stores it;

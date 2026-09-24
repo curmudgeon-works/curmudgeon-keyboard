@@ -19,17 +19,22 @@ object LanguagePriority {
     private const val PREF_PRIORITY_PREFIX = "language_priority_"
     private const val PREF_SHARE_HISTORY_PREFIX = "share_user_history_"
 
+    /** The preference keys holding a language's priority and share switch (global keys, one per language). */
+    fun keys(locale: Locale): List<String> =
+        listOf(PREF_PRIORITY_PREFIX + locale.toLanguageTag(), PREF_SHARE_HISTORY_PREFIX + locale.toLanguageTag())
+
     fun get(prefs: SharedPreferences, locale: Locale): Int =
         prefs.getInt(PREF_PRIORITY_PREFIX + locale.toLanguageTag(), DEFAULT).coerceIn(LOW, HIGH)
 
     fun set(prefs: SharedPreferences, locale: Locale, priority: Int) =
         prefs.edit().putInt(PREF_PRIORITY_PREFIX + locale.toLanguageTag(), priority.coerceIn(LOW, HIGH)).apply()
 
-    /** Score factor for a priority: high 1, medium 0.65, low 0.4. 0.85 / 0.7 (one / two confidence steps of the
-     *  auto-detection) still let common Hinglish words beat English ones, so medium / low now demote clearly. */
+    /** Score factor for a priority, the same for tap and swipe suggestions: high 1, medium 0.85, low 0.5.
+     *  (The swipe vocabulary first puts every language on the main language's frequency scale by rank, see
+     *  GestureDecoderVocabulary; tap suggestions use the dictionaries' own scales.) */
     fun factor(priority: Int): Float = when (priority) {
-        LOW -> 0.4f
-        MEDIUM -> 0.65f
+        LOW -> 0.5f
+        MEDIUM -> 0.85f
         else -> 1f
     }
 

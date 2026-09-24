@@ -72,6 +72,7 @@ enum class InflectionType {
     PEN_UP,          // stroke end — must match the last letter
     ANGLE_THRESHOLD, // direction change above a (speed-adaptive) angle threshold
     PAUSE,           // dwell: finger slowed/stopped over a key
+    SLOWDOWN,        // local speed minimum well below the stroke's mean, without a stop
     ROW_CHANGE,      // vertical direction reversal crossing row boundaries
     DOUBLE_LETTER,   // small loop or tight back-and-forth (Swype's double-letter gesture)
 }

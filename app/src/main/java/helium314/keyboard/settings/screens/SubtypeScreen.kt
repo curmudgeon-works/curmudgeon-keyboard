@@ -230,6 +230,8 @@ fun SubtypeScreen(
                     // two independent hint switches; the popups behind long-press stay either way
                     PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW_HINTS, Defaults.PREF_SHOW_NUMBER_ROW_HINTS, R.string.hints_number_row) { holdSpace = true; reloadPreview() }
                     PrefSwitchRow(Settings.PREF_SHOW_HINTS, Defaults.PREF_SHOW_HINTS, R.string.hints_other_keys) { holdSpace = true; reloadPreview() }
+                    // the "…" on keys whose long-press does something (Preferences calls it functional hints)
+                    PrefSwitchRow(Settings.PREF_SHOW_POPUP_HINTS, Defaults.PREF_SHOW_POPUP_HINTS, R.string.show_popup_hints) { holdSpace = true; reloadPreview() }
                 }
                 // ---- the layout, with the other layouts of this keyboard under it
                 WithBigTitle(stringResource(R.string.keyboard_layout_set)) {
@@ -260,7 +262,11 @@ fun SubtypeScreen(
                 // ---- every preference, the same list (and simple-mode filter) as the Preferences screen
                 WithBigTitle(stringResource(R.string.settings_screen_preferences)) {
                     val advanced by SettingsMode.state(ctx)
-                    SettingsMode.filter(preferencesItems(prefs), preferencesSimpleModeKeys, advanced).forEach {
+                    // the hint switches sit above and the key popups screen edits the symbol map; popup order, the TLD popups
+                    // and the per-app keyboard memory (not a property of one keyboard) are left to the Preferences screen
+                    val shownAbove = setOf(Settings.PREF_SHOW_HINTS, Settings.PREF_POPUP_KEYS_ORDER, Settings.PREF_SHOW_POPUP_HINTS, Settings.PREF_SHOW_TLD_POPUP_KEYS,
+                        Settings.PREF_SYMBOL_POPUP_MAP, Settings.PREF_SAVE_SUBTYPE_PER_APP)
+                    SettingsMode.filter(preferencesItems(prefs).filter { it !in shownAbove }, preferencesSimpleModeKeys, advanced).forEach {
                         if (it is Int) PreferenceCategory(stringResource(it))
                         else if (it is String) SettingsActivity.settingsContainer[it]?.Preference()
                     }

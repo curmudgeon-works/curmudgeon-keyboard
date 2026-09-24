@@ -52,6 +52,7 @@ import helium314.keyboard.latin.define.DebugFlags;
 import helium314.keyboard.latin.settings.Settings;
 import helium314.keyboard.latin.settings.SettingsValues;
 import helium314.keyboard.latin.gesture.GestureCorpusRecorder;
+import helium314.keyboard.latin.gesture.GestureStats;
 import helium314.keyboard.latin.settings.SpacingAndPunctuations;
 import helium314.keyboard.latin.suggestions.SuggestionStripViewAccessor;
 import helium314.keyboard.latin.utils.AsyncResultHolder;
@@ -355,10 +356,13 @@ public final class InputLogic {
         }
 
         final boolean pickedForBatchWord = mWordComposer.isBatchMode();
+        final int pickedRank = pickedForBatchWord ? rankInStrip(mSuggestedWords, suggestion) : -1;
         commitChosenWord(settingsValues, suggestion, LastComposedWord.COMMIT_TYPE_MANUAL_PICK, LastComposedWord.NOT_A_SEPARATOR);
         mConnection.endBatchEdit();
-        if (pickedForBatchWord) GestureCorpusRecorder.INSTANCE.onSuggestionPicked(suggestion);
-        else GestureCorpusRecorder.INSTANCE.onWordSettled();
+        if (pickedForBatchWord) {
+            GestureCorpusRecorder.INSTANCE.onSuggestionPicked(suggestion);
+            GestureStats.INSTANCE.onPicked(pickedRank);
+        } else GestureCorpusRecorder.INSTANCE.onWordSettled();
         // Don't allow cancellation of manual pick
         mLastComposedWord.deactivate();
         // Space state must be updated before calling updateShiftState
@@ -1366,6 +1370,7 @@ public final class InputLogic {
                 mWordComposer.reset();
                 mWordComposer.setRejectedBatchModeSuggestion(rejectedSuggestion);
                 GestureCorpusRecorder.INSTANCE.onWordDeleted();
+                GestureStats.INSTANCE.onDeleted();
                 if (!TextUtils.isEmpty(rejectedSuggestion)) {
                     unlearnWord(rejectedSuggestion, inputTransaction.getSettingsValues(),
                             Constants.EVENT_REJECTION);
@@ -1385,6 +1390,9 @@ public final class InputLogic {
         } else {
             if (mLastComposedWord.canRevertCommit() && inputTransaction.getSettingsValues().mBackspaceRevertsAutocorrect) {
                 final String lastComposedWord = mLastComposedWord.mTypedWord;
+                // a swiped word committed by a space comes back as the swiped word, with the strip it had
+                final SuggestedWords batchSuggestedWords = Constants.STRING_SPACE.equals(mLastComposedWord.mSeparatorString)
+                        ? mLastComposedWord.mBatchSuggestedWords : null;
                 revertCommit(inputTransaction);
                 StatsUtils.onRevertAutoCorrect();
                 StatsUtils.onWordCommitUserTyped(lastComposedWord, mWordComposer.isBatchMode());
@@ -1394,7 +1402,10 @@ public final class InputLogic {
                 //
                 // Note: restartSuggestionsOnWordTouchedByCursor is already called for normal
                 // (non-revert) backspace handling.
-                if (inputTransaction.getSettingsValues().needsToLookupSuggestions()
+                if (batchSuggestedWords != null
+                        && inputTransaction.getSettingsValues().mSpacingAndPunctuations.mCurrentLanguageHasSpaces) {
+                    resumeBatchWord(lastComposedWord, batchSuggestedWords);
+                } else if (inputTransaction.getSettingsValues().needsToLookupSuggestions()
                         && inputTransaction.getSettingsValues().mSpacingAndPunctuations.mCurrentLanguageHasSpaces) {
                     restartSuggestionsOnWordTouchedByCursor(inputTransaction.getSettingsValues(), currentKeyboardScript);
                 }
@@ -2005,6 +2016,26 @@ public final class InputLogic {
      *
      * @param inputTransaction The transaction in progress.
      */
+    /** 0-based position of [word] in the strip, or the strip size if it isn't there (picked from a later page). */
+    private static int rankInStrip(final SuggestedWords suggestedWords, final String word) {
+        for (int i = 0; i < suggestedWords.size(); i++)
+            if (suggestedWords.getWord(i).equals(word)) return i;
+        return suggestedWords.size();
+    }
+
+    /**
+     * A swiped word whose commit was just reverted becomes the composing swiped word again, with the suggestion
+     * strip it had: the list must not change because a space was typed and taken back.
+     */
+    private void resumeBatchWord(final String word, final SuggestedWords suggestedWords) {
+        mConnection.beginBatchEdit();
+        mConnection.deleteTextBeforeCursor(word.length());
+        mWordComposer.setBatchInputWord(word);
+        setComposingTextInternal(word, 1);
+        mConnection.endBatchEdit();
+        doShowSuggestionsAndClearAutoCorrectionIndicator(suggestedWords);
+    }
+
     private void revertCommit(final InputTransaction inputTransaction) {
         final CharSequence originallyTypedWord = mLastComposedWord.mTypedWord;
         final CharSequence committedWord = mLastComposedWord.mCommittedWord;
@@ -2519,6 +2550,8 @@ public final class InputLogic {
     private void commitChosenWord(final SettingsValues settingsValues, final String chosenWord,
             final int commitType, final String separatorString) {
         long startTimeMillis = 0;
+        // a swiped word keeps its strip, so a backspace right after the separator brings it back unchanged
+        final SuggestedWords batchSuggestedWords = mWordComposer.isBatchMode() ? mSuggestedWords : null;
         if (DebugFlags.DEBUG_ENABLED) {
             startTimeMillis = SystemClock.elapsedRealtime();
             Log.d(TAG, "commitChosenWord() : [" + chosenWord + "]");
@@ -2565,6 +2598,7 @@ public final class InputLogic {
         // LastComposedWord#didCommitTypedWord by string equality of the remembered
         // strings.
         mLastComposedWord = mWordComposer.commitWord(commitType, chosenWord, separatorString, ngramContext);
+        mLastComposedWord.mBatchSuggestedWords = batchSuggestedWords;
         if (DebugFlags.DEBUG_ENABLED) {
             long runTimeMillis = SystemClock.elapsedRealtime() - startTimeMillis;
             Log.d(TAG, "commitChosenWord() : " + runTimeMillis + " ms to run "

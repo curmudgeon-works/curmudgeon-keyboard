@@ -229,6 +229,35 @@
     <string name="button_restore">Restore</string>
     <!-- Message when backup is restored successfully -->
     <string name="backup_restored">Backup restored</string>
+    <!-- Restore dialog: choose between a full restore and single keyboards -->
+    <string name="restore_choice_message">Restore everything, or only the chosen keyboards (with their settings and layouts) and leave the rest as it is.</string>
+    <!-- Restore dialog button: full restore -->
+    <string name="restore_everything">Everything</string>
+    <!-- Warning shown before a full restore -->
+    <string name="restore_everything_warning">This replaces everything on the phone with the backup: all learned words, clipboard history, keyboards and settings. Anything learned or changed since the backup is lost.</string>
+    <!-- Restore dialog button: only the chosen keyboards -->
+    <string name="restore_chosen_keyboards">Chosen keyboards</string>
+    <!-- Message when single keyboards were restored from a backup -->
+    <string name="keyboards_restored">Keyboards restored</string>
+    <!-- Swipe tuning screen (own gesture decoder): inflection weights and per-setting statistics -->
+    <string name="swipe_tuning">Swipe tuning</string>
+    <string name="swipe_tuning_inflections">Inflection weights</string>
+    <string name="swipe_tuning_summary">How much the decoder trusts the points where your finger turns, stops or slows down, and how much of a word\'s score comes from those points rather than from the overall shape. Try a setting for a while: the results below show how each one did for you.</string>
+    <string name="swipe_tuning_turns">Turns</string>
+    <string name="swipe_tuning_pauses">Pauses (stopping on a key)</string>
+    <string name="swipe_tuning_slowdowns">Slowdowns (lingering on a key)</string>
+    <string name="swipe_tuning_blend">Inflections vs. shape</string>
+    <string name="swipe_tuning_blend_summary">1 = only the inflection points count, 0 = only the shape</string>
+    <string name="swipe_tuning_history_boost">Learned-word boost</string>
+    <string name="swipe_tuning_history_boost_summary">How much a word you have typed before is favoured over dictionary words of the same shape (0–255 frequency scale)</string>
+    <string name="swipe_tuning_stats">Results per setting</string>
+    <string name="swipe_tuning_no_stats">No swipes counted yet</string>
+    <!-- %1$d swipes, then percentages -->
+    <string name="swipe_tuning_row">%1$d swipes · first choice right %2$d%% · second choice %3$d%% · later choice %4$d%% · deleted %5$d%%</string>
+    <string name="swipe_tuning_recommended">Best so far</string>
+    <string name="swipe_tuning_use">Use</string>
+    <string name="swipe_tuning_reset">Reset these results</string>
+    <string name="swipe_tuning_current">Current setting</string>
     <!-- Preferences item for format for timestamp keycode -->
     <string name="timestamp_format_title">Format for timestamp key</string>
     <!-- Message in preferences how to get timestamp key -->
