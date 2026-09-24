@@ -9,6 +9,8 @@ class KushlerConfig(
     val weightX: Float = 0.5f,
     /** y-distance weight — heavier, row position is more reliable (spec). */
     val weightY: Float = 1.5f,
+    /** x-distance weight for PEN_DOWN / PEN_UP matches: the ends are deliberate, so no column leniency there. */
+    val endpointWeightX: Float = weightX,
     /** How strongly local speed widens the tolerance (US7453439: faster ⇒ more tolerant). */
     val speedTolerance: Float = 0.5f,
     /** Penalty (key widths) for skipping an inflection point, scaled by its confidence. */
@@ -120,8 +122,9 @@ class KushlerScorer(private val config: KushlerConfig = KushlerConfig()) : Score
     private fun matchCost(ip: InflectionPoint, letter: SokPoint, kw: Float): Float {
         val dx = (ip.x - letter.x) / kw
         val dy = (ip.y - letter.y) / kw
-        // weighted distance, y heavier (row more reliable than column)
-        var d = Geom.weightedDistance(dx, dy, config.weightX, config.weightY)
+        // weighted distance, y heavier (row more reliable than column), except at the deliberate ends
+        val wx = if (ip.type == InflectionType.PEN_DOWN || ip.type == InflectionType.PEN_UP) config.endpointWeightX else config.weightX
+        var d = Geom.weightedDistance(dx, dy, wx, config.weightY)
         // speed-adaptive threshold: faster local speed ⇒ larger tolerance ⇒ lower cost
         val tol = Geom.clamp(1f + config.speedTolerance * (ip.speedFactor - 1f), 0.7f, 1.8f)
         d = d / tol * ip.confidence

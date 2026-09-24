@@ -24,8 +24,23 @@ class DecoderConfig(
     val strongInflectionConfidence: Float = 0.8f,
     /** Slack subtracted from the strong-inflection count for min-letter pruning. */
     val minLetterSlack: Int = 1,
-    /** Hard cap on candidates sent to the scorer (safety net for huge vocabularies). */
-    val maxCandidates: Int = 512,
+    /**
+     * Hard cap on candidates sent to the scorer (safety net for huge vocabularies). The cut is in trie-walk order,
+     * not by merit: at 512 a long swipe lost words like "removed" before scoring (2026-09-23), so it sits high
+     * enough to be a pure safety net. Scoring cost is ~linear and small (73k-word vocabulary: ~1 ms per swipe).
+     */
+    val maxCandidates: Int = 4096,
+    /**
+     * Graded cost for the ends: per key width that a word's first / last letter lies from pen-down / pen-up beyond
+     * [endpointFreeKeyWidths], the rank is multiplied by (1 + this). Starts and ends are where people land where they
+     * mean to, so a word ending on the neighbouring key should lose to one ending under the finger. 0 = off.
+     */
+    val endpointPenaltyPerKeyWidth: Float = 0f,
+    val endpointFreeKeyWidths: Float = 0.4f,
+    /** Share of the graded cost applied at pen-down (1 = same as pen-up, 0 = ends only: starts are less deliberate). */
+    val startPenaltyShare: Float = 1f,
+    /** Pen-up radius (key widths) when it should be tighter than [endpointRadiusKeyWidths]; null = the same. */
+    val penUpRadiusKeyWidths: Float? = null,
 )
 
 class GestureDecoder(
@@ -73,7 +88,16 @@ class GestureDecoder(
                 val raw = s.score(gesture, candidate.sokgraph, geometry)
                 if (raw == Float.MAX_VALUE) continue
                 // patent ranking formula: score * (log(MAX_FREQ / word_frequency) + 1), lower is better
-                val rank = raw * (ln(maxFreq / candidate.frequency) + 1f)
+                var rank = raw * (ln(maxFreq / candidate.frequency) + 1f)
+                if (config.endpointPenaltyPerKeyWidth > 0f) {
+                    val sok = candidate.sokgraph.points
+                    val p0 = gesture.points.first(); val p1 = gesture.points.last()
+                    val dStart = Math.hypot((p0.x - sok.first().x).toDouble(), (p0.y - sok.first().y).toDouble()).toFloat() / geometry.keyWidth
+                    val dEnd = Math.hypot((p1.x - sok.last().x).toDouble(), (p1.y - sok.last().y).toDouble()).toFloat() / geometry.keyWidth
+                    val over = config.startPenaltyShare * (dStart - config.endpointFreeKeyWidths).coerceAtLeast(0f) +
+                            (dEnd - config.endpointFreeKeyWidths).coerceAtLeast(0f)
+                    rank *= 1f + config.endpointPenaltyPerKeyWidth * over
+                }
                 scored.add(ScoredWord(displayWords[i], rank, raw, candidate.frequency))
             }
             scored.sortBy { it.score }
@@ -133,7 +157,7 @@ class GestureDecoder(
         // prune 1: first letter within neighborhood of PEN_DOWN
         val startChars = geometry.keysNear(start.x, start.y, endpointRadius).map { it.char }.toHashSet()
         // last-letter neighborhood, checked when a word node is reached
-        val endChars = geometry.keysNear(end.x, end.y, endpointRadius).map { it.char }.toHashSet()
+        val endChars = geometry.keysNear(end.x, end.y, (config.penUpRadiusKeyWidths ?: config.endpointRadiusKeyWidths) * kw).map { it.char }.toHashSet()
 
         val out = ArrayList<Candidate>()
 
