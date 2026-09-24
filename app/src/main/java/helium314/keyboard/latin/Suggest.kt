@@ -19,6 +19,7 @@ import helium314.keyboard.latin.define.DecoderSpecificConstants.SHOULD_AUTO_CORR
 import helium314.keyboard.latin.define.DecoderSpecificConstants.SHOULD_REMOVE_PREVIOUSLY_REJECTED_SUGGESTION
 import helium314.keyboard.latin.dictionary.Dictionary
 import helium314.keyboard.latin.gesture.GestureCorpusRecorder
+import helium314.keyboard.latin.gesture.GestureStats
 import helium314.keyboard.latin.gesture.OwnGestureDecoder
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsValuesForSuggestion
@@ -317,6 +318,8 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
         if (inputStyle == SuggestedWords.INPUT_STYLE_TAIL_BATCH && GestureCorpusRecorder.isEnabled())
             GestureCorpusRecorder.onSwipe(wordComposer.composedDataSnapshot, keyboard, suggestionResults,
                 mDictionaryFacilitator.mainLocale.toLanguageTag())
+        if (inputStyle == SuggestedWords.INPUT_STYLE_TAIL_BATCH && BuildConfig.USE_OWN_GESTURE_DECODER && suggestionResults.isNotEmpty())
+            GestureStats.onSwipe(OwnGestureDecoder.currentTuning.key)
 
         // For transforming words that don't come from a dictionary, because it's our best bet
         val locale = mDictionaryFacilitator.mainLocale

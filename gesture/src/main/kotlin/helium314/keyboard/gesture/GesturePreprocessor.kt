@@ -18,6 +18,14 @@ class PreprocessorConfig(
     val minInflectionSeparation: Int = 3,
     /** A resampled-point dwell longer than this multiple of the median dt is a PAUSE. */
     val pauseDtFactor: Float = 3.5f,
+    /** Confidence of a PAUSE inflection (at or above DecoderConfig.strongInflectionConfidence it demands a letter). */
+    val pauseConfidence: Float = 0.7f,
+    /** A local speed minimum at or below this fraction of the stroke's mean speed is a SLOWDOWN. */
+    val slowdownSpeedRatio: Float = 0.45f,
+    /** Confidence of a SLOWDOWN inflection; 0 switches slowdown detection off. */
+    val slowdownConfidence: Float = 0f,
+    /** Multiplier on the confidence of turn (ANGLE_THRESHOLD) inflections. */
+    val turnConfidenceScale: Float = 1f,
     /** Prominence (in key heights) a y-extremum needs to count as ROW_CHANGE. */
     val rowChangeProminenceKeyHeights: Float = 0.6f,
     /** Turn angle (deg) above which a point counts as a back-and-forth DOUBLE_LETTER cusp. */
@@ -223,6 +231,7 @@ class GesturePreprocessor(private val config: PreprocessorConfig = PreprocessorC
             addAngleAndCuspInflections(pts, turnAngles, speedFactors, result)
             addLoopInflections(pts, geometry, speedFactors, result)
             addPauseInflections(pts, speedFactors, result)
+            addSlowdownInflections(pts, speedFactors, result)
             addRowChangeInflections(pts, geometry, speedFactors, result)
         }
 
@@ -279,7 +288,7 @@ class GesturePreprocessor(private val config: PreprocessorConfig = PreprocessorC
             val type = if (angle >= config.doubleLetterCuspDeg) InflectionType.DOUBLE_LETTER
                        else InflectionType.ANGLE_THRESHOLD
             val conf = if (type == InflectionType.DOUBLE_LETTER) 0.85f
-                       else 0.6f + 0.4f * Geom.clamp((angle - thresh) / (140f - thresh), 0f, 1f)
+                       else (0.6f + 0.4f * Geom.clamp((angle - thresh) / (140f - thresh), 0f, 1f)) * config.turnConfidenceScale
             out.add(InflectionPoint(i, pts[i].x, pts[i].y, type, conf, speedFactors[i]))
         }
     }
@@ -333,8 +342,26 @@ class GesturePreprocessor(private val config: PreprocessorConfig = PreprocessorC
         for (i in 1 until pts.size - 1) {
             val dt = (pts[i + 1].t - pts[i].t).toFloat()
             if (dt > config.pauseDtFactor * median) {
-                out.add(InflectionPoint(i, pts[i].x, pts[i].y, InflectionType.PAUSE, 0.7f, speedFactors[i]))
+                out.add(InflectionPoint(i, pts[i].x, pts[i].y, InflectionType.PAUSE, config.pauseConfidence, speedFactors[i]))
             }
+        }
+    }
+
+    /**
+     * Clear local minima of speed, well below the stroke's mean but not a stop (those are PAUSE):
+     * the finger lingering over a key it means. Off unless [PreprocessorConfig.slowdownConfidence] > 0.
+     */
+    private fun addSlowdownInflections(
+        pts: List<GesturePoint>,
+        speedFactors: FloatArray,
+        out: MutableList<InflectionPoint>,
+    ) {
+        if (config.slowdownConfidence <= 0f || pts.size < 4) return
+        for (i in 1 until pts.size - 1) {
+            val v = speedFactors[i]
+            if (v > config.slowdownSpeedRatio) continue
+            if (speedFactors[i - 1] < v || speedFactors[i + 1] < v) continue // local minimum only
+            out.add(InflectionPoint(i, pts[i].x, pts[i].y, InflectionType.SLOWDOWN, config.slowdownConfidence, v))
         }
     }
 

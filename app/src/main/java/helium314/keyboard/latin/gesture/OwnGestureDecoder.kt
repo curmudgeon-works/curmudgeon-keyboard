@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.latin.gesture
 
+import android.content.SharedPreferences
 import android.os.SystemClock
 import helium314.keyboard.gesture.GestureDecoder
 import helium314.keyboard.gesture.GesturePoint
@@ -45,17 +46,63 @@ object OwnGestureDecoder {
     private const val TAG = "OwnGestureDecoder"
     private const val MAX_RESULTS = 10
 
-    private val scorers: List<Scorer> = listOf(HybridScorer(), KushlerScorer(), Shark2Scorer())
-    // the caps height is part of the immutable preprocessor config, so the decoder is rebuilt when the setting changes
+    /** The user's inflection weights and scorer blend, read from the (per keyboard) preferences on every swipe. */
+    class Tuning(val turn: Float, val pause: Float, val slowdown: Float, val kushler: Float, val historyBoost: Int) {
+        /** One decimal each; the label the statistics are kept under. */
+        val key: String = String.format(Locale.ROOT, "T%.1f P%.1f S%.1f K%.1f H%d", turn, pause, slowdown, kushler, historyBoost)
+        override fun equals(other: Any?) = other is Tuning && other.key == key
+        override fun hashCode() = key.hashCode()
+
+        companion object {
+            val DEFAULT = Tuning(Defaults.PREF_GESTURE_TURN_WEIGHT, Defaults.PREF_GESTURE_PAUSE_WEIGHT,
+                Defaults.PREF_GESTURE_SLOWDOWN_WEIGHT, Defaults.PREF_GESTURE_KUSHLER_WEIGHT, Defaults.PREF_GESTURE_HISTORY_BOOST)
+
+            fun read(prefs: SharedPreferences) = Tuning(
+                prefs.getFloat(Settings.PREF_GESTURE_TURN_WEIGHT, Defaults.PREF_GESTURE_TURN_WEIGHT),
+                prefs.getFloat(Settings.PREF_GESTURE_PAUSE_WEIGHT, Defaults.PREF_GESTURE_PAUSE_WEIGHT),
+                prefs.getFloat(Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Defaults.PREF_GESTURE_SLOWDOWN_WEIGHT),
+                prefs.getFloat(Settings.PREF_GESTURE_KUSHLER_WEIGHT, Defaults.PREF_GESTURE_KUSHLER_WEIGHT),
+                prefs.getInt(Settings.PREF_GESTURE_HISTORY_BOOST, Defaults.PREF_GESTURE_HISTORY_BOOST),
+            )
+
+            /** The tuning a [key] stands for, or null if it isn't one. */
+            fun parse(key: String): Tuning? {
+                val m = Regex("T([\\d.]+) P([\\d.]+) S([\\d.]+) K([\\d.]+) H(\\d+)").matchEntire(key) ?: return null
+                val v = m.groupValues.drop(1).map { it.toFloatOrNull() ?: return null }
+                return Tuning(v[0], v[1], v[2], v[3], v[4].toInt())
+            }
+
+            fun write(prefs: SharedPreferences, tuning: Tuning) = prefs.edit()
+                .putFloat(Settings.PREF_GESTURE_TURN_WEIGHT, tuning.turn)
+                .putFloat(Settings.PREF_GESTURE_PAUSE_WEIGHT, tuning.pause)
+                .putFloat(Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, tuning.slowdown)
+                .putFloat(Settings.PREF_GESTURE_KUSHLER_WEIGHT, tuning.kushler)
+                .putInt(Settings.PREF_GESTURE_HISTORY_BOOST, tuning.historyBoost)
+                .apply()
+        }
+    }
+
+    /** The tuning the last swipe was decoded with (the statistics are kept under its key). */
+    @Volatile var currentTuning: Tuning = Tuning.DEFAULT
+        private set
+
+    private var scorers: List<Scorer> = listOf(HybridScorer(), KushlerScorer(), Shark2Scorer())
+    // the caps height and the tuning are part of the immutable configs, so the decoder is rebuilt when they change
     private var decoderCapsHeight = Float.NaN
+    private var decoderTuning: Tuning? = null
     private var decoder = GestureDecoder(HybridScorer()) // ctor scorer unused by decodeWithScorers
 
     @Synchronized
-    private fun decoderFor(capsHeight: Float): GestureDecoder {
-        if (capsHeight != decoderCapsHeight) {
-            decoder = GestureDecoder(HybridScorer(),
-                preprocessor = GesturePreprocessor(PreprocessorConfig(excursionMinHeightKeyHeights = capsHeight)))
+    private fun decoderFor(capsHeight: Float, tuning: Tuning): GestureDecoder {
+        if (capsHeight != decoderCapsHeight || tuning != decoderTuning) {
+            val hybrid = HybridScorer(kushlerWeight = tuning.kushler, shark2Weight = 1f - tuning.kushler)
+            scorers = listOf(hybrid, KushlerScorer(), Shark2Scorer())
+            decoder = GestureDecoder(hybrid,
+                preprocessor = GesturePreprocessor(PreprocessorConfig(excursionMinHeightKeyHeights = capsHeight,
+                    turnConfidenceScale = tuning.turn, pauseConfidence = tuning.pause, pauseDtFactor = 2.5f,
+                    slowdownConfidence = tuning.slowdown)))
             decoderCapsHeight = capsHeight
+            decoderTuning = tuning
         }
         return decoder
     }
@@ -85,6 +132,9 @@ object OwnGestureDecoder {
         if (points.size < 2) return results
         val geometry = geometryFor(keyboard) ?: return results
         val prefs = Settings.getCurrentContext()?.prefs()
+        val tuning = prefs?.let { Tuning.read(it) } ?: Tuning.DEFAULT
+        currentTuning = tuning
+        GestureDecoderVocabulary.historyBoost = tuning.historyBoost
         val specs = locales.map {
             GestureDecoderVocabulary.LocaleSpec(it,
                 prefs?.let { p -> LanguagePriority.factor(p, it) } ?: 1f,
@@ -97,7 +147,7 @@ object OwnGestureDecoder {
         }
 
         val start = SystemClock.elapsedRealtime()
-        val all = decoderFor(capsHeight).decodeWithScorers(points, geometry, vocabulary, scorers, MAX_RESULTS)
+        val all = decoderFor(capsHeight, tuning).decodeWithScorers(points, geometry, vocabulary, scorers, MAX_RESULTS)
         val elapsed = SystemClock.elapsedRealtime() - start
 
         val activeName = if (activeScorerPref != null && all.containsKey(activeScorerPref)) activeScorerPref

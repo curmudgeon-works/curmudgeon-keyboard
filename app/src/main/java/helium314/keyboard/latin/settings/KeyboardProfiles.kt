@@ -32,7 +32,7 @@ object KeyboardProfiles {
         PREF_SEPARATE, PREF_IDS, PREF_NEXT_ID,
         "key_popup_sets", // saved popup sets are meant to be reused across keyboards
     )
-    private val globalPrefixes = listOf(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX, "language_priority_", "share_user_history_", "debug_")
+    private val globalPrefixes = listOf(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX, "language_priority_", "share_user_history_", "debug_", "gesture_stats")
 
     fun isGlobal(key: String) = key in globalKeys || globalPrefixes.any { key.startsWith(it) } || key.startsWith(PREFIX) && key.contains(SEPARATOR)
 
@@ -113,20 +113,49 @@ object KeyboardProfiles {
             val plain = unprefixedKey(fromId, key) ?: continue
             if (fromId == SHARED && (key.startsWith(PREFIX) && key.contains(SEPARATOR))) continue
             if (isGlobal(plain)) continue
-            val target = prefixedKey(toId, plain)
-            @Suppress("UNCHECKED_CAST")
-            when (value) {
-                is Boolean -> editor.putBoolean(target, value)
-                is Int -> editor.putInt(target, value)
-                is Long -> editor.putLong(target, value)
-                is Float -> editor.putFloat(target, value)
-                is String -> editor.putString(target, value)
-                is Set<*> -> editor.putStringSet(target, value as Set<String>)
-            }
+            put(editor, prefixedKey(toId, plain), value)
         }
         editor.apply()
         Log.i("KeyboardProfiles", "copied settings $fromId -> $toId")
     }
+
+    /** Write [settings] (plain keys) as the own set of profile [id], replacing what was there. */
+    @Synchronized
+    fun write(real: SharedPreferences, id: Int, settings: Map<String, Any?>) {
+        val editor = real.edit()
+        real.all.keys.filter { it.startsWith("$PREFIX$id$SEPARATOR") }.forEach { editor.remove(it) }
+        for ((key, value) in settings) put(editor, prefixedKey(id, key), value)
+        editor.apply()
+    }
+
+    fun put(editor: SharedPreferences.Editor, key: String, value: Any?) {
+        @Suppress("UNCHECKED_CAST")
+        when (value) {
+            is Boolean -> editor.putBoolean(key, value)
+            is Int -> editor.putInt(key, value)
+            is Long -> editor.putLong(key, value)
+            is Float -> editor.putFloat(key, value)
+            is String -> editor.putString(key, value)
+            is Set<*> -> editor.putStringSet(key, value as Set<String>)
+        }
+    }
+
+    // ---- reading a backup's preference map (keys as stored, i.e. prefixed) ----
+
+    /** [keyboard]'s own set inside a backed-up preference map, plain keys; null when the backup kept no separate set for it. */
+    fun ownSettingsIn(backup: Map<String, Any?>, keyboard: SettingsSubtype): Map<String, Any?>? {
+        if (backup[PREF_SEPARATE] != true) return null
+        val map = try { JSONObject(backup[PREF_IDS] as? String ?: "{}") } catch (e: Exception) { JSONObject() }
+        val pref = keyboard.toPref()
+        if (!map.has(pref)) return null
+        val id = map.getInt(pref)
+        val start = "$PREFIX$id$SEPARATOR"
+        return backup.filterKeys { it.startsWith(start) }.mapKeys { it.key.substring(start.length) }.filterKeys { !isGlobal(it) }
+    }
+
+    /** The shared set of a backed-up preference map: plain, non-global keys. */
+    fun sharedSettingsIn(backup: Map<String, Any?>): Map<String, Any?> =
+        backup.filterKeys { !isGlobal(it) && !(it.startsWith(PREFIX) && it.contains(SEPARATOR)) }
 
     /**
      * Turn separate settings on: every enabled keyboard without a set of its own gets a copy of the shared set

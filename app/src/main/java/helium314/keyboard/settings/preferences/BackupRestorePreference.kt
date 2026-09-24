@@ -10,22 +10,40 @@ import android.os.Looper
 import android.widget.Toast
 import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.result.ActivityResult
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import helium314.keyboard.dictionarypack.DictionaryPackConstants
 import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.keyboard.emoji.SupportedEmojis
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.common.FileUtils
 import helium314.keyboard.latin.database.Database
+import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.settings.SettingsSubtype
+import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
+import helium314.keyboard.latin.utils.LanguagePriority
+import helium314.keyboard.latin.utils.LayoutType
+import helium314.keyboard.latin.utils.LayoutType.Companion.folder
+import helium314.keyboard.latin.utils.SubtypeUtilsAdditional
+import helium314.keyboard.latin.utils.getSecondaryLocales
 import helium314.keyboard.latin.utils.ExecutorUtils
 import helium314.keyboard.latin.utils.LayoutUtilsCustom
 import helium314.keyboard.latin.utils.Log
@@ -38,10 +56,13 @@ import helium314.keyboard.settings.Setting
 import helium314.keyboard.settings.SettingsActivity
 import helium314.keyboard.settings.dialogs.ConfirmationDialog
 import helium314.keyboard.settings.dialogs.InfoDialog
+import helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog
 import helium314.keyboard.settings.filePicker
+import helium314.keyboard.settings.screens.keyboardName
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.io.OutputStream
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -60,7 +81,8 @@ fun BackupRestorePreference(setting: Setting) {
     val ctx = LocalContext.current
     var error: String? by rememberSaveable { mutableStateOf(null) }
     val backupLauncher = backupLauncher { error = it }
-    val restoreLauncher = restoreLauncher { error = it }
+    var pendingRestore: PendingRestore? by remember { mutableStateOf(null) }
+    val restoreLauncher = restoreLauncher(onError = { error = it }, onChoose = { pendingRestore = it })
     Preference(name = setting.title, onClick = { showDialog = true })
     if (showDialog) {
         ConfirmationDialog(
@@ -89,6 +111,9 @@ fun BackupRestorePreference(setting: Setting) {
                 backupLauncher.launch(intent)
             }
         )
+    }
+    pendingRestore?.let { pending ->
+        RestoreChoiceDialog(pending, onDismiss = { pending.file.delete(); pendingRestore = null }, onError = { error = it })
     }
     if (error != null) {
         InfoDialog(
@@ -172,85 +197,231 @@ private fun backupLauncher(onError: (String) -> Unit): ManagedActivityResultLaun
     }
 }
 
+/** A picked backup, copied to the cache so it can be read twice: its preferences and the keyboards they list. */
+private class PendingRestore(val file: File, val prefs: Map<String, Any?>, val keyboards: List<SettingsSubtype>)
+
 @Composable
-private fun restoreLauncher(onError: (String) -> Unit): ManagedActivityResultLauncher<Intent, ActivityResult> {
+private fun restoreLauncher(onError: (String) -> Unit, onChoose: (PendingRestore) -> Unit): ManagedActivityResultLauncher<Intent, ActivityResult> {
     val ctx = LocalContext.current
     return filePicker { uri ->
-        val wait = CountDownLatch(1)
-        val restoredDb = ctx.getDatabasePath(Database.NAME + "_restored")
-        ExecutorUtils.getBackgroundExecutor(ExecutorUtils.KEYBOARD).execute {
-            try {
-                ctx.getActivity()?.contentResolver?.openInputStream(uri)?.use { inputStream ->
-                    ZipInputStream(inputStream).use { zip ->
-                        var entry: ZipEntry? = zip.nextEntry
-                        val filesDir = ctx.filesDir ?: return@execute
-                        val deviceProtectedFilesDir = DeviceProtectedUtils.getFilesDir(ctx)
-                        filesDir.deleteRecursively()
-                        deviceProtectedFilesDir.deleteRecursively()
-                        LayoutUtilsCustom.onLayoutFileChanged()
-                        Settings.getInstance().stopListener()
-                        while (entry != null) {
-                            if (entry.name.startsWith("unprotected${File.separator}")) {
-                                val adjustedName = entry.name.substringAfter("unprotected${File.separator}")
-                                if (backupFilePatterns.any { adjustedName.matches(it) }) {
-                                    val file = File(deviceProtectedFilesDir, adjustedName)
-                                    FileUtils.copyStreamToNewFile(zip, file)
-                                }
-                            } else if (backupFilePatterns.any { entry.name.matches(it) }) {
-                                val file = File(filesDir, entry.name)
-                                FileUtils.copyStreamToNewFile(zip, file)
-                            } else if (entry.name == Database.NAME) {
-                                FileUtils.copyStreamToNewFile(zip, restoredDb)
-                            } else if (entry.name == PREFS_FILE_NAME) {
-                                val prefLines = String(zip.readBytes()).split("\n")
-                                val prefs = ctx.prefs()
-                                prefs.edit { clear() }
-                                readJsonLinesToSettings(prefLines, prefs)
-                            } else if (entry.name == PROTECTED_PREFS_FILE_NAME) {
-                                val prefLines = String(zip.readBytes()).split("\n")
-                                val protectedPrefs = ctx.protectedPrefs()
-                                protectedPrefs.edit { clear() }
-                                readJsonLinesToSettings(prefLines, protectedPrefs)
-                            } else if (entry.name == PERSONAL_DICT_FILE_NAME) {
-                                // fork: merge backed-up personal dictionary into the system one (never fail the whole restore over it)
-                                try {
-                                    restorePersonalDictionary(ctx, String(zip.readBytes()))
-                                } catch (t: Throwable) {
-                                    Log.w("AdvancedScreen", "error restoring personal dictionary", t)
-                                }
-                            }
-                            zip.closeEntry()
-                            entry = zip.nextEntry
-                        }
-                    }
-                }
-
-                Database.copyFromDb(restoredDb, ctx)
-                Looper.prepare()
-                Toast.makeText(ctx, ctx.getString(R.string.backup_restored), Toast.LENGTH_LONG).show()
-            } catch (t: Throwable) {
-                onError("r" + t.message)
-                Log.w("AdvancedScreen", "error during restore", t)
-            } finally {
-                wait.countDown()
-            }
+        val file = File(ctx.cacheDir, "restore.zip")
+        val pending = try {
+            ctx.getActivity()?.contentResolver?.openInputStream(uri)?.use { input -> FileOutputStream(file).use { input.copyTo(it) } }
+            readBackup(file)
+        } catch (t: Throwable) {
+            Log.w("AdvancedScreen", "error reading backup", t)
+            onError("r" + t.message)
+            file.delete()
+            return@filePicker
         }
-        wait.await()
-        checkVersionUpgrade(ctx)
-        transferOldPinnedClips(ctx)
-        Settings.getInstance().startListener()
-        SubtypeSettings.reloadEnabledSubtypes(ctx)
-        val newDictBroadcast = Intent(DictionaryPackConstants.NEW_DICTIONARY_INTENT_ACTION)
-        ctx.getActivity()?.sendBroadcast(newDictBroadcast)
-        LayoutUtilsCustom.onLayoutFileChanged()
-        LayoutUtilsCustom.removeMissingLayouts(ctx)
-        (ctx.getActivity() as? SettingsActivity)?.prefChanged()
-        SupportedEmojis.load(ctx)
-        KeyboardSwitcher.getInstance().setThemeNeedsReload()
+        // a backup without keyboards (older format) has nothing to choose from
+        if (pending.keyboards.isEmpty()) {
+            runRestore(ctx, onError, R.string.backup_restored) { restoreEverything(ctx, file) }
+            file.delete()
+        } else onChoose(pending)
     }
 }
 
-@Suppress("UNCHECKED_CAST") // it is checked... but whatever (except string set, because can't check for that))
+@Composable
+private fun RestoreChoiceDialog(pending: PendingRestore, onDismiss: () -> Unit, onError: (String) -> Unit) {
+    val ctx = LocalContext.current
+    val selected = remember(pending) { mutableStateListOf<SettingsSubtype>() }
+    var confirmEverything by remember { mutableStateOf(false) }
+    if (confirmEverything) {
+        // a full restore wipes what was learned since the backup: never on one tap
+        ConfirmationDialog(
+            onDismissRequest = { confirmEverything = false },
+            title = { Text(stringResource(R.string.restore_everything)) },
+            content = { Text(stringResource(R.string.restore_everything_warning)) },
+            confirmButtonText = stringResource(R.string.button_restore),
+            onConfirmed = { runRestore(ctx, onError, R.string.backup_restored) { restoreEverything(ctx, pending.file) }; onDismiss() },
+        )
+        return
+    }
+    ThreeButtonAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.button_restore)) },
+        content = {
+            Column {
+                Text(stringResource(R.string.restore_choice_message))
+                pending.keyboards.forEach { keyboard ->
+                    Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = keyboard in selected, onCheckedChange = { if (it) selected.add(keyboard) else selected.remove(keyboard) })
+                        Text(keyboardName(keyboard, ctx))
+                    }
+                }
+            }
+        },
+        scrollContent = true,
+        confirmButtonText = stringResource(R.string.restore_chosen_keyboards),
+        checkOk = { selected.isNotEmpty() },
+        onConfirmed = { runRestore(ctx, onError, R.string.keyboards_restored) { restoreKeyboards(ctx, pending, selected.toList()) } },
+        neutralButtonText = stringResource(R.string.restore_everything),
+        onNeutral = { confirmEverything = true },
+    )
+}
+
+/** Runs [work] on the keyboard executor, waits for it, then refreshes everything that may have changed. */
+private fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: Int, work: () -> Unit) {
+    val wait = CountDownLatch(1)
+    ExecutorUtils.getBackgroundExecutor(ExecutorUtils.KEYBOARD).execute {
+        try {
+            work()
+            if (Looper.myLooper() == null) Looper.prepare()
+            Toast.makeText(ctx, ctx.getString(doneMessage), Toast.LENGTH_LONG).show()
+        } catch (t: Throwable) {
+            onError("r" + t.message)
+            Log.w("AdvancedScreen", "error during restore", t)
+        } finally {
+            wait.countDown()
+        }
+    }
+    wait.await()
+    checkVersionUpgrade(ctx)
+    transferOldPinnedClips(ctx)
+    Settings.getInstance().startListener()
+    SubtypeSettings.reloadEnabledSubtypes(ctx)
+    val newDictBroadcast = Intent(DictionaryPackConstants.NEW_DICTIONARY_INTENT_ACTION)
+    ctx.getActivity()?.sendBroadcast(newDictBroadcast)
+    LayoutUtilsCustom.onLayoutFileChanged()
+    LayoutUtilsCustom.removeMissingLayouts(ctx)
+    (ctx.getActivity() as? SettingsActivity)?.prefChanged()
+    SupportedEmojis.load(ctx)
+    KeyboardSwitcher.getInstance().setThemeNeedsReload()
+}
+
+/** The whole backup replaces everything, as before. */
+private fun restoreEverything(ctx: Context, file: File) {
+    val restoredDb = ctx.getDatabasePath(Database.NAME + "_restored")
+    ZipInputStream(FileInputStream(file)).use { zip ->
+        var entry: ZipEntry? = zip.nextEntry
+        val filesDir = ctx.filesDir ?: return
+        val deviceProtectedFilesDir = DeviceProtectedUtils.getFilesDir(ctx)
+        filesDir.deleteRecursively()
+        deviceProtectedFilesDir.deleteRecursively()
+        LayoutUtilsCustom.onLayoutFileChanged()
+        Settings.getInstance().stopListener()
+        while (entry != null) {
+            if (entry.name.startsWith("unprotected${File.separator}")) {
+                val adjustedName = entry.name.substringAfter("unprotected${File.separator}")
+                if (backupFilePatterns.any { adjustedName.matches(it) }) {
+                    val file = File(deviceProtectedFilesDir, adjustedName)
+                    FileUtils.copyStreamToNewFile(zip, file)
+                }
+            } else if (backupFilePatterns.any { entry.name.matches(it) }) {
+                val file = File(filesDir, entry.name)
+                FileUtils.copyStreamToNewFile(zip, file)
+            } else if (entry.name == Database.NAME) {
+                FileUtils.copyStreamToNewFile(zip, restoredDb)
+            } else if (entry.name == PREFS_FILE_NAME) {
+                val prefLines = String(zip.readBytes()).split("\n")
+                val prefs = ctx.prefs()
+                prefs.edit { clear() }
+                readJsonLinesToSettings(prefLines, prefs)
+            } else if (entry.name == PROTECTED_PREFS_FILE_NAME) {
+                val prefLines = String(zip.readBytes()).split("\n")
+                val protectedPrefs = ctx.protectedPrefs()
+                protectedPrefs.edit { clear() }
+                readJsonLinesToSettings(prefLines, protectedPrefs)
+            } else if (entry.name == PERSONAL_DICT_FILE_NAME) {
+                // fork: merge backed-up personal dictionary into the system one (never fail the whole restore over it)
+                try {
+                    restorePersonalDictionary(ctx, String(zip.readBytes()))
+                } catch (t: Throwable) {
+                    Log.w("AdvancedScreen", "error restoring personal dictionary", t)
+                }
+            }
+            zip.closeEntry()
+            entry = zip.nextEntry
+        }
+    }
+    Database.copyFromDb(restoredDb, ctx)
+}
+
+/**
+ * Only [chosen] keyboards come out of the backup: each is added (or replaced) with its settings, its custom layout
+ * files and the priority / share switches of its languages. Learned words, clipboard, other keyboards and
+ * everything else stay as they are. The keyboard's settings need a set of its own, so separate settings per
+ * keyboard get switched on if they aren't; the existing keyboards keep the shared set they behave by now.
+ */
+private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List<SettingsSubtype>) {
+    val real = ctx.realPrefs()
+    val prefs = ctx.prefs()
+    val backup = pending.prefs
+    // its own set when the backup kept one, else the backup's shared set was what it used
+    val settings = chosen.associateWith { KeyboardProfiles.ownSettingsIn(backup, it) ?: KeyboardProfiles.sharedSettingsIn(backup) }
+    if (!KeyboardProfiles.isSeparate(real))
+        KeyboardProfiles.enable(real, SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }, keepExisting = true)
+
+    // custom layout files the chosen keyboards use, by their path inside the backup
+    val wanted = chosen.flatMap { keyboard ->
+        LayoutType.entries.mapNotNull { type ->
+            keyboard.layoutName(type)?.takeIf { it.startsWith(LayoutUtilsCustom.CUSTOM_LAYOUT_PREFIX) }?.let { type.folder + File.separator + it }
+        }
+    }.toSet()
+    if (wanted.isNotEmpty()) {
+        val deviceProtectedFilesDir = DeviceProtectedUtils.getFilesDir(ctx)
+        ZipInputStream(FileInputStream(pending.file)).use { zip ->
+            var entry: ZipEntry? = zip.nextEntry
+            while (entry != null) {
+                val adjustedName = entry.name.substringAfter("unprotected${File.separator}", "")
+                if (adjustedName in wanted) FileUtils.copyStreamToNewFile(zip, File(deviceProtectedFilesDir, adjustedName))
+                zip.closeEntry()
+                entry = zip.nextEntry
+            }
+        }
+        LayoutUtilsCustom.onLayoutFileChanged()
+    }
+
+    // the languages' priority and share switches are per language, not per keyboard
+    val editor = real.edit()
+    for (keyboard in chosen)
+        for (locale in listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues))
+            for (key in LanguagePriority.keys(locale)) backup[key]?.let { KeyboardProfiles.put(editor, key, it) }
+    editor.apply()
+
+    for (keyboard in chosen) {
+        SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, keyboard, ctx) // registers it unless it equals a built-in one
+        if (SubtypeSettings.getEnabledSubtypes().none { it.toSettingsSubtype() == keyboard })
+            SubtypeSettings.addEnabledSubtype(prefs, keyboard.toAdditionalSubtype())
+        KeyboardProfiles.write(real, KeyboardProfiles.idFor(real, keyboard), settings.getValue(keyboard))
+    }
+}
+
+/** Reads the preferences entry of a backup and the keyboards listed in it. */
+private fun readBackup(file: File): PendingRestore {
+    var prefs: Map<String, Any?> = emptyMap()
+    ZipInputStream(FileInputStream(file)).use { zip ->
+        var entry: ZipEntry? = zip.nextEntry
+        while (entry != null) {
+            if (entry.name == PREFS_FILE_NAME) {
+                prefs = readJsonLinesToMap(String(zip.readBytes()).split("\n"))
+                break
+            }
+            zip.closeEntry()
+            entry = zip.nextEntry
+        }
+    }
+    val keyboards = (prefs[Settings.PREF_ENABLED_SUBTYPES] as? String)?.let { SubtypeSettings.createSettingsSubtypes(it) }.orEmpty()
+    return PendingRestore(file, prefs, keyboards)
+}
+
+private fun readJsonLinesToMap(list: List<String>): Map<String, Any?> {
+    val map = HashMap<String, Any?>()
+    val i = list.iterator()
+    while (i.hasNext()) {
+        when (i.next()) {
+            "boolean settings" -> map.putAll(Json.decodeFromString<Map<String, Boolean>>(i.next()))
+            "int settings" -> map.putAll(Json.decodeFromString<Map<String, Int>>(i.next()))
+            "long settings" -> map.putAll(Json.decodeFromString<Map<String, Long>>(i.next()))
+            "float settings" -> map.putAll(Json.decodeFromString<Map<String, Float>>(i.next()))
+            "string settings" -> map.putAll(Json.decodeFromString<Map<String, String>>(i.next()))
+            "string set settings" -> map.putAll(Json.decodeFromString<Map<String, Set<String>>>(i.next()))
+        }
+    }
+    return map
+}
+
 private fun settingsToJsonStream(settings: Map<String?, Any?>, out: OutputStream) {
     val booleans = settings.filter { it.key is String && it.value is Boolean } as Map<String, Boolean>
     val ints = settings.filter { it.key is String && it.value is Int } as Map<String, Int>

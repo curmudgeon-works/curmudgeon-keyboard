@@ -38,7 +38,15 @@ object GestureDecoderVocabulary {
     private const val TAG = "GestureDecoderVocab"
     private const val MAX_WORDS = 50_000
     private const val MIN_PROBABILITY = 1 // dictionary probabilities are 0..255, log-ish
-    private const val USER_HISTORY_BOOST = 64
+    /** Added to a learned word's probability (0..255) so personal words beat similar dictionary words; a user setting. */
+    @Volatile var historyBoost: Int = 64
+        set(value) {
+            if (value == field) return
+            field = value
+            // learned words are merged into every cached vocabulary with the boost baked in: rebuild from the disk caches
+            cache.clear()
+            merged.clear()
+        }
     private const val CACHE_DIR = "own_gesture_vocab"
     private const val CACHE_VERSION = 1
     // user-history dict loads asynchronously; on cold start wordPropertiesForSyncing
@@ -56,7 +64,7 @@ object GestureDecoderVocabulary {
 
     /** One language of a multilingual keyboard: its score factor from the priority setting, and whether its learned words count for every language. */
     class LocaleSpec(val locale: Locale, val factor: Float, val sharesHistory: Boolean) {
-        val key get() = "${locale.toLanguageTag()}*$factor*$sharesHistory"
+        val key get() = "${locale.toLanguageTag()}*$factor*$sharesHistory*$historyBoost"
     }
 
     /**
@@ -73,9 +81,15 @@ object GestureDecoderVocabulary {
         if (!allReady) return null
         val context = Settings.getCurrentContext() ?: return null
         val vocab = Vocabulary(emptyList())
+        // dictionaries from different sources use different frequency scales (the Hinglish list's top thousand words
+        // all sit at 248+, English's "the" is 222), so every further language is put on the first language's scale
+        // by rank before its priority factor applies; otherwise the factor fights the scale instead of expressing priority
+        val reference = specs.firstNotNullOfOrNull { mainEntries[it.locale.toLanguageTag()] }?.map { it.second }
         for (spec in specs) {
             val entries = mainEntries[spec.locale.toLanguageTag()] ?: continue
-            for ((word, freq) in entries) vocab.add(word, (freq * spec.factor).toInt().coerceAtLeast(MIN_PROBABILITY))
+            val normalized = if (reference == null || entries.map { it.second } == reference) entries
+                else entries.mapIndexed { i, (word, _) -> word to reference[i.coerceAtMost(reference.lastIndex)] }
+            for ((word, freq) in normalized) vocab.add(word, (freq * spec.factor).toInt().coerceAtLeast(MIN_PROBABILITY))
             val historyFactor = if (spec.sharesHistory) 1f else spec.factor
             for ((word, freq) in historyEntries(context, spec.locale, retries = 0))
                 vocab.add(word, (freq * historyFactor).toInt().coerceAtLeast(MIN_PROBABILITY))
@@ -198,7 +212,7 @@ object GestureDecoderVocabulary {
             for (wp in props) {
                 val word = wp.mWord ?: continue
                 if (!isDecodableWord(word)) continue
-                entries.add(word to (wp.probability + USER_HISTORY_BOOST).coerceIn(1, 255))
+                entries.add(word to (wp.probability + historyBoost).coerceIn(1, 255))
             }
             Log.d(TAG, "read ${entries.size} user-history words for $locale (after $attempts empty reads)")
             return entries

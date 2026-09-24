@@ -42,6 +42,8 @@ public final class LastComposedWord {
     public final String mSeparatorString;
     public final NgramContext mNgramContext;
     public final int mCapitalizedMode;
+    /** The suggestion strip a swiped word was committed with, so a reverted commit can show it again; null for typed words. */
+    public SuggestedWords mBatchSuggestedWords = null;
     public final InputPointers mInputPointers =
             new InputPointers(DecoderSpecificConstants.DICTIONARY_MAX_WORD_LENGTH);
 
