@@ -24,8 +24,10 @@ fun ConfirmationDialog(
     cancelButtonText: String = stringResource(android.R.string.cancel),
     neutralButtonText: String? = null,
     onNeutral: () -> Unit = { },
+    confirmFirst: Boolean = false,
 ) {
     ThreeButtonAlertDialog(
+        confirmFirst = confirmFirst,
         onDismissRequest = onDismissRequest,
         onConfirmed = onConfirmed,
         confirmButtonText = confirmButtonText,
