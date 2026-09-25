@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings
 
+import androidx.compose.foundation.background
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.VectorDrawable
 import androidx.annotation.DrawableRes
@@ -166,3 +167,13 @@ fun isWideScreen(): Boolean {
 }
 
 val contentTextDirectionStyle = TextStyle(textDirection = TextDirection.Content)
+
+/** The background of settings shown only in advanced mode, so toggling the mode shows what it adds. */
+@Composable
+fun advancedTint() = MaterialTheme.colorScheme.surfaceContainerHigh
+
+/** An advanced-only item (or run of items) on the advanced tint, edge to edge of its parent. */
+@Composable
+fun AdvancedTint(content: @Composable () -> Unit) {
+    Column(Modifier.fillMaxWidth().background(advancedTint())) { content() }
+}

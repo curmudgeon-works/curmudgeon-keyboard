@@ -83,15 +83,24 @@ fun SearchSettingsScreen(
                     Column(
                         Modifier.verticalScroll(rememberScrollState()).then(Modifier.padding(innerPadding))
                     ) {
-                        shownSettings.forEach {
+                        // advanced-only items (and headings whose items all are) on the advanced tint; not on screens
+                        // that are advanced as a whole (empty simple set), whose entry carries the tint instead
+                        val tinting = advanced && !simpleModeKeys.isNullOrEmpty()
+                        fun isAdvanced(item: Any?) = tinting && item is String && item !in simpleModeKeys!!
+                        shownSettings.forEachIndexed { index, it ->
                             if (it is Int) {
-                                PreferenceCategory(stringResource(it))
+                                val categoryItems = shownSettings.drop(index + 1).takeWhile { next -> next !is Int }.filterIsInstance<String>()
+                                if (categoryItems.isNotEmpty() && categoryItems.all { item -> isAdvanced(item) })
+                                    AdvancedTint { PreferenceCategory(stringResource(it)) }
+                                else PreferenceCategory(stringResource(it))
                             } else {
                                 // this only animates appearing prefs
                                 // a solution would be using a list(visible to key)
                                 AnimatedVisibility(visible = it != null) {
-                                    if (it != null)
-                                        SettingsActivity.settingsContainer[it]?.Preference()
+                                    if (it != null) {
+                                        if (isAdvanced(it)) AdvancedTint { SettingsActivity.settingsContainer[it]?.Preference() }
+                                        else SettingsActivity.settingsContainer[it]?.Preference()
+                                    }
                                 }
                             }
                         }

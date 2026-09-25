@@ -163,7 +163,7 @@ fun KeyboardsScreen(
                                 SettingsDestination.navigateTo(SettingsDestination.Languages + keyboard.toPref())
                             }
                         },
-                        icon = R.drawable.ic_settings_languages,
+                        icon = R.drawable.ic_settings_layout, // a keyboard (the globe is for its languages)
                         onLongClick = if (enabled.size > 1) ({ keyboardToDelete = keyboard }) else null,
                     ) {
                         if (order.size > 1)

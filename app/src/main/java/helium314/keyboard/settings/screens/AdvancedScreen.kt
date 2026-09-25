@@ -72,7 +72,7 @@ fun AdvancedSettingsScreen(
             Settings.PREF_LANGUAGE_SWIPE_DISTANCE else null,
         if (Settings.readVerticalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.TOUCHPAD_MODE)
             Settings.PREF_TOUCHPAD_SENSITIVITY else null,
-        Settings.PREF_DELETE_SWIPE,
+        // (delete swipe: in the Backspace group of the Preferences screen)
         Settings.PREF_SPACE_TO_CHANGE_LANG,
         Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD,
         Settings.PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY,

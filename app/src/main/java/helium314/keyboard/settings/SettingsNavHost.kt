@@ -34,6 +34,8 @@ import helium314.keyboard.settings.screens.PreferencesScreen
 import helium314.keyboard.settings.screens.SecondaryLayoutScreen
 import helium314.keyboard.settings.screens.SubtypeScreen
 import helium314.keyboard.settings.screens.SwipeTuningScreen
+import helium314.keyboard.settings.screens.LayoutFilesScreen
+import helium314.keyboard.settings.screens.CustomizePopupsScreen
 import helium314.keyboard.settings.screens.TextCorrectionScreen
 import helium314.keyboard.settings.screens.ToolbarScreen
 import helium314.keyboard.settings.screens.gesturedata.GestureDataScreen
@@ -134,6 +136,12 @@ fun SettingsNavHost(
         composable(SettingsDestination.Layouts) {
             SecondaryLayoutScreen(onClickBack = ::goBack)
         }
+        composable(SettingsDestination.CustomizePopups + "{subtype}") {
+            CustomizePopupsScreen(keyboard = it.arguments?.getString("subtype")!!.toSettingsSubtype(), onClickBack = ::goBack)
+        }
+        composable(SettingsDestination.LayoutFiles) {
+            LayoutFilesScreen(onClickBack = ::goBack)
+        }
         composable(SettingsDestination.Colors + "{theme}") {
             ColorsScreen(isNight = false, theme = it.arguments?.getString("theme"), onClickBack = ::goBack)
         }
@@ -173,6 +181,8 @@ object SettingsDestination {
     const val Subtype = "subtype/"
     const val SwipeTuning = "swipe_tuning/"
     const val Layouts = "layouts"
+    const val LayoutFiles = "layout_files"
+    const val CustomizePopups = "customize_popups/"
     const val Dictionaries = "dictionaries"
     val navTarget = MutableStateFlow(Keyboards)
 

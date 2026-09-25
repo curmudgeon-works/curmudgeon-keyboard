@@ -51,6 +51,9 @@ fun PreferenceCategory(
     }
 }
 
+/** Rows set as compact take the spacing of the Layout screen's own rows (less padding, no minimum height). */
+val LocalCompactPreferences = androidx.compose.runtime.compositionLocalOf { false }
+
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun Preference(
@@ -66,8 +69,8 @@ fun Preference(
         modifier = modifier
             .fillMaxWidth()
             .combinedClickable(onClick = { onClick() }, onLongClick = onLongClick)
-            .heightIn(min = 44.dp)
-            .padding(vertical = 10.dp, horizontal = 12.dp),
+            .then(if (LocalCompactPreferences.current) Modifier.heightIn(min = 56.dp).padding(vertical = 4.dp).padding(start = 10.dp)
+                else Modifier.heightIn(min = 44.dp).padding(vertical = 10.dp, horizontal = 12.dp)),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

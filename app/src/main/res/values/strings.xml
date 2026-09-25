@@ -249,7 +249,33 @@
     <string name="swipe_screen">Swiping</string>
     <string name="swipe_settings">Swipe settings</string>
     <!-- On the Layout screen: the files of every secondary layout (add, load, edit, delete) -->
-    <string name="layout_files">Layout files</string>
+    <string name="layout_files">Customize keys and popups with JSON</string>
+    <!-- Group on the Preferences screen: the backspace key\'s settings -->
+    <string name="backspace_settings">Backspace</string>
+    <string name="backspace_hold_deletes_words">Hold to delete whole words</string>
+    <string name="backspace_hold_deletes_words_summary">Off: holding backspace deletes a character at a time</string>
+    <string name="backspace_repeat_interval">Hold-to-delete speed</string>
+    <!-- Value of the hold-to-delete speed; %d is milliseconds -->
+    <string name="backspace_repeat_interval_value">One deletion every %d ms</string>
+    <string name="backspace_start_speed">Speed</string>
+    <string name="backspace_speed_up">Speed up while held</string>
+    <string name="backspace_speed_up_after">Speed up after</string>
+    <string name="backspace_top_speed">Top speed</string>
+    <!-- %s is a number of seconds like 2.0 -->
+    <string name="backspace_seconds_value">%s s of holding</string>
+    <!-- Summary addition: %1$d is milliseconds, %2$s seconds like 2.0 -->
+    <string name="backspace_speed_up_value">every %1$d ms after %2$s s</string>
+    <string name="backspace_deletes_swiped_word">Tap to delete a swiped word</string>
+    <string name="backspace_deletes_swiped_word_summary">Right after a swipe, one tap deletes the whole word; after anything else a tap deletes a character</string>
+    <string name="layout_files_summary">Number row, number pads, phone pad, bottom rows… in one editor and one file</string>
+    <!-- Name under which an edited layout is kept as the user's own -->
+    <string name="layout_files_own_name">My layout</string>
+    <string name="layout_files_builtin">Built-in</string>
+    <string name="layout_files_load">Load file</string>
+    <string name="layout_files_export">Save to file</string>
+    <string name="layout_files_loaded">Layouts loaded. Save to use them.</string>
+    <string name="layout_files_load_error">Not a layout file</string>
+    <string name="layout_files_invalid">This layout has an error</string>
     <string name="space_swipe_move_cursor">Swipe spacebar to move cursor</string>
     <string name="space_swipe_move_cursor_summary">Slide left or right along the spacebar to move the cursor</string>
     <string name="swipe_tuning_inflections">Inflection weights</string>
@@ -358,12 +384,16 @@
     <string name="hints_other_keys">Hints on the other keys</string>
     <string name="key_popups_symbols">Symbols page</string>
     <string name="key_popups_more_symbols">More symbols page</string>
-    <string name="key_popups_presets">Commonly used popup sets</string>
-    <string name="key_popups_full">Full popup customization</string>
-    <string name="key_popups_save_as_new">Save as new set</string>
+    <string name="key_popups_presets">Preset popup layouts</string>
+    <string name="key_popups_full">Customize popups</string>
+    <string name="key_popups_full_summary">Every key\'s long-press popups, a tab per group of keys</string>
+    <string name="key_popups_save_as_new">Save current popup layout</string>
     <string name="key_popups_save_change_title">Save this change to a set of your own</string>
     <string name="key_popups_my_set">My popups</string>
+    <string name="key_popups_rename_set">Rename popup layout</string>
     <string name="key_popups_delete_set">Delete this set</string>
+    <!-- Confirmation title for deleting a popup set of the user's own; %s is its name -->
+    <string name="key_popups_delete_set_title">Delete the popup set \"%s\"?</string>
     <string name="key_popups_preset_standard">Curmudgeon default</string>
     <string name="key_popups_preset_heliboard">HeliBoard default</string>
     <string name="key_popups_preset_main">Main accented letters</string>
@@ -409,7 +439,7 @@
     <string name="letter_hints">Show hints on letter keys</string>
     <string name="letter_hints_summary">Long-press types the same characters when hidden</string>
     <!-- Title of the setting to save subtype per app -->
-    <string name="save_subtype_per_app">Remember language per app</string>
+    <string name="save_subtype_per_app">Remember keyboard per app</string>
     <!-- Title of the setting to show key hints -->
     <string name="show_hints">Show key hints</string>
     <!-- Description of the settings to show hints -->
@@ -496,7 +526,7 @@
     <!-- Title of the setting to show "..." as hints for more functionality on long-press -->
     <string name="show_popup_hints">Show functional hints</string>
     <!-- Description of the show_popup_hints setting -->
-    <string name="show_popup_hints_summary">Show hints if long-pressing a key triggers additional functionality</string>
+    <string name="show_popup_hints_summary">The … in the bottom right corner of keys that do something on long press</string>
     <!-- Option to remove popup keys that already exist on the base keyboard -->
     <string name="remove_redundant_popups">Remove redundant popups</string>
     <!-- Description of the remove_redundant_popups setting -->
