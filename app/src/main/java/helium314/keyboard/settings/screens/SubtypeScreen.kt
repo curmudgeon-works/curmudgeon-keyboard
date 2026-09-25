@@ -103,7 +103,6 @@ import helium314.keyboard.settings.DropDownField
 import helium314.keyboard.settings.SearchScreen
 import helium314.keyboard.settings.SettingsActivity
 import helium314.keyboard.settings.SettingsMode
-import helium314.keyboard.settings.preferences.PreferenceCategory
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.latin.utils.previewDark
 import helium314.keyboard.settings.WithBigTitle
@@ -199,6 +198,8 @@ fun SubtypeScreen(
             ) {
                 WithBigTitle(stringResource(R.string.key_popups_title)) {
                     KeyPopupsSection(currentSubtype) { setCurrentSubtype(it) }
+                    PrefSwitchRow(Settings.PREF_REMOVE_REDUNDANT_POPUPS, Defaults.PREF_REMOVE_REDUNDANT_POPUPS, R.string.remove_redundant_popups) { holdSpace = true; reloadPreview() }
+                    PrefSwitchRow(Settings.PREF_SHOW_TLD_POPUP_KEYS, Defaults.PREF_SHOW_TLD_POPUP_KEYS, R.string.show_tld_popup_keys) { holdSpace = true; reloadPreview() }
                 }
                 if (hasLocalizedNumberRow(currentSubtype.locale, ctx)) {
                     val checked = currentSubtype.getExtraValueOf(ExtraValue.LOCALIZED_NUMBER_ROW)?.toBoolean()
@@ -227,6 +228,8 @@ fun SubtypeScreen(
                 // ---- number row and hints, in one place
                 WithBigTitle(stringResource(R.string.number_row_and_hints)) {
                     PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW, R.string.number_row_summary) { holdSpace = true; reloadPreview() }
+                    if (!prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW))
+                        PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS, Defaults.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS, R.string.number_row_in_symbols) { holdSpace = true; reloadPreview() }
                     // two independent hint switches; the popups behind long-press stay either way
                     PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW_HINTS, Defaults.PREF_SHOW_NUMBER_ROW_HINTS, R.string.hints_number_row) { holdSpace = true; reloadPreview() }
                     PrefSwitchRow(Settings.PREF_SHOW_HINTS, Defaults.PREF_SHOW_HINTS, R.string.hints_other_keys) { holdSpace = true; reloadPreview() }
@@ -236,6 +239,10 @@ fun SubtypeScreen(
                 // ---- the layout, with the other layouts of this keyboard under it
                 WithBigTitle(stringResource(R.string.keyboard_layout_set)) {
                     MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) }
+                    PrefSwitchRow(Settings.PREF_SHOW_EMOJI_KEY, Defaults.PREF_SHOW_EMOJI_KEY, R.string.show_emoji_key) {
+                        holdSpace = true
+                        KeyboardSwitcher.getInstance().reloadKeyboard()
+                    }
                 // ---- the other layouts of this keyboard, each with its own treatment
                     // bottom row: a tablet switch when that is the only alternative; the full choice for Bengali (khipro) or custom files
                     if (currentSubtype.locale.script() != ScriptUtils.SCRIPT_BENGALI && LayoutUtilsCustom.getLayoutFiles(LayoutType.FUNCTIONAL, ctx).isEmpty())
@@ -258,17 +265,12 @@ fun SubtypeScreen(
                     for (type in listOf(LayoutType.MORE_SYMBOLS, LayoutType.NUMBER, LayoutType.NUMBER_ROW, LayoutType.NUMPAD, LayoutType.NUMPAD_LANDSCAPE, LayoutType.PHONE, LayoutType.PHONE_SYMBOLS))
                         if (LayoutUtilsCustom.getLayoutFiles(type, ctx).isNotEmpty())
                             SecondaryLayoutRow(currentSubtype, type, ::setCurrentSubtype)
-                }
-                // ---- every preference, the same list (and simple-mode filter) as the Preferences screen
-                WithBigTitle(stringResource(R.string.settings_screen_preferences)) {
+                    // every secondary layout's files: add, load, edit, delete, and the default for all keyboards
+                    // (what the Secondary layouts screen had; advanced only, as that screen was)
                     val advanced by SettingsMode.state(ctx)
-                    // the hint switches sit above and the key popups screen edits the symbol map; popup order, the TLD popups
-                    // and the per-app keyboard memory (not a property of one keyboard) are left to the Preferences screen
-                    val shownAbove = setOf(Settings.PREF_SHOW_HINTS, Settings.PREF_POPUP_KEYS_ORDER, Settings.PREF_SHOW_POPUP_HINTS, Settings.PREF_SHOW_TLD_POPUP_KEYS,
-                        Settings.PREF_SYMBOL_POPUP_MAP, Settings.PREF_SAVE_SUBTYPE_PER_APP)
-                    SettingsMode.filter(preferencesItems(prefs).filter { it !in shownAbove }, preferencesSimpleModeKeys, advanced).forEach {
-                        if (it is Int) PreferenceCategory(stringResource(it))
-                        else if (it is String) SettingsActivity.settingsContainer[it]?.Preference()
+                    if (advanced) FoldableLayoutGroup(R.string.layout_files, onOpen = {}) {
+                        for (type in LayoutType.entries.filter { it != LayoutType.MAIN && it != LayoutType.SYMBOLS })
+                            SettingsActivity.settingsContainer[Settings.PREF_LAYOUT_PREFIX + type.name]?.Preference()
                     }
                 }
             }
@@ -289,46 +291,6 @@ fun SubtypeScreen(
     }
 }
 
-
-// from ReorderSwitchPreference
-@Composable
-private fun PopupOrderDialog(
-    onDismissRequest: () -> Unit,
-    initialValue: String,
-    onConfirmed: (String?) -> Unit,
-    title: String,
-    showDefault: Boolean
-) {
-    class KeyAndState(var name: String, var state: Boolean)
-    val items = initialValue.split(Separators.ENTRY).map {
-        KeyAndState(it.substringBefore(Separators.KV), it.substringAfter(Separators.KV).toBoolean())
-    }
-    val ctx = LocalContext.current
-    ReorderDialog(
-        onConfirmed = { reorderedItems ->
-            val value = reorderedItems.joinToString(Separators.ENTRY) { it.name + Separators.KV + it.state }
-            onConfirmed(value)
-        },
-        onDismissRequest = onDismissRequest,
-        onNeutral = { onDismissRequest(); onConfirmed(null) },
-        neutralButtonText = if (showDefault) stringResource(R.string.button_default) else null,
-        items = items,
-        title = { Text(title) },
-        displayItem = { item ->
-            var checked by rememberSaveable { mutableStateOf(item.state) }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                KeyboardIconsSet.instance.GetIconOrEmpty(item.name)
-                val text = item.name.lowercase().getStringResourceOrName("popup_keys_", ctx)
-                Text(text, Modifier.weight(1f))
-                Switch(
-                    checked = checked,
-                    onCheckedChange = { item.state = it; checked = it }
-                )
-            }
-        },
-        getKey = { it.name }
-    )
-}
 
 @Composable
 private fun MainLayoutRow(

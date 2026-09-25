@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -20,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import helium314.keyboard.keyboard.KeyboardActionListener
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.gesture.GestureStats
 import helium314.keyboard.latin.gesture.OwnGestureDecoder
@@ -32,13 +34,19 @@ import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.SearchSettingsScreen
 import helium314.keyboard.settings.SettingsActivity
+import helium314.keyboard.settings.SettingsMode
 import helium314.keyboard.settings.preferences.PreferenceCategory
 import helium314.keyboard.settings.preferences.SliderPreference
 import androidx.core.content.edit
 import kotlin.math.roundToInt
 
+@Composable
+private fun GroupTitle(titleId: Int) =
+    Text(stringResource(titleId), style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp))
+
 /**
- * The own swipe decoder's inflection weights and scorer blend for one keyboard, with the statistics of every
+ * The swipe settings (capitalizing by swiping up, the apostrophe via the period key), then the own swipe decoder's inflection weights and scorer blend for one keyboard, with the statistics of every
  * tuning tried so far, so the user can see which one suits their swiping and switch to it.
  */
 @Composable
@@ -54,9 +62,36 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     val recommended = GestureStats.recommended(rows)
     SearchSettingsScreen(
         onClickBack = onClickBack,
-        title = stringResource(R.string.swipe_tuning),
+        title = stringResource(R.string.swipe_screen),
         settings = emptyList(),
     ) {
+        // ---- what a swipe can do: gesture typing itself (its own screen without the own decoder), then the extras
+        GroupTitle(R.string.swipe_settings)
+        val advanced by SettingsMode.state(ctx)
+        SettingsMode.filter(gestureTypingItems(prefs), gestureTypingSimpleModeKeys, advanced).forEach {
+            if (it is String) SettingsActivity.settingsContainer[it]?.Preference()
+        }
+        SettingsActivity.settingsContainer[Settings.PREF_GESTURE_CAPS_SWIPE]?.Preference()
+        if (prefs.getBoolean(Settings.PREF_GESTURE_CAPS_SWIPE, Defaults.PREF_GESTURE_CAPS_SWIPE))
+            SettingsActivity.settingsContainer[Settings.PREF_GESTURE_CAPS_HEIGHT]?.Preference()
+        SettingsActivity.settingsContainer[Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD]?.Preference()
+        // on = move cursor, off = nothing; the other spacebar swipe actions stay in Advanced (shown off here)
+        val moveCursor = Settings.readHorizontalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.MOVE_CURSOR
+        Row(verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.space_swipe_move_cursor), style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.space_swipe_move_cursor_summary), style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Switch(checked = moveCursor, onCheckedChange = { on ->
+                prefs.edit { putString(Settings.PREF_SPACE_HORIZONTAL_SWIPE,
+                    (if (on) KeyboardActionListener.SwipeAction.MOVE_CURSOR else KeyboardActionListener.SwipeAction.NONE).name) }
+            })
+        }
+
+        // ---- how the decoder weighs a swipe, and how each weighting did
+        GroupTitle(R.string.swipe_tuning)
         PreferenceCategory(stringResource(R.string.swipe_tuning_inflections))
         Text(stringResource(R.string.swipe_tuning_summary), Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             style = MaterialTheme.typography.bodySmall)

@@ -2,6 +2,7 @@
 package helium314.keyboard.settings.screens
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -35,9 +36,19 @@ fun GestureTypingScreen(
     val b = (LocalContext.current.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
     if ((b?.value ?: 0) < 0)
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
+    SearchSettingsScreen(
+        onClickBack = onClickBack,
+        title = stringResource(R.string.settings_screen_gesture),
+        settings = gestureTypingItems(prefs),
+        simpleModeKeys = gestureTypingSimpleModeKeys,
+    )
+}
+
+/** The gesture typing items; with the own decoder they are on the Swiping screen instead of their own. */
+fun gestureTypingItems(prefs: SharedPreferences): List<String?> {
     val gestureFloatingPreviewEnabled = prefs.getBoolean(Settings.PREF_GESTURE_FLOATING_PREVIEW_TEXT, Defaults.PREF_GESTURE_FLOATING_PREVIEW_TEXT)
     val gestureEnabled = prefs.getBoolean(Settings.PREF_GESTURE_INPUT, Defaults.PREF_GESTURE_INPUT)
-    val items = listOf(
+    return listOf(
         Settings.PREF_GESTURE_INPUT,
         if (gestureEnabled)
             Settings.PREF_GESTURE_PREVIEW_TRAIL else null,
@@ -48,23 +59,18 @@ fun GestureTypingScreen(
         // phrase gesture is a feature of the native gesture library, the own decoder ignores it
         if (gestureEnabled && !BuildConfig.USE_OWN_GESTURE_DECODER)
             Settings.PREF_GESTURE_SPACE_AWARE else null,
-        if (gestureEnabled && BuildConfig.USE_OWN_GESTURE_DECODER)
-            Settings.PREF_GESTURE_CAPS_HEIGHT else null,
+        // the own decoder's swipe-up capitals and apostrophe are on the keyboard's Swipe screen
         if (gestureEnabled)
             Settings.PREF_GESTURE_FAST_TYPING_COOLDOWN else null,
         if (gestureEnabled &&
             (prefs.getBoolean(Settings.PREF_GESTURE_PREVIEW_TRAIL, Defaults.PREF_GESTURE_PREVIEW_TRAIL) || gestureFloatingPreviewEnabled))
             Settings.PREF_GESTURE_TRAIL_FADEOUT_DURATION else null
         )
-    SearchSettingsScreen(
-        onClickBack = onClickBack,
-        title = stringResource(R.string.settings_screen_gesture),
-        settings = items,
-        simpleModeKeys = setOf(
-            Settings.PREF_GESTURE_INPUT, Settings.PREF_GESTURE_PREVIEW_TRAIL, Settings.PREF_GESTURE_SPACE_AWARE,
-        ),
-    )
 }
+
+val gestureTypingSimpleModeKeys = setOf(
+    Settings.PREF_GESTURE_INPUT, Settings.PREF_GESTURE_PREVIEW_TRAIL, Settings.PREF_GESTURE_SPACE_AWARE,
+)
 
 fun createGestureTypingSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_GESTURE_INPUT, R.string.gesture_input, R.string.gesture_input_summary) {
@@ -94,6 +100,13 @@ fun createGestureTypingSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_GESTURE_SPACE_AWARE, R.string.gesture_space_aware, R.string.gesture_space_aware_summary) {
         SwitchPreference(it, Defaults.PREF_GESTURE_SPACE_AWARE)
+    },
+    Setting(context, Settings.PREF_GESTURE_CAPS_SWIPE, R.string.gesture_caps_swipe, R.string.gesture_caps_swipe_summary) {
+        SwitchPreference(it, Defaults.PREF_GESTURE_CAPS_SWIPE)
+    },
+    Setting(context, Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD, R.string.gesture_apostrophe_via_period,
+        R.string.gesture_apostrophe_via_period_summary) {
+        SwitchPreference(it, Defaults.PREF_GESTURE_APOSTROPHE_VIA_PERIOD)
     },
     Setting(context, Settings.PREF_GESTURE_CAPS_HEIGHT, R.string.gesture_caps_height, R.string.gesture_caps_height_summary) { def ->
         SliderPreference(

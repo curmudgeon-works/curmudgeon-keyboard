@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -17,9 +18,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -51,8 +55,7 @@ import helium314.keyboard.latin.utils.NextScreenIcon
 import java.util.Locale
 
 /**
- * Languages & layouts of ONE keyboard: a layout row on top (opening the keyboard screen with layout, popup order,
- * secondary layouts, dictionaries), then every language as a row — the keyboard's own languages first with their
+ * Languages of ONE keyboard (its layout and swipe screens are on the main screen): every language as a row — the keyboard's own languages first with their
  * Off / L / M / H priority, the others off. Turning a language on adds it to this keyboard (same script only;
  * a language of another script needs its own keyboard, so its row is faded and locked).
  */
@@ -64,7 +67,7 @@ fun LanguageListScreen(
     val ctx = LocalContext.current
     var keyboard by remember { mutableStateOf(initialKeyboard) }
     var generation by remember { mutableIntStateOf(0) } // bumped after every change so the list re-sorts
-    val languages = remember(keyboard, generation) { languagesFor(ctx, keyboard) }
+    val (ownLanguages, otherLanguages) = remember(keyboard, generation) { languagesFor(ctx, keyboard) }
     fun setKeyboard(new: SettingsSubtype) {
         SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, new, ctx)
         keyboard = new
@@ -74,7 +77,7 @@ fun LanguageListScreen(
         onClickBack = onClickBack,
         title = {
             Column {
-                Text(stringResource(R.string.language_and_layouts_title))
+                Text(stringResource(R.string.languages_title))
                 Text(
                     keyboardName(keyboard, ctx),
                     style = MaterialTheme.typography.bodyMedium,
@@ -82,37 +85,23 @@ fun LanguageListScreen(
                 )
             }
         },
-        // the layout row is the first list item (a content block would replace the list)
+        // (the layout and swipe screens are on the main screen)
         filteredItems = { term ->
-            val matching = languages.filter { locale ->
+            if (term.isBlank()) ownLanguages + otherLanguages
+            else (ownLanguages + otherLanguages).filter { locale ->
                 locale.localizedDisplayName(ctx.resources).replace("(", "")
                     .splitOnWhitespace().any { it.startsWith(term, true) }
             }
-            if (term.isBlank()) listOf<Any>(LayoutRowMarker, SwipeTuningRowMarker) + matching else matching
         },
         itemContent = { item ->
-            if (item === LayoutRowMarker)
-                Preference(
-                    name = stringResource(R.string.keyboard_layout_set),
-                    description = keyboard.mainLayoutName()?.getStringResourceOrName("layout_", ctx) ?: "",
-                    onClick = { SettingsDestination.navigateTo(SettingsDestination.Subtype + keyboard.toPref()) },
-                    icon = R.drawable.ic_settings_layout
-                ) { NextScreenIcon() }
-            else if (item === SwipeTuningRowMarker) {
-                if (BuildConfig.USE_OWN_GESTURE_DECODER) Preference(
-                    name = stringResource(R.string.swipe_tuning),
-                    description = OwnGestureDecoder.Tuning.read(ctx.prefs()).key,
-                    onClick = { SettingsDestination.navigateTo(SettingsDestination.SwipeTuning + keyboard.toPref()) },
-                    icon = R.drawable.ic_settings_gesture
-                ) { NextScreenIcon() }
-            }
-            else LanguageRow(item as Locale, keyboard, ::setKeyboard)
+            LanguageRow(item as Locale, keyboard, ::setKeyboard)
         },
     )
 }
 
-/** The keyboard's languages in priority order, then every other language: with a dictionary first, alphabetically. */
-private fun languagesFor(ctx: android.content.Context, keyboard: SettingsSubtype): List<Locale> {
+/** The keyboard's languages by priority, the same priority in the order they were added; and every other language:
+ *  same script first, then with a dictionary, then alphabetically. */
+private fun languagesFor(ctx: android.content.Context, keyboard: SettingsSubtype): Pair<List<Locale>, List<Locale>> {
     val prefs = ctx.prefs()
     val own = listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)
     val others = (SubtypeSettings.getAvailableSubtypeLocales() + getDictionaryLocales(ctx)).distinct().filter { it !in own }
@@ -121,7 +110,8 @@ private fun languagesFor(ctx: android.content.Context, keyboard: SettingsSubtype
         val (dicts, hasInternal) = getUserAndInternalDictionaries(ctx, locale)
         return hasInternal || dicts.isNotEmpty()
     }
-    return own.sortedByDescending { LanguagePriority.get(prefs, it) } +
+    // (sorting is stable: languages added before the adding time was recorded keep the keyboard's own order)
+    return own.sortedWith(compareByDescending<Locale> { LanguagePriority.get(prefs, it) }.thenBy { LanguagePriority.added(prefs, it) }) to
         others.sortedWith(compareBy({ it.script() != keyboard.locale.script() }, { !hasDictionary(it) },
             { it.localizedDisplayName(ctx.resources) }))
 }
@@ -210,8 +200,6 @@ private fun LanguageRow(locale: Locale, keyboard: SettingsSubtype, setKeyboard: 
 }
 
 private const val OFF = 0
-private object LayoutRowMarker
-private object SwipeTuningRowMarker
 
 /**
  * Apply a priority change to a keyboard: [OFF] removes the language, a priority adds it if needed and stores it;
@@ -223,7 +211,10 @@ fun withLanguagePriority(context: android.content.Context, subtype: SettingsSubt
     val languages = (listOf(subtype.locale) + getSecondaryLocales(subtype.extraValues)).toMutableList()
     if (priority == OFF) languages.remove(locale) else {
         LanguagePriority.set(prefs, locale, priority)
-        if (locale !in languages) languages.add(locale)
+        if (locale !in languages) {
+            languages.add(locale)
+            LanguagePriority.markAdded(prefs, locale)
+        }
     }
     val main = languages.maxWithOrNull(compareBy({ LanguagePriority.get(prefs, it) }, { it == subtype.locale })) ?: subtype.locale
     val secondaries = languages.filter { it != main }

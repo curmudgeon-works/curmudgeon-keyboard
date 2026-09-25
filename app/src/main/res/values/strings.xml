@@ -193,6 +193,10 @@
     <!-- Description for "gesture_space_aware" option. The user can input multiple words by gliding through the space key during a gesture input.-->
     <string name="gesture_space_aware_summary">Input spaces during gestures by gliding to the space key</string>
     <!-- Title of the setting for how far a swipe has to leave the keyboard upwards to capitalize a letter -->
+    <string name="gesture_caps_swipe">Swipe up to capitalize</string>
+    <string name="gesture_caps_swipe_summary">While swiping a word, go up above the keyboard to capitalize the letter you left from</string>
+    <string name="gesture_apostrophe_via_period">Apostrophe via the period key</string>
+    <string name="gesture_apostrophe_via_period_summary">Swipe through the period key for the apostrophe (i . m for I\'m). Off: skip it, swipe im for I\'m</string>
     <string name="gesture_caps_height">Swipe-up capitalization strictness</string>
     <string name="gesture_caps_height_summary">How far above the keyboard a swipe has to go to capitalize the letter it left from</string>
     <!-- Value of the swipe-up capitalization strictness setting, %s is a number like 0.75 -->
@@ -241,6 +245,13 @@
     <string name="keyboards_restored">Keyboards restored</string>
     <!-- Swipe tuning screen (own gesture decoder): inflection weights and per-setting statistics -->
     <string name="swipe_tuning">Swipe tuning</string>
+    <!-- The per-keyboard screen with the swipe settings and the swipe tuning -->
+    <string name="swipe_screen">Swiping</string>
+    <string name="swipe_settings">Swipe settings</string>
+    <!-- On the Layout screen: the files of every secondary layout (add, load, edit, delete) -->
+    <string name="layout_files">Layout files</string>
+    <string name="space_swipe_move_cursor">Swipe spacebar to move cursor</string>
+    <string name="space_swipe_move_cursor_summary">Slide left or right along the spacebar to move the cursor</string>
     <string name="swipe_tuning_inflections">Inflection weights</string>
     <string name="swipe_tuning_summary">How much the decoder trusts the points where your finger turns, stops or slows down, and how much of a word\'s score comes from those points rather than from the overall shape. Try a setting for a while: the results below show how each one did for you.</string>
     <string name="swipe_tuning_turns">Turns</string>

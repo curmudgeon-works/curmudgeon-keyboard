@@ -36,7 +36,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.BuildConfig
+import helium314.keyboard.latin.gesture.OwnGestureDecoder
 import helium314.keyboard.latin.utils.JniUtils
+import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.SubtypeLocaleUtils.displayName
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.NextScreenIcon
@@ -93,13 +95,13 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
     Column(modifier) {
     // this keyboard's languages, layout, dictionaries, popup order ...
     if (showLanguages) Preference(
-        name = stringResource(R.string.language_and_layouts_title),
+        name = stringResource(R.string.languages_title),
         description = keyboardName(keyboard, ctx),
         onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Languages + keyboard.toPref()) },
         icon = R.drawable.ic_settings_languages
     ) { NextScreenIcon() }
-    // the keyboard's layout, popups, number row and hints
-    if (showLanguages) Preference(
+    // the keyboard's layout, popups, number row and hints (on the main screen: the keyboard in use)
+    Preference(
         name = stringResource(R.string.layout_title),
         onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Subtype + keyboard.toPref()) },
         icon = R.drawable.ic_settings_layout
@@ -119,10 +121,18 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
         onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Toolbar) },
         icon = R.drawable.ic_settings_toolbar
     ) { NextScreenIcon() }
-    if (JniUtils.sHaveGestureLib || BuildConfig.USE_OWN_GESTURE_DECODER)
+    // with the own decoder, gesture typing's items are on the Swiping screen
+    if (JniUtils.sHaveGestureLib && !BuildConfig.USE_OWN_GESTURE_DECODER)
         Preference(
             name = stringResource(R.string.settings_screen_gesture),
             onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.GestureTyping) },
+            icon = R.drawable.ic_settings_gesture
+        ) { NextScreenIcon() }
+    // the own decoder: gesture typing, the swipe extras and the tuning in one screen
+    if (BuildConfig.USE_OWN_GESTURE_DECODER)
+        Preference(
+            name = stringResource(R.string.swipe_screen),
+            onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.SwipeTuning + keyboard.toPref()) },
             icon = R.drawable.ic_settings_gesture
         ) { NextScreenIcon() }
     // we don't even show the menu if data gathering phase ended more than 2 weeks ago
@@ -136,11 +146,6 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
         name = stringResource(R.string.settings_screen_correction),
         onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.TextCorrection) },
         icon = R.drawable.ic_settings_correction
-    ) { NextScreenIcon() }
-    if (advanced) Preference(
-        name = stringResource(R.string.settings_screen_secondary_layouts),
-        onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Layouts) },
-        icon = R.drawable.ic_ime_switcher
     ) { NextScreenIcon() }
     Preference(
         name = stringResource(R.string.dictionary_settings_category),

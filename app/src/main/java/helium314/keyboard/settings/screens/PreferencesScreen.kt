@@ -51,7 +51,8 @@ fun PreferencesScreen(
     val b = (LocalContext.current.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
     if ((b?.value ?: 0) < 0)
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
-    val items = preferencesItems(prefs)
+    // input and clipboard history; the additional keys are on each keyboard's Layout screen
+    val items = preferencesInputItems(prefs) + clipboardHistoryItems(prefs)
     SearchSettingsScreen(
         onClickBack = onClickBack,
         title = stringResource(R.string.settings_screen_preferences),
@@ -60,16 +61,11 @@ fun PreferencesScreen(
     )
 }
 
-/** The Preferences screen's items; the keyboard's Layout screen shows the same list at its end. */
-fun preferencesItems(prefs: SharedPreferences): List<Any?> {
-    val clipboardHistoryEnabled = prefs.getBoolean(Settings.PREF_ENABLE_CLIPBOARD_HISTORY, Defaults.PREF_ENABLE_CLIPBOARD_HISTORY)
-    return listOf(
+/** The input group; hints, the symbol map, the per-key popups (which replaced the popup order) and the TLD popups
+ *  are on the Layout screen. */
+private fun preferencesInputItems(prefs: SharedPreferences): List<Any?> =
+    listOf(
         R.string.settings_category_input,
-        Settings.PREF_SHOW_HINTS,
-        Settings.PREF_POPUP_KEYS_ORDER,
-        Settings.PREF_SHOW_POPUP_HINTS,
-        Settings.PREF_SHOW_TLD_POPUP_KEYS,
-        Settings.PREF_SYMBOL_POPUP_MAP,
         Settings.PREF_POPUP_ON,
         if (AudioAndHapticFeedbackManager.getInstance().hasVibrator())
             Settings.PREF_VIBRATE_ON else null,
@@ -82,18 +78,11 @@ fun preferencesItems(prefs: SharedPreferences): List<Any?> {
             Settings.PREF_KEYPRESS_SOUND_VOLUME else null,
         Settings.PREF_SAVE_SUBTYPE_PER_APP,
         Settings.PREF_SHOW_EMOJI_DESCRIPTIONS,
-        R.string.settings_category_additional_keys,
-        Settings.PREF_SHOW_NUMBER_ROW,
-        if (SubtypeSettings.getEnabledSubtypes(true).any { it.locale().language in localesWithLocalizedNumberRow })
-            Settings.PREF_LOCALIZED_NUMBER_ROW else null,
-        if (prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW))
-            Settings.PREF_SHOW_NUMBER_ROW_HINTS else null,
-        if (!prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW))
-            Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS else null,
-        Settings.PREF_SHOW_LANGUAGE_SWITCH_KEY,
-        Settings.PREF_LANGUAGE_SWITCH_KEY,
-        Settings.PREF_SHOW_EMOJI_KEY,
-        Settings.PREF_REMOVE_REDUNDANT_POPUPS,
+    )
+
+private fun clipboardHistoryItems(prefs: SharedPreferences): List<Any?> {
+    val clipboardHistoryEnabled = prefs.getBoolean(Settings.PREF_ENABLE_CLIPBOARD_HISTORY, Defaults.PREF_ENABLE_CLIPBOARD_HISTORY)
+    return listOf(
         R.string.settings_category_clipboard_history,
         Settings.PREF_ENABLE_CLIPBOARD_HISTORY,
         if (clipboardHistoryEnabled) Settings.PREF_CLIPBOARD_HISTORY_RETENTION_TIME else null,
