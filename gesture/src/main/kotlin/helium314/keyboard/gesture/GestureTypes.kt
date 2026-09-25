@@ -20,8 +20,11 @@ data class KeyInfo(
     val height: Float,
 )
 
-/** Minimal keyboard-geometry holder with the lookups the decoder needs. */
-class KeyboardGeometry(val keys: List<KeyInfo>) {
+/**
+ * Minimal keyboard-geometry holder with the lookups the decoder needs. With [apostropheViaPeriod] off, apostrophes
+ * are not gestured at all: words skip over them ("dont" swipes "don't"), see [isSkippedWordChar].
+ */
+class KeyboardGeometry(val keys: List<KeyInfo>, val apostropheViaPeriod: Boolean = true) {
     private val byChar: Map<Char, KeyInfo> = keys.associateBy { it.char }
 
     /** Typical key width/height, used as the natural distance unit of the decoder. */
@@ -39,9 +42,12 @@ class KeyboardGeometry(val keys: List<KeyInfo>) {
      * the keyboard has no key for the character (word not gesture-decodable here).
      */
     fun keyForWordChar(c: Char): KeyInfo? = when (c) {
-        '\'', '’' -> byChar[PERIOD_KEY_CHAR]
+        '\'', '’' -> if (apostropheViaPeriod) byChar[PERIOD_KEY_CHAR] else null
         else -> byChar[c.lowercaseChar()]
     }
+
+    /** A word character without a place on the path: an apostrophe when it isn't swiped via the period key. */
+    fun isSkippedWordChar(c: Char): Boolean = !apostropheViaPeriod && (c == '\'' || c == '’')
 
     fun nearestKey(x: Float, y: Float): KeyInfo? = keys.minByOrNull { distSq(it, x, y) }
 
@@ -214,6 +220,7 @@ object SokgraphBuilder {
         var prev: Char? = null
         for (c in word) {
             val lc = c.lowercaseChar()
+            if (geometry.isSkippedWordChar(lc)) continue // not on the path; the letters either side join up
             if (lc == prev) {
                 // collapse consecutive identical letters, mark as double
                 val last = pts.removeAt(pts.size - 1)

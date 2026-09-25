@@ -3,6 +3,7 @@ package helium314.keyboard.latin.gesture
 
 import android.content.SharedPreferences
 import android.os.SystemClock
+import helium314.keyboard.gesture.DecoderConfig
 import helium314.keyboard.gesture.GestureDecoder
 import helium314.keyboard.gesture.GesturePoint
 import helium314.keyboard.gesture.GesturePreprocessor
@@ -87,21 +88,23 @@ object OwnGestureDecoder {
         private set
 
     private var scorers: List<Scorer> = listOf(HybridScorer(), KushlerScorer(), Shark2Scorer())
-    // the caps height and the tuning are part of the immutable configs, so the decoder is rebuilt when they change
+    // the caps settings and the tuning are part of the immutable configs, so the decoder is rebuilt when they change
     private var decoderCapsHeight = Float.NaN
+    private var decoderCapsSwipe = true
     private var decoderTuning: Tuning? = null
     private var decoder = GestureDecoder(HybridScorer()) // ctor scorer unused by decodeWithScorers
 
     @Synchronized
-    private fun decoderFor(capsHeight: Float, tuning: Tuning): GestureDecoder {
-        if (capsHeight != decoderCapsHeight || tuning != decoderTuning) {
+    private fun decoderFor(capsHeight: Float, capsSwipe: Boolean, tuning: Tuning): GestureDecoder {
+        if (capsHeight != decoderCapsHeight || capsSwipe != decoderCapsSwipe || tuning != decoderTuning) {
             val hybrid = HybridScorer(kushlerWeight = tuning.kushler, shark2Weight = 1f - tuning.kushler)
             scorers = listOf(hybrid, KushlerScorer(), Shark2Scorer())
-            decoder = GestureDecoder(hybrid,
+            decoder = GestureDecoder(hybrid, DecoderConfig(capsExcursions = capsSwipe),
                 preprocessor = GesturePreprocessor(PreprocessorConfig(excursionMinHeightKeyHeights = capsHeight,
                     turnConfidenceScale = tuning.turn, pauseConfidence = tuning.pause, pauseDtFactor = 2.5f,
                     slowdownConfidence = tuning.slowdown)))
             decoderCapsHeight = capsHeight
+            decoderCapsSwipe = capsSwipe
             decoderTuning = tuning
         }
         return decoder
@@ -110,6 +113,7 @@ object OwnGestureDecoder {
     // keyboard geometry cache — keyboards change with layout/rotation, so cache per instance
     private var cachedKeyboardRef: WeakReference<Keyboard>? = null
     private var cachedGeometry: KeyboardGeometry? = null
+    private var cachedApostropheViaPeriod = true
 
     // phony source dict per locale so results look main-dict-sourced like native gesture results
     private var cachedSourceDict: DecoderSourceDictionary? = null
@@ -130,8 +134,11 @@ object OwnGestureDecoder {
         val locale = locales.first()
         val points = adaptPointers(composedData)
         if (points.size < 2) return results
-        val geometry = geometryFor(keyboard) ?: return results
         val prefs = Settings.getCurrentContext()?.prefs()
+        val apostropheViaPeriod = prefs?.getBoolean(Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD, Defaults.PREF_GESTURE_APOSTROPHE_VIA_PERIOD)
+            ?: Defaults.PREF_GESTURE_APOSTROPHE_VIA_PERIOD
+        val capsSwipe = prefs?.getBoolean(Settings.PREF_GESTURE_CAPS_SWIPE, Defaults.PREF_GESTURE_CAPS_SWIPE) ?: Defaults.PREF_GESTURE_CAPS_SWIPE
+        val geometry = geometryFor(keyboard, apostropheViaPeriod) ?: return results
         val tuning = prefs?.let { Tuning.read(it) } ?: Tuning.DEFAULT
         currentTuning = tuning
         GestureDecoderVocabulary.historyBoost = tuning.historyBoost
@@ -147,7 +154,7 @@ object OwnGestureDecoder {
         }
 
         val start = SystemClock.elapsedRealtime()
-        val all = decoderFor(capsHeight, tuning).decodeWithScorers(points, geometry, vocabulary, scorers, MAX_RESULTS)
+        val all = decoderFor(capsHeight, capsSwipe, tuning).decodeWithScorers(points, geometry, vocabulary, scorers, MAX_RESULTS)
         val elapsed = SystemClock.elapsedRealtime() - start
 
         val activeName = if (activeScorerPref != null && all.containsKey(activeScorerPref)) activeScorerPref
@@ -191,8 +198,8 @@ object OwnGestureDecoder {
     }
 
     @Synchronized
-    private fun geometryFor(keyboard: Keyboard): KeyboardGeometry? {
-        if (cachedKeyboardRef?.get() === keyboard) return cachedGeometry
+    private fun geometryFor(keyboard: Keyboard, apostropheViaPeriod: Boolean): KeyboardGeometry? {
+        if (cachedKeyboardRef?.get() === keyboard && cachedApostropheViaPeriod == apostropheViaPeriod) return cachedGeometry
         val seen = HashSet<Char>()
         val keys = ArrayList<KeyInfo>()
         for (key in keyboard.sortedKeys) {
@@ -208,9 +215,10 @@ object OwnGestureDecoder {
                 key.width.toFloat(), key.height.toFloat()))
         }
         if (keys.size < 5) return null // not a letter keyboard
-        val geometry = KeyboardGeometry(keys)
+        val geometry = KeyboardGeometry(keys, apostropheViaPeriod)
         cachedKeyboardRef = WeakReference(keyboard)
         cachedGeometry = geometry
+        cachedApostropheViaPeriod = apostropheViaPeriod
         return geometry
     }
 

@@ -41,6 +41,8 @@ class DecoderConfig(
     val startPenaltyShare: Float = 1f,
     /** Pen-up radius (key widths) when it should be tighter than [endpointRadiusKeyWidths]; null = the same. */
     val penUpRadiusKeyWidths: Float? = null,
+    /** Capitalize the letter a swipe leaves the keyboard upwards from (the excursion is stripped from the path either way). */
+    val capsExcursions: Boolean = true,
 )
 
 class GestureDecoder(
@@ -79,7 +81,7 @@ class GestureDecoder(
 
         // caps-excursion: uppercase the letter matched nearest before each excursion.
         // Applied once per candidate, shared by all scorers (post-scoring display form).
-        val displayWords = candidates.map { applyExcursionCaps(it, gesture, geometry) }
+        val displayWords = candidates.map { if (config.capsExcursions) applyExcursionCaps(it, gesture, geometry) else it.sokgraph.word }
 
         val maxFreq = vocabulary.maxFrequency.toFloat()
         for (s in scorers) {
@@ -177,6 +179,13 @@ class GestureDecoder(
         // with letters required to progress (with slack) along the path
         fun walk(node: Vocabulary.Node, c: Char, arcPos: Float, depth: Int) {
             if (out.size >= config.maxCandidates) return
+            if (geometry.isSkippedWordChar(c)) {
+                // not on the path: holds the previous letter's position (a word can't end here, its last key is a letter)
+                arcStack.add(arcPos)
+                for (i in 0 until node.childCount) walk(node.childAt(i), node.childCharAt(i), arcPos, depth + 1)
+                arcStack.removeAt(arcStack.size - 1)
+                return
+            }
             val key = geometry.keyForWordChar(c) ?: return
             // corridor check: key must be near the drawn path at all
             if (distToPath(c) > corridorRadius) return
