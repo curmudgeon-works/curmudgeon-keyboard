@@ -1317,11 +1317,13 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         callListenerOnCodeInput(key, code, mKeyX, mKeyY, SystemClock.uptimeMillis(), true);
     }
 
-    // Backspace word-delete cadence: first word after BACKSPACE_FIRST_DELAY_MS, then
-    // one word every BACKSPACE_REPEAT_INTERVAL_MS while held. Other repeatable keys
+    // Backspace hold cadence: first deletion (a word, or a character if so set) after BACKSPACE_FIRST_DELAY_MS, then
+    // one every Settings.PREF_BACKSPACE_REPEAT_INTERVAL ms while held. Other repeatable keys
     // continue to use the global mKeyRepeatStartTimeout / mKeyRepeatInterval.
     private static final int BACKSPACE_FIRST_DELAY_MS = 300;
-    private static final int BACKSPACE_REPEAT_INTERVAL_MS = 200;
+    // with the speed-up on: after the set time of holding, the interval ramps to the top speed over this long
+    private static final int BACKSPACE_SPEED_UP_RAMP_MS = 1000;
+    private long mBackspaceHoldStart;
 
     private void startKeyRepeatTimer(final int repeatCount) {
         // At repeatCount == 1 the repeat hasn't fired yet, so mCurrentRepeatingKeyCode
@@ -1332,13 +1334,23 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         final boolean isDelete = keyCode == KeyCode.DELETE;
         final int delay;
         if (repeatCount == 1) {
+            if (isDelete) mBackspaceHoldStart = SystemClock.uptimeMillis();
             delay = isDelete ? BACKSPACE_FIRST_DELAY_MS : sParams.mKeyRepeatStartTimeout;
         } else if (isDelete) {
-            delay = BACKSPACE_REPEAT_INTERVAL_MS;
+            delay = backspaceInterval(Settings.getValues(), SystemClock.uptimeMillis() - mBackspaceHoldStart);
         } else {
             delay = sParams.mKeyRepeatInterval;
         }
         sTimerProxy.startKeyRepeatTimerOf(this, repeatCount, delay);
+    }
+
+    /** The interval between deletions [held] ms into holding backspace: the set one, ramping to the top speed if on. */
+    private static int backspaceInterval(final helium314.keyboard.latin.settings.SettingsValues sv, final long held) {
+        final int start = sv.mBackspaceRepeatInterval;
+        if (!sv.mBackspaceSpeedUp || sv.mBackspaceTopInterval >= start || held <= sv.mBackspaceSpeedUpAfter)
+            return start;
+        final float t = Math.min(1f, (held - sv.mBackspaceSpeedUpAfter) / (float) BACKSPACE_SPEED_UP_RAMP_MS);
+        return Math.round(start + (sv.mBackspaceTopInterval - start) * t);
     }
 
     private void printTouchEvent(final String title, final int x, final int y,

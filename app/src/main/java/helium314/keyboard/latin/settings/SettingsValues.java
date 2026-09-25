@@ -158,6 +158,12 @@ public class SettingsValues {
     public final boolean mAutoCorrectEnabled;
     public final float mAutoCorrectionThreshold;
     public final boolean mBackspaceRevertsAutocorrect;
+    public final boolean mBackspaceHoldDeletesWords;
+    public final boolean mBackspaceDeletesSwipedWord;
+    public final int mBackspaceRepeatInterval;
+    public final boolean mBackspaceSpeedUp;
+    public final int mBackspaceSpeedUpAfter;
+    public final int mBackspaceTopInterval;
     public final int mScoreLimitForAutocorrect;
     public final boolean mAutoCorrectShortcuts;
     private final boolean mSuggestionsEnabledPerUserSettings;
@@ -228,6 +234,12 @@ public class SettingsValues {
                 : (mAutoCorrectionThreshold < 0.07 ? 800000 : 950000); // aggressive or modest
         mAutoCorrectShortcuts = prefs.getBoolean(Settings.PREF_AUTOCORRECT_SHORTCUTS, Defaults.PREF_AUTOCORRECT_SHORTCUTS);
         mBackspaceRevertsAutocorrect = prefs.getBoolean(Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT, Defaults.PREF_BACKSPACE_REVERTS_AUTOCORRECT);
+        mBackspaceHoldDeletesWords = prefs.getBoolean(Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS, Defaults.PREF_BACKSPACE_HOLD_DELETES_WORDS);
+        mBackspaceDeletesSwipedWord = prefs.getBoolean(Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD, Defaults.PREF_BACKSPACE_DELETES_SWIPED_WORD);
+        mBackspaceRepeatInterval = prefs.getInt(Settings.PREF_BACKSPACE_REPEAT_INTERVAL, Defaults.PREF_BACKSPACE_REPEAT_INTERVAL);
+        mBackspaceSpeedUp = prefs.getBoolean(Settings.PREF_BACKSPACE_SPEED_UP, Defaults.PREF_BACKSPACE_SPEED_UP);
+        mBackspaceSpeedUpAfter = prefs.getInt(Settings.PREF_BACKSPACE_SPEED_UP_AFTER, Defaults.PREF_BACKSPACE_SPEED_UP_AFTER);
+        mBackspaceTopInterval = prefs.getInt(Settings.PREF_BACKSPACE_TOP_INTERVAL, Defaults.PREF_BACKSPACE_TOP_INTERVAL);
         mBigramPredictionEnabled = prefs.getBoolean(Settings.PREF_BIGRAM_PREDICTIONS, Defaults.PREF_BIGRAM_PREDICTIONS);
         mSuggestPunctuation = prefs.getBoolean(Settings.PREF_SUGGEST_PUNCTUATION, Defaults.PREF_SUGGEST_PUNCTUATION);
         mSuggestClipboardContent = prefs.getBoolean(Settings.PREF_SUGGEST_CLIPBOARD_CONTENT, Defaults.PREF_SUGGEST_CLIPBOARD_CONTENT);

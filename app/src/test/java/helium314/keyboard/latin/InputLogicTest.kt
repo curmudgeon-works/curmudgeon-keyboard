@@ -1176,6 +1176,13 @@ class ShadowFacilitator2 {
                          blockPotentiallyOffensive: Boolean) {
         lastAddedWord = suggestion
     }
+    // a picked suggestion is learned with extra uses
+    @Implementation
+    fun addToUserHistory(suggestion: String, wasAutoCapitalized: Boolean,
+                         ngramContext: NgramContext, timeStampInSeconds: Long,
+                         blockPotentiallyOffensive: Boolean, extraUses: Int) {
+        lastAddedWord = suggestion
+    }
     companion object {
         var lastAddedWord = ""
     }
