@@ -5,6 +5,7 @@
  */
 package helium314.keyboard.latin
 
+import helium314.keyboard.latin.gesture.GestureDecoderVocabulary
 import android.Manifest
 import android.content.Context
 import android.provider.UserDictionary
@@ -296,6 +297,11 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
     override fun addToUserHistory(
         suggestion: String, wasAutoCapitalized: Boolean, ngramContext: NgramContext,
         timeStampInSeconds: Long, blockPotentiallyOffensive: Boolean
+    ) = addToUserHistory(suggestion, wasAutoCapitalized, ngramContext, timeStampInSeconds, blockPotentiallyOffensive, 0)
+
+    override fun addToUserHistory(
+        suggestion: String, wasAutoCapitalized: Boolean, ngramContext: NgramContext,
+        timeStampInSeconds: Long, blockPotentiallyOffensive: Boolean, extraUses: Int
     ) {
         // Update the spelling cache before learning. Words that are not yet added to user history
         // and appear in no other language model are not considered valid.
@@ -327,7 +333,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
             // add to history for preferred dictionary group, to avoid mixing languages in history
             addWordToUserHistory(
                 preferredGroup, ngramContextForCurrentWord, currentWord,
-                wasCurrentWordAutoCapitalized, timeStampInSeconds.toInt(), blockPotentiallyOffensive
+                wasCurrentWordAutoCapitalized, timeStampInSeconds.toInt(), blockPotentiallyOffensive, extraUses
             )
             ngramContextForCurrentWord = ngramContextForCurrentWord.getNextNgramContext(WordInfo(currentWord))
 
@@ -340,7 +346,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
 
     private fun addWordToUserHistory(
         dictionaryGroup: DictionaryGroup, ngramContext: NgramContext, word: String, wasAutoCapitalized: Boolean,
-        timeStampInSeconds: Int, blockPotentiallyOffensive: Boolean
+        timeStampInSeconds: Int, blockPotentiallyOffensive: Boolean, extraUses: Int = 0
     ) {
         val userHistoryDictionary = dictionaryGroup.getSubDict(Dictionary.TYPE_USER_HISTORY) ?: return
 
@@ -393,6 +399,12 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         // We don't add words with 0-frequency (assuming they would be profanity etc.).
         val isValid = mainFreq > 0
         UserHistoryDictionary.addToDictionary(userHistoryDictionary, ngramContext, wordToUse, isValid, timeStampInSeconds)
+        // each further use raises the word's level once more (the word alone: the word pair was counted above)
+        repeat(extraUses) {
+            UserHistoryDictionary.addToDictionary(userHistoryDictionary, NgramContext.EMPTY_PREV_WORDS_INFO, wordToUse, isValid, timeStampInSeconds)
+        }
+        if (BuildConfig.USE_OWN_GESTURE_DECODER)
+            GestureDecoderVocabulary.onWordLearned(userHistoryDictionary.mContext, dictionaryGroup.locale, wordToUse)
     }
 
     private fun addToPersonalDictionaryIfInvalidButInHistory(word: String) {

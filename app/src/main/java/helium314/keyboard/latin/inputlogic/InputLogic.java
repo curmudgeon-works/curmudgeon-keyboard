@@ -485,6 +485,7 @@ public final class InputLogic {
             final String currentKeyboardScript, final LatinIME.UIHandler handler) {
         mWordBeingCorrectedByCursor = null;
         mJustRevertedACommit = false;
+        final LastComposedWord lastComposedWordBefore = mLastComposedWord;
         final Event processedEvent = mWordComposer.processEvent(event);
         final InputTransaction inputTransaction = new InputTransaction(settingsValues,
                 processedEvent, SystemClock.uptimeMillis(), mSpaceState,
@@ -536,8 +537,12 @@ public final class InputLogic {
                 && processedEvent.getKeyCode() != KeyCode.CAPS_LOCK
                 && processedEvent.getKeyCode() != KeyCode.SYMBOL_ALPHA
                 && processedEvent.getKeyCode() != KeyCode.ALPHA
-                && processedEvent.getKeyCode() != KeyCode.SYMBOL)
+                && processedEvent.getKeyCode() != KeyCode.SYMBOL) {
             mLastComposedWord.deactivate();
+            // a swiped word keeps its strip for a backspace right after the space that committed it (the
+            // deactivation above comes with that space already); any later event ends that
+            if (mLastComposedWord == lastComposedWordBefore) mLastComposedWord.mBatchSuggestedWords = null;
+        }
         if (KeyCode.DELETE != processedEvent.getKeyCode()) {
             mEnteredText = null;
         }
@@ -1411,6 +1416,21 @@ public final class InputLogic {
                 }
                 return;
             }
+            // swipe, space, backspace: the swiped word comes back with the strip it had after the swipe (the revert above
+            // only covers a commit that differs from the swiped word, and the regular path below would look it up as typed)
+            if (mLastComposedWord.canRestoreBatchWord()) {
+                final String committedWord = mLastComposedWord.mCommittedWord.toString();
+                final CharSequence before = mConnection.getTextBeforeCursor(committedWord.length() + 1, 0);
+                if (before != null && TextUtils.equals(before, committedWord + Constants.STRING_SPACE)
+                        && inputTransaction.getSettingsValues().mSpacingAndPunctuations.mCurrentLanguageHasSpaces) {
+                    final SuggestedWords batchSuggestedWords = mLastComposedWord.mBatchSuggestedWords;
+                    mLastComposedWord = LastComposedWord.NOT_A_COMPOSED_WORD;
+                    mConnection.deleteTextBeforeCursor(1);
+                    StatsUtils.onBackspacePressed(1);
+                    resumeBatchWord(committedWord, batchSuggestedWords);
+                    return;
+                }
+            }
             // todo: this is currently disabled, as it causes inconsistencies with textInput, depending whether the end
             //  is part of a word (where we start composing) or not (where we end in code below)
             //  see https://github.com/HeliBorg/HeliBoard/issues/1019
@@ -1788,6 +1808,14 @@ public final class InputLogic {
 
     private void performAdditionToUserHistoryDictionary(final SettingsValues settingsValues,
             final String suggestion, @NonNull final NgramContext ngramContext) {
+        performAdditionToUserHistoryDictionary(settingsValues, suggestion, ngramContext, 0);
+    }
+
+    /** A word picked from the suggestions counts as this many more uses: it jumps up the ranking, more with each pick. */
+    private static final int PICKED_SUGGESTION_EXTRA_USES = 3;
+
+    private void performAdditionToUserHistoryDictionary(final SettingsValues settingsValues,
+            final String suggestion, @NonNull final NgramContext ngramContext, final int extraUses) {
         // If correction is not enabled, we don't add words to the user history dictionary.
         // That's to avoid unintended additions in some sensitive fields, or fields that
         // expect to receive non-words.
@@ -1811,7 +1839,7 @@ public final class InputLogic {
         }
         final int timeStampInSeconds = (int)TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis());
         mDictionaryFacilitator.addToUserHistory(word, wasAutoCapitalized, ngramContext,
-                timeStampInSeconds, settingsValues.mBlockPotentiallyOffensive);
+                timeStampInSeconds, settingsValues.mBlockPotentiallyOffensive, extraUses);
     }
 
     // strip word separators from end (may be necessary for urls, e.g. when the user has typed
@@ -2586,7 +2614,8 @@ public final class InputLogic {
             startTimeMillis = SystemClock.elapsedRealtime();
         }
         // Add the word to the user history dictionary
-        performAdditionToUserHistoryDictionary(settingsValues, chosenWord, ngramContext);
+        performAdditionToUserHistoryDictionary(settingsValues, chosenWord, ngramContext,
+                commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK ? PICKED_SUGGESTION_EXTRA_USES : 0);
         if (DebugFlags.DEBUG_ENABLED) {
             long runTimeMillis = SystemClock.elapsedRealtime() - startTimeMillis;
             Log.d(TAG, "commitChosenWord() : " + runTimeMillis + " ms to run "

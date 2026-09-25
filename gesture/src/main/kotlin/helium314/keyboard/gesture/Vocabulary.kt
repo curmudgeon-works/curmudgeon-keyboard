@@ -9,48 +9,52 @@ package helium314.keyboard.gesture
 class Vocabulary(entries: Iterable<Pair<String, Int>>) {
 
     class Node {
-        var word: String? = null
+        @Volatile var word: String? = null
             internal set
-        var frequency: Int = 0
+        @Volatile var frequency: Int = 0
             internal set
-        private var childChars = EMPTY_CHARS
-        private var childNodes = EMPTY_NODES
+        // chars and nodes in one immutable holder, replaced in a single write: a learned word can be added while a
+        // swipe is being decoded on another thread, and a reader never sees chars and nodes of different sizes
+        // (children are only ever appended, so an index read from an older holder stays valid in a newer one)
+        private class Children(val chars: CharArray, val nodes: Array<Node?>)
+        @Volatile private var children = EMPTY
 
-        val childCount: Int get() = childChars.size
-        fun childCharAt(i: Int): Char = childChars[i]
-        fun childAt(i: Int): Node = childNodes[i]!!
+        val childCount: Int get() = children.chars.size
+        fun childCharAt(i: Int): Char = children.chars[i]
+        fun childAt(i: Int): Node = children.nodes[i]!!
 
         fun child(c: Char): Node? {
-            val chars = childChars
-            for (i in chars.indices) if (chars[i] == c) return childNodes[i]
+            val ch = children
+            for (i in ch.chars.indices) if (ch.chars[i] == c) return ch.nodes[i]
             return null
         }
 
         internal fun getOrPut(c: Char): Node {
             child(c)?.let { return it }
             val node = Node()
-            val n = childChars.size
-            childChars = childChars.copyOf(n + 1).also { it[n] = c }
-            childNodes = childNodes.copyOf(n + 1).also { it[n] = node }
+            val ch = children
+            val n = ch.chars.size
+            children = Children(ch.chars.copyOf(n + 1).also { it[n] = c }, ch.nodes.copyOf(n + 1).also { it[n] = node })
             return node
         }
 
         companion object {
-            private val EMPTY_CHARS = CharArray(0)
-            private val EMPTY_NODES = arrayOfNulls<Node>(0)
+            private val EMPTY = Children(CharArray(0), arrayOfNulls(0))
         }
     }
 
     val root = Node()
-    var maxFrequency: Int = 1
+    @Volatile var maxFrequency: Int = 1
         private set
-    var size: Int = 0
+    @Volatile var size: Int = 0
         private set
 
     init {
         for ((word, freq) in entries) add(word, freq)
     }
 
+    /** Adds a word or raises its frequency. Safe while other threads read the trie; callers must not add concurrently. */
+    @Synchronized
     fun add(word: String, frequency: Int) {
         if (word.isEmpty() || frequency <= 0) return
         var node = root
@@ -59,8 +63,8 @@ class Vocabulary(entries: Iterable<Pair<String, Int>>) {
         // keep the casing of the highest-frequency variant (trie keys are lowercased,
         // stored words keep original casing so e.g. proper nouns display correctly)
         if (frequency >= node.frequency) {
-            node.word = word
             node.frequency = frequency
+            node.word = word // last: a reader that sees the word sees its frequency
         }
         if (frequency > maxFrequency) maxFrequency = frequency
     }

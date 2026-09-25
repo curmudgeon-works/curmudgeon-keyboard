@@ -61,6 +61,11 @@ object GestureDecoderVocabulary {
     // main-dict entries per locale, kept so multilingual vocabularies can be merged from them
     private val mainEntries = ConcurrentHashMap<String, List<Pair<String, Int>>>()
     private val merged = ConcurrentHashMap<String, Vocabulary>()
+    // the languages of each merged vocabulary, so a newly learned word can go in with its language's weight
+    private val mergedSpecs = ConcurrentHashMap<String, List<LocaleSpec>>()
+    // learned words go into the live vocabularies one at a time, off the typing thread
+    private val learnExecutor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor { Thread(it, "GestureVocabLearn") }
+    private const val LEARN_DELAY_MS = 1000L // the user-history write is asynchronous too: read the word's new weight after it
 
     /** One language of a multilingual keyboard: its score factor from the priority setting, and whether its learned words count for every language. */
     class LocaleSpec(val locale: Locale, val factor: Float, val sharesHistory: Boolean) {
@@ -97,6 +102,7 @@ object GestureDecoderVocabulary {
         if (vocab.size == 0) return null
         Log.d(TAG, "merged vocabulary for $key: ${vocab.size} words")
         merged[key] = vocab
+        mergedSpecs[key] = specs
         return vocab
     }
 
@@ -128,6 +134,30 @@ object GestureDecoderVocabulary {
     fun clear() {
         cache.clear()
         merged.clear()
+        mergedSpecs.clear()
+    }
+
+    /**
+     * A word was just learned into [locale]'s user history: put it into the vocabularies already built (they only read
+     * user history when they are built, so a new word could otherwise not be swiped until the next rebuild).
+     */
+    fun onWordLearned(context: Context, locale: Locale, word: String) {
+        if (!isDecodableWord(word)) return
+        learnExecutor.schedule({
+            try {
+                val probability = PersonalizationHelper.getUserHistoryDictionary(context, locale).getFrequency(word)
+                if (probability <= 0) return@schedule
+                val freq = (probability + historyBoost).coerceIn(1, 255)
+                val tag = locale.toLanguageTag()
+                cache[tag]?.add(word, freq)
+                for ((key, vocab) in merged) {
+                    val spec = mergedSpecs[key]?.firstOrNull { it.locale.toLanguageTag() == tag } ?: continue
+                    vocab.add(word, (freq * (if (spec.sharesHistory) 1f else spec.factor)).toInt().coerceAtLeast(MIN_PROBABILITY))
+                }
+            } catch (t: Throwable) {
+                Log.w(TAG, "could not add learned word to the gesture vocabulary", t)
+            }
+        }, LEARN_DELAY_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
     }
 
     private fun loadOrBuild(locale: Locale, key: String) {
