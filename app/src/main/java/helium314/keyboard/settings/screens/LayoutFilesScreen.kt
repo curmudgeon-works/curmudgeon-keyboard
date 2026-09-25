@@ -1,0 +1,161 @@
+// SPDX-License-Identifier: GPL-3.0-only
+package helium314.keyboard.settings.screens
+
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Tab
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import helium314.keyboard.keyboard.KeyboardSwitcher
+import helium314.keyboard.latin.R
+import helium314.keyboard.latin.settings.Defaults.default
+import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.utils.BackButton
+import helium314.keyboard.latin.utils.LayoutType
+import helium314.keyboard.latin.utils.LayoutType.Companion.displayNameId
+import helium314.keyboard.latin.utils.LayoutUtils
+import helium314.keyboard.latin.utils.LayoutUtilsCustom
+import helium314.keyboard.latin.utils.getActivity
+import helium314.keyboard.latin.utils.prefs
+import helium314.keyboard.settings.SettingsActivity
+import org.json.JSONObject
+
+/** The layouts edited here, one tab each: everything but the letters (own picker) and the symbols pages (popup editor). */
+private val LAYOUT_FILE_TYPES = listOf(
+    LayoutType.NUMBER_ROW, LayoutType.NUMBER, LayoutType.NUMPAD, LayoutType.NUMPAD_LANDSCAPE, LayoutType.PHONE,
+    LayoutType.PHONE_SYMBOLS, LayoutType.MORE_SYMBOLS, LayoutType.FUNCTIONAL, LayoutType.EMOJI_BOTTOM, LayoutType.CLIPBOARD_BOTTOM,
+)
+private const val FILE_FORMAT = "curmudgeon-layouts"
+
+/**
+ * The secondary layouts in one editor, a tab each, saved to and loaded from one file. Saving writes each changed
+ * layout as the user's own (one custom layout per kind) and makes it the default for all keyboards; a layout
+ * edited back to the built-in one returns to the built-in.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LayoutFilesScreen(onClickBack: () -> Unit) {
+    val ctx = LocalContext.current
+    val prefs = ctx.prefs()
+    val ownName = stringResource(R.string.layout_files_own_name)
+    fun builtIn(type: LayoutType) = LayoutUtils.getContent(type, type.default, ctx)
+    fun inUse(type: LayoutType): String {
+        val name = Settings.readDefaultLayoutName(type, prefs)
+        return if (!LayoutUtilsCustom.isCustomLayout(name)) LayoutUtils.getContent(type, name, ctx)
+            else LayoutUtilsCustom.getLayoutFile(name, type, ctx).takeIf { it.isFile }?.readText() ?: builtIn(type)
+    }
+    val saved = remember { mutableStateMapOf<LayoutType, String>().apply { LAYOUT_FILE_TYPES.forEach { put(it, inUse(it)) } } }
+    val texts = remember { mutableStateMapOf<LayoutType, String>().apply { putAll(saved) } }
+    var tab by rememberSaveable { mutableIntStateOf(0) }
+    val type = LAYOUT_FILE_TYPES[tab]
+    // checked as typed; the tabs show which layouts are changed (•) or broken (!)
+    val invalid = LAYOUT_FILE_TYPES.filter { t -> texts[t] != saved[t] && !LayoutUtilsCustom.checkLayout(texts[t]!!, ctx) }.toSet()
+    val changed = LAYOUT_FILE_TYPES.filter { texts[it] != saved[it] }
+
+    fun save() {
+        for (t in changed) {
+            val text = texts[t]!!
+            val name = LayoutUtilsCustom.getLayoutName(ownName, t)
+            if (text == builtIn(t)) {
+                Settings.writeDefaultLayoutName(null, t, prefs)
+                if (LayoutUtilsCustom.getLayoutFile(name, t, ctx).isFile) LayoutUtilsCustom.deleteLayout(name, t, ctx)
+            } else {
+                LayoutUtilsCustom.getLayoutFile(name, t, ctx).writeText(text)
+                Settings.writeDefaultLayoutName(name, t, prefs)
+            }
+            saved[t] = text
+        }
+        LayoutUtilsCustom.onLayoutFileChanged()
+        KeyboardSwitcher.getInstance().setThemeNeedsReload()
+        (ctx.getActivity() as? SettingsActivity)?.prefChanged()
+    }
+
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        val layouts = JSONObject()
+        LAYOUT_FILE_TYPES.forEach { layouts.put(it.name.lowercase(), texts[it]) }
+        val json = JSONObject().put("format", FILE_FORMAT).put("version", 1).put("layouts", layouts)
+        ctx.contentResolver.openOutputStream(uri)?.use { it.writer().apply { write(json.toString(2)); flush() } }
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        val loaded = runCatching {
+            val json = JSONObject(ctx.contentResolver.openInputStream(uri)!!.use { it.reader().readText() })
+            val layouts = json.getJSONObject("layouts")
+            LAYOUT_FILE_TYPES.mapNotNull { t -> layouts.optString(t.name.lowercase(), "").takeIf { it.isNotBlank() }?.let { t to it } }
+        }.getOrNull()
+        if (loaded.isNullOrEmpty()) Toast.makeText(ctx, R.string.layout_files_load_error, Toast.LENGTH_LONG).show()
+        else {
+            loaded.forEach { (t, text) -> texts[t] = text }
+            Toast.makeText(ctx, R.string.layout_files_loaded, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    Scaffold(
+        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
+        topBar = { TopAppBar(
+            title = { Text(stringResource(R.string.layout_files)) },
+            navigationIcon = { BackButton(onClickBack) },
+            actions = { Button(onClick = ::save, enabled = changed.isNotEmpty() && invalid.isEmpty(),
+                modifier = Modifier.padding(end = 8.dp)) { Text(stringResource(R.string.save)) } },
+        ) },
+    ) { innerPadding ->
+        Column(Modifier.fillMaxSize().padding(innerPadding)
+            .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)))) {
+            ScrollableTabRow(selectedTabIndex = tab, edgePadding = 8.dp) {
+                LAYOUT_FILE_TYPES.forEachIndexed { i, t ->
+                    val mark = if (t in invalid) " !" else if (t in changed) " •" else ""
+                    Tab(selected = i == tab, onClick = { tab = i }, text = { Text(stringResource(t.displayNameId) + mark) })
+                }
+            }
+            OutlinedTextField(
+                value = texts[type]!!,
+                onValueChange = { texts[type] = it },
+                modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 12.dp, vertical = 8.dp),
+                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, autoCorrectEnabled = false),
+                isError = type in invalid,
+                supportingText = { if (type in invalid) Text(stringResource(R.string.layout_files_invalid)) },
+            )
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
+                TextButton(onClick = { texts[type] = builtIn(type) }) { Text(stringResource(R.string.layout_files_builtin)) }
+                TextButton(onClick = { importLauncher.launch(arrayOf("application/json", "text/*", "*/*")) }) { Text(stringResource(R.string.layout_files_load)) }
+                TextButton(onClick = { exportLauncher.launch("curmudgeon_layouts.json") }) { Text(stringResource(R.string.layout_files_export)) }
+            }
+        }
+    }
+}

@@ -5,11 +5,13 @@ import android.content.Context
 import android.text.InputType
 import android.view.inputmethod.EditorInfo
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -18,6 +20,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -26,6 +29,15 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Tab
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.ExperimentalMaterial3Api
+import helium314.keyboard.latin.utils.BackButton
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -51,6 +63,10 @@ import helium314.keyboard.keyboard.Key
 import helium314.keyboard.keyboard.KeyboardId
 import helium314.keyboard.keyboard.KeyboardLayoutSet
 import helium314.keyboard.latin.R
+import helium314.keyboard.settings.SettingsDestination
+import helium314.keyboard.settings.SettingsMode
+import helium314.keyboard.latin.utils.DeleteButton
+import helium314.keyboard.settings.dialogs.ConfirmationDialog
 import helium314.keyboard.latin.RichInputMethodSubtype
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
@@ -98,16 +114,8 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
     val prefs = ctx.prefs()
     var generation by remember { mutableIntStateOf(0) }
     var showAccentsDialog by remember { mutableStateOf(false) }
-    val groups = remember(keyboard, generation) { keysWithPopups(ctx, keyboard) }
     val overrides = remember(generation) { KeyPopupOverrides.load(prefs) }
-    val unfolded = rememberSaveable(saver = listSaver(save = { it.toList() }, restore = { mutableStateListOf(*it.toTypedArray()) })) { mutableStateListOf<String>() }
     Column {
-        Text(
-            stringResource(R.string.key_popups_summary),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(vertical = 8.dp)
-        )
         // presets: the generated defaults for every key at once (the user's own per-key edits stay on top)
         val userSets = remember(generation) { KeyPopupOverrides.loadSets(ctx.realPrefs()) }
         val selectedUserSet = prefs.getString(KeyPopupOverrides.PREF_SELECTED_SET, null)?.let { name -> userSets.firstOrNull { it.name == name } }
@@ -134,39 +142,45 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
             ?: presets[0]
         // every arrangement belongs to a set of the user's own: into the selected one, or into a new one to be named
         fun storeInSet(name: String, all: Map<String, List<String>>) {
-            val set = KeyPopupOverrides.UserSet(name, accentsValue, symbolsLayout, all)
-            KeyPopupOverrides.saveSets(ctx.realPrefs(), userSets.filter { it.name != name } + set)
-            KeyPopupOverrides.save(prefs, all)
-            prefs.edit().putString(KeyPopupOverrides.PREF_SELECTED_SET, name).apply()
+            storePopupSet(ctx, name, accentsValue, symbolsLayout, all)
             generation++
-            reloadPreview()
-        }
-        fun applyChange(overrideKey: String, labels: List<String>?) {
-            val all = overrides.toMutableMap().also { if (labels == null) it.remove(overrideKey) else it[overrideKey] = labels }
-            if (selectedUserSet != null) storeInSet(selectedUserSet.name, all)
-            else { pendingChange = overrideKey to labels; showSaveAsDialog = true }
         }
         @Composable fun presetName(p: Preset) = p.userName ?: stringResource(p.name)
-        Row(verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().clickable { showAccentsDialog = true }.padding(vertical = 10.dp)) {
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.key_popups_presets), style = MaterialTheme.typography.bodyLarge)
-                Text(presetName(current), style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+        fun deleteSet(name: String) {
+            KeyPopupOverrides.saveSets(ctx.realPrefs(), userSets.filter { it.name != name })
+            if (name == selectedUserSet?.name) { // the keyboard falls back to the built-in arrangement
+                KeyPopupOverrides.save(prefs, emptyMap())
+                prefs.edit().remove(KeyPopupOverrides.PREF_SELECTED_SET).apply()
+                reloadPreview()
             }
-            NextScreenIcon()
+            generation++
         }
-        Row(modifier = Modifier.fillMaxWidth().padding(start = 12.dp)) {
-            if (current.userName != null) {
-                TextButton(onClick = { pendingChange = null; showSaveAsDialog = true }) { Text(stringResource(R.string.key_popups_save_as_new)) }
-                TextButton(onClick = {
-                    KeyPopupOverrides.saveSets(ctx.realPrefs(), userSets.filter { it.name != current.userName })
-                    KeyPopupOverrides.save(prefs, emptyMap())
-                    prefs.edit().remove(KeyPopupOverrides.PREF_SELECTED_SET).apply()
+        var setToDelete: String? by remember { mutableStateOf(null) }
+        var setToRename: String? by remember { mutableStateOf(null) }
+        setToRename?.let { oldName ->
+            TextInputDialog(
+                onDismissRequest = { setToRename = null },
+                onConfirmed = { newName ->
+                    val name = newName.trim()
+                    KeyPopupOverrides.saveSets(ctx.realPrefs(), userSets.map {
+                        if (it.name == oldName) KeyPopupOverrides.UserSet(name, it.morePopups, it.symbolsLayout, it.overrides) else it
+                    })
+                    if (selectedUserSet?.name == oldName) prefs.edit().putString(KeyPopupOverrides.PREF_SELECTED_SET, name).apply()
+                    setToRename = null
                     generation++
-                    reloadPreview()
-                }) { Text(stringResource(R.string.key_popups_delete_set)) }
-            }
+                },
+                title = { Text(stringResource(R.string.key_popups_rename_set)) },
+                initialText = oldName,
+                checkTextValid = { text -> text.isNotBlank() && (text.trim() == oldName || userSets.none { it.name == text.trim() }) },
+            )
+        }
+        setToDelete?.let { name ->
+            ConfirmationDialog(
+                onDismissRequest = { setToDelete = null },
+                onConfirmed = { deleteSet(name); setToDelete = null },
+                title = { Text(stringResource(R.string.key_popups_delete_set_title, name)) },
+                confirmButtonText = stringResource(R.string.delete),
+            )
         }
         if (showSaveAsDialog)
             TextInputDialog(
@@ -187,6 +201,19 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                 items = presets,
                 getItemName = { presetName(it) },
                 selectedItem = current,
+                trailing = { p -> p.userName?.let { name ->
+                    IconButton({ showAccentsDialog = false; setToRename = name }) { Icon(painterResource(R.drawable.ic_edit), stringResource(R.string.key_popups_rename_set)) }
+                    DeleteButton { showAccentsDialog = false; setToDelete = name }
+                } },
+                // the current arrangement (built-in or own, with any changes) as a new set of the user's own
+                footer = {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxWidth().clickable { showAccentsDialog = false; pendingChange = null; showSaveAsDialog = true }
+                            .padding(horizontal = 8.dp).heightIn(min = 48.dp)) {
+                        Icon(painterResource(R.drawable.ic_plus), null, Modifier.padding(horizontal = 12.dp))
+                        Text(stringResource(R.string.key_popups_save_as_new), color = MaterialTheme.colorScheme.primary)
+                    }
+                },
                 onItemSelected = { preset ->
                     var changed = keyboard.with(ExtraValue.MORE_POPUPS, preset.morePopups)
                     changed = if (preset.symbolsLayout == null) changed.withoutLayout(LayoutType.SYMBOLS)
@@ -202,40 +229,131 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                     reloadPreview()
                 }
             )
-        // everything per key, behind one fold
-        val fullId = "full"
-        FoldRow(title = stringResource(R.string.key_popups_full), unfolded = fullId in unfolded, style = MaterialTheme.typography.bodyLarge) {
-            if (fullId in unfolded) unfolded.remove(fullId) else unfolded.add(fullId)
-        }
-        for ((groupTitle, keys) in groups) {
-            if (fullId !in unfolded) break
-            val groupId = "group:$groupTitle"
-            FoldRow(title = stringResource(groupTitle), unfolded = groupId in unfolded, style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(start = 12.dp)) {
-                if (groupId in unfolded) unfolded.remove(groupId) else unfolded.add(groupId)
+        // the deep customization, advanced only: every key's popups (a tab per key group), the keys and popups as JSON
+        val advanced by SettingsMode.state(ctx)
+        if (advanced) AdvancedBlock {
+            NavRow(stringResource(R.string.key_popups_full), stringResource(R.string.key_popups_full_summary)) {
+                SettingsDestination.navigateTo(SettingsDestination.CustomizePopups + keyboard.toPref())
             }
-            if (groupId !in unfolded) continue
-            for (keyInfo in keys) key(groupTitle, keyInfo.overrideKey) {
-                val id = "$groupTitle:${keyInfo.overrideKey}"
-                val override = overrides[keyInfo.overrideKey]
-                val summary = (override ?: keyInfo.popups).joinToString(" ")
-                FoldRow(
-                    title = keyInfo.title,
-                    subtitle = summary.ifEmpty { stringResource(R.string.key_popups_none) },
-                    unfolded = id in unfolded,
-                    changed = override != null,
-                    modifier = Modifier.padding(start = 24.dp),
-                ) { if (id in unfolded) unfolded.remove(id) else unfolded.add(id) }
-                if (id in unfolded)
-                    PopupEditor(
-                        allPopups = (keyInfo.pool + override.orEmpty()).distinct(), // the user's own additions too
-                        enabledInOrder = override ?: keyInfo.popups,
-                        onChanged = { applyChange(keyInfo.overrideKey, it) },
-                        onReset = { applyChange(keyInfo.overrideKey, null) },
-                        modifier = Modifier.padding(start = 36.dp),
-                    )
+            LayoutFilesRow()
+            // the preset layouts under the full customization, with saving the current one
+            Row(verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().clickable { showAccentsDialog = true }.heightIn(min = ROW_HEIGHT).padding(vertical = 4.dp).padding(start = 10.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.key_popups_presets), style = MaterialTheme.typography.bodyLarge)
+                    Text(presetName(current), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                NextScreenIcon()
             }
         }
+        // own sets are saved (last entry), renamed (pencil) and deleted (trash icon) in the preset list
+    }
+}
+
+/** Every arrangement belongs to a set of the user's own: stores [all] as set [name] and selects it. */
+private fun storePopupSet(ctx: Context, name: String, accentsValue: String, symbolsLayout: String?, all: Map<String, List<String>>) {
+    val prefs = ctx.prefs()
+    val set = KeyPopupOverrides.UserSet(name, accentsValue, symbolsLayout, all)
+    KeyPopupOverrides.saveSets(ctx.realPrefs(), KeyPopupOverrides.loadSets(ctx.realPrefs()).filter { it.name != name } + set)
+    KeyPopupOverrides.save(prefs, all)
+    prefs.edit().putString(KeyPopupOverrides.PREF_SELECTED_SET, name).apply()
+    reloadPreview()
+}
+
+/** A row that opens another screen: title, summary, arrow; the Preferences screen's row style. */
+@Composable
+fun NavRow(title: String, summary: String? = null, onClick: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = ROW_HEIGHT).padding(vertical = 4.dp).padding(start = 10.dp)) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            if (summary != null)
+                Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        NextScreenIcon()
+    }
+}
+
+/**
+ * Every key's long-press popups, a tab per key group (letters and digits, the keys that change with the text field,
+ * the symbol pages, the number pad); each key folds open to its popups, switchable and draggable. A change goes into
+ * the selected popup set of the user's own, or asks for the name of a new one.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CustomizePopupsScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
+    val ctx = LocalContext.current
+    val prefs = ctx.prefs()
+    var generation by remember { mutableIntStateOf(0) }
+    val groups = remember(keyboard, generation) { keysWithPopups(ctx, keyboard) }
+    val overrides = remember(generation) { KeyPopupOverrides.load(prefs) }
+    val selectedUserSet = remember(generation) {
+        prefs.getString(KeyPopupOverrides.PREF_SELECTED_SET, null)?.let { name -> KeyPopupOverrides.loadSets(ctx.realPrefs()).firstOrNull { it.name == name } }
+    }
+    val accentsValue = keyboard.getExtraValueOf(ExtraValue.MORE_POPUPS) ?: prefs.getString(Settings.PREF_MORE_POPUP_KEYS, Defaults.PREF_MORE_POPUP_KEYS)!!
+    val symbolsLayout = keyboard.layoutName(LayoutType.SYMBOLS)
+    val unfolded = rememberSaveable(saver = listSaver(save = { it.toList() }, restore = { mutableStateListOf(*it.toTypedArray()) })) { mutableStateListOf<String>() }
+    var tab by rememberSaveable { mutableIntStateOf(0) }
+    // a change made while a built-in set is selected is held here until the user names a set for it
+    var pendingChange: Pair<String, List<String>?>? by remember { mutableStateOf(null) }
+    fun applyChange(overrideKey: String, labels: List<String>?) {
+        val all = overrides.toMutableMap().also { if (labels == null) it.remove(overrideKey) else it[overrideKey] = labels }
+        if (selectedUserSet != null) { storePopupSet(ctx, selectedUserSet.name, accentsValue, symbolsLayout, all); generation++ }
+        else pendingChange = overrideKey to labels
+    }
+    val tryIt = remember { TryItState() }
+    Scaffold(
+        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.key_popups_full)) }, navigationIcon = { BackButton(onClickBack) }) },
+        bottomBar = { TryItBar(keyboard, tryIt) },
+    ) { innerPadding ->
+        Column(Modifier.fillMaxSize().padding(innerPadding)) {
+            ScrollableTabRow(selectedTabIndex = tab, edgePadding = 8.dp) {
+                groups.forEachIndexed { i, (titleId, keys) ->
+                    val changed = keys.any { overrides.containsKey(it.overrideKey) }
+                    Tab(selected = i == tab, onClick = { tab = i }, text = { Text(stringResource(titleId) + if (changed) " •" else "") })
+                }
+            }
+            val (groupTitle, keys) = groups[tab.coerceAtMost(groups.lastIndex)]
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
+                for (keyInfo in keys) key(groupTitle, keyInfo.overrideKey) {
+                    val id = "$groupTitle:${keyInfo.overrideKey}"
+                    val override = overrides[keyInfo.overrideKey]
+                    val summary = (override ?: keyInfo.popups).joinToString(" ")
+                    FoldRow(
+                        title = keyInfo.title,
+                        subtitle = summary.ifEmpty { stringResource(R.string.key_popups_none) },
+                        unfolded = id in unfolded,
+                        changed = override != null,
+                        modifier = Modifier.padding(start = 10.dp),
+                    ) { if (id in unfolded) unfolded.remove(id) else unfolded.add(id) }
+                    if (id in unfolded)
+                        PopupEditor(
+                            allPopups = (keyInfo.pool + override.orEmpty()).distinct(), // the user's own additions too
+                            enabledInOrder = override ?: keyInfo.popups,
+                            onChanged = { applyChange(keyInfo.overrideKey, it) },
+                            onReset = { applyChange(keyInfo.overrideKey, null) },
+                            modifier = Modifier.padding(start = 22.dp),
+                        )
+                }
+            }
+        }
+    }
+    pendingChange?.let { change ->
+        TextInputDialog(
+            onDismissRequest = { pendingChange = null }, // cancel = the change is dropped
+            onConfirmed = { name ->
+                val all = overrides.toMutableMap()
+                change.second.let { if (it == null) all.remove(change.first) else all[change.first] = it }
+                storePopupSet(ctx, name.trim(), accentsValue, symbolsLayout, all)
+                pendingChange = null
+                generation++
+            },
+            title = { Text(stringResource(R.string.key_popups_save_change_title)) },
+            initialText = stringResource(R.string.key_popups_my_set),
+            checkTextValid = { it.isNotBlank() },
+        )
     }
 }
 
@@ -365,7 +483,7 @@ private fun FoldRow(
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier.fillMaxWidth().clickable { onClick() }.padding(vertical = 10.dp)
+        modifier = modifier.fillMaxWidth().clickable { onClick() }.heightIn(min = ROW_HEIGHT).padding(vertical = 4.dp)
     ) {
         Column(Modifier.weight(1f)) {
             Text(title + if (changed) " •" else "", style = style)
@@ -466,4 +584,10 @@ private fun showKeyboardForPreview(keyboard: SettingsSubtype) {
 /** Rebuild the live keyboard so the hint and long-press popups show the change immediately. */
 private fun reloadPreview() {
     KeyboardSwitcher.getInstance().setThemeNeedsReload()
+}
+
+/** The row opening the Layout files editor: every secondary layout in one editor (a tab each), one file. */
+@Composable
+fun LayoutFilesRow() = NavRow(stringResource(R.string.layout_files), stringResource(R.string.layout_files_summary)) {
+    SettingsDestination.navigateTo(SettingsDestination.LayoutFiles)
 }

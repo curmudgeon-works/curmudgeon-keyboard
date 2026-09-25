@@ -40,6 +40,10 @@ fun <T: Any> ListPickerDialog(
     getItemName: (@Composable (T) -> String) = { it.toString() },
     confirmImmediately: Boolean = true,
     showRadioButtons: Boolean = true,
+    /** Shown at the end of an item's row, e.g. a delete button for the user's own entries. */
+    trailing: (@Composable (T) -> Unit)? = null,
+    /** Shown after the items, e.g. an entry that adds one. */
+    footer: (@Composable () -> Unit)? = null,
 ) {
     var selected by remember { mutableStateOf(selectedItem) }
     val state = rememberLazyListState()
@@ -90,8 +94,10 @@ fun <T: Any> ListPickerDialog(
                                 text = getItemName(item),
                                 modifier = Modifier.weight(1f),
                             )
+                            trailing?.invoke(item)
                         }
                     }
+                    if (footer != null) item { footer() }
                 }
             }
         },

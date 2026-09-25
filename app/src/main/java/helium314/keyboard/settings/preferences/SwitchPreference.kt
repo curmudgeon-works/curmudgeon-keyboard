@@ -84,7 +84,12 @@ fun SwitchPreferenceWithEmojiDictWarning(setting: Setting, default: Boolean) {
     val context = LocalContext.current
     var showWarningDialog by rememberSaveable { mutableStateOf(false) }
     val hasEmojiDict = DictionaryInfoUtils.getLocalesWithEmojiDicts(context).isNotEmpty()
-    SwitchPreference(setting, default && hasEmojiDict) { showWarningDialog = it && !hasEmojiDict }
+    // without an emoji dictionary there is nothing to show: the switch stays off (a stored "on" is reset) and
+    // turning it on only explains where to get the dictionary
+    if (!hasEmojiDict && context.prefs().getBoolean(setting.key, false))
+        context.prefs().edit { putBoolean(setting.key, false) }
+    SwitchPreference(setting, default && hasEmojiDict,
+        allowCheckedChange = { on -> if (on && !hasEmojiDict) { showWarningDialog = true; false } else true })
     if (showWarningDialog) {
         // emoji_dictionary_required contains "%s" since we didn't supply a formatArg
         val link = stringResource(R.string.dictionary_link_text).withHtmlLink(Links.DICTIONARY_URL + Links.DICTIONARY_DOWNLOAD_SUFFIX.replace("raw", "src")

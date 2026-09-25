@@ -1,7 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.screens
 
+import helium314.keyboard.settings.AdvancedTint
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -65,69 +73,74 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
         title = stringResource(R.string.swipe_screen),
         settings = emptyList(),
     ) {
-        // ---- what a swipe can do: gesture typing itself (its own screen without the own decoder), then the extras
-        GroupTitle(R.string.swipe_settings)
-        val advanced by SettingsMode.state(ctx)
-        SettingsMode.filter(gestureTypingItems(prefs), gestureTypingSimpleModeKeys, advanced).forEach {
-            if (it is String) SettingsActivity.settingsContainer[it]?.Preference()
-        }
-        SettingsActivity.settingsContainer[Settings.PREF_GESTURE_CAPS_SWIPE]?.Preference()
-        if (prefs.getBoolean(Settings.PREF_GESTURE_CAPS_SWIPE, Defaults.PREF_GESTURE_CAPS_SWIPE))
-            SettingsActivity.settingsContainer[Settings.PREF_GESTURE_CAPS_HEIGHT]?.Preference()
-        SettingsActivity.settingsContainer[Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD]?.Preference()
-        // on = move cursor, off = nothing; the other spacebar swipe actions stay in Advanced (shown off here)
-        val moveCursor = Settings.readHorizontalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.MOVE_CURSOR
-        Row(verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.space_swipe_move_cursor), style = MaterialTheme.typography.bodyLarge)
-                Text(stringResource(R.string.space_swipe_move_cursor_summary), style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // the content is taller than a screen now that the gesture typing items are here
+        Column(Modifier.verticalScroll(rememberScrollState()).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))) {
+            // ---- what a swipe can do: gesture typing itself (its own screen without the own decoder), then the extras
+            GroupTitle(R.string.swipe_settings)
+            val advanced by SettingsMode.state(ctx)
+            SettingsMode.filter(gestureTypingItems(prefs), gestureTypingSimpleModeKeys, advanced).forEach {
+                if (it !is String) return@forEach
+                if (it in gestureTypingSimpleModeKeys) SettingsActivity.settingsContainer[it]?.Preference()
+                else AdvancedTint { SettingsActivity.settingsContainer[it]?.Preference() }
             }
-            Switch(checked = moveCursor, onCheckedChange = { on ->
-                prefs.edit { putString(Settings.PREF_SPACE_HORIZONTAL_SWIPE,
-                    (if (on) KeyboardActionListener.SwipeAction.MOVE_CURSOR else KeyboardActionListener.SwipeAction.NONE).name) }
-            })
-        }
-
-        // ---- how the decoder weighs a swipe, and how each weighting did
-        GroupTitle(R.string.swipe_tuning)
-        PreferenceCategory(stringResource(R.string.swipe_tuning_inflections))
-        Text(stringResource(R.string.swipe_tuning_summary), Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.bodySmall)
-        WeightSlider(Settings.PREF_GESTURE_TURN_WEIGHT, Defaults.PREF_GESTURE_TURN_WEIGHT, R.string.swipe_tuning_turns, 0f..1.5f)
-        WeightSlider(Settings.PREF_GESTURE_PAUSE_WEIGHT, Defaults.PREF_GESTURE_PAUSE_WEIGHT, R.string.swipe_tuning_pauses, 0f..1f)
-        WeightSlider(Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Defaults.PREF_GESTURE_SLOWDOWN_WEIGHT, R.string.swipe_tuning_slowdowns, 0f..1f)
-        WeightSlider(Settings.PREF_GESTURE_KUSHLER_WEIGHT, Defaults.PREF_GESTURE_KUSHLER_WEIGHT, R.string.swipe_tuning_blend, 0f..1f,
-            R.string.swipe_tuning_blend_summary)
-        BoostSlider()
-
-        PreferenceCategory(stringResource(R.string.swipe_tuning_stats))
-        if (rows.isEmpty())
-            Text(stringResource(R.string.swipe_tuning_no_stats), Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium)
-        // the current tuning first, then the rest by how well they did
-        val ordered = rows.entries.sortedWith(compareBy({ it.key != current.key }, { -it.value.score }))
-        for ((key, row) in ordered) {
-            val isCurrent = key == current.key
-            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(key, Modifier.weight(1f), fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal)
-                    if (isCurrent)
-                        Text(stringResource(R.string.swipe_tuning_current), style = MaterialTheme.typography.labelMedium)
-                    if (key == recommended) {
-                        Text(stringResource(R.string.swipe_tuning_recommended), Modifier.padding(start = 8.dp),
-                            color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
-                        if (!isCurrent) TextButton(onClick = {
-                            OwnGestureDecoder.Tuning.parse(key)?.let { OwnGestureDecoder.Tuning.write(prefs, it) }
-                            (ctx.getActivity() as? SettingsActivity)?.prefChanged()
-                        }) { Text(stringResource(R.string.swipe_tuning_use)) }
-                    }
+            SettingsActivity.settingsContainer[Settings.PREF_GESTURE_CAPS_SWIPE]?.Preference()
+            if (prefs.getBoolean(Settings.PREF_GESTURE_CAPS_SWIPE, Defaults.PREF_GESTURE_CAPS_SWIPE))
+                SettingsActivity.settingsContainer[Settings.PREF_GESTURE_CAPS_HEIGHT]?.Preference()
+            SettingsActivity.settingsContainer[Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD]?.Preference()
+            // on = move cursor, off = nothing; the other spacebar swipe actions stay in Advanced (shown off here)
+            val moveCursor = Settings.readHorizontalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.MOVE_CURSOR
+            Row(verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.space_swipe_move_cursor), style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.space_swipe_move_cursor_summary), style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                fun pct(n: Int) = if (row.swipes == 0) 0 else (100f * n / row.swipes).roundToInt()
-                Text(stringResource(R.string.swipe_tuning_row, row.swipes, pct(row.kept), pct(row.pickedSecond),
-                    pct(row.pickedThird + row.pickedLater), pct(row.deleted)), style = MaterialTheme.typography.bodySmall)
-                if (isCurrent) TextButton(onClick = { GestureStats.clear(ctx.realPrefs(), key); statsGeneration++ }) {
-                    Text(stringResource(R.string.swipe_tuning_reset))
+                Switch(checked = moveCursor, onCheckedChange = { on ->
+                    prefs.edit { putString(Settings.PREF_SPACE_HORIZONTAL_SWIPE,
+                        (if (on) KeyboardActionListener.SwipeAction.MOVE_CURSOR else KeyboardActionListener.SwipeAction.NONE).name) }
+                })
+            }
+
+            // ---- how the decoder weighs a swipe, and how each weighting did
+            GroupTitle(R.string.swipe_tuning)
+            PreferenceCategory(stringResource(R.string.swipe_tuning_inflections))
+            Text(stringResource(R.string.swipe_tuning_summary), Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.bodySmall)
+            WeightSlider(Settings.PREF_GESTURE_TURN_WEIGHT, Defaults.PREF_GESTURE_TURN_WEIGHT, R.string.swipe_tuning_turns, 0f..1.5f)
+            WeightSlider(Settings.PREF_GESTURE_PAUSE_WEIGHT, Defaults.PREF_GESTURE_PAUSE_WEIGHT, R.string.swipe_tuning_pauses, 0f..1f)
+            WeightSlider(Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Defaults.PREF_GESTURE_SLOWDOWN_WEIGHT, R.string.swipe_tuning_slowdowns, 0f..1f)
+            WeightSlider(Settings.PREF_GESTURE_KUSHLER_WEIGHT, Defaults.PREF_GESTURE_KUSHLER_WEIGHT, R.string.swipe_tuning_blend, 0f..1f,
+                R.string.swipe_tuning_blend_summary)
+            BoostSlider()
+
+            PreferenceCategory(stringResource(R.string.swipe_tuning_stats))
+            if (rows.isEmpty())
+                Text(stringResource(R.string.swipe_tuning_no_stats), Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium)
+            // the current tuning first, then the rest by how well they did
+            val ordered = rows.entries.sortedWith(compareBy({ it.key != current.key }, { -it.value.score }))
+            for ((key, row) in ordered) {
+                val isCurrent = key == current.key
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(key, Modifier.weight(1f), fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal)
+                        if (isCurrent)
+                            Text(stringResource(R.string.swipe_tuning_current), style = MaterialTheme.typography.labelMedium)
+                        if (key == recommended) {
+                            Text(stringResource(R.string.swipe_tuning_recommended), Modifier.padding(start = 8.dp),
+                                color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
+                            if (!isCurrent) TextButton(onClick = {
+                                OwnGestureDecoder.Tuning.parse(key)?.let { OwnGestureDecoder.Tuning.write(prefs, it) }
+                                (ctx.getActivity() as? SettingsActivity)?.prefChanged()
+                            }) { Text(stringResource(R.string.swipe_tuning_use)) }
+                        }
+                    }
+                    fun pct(n: Int) = if (row.swipes == 0) 0 else (100f * n / row.swipes).roundToInt()
+                    Text(stringResource(R.string.swipe_tuning_row, row.swipes, pct(row.kept), pct(row.pickedSecond),
+                        pct(row.pickedThird + row.pickedLater), pct(row.deleted)), style = MaterialTheme.typography.bodySmall)
+                    if (isCurrent) TextButton(onClick = { GestureStats.clear(ctx.realPrefs(), key); statsGeneration++ }) {
+                        Text(stringResource(R.string.swipe_tuning_reset))
+                    }
                 }
             }
         }

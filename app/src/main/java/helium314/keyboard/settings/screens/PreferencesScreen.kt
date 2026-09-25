@@ -1,6 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.screens
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog
 import android.content.Context
 import android.content.SharedPreferences
 import android.media.AudioManager
@@ -61,9 +73,10 @@ fun PreferencesScreen(
     )
 }
 
-/** The input group; hints, the symbol map, the per-key popups (which replaced the popup order) and the TLD popups
+/** The input group, shown at the top of the Layout screen (the Preferences screen stays reachable through search);
+ *  hints, the symbol map, the per-key popups (which replaced the popup order) and the TLD popups
  *  are on the Layout screen. */
-private fun preferencesInputItems(prefs: SharedPreferences): List<Any?> =
+fun preferencesInputItems(prefs: SharedPreferences): List<Any?> =
     listOf(
         R.string.settings_category_input,
         Settings.PREF_POPUP_ON,
@@ -80,7 +93,7 @@ private fun preferencesInputItems(prefs: SharedPreferences): List<Any?> =
         Settings.PREF_SHOW_EMOJI_DESCRIPTIONS,
     )
 
-private fun clipboardHistoryItems(prefs: SharedPreferences): List<Any?> {
+fun clipboardHistoryItems(prefs: SharedPreferences): List<Any?> {
     val clipboardHistoryEnabled = prefs.getBoolean(Settings.PREF_ENABLE_CLIPBOARD_HISTORY, Defaults.PREF_ENABLE_CLIPBOARD_HISTORY)
     return listOf(
         R.string.settings_category_clipboard_history,
@@ -97,6 +110,15 @@ val preferencesSimpleModeKeys = setOf(
 )
 
 fun createPreferencesSettings(context: Context) = listOf(
+    Setting(context, Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS, R.string.backspace_hold_deletes_words, R.string.backspace_hold_deletes_words_summary) {
+        SwitchPreference(it, Defaults.PREF_BACKSPACE_HOLD_DELETES_WORDS)
+    },
+    Setting(context, Settings.PREF_BACKSPACE_REPEAT_INTERVAL, R.string.backspace_repeat_interval) {
+        BackspaceSpeedPreference(it)
+    },
+    Setting(context, Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD, R.string.backspace_deletes_swiped_word, R.string.backspace_deletes_swiped_word_summary) {
+        SwitchPreference(it, Defaults.PREF_BACKSPACE_DELETES_SWIPED_WORD)
+    },
     Setting(context, Settings.PREF_SAVE_SUBTYPE_PER_APP, R.string.save_subtype_per_app) {
         SwitchPreference(it, Defaults.PREF_SAVE_SUBTYPE_PER_APP)
     },
@@ -255,4 +277,76 @@ private fun Preview() {
             PreferencesScreen { }
         }
     }
+}
+
+/**
+ * Hold-to-delete speed: the interval between deletions, and optionally a speed-up — after holding for a while
+ * the interval ramps (over a second) to a faster top speed. All in one dialog.
+ */
+@Composable
+private fun BackspaceSpeedPreference(setting: Setting) {
+    val ctx = LocalContext.current
+    val prefs = ctx.prefs()
+    val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
+    if ((b?.value ?: 0) < 0)
+        Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
+    val interval = prefs.getInt(Settings.PREF_BACKSPACE_REPEAT_INTERVAL, Defaults.PREF_BACKSPACE_REPEAT_INTERVAL)
+    val speedUp = prefs.getBoolean(Settings.PREF_BACKSPACE_SPEED_UP, Defaults.PREF_BACKSPACE_SPEED_UP)
+    val after = prefs.getInt(Settings.PREF_BACKSPACE_SPEED_UP_AFTER, Defaults.PREF_BACKSPACE_SPEED_UP_AFTER)
+    val top = prefs.getInt(Settings.PREF_BACKSPACE_TOP_INTERVAL, Defaults.PREF_BACKSPACE_TOP_INTERVAL)
+    fun seconds(ms: Int) = String.format(java.util.Locale.getDefault(), "%.1f", ms / 1000f)
+    var showDialog by rememberSaveable { mutableStateOf(false) }
+    Preference(
+        name = setting.title,
+        onClick = { showDialog = true },
+        description = stringResource(R.string.backspace_repeat_interval_value, interval) +
+            if (speedUp) " · " + stringResource(R.string.backspace_speed_up_value, top, seconds(after)) else "",
+    )
+    if (!showDialog) return
+    var newInterval by rememberSaveable { mutableFloatStateOf(interval.toFloat()) }
+    var newSpeedUp by rememberSaveable { mutableStateOf(speedUp) }
+    var newAfter by rememberSaveable { mutableFloatStateOf(after.toFloat()) }
+    var newTop by rememberSaveable { mutableFloatStateOf(top.toFloat()) }
+    ThreeButtonAlertDialog(
+        onDismissRequest = { showDialog = false },
+        title = { Text(setting.title) },
+        neutralButtonText = stringResource(R.string.button_default),
+        onNeutral = {
+            showDialog = false
+            prefs.edit {
+                remove(Settings.PREF_BACKSPACE_REPEAT_INTERVAL); remove(Settings.PREF_BACKSPACE_SPEED_UP)
+                remove(Settings.PREF_BACKSPACE_SPEED_UP_AFTER); remove(Settings.PREF_BACKSPACE_TOP_INTERVAL)
+            }
+        },
+        onConfirmed = {
+            prefs.edit {
+                putInt(Settings.PREF_BACKSPACE_REPEAT_INTERVAL, newInterval.toInt())
+                putBoolean(Settings.PREF_BACKSPACE_SPEED_UP, newSpeedUp)
+                putInt(Settings.PREF_BACKSPACE_SPEED_UP_AFTER, newAfter.toInt())
+                putInt(Settings.PREF_BACKSPACE_TOP_INTERVAL, newTop.toInt())
+            }
+        },
+        content = {
+            Column {
+                Text(stringResource(R.string.backspace_start_speed))
+                Slider(value = newInterval, onValueChange = { newInterval = it }, valueRange = 50f..500f, steps = 17)
+                Text(stringResource(R.string.backspace_repeat_interval_value, newInterval.toInt()),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                    Text(stringResource(R.string.backspace_speed_up), Modifier.weight(1f))
+                    Switch(checked = newSpeedUp, onCheckedChange = { newSpeedUp = it })
+                }
+                if (newSpeedUp) {
+                    Text(stringResource(R.string.backspace_speed_up_after), Modifier.padding(top = 8.dp))
+                    Slider(value = newAfter, onValueChange = { newAfter = it }, valueRange = 500f..5000f, steps = 8)
+                    Text(stringResource(R.string.backspace_seconds_value, seconds(newAfter.toInt())),
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.backspace_top_speed), Modifier.padding(top = 8.dp))
+                    Slider(value = newTop, onValueChange = { newTop = it }, valueRange = 25f..200f, steps = 6)
+                    Text(stringResource(R.string.backspace_repeat_interval_value, newTop.toInt()),
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        },
+    )
 }

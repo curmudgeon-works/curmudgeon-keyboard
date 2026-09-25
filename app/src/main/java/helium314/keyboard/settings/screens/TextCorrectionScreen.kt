@@ -67,7 +67,7 @@ fun TextCorrectionScreen(
         if (autocorrectEnabled) Settings.PREF_MORE_AUTO_CORRECTION else null,
         if (autocorrectEnabled) Settings.PREF_AUTOCORRECT_SHORTCUTS else null,
         if (autocorrectEnabled) Settings.PREF_AUTO_CORRECT_THRESHOLD else null,
-        if (autocorrectEnabled) Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT else null,
+        // (backspace reverts autocorrect: in the Backspace group of the Preferences screen)
         Settings.PREF_AUTO_CAP,
         R.string.settings_category_space,
         Settings.PREF_KEY_USE_DOUBLE_SPACE_PERIOD,
