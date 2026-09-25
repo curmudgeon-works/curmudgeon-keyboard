@@ -103,6 +103,10 @@ public final class InputLogic {
     }
 
     public LastComposedWord mLastComposedWord = LastComposedWord.NOT_A_COMPOSED_WORD;
+    // true from the end of a swipe until the next key: only then does a backspace tap take the whole swiped word
+    // (a swiped word brought back by swipe, space, backspace is deleted a character at a time)
+    private boolean mJustSwiped = false;
+    private boolean mSwipeIsFresh = false; // mJustSwiped as it was when the current key event began
     // This has package visibility so it can be accessed from InputLogicHandler.
     /* package */ final WordComposer mWordComposer;
     public final RichInputConnection mConnection;
@@ -486,6 +490,8 @@ public final class InputLogic {
         mWordBeingCorrectedByCursor = null;
         mJustRevertedACommit = false;
         final LastComposedWord lastComposedWordBefore = mLastComposedWord;
+        mSwipeIsFresh = mJustSwiped;
+        mJustSwiped = false;
         final Event processedEvent = mWordComposer.processEvent(event);
         final InputTransaction inputTransaction = new InputTransaction(settingsValues,
                 processedEvent, SystemClock.uptimeMillis(), mSpaceState,
@@ -1312,7 +1318,7 @@ public final class InputLogic {
         // Word-level delete when backspace is held: each repeat tick removes the
         // previous word (plus any trailing whitespace/punctuation) instead of one char.
         // Single tap still deletes one char (event.isKeyRepeat() is false on the initial press).
-        if (event.isKeyRepeat()
+        if (event.isKeyRepeat() && inputTransaction.getSettingsValues().mBackspaceHoldDeletesWords
                 && !mConnection.hasSelection()
                 && mConnection.getExpectedSelectionStart() > 0) {
             final SettingsValues settingsValues = inputTransaction.getSettingsValues();
@@ -1370,6 +1376,9 @@ public final class InputLogic {
             // When we exit this if-clause, mWordComposer.isComposingWord() will return false.
         }
         if (mWordComposer.isComposingWord()) {
+            // a swiped word: the whole word right after the swipe (if wanted), otherwise it is edited like a typed one
+            if (mWordComposer.isBatchMode() && !(mSwipeIsFresh && inputTransaction.getSettingsValues().mBackspaceDeletesSwipedWord))
+                mWordComposer.unsetBatchMode();
             if (mWordComposer.isBatchMode()) {
                 final String rejectedSuggestion = mWordComposer.getTypedWord();
                 mWordComposer.reset();
@@ -1838,7 +1847,10 @@ public final class InputLogic {
             return;
         }
         final int timeStampInSeconds = (int)TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis());
-        mDictionaryFacilitator.addToUserHistory(word, wasAutoCapitalized, ngramContext,
+        if (extraUses == 0)
+            mDictionaryFacilitator.addToUserHistory(word, wasAutoCapitalized, ngramContext,
+                    timeStampInSeconds, settingsValues.mBlockPotentiallyOffensive);
+        else mDictionaryFacilitator.addToUserHistory(word, wasAutoCapitalized, ngramContext,
                 timeStampInSeconds, settingsValues.mBlockPotentiallyOffensive, extraUses);
     }
 
@@ -2473,6 +2485,7 @@ public final class InputLogic {
         mWordComposer.setBatchInputWord(batchInputText);
         setComposingTextInternal(batchInputText, 1);
         mConnection.endBatchEdit();
+        mJustSwiped = true;
         // Space state must be updated before calling updateShiftState
         if (settingsValues.mAutospaceAfterGestureTyping)
             mSpaceState = SpaceState.PHANTOM;

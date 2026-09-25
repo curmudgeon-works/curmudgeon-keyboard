@@ -65,6 +65,12 @@ object Defaults {
     const val PREF_AUTO_CORRECT_THRESHOLD = 0.185f
     const val PREF_AUTOCORRECT_SHORTCUTS = true
     const val PREF_BACKSPACE_REVERTS_AUTOCORRECT = true
+    const val PREF_BACKSPACE_HOLD_DELETES_WORDS = true // holding backspace deletes a word per repeat, not a character
+    const val PREF_BACKSPACE_DELETES_SWIPED_WORD = true // a tap right after a swipe deletes the swiped word
+    const val PREF_BACKSPACE_REPEAT_INTERVAL = 200 // ms between deletions while backspace is held
+    const val PREF_BACKSPACE_SPEED_UP = false // held long enough, backspace ramps to the top speed
+    const val PREF_BACKSPACE_SPEED_UP_AFTER = 2000 // ms of holding before the speed-up starts
+    const val PREF_BACKSPACE_TOP_INTERVAL = 50 // ms between deletions at the top speed
     const val PREF_CENTER_SUGGESTION_TEXT_TO_ENTER = false
     const val PREF_SHOW_SUGGESTIONS = true
     const val PREF_ALWAYS_SHOW_SUGGESTIONS = true // fork: suggest even in fields that request no suggestions
