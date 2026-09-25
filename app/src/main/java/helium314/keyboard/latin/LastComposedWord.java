@@ -8,6 +8,8 @@ package helium314.keyboard.latin;
 
 import android.text.TextUtils;
 
+import helium314.keyboard.latin.common.Constants;
+
 import helium314.keyboard.event.Event;
 import helium314.keyboard.latin.common.InputPointers;
 import helium314.keyboard.latin.define.DecoderSpecificConstants;
@@ -77,6 +79,13 @@ public final class LastComposedWord {
 
     public boolean canRevertCommit() {
         return mActive && !TextUtils.isEmpty(mCommittedWord) && !didCommitTypedWord();
+    }
+
+    /** A swiped word committed as swiped by a space: backspace brings it back with the strip it had. Not tied to
+     *  {@link #mActive}, which the committing space already clears; InputLogic drops the strip on the next event. */
+    public boolean canRestoreBatchWord() {
+        return mBatchSuggestedWords != null && !TextUtils.isEmpty(mCommittedWord)
+                && Constants.STRING_SPACE.equals(mSeparatorString);
     }
 
     private boolean didCommitTypedWord() {
