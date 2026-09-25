@@ -46,7 +46,8 @@ fun ThreeButtonAlertDialog(
     cancelButtonText: String = stringResource(android.R.string.cancel),
     neutralButtonText: String? = null,
     reducePadding: Boolean = false,
-    properties: DialogProperties = DialogProperties()
+    properties: DialogProperties = DialogProperties(),
+    confirmFirst: Boolean = false, // OK left of Cancel, for dialogs whose buttons are spelled out as "Ok: …" / "Cancel: …"
 ) {
     Dialog(
         onDismissRequest = onDismissRequest,
@@ -98,12 +99,16 @@ fun ThreeButtonAlertDialog(
                                 onClick = onNeutral
                             ) { Text(neutralButtonText) }
                         Spacer(Modifier.weight(1f))
+                        val confirm: @Composable () -> Unit = {
+                            if (confirmButtonText != null)
+                                TextButton(
+                                    enabled = checkOk(),
+                                    onClick = { onConfirmed(); onDismissRequest() },
+                                ) { Text(confirmButtonText) }
+                        }
+                        if (confirmFirst) confirm()
                         TextButton(onClick = onDismissRequest) { Text(cancelButtonText) }
-                        if (confirmButtonText != null)
-                            TextButton(
-                                enabled = checkOk(),
-                                onClick = { onConfirmed(); onDismissRequest() },
-                            ) { Text(confirmButtonText) }
+                        if (!confirmFirst) confirm()
                     }
                 }
             }

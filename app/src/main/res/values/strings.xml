@@ -409,14 +409,15 @@
     <string name="delete_keyboard_message">\"%s\" will be removed, with its languages, their priorities and its layout choice. This cannot be undone. Learned words and dictionaries are kept.</string>
     <string name="separate_settings_per_keyboard">Separate settings per keyboard</string>
     <string name="separate_settings_per_keyboard_summary">Off: the settings above apply to every keyboard. On: each keyboard has its own, starting from a copy of the shared ones</string>
-    <string name="separate_settings_enable_message">Every keyboard now uses its own settings. The shared settings stay saved and come back when this is turned off.\n\nSome keyboards still have their own settings from an earlier time. Keep: they continue with those. Reset all: they start again from a copy of the shared settings (their earlier own settings are replaced).</string>
+    <string name="separate_settings_enable_message">Every keyboard will use its own settings.\n\nTurning this off later gives all keyboards the primary keyboard\'s settings. Each keyboard\'s own settings stay saved and come back when you turn this on again.</string>
     <string name="separate_settings_hint">Each keyboard\'s settings are under its entry above. Tap a keyboard to unfold them.</string>
-    <string name="separate_settings_keep">Keep</string>
-    <string name="separate_settings_reset">Reset all</string>
-    <string name="separate_settings_disable_title">Back to shared settings</string>
-    <string name="separate_settings_disable_message">Which settings should every keyboard use? Each keyboard\'s own settings stay saved for the next time. Current keyboard: %s</string>
-    <string name="separate_settings_use_current">Current keyboard\'s</string>
-    <string name="separate_settings_keep_shared">Previous shared</string>
+    <string name="separate_settings_turn_on">Ok: Use separate settings</string>
+    <string name="separate_settings_keep_one">Cancel: Keep one set</string>
+    <string name="separate_settings_disable_title">Common settings for all keyboards</string>
+    <!-- %s: the name of the primary keyboard (the first in the list) -->
+    <string name="separate_settings_disable_message">All keyboards will use the settings of the primary keyboard, %s.\n\nEach keyboard\'s own settings stay saved and come back when you turn separate settings on again.</string>
+    <string name="separate_settings_use_primary">Ok: Use common settings</string>
+    <string name="separate_settings_keep_separate">Cancel: Keep separate settings</string>
     <string name="language_list_summary">Higher priority languages win when matches are close</string>
     <string name="language_priority_off">Off</string>
     <string name="language_priority_low">L</string>

@@ -98,15 +98,8 @@ fun KeyboardsScreen(
                 Column(Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))) {
                     // off = one set of settings for every keyboard (the sections above); on = each keyboard its own
                     fun toggle(on: Boolean) {
-                        if (on) {
-                            val keyboards = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }
-                            if (keyboards.any { KeyboardProfiles.hasOwnSettings(real, it) }) askEnable = true
-                            else {
-                                KeyboardProfiles.enable(real, keyboards, keepExisting = true)
-                                separate = true
-                                expanded.add(SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype()) // show where the sections went
-                            }
-                        } else askDisable = true
+                        // both ways ask first, saying what happens
+                        if (on) askEnable = true else askDisable = true
                         KeyboardProfiles.refreshImeId(real)
                     }
                     Preference(
@@ -233,23 +226,25 @@ fun KeyboardsScreen(
         if (askEnable)
             ConfirmationDialog(
                 onDismissRequest = { askEnable = false },
+                // each keyboard gets its saved settings back; one without starts from a copy of the common ones
                 onConfirmed = { KeyboardProfiles.enable(real, enabledNow, keepExisting = true); KeyboardProfiles.refreshImeId(real); separate = true; askEnable = false; expanded.add(SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype()) },
-                onNeutral = { KeyboardProfiles.enable(real, enabledNow, keepExisting = false); KeyboardProfiles.refreshImeId(real); separate = true; askEnable = false; expanded.add(SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype()) },
                 title = { Text(stringResource(R.string.separate_settings_per_keyboard)) },
                 content = { Text(stringResource(R.string.separate_settings_enable_message)) },
-                confirmButtonText = stringResource(R.string.separate_settings_keep),
-                neutralButtonText = stringResource(R.string.separate_settings_reset),
+                confirmButtonText = stringResource(R.string.separate_settings_turn_on),
+                cancelButtonText = stringResource(R.string.separate_settings_keep_one),
+                confirmFirst = true,
             )
         if (askDisable) {
-            val current = SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype()
+            // the primary keyboard: the first in the list (and in the switching order)
+            val primary = enabledNow.firstOrNull() ?: SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype()
             ConfirmationDialog(
                 onDismissRequest = { askDisable = false },
-                onConfirmed = { KeyboardProfiles.disable(real, current); KeyboardProfiles.refreshImeId(real); separate = false; askDisable = false },
-                onNeutral = { KeyboardProfiles.disable(real, null); KeyboardProfiles.refreshImeId(real); separate = false; askDisable = false },
+                onConfirmed = { KeyboardProfiles.disable(real, primary); KeyboardProfiles.refreshImeId(real); separate = false; askDisable = false },
                 title = { Text(stringResource(R.string.separate_settings_disable_title)) },
-                content = { Text(stringResource(R.string.separate_settings_disable_message, keyboardName(current, ctx))) },
-                confirmButtonText = stringResource(R.string.separate_settings_use_current),
-                neutralButtonText = stringResource(R.string.separate_settings_keep_shared),
+                content = { Text(stringResource(R.string.separate_settings_disable_message, keyboardName(primary, ctx))) },
+                confirmButtonText = stringResource(R.string.separate_settings_use_primary),
+                cancelButtonText = stringResource(R.string.separate_settings_keep_separate),
+                confirmFirst = true,
             )
         }
         keyboardToDelete?.let { keyboard ->
