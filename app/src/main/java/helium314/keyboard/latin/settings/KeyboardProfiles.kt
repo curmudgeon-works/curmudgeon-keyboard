@@ -3,6 +3,7 @@ package helium314.keyboard.latin.settings
 
 import android.content.SharedPreferences
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
+import helium314.keyboard.latin.utils.LanguagePriority
 import helium314.keyboard.latin.utils.Log
 import org.json.JSONObject
 
@@ -32,7 +33,7 @@ object KeyboardProfiles {
         PREF_SEPARATE, PREF_IDS, PREF_NEXT_ID,
         "key_popup_sets", // saved popup sets are meant to be reused across keyboards
     )
-    private val globalPrefixes = listOf(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX, "language_priority_", "share_user_history_", "debug_", "gesture_stats")
+    private val globalPrefixes = listOf(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX, "language_priority_", "share_user_history_", LanguagePriority.PREF_ADDED_PREFIX, "debug_", "gesture_stats")
 
     fun isGlobal(key: String) = key in globalKeys || globalPrefixes.any { key.startsWith(it) } || key.startsWith(PREFIX) && key.contains(SEPARATOR)
 

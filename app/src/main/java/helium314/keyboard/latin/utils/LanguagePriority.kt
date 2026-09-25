@@ -18,10 +18,12 @@ object LanguagePriority {
 
     private const val PREF_PRIORITY_PREFIX = "language_priority_"
     private const val PREF_SHARE_HISTORY_PREFIX = "share_user_history_"
+    const val PREF_ADDED_PREFIX = "language_added_"
 
-    /** The preference keys holding a language's priority and share switch (global keys, one per language). */
+    /** The preference keys holding a language's priority, share switch and adding time (global keys, one per language). */
     fun keys(locale: Locale): List<String> =
-        listOf(PREF_PRIORITY_PREFIX + locale.toLanguageTag(), PREF_SHARE_HISTORY_PREFIX + locale.toLanguageTag())
+        listOf(PREF_PRIORITY_PREFIX + locale.toLanguageTag(), PREF_SHARE_HISTORY_PREFIX + locale.toLanguageTag(),
+            PREF_ADDED_PREFIX + locale.toLanguageTag())
 
     fun get(prefs: SharedPreferences, locale: Locale): Int =
         prefs.getInt(PREF_PRIORITY_PREFIX + locale.toLanguageTag(), DEFAULT).coerceIn(LOW, HIGH)
@@ -45,6 +47,13 @@ object LanguagePriority {
 
     fun setSharesUserHistory(prefs: SharedPreferences, locale: Locale, shared: Boolean) =
         prefs.edit().putBoolean(PREF_SHARE_HISTORY_PREFIX + locale.toLanguageTag(), shared).apply()
+
+    /** When the language was last added to a keyboard (0 for languages added before this was recorded). */
+    fun added(prefs: SharedPreferences, locale: Locale): Long =
+        prefs.getLong(PREF_ADDED_PREFIX + locale.toLanguageTag(), 0L)
+
+    fun markAdded(prefs: SharedPreferences, locale: Locale) =
+        prefs.edit().putLong(PREF_ADDED_PREFIX + locale.toLanguageTag(), System.currentTimeMillis()).apply()
 
     /** Short label for settings rows. */
     fun label(priority: Int): String = when (priority) {
