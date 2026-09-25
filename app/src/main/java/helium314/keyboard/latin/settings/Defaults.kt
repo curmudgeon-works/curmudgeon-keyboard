@@ -131,6 +131,8 @@ object Defaults {
     @JvmField
     var PREF_GESTURE_DYNAMIC_PREVIEW_FOLLOW_SYSTEM = true
     const val PREF_GESTURE_SPACE_AWARE = false
+    const val PREF_GESTURE_CAPS_SWIPE = true // swiping up above the keyboard capitalizes the letter left from (own gesture decoder)
+    const val PREF_GESTURE_APOSTROPHE_VIA_PERIOD = true // apostrophes are swiped through the period key; off = skipped (own gesture decoder)
     const val PREF_GESTURE_CAPS_HEIGHT = 75 // percent of a key height the swipe must rise above the keyboard to capitalize (own gesture decoder)
     // own gesture decoder tuning (see OwnGestureDecoder.Tuning): inflection confidences and the scorer blend
     const val PREF_GESTURE_TURN_WEIGHT = 1.0f // multiplier on the confidence of turn inflections

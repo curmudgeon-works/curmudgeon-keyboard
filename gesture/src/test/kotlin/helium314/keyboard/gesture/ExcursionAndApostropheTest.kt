@@ -149,4 +149,46 @@ class ExcursionAndApostropheTest {
             assertEquals(word, decode(HybridScorer(), path).firstOrNull()?.word)
         }
     }
+
+    // ---- the two switches off ----
+
+    private val skipGeometry = KeyboardGeometry(geometry.keys, apostropheViaPeriod = false)
+
+    @Test
+    fun `apostrophe off - sokgraph skips the apostrophe`() {
+        val sok = SokgraphBuilder.build("don't", skipGeometry)!!
+        assertEquals(listOf('d', 'o', 'n', 't'), sok.points.map { it.char })
+    }
+
+    @Test
+    fun `apostrophe off - letters-only swipe gives the contraction`() {
+        for ((swiped, word) in listOf("dont" to "don't", "cant" to "can't", "didnt" to "didn't", "isnt" to "isn't", "youre" to "you're")) {
+            val path = SyntheticPathGenerator.idealPath(swiped, skipGeometry)
+            for (scorer in scorers) {
+                val results = GestureDecoder(scorer).decode(path, skipGeometry, vocab, maxResults = 10)
+                assertEquals(word, results.firstOrNull()?.word?.lowercase(),
+                    "${scorer.name}/$swiped: got ${results.take(4).map { it.word }}")
+            }
+        }
+    }
+
+    @Test
+    fun `apostrophe off - plain words unaffected`() {
+        for (word in listOf("in", "on", "hello", "water", "people", "keyboard")) {
+            val path = SyntheticPathGenerator.idealPath(word, skipGeometry)
+            assertEquals(word, GestureDecoder(HybridScorer()).decode(path, skipGeometry, vocab).firstOrNull()?.word)
+        }
+    }
+
+    @Test
+    fun `caps off - excursion is ignored, no capital, same word`() {
+        val plain = SyntheticPathGenerator.idealPath("water", geometry)
+        val idx = SyntheticPathGenerator.indexNearestToLetter(plain, geometry, "water", 2)
+        for (path in listOf(SyntheticPathGenerator.withExcursion(plain, geometry, idx), SyntheticPathGenerator.withExcursion(plain, geometry, 0))) {
+            for (scorer in scorers) {
+                val top = GestureDecoder(scorer, DecoderConfig(capsExcursions = false)).decode(path, geometry, vocab).firstOrNull()?.word
+                assertEquals("water", top, "${scorer.name}: got $top")
+            }
+        }
+    }
 }
