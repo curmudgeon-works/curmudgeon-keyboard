@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.screens
 
+import android.content.Context
+import helium314.keyboard.latin.common.Constants.Subtype.ExtraValue
+import helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog
+import java.util.Locale
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -78,6 +82,7 @@ fun KeyboardsScreen(
     val ctx = LocalContext.current
     val advanced by SettingsMode.state(ctx)
     var showAddKeyboard by remember { mutableStateOf(false) }
+    var keyboardToCopy: SettingsSubtype? by remember { mutableStateOf(null) } // asks: its own settings, or the common ones?
     var keyboardToDelete: SettingsSubtype? by remember { mutableStateOf(null) }
     val real = ctx.realPrefs()
     var separate by remember { mutableStateOf(KeyboardProfiles.isSeparate(real)) }
@@ -263,9 +268,17 @@ fun KeyboardsScreen(
             )
         }
         if (showAddKeyboard)
-            ListPickerDialog(
+            ListPickerDialog<Any>(
                 onDismissRequest = { showAddKeyboard = false },
-                onItemSelected = { locale ->
+                onItemSelected = { item ->
+                    if (item is CopyOf) {
+                        showAddKeyboard = false
+                        // with one set of settings for all there is nothing to choose: the copy has them too
+                        if (separate) keyboardToCopy = item.keyboard
+                        else { copyKeyboard(ctx, item.keyboard, withOwnSettings = false); generation++ }
+                        return@ListPickerDialog
+                    }
+                    val locale = item as Locale
                     val settingsSubtype = SubtypeUtilsAdditional.createDefaultSubtype(locale).toSettingsSubtype()
                     SubtypeUtilsAdditional.changeAdditionalSubtype(settingsSubtype, settingsSubtype, ctx) // registers it unless it equals a built-in one
                     SubtypeSettings.addEnabledSubtype(ctx.prefs(), settingsSubtype.toAdditionalSubtype())
@@ -276,9 +289,43 @@ fun KeyboardsScreen(
                     generation++ // stays on this screen, the new keyboard appears at the end of the list
                 },
                 title = { Text(stringResource(R.string.add_keyboard)) },
-                items = SubtypeSettings.getAvailableSubtypeLocales().sortedBy { it.localizedDisplayName(ctx.resources) },
-                getItemName = { it.localizedDisplayName(ctx.resources) },
+                // copies of the keyboards first, then a new keyboard for any language
+                items = enabledNow.map { CopyOf(it) } + SubtypeSettings.getAvailableSubtypeLocales().sortedBy { it.localizedDisplayName(ctx.resources) },
+                getItemName = { if (it is CopyOf) stringResource(R.string.copy_of_keyboard, keyboardName(it.keyboard, ctx)) else (it as Locale).localizedDisplayName(ctx.resources) },
                 showRadioButtons = false,
             )
+        keyboardToCopy?.let { source ->
+            ThreeButtonAlertDialog(
+                onDismissRequest = { keyboardToCopy = null },
+                onConfirmed = { copyKeyboard(ctx, source, withOwnSettings = true); generation++ },
+                title = { Text(stringResource(R.string.copy_of_keyboard, keyboardName(source, ctx))) },
+                content = { Text(stringResource(R.string.copy_keyboard_message)) },
+                confirmButtonText = stringResource(R.string.copy_keyboard_with_settings),
+                neutralButtonText = stringResource(R.string.copy_keyboard_common_settings),
+                onNeutral = { copyKeyboard(ctx, source, withOwnSettings = false); generation++ },
+                confirmFirst = true,
+            )
+        }
     }
+}
+
+/** An Add keyboard entry: a copy of an existing keyboard. */
+private class CopyOf(val keyboard: SettingsSubtype)
+
+/**
+ * Adds a copy of [source]: the same languages and layout, told apart by a number; with [withOwnSettings] it takes
+ * [source]'s own settings (separate settings), otherwise it starts from the common ones.
+ */
+private fun copyKeyboard(ctx: Context, source: SettingsSubtype, withOwnSettings: Boolean) {
+    val real = ctx.realPrefs()
+    val base = source.without(ExtraValue.KEYBOARD_COPY)
+    val taken = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }
+        .filter { it.without(ExtraValue.KEYBOARD_COPY) == base }
+        .mapNotNull { it.getExtraValueOf(ExtraValue.KEYBOARD_COPY)?.toIntOrNull() }
+    val number = generateSequence(2) { it + 1 }.first { it !in taken }
+    val copy = base.with(ExtraValue.KEYBOARD_COPY, number.toString())
+    SubtypeUtilsAdditional.changeAdditionalSubtype(copy, copy, ctx) // registers it
+    SubtypeSettings.addEnabledSubtype(ctx.prefs(), copy.toAdditionalSubtype())
+    KeyboardProfiles.copy(real, if (withOwnSettings) KeyboardProfiles.idFor(real, source) else KeyboardProfiles.SHARED,
+        KeyboardProfiles.idFor(real, copy))
 }

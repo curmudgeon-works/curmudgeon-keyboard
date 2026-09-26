@@ -233,16 +233,17 @@
     <string name="button_restore">Restore</string>
     <!-- Message when backup is restored successfully -->
     <string name="backup_restored">Backup restored</string>
-    <!-- Restore dialog: choose between a full restore and single keyboards -->
-    <string name="restore_choice_message">Restore everything, or only the chosen keyboards (with their settings and layouts) and leave the rest as it is.</string>
-    <!-- Restore dialog button: full restore -->
-    <string name="restore_everything">Everything</string>
-    <!-- Warning shown before a full restore -->
-    <string name="restore_everything_warning">This replaces everything on the phone with the backup: all learned words, clipboard history, keyboards and settings. Anything learned or changed since the backup is lost.</string>
-    <!-- Restore dialog button: only the chosen keyboards -->
-    <string name="restore_chosen_keyboards">Chosen keyboards</string>
-    <!-- Message when single keyboards were restored from a backup -->
-    <string name="keyboards_restored">Keyboards restored</string>
+    <!-- Restore dialog: one checklist, mirroring the factory reset one -->
+    <string name="restore_choice_message">Choose what to bring from the backup.</string>
+    <string name="restore_keyboards">Keyboards</string>
+    <string name="restore_with_keyboards">Bring with them</string>
+    <string name="restore_settings">Settings</string>
+    <string name="restore_learned_words">Learned words (for their languages)</string>
+    <string name="restore_dictionaries">Added dictionaries</string>
+    <string name="restore_also">Also restore</string>
+    <string name="restore_custom_words">Custom words</string>
+    <string name="restore_clipboard">Clipboard history</string>
+    <string name="restore_replaces_note">What\'s chosen replaces what the phone has now.</string>
     <!-- Swipe tuning screen (own gesture decoder): inflection weights and per-setting statistics -->
     <string name="swipe_tuning">Swipe tuning</string>
     <!-- The per-keyboard screen with the swipe settings and the swipe tuning -->
@@ -251,6 +252,15 @@
     <!-- On the Layout screen: the files of every secondary layout (add, load, edit, delete) -->
     <string name="layout_files">Customize keys and popups with JSON</string>
     <!-- Group on the Preferences screen: the backspace key\'s settings -->
+    <string name="factory_reset">Factory reset</string>
+    <string name="factory_reset_summary">Settings back to how they were at install</string>
+    <string name="factory_reset_message">All settings go back to their defaults. This can\'t be undone. Also reset:</string>
+    <string name="factory_reset_keyboards">Keyboards and languages</string>
+    <string name="factory_reset_learned_words">Learned words</string>
+    <string name="factory_reset_clipboard">Clipboard history</string>
+    <string name="factory_reset_custom">Your own layouts, popup layouts and added dictionaries</string>
+    <string name="factory_reset_backup_hint">To be able to go back, make a backup first (Backup and restore, above).</string>
+    <string name="factory_reset_done">Reset done</string>
     <string name="backspace_settings">Backspace</string>
     <string name="backspace_hold_deletes_words">Hold to delete whole words</string>
     <string name="backspace_hold_deletes_words_summary">Off: holding backspace deletes a character at a time</string>
@@ -378,10 +388,10 @@
     <string name="layout_group_phone">Phone pad</string>
     <string name="bottom_rows_action_key">Send key on the emoji and clipboard rows</string>
     <string name="bottom_row_tablet">Tablet-style bottom row</string>
-    <string name="hints_title">Key hints</string>
-    <string name="number_row_and_hints">Number row and hints</string>
-    <string name="hints_number_row">Hints on the number row</string>
-    <string name="hints_other_keys">Hints on the other keys</string>
+    <string name="hints_title">Symbols on keys</string>
+    <string name="number_row_and_hints">Number row and symbols</string>
+    <string name="hints_number_row">Symbols on the number row</string>
+    <string name="hints_other_keys">Symbols on the other keys</string>
     <string name="key_popups_symbols">Symbols page</string>
     <string name="key_popups_more_symbols">More symbols page</string>
     <string name="key_popups_presets">Preset popup layouts</string>
@@ -405,6 +415,11 @@
     <string name="language_other_script">Different script, needs its own keyboard</string>
     <string name="add_language">Add language</string>
     <string name="add_keyboard">Add keyboard</string>
+    <!-- %s: a keyboard's name -->
+    <string name="copy_of_keyboard">Copy of %s</string>
+    <string name="copy_keyboard_message">The copy has the same languages and layout. Which settings should it start with?</string>
+    <string name="copy_keyboard_with_settings">Ok: All its settings</string>
+    <string name="copy_keyboard_common_settings">The common settings</string>
     <string name="delete_keyboard_title">Delete this keyboard?</string>
     <string name="delete_keyboard_message">\"%s\" will be removed, with its languages, their priorities and its layout choice. This cannot be undone. Learned words and dictionaries are kept.</string>
     <string name="separate_settings_per_keyboard">Separate settings per keyboard</string>
@@ -435,16 +450,16 @@
     <!-- Description of the settings to localize number row -->
     <string name="localized_number_row_summary">Prefer localized over latin numbers</string>
     <!-- Title of the setting to enable number row hints -->
-    <string name="number_row_hints">Show hints on number row</string>
+    <string name="number_row_hints">Symbols on the number row</string>
     <!-- Title and description of the setting to show long-press hints on the letter keys -->
-    <string name="letter_hints">Show hints on letter keys</string>
-    <string name="letter_hints_summary">Long-press types the same characters when hidden</string>
+    <string name="letter_hints">Symbols on letter keys</string>
+    <string name="letter_hints_summary">Long-press still types them when hidden</string>
     <!-- Title of the setting to save subtype per app -->
     <string name="save_subtype_per_app">Remember keyboard per app</string>
     <!-- Title of the setting to show key hints -->
-    <string name="show_hints">Show key hints</string>
+    <string name="show_hints">Symbols on keys</string>
     <!-- Description of the settings to show hints -->
-    <string name="show_hints_summary">Show long-press hints</string>
+    <string name="show_hints_summary">Long-press still types them when hidden</string>
     <!-- Preferences item to set popup key order and select hints source -->
     <string name="popup_order_and_hint_source">Popup key order and hints source</string>
     <!-- Title of the setting to select key hints source -->
@@ -525,7 +540,7 @@
     <!-- Description of the setting to quick-pin toolbar keys -->
     <string name="quick_pin_toolbar_keys_summary">This will disable other long press actions for toolbar keys that are not pinned</string>
     <!-- Title of the setting to show "..." as hints for more functionality on long-press -->
-    <string name="show_popup_hints">Show functional hints</string>
+    <string name="show_popup_hints">Long-press dots</string>
     <!-- Description of the show_popup_hints setting -->
     <string name="show_popup_hints_summary">The … in the bottom right corner of keys that do something on long press</string>
     <!-- Option to remove popup keys that already exist on the base keyboard -->
