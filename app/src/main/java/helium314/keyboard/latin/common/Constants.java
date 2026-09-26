@@ -89,6 +89,9 @@ public final class Constants {
             /** Language tags indicating enabled secondary locales */
             public static final String SECONDARY_LOCALES = "SecondaryLocales";
 
+            /** The number of a copy of a keyboard (2, 3, ...): tells it apart from the original, which it otherwise equals */
+            public static final String KEYBOARD_COPY = "KeyboardCopy";
+
             /** Overrides the general "more popups" setting */
             public static final String MORE_POPUPS = "MorePopups";
 

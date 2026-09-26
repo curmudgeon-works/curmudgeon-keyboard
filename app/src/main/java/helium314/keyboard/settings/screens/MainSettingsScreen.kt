@@ -86,7 +86,8 @@ private fun PreviewScreen() {
 
 /** "English (US) + Hinglish" */
 fun keyboardName(keyboard: SettingsSubtype, ctx: Context): String =
-    (listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)).joinToString(" + ") { it.localizedDisplayName(ctx.resources) }
+    (listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)).joinToString(" + ") { it.localizedDisplayName(ctx.resources) } +
+        (keyboard.getExtraValueOf(helium314.keyboard.latin.common.Constants.Subtype.ExtraValue.KEYBOARD_COPY)?.let { " ($it)" } ?: "")
 
 /** The sections of one keyboard's settings, as menu entries. Used by the keyboard's own screen and inline under the keyboards list. */
 @Composable

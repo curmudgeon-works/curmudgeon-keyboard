@@ -25,6 +25,10 @@ object LanguagePriority {
         listOf(PREF_PRIORITY_PREFIX + locale.toLanguageTag(), PREF_SHARE_HISTORY_PREFIX + locale.toLanguageTag(),
             PREF_ADDED_PREFIX + locale.toLanguageTag())
 
+    /** Whether [key] is one of the per-language keys (priority, share switch, adding time). */
+    fun isLanguageKey(key: String) =
+        key.startsWith(PREF_PRIORITY_PREFIX) || key.startsWith(PREF_SHARE_HISTORY_PREFIX) || key.startsWith(PREF_ADDED_PREFIX)
+
     fun get(prefs: SharedPreferences, locale: Locale): Int =
         prefs.getInt(PREF_PRIORITY_PREFIX + locale.toLanguageTag(), DEFAULT).coerceIn(LOW, HIGH)
 

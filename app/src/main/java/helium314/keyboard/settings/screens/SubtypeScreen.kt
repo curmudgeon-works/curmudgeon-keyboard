@@ -223,8 +223,8 @@ fun SubtypeScreen(
                         ) { setCurrentSubtype(currentSubtype.with(ExtraValue.LOCALIZED_NUMBER_ROW, it.toString())) }
                     }
                     // two independent hint switches; the popups behind long-press stay either way
-                    PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW_HINTS, Defaults.PREF_SHOW_NUMBER_ROW_HINTS, R.string.hints_number_row) { holdSpace = true; reloadPreview() }
-                    PrefSwitchRow(Settings.PREF_SHOW_HINTS, Defaults.PREF_SHOW_HINTS, R.string.hints_other_keys) { holdSpace = true; reloadPreview() }
+                    PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW_HINTS, Defaults.PREF_SHOW_NUMBER_ROW_HINTS, R.string.hints_number_row, R.string.show_hints_summary) { holdSpace = true; reloadPreview() }
+                    PrefSwitchRow(Settings.PREF_SHOW_HINTS, Defaults.PREF_SHOW_HINTS, R.string.hints_other_keys, R.string.show_hints_summary) { holdSpace = true; reloadPreview() }
                     if (advanced) AdvancedBlock {
                         CompositionLocalProvider(LocalCompactPreferences provides true) {
                             advancedInputItems.forEach { SettingsActivity.settingsContainer[it]?.Preference() }

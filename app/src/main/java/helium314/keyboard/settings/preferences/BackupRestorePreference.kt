@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -34,11 +36,14 @@ import helium314.keyboard.keyboard.emoji.SupportedEmojis
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.common.FileUtils
 import helium314.keyboard.latin.database.Database
+import helium314.keyboard.latin.gesture.GestureDecoderVocabulary
+import helium314.keyboard.latin.personalization.UserHistoryDictionary
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
+import helium314.keyboard.latin.utils.DictionaryInfoUtils
 import helium314.keyboard.latin.utils.LanguagePriority
 import helium314.keyboard.latin.utils.LayoutType
 import helium314.keyboard.latin.utils.LayoutType.Companion.folder
@@ -197,8 +202,20 @@ private fun backupLauncher(onError: (String) -> Unit): ManagedActivityResultLaun
     }
 }
 
-/** A picked backup, copied to the cache so it can be read twice: its preferences and the keyboards they list. */
-private class PendingRestore(val file: File, val prefs: Map<String, Any?>, val keyboards: List<SettingsSubtype>)
+/** A picked backup, copied to the cache so it can be read twice: its preferences, the keyboards they list and its entries. */
+private class PendingRestore(val file: File, val prefs: Map<String, Any?>, val keyboards: List<SettingsSubtype>, val entries: Set<String>) {
+    private val plain = entries.map { it.substringAfter("unprotected${File.separator}") }
+    val hasLearnedWords = plain.any { it.startsWith(UserHistoryDictionary.NAME) || it.startsWith("blacklists${File.separator}") }
+    val hasDictionaries = plain.any { it.startsWith("dicts${File.separator}") && it.endsWith(DictionaryInfoUtils.USER_DICTIONARY_SUFFIX) }
+    val hasCustomWords = PERSONAL_DICT_FILE_NAME in entries
+    val hasClipboard = Database.NAME in entries
+}
+
+/** What the restore dialog was told to bring: [keyboards] with or without their [settings], and the rest by data type. */
+private class RestoreChoice(
+    val keyboards: List<SettingsSubtype>, val settings: Boolean, val learnedWords: Boolean, val dictionaries: Boolean,
+    val customWords: Boolean, val clipboard: Boolean,
+)
 
 @Composable
 private fun restoreLauncher(onError: (String) -> Unit, onChoose: (PendingRestore) -> Unit): ManagedActivityResultLauncher<Intent, ActivityResult> {
@@ -225,39 +242,55 @@ private fun restoreLauncher(onError: (String) -> Unit, onChoose: (PendingRestore
 @Composable
 private fun RestoreChoiceDialog(pending: PendingRestore, onDismiss: () -> Unit, onError: (String) -> Unit) {
     val ctx = LocalContext.current
-    val selected = remember(pending) { mutableStateListOf<SettingsSubtype>() }
-    var confirmEverything by remember { mutableStateOf(false) }
-    if (confirmEverything) {
-        // a full restore wipes what was learned since the backup: never on one tap
-        ConfirmationDialog(
-            onDismissRequest = { confirmEverything = false },
-            title = { Text(stringResource(R.string.restore_everything)) },
-            content = { Text(stringResource(R.string.restore_everything_warning)) },
-            confirmButtonText = stringResource(R.string.button_restore),
-            onConfirmed = { runRestore(ctx, onError, R.string.backup_restored) { restoreEverything(ctx, pending.file) }; onDismiss() },
-        )
-        return
-    }
+    val selected = remember(pending) { mutableStateListOf<SettingsSubtype>().apply { addAll(pending.keyboards) } }
+    var settings by rememberSaveable { mutableStateOf(true) }
+    var learnedWords by rememberSaveable { mutableStateOf(true) }
+    var dictionaries by rememberSaveable { mutableStateOf(true) }
+    var customWords by rememberSaveable { mutableStateOf(true) }
+    var clipboard by rememberSaveable { mutableStateOf(false) }
+    val withKeyboards = selected.isNotEmpty() // the "bring with them" rows mean nothing without a keyboard
     ThreeButtonAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.button_restore)) },
         content = {
             Column {
                 Text(stringResource(R.string.restore_choice_message))
-                pending.keyboards.forEach { keyboard ->
-                    Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = keyboard in selected, onCheckedChange = { if (it) selected.add(keyboard) else selected.remove(keyboard) })
-                        Text(keyboardName(keyboard, ctx))
+                @Composable fun Heading(text: Int) = Text(stringResource(text), style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(top = 12.dp, bottom = 2.dp))
+                @Composable fun CheckRow(text: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) =
+                    Row(verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().clickable(enabled = enabled) { onChange(!checked) }.padding(vertical = 2.dp)) {
+                        Checkbox(checked = checked, onCheckedChange = if (enabled) onChange else null, enabled = enabled)
+                        Text(text)
                     }
+                Heading(R.string.restore_keyboards)
+                pending.keyboards.forEach { keyboard ->
+                    CheckRow(keyboardName(keyboard, ctx), keyboard in selected) { if (it) selected.add(keyboard) else selected.remove(keyboard) }
                 }
+                Heading(R.string.restore_with_keyboards)
+                CheckRow(stringResource(R.string.restore_settings), settings, withKeyboards) { settings = it }
+                if (pending.hasLearnedWords)
+                    CheckRow(stringResource(R.string.restore_learned_words), learnedWords, withKeyboards) { learnedWords = it }
+                if (pending.hasDictionaries)
+                    CheckRow(stringResource(R.string.restore_dictionaries), dictionaries, withKeyboards) { dictionaries = it }
+                if (pending.hasCustomWords || pending.hasClipboard) {
+                    Heading(R.string.restore_also)
+                    if (pending.hasCustomWords) CheckRow(stringResource(R.string.restore_custom_words), customWords) { customWords = it }
+                    if (pending.hasClipboard) CheckRow(stringResource(R.string.restore_clipboard), clipboard) { clipboard = it }
+                }
+                Text(stringResource(R.string.restore_replaces_note), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
             }
         },
         scrollContent = true,
-        confirmButtonText = stringResource(R.string.restore_chosen_keyboards),
-        checkOk = { selected.isNotEmpty() },
-        onConfirmed = { runRestore(ctx, onError, R.string.keyboards_restored) { restoreKeyboards(ctx, pending, selected.toList()) } },
-        neutralButtonText = stringResource(R.string.restore_everything),
-        onNeutral = { confirmEverything = true },
+        confirmFirst = true,
+        checkOk = { withKeyboards || (customWords && pending.hasCustomWords) || (clipboard && pending.hasClipboard) },
+        onConfirmed = {
+            val choice = RestoreChoice(selected.toList(), settings, learnedWords && pending.hasLearnedWords,
+                dictionaries && pending.hasDictionaries, customWords && pending.hasCustomWords, clipboard && pending.hasClipboard)
+            runRestore(ctx, onError, R.string.backup_restored) { restoreChosen(ctx, pending, choice) }
+            onDismiss()
+        },
     )
 }
 
@@ -287,6 +320,7 @@ private fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: Int
     LayoutUtilsCustom.removeMissingLayouts(ctx)
     (ctx.getActivity() as? SettingsActivity)?.prefChanged()
     SupportedEmojis.load(ctx)
+    GestureDecoderVocabulary.clear()
     KeyboardSwitcher.getInstance().setThemeNeedsReload()
 }
 
@@ -339,18 +373,85 @@ private fun restoreEverything(ctx: Context, file: File) {
 }
 
 /**
- * Only [chosen] keyboards come out of the backup: each is added (or replaced) with its settings, its custom layout
- * files and the priority / share switches of its languages. Learned words, clipboard, other keyboards and
- * everything else stay as they are. The keyboard's settings need a set of its own, so separate settings per
- * keyboard get switched on if they aren't; the existing keyboards keep the shared set they behave by now.
+ * Brings what [choice] asks for out of the backup and leaves the rest of the phone as it is. With every keyboard
+ * of the backup chosen together with the settings, the backup's whole preference set (shared or separate, as it
+ * was) replaces the phone's; a subset is restored keyboard by keyboard, see [restoreKeyboards]. Learned words and
+ * added dictionaries follow the chosen keyboards' languages.
  */
-private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List<SettingsSubtype>) {
+private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: RestoreChoice) {
+    val everyKeyboard = choice.keyboards.toSet() == pending.keyboards.toSet()
+    val allSettings = choice.settings && choice.keyboards.isNotEmpty() && everyKeyboard
+    if (choice.keyboards.isNotEmpty()) {
+        if (allSettings) restoreAllSettings(ctx, pending)
+        else restoreKeyboards(ctx, pending, choice.keyboards, choice.settings)
+    }
+    val tags = choice.keyboards.flatMap { listOf(it.locale) + getSecondaryLocales(it.extraValues) }.map { it.toLanguageTag() }.toSet()
+    val filesDir = ctx.filesDir ?: return
+    val deviceProtectedFilesDir = DeviceProtectedUtils.getFilesDir(ctx)
+    // a language's learned words are replaced as a whole, never mixed with the phone's
+    if (choice.learnedWords) for (tag in tags) File(filesDir, "${UserHistoryDictionary.NAME}.$tag.dict").deleteRecursively()
+    fun isLearnedWords(path: String) = tags.any { path.startsWith("${UserHistoryDictionary.NAME}.$it.") || path == "blacklists${File.separator}$it.txt" }
+    fun isDictionary(path: String) = path.endsWith(DictionaryInfoUtils.USER_DICTIONARY_SUFFIX)
+        && tags.any { path.startsWith("dicts${File.separator}$it${File.separator}") }
+    // the files behind the settings: custom layouts (a keyboard's layout must exist for it), font and background
+    fun isSettingsFile(path: String) = path.startsWith("layouts${File.separator}") || path.startsWith("custom_")
+    val restoredDb = ctx.getDatabasePath(Database.NAME + "_restored")
+    ZipInputStream(FileInputStream(pending.file)).use { zip ->
+        var entry: ZipEntry? = zip.nextEntry
+        while (entry != null) {
+            val name = entry.name
+            val protected = name.startsWith("unprotected${File.separator}")
+            val path = name.substringAfter("unprotected${File.separator}")
+            val target = if (protected) File(deviceProtectedFilesDir, path) else File(filesDir, path)
+            when {
+                !backupFilePatterns.any { path.matches(it) } -> when {
+                    name == Database.NAME && choice.clipboard -> FileUtils.copyStreamToNewFile(zip, restoredDb)
+                    name == PROTECTED_PREFS_FILE_NAME && allSettings -> {
+                        val protectedPrefs = ctx.protectedPrefs()
+                        protectedPrefs.edit { clear() }
+                        readJsonLinesToSettings(String(zip.readBytes()).split("\n"), protectedPrefs)
+                    }
+                    name == PERSONAL_DICT_FILE_NAME && choice.customWords -> try {
+                        restorePersonalDictionary(ctx, String(zip.readBytes())) // never fail the whole restore over it
+                    } catch (t: Throwable) {
+                        Log.w("AdvancedScreen", "error restoring personal dictionary", t)
+                    }
+                }
+                choice.learnedWords && isLearnedWords(path) -> FileUtils.copyStreamToNewFile(zip, target)
+                choice.dictionaries && isDictionary(path) -> FileUtils.copyStreamToNewFile(zip, target)
+                allSettings && isSettingsFile(path) -> FileUtils.copyStreamToNewFile(zip, target)
+            }
+            zip.closeEntry()
+            entry = zip.nextEntry
+        }
+    }
+    if (choice.clipboard) Database.copyFromDb(restoredDb, ctx)
+    LayoutUtilsCustom.onLayoutFileChanged()
+}
+
+/** The backup's preferences replace the phone's, every keyboard's set included. */
+private fun restoreAllSettings(ctx: Context, pending: PendingRestore) {
+    Settings.getInstance().stopListener()
+    ctx.realPrefs().edit {
+        clear()
+        for ((key, value) in pending.prefs) KeyboardProfiles.put(this, key, value)
+    }
+    KeyboardProfiles.editingId = KeyboardProfiles.SHARED
+}
+
+/**
+ * Only [chosen] keyboards come out of the backup: each is added (or replaced) with its custom layout files and,
+ * [withSettings], its settings and the priority / share switches of its languages. Other keyboards stay as they
+ * are. The keyboard's settings need a set of its own, so separate settings per keyboard get switched on if they
+ * aren't; the existing keyboards keep the shared set they behave by now.
+ */
+private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List<SettingsSubtype>, withSettings: Boolean) {
     val real = ctx.realPrefs()
     val prefs = ctx.prefs()
     val backup = pending.prefs
     // its own set when the backup kept one, else the backup's shared set was what it used
     val settings = chosen.associateWith { KeyboardProfiles.ownSettingsIn(backup, it) ?: KeyboardProfiles.sharedSettingsIn(backup) }
-    if (!KeyboardProfiles.isSeparate(real))
+    if (withSettings && !KeyboardProfiles.isSeparate(real))
         KeyboardProfiles.enable(real, SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }, keepExisting = true)
 
     // custom layout files the chosen keyboards use, by their path inside the backup
@@ -373,37 +474,39 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
         LayoutUtilsCustom.onLayoutFileChanged()
     }
 
-    // the languages' priority and share switches are per language, not per keyboard
-    val editor = real.edit()
-    for (keyboard in chosen)
-        for (locale in listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues))
-            for (key in LanguagePriority.keys(locale)) backup[key]?.let { KeyboardProfiles.put(editor, key, it) }
-    editor.apply()
+    if (withSettings) {
+        // the languages' priority and share switches are per language, not per keyboard
+        val editor = real.edit()
+        for (keyboard in chosen)
+            for (locale in listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues))
+                for (key in LanguagePriority.keys(locale)) backup[key]?.let { KeyboardProfiles.put(editor, key, it) }
+        editor.apply()
+    }
 
     for (keyboard in chosen) {
         SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, keyboard, ctx) // registers it unless it equals a built-in one
         if (SubtypeSettings.getEnabledSubtypes().none { it.toSettingsSubtype() == keyboard })
             SubtypeSettings.addEnabledSubtype(prefs, keyboard.toAdditionalSubtype())
-        KeyboardProfiles.write(real, KeyboardProfiles.idFor(real, keyboard), settings.getValue(keyboard))
+        if (withSettings) KeyboardProfiles.write(real, KeyboardProfiles.idFor(real, keyboard), settings.getValue(keyboard))
     }
 }
 
-/** Reads the preferences entry of a backup and the keyboards listed in it. */
+/** Reads the preferences entry of a backup, the keyboards listed in it and the names of all its entries. */
 private fun readBackup(file: File): PendingRestore {
     var prefs: Map<String, Any?> = emptyMap()
+    val entries = mutableSetOf<String>()
     ZipInputStream(FileInputStream(file)).use { zip ->
         var entry: ZipEntry? = zip.nextEntry
         while (entry != null) {
-            if (entry.name == PREFS_FILE_NAME) {
+            entries.add(entry.name)
+            if (entry.name == PREFS_FILE_NAME)
                 prefs = readJsonLinesToMap(String(zip.readBytes()).split("\n"))
-                break
-            }
             zip.closeEntry()
             entry = zip.nextEntry
         }
     }
     val keyboards = (prefs[Settings.PREF_ENABLED_SUBTYPES] as? String)?.let { SubtypeSettings.createSettingsSubtypes(it) }.orEmpty()
-    return PendingRestore(file, prefs, keyboards)
+    return PendingRestore(file, prefs, keyboards, entries)
 }
 
 private fun readJsonLinesToMap(list: List<String>): Map<String, Any?> {
