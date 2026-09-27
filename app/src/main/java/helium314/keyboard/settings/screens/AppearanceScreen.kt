@@ -227,7 +227,9 @@ fun AppearanceScreen(
             preview.changed(emoji = changedKeys.any { it in emojiKeys })
         }
     }
-    fun leave() { if (changed) askOnLeave = true else onClickBack() }
+    // checked when leaving, not taken from this composition: the top bar's back arrow can hold an older copy of this
+    // function (from before the first change), and the back gesture and the arrow must both ask
+    fun leave() { if (draft.hasChanges(ctx)) askOnLeave = true else onClickBack() }
     BackHandler(enabled = changed) { leave() }
     var bottomBarTop by remember { mutableIntStateOf(-1) }
     DisposableEffect(Unit) { onDispose { (ctx.getActivity() as? SettingsActivity)?.touchPassFromY = Int.MAX_VALUE } }
