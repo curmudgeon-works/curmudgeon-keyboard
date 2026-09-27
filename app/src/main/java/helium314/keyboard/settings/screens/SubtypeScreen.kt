@@ -505,8 +505,8 @@ private fun SwitchRow(title: String, checked: Boolean, summary: String? = null, 
 }
 
 /** The Input items shown only in advanced mode, last in the group (see [AdvancedBlock]). */
-/** Settings whose dialogs keep the preview keyboard up (to hear the key sound while choosing it). */
-private val soundPreviewItems = setOf(Settings.PREF_KEYPRESS_SOUND, Settings.PREF_KEYPRESS_SOUND_VOLUME)
+/** Settings whose dialogs keep the preview keyboard up (to hear the key sound or feel the vibration while choosing it). */
+private val soundPreviewItems = setOf(Settings.PREF_KEYPRESS_SOUND, Settings.PREF_KEYPRESS_SOUND_VOLUME, Settings.PREF_VIBRATION_DURATION_SETTINGS)
 
 private val advancedInputItems = listOf(Settings.PREF_SAVE_SUBTYPE_PER_APP) // (emoji descriptions: Appearance, Emoji group)
 
