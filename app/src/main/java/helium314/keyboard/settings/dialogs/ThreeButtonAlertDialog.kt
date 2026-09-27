@@ -73,6 +73,7 @@ fun ThreeButtonAlertDialog(
             SideEffect {
                 // no focus: the keyboard stays with the screen behind; outside taps are reported so they still dismiss
                 window?.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH)
+                window?.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND) // the keyboard below is the preview: no fade
                 window?.setGravity(Gravity.TOP)
             }
             // back goes to the screen behind too, so the screen's activity dismisses the dialog while it is open

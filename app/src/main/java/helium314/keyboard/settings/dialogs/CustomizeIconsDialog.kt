@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.keyboard.internal.KeyboardIconsSet
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.settings.customIconNames
@@ -69,11 +70,32 @@ fun CustomizeIconsDialog(
     var showIconDialog: Pair<String, String>? by rememberSaveable { mutableStateOf(null) }
     var showDeletePrefConfirmDialog by rememberSaveable { mutableStateOf(false) }
     val prefs = ctx.prefs()
+    // every change shows on the live keyboard at once; Cancel puts back what was set when the dialog opened
+    val initial = remember { prefs.getString(prefKey, null) }
+    var confirmed by remember { mutableStateOf(false) }
+    fun writeIcons(change: (MutableMap<String, String>) -> Unit) {
+        runCatching {
+            val icons = customIconNames(prefs).toMutableMap()
+            change(icons)
+            if (icons.isEmpty()) prefs.edit { remove(prefKey) }
+            else prefs.edit { putString(prefKey, Json.encodeToString(icons)) }
+        }
+        KeyboardIconsSet.instance.loadIcons(ctx)
+        KeyboardIconsSet.needsReload = true
+        KeyboardSwitcher.getInstance().setThemeNeedsReload()
+    }
+    fun restore(value: String?) {
+        prefs.edit { if (value == null) remove(prefKey) else putString(prefKey, value) }
+        KeyboardIconsSet.instance.loadIcons(ctx)
+        KeyboardIconsSet.needsReload = true
+        KeyboardSwitcher.getInstance().setThemeNeedsReload()
+    }
     ThreeButtonAlertDialog(
-        onDismissRequest = onDismissRequest,
-        onConfirmed = { },
-        confirmButtonText = null,
-        cancelButtonText = stringResource(R.string.dialog_close),
+        onDismissRequest = {
+            if (!confirmed && prefs.getString(prefKey, null) != initial) restore(initial)
+            onDismissRequest()
+        },
+        onConfirmed = { confirmed = true },
         neutralButtonText = if (prefs.contains(prefKey)) stringResource(R.string.button_default) else null,
         onNeutral = { showDeletePrefConfirmDialog = true },
         title = { Text(stringResource(R.string.customize_icons)) },
@@ -101,6 +123,9 @@ fun CustomizeIconsDialog(
         val icons = iconsSet.toList()
         val initialIcon = KeyboardIconsSet.instance.iconIds[iconName]
         var selectedIcon by rememberSaveable { mutableStateOf(initialIcon) }
+        // this slot's saved name when the grid opened, for Cancel
+        val slotInitial = remember(iconName) { customIconNames(prefs)[iconName] }
+        var slotConfirmed by remember(iconName) { mutableStateOf(false) }
 
         val gridState = rememberLazyGridState()
         LaunchedEffect(initialIcon) {
@@ -108,26 +133,18 @@ fun CustomizeIconsDialog(
             if (index != -1) gridState.animateScrollToItem(index, -state.layoutInfo.viewportSize.height / 3)
         }
         ThreeButtonAlertDialog(
-            onDismissRequest = { showIconDialog = null },
-            onConfirmed = {
-                runCatching {
-                    val newIcons = customIconNames(prefs).toMutableMap()
-                    newIcons[iconName] = selectedIcon?.let { ctx.resources.getResourceEntryName(it) } ?: return@runCatching
-                    prefs.edit { putString(prefKey, Json.encodeToString(newIcons)) }
-                    KeyboardIconsSet.instance.loadIcons(ctx)
-                }
+            onDismissRequest = {
+                if (!slotConfirmed && customIconNames(prefs)[iconName] != slotInitial)
+                    writeIcons { if (slotInitial == null) it.remove(iconName) else it[iconName] = slotInitial }
                 reloadItem(iconName)
+                showIconDialog = null
             },
+            onConfirmed = { slotConfirmed = true; reloadItem(iconName) },
             neutralButtonText = if (customIconNames(prefs).contains(iconName)) stringResource(R.string.button_default) else null,
             onNeutral = {
+                slotConfirmed = true
                 showIconDialog = null
-                runCatching {
-                    val icons2 = customIconNames(prefs).toMutableMap()
-                    icons2.remove(iconName)
-                    if (icons2.isEmpty()) prefs.edit { remove(prefKey) }
-                    else prefs.edit { putString(prefKey, Json.encodeToString(icons2)) }
-                    KeyboardIconsSet.instance.loadIcons(ctx)
-                }
+                writeIcons { it.remove(iconName) }
                 reloadItem(iconName)
             },
             title = { Text(showIconDialog!!.second) },
@@ -143,7 +160,11 @@ fun CustomizeIconsDialog(
                             LocalContentColor provides color
                         ) {
                             Box(
-                                Modifier.size(40.dp).clickable { selectedIcon = resId },
+                                Modifier.size(40.dp).clickable {
+                                    selectedIcon = resId
+                                    // shows on the live keyboard right away
+                                    writeIcons { icons -> icons[iconName] = ctx.resources.getResourceEntryName(resId) }
+                                },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(painterResourceCompat(resId), null, Modifier.fillMaxSize(0.8f))
@@ -159,9 +180,9 @@ fun CustomizeIconsDialog(
             onDismissRequest = { showDeletePrefConfirmDialog = false },
             onConfirmed = {
                 showDeletePrefConfirmDialog = false
+                confirmed = true
                 onDismissRequest()
-                prefs.edit { remove(prefKey) }
-                KeyboardIconsSet.instance.loadIcons(ctx)
+                restore(null)
             },
             content = { Text(stringResource(R.string.customize_icons_reset_message)) }
         )
