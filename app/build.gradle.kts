@@ -60,7 +60,7 @@ android {
             isJniDebuggable = false
         }
         debug {
-            // "normal" debug has minify for smaller APK to fit the GitHub 25 MB limit when zipped
+            // debug has minify for a smaller APK (GitHub's 25 MB limit when zipped)
             // and for better performance in case users want to install a debug APK
             isMinifyEnabled = true
             isJniDebuggable = false
@@ -90,29 +90,24 @@ android {
             // the play flavor ships all bundled dictionaries, like upstream (~40 MB APK; en-US only was ~9 MB)
             variant.outputs.forEach { output ->
                 if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
-                    // keep the historical name for the normal flavor, distinct names for lab and play
                     output.outputFileName = when (variant.flavorName) {
-                        "lab" -> "HeliBoard_Lab_${defaultConfig.versionName}-${variant.buildType}.apk"
                         "play" -> "Curmudgeon_Keyboard_${output.versionName.get()}-${variant.buildType}.apk"
-                        else -> "HeliBoard_${defaultConfig.versionName}-${variant.buildType}.apk"
+                        else -> "HeliBoard_Lab_${defaultConfig.versionName}-${variant.buildType}.apk"
                     }
                 }
             }
         }
     }
 
-    // "normal" is the unchanged keyboard; "lab" installs side-by-side ("HeliBoard Lab",
-    // labels overridden in src/lab/res) and swipe-decodes with the in-tree :gesture decoder
-    // (see docs/gesture-decoder-spec.md) instead of the proprietary library.
+    // "play" is the app (phones, testers, Google Play); "lab" installs side by side ("HeliBoard Lab", labels
+    // overridden in src/lab/res) for swipe experiments before they reach play. Both swipe-decode with the in-tree
+    // :gesture decoder (docs/gesture-decoder-spec.md). Upstream's "normal" flavor (Google's closed swipe library,
+    // which can't ship) was removed in 0.1.004.
     flavorDimensions += "distribution"
     productFlavors {
-        create("normal") {
-            dimension = "distribution"
-            isDefault = true
-            buildConfigField("boolean", "USE_OWN_GESTURE_DECODER", "false")
-        }
         create("lab") {
             dimension = "distribution"
+            isDefault = true
             applicationIdSuffix = ".lab"
             buildConfigField("boolean", "USE_OWN_GESTURE_DECODER", "true")
         }
@@ -183,8 +178,7 @@ android {
 }
 
 dependencies {
-    // own gesture decoder (only reachable when BuildConfig.USE_OWN_GESTURE_DECODER, i.e. lab flavor;
-    // R8 strips it from normal builds since all references are behind the constant-false flag)
+    // own gesture decoder (both flavors)
     implementation(project(":gesture"))
 
     // androidx
