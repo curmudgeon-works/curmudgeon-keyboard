@@ -196,7 +196,9 @@ fun getOrCreate(context: Context, locale: Locale): LocaleKeyboardInfos =
 
 fun addLocaleKeyTextsToParams(context: Context, params: KeyboardParams, popupKeysSetting: String) {
     val locales = params.mSecondaryLocales + params.mId.locale
-    params.mLocaleKeyboardInfos = localeKeyboardInfosCache.getOrPut(locales.joinToString { it.toString() }) {
+    // the level is part of the key: the same languages at another level are another table (a preset switch
+    // otherwise kept showing the popups of the level the table was first built with)
+    params.mLocaleKeyboardInfos = localeKeyboardInfosCache.getOrPut(locales.joinToString { it.toString() } + "|" + popupKeysSetting) {
         createLocaleKeyTexts(context, params, popupKeysSetting)
     }
 }
