@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings
 
+import helium314.keyboard.settings.dialogs.LocalKeepKeyboard
+
+import androidx.compose.ui.window.PopupProperties
+
 import androidx.compose.foundation.background
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.VectorDrawable
@@ -148,7 +152,9 @@ fun <T>DropDownField(
     }
     DropdownMenu(
         expanded = expanded,
-        onDismissRequest = { expanded = false }
+        onDismissRequest = { expanded = false },
+        // on a screen whose keyboard is the preview the menu must not take the focus, or the keyboard goes away
+        properties = PopupProperties(focusable = !LocalKeepKeyboard.current),
     ) {
         items.forEach {
             DropdownMenuItem(

@@ -39,7 +39,7 @@ final class EmojiCategory {
     private static final int ID_UNSPECIFIED = -1;
     public static final int ID_RECENTS = 0;
     private static final int ID_SMILEYS_EMOTION = 1;
-    private static final int ID_PEOPLE_BODY = 2;
+    static final int ID_PEOPLE_BODY = 2;
     private static final int ID_ANIMALS_NATURE = 3;
     private static final int ID_FOOD_DRINK = 4;
     private static final int ID_TRAVEL_PLACES = 5;

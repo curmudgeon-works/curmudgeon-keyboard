@@ -1,6 +1,46 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.screens
 
+import androidx.compose.runtime.DisposableEffect
+
+import helium314.keyboard.settings.dialogs.LocalPreviewEmojiPeople
+
+import helium314.keyboard.settings.preferences.ScalePart
+
+import helium314.keyboard.settings.DropDownField
+
+import helium314.keyboard.settings.WithSmallTitle
+
+import androidx.compose.runtime.mutableFloatStateOf
+
+import androidx.compose.material3.Slider
+
+import helium314.keyboard.latin.utils.ResourceUtils
+
+import androidx.core.view.WindowInsetsCompat
+
+import androidx.core.view.ViewCompat
+
+import androidx.compose.ui.platform.LocalView
+
+import helium314.keyboard.settings.TapRevealer
+
+import helium314.keyboard.settings.dialogs.LocalPreviewEmoji
+
+import helium314.keyboard.settings.preferences.TextStyleKeys
+
+import helium314.keyboard.settings.preferences.TextStylePreference
+
+import androidx.compose.foundation.layout.Box
+
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import kotlin.math.roundToInt
+
+import helium314.keyboard.settings.dialogs.LocalBottomBarTop
+
+import helium314.keyboard.keyboard.KeyboardLayoutSet
+
 import android.content.Context
 import android.os.Build
 import androidx.activity.compose.BackHandler
@@ -96,20 +136,17 @@ fun AppearanceScreen(
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
     val dayNightMode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && prefs.getBoolean(Settings.PREF_THEME_DAY_NIGHT, Defaults.PREF_THEME_DAY_NIGHT)
     val items = listOf(
-        R.string.settings_screen_theme,
+        // a theme saves everything on this screen, so it comes first
         SettingsWithoutKey.APPEARANCE_LOOKS,
-        Settings.PREF_THEME_STYLE,
-        Settings.PREF_ICON_STYLE,
-        Settings.PREF_CUSTOM_ICON_NAMES,
+        R.string.appearance_group_colors,
         Settings.PREF_THEME_COLORS,
-        Settings.PREF_THEME_KEY_BORDERS,
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
             Settings.PREF_THEME_DAY_NIGHT else null,
         if (dayNightMode) Settings.PREF_THEME_COLORS_NIGHT else null,
-        Settings.PREF_NAVBAR_COLOR,
         SettingsWithoutKey.BACKGROUND_IMAGE,
         SettingsWithoutKey.BACKGROUND_IMAGE_LANDSCAPE,
-        R.string.settings_category_miscellaneous,
+        R.string.appearance_group_style,
+        Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX,
         Settings.PREF_ENABLE_SPLIT_KEYBOARD,
         if (prefs.getBoolean(Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE, Defaults.PREF_ENABLE_SPLIT_KEYBOARD)
             || prefs.getBoolean(Settings.PREF_ENABLE_SPLIT_KEYBOARD, Defaults.PREF_ENABLE_SPLIT_KEYBOARD)
@@ -117,35 +154,37 @@ fun AppearanceScreen(
             || prefs.getBoolean(Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE, Defaults.PREF_ENABLE_SPLIT_KEYBOARD)
             )
             Settings.PREF_SPLIT_SPACER_SCALE_PREFIX else null,
-        if (prefs.getBoolean(Settings.PREF_THEME_KEY_BORDERS, Defaults.PREF_THEME_KEY_BORDERS))
-            Settings.PREF_NARROW_KEY_GAPS else null,
-        Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX,
+        Settings.PREF_THEME_KEY_BORDERS,
+        Settings.PREF_KEY_HORIZONTAL_GAP,
+        Settings.PREF_KEY_VERTICAL_GAP,
+        Settings.PREF_THEME_STYLE,
+        Settings.PREF_ICON_STYLE,
+        Settings.PREF_CUSTOM_ICON_NAMES,
         Settings.PREF_BOTTOM_ROW_SCALE_PREFIX,
-        Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX,
         Settings.PREF_SIDE_PADDING_SCALE_PREFIX,
+        R.string.appearance_group_fonts,
+        Settings.PREF_SHOW_NUMBER_ROW_HINTS,
+        Settings.PREF_SHOW_HINTS,
+        Settings.PREF_SHOW_POPUP_HINTS,
+        SettingsWithoutKey.KEY_TEXT_STYLE,
+        SettingsWithoutKey.HINT_TEXT_STYLE,
+        SettingsWithoutKey.SUGGESTION_TEXT_STYLE,
         Settings.PREF_SPACE_BAR_TEXT,
-        SettingsWithoutKey.CUSTOM_FONT,
-        Settings.PREF_FONT_SCALE,
-        SettingsWithoutKey.CUSTOM_EMOJI_FONT,
+        R.string.appearance_group_emoji,
         Settings.PREF_EMOJI_FONT_SCALE,
         if (prefs.getFloat(Settings.PREF_EMOJI_FONT_SCALE, Defaults.PREF_EMOJI_FONT_SCALE) != 1f)
             Settings.PREF_EMOJI_KEY_FIT else null,
         if (prefs.getInt(Settings.PREF_EMOJI_MAX_SDK, 0) >= 24)
             Settings.PREF_EMOJI_SKIN_TONE else null,
-        R.string.settings_category_suggestion_strip,
-        Settings.PREF_SUGGESTION_TEXT_SIZE,
-        Settings.PREF_SUGGESTION_BOLD,
-        Settings.PREF_SUGGESTION_ITALIC,
-        Settings.PREF_SUGGESTION_UNDERLINE,
-        Settings.PREF_SUGGESTION_WORD_PADDING,
-        Settings.PREF_TOOLBAR_EXPAND_ICON,
-        R.string.settings_category_key_gaps,
-        Settings.PREF_KEY_HORIZONTAL_GAP,
-        Settings.PREF_KEY_VERTICAL_GAP,
+        SettingsWithoutKey.CUSTOM_EMOJI_FONT,
+        Settings.PREF_SHOW_EMOJI_DESCRIPTIONS,
     )
     // every change shows on the live keyboard at once; the draft remembers how things were when the screen opened
-    val draft = remember { AppearanceDraft.of(ctx) }
+    // after Accept or Reject the current state is the new starting point: a fresh snapshot
+    var draft by remember { mutableStateOf(AppearanceDraft.of(ctx)) }
     val changed = draft.hasChanges(ctx)
+    val pendingKeys = if (changed) draft.changedKeys(ctx) else emptySet()
+    val pendingFiles = if (changed) draft.changedFiles() else emptySet()
     var askOnLeave by remember { mutableStateOf(false) }
     var askReject by remember { mutableStateOf(false) }
     var askAccept by remember { mutableStateOf(false) }
@@ -154,22 +193,43 @@ fun AppearanceScreen(
     val focusManager = LocalFocusManager.current
     val softKeyboard = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
-    val preview = remember { PreviewKeyboard(tryIt, scope) { focusManager.clearFocus(); softKeyboard?.hide() } }
+    // where the keyboard's top (with the try-it bar on it) will be: as seen the last time it was up, else computed from
+    // the keyboard's own height; a row tapped below that line is moved above it as the keyboard is raised
+    val revealer = remember { TapRevealer() }
+    val view = LocalView.current
+    var hiddenBarTop by remember { mutableIntStateOf(-1) }
+    var shownBarTop by remember { mutableIntStateOf(-1) }
+    fun keyboardLine(): Int {
+        if (shownBarTop > 0) return shownBarTop
+        if (hiddenBarTop <= 0) return Int.MAX_VALUE
+        val sv = Settings.getValues()
+        val strip = ctx.resources.getDimensionPixelSize(R.dimen.config_suggestions_strip_height)
+        return hiddenBarTop - ResourceUtils.getKeyboardHeight(ctx.resources, sv) - strip
+    }
+    val preview = remember { PreviewKeyboard(tryIt, scope, showIme = { softKeyboard?.show() }, reveal = { revealer.revealAbove(keyboardLine()) }) {
+        focusManager.clearFocus(); softKeyboard?.hide() } }
     // a changed appearance value (a switch, say) brings the keyboard up for a moment; dialogs report themselves
     var lastValues by remember { mutableStateOf(AppearanceLooks.current(prefs)) }
     LaunchedEffect(b?.value) {
         val now = AppearanceLooks.current(prefs)
-        if (now != lastValues) { lastValues = now; preview.changed() }
+        if (now != lastValues) {
+            val changedKeys = (now.keys + lastValues.keys).filter { now[it] != lastValues[it] }
+            lastValues = now
+            preview.changed(emoji = changedKeys.any { it in emojiKeys })
+        }
     }
     fun leave() { if (changed) askOnLeave = true else onClickBack() }
     BackHandler(enabled = changed) { leave() }
-    CompositionLocalProvider(LocalKeepKeyboard provides true, LocalPreviewKeyboard provides preview) { SearchSettingsScreen(
+    var bottomBarTop by remember { mutableIntStateOf(-1) }
+    DisposableEffect(Unit) { onDispose { (ctx.getActivity() as? SettingsActivity)?.touchPassFromY = Int.MAX_VALUE } }
+    CompositionLocalProvider(LocalKeepKeyboard provides true, LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) { SearchSettingsScreen(
         onClickBack = ::leave,
         title = stringResource(R.string.settings_screen_appearance),
         settings = items,
         simpleModeKeys = setOf(
-            SettingsWithoutKey.APPEARANCE_LOOKS, Settings.PREF_THEME_COLORS, Settings.PREF_THEME_KEY_BORDERS, Settings.PREF_THEME_DAY_NIGHT,
-            Settings.PREF_THEME_COLORS_NIGHT, Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, Settings.PREF_FONT_SCALE,
+            SettingsWithoutKey.APPEARANCE_LOOKS, Settings.PREF_THEME_STYLE, Settings.PREF_THEME_COLORS, Settings.PREF_THEME_KEY_BORDERS, Settings.PREF_THEME_DAY_NIGHT,
+            Settings.PREF_THEME_COLORS_NIGHT, Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, SettingsWithoutKey.KEY_TEXT_STYLE, SettingsWithoutKey.HINT_TEXT_STYLE, SettingsWithoutKey.SUGGESTION_TEXT_STYLE,
+            Settings.PREF_SHOW_NUMBER_ROW_HINTS, Settings.PREF_SHOW_HINTS,
         ),
         // cross and tick: reject or accept everything changed since the screen opened, each asks first
         topActions = {
@@ -178,21 +238,32 @@ fun AppearanceScreen(
                 IconButton({ askAccept = true }) { Icon(painterResource(R.drawable.ic_check), stringResource(R.string.appearance_accept)) }
             }
         },
-        bottomBar = { TryItBar(keyboard, tryIt, onFocus = preview::onFocus) },
+        bottomBar = { Box(Modifier.onGloballyPositioned {
+            bottomBarTop = it.positionInWindow().y.roundToInt()
+            // the try-it bar stays usable while a dialog is open (typing, the ABC / 123 / ☎ / 😀 tabs)
+            (ctx.getActivity() as? SettingsActivity)?.touchPassFromY = bottomBarTop
+            val imeUp = ViewCompat.getRootWindowInsets(view)?.isVisible(WindowInsetsCompat.Type.ime()) == true
+            if (imeUp) shownBarTop = bottomBarTop else hiddenBarTop = bottomBarTop
+        }) { TryItBar(keyboard, tryIt, onFocus = preview::onFocus) } },
+        revealer = revealer,
+        isPending = { tile -> tileChanged(tile, pendingKeys, pendingFiles) },
     )
     if (askReject)
         ConfirmationDialog(
             onDismissRequest = { askReject = false },
-            title = { Text(stringResource(R.string.appearance_reject)) },
+            title = { Text(stringResource(R.string.appearance_reject_title)) },
             content = { Text(stringResource(R.string.appearance_reject_message)) },
-            onConfirmed = { draft.reject(ctx) },
+            cancelButtonText = stringResource(R.string.appearance_keep_working),
+            confirmButtonText = stringResource(R.string.appearance_discard_all),
+            onConfirmed = { draft.reject(ctx); draft = AppearanceDraft.of(ctx) },
         )
     if (askAccept)
         ConfirmationDialog(
             onDismissRequest = { askAccept = false },
-            title = { Text(stringResource(R.string.appearance_accept)) },
-            content = { Text(stringResource(R.string.appearance_accept_message)) },
-            onConfirmed = { draft.accept() },
+            title = { Text(stringResource(R.string.appearance_accept_title)) },
+            cancelButtonText = stringResource(R.string.appearance_keep_working),
+            confirmButtonText = stringResource(R.string.appearance_accept_all),
+            onConfirmed = { draft.accept(); draft = AppearanceDraft.of(ctx) },
         )
     }
     if (askOnLeave)
@@ -207,8 +278,29 @@ fun AppearanceScreen(
         )
 }
 
+/** Settings whose change is best seen on the emoji panel. */
+private val emojiKeys = setOf(Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT, Settings.PREF_EMOJI_SKIN_TONE)
+
 fun createAppearanceSettings(context: Context) = listOf(
-    Setting(context, SettingsWithoutKey.APPEARANCE_LOOKS, R.string.appearance_looks, R.string.appearance_looks_summary) {
+    Setting(context, SettingsWithoutKey.KEY_TEXT_STYLE, R.string.key_text_style) {
+        TextStylePreference(it, TextStyleKeys(Settings.PREF_KEY_FONT, Settings::getCustomFontFile, Settings.PREF_FONT_SCALE,
+            Defaults.PREF_FONT_SCALE, 0.5f..1.5f, Settings.PREF_KEY_TEXT_BOLD, Defaults.PREF_KEY_TEXT_BOLD,
+            Settings.PREF_KEY_TEXT_ITALIC, Settings.PREF_KEY_TEXT_UNDERLINE))
+    },
+    Setting(context, SettingsWithoutKey.SUGGESTION_TEXT_STYLE, R.string.suggestion_text_style) {
+        TextStylePreference(it, TextStyleKeys(Settings.PREF_SUGGESTION_FONT, Settings::getCustomSuggestionFontFile,
+            Settings.PREF_SUGGESTION_TEXT_SIZE, Defaults.PREF_SUGGESTION_TEXT_SIZE.toFloat(), 10f..32f,
+            Settings.PREF_SUGGESTION_BOLD, Defaults.PREF_SUGGESTION_BOLD, Settings.PREF_SUGGESTION_ITALIC, Settings.PREF_SUGGESTION_UNDERLINE,
+            sizeIsInt = true, sizeText = { "${it.roundToInt()} dp" },
+            extraKeys = listOf(Settings.PREF_SUGGESTION_WORD_PADDING, Settings.PREF_TOOLBAR_EXPAND_ICON),
+            extra = { reload -> SuggestionStripExtras(reload) }))
+    },
+    Setting(context, SettingsWithoutKey.HINT_TEXT_STYLE, R.string.hint_text_style) {
+        TextStylePreference(it, TextStyleKeys(Settings.PREF_HINT_FONT, Settings::getCustomHintFontFile, Settings.PREF_HINT_FONT_SCALE,
+            Defaults.PREF_HINT_FONT_SCALE, 0.5f..2f, Settings.PREF_HINT_TEXT_BOLD, Defaults.PREF_HINT_TEXT_BOLD,
+            Settings.PREF_HINT_TEXT_ITALIC, Settings.PREF_HINT_TEXT_UNDERLINE))
+    },
+    Setting(context, SettingsWithoutKey.APPEARANCE_LOOKS, R.string.appearance_looks) {
         SavedLooksPreference(it)
     },
     Setting(context, Settings.PREF_THEME_STYLE, R.string.theme_style) { setting ->
@@ -223,12 +315,7 @@ fun createAppearanceSettings(context: Context) = listOf(
             Defaults.PREF_ICON_STYLE,
             live = true,
         ) {
-            if (it != KeyboardTheme.STYLE_HOLO) {
-                if (prefs.getString(Settings.PREF_THEME_COLORS, Defaults.PREF_THEME_COLORS) == KeyboardTheme.THEME_HOLO_WHITE)
-                    prefs.edit { remove(Settings.PREF_THEME_COLORS) }
-                if (prefs.getString(Settings.PREF_THEME_COLORS_NIGHT, Defaults.PREF_THEME_COLORS_NIGHT) == KeyboardTheme.THEME_HOLO_WHITE)
-                    prefs.edit { remove(Settings.PREF_THEME_COLORS_NIGHT) }
-            }
+            // (upstream reset Holo White colours on leaving the Holo style; they're allowed with every style now)
             KeyboardIconsSet.needsReload = true // only relevant for Settings.PREF_CUSTOM_ICON_NAMES
             KeyboardSwitcher.getInstance().setThemeNeedsReload()
         }
@@ -312,11 +399,8 @@ fun createAppearanceSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_THEME_KEY_BORDERS, R.string.key_borders) {
         SwitchPreference(it, Defaults.PREF_THEME_KEY_BORDERS) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
-    Setting(context, Settings.PREF_THEME_DAY_NIGHT, R.string.day_night_mode, R.string.day_night_mode_summary) {
+    Setting(context, Settings.PREF_THEME_DAY_NIGHT, R.string.day_night_mode) {
         SwitchPreference(it, Defaults.PREF_THEME_DAY_NIGHT) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
-    },
-    Setting(context, Settings.PREF_NAVBAR_COLOR, R.string.theme_navbar, R.string.day_night_mode_summary) {
-        SwitchPreference(it, Defaults.PREF_NAVBAR_COLOR)
     },
     Setting(context, SettingsWithoutKey.BACKGROUND_IMAGE, R.string.customize_background_image) {
         BackgroundImagePref(it, false)
@@ -351,7 +435,11 @@ fun createAppearanceSettings(context: Context) = listOf(
                 content = {
                     Column {
                         prefAndName.forEach {
-                            SwitchPreference(name = it.second, key = it.first, default = Defaults.PREF_ENABLE_SPLIT_KEYBOARD)
+                            SwitchPreference(name = it.second, key = it.first, default = Defaults.PREF_ENABLE_SPLIT_KEYBOARD) {
+                                // the live keyboard shows the split right away
+                                KeyboardLayoutSet.onSystemLocaleChanged()
+                                KeyboardSwitcher.getInstance().setThemeNeedsReload()
+                            }
                         }
                     }
                 }
@@ -370,9 +458,6 @@ fun createAppearanceSettings(context: Context) = listOf(
         ) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
     // todo: also for landscape + folded, but maybe consider this variable gap setting first so it could be a scale setting (was in some PR)
-    Setting(context, Settings.PREF_NARROW_KEY_GAPS, R.string.prefs_narrow_key_gaps) {
-        SwitchPreference(it, Defaults.PREF_NARROW_KEY_GAPS) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
-    },
     Setting(context, Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, R.string.prefs_keyboard_height_scale) { setting ->
         KeyboardScalePreference(
             live = true,
@@ -386,7 +471,7 @@ fun createAppearanceSettings(context: Context) = listOf(
             description = { "${(100 * it).toInt()}%" }
         ) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
-    Setting(context, Settings.PREF_BOTTOM_ROW_SCALE_PREFIX, R.string.prefs_bottom_row_scale) { setting ->
+    Setting(context, Settings.PREF_BOTTOM_ROW_SCALE_PREFIX, R.string.prefs_bottom_row_size) { setting ->
         KeyboardScalePreference(
             live = true,
             name = setting.title,
@@ -394,18 +479,10 @@ fun createAppearanceSettings(context: Context) = listOf(
             dimensions = listOf(stringResource(R.string.landscape), stringResource(R.string.folded)),
             defaults = Defaults.PREF_BOTTOM_ROW_SCALE,
             range = 0.5f..2f,
-            description = { "${(100 * it).toInt()}%" }
-        ) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
-    },
-    Setting(context, Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX, R.string.prefs_bottom_padding_scale) { setting ->
-        KeyboardScalePreference(
-            live = true,
-            name = setting.title,
-            baseKey = setting.key,
-            dimensions = listOf(stringResource(R.string.landscape), stringResource(R.string.folded)),
-            defaults = Defaults.PREF_BOTTOM_PADDING_SCALE,
-            range = 0f..5f,
-            description = { "${(100 * it).toInt()}%" }
+            description = { "${(100 * it).toInt()}%" },
+            firstTitle = stringResource(R.string.bottom_row_part_scale),
+            more = listOf(ScalePart(stringResource(R.string.bottom_row_part_padding), Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX,
+                Defaults.PREF_BOTTOM_PADDING_SCALE, 0f..5f) { "${(100 * it).toInt()}%" }),
         ) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
     Setting(context, Settings.PREF_SIDE_PADDING_SCALE_PREFIX, R.string.prefs_side_padding_scale) { setting ->
@@ -422,36 +499,31 @@ fun createAppearanceSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_SPACE_BAR_TEXT, R.string.prefs_space_bar_text) {
         TextInputPreference(it, Defaults.PREF_SPACE_BAR_TEXT)
     },
-    Setting(context, SettingsWithoutKey.CUSTOM_FONT, R.string.custom_font) {
-        CustomFontPreference(it, Settings.getCustomFontFile(LocalContext.current), R.string.custom_font)
-    },
-    Setting(context, Settings.PREF_FONT_SCALE, R.string.prefs_font_scale) { def ->
-        SliderPreference(
-            live = true,
-            name = def.title,
-            key = def.key,
-            default = Defaults.PREF_FONT_SCALE,
-            range = 0.5f..1.5f,
-            description = { "${(100 * it).toInt()}%" }
-        ) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
-    },
     Setting(context, SettingsWithoutKey.CUSTOM_EMOJI_FONT, R.string.custom_emoji_font) {
+        CompositionLocalProvider(LocalPreviewEmoji provides true) {
         CustomFontPreference(it, Settings.getCustomEmojiFontFile(LocalContext.current), R.string.custom_emoji_font)
+        }
     },
     Setting(context, Settings.PREF_EMOJI_FONT_SCALE, R.string.prefs_emoji_font_scale) { setting ->
+        CompositionLocalProvider(LocalPreviewEmoji provides true) {
         SliderPreference(
             live = true,
+            applyOnRelease = true, // a keyboard rebuild per drag step flickers
             name = setting.title,
             key = setting.key,
             default = Defaults.PREF_EMOJI_FONT_SCALE,
             range = 0.5f..1.5f,
             description = { "${(100 * it).toInt()}%" }
-        ) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+        ) { KeyboardSwitcher.getInstance().clearEmojiCache(); KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+        }
     },
     Setting(context, Settings.PREF_EMOJI_KEY_FIT, R.string.prefs_emoji_key_fit) {
-        SwitchPreference(it, Defaults.PREF_EMOJI_KEY_FIT) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+        CompositionLocalProvider(LocalPreviewEmoji provides true) {
+        SwitchPreference(it, Defaults.PREF_EMOJI_KEY_FIT) { KeyboardSwitcher.getInstance().clearEmojiCache(); KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+        }
     },
     Setting(context, Settings.PREF_EMOJI_SKIN_TONE, R.string.prefs_emoji_skin_tone) { setting ->
+        CompositionLocalProvider(LocalPreviewEmoji provides true, LocalPreviewEmojiPeople provides true) {
         val items = listOf(
             stringResource(R.string.prefs_emoji_skin_tone_neutral) to "",
             "\uD83C\uDFFB" to "\uD83C\uDFFB",
@@ -460,67 +532,30 @@ fun createAppearanceSettings(context: Context) = listOf(
             "\uD83C\uDFFE" to "\uD83C\uDFFE",
             "\uD83C\uDFFF" to "\uD83C\uDFFF"
         )
-        ListPreference(setting, items, Defaults.PREF_EMOJI_SKIN_TONE, live = true) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
-    },
-    Setting(context, Settings.PREF_SUGGESTION_TEXT_SIZE, R.string.pref_suggestion_text_size) { setting ->
-        SliderPreference(
-            live = true,
-            name = setting.title,
-            key = setting.key,
-            default = Defaults.PREF_SUGGESTION_TEXT_SIZE,
-            range = 10f..32f,
-            description = { "$it dp" }
-        )
-    },
-    Setting(context, Settings.PREF_SUGGESTION_BOLD, R.string.pref_suggestion_bold) {
-        SwitchPreference(it, Defaults.PREF_SUGGESTION_BOLD)
-    },
-    Setting(context, Settings.PREF_SUGGESTION_ITALIC, R.string.pref_suggestion_italic) {
-        SwitchPreference(it, Defaults.PREF_SUGGESTION_ITALIC)
-    },
-    Setting(context, Settings.PREF_SUGGESTION_UNDERLINE, R.string.pref_suggestion_underline) {
-        SwitchPreference(it, Defaults.PREF_SUGGESTION_UNDERLINE)
-    },
-    Setting(context, Settings.PREF_SUGGESTION_WORD_PADDING, R.string.pref_suggestion_word_padding) { setting ->
-        SliderPreference(
-            live = true,
-            name = setting.title,
-            key = setting.key,
-            default = Defaults.PREF_SUGGESTION_WORD_PADDING,
-            range = 0f..30f,
-            description = { "$it dp" }
-        )
+        ListPreference(setting, items, Defaults.PREF_EMOJI_SKIN_TONE, live = true) { KeyboardSwitcher.getInstance().clearEmojiCache(); KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+        }
     },
     Setting(context, Settings.PREF_KEY_HORIZONTAL_GAP, R.string.pref_key_horizontal_gap) { setting ->
         SliderPreference(
             live = true,
+            applyOnRelease = true, // a keyboard rebuild per drag step flickers
             name = setting.title,
             key = setting.key,
             default = Defaults.PREF_KEY_HORIZONTAL_GAP,
             range = 0f..3f,
             description = { "%.2f%%".format(it) }
-        ) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+        ) { KeyboardLayoutSet.onSystemLocaleChanged(); KeyboardSwitcher.getInstance().setThemeNeedsReload() } // built keyboards are cached: drop them so the gap shows
     },
     Setting(context, Settings.PREF_KEY_VERTICAL_GAP, R.string.pref_key_vertical_gap) { setting ->
         SliderPreference(
             live = true,
+            applyOnRelease = true, // a keyboard rebuild per drag step flickers
             name = setting.title,
             key = setting.key,
             default = Defaults.PREF_KEY_VERTICAL_GAP,
             range = 0f..6f,
             description = { "%.2f%%".format(it) }
-        ) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
-    },
-    Setting(context, Settings.PREF_TOOLBAR_EXPAND_ICON, R.string.pref_toolbar_expand_icon) { setting ->
-        val items = listOf(
-            stringResource(R.string.pref_toolbar_expand_icon_arrow) to "arrow",
-            stringResource(R.string.pref_toolbar_expand_icon_incognito) to "incognito",
-            stringResource(R.string.pref_toolbar_expand_icon_settings) to "settings",
-            stringResource(R.string.pref_toolbar_expand_icon_none) to "none",
-        )
-        ListPreference(setting, items, Defaults.PREF_TOOLBAR_EXPAND_ICON, live = true) {
-            KeyboardSwitcher.getInstance().setThemeNeedsReload()
-        }
+        ) { KeyboardLayoutSet.onSystemLocaleChanged(); KeyboardSwitcher.getInstance().setThemeNeedsReload() } // built keyboards are cached: drop them so the gap shows
     },
 )
 
@@ -542,7 +577,11 @@ private fun SavedLooksPreference(setting: Setting) {
     val prefs = ctx.prefs()
     var generation by remember { mutableIntStateOf(0) }
     val looks = remember(generation) { AppearanceLooks.load(prefs) }
+    val builtIn = remember { AppearanceLooks.builtIn(ctx) }
     var showList by remember { mutableStateOf(false) }
+    // a tap shows the theme on the live keyboard; OK keeps it, Cancel puts back what was set when the list opened
+    val initial = remember(showList) { AppearanceLooks.current(prefs) }
+    var confirmed by remember(showList) { mutableStateOf(false) }
     var saveAs by remember { mutableStateOf(false) }
     var toRename: AppearanceLooks.Look? by remember { mutableStateOf(null) }
     var toDelete: AppearanceLooks.Look? by remember { mutableStateOf(null) }
@@ -550,19 +589,24 @@ private fun SavedLooksPreference(setting: Setting) {
     Preference(name = setting.title, description = setting.description, onClick = { showList = true }) { NextScreenIcon() }
     if (showList)
         ListPickerDialog(
-            onDismissRequest = { showList = false },
-            title = { Text(setting.title) },
-            items = looks,
-            getItemName = { it.name },
-            showRadioButtons = false,
-            onItemSelected = { AppearanceLooks.apply(ctx, it.values) },
-            trailing = { look ->
-                IconButton({ showList = false; toRename = look }) { Icon(painterResource(R.drawable.ic_edit), stringResource(R.string.appearance_look_rename)) }
-                DeleteButton { showList = false; toDelete = look }
+            onDismissRequest = {
+                if (!confirmed && AppearanceLooks.current(prefs) != initial) AppearanceLooks.apply(ctx, initial)
+                showList = false
             },
+            title = { Text(setting.title) },
+            items = builtIn + looks,
+            getItemName = { it.name },
+            confirmImmediately = false,
+            onItemHighlighted = { AppearanceLooks.apply(ctx, it.values) },
+            onItemSelected = { confirmed = true },
+            // the built-in themes come first and can't be changed; the user's own are renamed and deleted here
+            trailing = { look -> if (look !in builtIn) {
+                IconButton({ confirmed = true; showList = false; toRename = look }) { Icon(painterResource(R.drawable.ic_edit), stringResource(R.string.appearance_look_rename)) }
+                DeleteButton { confirmed = true; showList = false; toDelete = look }
+            } },
             footer = {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.fillMaxWidth().clickable { showList = false; saveAs = true }
+                    modifier = Modifier.fillMaxWidth().clickable { confirmed = true; showList = false; saveAs = true }
                         .padding(horizontal = 8.dp).heightIn(min = 48.dp)) {
                     Icon(painterResource(R.drawable.ic_plus), null, Modifier.padding(horizontal = 12.dp))
                     Text(stringResource(R.string.appearance_look_save), color = MaterialTheme.colorScheme.primary)
@@ -600,7 +644,8 @@ private fun SavedLooksPreference(setting: Setting) {
  * The keyboard as the Appearance preview: up while a dialog is open or for a few seconds after a change, and
  * gone again afterwards; only when the user put the cursor in the try-it field themselves does it stay.
  */
-private class PreviewKeyboard(private val tryIt: TryItState, private val scope: CoroutineScope, private val hide: () -> Unit) : PreviewKeyboardHooks {
+private class PreviewKeyboard(private val tryIt: TryItState, private val scope: CoroutineScope, private val showIme: () -> Unit,
+    private val reveal: () -> Unit, private val hide: () -> Unit) : PreviewKeyboardHooks {
     private var focused = false
     private var byUs = false // we brought it up, so we take it down
     private var dialogs = 0
@@ -611,26 +656,92 @@ private class PreviewKeyboard(private val tryIt: TryItState, private val scope: 
         if (!isFocused) byUs = false
     }
 
-    private fun show() {
+    private var emojiByUs = false // we switched the preview to the emoji panel, so we switch it back
+
+    private fun show(emoji: Boolean = false, people: Boolean = false) {
         hideJob?.cancel()
-        if (!focused) { byUs = true; tryIt.show(TryItMode.TEXT) }
+        reveal() // the tapped row moves above where the keyboard will end, together with it
+        if (emoji) {
+            // straight to the emoji panel (the people page for the skin tone), like the 😀 tab
+            emojiByUs = true
+            if (!focused) byUs = true
+            tryIt.show(TryItMode.EMOJI, people)
+        } else if (!focused) { byUs = true; tryIt.show(TryItMode.TEXT) }
+        // a dialog opening at the same moment takes the window focus for a while and the keyboard request can be
+        // lost; once the dialog has told the system it doesn't need the keyboard, asking again works
+        scope.launch { delay(150); showIme(); delay(400); if (byUs || focused) showIme() }
+    }
+
+    private fun backToLetters() {
+        if (!emojiByUs) return
+        emojiByUs = false
+        tryIt.mode = TryItMode.TEXT // the tab goes back to ABC, the keyboard to the letters
+        runCatching { KeyboardSwitcher.getInstance().setAlphabetKeyboard() }
     }
 
     private fun hideIfOurs() {
+        backToLetters()
         if (!byUs) return
         byUs = false
         hide()
     }
 
-    override fun dialogOpened() { dialogs++; show() }
+    override fun dialogOpened(emoji: Boolean, people: Boolean) { dialogs++; show(emoji, people) }
     override fun dialogClosed() {
         dialogs = (dialogs - 1).coerceAtLeast(0)
         if (dialogs == 0) hideIfOurs()
     }
 
-    fun changed() {
+    fun changed(emoji: Boolean) {
         if (dialogs > 0) return
-        show()
+        show(emoji)
         hideJob = scope.launch { delay(3000); hideIfOurs() }
+    }
+}
+
+/** Under the Suggestion strip dialog's B I U: the spacing between suggestions and the toolbar button. */
+@Composable
+private fun SuggestionStripExtras(reload: () -> Unit) {
+    val prefs = LocalContext.current.prefs()
+    var spacing by remember { mutableFloatStateOf(prefs.getInt(Settings.PREF_SUGGESTION_WORD_PADDING, Defaults.PREF_SUGGESTION_WORD_PADDING).toFloat()) }
+    WithSmallTitle(stringResource(R.string.suggestion_spacing, spacing.roundToInt())) {
+        Slider(value = spacing, onValueChange = { spacing = it }, valueRange = 0f..30f,
+            onValueChangeFinished = { prefs.edit { putInt(Settings.PREF_SUGGESTION_WORD_PADDING, spacing.roundToInt()) }; reload() })
+    }
+    val icons = listOf("arrow" to R.string.pref_toolbar_expand_icon_arrow, "incognito" to R.string.pref_toolbar_expand_icon_incognito,
+        "settings" to R.string.pref_toolbar_expand_icon_settings, "none" to R.string.pref_toolbar_expand_icon_none)
+    val current = prefs.getString(Settings.PREF_TOOLBAR_EXPAND_ICON, Defaults.PREF_TOOLBAR_EXPAND_ICON)
+    WithSmallTitle(stringResource(R.string.toolbar_button)) {
+        DropDownField(
+            items = icons,
+            selectedItem = icons.firstOrNull { it.first == current } ?: icons.first(),
+            onSelected = { prefs.edit { putString(Settings.PREF_TOOLBAR_EXPAND_ICON, it.first) }; reload() },
+        ) { Text(stringResource(it.second)) }
+    }
+}
+
+/** Whether a tile on this screen covers a preference or file changed since the draft's snapshot. */
+private fun tileChanged(tile: String, keys: Set<String>, files: Set<String>): Boolean {
+    if (keys.isEmpty() && files.isEmpty()) return false
+    fun any(vararg k: String) = k.any { it in keys }
+    fun prefix(vararg p: String) = keys.any { key -> p.any { key.startsWith(it) } }
+    return when (tile) {
+        SettingsWithoutKey.APPEARANCE_LOOKS -> false
+        SettingsWithoutKey.KEY_TEXT_STYLE -> any(Settings.PREF_KEY_FONT, Settings.PREF_FONT_SCALE, Settings.PREF_KEY_TEXT_BOLD,
+            Settings.PREF_KEY_TEXT_ITALIC, Settings.PREF_KEY_TEXT_UNDERLINE) || "custom_font" in files
+        SettingsWithoutKey.HINT_TEXT_STYLE -> any(Settings.PREF_HINT_FONT, Settings.PREF_HINT_FONT_SCALE, Settings.PREF_HINT_TEXT_BOLD,
+            Settings.PREF_HINT_TEXT_ITALIC, Settings.PREF_HINT_TEXT_UNDERLINE) || "custom_hint_font" in files
+        SettingsWithoutKey.SUGGESTION_TEXT_STYLE -> any(Settings.PREF_SUGGESTION_FONT, Settings.PREF_SUGGESTION_TEXT_SIZE, Settings.PREF_SUGGESTION_BOLD,
+            Settings.PREF_SUGGESTION_ITALIC, Settings.PREF_SUGGESTION_UNDERLINE, Settings.PREF_SUGGESTION_WORD_PADDING,
+            Settings.PREF_TOOLBAR_EXPAND_ICON) || "custom_suggestion_font" in files
+        SettingsWithoutKey.CUSTOM_EMOJI_FONT -> "custom_emoji_font" in files
+        SettingsWithoutKey.BACKGROUND_IMAGE -> files.any { it.startsWith("custom_background_image") && !it.contains("landscape") }
+        SettingsWithoutKey.BACKGROUND_IMAGE_LANDSCAPE -> files.any { it.startsWith("custom_background_image_landscape") }
+        Settings.PREF_ENABLE_SPLIT_KEYBOARD -> any(Settings.PREF_ENABLE_SPLIT_KEYBOARD, Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE,
+            Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE)
+        Settings.PREF_BOTTOM_ROW_SCALE_PREFIX -> prefix(Settings.PREF_BOTTOM_ROW_SCALE_PREFIX, Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX)
+        Settings.PREF_THEME_COLORS, Settings.PREF_THEME_COLORS_NIGHT -> tile in keys
+            || prefix(Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
+        else -> tile in keys || keys.any { it.startsWith(tile) } // the scales keep a key per orientation after their prefix
     }
 }

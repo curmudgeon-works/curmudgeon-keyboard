@@ -85,6 +85,16 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_BACKSPACE_HOLD_DELETES_WORDS = "backspace_hold_deletes_words";
     public static final String PREF_BACKSPACE_DELETES_SWIPED_WORD = "backspace_deletes_swiped_word";
     public static final String PREF_AUTOCORRECT_WITH_DIGITS = "autocorrect_with_digits";
+    public static final String PREF_KEY_TEXT_BOLD = "key_text_bold";
+    public static final String PREF_KEY_TEXT_ITALIC = "key_text_italic";
+    public static final String PREF_KEY_TEXT_UNDERLINE = "key_text_underline";
+    public static final String PREF_HINT_FONT_SCALE = "hint_font_scale";
+    public static final String PREF_KEY_FONT = "key_font";
+    public static final String PREF_HINT_FONT = "hint_font";
+    public static final String PREF_SUGGESTION_FONT = "suggestion_font";
+    public static final String PREF_HINT_TEXT_BOLD = "hint_text_bold";
+    public static final String PREF_HINT_TEXT_ITALIC = "hint_text_italic";
+    public static final String PREF_HINT_TEXT_UNDERLINE = "hint_text_underline";
     public static final String PREF_BACKSPACE_REPEAT_INTERVAL = "backspace_repeat_interval";
     public static final String PREF_BACKSPACE_SPEED_UP = "backspace_speed_up";
     public static final String PREF_BACKSPACE_SPEED_UP_AFTER = "backspace_speed_up_after";
@@ -575,6 +585,16 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
 
     public static File getCustomEmojiFontFile(final Context context) {
         return new File(DeviceProtectedUtils.getFilesDir(context), "custom_emoji_font");
+    }
+
+    /** The font for the suggestion strip, when the user set one. */
+    public static File getCustomSuggestionFontFile(final Context context) {
+        return new File(DeviceProtectedUtils.getFilesDir(context), "custom_suggestion_font");
+    }
+
+    /** The font for the symbols (hints) on the keys, when the user set one. */
+    public static File getCustomHintFontFile(final Context context) {
+        return new File(DeviceProtectedUtils.getFilesDir(context), "custom_hint_font");
     }
 
     // "default" layout as in this is used if nothing else is specified in the subtype

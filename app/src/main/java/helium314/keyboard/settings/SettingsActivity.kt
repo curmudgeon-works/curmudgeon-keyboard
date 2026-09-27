@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings
 
+import android.view.MotionEvent
+
 import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
@@ -69,6 +71,21 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
     private val cachedDictionaryFile by lazy { File(this.cacheDir.path + File.separator + "temp_dict") }
     private val crashReportFiles = MutableStateFlow<List<File>>(emptyList())
     private var paused = true
+
+    /** Set while a dialog that keeps the preview keyboard is open: a tap on this screen closes it (and does nothing else). */
+    var outsideTapHandler: (() -> Unit)? = null
+
+    /** Window y from which touches still work normally while such a dialog is open (the try-it bar above the keyboard). */
+    var touchPassFromY = Int.MAX_VALUE
+    private var passingGesture = false
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        val handler = outsideTapHandler ?: return super.dispatchTouchEvent(ev)
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) passingGesture = ev.y >= touchPassFromY
+        if (passingGesture) return super.dispatchTouchEvent(ev)
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) handler()
+        return true
+    }
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {

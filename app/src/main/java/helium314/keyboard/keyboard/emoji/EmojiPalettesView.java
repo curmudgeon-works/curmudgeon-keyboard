@@ -414,6 +414,11 @@ public final class EmojiPalettesView extends LinearLayout
                 mEmojiCategory.getCurrentCategoryPageId(), 0.0f);
     }
 
+    /** The people page, where skin tones show (a settings preview of the skin tone). */
+    public void showPeopleCategory() {
+        if (initialized) setCurrentCategoryId(EmojiCategory.ID_PEOPLE_BODY, false);
+    }
+
     private void setCurrentCategoryId(final int categoryId, final boolean initial) {
         final int oldCategoryId = mEmojiCategory.getCurrentCategoryId();
         if (initial || oldCategoryId != categoryId) {

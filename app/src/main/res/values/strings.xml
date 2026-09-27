@@ -175,11 +175,11 @@
     <!-- Description for the "suggest clipboard content" option. This makes the primary clipboard content visible in the suggestion strip view. -->
     <string name="suggest_clipboard_content_summary">Show recently copied clipboard content as a suggestion</string>
     <!-- Option to enable gesture input. The user can input a word by tracing the letters of a word without releasing the finger from the screen.-->
-    <string name="gesture_input">Enable gesture typing</string>
+    <string name="gesture_input">Enable swiping</string>
     <!-- Description for "gesture_input" option. The user can input a word by tracing the letters of a word without releasing the finger from the screen.-->
-    <string name="gesture_input_summary">Input a word by sliding through the letters</string>
+    <string name="gesture_input_summary">Type a word by swiping through its letters</string>
     <!-- Option to enable gesture trail preview. The user can see a trail of the gesture during gesture input.-->
-    <string name="gesture_preview_trail">Show gesture trail</string>
+    <string name="gesture_preview_trail">Show swipe trail</string>
     <!-- Option to enable gesture floating text preview. The user can see a suggested word floating above the keyboard during a gesture input.-->
     <string name="gesture_floating_preview_static">Floating preview</string>
     <!-- Description for "gesture_floating_preview_static" option. The user can see a suggested word floating above the keyboard during a gesture input.-->
@@ -187,7 +187,7 @@
     <!-- Option to enable gesture dynamic floating preview. The user can see a suggested word floating above the moving finger during a gesture input.-->
     <string name="gesture_floating_preview_text">Dynamic floating preview</string>
     <!-- Description for "gesture_floating_preview_text" option. The user can see a suggested word floating above the moving finger during a gesture input.-->
-    <string name="gesture_floating_preview_dynamic_summary">Move the preview during a gesture</string>
+    <string name="gesture_floating_preview_dynamic_summary">Move the preview while swiping</string>
     <!-- Option to enable space aware gesture input. The user can input multiple words by gliding through the space key during a gesture input.-->
     <string name="gesture_space_aware">Phrase gesture</string>
     <!-- Description for "gesture_space_aware" option. The user can input multiple words by gliding through the space key during a gesture input.-->
@@ -206,7 +206,7 @@
     <!-- The text that represents no cooldown-->
     <string name="gesture_fast_typing_cooldown_instant">Always start instantly</string>
     <!-- Title of the setting to adjust the gesture trail fadeout duration-->
-    <string name="gesture_trail_fadeout_duration">Gesture trail lifespan</string>
+    <string name="gesture_trail_fadeout_duration">Swipe trail lifespan</string>
     <!-- Preferences item for enabling clipboard history -->
     <string name="enable_clipboard_history">Enable clipboard history</string>
     <!-- Description for enabling/disabling clipboard history mentioning that if disabled, clipboard content is pasted -->
@@ -343,9 +343,9 @@
     <!-- Preferences item for inserting space after manualle picking a suggestion -->
     <string name="autospace_after_suggestion">Autospace after picking a suggestion</string>
     <!-- Preferences item for inserting space before entering a word using gesture typing -->
-    <string name="autospace_before_gesture_typing">Autospace before gesture typing a word</string>
+    <string name="autospace_before_gesture_typing">Autospace before swiping a word</string>
     <!-- Preferences item for inserting space after entering a word using gesture typing -->
-    <string name="autospace_after_gesture_typing">Autospace after gesture typing a word</string>
+    <string name="autospace_after_gesture_typing">Autospace after swiping a word</string>
     <!-- Preferences item for avoiding automatic space insertion by pressing shift -->
     <string name="shift_removes_autospace">No autospace when pressing shift</string>
     <!-- Description for "autospace_after_punctuation" setting -->
@@ -395,7 +395,7 @@
     <string name="bottom_rows_action_key">Show send key on emoji and clipboard panels</string>
     <string name="bottom_row_tablet">Tablet-style bottom row</string>
     <string name="hints_title">Symbols on keys</string>
-    <string name="number_row_and_hints">Number row and symbols</string>
+    <string name="number_row_and_hints">Number row</string>
     <string name="hints_number_row">Hide symbols on the number row</string>
     <string name="hints_other_keys">Hide symbols on the other keys</string>
     <string name="key_popups_symbols">Symbols page</string>
@@ -518,17 +518,27 @@
     <string name="clear_clipboard_confirm">Clear</string>
     <!-- Appearance screen: the live keyboard is the preview, changes can be taken back as a whole -->
     <string name="appearance_accept">Accept all changes</string>
-    <string name="appearance_accept_message">The keyboard stays as it looks now.</string>
+    <string name="appearance_accept_title">Accept all changes?</string>
+    <string name="appearance_accept_all">Accept all</string>
+    <string name="appearance_reject_title">Discard all changes?</string>
+    <string name="appearance_discard_all">Discard all</string>
+    <string name="appearance_keep_working">Keep working</string>
     <string name="appearance_reject">Reject all changes</string>
     <string name="appearance_reject_message">The keyboard goes back to how it looked when you opened Appearance.</string>
-    <string name="appearance_looks">Saved looks</string>
-    <string name="appearance_looks_summary">Save how the keyboard looks under a name and bring it back later</string>
-    <string name="appearance_look_save">Save the current look…</string>
+    <string name="appearance_looks">Themes</string>
+    <string name="appearance_looks_summary">Built-in themes, and your own: save how the keyboard looks under a name</string>
+    <string name="appearance_look_save">Save the current theme…</string>
     <!-- %d: a number, so the suggested name is unused -->
-    <string name="appearance_look_default_name">My look %d</string>
-    <string name="appearance_look_rename">Rename look</string>
+    <string name="appearance_look_default_name">My theme %d</string>
+    <string name="appearance_look_rename">Rename theme</string>
     <!-- %s: the look's name -->
-    <string name="appearance_look_delete">Delete the look \"%s\"?</string>
+    <string name="appearance_look_delete">Delete the theme \"%s\"?</string>
+    <!-- the four built-in themes -->
+    <string name="theme_preset_midnight">Midnight</string>
+    <string name="theme_preset_daylight">Daylight</string>
+    <string name="theme_preset_paper">Paper</string>
+    <string name="theme_preset_ocean">Rounded ocean</string>
+    <string name="theme_preset_holo">Holo classic</string>
     <string name="appearance_keep_title">Keep the appearance changes?</string>
     <string name="appearance_keep_message">Keep: the keyboard stays as it looks now. Discard: it goes back to how it looked when you opened Appearance.</string>
     <string name="appearance_keep">Keep</string>
@@ -567,7 +577,7 @@
     <!-- Description of the setting to quick-pin toolbar keys -->
     <string name="quick_pin_toolbar_keys_summary">This will disable other long press actions for toolbar keys that are not pinned</string>
     <!-- Title of the setting to show "..." as hints for more functionality on long-press -->
-    <string name="show_popup_hints">Show long-press dots</string>
+    <string name="show_popup_hints">Hide bottom-right ellipsis symbols</string>
     <!-- Description of the show_popup_hints setting -->
     <string name="show_popup_hints_summary">The … in the bottom right corner of keys that do something on long press</string>
     <!-- Option to remove popup keys that already exist on the base keyboard -->
@@ -583,7 +593,7 @@
     <!-- Title of the setting for reduced distance between keys -->
     <string name="prefs_narrow_key_gaps">Narrow key gaps</string>
     <!-- Title of the setting for setting keyboard height -->
-    <string name="prefs_keyboard_height_scale">Keyboard height scale</string>
+    <string name="prefs_keyboard_height_scale">Keyboard height</string>
     <!-- Title of the setting for setting bottom padding height -->
     <string name="prefs_bottom_padding_scale">Bottom padding scale</string>
     <!-- Title of the setting for setting height of the bottom row -->
@@ -591,11 +601,38 @@
     <!-- Title of the setting for setting side padding -->
     <string name="prefs_side_padding_scale">Side padding scale</string>
     <!-- Title of the setting for adjusting font size on the keyboard -->
-    <string name="prefs_font_scale">Keyboard font scale</string>
+    <string name="prefs_font_scale">Key text size</string>
+    <string name="settings_category_key_text">Key text</string>
+    <string name="key_text_style">Key text</string>
+    <string name="hint_text_style">Symbols text</string>
+    <string name="suggestion_text_style">Suggestion strip text</string>
+    <string name="suggestion_spacing">Spacing between suggestions: %d dp</string>
+    <string name="toolbar_button">Toolbar button</string>
+    <string name="appearance_group_colors">Colors</string>
+    <string name="appearance_group_size">Size, borders and gaps</string>
+    <string name="appearance_group_fonts">Fonts</string>
+    <string name="appearance_group_style">Style</string>
+    <string name="appearance_group_emoji">Emoji</string>
+    <string name="prefs_bottom_row_size">Bottom row size</string>
+    <string name="bottom_row_part_scale">Bottom row height</string>
+    <string name="bottom_row_part_padding">Space under the bottom row</string>
+    <string name="text_style_font">Font</string>
+    <!-- %d: percent -->
+    <string name="text_style_size">Size: %s</string>
+    <string name="text_font_default">Default</string>
+    <string name="text_font_sans">Sans serif</string>
+    <string name="text_font_serif">Serif</string>
+    <string name="text_font_mono">Monospace</string>
+    <string name="text_font_file">From a font file</string>
+    <string name="key_text_bold">Bold</string>
+    <string name="key_text_italic">Italic</string>
+    <string name="key_text_underline">Underlined</string>
+    <string name="prefs_hint_font_scale">Symbols size</string>
+    <string name="custom_hint_font">Set symbols font from file</string>
     <!-- Title of the setting for adjusting font size in emoji view -->
-    <string name="prefs_emoji_font_scale">Emoji view font scale</string>
+    <string name="prefs_emoji_font_scale">Emoji size</string>
     <!-- Title of the setting for adjusting emoji key size to fit emoji size in emoji view -->
-    <string name="prefs_emoji_key_fit">Scale emoji key size with font size</string>
+    <string name="prefs_emoji_key_fit">Emoji grid scales with emoji size</string>
     <!-- Title of the setting for setting default emoji skin tone -->
     <string name="prefs_emoji_skin_tone">Default emoji skin tone</string>
     <!-- Name of the neutral / yellow skin tone -->
@@ -629,7 +666,7 @@
     <!-- Title of the setting for adding / removing custom font file -->
     <string name="custom_font">Set custom font from file</string>
     <!-- Title of the setting for adding / removing custom font file used only for emojis -->
-    <string name="custom_emoji_font">Set custom emoji font from file</string>
+    <string name="custom_emoji_font">Emoji style from a font file</string>
     <!-- Description for English (UK) keyboard subtype
          (UK) should be an abbreviation of United Kingdom. -->
     <string name="subtype_en_GB">English (UK)</string>
@@ -908,13 +945,16 @@ New dictionary:
     <!-- Option for choosing whether we use a theme that provides borders to keys -->
     <string name="key_borders">Key borders</string>
     <!-- Option for choosing auto day/night theme switch -->
-    <string name="day_night_mode">Auto day/night mode</string>
+    <string name="day_night_mode">Light/Dark based on system settings</string>
     <!-- Description for "day_night_mode" option. -->
     <string name="day_night_mode_summary">Appearance will follow system settings</string>
     <!-- Option for setting navbar to follow keyboard color -->
     <string name="theme_navbar">Color navigation bar</string>
     <!-- Theme name for light theme -->
     <string name="theme_name_midnight" tools:keep="@string/theme_name_midnight">Midnight</string>
+    <string name="theme_name_daylight" tools:keep="@string/theme_name_daylight">Daylight</string>
+    <string name="theme_name_classic" tools:keep="@string/theme_name_classic">Classic</string>
+    <string name="theme_name_paper" tools:keep="@string/theme_name_paper">Paper</string>
     <string name="theme_name_light" tools:keep="@string/theme_name_light">Light</string>
     <!-- Theme name for holo white theme -->
     <string name="theme_name_holo_white" tools:keep="@string/theme_name_holo_white">Holo White</string>

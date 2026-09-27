@@ -30,6 +30,7 @@ fun <T: Number> SliderPreference(
     stepSize: Int? = null,
     onValueChanged: (Float?) -> Unit = { },
     live: Boolean = false, // the value is written while dragging (the live keyboard shows it); Cancel puts the old one back
+    applyOnRelease: Boolean = false, // with [live]: written when the slider is let go
     onConfirmed: (T) -> Unit = { },
 ) {
     val ctx = LocalContext.current
@@ -77,6 +78,7 @@ fun <T: Number> SliderPreference(
             onValueChanged = { if (live && it != null) write(it); onValueChanged(it) },
             showDefault = true,
             live = live,
+            applyOnRelease = applyOnRelease,
             onDefault = { prefs.edit { remove(key) }; onConfirmed(default) },
             intermediateSteps = stepSize?.let {
                 // this is not nice, but slider wants it like this...

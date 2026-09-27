@@ -161,6 +161,15 @@ public class SettingsValues {
     public final boolean mBackspaceHoldDeletesWords;
     public final boolean mBackspaceDeletesSwipedWord;
     public final boolean mAutoCorrectWithDigits;
+    public final boolean mKeyTextBold;
+    public final boolean mKeyTextItalic;
+    public final boolean mKeyTextUnderline;
+    public final float mHintFontScale;
+    public final String mKeyFont;
+    public final String mHintFont;
+    public final boolean mHintTextBold;
+    public final boolean mHintTextItalic;
+    public final boolean mHintTextUnderline;
     public final int mBackspaceRepeatInterval;
     public final boolean mBackspaceSpeedUp;
     public final int mBackspaceSpeedUpAfter;
@@ -238,6 +247,15 @@ public class SettingsValues {
         mBackspaceHoldDeletesWords = prefs.getBoolean(Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS, Defaults.PREF_BACKSPACE_HOLD_DELETES_WORDS);
         mBackspaceDeletesSwipedWord = prefs.getBoolean(Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD, Defaults.PREF_BACKSPACE_DELETES_SWIPED_WORD);
         mAutoCorrectWithDigits = prefs.getBoolean(Settings.PREF_AUTOCORRECT_WITH_DIGITS, Defaults.PREF_AUTOCORRECT_WITH_DIGITS);
+        mKeyTextBold = prefs.getBoolean(Settings.PREF_KEY_TEXT_BOLD, Defaults.PREF_KEY_TEXT_BOLD);
+        mKeyTextItalic = prefs.getBoolean(Settings.PREF_KEY_TEXT_ITALIC, Defaults.PREF_KEY_TEXT_ITALIC);
+        mKeyTextUnderline = prefs.getBoolean(Settings.PREF_KEY_TEXT_UNDERLINE, Defaults.PREF_KEY_TEXT_UNDERLINE);
+        mHintFontScale = prefs.getFloat(Settings.PREF_HINT_FONT_SCALE, Defaults.PREF_HINT_FONT_SCALE);
+        mKeyFont = prefs.getString(Settings.PREF_KEY_FONT, "auto");
+        mHintFont = prefs.getString(Settings.PREF_HINT_FONT, "auto");
+        mHintTextBold = prefs.getBoolean(Settings.PREF_HINT_TEXT_BOLD, Defaults.PREF_HINT_TEXT_BOLD);
+        mHintTextItalic = prefs.getBoolean(Settings.PREF_HINT_TEXT_ITALIC, false);
+        mHintTextUnderline = prefs.getBoolean(Settings.PREF_HINT_TEXT_UNDERLINE, false);
         mBackspaceRepeatInterval = prefs.getInt(Settings.PREF_BACKSPACE_REPEAT_INTERVAL, Defaults.PREF_BACKSPACE_REPEAT_INTERVAL);
         mBackspaceSpeedUp = prefs.getBoolean(Settings.PREF_BACKSPACE_SPEED_UP, Defaults.PREF_BACKSPACE_SPEED_UP);
         mBackspaceSpeedUpAfter = prefs.getInt(Settings.PREF_BACKSPACE_SPEED_UP_AFTER, Defaults.PREF_BACKSPACE_SPEED_UP_AFTER);
@@ -321,8 +339,8 @@ public class SettingsValues {
         mAddToPersonalDictionary = prefs.getBoolean(Settings.PREF_ADD_TO_PERSONAL_DICTIONARY, Defaults.PREF_ADD_TO_PERSONAL_DICTIONARY);
         mUseContactsDictionary = SettingsValues.readUseContactsEnabled(prefs, context);
         mUseAppsDictionary = prefs.getBoolean(Settings.PREF_USE_APPS, Defaults.PREF_USE_APPS);
-        mCustomNavBarColor = prefs.getBoolean(Settings.PREF_NAVBAR_COLOR, Defaults.PREF_NAVBAR_COLOR);
-        mNarrowKeyGaps = prefs.getBoolean(Settings.PREF_NARROW_KEY_GAPS, Defaults.PREF_NARROW_KEY_GAPS);
+        mCustomNavBarColor = false; // the switch is gone: the keyboard draws behind the navigation bar itself
+        mNarrowKeyGaps = false; // the switch is gone: the key gap sliders set the gaps
         mSettingsValuesForSuggestion = new SettingsValuesForSuggestion(
                 mBlockPotentiallyOffensive,
                 prefs.getBoolean(Settings.PREF_GESTURE_SPACE_AWARE, Defaults.PREF_GESTURE_SPACE_AWARE)

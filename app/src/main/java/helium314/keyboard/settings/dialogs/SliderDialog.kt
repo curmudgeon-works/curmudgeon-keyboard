@@ -36,11 +36,12 @@ fun SliderDialog(
     intermediateSteps: Int? = null,
     positionString: (@Composable (Float) -> String) = { it.toString() },
     live: Boolean = false, // the keyboard stays up and [onValueChanged] follows the drag; Cancel reports [initialValue] again
+    applyOnRelease: Boolean = false, // with [live]: only when the slider is let go, not during the drag
 ) {
     var sliderPosition by remember { mutableFloatStateOf(initialValue) }
     var touched by remember { mutableStateOf(false) }
     var confirmed by remember { mutableStateOf(false) }
-    if (live && touched) LaunchedEffect(sliderPosition) { delay(80); onValueChanged(sliderPosition) }
+    if (live && touched && !applyOnRelease) LaunchedEffect(sliderPosition) { delay(80); onValueChanged(sliderPosition) }
     val dismiss = { if (live && touched && !confirmed) onValueChanged(initialValue); onDismissRequest() }
 
     ThreeButtonAlertDialog(

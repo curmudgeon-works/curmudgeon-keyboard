@@ -26,6 +26,17 @@ class AppearanceDraft private constructor(
         }
     }
 
+    /** The preferences whose value differs from the snapshot. */
+    fun changedKeys(ctx: Context): Set<String> {
+        val now = currentPrefs(ctx)
+        return (now.keys + prefs.keys).filterTo(HashSet()) { now[it] != prefs[it] }
+    }
+
+    /** The names of the custom files (background images, fonts) that differ from the snapshot. */
+    fun changedFiles(): Set<String> = files.filter { (live, saved) ->
+        if (saved == null) live.exists() else !live.exists() || live.length() != saved.length || live.lastModified() != saved.modified
+    }.keys.mapTo(HashSet()) { it.name }
+
     /** Back to the snapshot; the live keyboard reloads. */
     fun reject(ctx: Context) {
         for ((live, saved) in files) {
@@ -50,7 +61,7 @@ class AppearanceDraft private constructor(
         private fun liveFiles(ctx: Context) = listOf(
             Settings.getCustomBackgroundFile(ctx, false, false), Settings.getCustomBackgroundFile(ctx, false, true),
             Settings.getCustomBackgroundFile(ctx, true, false), Settings.getCustomBackgroundFile(ctx, true, true),
-            Settings.getCustomFontFile(ctx), Settings.getCustomEmojiFontFile(ctx),
+            Settings.getCustomFontFile(ctx), Settings.getCustomEmojiFontFile(ctx), Settings.getCustomHintFontFile(ctx), Settings.getCustomSuggestionFontFile(ctx),
         )
 
         /** The draft of the open Appearance screen; it outlives the screen's composition (rotation, search). */
