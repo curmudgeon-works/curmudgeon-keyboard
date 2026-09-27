@@ -54,12 +54,22 @@ fun checkVersionUpgrade(context: Context) {
     val oldVersion = prefs.getInt(Settings.PREF_VERSION_CODE, 0)
     if (oldVersion != BuildConfig.MIGRATION_VERSION)
         AppUpgrade.onUpgrade(context)
-    curmudgeonUpgrades(prefs)
+    curmudgeonUpgrades(prefs, freshInstall = oldVersion == 0)
 }
 
 /** Our own settings changes: each checks its own state, so running them on every start is cheap and safe
  *  (MIGRATION_VERSION stays at upstream's, so onUpgrade doesn't run for them). */
-private fun curmudgeonUpgrades(prefs: SharedPreferences) {
+private fun curmudgeonUpgrades(prefs: SharedPreferences, freshInstall: Boolean) {
+    // 0.1.004: key-press vibration and sound became on by default; installs from before keep what they had
+    if (!prefs.getBoolean("defaults_feedback_on_done", false)) {
+        prefs.edit {
+            if (!freshInstall) {
+                if (!prefs.contains(Settings.PREF_VIBRATE_ON)) putBoolean(Settings.PREF_VIBRATE_ON, false)
+                if (!prefs.contains(Settings.PREF_SOUND_ON)) putBoolean(Settings.PREF_SOUND_ON, false)
+            }
+            putBoolean("defaults_feedback_on_done", true)
+        }
+    }
     // "midnight" was always black's colours under another name: the colour is black now (the Midnight theme stays)
     for (key in listOf(Settings.PREF_THEME_COLORS, Settings.PREF_THEME_COLORS_NIGHT))
         if (prefs.getString(key, null) == "midnight") prefs.edit { putString(key, KeyboardTheme.THEME_BLACK) }

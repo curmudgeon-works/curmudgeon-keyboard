@@ -51,7 +51,8 @@ fun SliderDialog(
         onConfirmed = { confirmed = true; onDone(sliderPosition) },
         modifier = modifier,
         title = title,
-        keepKeyboard = live,
+        // live sliders preview on the keyboard; so do sliders on a screen that keeps it up (the key sound / vibration ones)
+        keepKeyboard = live || LocalKeepKeyboard.current,
         content = {
             CompositionLocalProvider(
                 LocalTextStyle provides MaterialTheme.typography.bodyLarge

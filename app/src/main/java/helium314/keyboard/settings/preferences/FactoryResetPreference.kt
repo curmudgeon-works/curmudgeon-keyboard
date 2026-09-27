@@ -90,7 +90,8 @@ fun FactoryResetPreference(setting: Setting) {
 private fun factoryReset(ctx: Context, keyboards: Boolean, learnedWords: Boolean, clipboard: Boolean, custom: Boolean) {
     val prefs = ctx.realPrefs()
     // what survives the settings reset: the version (else every upgrade step runs again), and what isn't being reset
-    fun keep(key: String): Boolean = key == Settings.PREF_VERSION_CODE
+    // (the defaults flag too: after a reset the defaults apply, the upgrade mustn't turn sound / vibration off again)
+    fun keep(key: String): Boolean = key == Settings.PREF_VERSION_CODE || key == "defaults_feedback_on_done"
         || (!keyboards && (key == Settings.PREF_ENABLED_SUBTYPES || key == Settings.PREF_ADDITIONAL_SUBTYPES
             || key == Settings.PREF_SELECTED_SUBTYPE || LanguagePriority.isLanguageKey(key)))
         || (!custom && (key == KeyPopupOverrides.PREF || key == KeyPopupOverrides.PREF_SETS
