@@ -44,6 +44,8 @@ fun <T: Any> ListPickerDialog(
     trailing: (@Composable (T) -> Unit)? = null,
     /** Shown after the items, e.g. an entry that adds one. */
     footer: (@Composable () -> Unit)? = null,
+    /** Without [confirmImmediately]: called on every tap, so the choice can show before OK. */
+    onItemHighlighted: ((T) -> Unit)? = null,
 ) {
     var selected by remember { mutableStateOf(selectedItem) }
     val state = rememberLazyListState()
@@ -73,7 +75,7 @@ fun <T: Any> ListPickerDialog(
                                     if (confirmImmediately) {
                                         onDismissRequest()
                                         onItemSelected(item)
-                                    }
+                                    } else onItemHighlighted?.invoke(item)
                                     selected = item
                                 }
                                 .padding(horizontal = if (showRadioButtons) 8.dp else 16.dp)
@@ -86,7 +88,7 @@ fun <T: Any> ListPickerDialog(
                                         if (confirmImmediately) {
                                             onDismissRequest()
                                             onItemSelected(item)
-                                        }
+                                        } else onItemHighlighted?.invoke(item)
                                         selected = item
                                     }
                                 )

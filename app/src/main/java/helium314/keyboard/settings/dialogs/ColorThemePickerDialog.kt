@@ -101,11 +101,19 @@ fun ColorThemePickerDialog(
     }
     var showLoadDialog by remember { mutableStateOf(false) }
     val targetScreen = if (isNight) SettingsDestination.ColorsNight else SettingsDestination.Colors
+    // a tap shows the colors on the live keyboard; OK keeps them, Cancel puts back what was set when the dialog opened
+    val initial = remember { if (prefs.contains(setting.key)) prefs.getString(setting.key, default) else null }
+    var confirmed by remember { mutableStateOf(false) }
+    val close = { confirmed = true; onDismissRequest() }
     ThreeButtonAlertDialog(
-        onDismissRequest = onDismissRequest,
-        cancelButtonText = stringResource(R.string.dialog_close),
-        onConfirmed = { },
-        confirmButtonText = null,
+        onDismissRequest = {
+            if (!confirmed && prefs.getString(setting.key, default) != (initial ?: default)) {
+                prefs.edit { if (initial == null) remove(setting.key) else putString(setting.key, initial) }
+                KeyboardSwitcher.getInstance().setThemeNeedsReload()
+            }
+            onDismissRequest()
+        },
+        onConfirmed = { confirmed = true },
         neutralButtonText = stringResource(R.string.load),
         onNeutral = { showLoadDialog = true },
         title = { Text(setting.title) },
@@ -116,9 +124,9 @@ fun ColorThemePickerDialog(
                 LazyColumn(state = state) {
                     items(colors) { item ->
                         if (item == "") {
-                            AddColorRow(onDismissRequest, userColors, targetScreen, setting.key)
+                            AddColorRow(close, userColors, targetScreen, setting.key)
                         } else {
-                            ColorItemRow(onDismissRequest, item, item == selectedColor, item in userColors, targetScreen, setting.key)
+                            ColorItemRow(close, item, item == selectedColor, item in userColors, targetScreen, setting.key)
                         }
                     }
                 }
@@ -203,7 +211,6 @@ private fun ColorItemRow(onDismissRequest: () -> Unit, item: String, isSelected:
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .clickable {
-                onDismissRequest()
                 prefs.edit {putString(prefKey, item)}
                 KeyboardSwitcher.getInstance().setThemeNeedsReload()
             }
@@ -213,7 +220,6 @@ private fun ColorItemRow(onDismissRequest: () -> Unit, item: String, isSelected:
         RadioButton(
             selected = isSelected,
             onClick = {
-                onDismissRequest()
                 prefs.edit { putString(prefKey, item) }
                 KeyboardSwitcher.getInstance().setThemeNeedsReload()
             }
