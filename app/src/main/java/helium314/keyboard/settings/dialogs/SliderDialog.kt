@@ -9,7 +9,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -32,16 +35,22 @@ fun SliderDialog(
     title: (@Composable () -> Unit)? = null,
     intermediateSteps: Int? = null,
     positionString: (@Composable (Float) -> String) = { it.toString() },
+    live: Boolean = false, // the keyboard stays up and [onValueChanged] follows the drag; Cancel reports [initialValue] again
 ) {
     var sliderPosition by remember { mutableFloatStateOf(initialValue) }
+    var touched by remember { mutableStateOf(false) }
+    var confirmed by remember { mutableStateOf(false) }
+    if (live && touched) LaunchedEffect(sliderPosition) { delay(80); onValueChanged(sliderPosition) }
+    val dismiss = { if (live && touched && !confirmed) onValueChanged(initialValue); onDismissRequest() }
 
     ThreeButtonAlertDialog(
-        onDismissRequest = onDismissRequest,
+        onDismissRequest = dismiss,
         neutralButtonText = if (showDefault) stringResource(R.string.button_default) else null,
-        onNeutral = { onDismissRequest(); onDefault() },
-        onConfirmed = { onDone(sliderPosition) },
+        onNeutral = { confirmed = true; onDismissRequest(); onDefault() },
+        onConfirmed = { confirmed = true; onDone(sliderPosition) },
         modifier = modifier,
         title = title,
+        keepKeyboard = live,
         content = {
             CompositionLocalProvider(
                 LocalTextStyle provides MaterialTheme.typography.bodyLarge
@@ -50,14 +59,14 @@ fun SliderDialog(
                     if (intermediateSteps == null)
                         Slider(
                             value = sliderPosition,
-                            onValueChange = { sliderPosition = it },
+                            onValueChange = { sliderPosition = it; touched = true },
                             onValueChangeFinished = { onValueChanged(sliderPosition) },
                             valueRange = range,
                         )
                     else
                         Slider(
                             value = sliderPosition,
-                            onValueChange = { sliderPosition = it },
+                            onValueChange = { sliderPosition = it; touched = true },
                             onValueChangeFinished = { onValueChanged(sliderPosition) },
                             valueRange = range,
                             steps = intermediateSteps

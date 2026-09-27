@@ -22,7 +22,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -53,6 +55,7 @@ fun KeyboardScalePreference(
     defaults: Array<Float>,
     range:  ClosedFloatingPointRange<Float>,
     description: (Float) -> String,
+    live: Boolean = false, // values are written while dragging (the live keyboard shows them); Cancel puts the old ones back
     onDone: () -> Unit
 ) {
     if (defaults.size != 1.shl(dimensions.size))
@@ -72,7 +75,8 @@ fun KeyboardScalePreference(
             defaultValues = defaults,
             range = range,
             dimensions = dimensions,
-            positionString = description
+            positionString = description,
+            live = live,
         )
 }
 
@@ -88,6 +92,7 @@ private fun KeyboardScaleDialog(
     dimensions: List<String>,
     modifier: Modifier = Modifier,
     positionString: (Float) -> String,
+    live: Boolean = false,
 ) {
     val (variants, keys) = createVariantsAndKeys(dimensions, baseKey)
     val foldedString = stringResource(R.string.folded) // we want to hide foldable settings for non-foldable phones
@@ -95,12 +100,21 @@ private fun KeyboardScaleDialog(
     var checked by remember { mutableStateOf(dimensions.map { FoldableUtils.isFoldable || !it.contains(foldedString) }) }
     val prefs = ctx.prefs()
     val done = remember { mutableMapOf<String, () -> Unit>() }
+    // what the keys held when the dialog opened, so Cancel can put it back in live mode
+    val original = remember { keys.associateWith { if (prefs.contains(it)) prefs.getFloat(it, 0f) else null } }
+    var confirmed by remember { mutableStateOf(false) }
+    fun write(key: String, value: Float?) = prefs.edit { if (value == null) remove(key) else putFloat(key, value) }
+    val dismiss = {
+        if (live && !confirmed) { original.forEach { (key, value) -> write(key, value) }; onDone() }
+        onDismissRequest()
+    }
 
     ThreeButtonAlertDialog(
-        onDismissRequest = onDismissRequest,
-        onConfirmed = { done.values.forEach { it.invoke() }; onDone() },
+        onDismissRequest = dismiss,
+        onConfirmed = { confirmed = true; done.values.forEach { it.invoke() }; onDone() },
         modifier = modifier,
         title = title,
+        keepKeyboard = live,
         content = {
             CompositionLocalProvider(
                 LocalTextStyle provides MaterialTheme.typography.bodyLarge
@@ -119,6 +133,12 @@ private fun KeyboardScaleDialog(
                     variants.forEachIndexed { i, variant ->
                         val key = keys[i]
                         var sliderPosition by remember { mutableFloatStateOf(prefs.getFloat(key, defaultValues[i])) }
+                        var touched by remember { mutableStateOf(false) }
+                        if (live && touched) LaunchedEffect(sliderPosition) {
+                            delay(80)
+                            write(key, if (sliderPosition == defaultValues[i]) null else sliderPosition)
+                            onDone()
+                        }
                         if (!done.contains(variant))
                             done[variant] = {
                                 if (sliderPosition == defaultValues[i])
@@ -133,7 +153,7 @@ private fun KeyboardScaleDialog(
                             WithSmallTitle(variant.ifEmpty { stringResource(R.string.button_default) }) {
                                 Slider(
                                     value = sliderPosition,
-                                    onValueChange = { sliderPosition = it },
+                                    onValueChange = { sliderPosition = it; touched = true },
                                     valueRange = range,
                                 )
                                 Row(
@@ -142,7 +162,7 @@ private fun KeyboardScaleDialog(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(positionString(sliderPosition))
-                                    TextButton({ sliderPosition = defaultValues[i] }) { Text(stringResource(R.string.button_default)) }
+                                    TextButton({ sliderPosition = defaultValues[i]; touched = true }) { Text(stringResource(R.string.button_default)) }
                                 }
                                 Spacer(Modifier.height(6.dp))
                             }

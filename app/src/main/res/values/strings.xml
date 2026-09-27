@@ -510,6 +510,25 @@
     <string name="clear_clipboard" tools:keep="@string/clear_clipboard">Clear clipboard</string>
     <string name="clear_clipboard_message">Removes every entry from the clipboard history except pinned ones. This can\'t be undone.</string>
     <string name="clear_clipboard_confirm">Clear</string>
+    <!-- Appearance screen: the live keyboard is the preview, changes can be taken back as a whole -->
+    <string name="appearance_accept">Accept all changes</string>
+    <string name="appearance_accept_message">The keyboard stays as it looks now.</string>
+    <string name="appearance_reject">Reject all changes</string>
+    <string name="appearance_reject_message">The keyboard goes back to how it looked when you opened Appearance.</string>
+    <string name="appearance_looks">Saved looks</string>
+    <string name="appearance_looks_summary">Save how the keyboard looks under a name and bring it back later</string>
+    <string name="appearance_look_save">Save the current look…</string>
+    <!-- %d: a number, so the suggested name is unused -->
+    <string name="appearance_look_default_name">My look %d</string>
+    <string name="appearance_look_rename">Rename look</string>
+    <!-- %s: the look's name -->
+    <string name="appearance_look_delete">Delete the look \"%s\"?</string>
+    <string name="appearance_keep_title">Keep the appearance changes?</string>
+    <string name="appearance_keep_message">Keep: the keyboard stays as it looks now. Discard: it goes back to how it looked when you opened Appearance.</string>
+    <string name="appearance_keep">Keep</string>
+    <string name="appearance_discard">Discard</string>
+    <!-- %s: the name the new colour theme gets unless renamed -->
+    <string name="add_color_theme">Add your own (%s)</string>
     <string name="voice" tools:keep="@string/voice">Voice input</string>
     <string name="numpad" tools:keep="@string/numpad" translatable="false">@string/layout_numpad</string>
     <string name="settings" tools:keep="@string/settings">Settings</string>

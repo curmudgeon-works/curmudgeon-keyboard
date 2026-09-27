@@ -8,6 +8,7 @@ import android.content.SharedPreferences
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,7 +19,6 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -33,7 +33,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import helium314.keyboard.keyboard.ColorSetting
@@ -60,7 +59,6 @@ import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.settings.filePicker
 import helium314.keyboard.latin.utils.previewDark
 import helium314.keyboard.settings.screens.SaveThoseColors
-import helium314.keyboard.settings.contentTextDirectionStyle
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -169,33 +167,31 @@ fun ColorThemePickerDialog(
 
 @Composable
 private fun AddColorRow(onDismissRequest: () -> Unit, userColors: Collection<String>, targetScreen: String, prefKey: String) {
-    var textValue by remember { mutableStateOf(TextFieldValue()) }
     val prefs = LocalContext.current.prefs()
     val defaultName = KeyboardTheme.getUnusedThemeName(stringResource(R.string.theme_name_user), prefs)
-    val textEmpty = textValue.text.isEmpty()
-    val currentName = if (textEmpty) defaultName else textValue.text
-    val label: @Composable (() -> Unit)? = if (textEmpty) { { Text(defaultName) } } else null
+    // the name is asked in its own dialog: this list keeps the keyboard up as a preview, so it can't take typing
+    var askName by remember { mutableStateOf(false) }
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(start = 10.dp)
+        modifier = Modifier.fillMaxWidth().clickable { askName = true }.padding(start = 10.dp, top = 12.dp, bottom = 12.dp)
     ) {
         Icon(painterResource(R.drawable.ic_plus), stringResource(R.string.add))
-        TextField(
-            value = textValue,
-            onValueChange = { textValue = it },
-            modifier = Modifier.weight(1f),
-            singleLine = true,
-            label = label,
-            textStyle = contentTextDirectionStyle,
-        )
-        EditButton(currentName.isNotBlank() && currentName !in userColors) {
-            onDismissRequest()
-            prefs.edit { putString(prefKey, currentName) }
-            KeyboardTheme.writeUserMoreColors(prefs, currentName, Defaults.PREF_USER_MORE_COLORS) // write sth so theme is stored
-            SettingsDestination.navigateTo(targetScreen + currentName)
-            KeyboardSwitcher.getInstance().setThemeNeedsReload()
-        }
+        Text(stringResource(R.string.add_color_theme, defaultName), Modifier.padding(start = 8.dp))
     }
+    if (askName)
+        TextInputDialog(
+            onDismissRequest = { askName = false },
+            initialText = defaultName,
+            title = { Text(stringResource(R.string.add)) },
+            checkTextValid = { it.isNotBlank() && it !in userColors },
+            onConfirmed = { name ->
+                onDismissRequest()
+                prefs.edit { putString(prefKey, name) }
+                KeyboardTheme.writeUserMoreColors(prefs, name, Defaults.PREF_USER_MORE_COLORS) // write sth so theme is stored
+                SettingsDestination.navigateTo(targetScreen + name)
+                KeyboardSwitcher.getInstance().setThemeNeedsReload()
+            },
+        )
 }
 
 @Composable

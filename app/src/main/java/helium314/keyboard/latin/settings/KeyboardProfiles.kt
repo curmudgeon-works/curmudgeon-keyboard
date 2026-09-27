@@ -32,6 +32,7 @@ object KeyboardProfiles {
         Settings.PREF_CLIPBOARD_HISTORY_RETENTION_TIME, Settings.PREF_CLIPBOARD_HISTORY_PINNED_FIRST,
         PREF_SEPARATE, PREF_IDS, PREF_NEXT_ID,
         "key_popup_sets", // saved popup sets are meant to be reused across keyboards
+        "appearance_looks", // saved looks too
     )
     private val globalPrefixes = listOf(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX, "language_priority_", "share_user_history_", LanguagePriority.PREF_ADDED_PREFIX, "debug_", "gesture_stats")
 

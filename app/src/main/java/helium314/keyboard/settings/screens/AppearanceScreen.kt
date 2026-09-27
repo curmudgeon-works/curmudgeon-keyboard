@@ -3,7 +3,34 @@ package helium314.keyboard.settings.screens
 
 import android.content.Context
 import android.os.Build
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
+import helium314.keyboard.latin.utils.SubtypeSettings
+import helium314.keyboard.settings.AppearanceDraft
+import helium314.keyboard.settings.AppearanceLooks
+import helium314.keyboard.latin.utils.NextScreenIcon
+import helium314.keyboard.settings.dialogs.ConfirmationDialog
+import helium314.keyboard.settings.dialogs.ListPickerDialog
+import helium314.keyboard.settings.dialogs.TextInputDialog
+import helium314.keyboard.latin.utils.DeleteButton
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.painterResource
+import helium314.keyboard.settings.dialogs.LocalKeepKeyboard
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -58,6 +85,7 @@ fun AppearanceScreen(
     val dayNightMode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && prefs.getBoolean(Settings.PREF_THEME_DAY_NIGHT, Defaults.PREF_THEME_DAY_NIGHT)
     val items = listOf(
         R.string.settings_screen_theme,
+        SettingsWithoutKey.APPEARANCE_LOOKS,
         Settings.PREF_THEME_STYLE,
         Settings.PREF_ICON_STYLE,
         Settings.PREF_CUSTOM_ICON_NAMES,
@@ -103,18 +131,64 @@ fun AppearanceScreen(
         Settings.PREF_KEY_HORIZONTAL_GAP,
         Settings.PREF_KEY_VERTICAL_GAP,
     )
-    SearchSettingsScreen(
-        onClickBack = onClickBack,
+    // every change shows on the live keyboard at once; the draft remembers how things were when the screen opened
+    val draft = remember { AppearanceDraft.of(ctx) }
+    val changed = draft.hasChanges(ctx)
+    var askOnLeave by remember { mutableStateOf(false) }
+    var askReject by remember { mutableStateOf(false) }
+    var askAccept by remember { mutableStateOf(false) }
+    val tryIt = remember { TryItState() }
+    val keyboard = SubtypeSettings.getSelectedSubtype(prefs).toSettingsSubtype()
+    fun leave() { if (changed) askOnLeave = true else onClickBack() }
+    BackHandler(enabled = changed) { leave() }
+    CompositionLocalProvider(LocalKeepKeyboard provides true) { SearchSettingsScreen(
+        onClickBack = ::leave,
         title = stringResource(R.string.settings_screen_appearance),
         settings = items,
         simpleModeKeys = setOf(
-            Settings.PREF_THEME_COLORS, Settings.PREF_THEME_KEY_BORDERS, Settings.PREF_THEME_DAY_NIGHT,
+            SettingsWithoutKey.APPEARANCE_LOOKS, Settings.PREF_THEME_COLORS, Settings.PREF_THEME_KEY_BORDERS, Settings.PREF_THEME_DAY_NIGHT,
             Settings.PREF_THEME_COLORS_NIGHT, Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, Settings.PREF_FONT_SCALE,
         ),
+        // cross and tick: reject or accept everything changed since the screen opened, each asks first
+        topActions = {
+            if (changed) {
+                IconButton({ askReject = true }) { Icon(painterResource(R.drawable.ic_close), stringResource(R.string.appearance_reject)) }
+                IconButton({ askAccept = true }) { Icon(painterResource(R.drawable.ic_check), stringResource(R.string.appearance_accept)) }
+            }
+        },
+        bottomBar = { TryItBar(keyboard, tryIt) },
     )
+    if (askReject)
+        ConfirmationDialog(
+            onDismissRequest = { askReject = false },
+            title = { Text(stringResource(R.string.appearance_reject)) },
+            content = { Text(stringResource(R.string.appearance_reject_message)) },
+            onConfirmed = { draft.reject(ctx) },
+        )
+    if (askAccept)
+        ConfirmationDialog(
+            onDismissRequest = { askAccept = false },
+            title = { Text(stringResource(R.string.appearance_accept)) },
+            content = { Text(stringResource(R.string.appearance_accept_message)) },
+            onConfirmed = { draft.accept() },
+        )
+    }
+    if (askOnLeave)
+        ThreeButtonAlertDialog(
+            onDismissRequest = { askOnLeave = false },
+            title = { Text(stringResource(R.string.appearance_keep_title)) },
+            content = { Text(stringResource(R.string.appearance_keep_message)) },
+            confirmButtonText = stringResource(R.string.appearance_keep),
+            onConfirmed = { draft.accept(); onClickBack() },
+            neutralButtonText = stringResource(R.string.appearance_discard),
+            onNeutral = { draft.reject(ctx); askOnLeave = false; onClickBack() },
+        )
 }
 
 fun createAppearanceSettings(context: Context) = listOf(
+    Setting(context, SettingsWithoutKey.APPEARANCE_LOOKS, R.string.appearance_looks, R.string.appearance_looks_summary) {
+        SavedLooksPreference(it)
+    },
     Setting(context, Settings.PREF_THEME_STYLE, R.string.theme_style) { setting ->
         val ctx = LocalContext.current
         val prefs = ctx.prefs()
@@ -250,6 +324,7 @@ fun createAppearanceSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_SPLIT_SPACER_SCALE_PREFIX, R.string.split_spacer_scale) { setting ->
         KeyboardScalePreference(
+            live = true,
             name = setting.title,
             baseKey = setting.key,
             dimensions = listOf(stringResource(R.string.landscape), stringResource(R.string.folded)),
@@ -264,6 +339,7 @@ fun createAppearanceSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, R.string.prefs_keyboard_height_scale) { setting ->
         KeyboardScalePreference(
+            live = true,
             name = setting.title,
             baseKey = setting.key,
             dimensions = listOf(stringResource(R.string.landscape), stringResource(R.string.folded)),
@@ -274,6 +350,7 @@ fun createAppearanceSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_BOTTOM_ROW_SCALE_PREFIX, R.string.prefs_bottom_row_scale) { setting ->
         KeyboardScalePreference(
+            live = true,
             name = setting.title,
             baseKey = setting.key,
             dimensions = listOf(stringResource(R.string.landscape), stringResource(R.string.folded)),
@@ -284,6 +361,7 @@ fun createAppearanceSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX, R.string.prefs_bottom_padding_scale) { setting ->
         KeyboardScalePreference(
+            live = true,
             name = setting.title,
             baseKey = setting.key,
             dimensions = listOf(stringResource(R.string.landscape), stringResource(R.string.folded)),
@@ -294,6 +372,7 @@ fun createAppearanceSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_SIDE_PADDING_SCALE_PREFIX, R.string.prefs_side_padding_scale) { setting ->
         KeyboardScalePreference(
+            live = true,
             name = setting.title,
             baseKey = setting.key,
             dimensions = listOf(stringResource(R.string.landscape), stringResource(R.string.split), stringResource(R.string.folded)),
@@ -310,6 +389,7 @@ fun createAppearanceSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_FONT_SCALE, R.string.prefs_font_scale) { def ->
         SliderPreference(
+            live = true,
             name = def.title,
             key = def.key,
             default = Defaults.PREF_FONT_SCALE,
@@ -322,6 +402,7 @@ fun createAppearanceSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_EMOJI_FONT_SCALE, R.string.prefs_emoji_font_scale) { setting ->
         SliderPreference(
+            live = true,
             name = setting.title,
             key = setting.key,
             default = Defaults.PREF_EMOJI_FONT_SCALE,
@@ -345,6 +426,7 @@ fun createAppearanceSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_SUGGESTION_TEXT_SIZE, R.string.pref_suggestion_text_size) { setting ->
         SliderPreference(
+            live = true,
             name = setting.title,
             key = setting.key,
             default = Defaults.PREF_SUGGESTION_TEXT_SIZE,
@@ -363,6 +445,7 @@ fun createAppearanceSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_SUGGESTION_WORD_PADDING, R.string.pref_suggestion_word_padding) { setting ->
         SliderPreference(
+            live = true,
             name = setting.title,
             key = setting.key,
             default = Defaults.PREF_SUGGESTION_WORD_PADDING,
@@ -372,6 +455,7 @@ fun createAppearanceSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_KEY_HORIZONTAL_GAP, R.string.pref_key_horizontal_gap) { setting ->
         SliderPreference(
+            live = true,
             name = setting.title,
             key = setting.key,
             default = Defaults.PREF_KEY_HORIZONTAL_GAP,
@@ -381,6 +465,7 @@ fun createAppearanceSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_KEY_VERTICAL_GAP, R.string.pref_key_vertical_gap) { setting ->
         SliderPreference(
+            live = true,
             name = setting.title,
             key = setting.key,
             default = Defaults.PREF_KEY_VERTICAL_GAP,
@@ -409,5 +494,66 @@ private fun Preview() {
         Surface {
             AppearanceScreen { }
         }
+    }
+}
+
+/** The saved looks: pick one to apply it, save the current look under a name, rename or delete your own. */
+@Composable
+private fun SavedLooksPreference(setting: Setting) {
+    val ctx = LocalContext.current
+    val prefs = ctx.prefs()
+    var generation by remember { mutableIntStateOf(0) }
+    val looks = remember(generation) { AppearanceLooks.load(prefs) }
+    var showList by remember { mutableStateOf(false) }
+    var saveAs by remember { mutableStateOf(false) }
+    var toRename: AppearanceLooks.Look? by remember { mutableStateOf(null) }
+    var toDelete: AppearanceLooks.Look? by remember { mutableStateOf(null) }
+    fun store(list: List<AppearanceLooks.Look>) { AppearanceLooks.save(prefs, list); generation++ }
+    Preference(name = setting.title, description = setting.description, onClick = { showList = true }) { NextScreenIcon() }
+    if (showList)
+        ListPickerDialog(
+            onDismissRequest = { showList = false },
+            title = { Text(setting.title) },
+            items = looks,
+            getItemName = { it.name },
+            showRadioButtons = false,
+            onItemSelected = { AppearanceLooks.apply(ctx, it.values) },
+            trailing = { look ->
+                IconButton({ showList = false; toRename = look }) { Icon(painterResource(R.drawable.ic_edit), stringResource(R.string.appearance_look_rename)) }
+                DeleteButton { showList = false; toDelete = look }
+            },
+            footer = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxWidth().clickable { showList = false; saveAs = true }
+                        .padding(horizontal = 8.dp).heightIn(min = 48.dp)) {
+                    Icon(painterResource(R.drawable.ic_plus), null, Modifier.padding(horizontal = 12.dp))
+                    Text(stringResource(R.string.appearance_look_save), color = MaterialTheme.colorScheme.primary)
+                }
+            },
+        )
+    if (saveAs)
+        TextInputDialog(
+            onDismissRequest = { saveAs = false },
+            title = { Text(stringResource(R.string.appearance_look_save)) },
+            initialText = stringResource(R.string.appearance_look_default_name, looks.size + 1),
+            checkTextValid = { name -> name.isNotBlank() && looks.none { it.name == name } },
+            onConfirmed = { name -> store(looks + AppearanceLooks.Look(name, AppearanceLooks.current(prefs))) },
+        )
+    toRename?.let { look ->
+        TextInputDialog(
+            onDismissRequest = { toRename = null },
+            title = { Text(stringResource(R.string.appearance_look_rename)) },
+            initialText = look.name,
+            checkTextValid = { name -> name.isNotBlank() && looks.none { it !== look && it.name == name } },
+            onConfirmed = { name -> store(looks.map { if (it === look) AppearanceLooks.Look(name, it.values) else it }) },
+        )
+    }
+    toDelete?.let { look ->
+        ConfirmationDialog(
+            onDismissRequest = { toDelete = null },
+            title = { Text(stringResource(R.string.appearance_look_delete, look.name)) },
+            confirmButtonText = stringResource(R.string.delete),
+            onConfirmed = { store(looks.filter { it !== look }) },
+        )
     }
 }

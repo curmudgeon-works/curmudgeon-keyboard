@@ -49,6 +49,7 @@ fun TextInputDialog(
     val state = rememberTextFieldState(initialText, TextRange(if (singleLine) initialText.length else 0))
 
     ThreeButtonAlertDialog(
+        keepKeyboard = false, // has a text field, needs the focus
         onDismissRequest = onDismissRequest,
         onConfirmed = { onConfirmed(state.text.toString()) },
         confirmButtonText = confirmButtonText,
