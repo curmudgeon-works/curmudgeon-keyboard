@@ -275,6 +275,8 @@
     <string name="backspace_seconds_value">%s s of holding</string>
     <!-- Summary addition: %1$d is milliseconds, %2$s seconds like 2.0 -->
     <string name="backspace_speed_up_value">every %1$d ms after %2$s s</string>
+    <string name="autocorrect_with_digits">Auto-correct words with digits</string>
+    <string name="autocorrect_with_digits_summary">Off: a word with a digit in it (th3) is only offered as a suggestion, never replaced</string>
     <string name="backspace_deletes_swiped_word">Tap to delete a swiped word</string>
     <string name="backspace_deletes_swiped_word_summary">Right after a swipe, one tap deletes the whole word; after anything else a tap deletes a character</string>
     <string name="layout_files_summary">Number row, number pads, phone pad, bottom rows… in one editor and one file</string>
