@@ -892,7 +892,7 @@ New dictionary:
     <!-- User dictionary settings. Text button to add a word -->
     <string name="user_dict_add_word_button">Add a word</string>
     <!-- Option for choosing theme style -->
-    <string name="theme_style">Style</string>
+    <string name="theme_style">Key style</string>
     <!-- Option for choosing icon style (same options as theme_style) -->
     <string name="icon_style">Icon style</string>
     <!-- Style name for Rounded style -->
@@ -1155,6 +1155,7 @@ New dictionary:
     <string name="custom_subtype">Custom subtype</string>
     <!-- Name for landscape orientation, used in various settings -->
     <string name="landscape">Landscape</string>
+    <string name="portrait">Portrait</string>
     <!-- When a foldable phone is folded -->
     <string name="folded">Folded</string>
     <!-- Emoji search title bar text -->

@@ -17,6 +17,7 @@ import android.widget.ImageView
 import androidx.annotation.ColorInt
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
+import androidx.core.content.res.ResourcesCompat
 import androidx.core.graphics.BlendModeColorFilterCompat
 import androidx.core.graphics.BlendModeCompat
 import androidx.core.graphics.ColorUtils
@@ -71,6 +72,8 @@ interface Colors {
             ACTION_KEY_BACKGROUND -> {
                 if (themeStyle == STYLE_HOLO && hasKeyBorders) // no borders has a very small pressed drawable otherwise
                     attr.getDrawable(R.styleable.KeyboardView_functionalKeyBackground)
+                else if (!hasKeyBorders && themeStyle != STYLE_HOLO) // the key fills its cell like the others, not a 35 dp circle
+                    ResourcesCompat.getDrawable(attr.resources, R.drawable.btn_keyboard_key_action_flat, null)
                 else
                     attr.getDrawable(R.styleable.KeyboardView_keyBackground)
             }
@@ -384,6 +387,10 @@ class DefaultColors (
     private val adjustedSuggestionText = brightenOrDarken(suggestionText, true)
 
     private val backgroundFilter = colorFilter(background)
+    /** With key borders off the keys keep their colour and the gaps go: the keyboard's background is painted in
+     *  the key colour (the keys themselves stay transparent). With borders on it is the background colour. */
+    private val mainBackground = if (hasKeyBorders) background else keyBackground
+    private val mainBackgroundFilter = colorFilter(mainBackground)
     private val adjustedBackgroundFilter: ColorFilter
     private val keyTextFilter: ColorFilter
     private val suggestionTextFilter = colorFilter(suggestionText)
@@ -432,12 +439,12 @@ class DefaultColors (
         stripBackgroundList = pressedStateList(pressedStripElementBackground, stripBackground)
 
         if (themeStyle == STYLE_HOLO && keyboardBackground == null) {
-            val darkerBackground = adjustLuminosityAndKeepAlpha(background, -0.2f)
+            val darkerBackground = adjustLuminosityAndKeepAlpha(mainBackground, -0.2f)
             navBar = darkerBackground
-            keyboardBackground = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(background, darkerBackground))
+            keyboardBackground = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(mainBackground, darkerBackground))
             backgroundSetupDone = true
         } else {
-            navBar = background
+            navBar = mainBackground
         }
 
         adjustedBackgroundFilter = colorFilter(adjustedBackground)
@@ -453,19 +460,19 @@ class DefaultColors (
         } else {
             // need to set color to background if key borders are disabled, or there will be ugly keys
             backgroundStateList = pressedStateList(brightenOrDarken(background, true), background)
-            keyStateList = pressedStateList(keyBackground, Color.TRANSPARENT)
-            functionalKeyStateList = keyStateList
+            // the keys are transparent on a background in their colour, so a press must differ from it
+            keyStateList = pressedStateList(brightenOrDarken(keyBackground, true), Color.TRANSPARENT)
+            // shift, backspace and the like keep their own colour when the theme gives them one
+            functionalKeyStateList = if (functionalKey == keyBackground) keyStateList
+                else pressedStateList(brightenOrDarken(functionalKey, true), functionalKey)
             actionKeyStateList = if (themeStyle == STYLE_HOLO) functionalKeyStateList
                 else pressedStateList(brightenOrDarken(accent, true), accent)
             spaceBarStateList = pressedStateList(brightenOrDarken(spaceBar, true), spaceBar)
         }
         keyTextFilter = colorFilter(keyText)
-        actionKeyIconColorFilter = when {
-            themeStyle == STYLE_HOLO -> keyTextFilter
-            // the white icon may not have enough contrast, and can't be adjusted by the user
-            isBrightColor(accent) -> colorFilter(Color.DKGRAY)
-            else -> null
-        }
+        // the action key's icon is in the key text colour, like every other key's (upstream: white, or dark grey on
+        // a bright accent)
+        actionKeyIconColorFilter = keyTextFilter
     }
 
     override fun get(color: ColorType): Int = when (color) {
@@ -481,14 +488,15 @@ class DefaultColors (
         SPACE_BAR_TEXT -> spaceBarText
         FUNCTIONAL_KEY_BACKGROUND -> functionalKey
         SPACE_BAR_BACKGROUND -> spaceBar
-        MORE_SUGGESTIONS_WORD_BACKGROUND, MAIN_BACKGROUND -> background
+        MORE_SUGGESTIONS_WORD_BACKGROUND -> background
+        MAIN_BACKGROUND -> mainBackground
         KEY_BACKGROUND -> keyBackground
         ACTION_KEY_POPUP_KEYS_BACKGROUND -> if (themeStyle == STYLE_HOLO) adjustedBackground else accent
         STRIP_BACKGROUND -> if (!hasKeyBorders && themeStyle == STYLE_MATERIAL) adjustedBackground else background
         NAVIGATION_BAR -> navBar
         SUGGESTION_AUTO_CORRECT, EMOJI_CATEGORY, TOOL_BAR_KEY, TOOL_BAR_EXPAND_KEY, ONE_HANDED_MODE_BUTTON -> suggestionText
         MORE_SUGGESTIONS_HINT, SUGGESTED_WORD, SUGGESTION_TYPED_WORD, SUGGESTION_VALID_WORD -> adjustedSuggestionText
-        ACTION_KEY_ICON -> Color.WHITE
+        ACTION_KEY_ICON -> keyText
     }
 
     override fun setColor(drawable: Drawable, color: ColorType) {
@@ -537,7 +545,7 @@ class DefaultColors (
                     }
                     view.background = keyboardBackground
                 } else {
-                    view.background.colorFilter = backgroundFilter
+                    view.background.colorFilter = mainBackgroundFilter
                 }
             }
             else -> view.background.colorFilter = backgroundFilter
