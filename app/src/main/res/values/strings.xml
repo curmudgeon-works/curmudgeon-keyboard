@@ -46,7 +46,7 @@
     <!-- Description for toolbar_swipe_down_to_hide -->
     <string name="toolbar_swipe_down_to_hide_summary">Swipe down on the toolbar to close the keyboard</string>
     <!-- Settings screen title for preferences-->
-    <string name="settings_screen_preferences">Preferences</string>
+    <string name="settings_screen_preferences">Layout &amp; Typing</string>
     <!-- Settings screen title for gesture typing preferences -->
     <string name="settings_screen_gesture">Gesture Typing</string>
     <!-- Settings screen title for text correction options -->
@@ -56,7 +56,7 @@
     <!-- Settings screen title for keyboard theme settings -->
     <string name="settings_screen_theme">Theme</string>
     <!-- Settings category title for Preference/Input settings -->
-    <string name="settings_category_input">Input</string>
+    <string name="settings_category_input">Typing</string>
     <!-- Settings category title for Preference/Additional keys settings -->
     <string name="settings_category_additional_keys">Additional keys</string>
     <!-- Settings category title for Preference/Additional keys settings -->
@@ -545,6 +545,10 @@
     <string name="theme_preset_paper">Paper</string>
     <string name="theme_preset_ocean">Rounded ocean</string>
     <string name="theme_preset_holo">Holo classic</string>
+    <!-- Layout & Typing's keep / discard, like Appearance's -->
+    <string name="layout_keep_title">Keep the layout and typing changes?</string>
+    <string name="layout_keep_message">Keep: the keyboard stays as it is now. Discard: it goes back to how it was when you opened Layout &amp; Typing.</string>
+    <string name="layout_reject_message">The keyboard goes back to how it was when you opened Layout &amp; Typing.</string>
     <string name="appearance_keep_title">Keep the appearance changes?</string>
     <string name="appearance_keep_message">Keep: the keyboard stays as it looks now. Discard: it goes back to how it looked when you opened Appearance.</string>
     <string name="appearance_keep">Keep</string>

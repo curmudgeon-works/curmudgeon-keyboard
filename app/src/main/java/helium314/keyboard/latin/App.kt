@@ -26,6 +26,7 @@ class App : Application() {
         Settings.init(this)
         // the process died with Appearance open (a crash): its changes that weren't kept are undone
         helium314.keyboard.settings.AppearanceDraft.recoverAfterCrash(this)
+        helium314.keyboard.settings.LayoutDraft.recoverAfterCrash(this)
         SubtypeSettings.init(this)
         GestureCorpusRecorder.init(this)
 

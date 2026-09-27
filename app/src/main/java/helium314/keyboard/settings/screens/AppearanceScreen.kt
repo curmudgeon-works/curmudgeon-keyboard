@@ -150,17 +150,7 @@ fun AppearanceScreen(
         SettingsWithoutKey.BACKGROUND_IMAGE,
         SettingsWithoutKey.BACKGROUND_IMAGE_LANDSCAPE,
         R.string.appearance_group_style,
-        Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX,
-        Settings.PREF_SHOW_NUMBER_ROW,
-        if (!prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW))
-            Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS else null,
-        Settings.PREF_ENABLE_SPLIT_KEYBOARD,
-        if (prefs.getBoolean(Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE, Defaults.PREF_ENABLE_SPLIT_KEYBOARD)
-            || prefs.getBoolean(Settings.PREF_ENABLE_SPLIT_KEYBOARD, Defaults.PREF_ENABLE_SPLIT_KEYBOARD)
-            || prefs.getBoolean(Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED, Defaults.PREF_ENABLE_SPLIT_KEYBOARD)
-            || prefs.getBoolean(Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE, Defaults.PREF_ENABLE_SPLIT_KEYBOARD)
-            )
-            Settings.PREF_SPLIT_SPACER_SCALE_PREFIX else null,
+        // (keyboard height, numbers row and split keyboard are on Layout & Typing: the keyboard's shape, not its look)
         Settings.PREF_THEME_KEY_BORDERS,
         Settings.PREF_KEY_HORIZONTAL_GAP,
         Settings.PREF_KEY_VERTICAL_GAP,
@@ -247,7 +237,7 @@ fun AppearanceScreen(
         settings = items,
         simpleModeKeys = setOf(
             SettingsWithoutKey.APPEARANCE_LOOKS, Settings.PREF_THEME_STYLE, Settings.PREF_THEME_COLORS, Settings.PREF_THEME_KEY_BORDERS, Settings.PREF_THEME_DAY_NIGHT,
-            Settings.PREF_THEME_COLORS_NIGHT, Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, Settings.PREF_SHOW_NUMBER_ROW, SettingsWithoutKey.KEY_TEXT_STYLE, SettingsWithoutKey.HINT_TEXT_STYLE, SettingsWithoutKey.SUGGESTION_TEXT_STYLE,
+            Settings.PREF_THEME_COLORS_NIGHT, SettingsWithoutKey.KEY_TEXT_STYLE, SettingsWithoutKey.HINT_TEXT_STYLE, SettingsWithoutKey.SUGGESTION_TEXT_STYLE,
             SettingsWithoutKey.HIDE_ALL_SYMBOLS,
         ),
         // cross and tick: reject or accept everything changed since the screen opened, each asks first
