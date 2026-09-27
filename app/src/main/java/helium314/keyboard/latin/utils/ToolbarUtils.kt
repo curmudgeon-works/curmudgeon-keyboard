@@ -27,7 +27,11 @@ fun createToolbarKey(context: Context, key: ToolbarKey): ImageButton {
     button.tag = key
     button.contentDescription = key.name.lowercase().getStringResourceOrName("", context)
     setToolbarButtonActivatedState(button)
-    button.setImageDrawable(KeyboardIconsSet.instance.getNewDrawable(key.name, context))
+    val icon = KeyboardIconsSet.instance.getNewDrawable(key.name, context)
+    // the clipboard key says what it is, in small type under the icon, within the key's usual height
+    button.setImageDrawable(if (key == CLIPBOARD && icon != null)
+        LabeledIconDrawable(icon, context.getString(R.string.clipboard), context.resources.displayMetrics.scaledDensity * 8f)
+        else icon)
     return button
 }
 
@@ -120,7 +124,7 @@ enum class ToolbarMode {
 val toolbarKeyStrings = entries.associateWithTo(EnumMap(ToolbarKey::class.java)) { it.toString().lowercase(Locale.US) }
 
 val defaultToolbarPref by lazy {
-    val default = listOf(SETTINGS, VOICE, CLIPBOARD, UNDO, REDO, SELECT_WORD, COPY, PASTE, LEFT, RIGHT)
+    val default = listOf(SETTINGS, CLIPBOARD, UNDO, REDO, SELECT_WORD, COPY, PASTE, LEFT, RIGHT, VOICE) // voice last
     val others = entries.filterNot { it in default || it == CLOSE_HISTORY }
     default.joinToString(Separators.ENTRY) { it.name + Separators.KV + true } + Separators.ENTRY +
             others.joinToString(Separators.ENTRY) { it.name + Separators.KV + false }
@@ -140,8 +144,22 @@ val defaultClipboardToolbarPref by lazy {
 /** add missing keys, typically because a new key has been added */
 fun upgradeToolbarPrefs(prefs: SharedPreferences) {
     upgradeToolbarPref(prefs, Settings.PREF_TOOLBAR_KEYS, defaultToolbarPref)
+    moveVoiceToEnd(prefs)
     upgradeToolbarPref(prefs, Settings.PREF_PINNED_TOOLBAR_KEYS, defaultPinnedToolbarPref)
     upgradeToolbarPref(prefs, Settings.PREF_CLIPBOARD_TOOLBAR_KEYS, defaultClipboardToolbarPref)
+}
+
+/** The old default put voice second; a toolbar still in that order gets voice as the last enabled key (once). */
+private fun moveVoiceToEnd(prefs: SharedPreferences) {
+    val stored = prefs.getString(Settings.PREF_TOOLBAR_KEYS, null) ?: return
+    val list = stored.split(Separators.ENTRY).toMutableList()
+    val enabled = list.filter { it.endsWith(Separators.KV + "true") }.map { it.substringBefore(Separators.KV) }
+    if (enabled.take(3) != listOf(SETTINGS.name, VOICE.name, CLIPBOARD.name)) return
+    val voice = list.first { it.startsWith(VOICE.name + Separators.KV) }
+    list.remove(voice)
+    val lastEnabled = list.indexOfLast { it.endsWith(Separators.KV + "true") }
+    list.add(lastEnabled + 1, voice)
+    prefs.edit().putString(Settings.PREF_TOOLBAR_KEYS, list.joinToString(Separators.ENTRY)).apply()
 }
 
 private fun upgradeToolbarPref(prefs: SharedPreferences, pref: String, default: String) {

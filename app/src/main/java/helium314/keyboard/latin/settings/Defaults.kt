@@ -37,8 +37,8 @@ object Defaults {
         LayoutType.NUMPAD_LANDSCAPE -> "numpad_landscape"
         LayoutType.PHONE -> "phone"
         LayoutType.PHONE_SYMBOLS -> "phone_symbols"
-        LayoutType.EMOJI_BOTTOM -> "emoji_bottom_row"
-        LayoutType.CLIPBOARD_BOTTOM -> "clip_bottom_row"
+        LayoutType.EMOJI_BOTTOM -> "emoji_bottom_row_with_action" // the send key is there by default (2026-09-27)
+        LayoutType.CLIPBOARD_BOTTOM -> "clip_bottom_row_with_action"
     }
 
     private const val DEFAULT_SIZE_SCALE = 1.0f // 100%
@@ -177,7 +177,8 @@ object Defaults {
     const val PREF_LANGUAGE_SWIPE_DISTANCE = 5
     const val PREF_TOUCHPAD_SENSITIVITY = 50
     const val PREF_ENABLE_CLIPBOARD_HISTORY = true
-    const val PREF_CLIPBOARD_HISTORY_RETENTION_TIME = 10 // minutes
+    const val PREF_CLIPBOARD_HISTORY_RETENTION_TIME = 10 // minutes (old setting, kept for the upgrade step)
+    const val PREF_CLIPBOARD_HISTORY_SIZE = 100 // entries kept, pinned ones not counted; never expires by time
     const val PREF_CLIPBOARD_HISTORY_PINNED_FIRST = true
     const val PREF_ADD_TO_PERSONAL_DICTIONARY = false
     @JvmField

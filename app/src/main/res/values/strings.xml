@@ -213,6 +213,10 @@
     <string name="enable_clipboard_history_summary">If disabled, clipboard key will paste clipboard content if any</string>
     <!-- Preferences item for controlling clipboard history retention time -->
     <string name="clipboard_history_retention_time">History retention time</string>
+    <string name="clipboard_history_size">History length</string>
+    <string name="clipboard_history_size_summary">Entries never expire; the oldest go when there are more than this (pinned ones don\'t count)</string>
+    <!-- %s: a number -->
+    <string name="clipboard_history_size_entries">%s entries</string>
     <!-- Preferences item for showing pinned clipboard items first -->
     <string name="clipboard_history_pinned_first">Show pinned items on top</string>
     <!-- Preferences item for enabling swipe deletion -->
@@ -388,12 +392,12 @@
     <string name="key_popups_try">Try it here</string>
     <string name="layout_group_numpad">Number pad</string>
     <string name="layout_group_phone">Phone pad</string>
-    <string name="bottom_rows_action_key">Send key on the emoji and clipboard rows</string>
+    <string name="bottom_rows_action_key">Show send key on emoji and clipboard panels</string>
     <string name="bottom_row_tablet">Tablet-style bottom row</string>
     <string name="hints_title">Symbols on keys</string>
     <string name="number_row_and_hints">Number row and symbols</string>
-    <string name="hints_number_row">Symbols on the number row</string>
-    <string name="hints_other_keys">Symbols on the other keys</string>
+    <string name="hints_number_row">Hide symbols on the number row</string>
+    <string name="hints_other_keys">Hide symbols on the other keys</string>
     <string name="key_popups_symbols">Symbols page</string>
     <string name="key_popups_more_symbols">More symbols page</string>
     <string name="key_popups_presets">Preset popup layouts</string>
@@ -452,14 +456,14 @@
     <!-- Description of the settings to localize number row -->
     <string name="localized_number_row_summary">Prefer localized over latin numbers</string>
     <!-- Title of the setting to enable number row hints -->
-    <string name="number_row_hints">Symbols on the number row</string>
+    <string name="number_row_hints">Hide symbols on the number row</string>
     <!-- Title and description of the setting to show long-press hints on the letter keys -->
-    <string name="letter_hints">Symbols on letter keys</string>
+    <string name="letter_hints">Hide symbols on letter keys</string>
     <string name="letter_hints_summary">Long-press still types them when hidden</string>
     <!-- Title of the setting to save subtype per app -->
     <string name="save_subtype_per_app">Remember keyboard per app</string>
     <!-- Title of the setting to show key hints -->
-    <string name="show_hints">Symbols on keys</string>
+    <string name="show_hints">Hide symbols on keys</string>
     <!-- Description of the settings to show hints -->
     <string name="show_hints_summary">Long-press still types them when hidden</string>
     <!-- Preferences item to set popup key order and select hints source -->
@@ -563,13 +567,13 @@
     <!-- Description of the setting to quick-pin toolbar keys -->
     <string name="quick_pin_toolbar_keys_summary">This will disable other long press actions for toolbar keys that are not pinned</string>
     <!-- Title of the setting to show "..." as hints for more functionality on long-press -->
-    <string name="show_popup_hints">Long-press dots</string>
+    <string name="show_popup_hints">Show long-press dots</string>
     <!-- Description of the show_popup_hints setting -->
     <string name="show_popup_hints_summary">The … in the bottom right corner of keys that do something on long press</string>
     <!-- Option to remove popup keys that already exist on the base keyboard -->
     <string name="remove_redundant_popups">Remove redundant popups</string>
     <!-- Description of the remove_redundant_popups setting -->
-    <string name="remove_redundant_popups_summary">Suppress popup keys that are already present on the base layout</string>
+    <string name="remove_redundant_popups_summary">Each character on the keyboard only once: a popup that is a key, or a popup of an earlier key (counting from the bottom left, around the edge and inwards), is dropped</string>
     <!-- Title of the setting enabling long press on space key to change IME -->
     <string name="prefs_long_press_keyboard_to_change_lang">Change input method with space key</string>
     <!-- Description of the settings to change IME indicating long press triggers change. -->

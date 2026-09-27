@@ -98,7 +98,7 @@ fun clipboardHistoryItems(prefs: SharedPreferences): List<Any?> {
     return listOf(
         R.string.settings_category_clipboard_history,
         Settings.PREF_ENABLE_CLIPBOARD_HISTORY,
-        if (clipboardHistoryEnabled) Settings.PREF_CLIPBOARD_HISTORY_RETENTION_TIME else null,
+        if (clipboardHistoryEnabled) Settings.PREF_CLIPBOARD_HISTORY_SIZE else null,
     )
 }
 
@@ -121,11 +121,14 @@ fun createPreferencesSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_SAVE_SUBTYPE_PER_APP, R.string.save_subtype_per_app) {
         SwitchPreference(it, Defaults.PREF_SAVE_SUBTYPE_PER_APP)
     },
-    Setting(context, Settings.PREF_SHOW_HINTS, R.string.hints_other_keys, R.string.show_hints_summary) {
-        SwitchPreference(it, Defaults.PREF_SHOW_HINTS) { KeyboardSwitcher.getInstance().reloadKeyboard() }
+    Setting(context, Settings.PREF_SHOW_HINTS, R.string.hints_other_keys) {
+        SwitchPreference(it, Defaults.PREF_SHOW_HINTS, inverted = true) { KeyboardSwitcher.getInstance().reloadKeyboard() }
     },
-    Setting(context, Settings.PREF_SHOW_LETTER_HINTS, R.string.letter_hints, R.string.letter_hints_summary) {
-        SwitchPreference(it, Defaults.PREF_SHOW_LETTER_HINTS) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+    Setting(context, Settings.PREF_REMOVE_REDUNDANT_POPUPS, R.string.remove_redundant_popups) {
+        SwitchPreference(it, Defaults.PREF_REMOVE_REDUNDANT_POPUPS) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+    },
+    Setting(context, Settings.PREF_SHOW_LETTER_HINTS, R.string.letter_hints) {
+        SwitchPreference(it, Defaults.PREF_SHOW_LETTER_HINTS, inverted = true) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
     Setting(context, Settings.PREF_POPUP_KEYS_ORDER, R.string.popup_order) {
         ReorderSwitchPreference(it, Defaults.PREF_POPUP_KEYS_ORDER)
@@ -189,7 +192,7 @@ fun createPreferencesSettings(context: Context) = listOf(
         }
     },
     Setting(context, Settings.PREF_SHOW_NUMBER_ROW_HINTS, R.string.number_row_hints) {
-        SwitchPreference(it, Defaults.PREF_SHOW_NUMBER_ROW_HINTS) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+        SwitchPreference(it, Defaults.PREF_SHOW_NUMBER_ROW_HINTS, inverted = true) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
     Setting(context, Settings.PREF_SHOW_LANGUAGE_SWITCH_KEY, R.string.show_language_switch_key) {
         SwitchPreference(it, Defaults.PREF_SHOW_LANGUAGE_SWITCH_KEY) { KeyboardSwitcher.getInstance().reloadKeyboard() }
@@ -208,28 +211,21 @@ fun createPreferencesSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_SHOW_EMOJI_KEY, R.string.show_emoji_key) {
         SwitchPreference(it, Defaults.PREF_SHOW_EMOJI_KEY) { KeyboardSwitcher.getInstance().reloadKeyboard() }
     },
-    Setting(context, Settings.PREF_REMOVE_REDUNDANT_POPUPS,
-        R.string.remove_redundant_popups, R.string.remove_redundant_popups_summary)
-    {
-        SwitchPreference(it, Defaults.PREF_REMOVE_REDUNDANT_POPUPS) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
-    },
     Setting(context, Settings.PREF_ENABLE_CLIPBOARD_HISTORY,
         R.string.enable_clipboard_history, R.string.enable_clipboard_history_summary)
     {
         val ctx = LocalContext.current
         SwitchPreference(it, Defaults.PREF_ENABLE_CLIPBOARD_HISTORY) { ClipboardDao.getInstance(ctx)?.clearNonPinned() }
     },
-    Setting(context, Settings.PREF_CLIPBOARD_HISTORY_RETENTION_TIME, R.string.clipboard_history_retention_time) { setting ->
+    Setting(context, Settings.PREF_CLIPBOARD_HISTORY_SIZE, R.string.clipboard_history_size, R.string.clipboard_history_size_summary) { setting ->
         val ctx = LocalContext.current
         SliderPreference(
             name = setting.title,
             key = setting.key,
-            default = Defaults.PREF_CLIPBOARD_HISTORY_RETENTION_TIME,
-            description = {
-                if (it > 120) stringResource(R.string.settings_no_limit)
-                else stringResource(R.string.abbreviation_unit_minutes, it.toString())
-            },
-            range = 1f..121f,
+            default = Defaults.PREF_CLIPBOARD_HISTORY_SIZE,
+            description = { stringResource(R.string.clipboard_history_size_entries, it.toString()) },
+            range = 10f..500f,
+            stepSize = 10,
         ) { ClipboardDao.getInstance(ctx)?.clearOldClips(true) }
     },
     Setting(context, Settings.PREF_VIBRATION_DURATION_SETTINGS, R.string.prefs_keypress_vibration_duration_settings) { setting ->

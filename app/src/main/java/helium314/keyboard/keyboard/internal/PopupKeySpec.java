@@ -122,6 +122,16 @@ public final class PopupKeySpec {
             }
         }
 
+        public void addCode(final int code) {
+            if (code > 32) mCodes.put(code, 0);
+        }
+
+        /** A popup an earlier key already offers counts like a key on the layout. */
+        public void addPopup(@NonNull final PopupKeySpec popupKey) {
+            if (popupKey.mCode > 32) mCodes.put(popupKey.mCode, 0);
+            else if (popupKey.mCode == KeyCode.MULTIPLE_CODE_POINTS && popupKey.mOutputText != null) mTexts.add(popupKey.mOutputText);
+        }
+
         public boolean contains(@NonNull final PopupKeySpec popupKey) {
             final int code = popupKey.mCode;
             if (mCodes.indexOfKey(code) >= 0) {
