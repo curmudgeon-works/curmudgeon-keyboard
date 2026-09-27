@@ -180,7 +180,20 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
 
     override fun onStop() {
         prefs.unregisterOnSharedPreferenceChangeListener(this)
+        // leaving the app with Appearance open undoes its changes that weren't kept; a file picker we opened
+        // (background image, font) and rotating don't count
+        if (!isChangingConfigurations && !awaitingResult) AppearanceDraft.rejectOpen(this)
         super.onStop()
+    }
+
+    // an activity we started for a result (file pickers) is in front: this isn't leaving the app
+    private var awaitingResult = false
+
+    @Deprecated("Deprecated in Java")
+    override fun startActivityForResult(intent: Intent, requestCode: Int, options: Bundle?) {
+        awaitingResult = true
+        @Suppress("DEPRECATION")
+        super.startActivityForResult(intent, requestCode, options)
     }
 
     override fun onPause() {
@@ -191,6 +204,7 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
 
     override fun onResume() {
         super.onResume()
+        awaitingResult = false
         paused = false
     }
 
