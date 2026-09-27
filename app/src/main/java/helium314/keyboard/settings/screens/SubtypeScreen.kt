@@ -188,6 +188,15 @@ fun SubtypeScreen(
     // moment while it reloads (otherwise the content is short again, maxValue drops to 0 and the position is lost)
     val scrollState = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) }
     val tryIt = remember { TryItState() }
+    // back from Android's settings (sound / vibration switched there): the input rows are worked out again
+    var resumed by remember { mutableIntStateOf(0) }
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) resumed++ }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     // the key sound settings preview on the keyboard like Appearance's: their dialogs bring it up and keep it
     val focusManager = LocalFocusManager.current
     val softKeyboard = LocalSoftwareKeyboardController.current
@@ -232,7 +241,7 @@ fun SubtypeScreen(
                 // ---- input: key-press popup, vibration, sound, per-app keyboard, localized number row
                 WithBigTitle(stringResource(R.string.settings_category_input)) {
                     CompositionLocalProvider(LocalCompactPreferences provides true) {
-                        preferencesInputItems(prefs).filter { it !in advancedInputItems }.forEach {
+                        (if (resumed >= 0) preferencesInputItems(prefs, ctx) else emptyList()).filter { it !in advancedInputItems }.forEach {
                             if (it !is String) return@forEach
                             // the rows that appear under Vibrate / Sound when they're on sit a little in
                             if (it in soundPreviewItems) CompositionLocalProvider(LocalKeepKeyboard provides true,
