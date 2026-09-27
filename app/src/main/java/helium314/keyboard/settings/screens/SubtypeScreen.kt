@@ -168,6 +168,8 @@ fun SubtypeScreen(
     fun layoutChanged(type: LayoutType) = currentSubtype.layoutName(type) != openedSubtype.layoutName(type)
         || type.folder.substringAfterLast(java.io.File.separator) in changedFolders || keyChanged(Settings.PREF_LAYOUT_PREFIX + type.name)
     var askOnLeave by remember { mutableStateOf(false) }
+    // a Discard puts values back behind the rows' backs: the list is built anew, every row reads its value again
+    var rebuild by remember { mutableIntStateOf(0) }
     var askReject by remember { mutableStateOf(false) }
     var askAccept by remember { mutableStateOf(false) }
     fun setCurrentSubtype(subtype: SettingsSubtype) {
@@ -236,6 +238,7 @@ fun SubtypeScreen(
     fun leave() { if (draft.hasChanges(ctx)) askOnLeave = true else { LayoutDraft.close(); onClickBack() } }
     fun discardChanges() {
         draft.reject(ctx)
+        rebuild++
         currentSubtypeString = draft.subtype
         if (RichInputMethodManager.isInitialized())
             KeyboardSwitcher.getInstance().switchToSubtype(draft.subtype.toSettingsSubtype().toAdditionalSubtype())
@@ -245,7 +248,7 @@ fun SubtypeScreen(
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                 val fresh = LayoutDraft.of(ctx, currentSubtypeString)
-                if (fresh !== draft) { currentSubtypeString = fresh.subtype; draft = fresh }
+                if (fresh !== draft) { currentSubtypeString = fresh.subtype; draft = fresh; rebuild++ }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -315,7 +318,7 @@ fun SubtypeScreen(
                     .then(Modifier.padding(innerPadding))
                     .padding(bottom = with(LocalDensity.current) { reservedBottom.toDp() }),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
+            ) { androidx.compose.runtime.key(rebuild) {
                 val advanced by SettingsMode.state(ctx)
                 // two groups, one row style (label 10 dp in, rows 56 dp high): see LocalCompactPreferences, SwitchRow
                 // ---- the layout: first the layout and its popups, then the other layouts, the five key switches last
@@ -340,7 +343,7 @@ fun SubtypeScreen(
                             Pending(prefixChanged(Settings.PREF_SPLIT_SPACER_SCALE_PREFIX)) { Box(Modifier.padding(start = 16.dp)) {
                                 SettingsActivity.settingsContainer[Settings.PREF_SPLIT_SPACER_SCALE_PREFIX]?.Preference() } }
                     }
-                    // then the plain switches: emoji key, send key on the emoji and clipboard panels, TLD popups
+                    // then the emoji key switch
                     Pending(keyChanged(Settings.PREF_SHOW_EMOJI_KEY)) {
                         PrefSwitchRow(Settings.PREF_SHOW_EMOJI_KEY, Defaults.PREF_SHOW_EMOJI_KEY, R.string.show_emoji_key) {
                             holdPreview()
@@ -349,14 +352,17 @@ fun SubtypeScreen(
                     }
                     // the send/enter key on the rows under the emoji and clipboard panels: one switch for both
                     val withAction = (currentSubtype.layoutName(LayoutType.EMOJI_BOTTOM) ?: Settings.readDefaultLayoutName(LayoutType.EMOJI_BOTTOM, prefs)) == "emoji_bottom_row_with_action"
-                    Pending(layoutChanged(LayoutType.EMOJI_BOTTOM)) { SwitchRow(stringResource(R.string.bottom_rows_action_key), withAction) { on ->
-                        setCurrentSubtype(
-                            if (on) currentSubtype.withLayout(LayoutType.EMOJI_BOTTOM, "emoji_bottom_row_with_action").withLayout(LayoutType.CLIPBOARD_BOTTOM, "clip_bottom_row_with_action")
-                            else currentSubtype.withLayout(LayoutType.EMOJI_BOTTOM, "emoji_bottom_row").withLayout(LayoutType.CLIPBOARD_BOTTOM, "clip_bottom_row")
-                        )
-                    } }
-                    Pending(keyChanged(Settings.PREF_SHOW_TLD_POPUP_KEYS)) {
-                        PrefSwitchRow(Settings.PREF_SHOW_TLD_POPUP_KEYS, Defaults.PREF_SHOW_TLD_POPUP_KEYS, R.string.show_tld_popup_keys) { holdPreview(); reloadPreview() } }
+                    // advanced: the send key on the emoji and clipboard panels, TLD popups
+                    if (advanced) AdvancedBlock {
+                        Pending(layoutChanged(LayoutType.EMOJI_BOTTOM)) { SwitchRow(stringResource(R.string.bottom_rows_action_key), withAction) { on ->
+                            setCurrentSubtype(
+                                if (on) currentSubtype.withLayout(LayoutType.EMOJI_BOTTOM, "emoji_bottom_row_with_action").withLayout(LayoutType.CLIPBOARD_BOTTOM, "clip_bottom_row_with_action")
+                                else currentSubtype.withLayout(LayoutType.EMOJI_BOTTOM, "emoji_bottom_row").withLayout(LayoutType.CLIPBOARD_BOTTOM, "clip_bottom_row")
+                            )
+                        } }
+                        Pending(keyChanged(Settings.PREF_SHOW_TLD_POPUP_KEYS)) {
+                            PrefSwitchRow(Settings.PREF_SHOW_TLD_POPUP_KEYS, Defaults.PREF_SHOW_TLD_POPUP_KEYS, R.string.show_tld_popup_keys) { holdPreview(); reloadPreview() } }
+                    }
                     // preset popup layouts, customize popups, customize keys and popups with JSON (all advanced);
                     // italic as a whole when any of it changed
                     Pending(keyChanged("key_popups", "key_popup_set_selected", "key_popup_sets", Settings.PREF_SYMBOL_POPUP_MAP)
@@ -443,6 +449,7 @@ fun SubtypeScreen(
                         }
                     }
                 }
+            }
             }
         }
         if (showSecondaryLocaleDialog)
