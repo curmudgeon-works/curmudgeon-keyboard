@@ -120,7 +120,7 @@ object AppearanceLooks {
         prefs.edit { putString(PREF, arr.toString()) }
     }
 
-    private fun toJson(value: Any?): JSONObject? = when (value) {
+    internal fun toJson(value: Any?): JSONObject? = when (value) {
         is Boolean -> JSONObject().put("b", value)
         is Int -> JSONObject().put("i", value)
         is Long -> JSONObject().put("l", value)
@@ -130,7 +130,7 @@ object AppearanceLooks {
         else -> null
     }
 
-    private fun fromJson(o: JSONObject): Any? = when {
+    internal fun fromJson(o: JSONObject): Any? = when {
         o.has("b") -> o.getBoolean("b")
         o.has("i") -> o.getInt("i")
         o.has("l") -> o.getLong("l")

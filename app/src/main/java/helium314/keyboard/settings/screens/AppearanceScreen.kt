@@ -229,7 +229,15 @@ fun AppearanceScreen(
     }
     // checked when leaving, not taken from this composition: the top bar's back arrow can hold an older copy of this
     // function (from before the first change), and the back gesture and the arrow must both ask
-    fun leave() { if (draft.hasChanges(ctx)) askOnLeave = true else onClickBack() }
+    fun leave() { if (draft.hasChanges(ctx)) askOnLeave = true else { AppearanceDraft.close(); onClickBack() } }
+    // back in the app after leaving it (the changes were undone then): a new snapshot of what is there now
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) draft = AppearanceDraft.of(ctx) }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     BackHandler(enabled = changed) { leave() }
     var bottomBarTop by remember { mutableIntStateOf(-1) }
     DisposableEffect(Unit) { onDispose { (ctx.getActivity() as? SettingsActivity)?.touchPassFromY = Int.MAX_VALUE } }

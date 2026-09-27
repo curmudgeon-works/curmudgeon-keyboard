@@ -24,6 +24,8 @@ class App : Application() {
         DebugFlags.init(this)
         FoldableUtils.init(this)
         Settings.init(this)
+        // the process died with Appearance open (a crash): its changes that weren't kept are undone
+        helium314.keyboard.settings.AppearanceDraft.recoverAfterCrash(this)
         SubtypeSettings.init(this)
         GestureCorpusRecorder.init(this)
 
