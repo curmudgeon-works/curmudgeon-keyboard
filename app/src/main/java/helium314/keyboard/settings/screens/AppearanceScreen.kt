@@ -16,6 +16,7 @@ import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSub
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.settings.AppearanceDraft
 import helium314.keyboard.settings.AppearanceLooks
+import helium314.keyboard.settings.painterResourceCompat
 import helium314.keyboard.latin.utils.NextScreenIcon
 import helium314.keyboard.settings.dialogs.ConfirmationDialog
 import helium314.keyboard.settings.dialogs.ListPickerDialog
@@ -23,6 +24,7 @@ import helium314.keyboard.settings.dialogs.TextInputDialog
 import helium314.keyboard.latin.utils.DeleteButton
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -214,11 +216,22 @@ fun createAppearanceSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_ICON_STYLE, R.string.icon_style) { setting ->
         val ctx = LocalContext.current
         val items = KeyboardTheme.STYLES.map { it.getStringResourceOrName("style_name_", ctx) to it }
+        // each style previewed by a few of its own icons, right in the list
+        val sampleIcons = listOf(KeyboardIconsSet.NAME_SHIFT_KEY, KeyboardIconsSet.NAME_DELETE_KEY, KeyboardIconsSet.NAME_ENTER_KEY,
+            KeyboardIconsSet.NAME_LANGUAGE_SWITCH_KEY, KeyboardIconsSet.NAME_TOOLBAR_KEY)
         ListPreference(
             setting,
             items,
             Defaults.PREF_ICON_STYLE,
             live = true,
+            itemTrailing = { (_, style) ->
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(end = 8.dp)) {
+                    sampleIcons.forEach { name ->
+                        KeyboardIconsSet.iconForStyle(style, name)?.let { Icon(painterResourceCompat(it, 22), null, Modifier.size(22.dp)) }
+                    }
+                }
+            },
         ) {
             KeyboardIconsSet.needsReload = true // only relevant for Settings.PREF_CUSTOM_ICON_NAMES
             KeyboardSwitcher.getInstance().setThemeNeedsReload()

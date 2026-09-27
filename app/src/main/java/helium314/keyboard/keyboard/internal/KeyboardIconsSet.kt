@@ -292,6 +292,13 @@ class KeyboardIconsSet private constructor() {
             }
         }
 
+        /** The drawable [style] uses for [name] (a style without its own falls back like [loadIcons] does). */
+        fun iconForStyle(style: String, name: String): Int? = when (style) {
+            KeyboardTheme.STYLE_HOLO -> keyboardIconsHolo[name] ?: keyboardIconsMaterial[name]
+            KeyboardTheme.STYLE_ROUNDED -> keyboardIconsRounded[name] ?: keyboardIconsMaterial[name]
+            else -> keyboardIconsMaterial[name]
+        }
+
         val instance = KeyboardIconsSet()
         var needsReload = false
     }
