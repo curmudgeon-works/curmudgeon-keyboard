@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.preferences
 
+import helium314.keyboard.settings.rememberPrefSnapshot
 import kotlin.math.roundToInt
 
 import android.app.Activity
@@ -125,7 +126,7 @@ fun TextStylePreference(setting: Setting, keys: TextStyleKeys) {
     }
     val allKeys = listOf(keys.font, keys.size, keys.bold, keys.italic, keys.underline) + keys.extraKeys +
         listOfNotNull(keys.otherFont, keys.otherFont?.let { Settings.PREF_FONT_FOLLOWS_KEY_TEXT })
-    val initial = remember { allKeys.associateWith { prefs.all[it] } }
+    val snapshot = rememberPrefSnapshot(prefs, allKeys)
     var confirmed by remember { mutableStateOf(false) }
     var sizePosition by remember { mutableFloatStateOf(size) }
     var showError by remember { mutableStateOf(false) }
@@ -163,16 +164,7 @@ fun TextStylePreference(setting: Setting, keys: TextStyleKeys) {
 
     ThreeButtonAlertDialog(
         onDismissRequest = {
-            if (!confirmed && allKeys.any { prefs.all[it] != initial[it] }) {
-                prefs.edit { initial.forEach { (key, value) -> when (value) {
-                    null -> remove(key)
-                    is String -> putString(key, value)
-                    is Float -> putFloat(key, value)
-                    is Int -> putInt(key, value)
-                    is Boolean -> putBoolean(key, value)
-                } } }
-                reload()
-            }
+            if (!confirmed && snapshot.restore()) reload()
             FontLibrary.discardPending(ctx) // after OK it's in the list already
             showDialog = false
         },

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.dialogs
 
+import helium314.keyboard.settings.rememberPrefSnapshot
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -71,7 +72,7 @@ fun CustomizeIconsDialog(
     var showDeletePrefConfirmDialog by rememberSaveable { mutableStateOf(false) }
     val prefs = ctx.prefs()
     // every change shows on the live keyboard at once; Cancel puts back what was set when the dialog opened
-    val initial = remember { prefs.getString(prefKey, null) }
+    val snapshot = rememberPrefSnapshot(prefs, listOf(prefKey))
     var confirmed by remember { mutableStateOf(false) }
     fun writeIcons(change: (MutableMap<String, String>) -> Unit) {
         runCatching {
@@ -84,15 +85,14 @@ fun CustomizeIconsDialog(
         KeyboardIconsSet.needsReload = true
         KeyboardSwitcher.getInstance().setThemeNeedsReload()
     }
-    fun restore(value: String?) {
-        prefs.edit { if (value == null) remove(prefKey) else putString(prefKey, value) }
+    fun reloadIcons() {
         KeyboardIconsSet.instance.loadIcons(ctx)
         KeyboardIconsSet.needsReload = true
         KeyboardSwitcher.getInstance().setThemeNeedsReload()
     }
     ThreeButtonAlertDialog(
         onDismissRequest = {
-            if (!confirmed && prefs.getString(prefKey, null) != initial) restore(initial)
+            if (!confirmed && snapshot.restore()) reloadIcons()
             onDismissRequest()
         },
         onConfirmed = { confirmed = true },
@@ -182,7 +182,8 @@ fun CustomizeIconsDialog(
                 showDeletePrefConfirmDialog = false
                 confirmed = true
                 onDismissRequest()
-                restore(null)
+                prefs.edit { remove(prefKey) } // reset: all icons back to the style's own
+                reloadIcons()
             },
             content = { Text(stringResource(R.string.customize_icons_reset_message)) }
         )

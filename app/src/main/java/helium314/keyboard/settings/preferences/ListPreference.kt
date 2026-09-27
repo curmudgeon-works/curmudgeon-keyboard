@@ -1,5 +1,6 @@
 package helium314.keyboard.settings.preferences
 
+import helium314.keyboard.settings.rememberPrefSnapshot
 import android.content.SharedPreferences
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,7 +30,7 @@ fun <T: Any> ListPreference(
     val prefs = LocalContext.current.prefs()
     val selected = items.firstOrNull { it.second == getPrefOfType(prefs, setting.key, default) }
     // what was set when the dialog opened, for Cancel in live mode (unset stays unset)
-    val initial = remember(showDialog) { if (prefs.contains(setting.key)) getPrefOfType(prefs, setting.key, default) else null }
+    val snapshot = rememberPrefSnapshot(prefs, listOf(setting.key), showDialog)
     var confirmed by remember(showDialog) { mutableStateOf(false) }
     fun apply(value: T) {
         if (value == getPrefOfType(prefs, setting.key, default)) return
@@ -44,10 +45,7 @@ fun <T: Any> ListPreference(
     if (showDialog) {
         ListPickerDialog(
             onDismissRequest = {
-                if (live && !confirmed) {
-                    if (initial == null) { if (prefs.contains(setting.key)) { prefs.edit { remove(setting.key) }; onChanged(default) } }
-                    else apply(initial)
-                }
+                if (live && !confirmed && snapshot.restore()) onChanged(getPrefOfType(prefs, setting.key, default))
                 showDialog = false
             },
             items = items,
