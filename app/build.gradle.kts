@@ -79,14 +79,15 @@ android {
         }
 
         androidComponents.onVariants { variant: ApplicationVariant ->
-            // all 18 dictionaries in the repo are built in (~22 MB): the keyboard has no internet access, so bundling
-            // is the one-step way to have them; languages beyond these are downloaded and imported (wizard, Languages)
             if (variant.buildType == "debug") {
+                // got a little too big for GitHub after some dependency upgrades, so we remove the largest dictionary
+                variant.androidResources.ignoreAssetsPatterns = listOf("main_ro.dict")
                 variant.proguardFiles = emptyList()
                 //noinspection ProguardAndroidTxtUsage we intentionally use the "normal" file here
                 variant.proguardFiles.add(project.layout.buildDirectory.file(project.buildFile.parent + "/dontoptimize.pro"))
                 variant.proguardFiles.add(project.layout.buildDirectory.file(project.buildFile.parent + "/proguard-rules.pro"))
             }
+            // the play flavor ships all bundled dictionaries, like upstream (~40 MB APK; en-US only was ~9 MB)
             variant.outputs.forEach { output ->
                 if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
                     output.outputFileName = "Curmudgeon_Keyboard_${output.versionName.get()}-${variant.buildType}.apk"
