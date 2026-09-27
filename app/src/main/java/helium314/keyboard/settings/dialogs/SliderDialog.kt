@@ -31,6 +31,7 @@ fun SliderDialog(
     modifier: Modifier = Modifier,
     showDefault: Boolean = false,
     onDefault: () -> Unit = { },
+    defaultValue: Float? = null, // Default moves the slider here and previews it; OK then calls [onDefault]
     onValueChanged: (Float) -> Unit = { },
     title: (@Composable () -> Unit)? = null,
     intermediateSteps: Int? = null,
@@ -41,14 +42,19 @@ fun SliderDialog(
     var sliderPosition by remember { mutableFloatStateOf(initialValue) }
     var touched by remember { mutableStateOf(false) }
     var confirmed by remember { mutableStateOf(false) }
+    var atDefault by remember { mutableStateOf(false) } // Default was pressed and the slider not moved since
     if (live && touched && !applyOnRelease) LaunchedEffect(sliderPosition) { delay(80); onValueChanged(sliderPosition) }
     val dismiss = { if (live && touched && !confirmed) onValueChanged(initialValue); onDismissRequest() }
 
     ThreeButtonAlertDialog(
         onDismissRequest = dismiss,
         neutralButtonText = if (showDefault) stringResource(R.string.button_default) else null,
-        onNeutral = { confirmed = true; onDismissRequest(); onDefault() },
-        onConfirmed = { confirmed = true; onDone(sliderPosition) },
+        // Default doesn't close: the slider shows the default (previewed like a drag), OK or Cancel decide
+        onNeutral = {
+            if (defaultValue == null) { confirmed = true; onDismissRequest(); onDefault() }
+            else { sliderPosition = defaultValue; atDefault = true; touched = true; onValueChanged(defaultValue) }
+        },
+        onConfirmed = { confirmed = true; if (atDefault) onDefault() else onDone(sliderPosition) },
         modifier = modifier,
         title = title,
         // live sliders preview on the keyboard; so do sliders on a screen that keeps it up (the key sound / vibration ones)
@@ -61,14 +67,14 @@ fun SliderDialog(
                     if (intermediateSteps == null)
                         Slider(
                             value = sliderPosition,
-                            onValueChange = { sliderPosition = it; touched = true },
+                            onValueChange = { sliderPosition = it; touched = true; atDefault = false },
                             onValueChangeFinished = { onValueChanged(sliderPosition) },
                             valueRange = range,
                         )
                     else
                         Slider(
                             value = sliderPosition,
-                            onValueChange = { sliderPosition = it; touched = true },
+                            onValueChange = { sliderPosition = it; touched = true; atDefault = false },
                             onValueChangeFinished = { onValueChanged(sliderPosition) },
                             valueRange = range,
                             steps = intermediateSteps
