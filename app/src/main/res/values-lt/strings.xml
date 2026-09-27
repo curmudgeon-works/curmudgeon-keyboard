@@ -299,7 +299,6 @@
     <string name="show_tld_popup_keys_summary">Rašant URL arba el. paštą pakeisti kablelio klavišo iššokantį langą su aukščiausio lygio domenu</string>
     <string name="quick_pin_toolbar_keys_summary">Bus išjungti kiti(neprisegti) įrankių juostos mygtukai ilgo paspaudimo veiksmai</string>
     <string name="show_popup_hints">Rodyti funkcinius patarimus</string>
-    <string name="show_popup_hints_summary">Rodyti patarimus jei ilgas paspaudimas iškviečia kitus veiksmus</string>
     <string name="remove_redundant_popups">Pašalinti pasikartojančius iššokančius langus</string>
     <string name="remove_redundant_popups_summary">Paslėpti iššokančius mygtukus kurie jau yra</string>
     <string name="prefs_long_press_symbol_for_numpad">Skaičių įvesčiai ilgai paspausti simbolių mygtuką</string>

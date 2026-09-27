@@ -20,6 +20,13 @@
     <string name="vibrate_in_dnd_mode">Vibrate in do not disturb mode</string>
     <!-- Option to play back sound on keypress in soft keyboard -->
     <string name="sound_on_keypress">Sound on keypress</string>
+    <!-- a line under the vibrate / sound switches when they are switched on while Android keeps that feedback off -->
+    <string name="system_vibration">Phone vibration is off. Tap to open settings, and turn it on.</string>
+    <string name="system_touch_feedback">Phone touch feedback is off. Tap to open settings, and turn it on.</string>
+    <string name="system_sound_silent">Phone is silent. Tap to open settings, and turn on ring volume and also tap &amp; click sounds.</string>
+    <string name="system_sound_touch">Phone tap &amp; click sounds are off. Tap to open settings, and turn them on.</string>
+    <string name="system_sound_dnd">Phone is on Do Not Disturb. Tap to open settings, and turn it off.</string>
+    <string name="system_sound_volume">Phone ring volume is at zero. Tap to open settings, and turn ring volume up.</string>
     <!-- Option to suggest emojis -->
     <string name="suggest_emojis">Suggest emojis</string>
     <!-- Description for option to suggest emojis -->
@@ -396,8 +403,8 @@
     <string name="bottom_row_tablet">Tablet-style bottom row</string>
     <string name="hints_title">Symbols on keys</string>
     <string name="number_row_and_hints">Number row</string>
-    <string name="hints_number_row">Hide symbols on the number row</string>
-    <string name="hints_other_keys">Hide symbols on the other keys</string>
+    <string name="hints_other_keys">Hide symbols on non-number keys</string>
+    <string name="hide_all_symbols">Hide symbols on keys</string>
     <string name="key_popups_symbols">Symbols page</string>
     <string name="key_popups_more_symbols">More symbols page</string>
     <string name="key_popups_presets">Preset popup layouts</string>
@@ -448,6 +455,7 @@
     <!-- Title of the setting to enable number row -->
     <string name="number_row">Number row</string>
     <!-- Description of the settings to enable number row -->
+    <string name="show_numbers_row">Show numbers row</string>
     <string name="number_row_summary">Always show number row</string>
     <!-- Title of the setting to replace the top row in symbols layout with number row -->
     <string name="number_row_in_symbols">Show number row in symbols view</string>
@@ -458,8 +466,6 @@
     <!-- Title of the setting to enable number row hints -->
     <string name="number_row_hints">Hide symbols on the number row</string>
     <!-- Title and description of the setting to show long-press hints on the letter keys -->
-    <string name="letter_hints">Hide symbols on letter keys</string>
-    <string name="letter_hints_summary">Long-press still types them when hidden</string>
     <!-- Title of the setting to save subtype per app -->
     <string name="save_subtype_per_app">Remember keyboard per app</string>
     <!-- Title of the setting to show key hints -->
@@ -578,12 +584,10 @@
     <string name="quick_pin_toolbar_keys_summary">This will disable other long press actions for toolbar keys that are not pinned</string>
     <!-- Title of the setting to show "..." as hints for more functionality on long-press -->
     <string name="show_popup_hints">Hide bottom-right ellipsis symbols</string>
-    <!-- Description of the show_popup_hints setting -->
-    <string name="show_popup_hints_summary">The … in the bottom right corner of keys that do something on long press</string>
     <!-- Option to remove popup keys that already exist on the base keyboard -->
-    <string name="remove_redundant_popups">Remove redundant popups</string>
+    <string name="remove_redundant_popups">Remove duplicates from letters &amp; numbers</string>
     <!-- Description of the remove_redundant_popups setting -->
-    <string name="remove_redundant_popups_summary">Each character on the keyboard only once: a popup that is a key, or a popup of an earlier key (counting from the bottom left, around the edge and inwards), is dropped</string>
+    <string name="remove_redundant_popups_summary">Each character on the letter and number keys only once: a popup that is a key, or a popup of an earlier key (counting from the bottom left, around the edge and inwards), is dropped</string>
     <!-- Title of the setting enabling long press on space key to change IME -->
     <string name="prefs_long_press_keyboard_to_change_lang">Change input method with space key</string>
     <!-- Description of the settings to change IME indicating long press triggers change. -->
@@ -624,6 +628,11 @@
     <string name="text_font_serif">Serif</string>
     <string name="text_font_mono">Monospace</string>
     <string name="text_font_file">From a font file</string>
+    <string name="text_font_load">Load a font file…</string>
+    <!-- a font file just loaded in the dialog, kept only on OK -->
+    <string name="text_font_new">%s (new)</string>
+    <string name="text_font_follows_key_text">Following the key text font</string>
+    <string name="font_follows_key_text">Use key text font for symbols and suggestions</string>
     <string name="key_text_bold">Bold</string>
     <string name="key_text_italic">Italic</string>
     <string name="key_text_underline">Underlined</string>
@@ -824,6 +833,15 @@ language, hence "No language". -->
     <string name="prefs_keypress_vibration_duration_settings">Keypress vibration duration</string>
     <!-- Title of the setting for keypress sound volume -->
     <string name="prefs_keypress_sound_volume_settings">Keypress sound volume</string>
+    <!-- the key-press sound: the phone's own sounds, nothing added to the app -->
+    <string name="keypress_sound">Key sound</string>
+    <string name="keypress_sound_android">Android key click (quiet, needs phone touch sounds)</string>
+    <string name="keypress_sound_click">Android key click, loud</string>
+    <string name="keypress_sound_tick">Tick</string>
+    <string name="keypress_sound_lock">Lock</string>
+    <string name="keypress_sound_unlock">Unlock</string>
+    <string name="keypress_sound_camera">Camera shutter</string>
+    <string name="keypress_sound_beep">Beep</string>
     <!-- Title of the setting for key long press delay -->
     <string name="prefs_key_longpress_timeout_settings">Key long press delay</string>
     <!-- Title of the setting for overriding Android SDK level for showing emojis -->
@@ -951,7 +969,6 @@ New dictionary:
     <!-- Option for setting navbar to follow keyboard color -->
     <string name="theme_navbar">Color navigation bar</string>
     <!-- Theme name for light theme -->
-    <string name="theme_name_midnight" tools:keep="@string/theme_name_midnight">Midnight</string>
     <string name="theme_name_daylight" tools:keep="@string/theme_name_daylight">Daylight</string>
     <string name="theme_name_classic" tools:keep="@string/theme_name_classic">Classic</string>
     <string name="theme_name_paper" tools:keep="@string/theme_name_paper">Paper</string>

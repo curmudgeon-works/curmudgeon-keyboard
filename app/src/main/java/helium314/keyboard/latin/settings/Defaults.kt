@@ -37,15 +37,15 @@ object Defaults {
         LayoutType.NUMPAD_LANDSCAPE -> "numpad_landscape"
         LayoutType.PHONE -> "phone"
         LayoutType.PHONE_SYMBOLS -> "phone_symbols"
-        LayoutType.EMOJI_BOTTOM -> "emoji_bottom_row_with_action" // the send key is there by default (Rahul 2026-09-27)
+        LayoutType.EMOJI_BOTTOM -> "emoji_bottom_row_with_action" // the send key is there by default (owner's call, 2026-09-27)
         LayoutType.CLIPBOARD_BOTTOM -> "clip_bottom_row_with_action"
     }
 
     private const val DEFAULT_SIZE_SCALE = 1.0f // 100%
     const val PREF_THEME_STYLE = KeyboardTheme.STYLE_MATERIAL
     const val PREF_ICON_STYLE = KeyboardTheme.STYLE_MATERIAL
-    const val PREF_THEME_COLORS = KeyboardTheme.THEME_MIDNIGHT
-    const val PREF_THEME_COLORS_NIGHT = KeyboardTheme.THEME_MIDNIGHT
+    const val PREF_THEME_COLORS = KeyboardTheme.THEME_BLACK
+    const val PREF_THEME_COLORS_NIGHT = KeyboardTheme.THEME_BLACK
     const val PREF_THEME_KEY_BORDERS = true
     @JvmField
     val PREF_THEME_DAY_NIGHT = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
@@ -68,7 +68,8 @@ object Defaults {
     const val PREF_BACKSPACE_HOLD_DELETES_WORDS = true // holding backspace deletes a word per repeat, not a character
     const val PREF_BACKSPACE_DELETES_SWIPED_WORD = true // a tap right after a swipe deletes the swiped word
     const val PREF_AUTOCORRECT_WITH_DIGITS = false // a word with a digit is suggested, not replaced
-    const val PREF_KEY_TEXT_BOLD = false
+    const val PREF_KEY_TEXT_BOLD = false // until set, the key style decides (Holo draws bold)
+    const val PREF_FONT_FOLLOWS_KEY_TEXT = true // symbols and suggestions use the key text font
     const val PREF_KEY_TEXT_ITALIC = false
     const val PREF_KEY_TEXT_UNDERLINE = false
     const val PREF_HINT_FONT_SCALE = 1.0f // the symbols on the keys, relative to their usual size
@@ -135,6 +136,7 @@ object Defaults {
     const val PREF_GESTURE_INPUT = true
     const val PREF_VIBRATION_DURATION_SETTINGS = -1
     const val PREF_KEYPRESS_SOUND_VOLUME = -0.01f
+    const val PREF_KEYPRESS_SOUND = "android" // KeypressSounds
     const val PREF_KEY_LONGPRESS_TIMEOUT = 300
     const val PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY = true
     const val PREF_GESTURE_PREVIEW_TRAIL = true
@@ -168,7 +170,6 @@ object Defaults {
     const val PREF_SHOW_NUMBER_ROW_HINTS = true
     const val PREF_CUSTOM_CURRENCY_KEY = ""
     const val PREF_SHOW_HINTS = true
-    const val PREF_SHOW_LETTER_HINTS = true
     const val PREF_POPUP_KEYS_ORDER = POPUP_KEYS_ORDER_DEFAULT
     const val PREF_POPUP_KEYS_LABELS_ORDER = POPUP_KEYS_LABEL_DEFAULT
     const val PREF_SHOW_POPUP_HINTS = false

@@ -251,7 +251,6 @@
     <string name="toolbar_keys">حدد مفاتيح شريط الأدوات</string>
     <string name="full_left" tools:keep="@string/full_left">اليسار الكامل</string>
     <string name="full_right" tools:keep="@string/full_right">اليمين الكامل</string>
-    <string name="show_popup_hints_summary">أظهِر تلميحات إذا كان الضغط لفترة طويلة على المفتاح يؤدي إلى تشغيل وظائف إضافية</string>
     <string name="day_or_night_image">تعيين الصورة لوضع النهار أو الليل؟</string>
     <string name="day_or_night_day">صباح</string>
     <string name="subtype_generic_sebeolsik_final">%s (سيبولسيك النهائي)</string>

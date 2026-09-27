@@ -395,6 +395,7 @@ private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: Restore
         && tags.any { path.startsWith("dicts${File.separator}$it${File.separator}") }
     // the files behind the settings: custom layouts (a keyboard's layout must exist for it), font and background
     fun isSettingsFile(path: String) = path.startsWith("layouts${File.separator}") || path.startsWith("custom_")
+        || path.startsWith("fonts${File.separator}") // the loaded fonts (FontLibrary)
     val restoredDb = ctx.getDatabasePath(Database.NAME + "_restored")
     ZipInputStream(FileInputStream(pending.file)).use { zip ->
         var entry: ZipEntry? = zip.nextEntry
@@ -620,7 +621,8 @@ private val backupFilePatterns by lazy { listOf(
     "dicts${File.separator}.*${File.separator}.*user\\.dict".toRegex(),
     "UserHistoryDictionary.*${File.separator}UserHistoryDictionary.*\\.(body|header)".toRegex(),
     "custom_background_image.*".toRegex(),
-    "custom_font".toRegex(),
+    "custom_font".toRegex(), // the text style fonts of before; restored ones move into the list (FontLibrary)
+    "fonts${File.separator}[^${File.separator}]+".toRegex(),
     "custom_emoji_font".toRegex(),
     "custom_hint_font".toRegex(),
     "custom_suggestion_font".toRegex(),

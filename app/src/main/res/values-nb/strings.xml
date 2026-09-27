@@ -219,7 +219,6 @@
     <string name="popup_keys_layout" tools:keep="@string/popup_keys_layout">Oppsett</string>
     <string name="popup_keys_symbols" tools:keep="@string/popup_keys_symbols">Symboler</string>
     <string name="show_popup_hints">Vis funksjonshint</string>
-    <string name="show_popup_hints_summary">Vis hint hvis å holde knappen inne utløser tilleggsfunksjonalitet</string>
     <string name="prefs_narrow_key_gaps">Smal tastemellomrom</string>
     <string name="subtype_xdq">Kaitag</string>
     <string name="toolbar_keys">Velg verktøylinjetaster</string>

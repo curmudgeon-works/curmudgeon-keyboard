@@ -68,6 +68,8 @@ class KeyboardState(private val switchActions: SwitchActions) {
     private var prevMainKeyboardWasShiftLocked = false
     private var prevSymbolsKeyboardWasShifted = false
     private var recapitalizeMode: RecapitalizeMode? = null
+    // the clipboard was opened from the emoji view: its ABC key goes back there (the state stays in emoji mode)
+    private var clipboardFromEmoji = false
 
     // For handling double tap.
     private var isInAlphabetUnshiftedFromShifted = false
@@ -281,10 +283,10 @@ class KeyboardState(private val switchActions: SwitchActions) {
         if (DebugFlags.DEBUG_ENABLED) {
             Log.d(TAG, "setEmojiKeyboard")
         }
+        // Remember caps lock mode and reset alphabet shift state (back from the clipboard it's remembered already)
+        if (mode != Mode.CLIPBOARD) prevMainKeyboardWasShiftLocked = alphabetShiftState.isShiftLocked
         mode = Mode.EMOJI
         recapitalizeMode = null
-        // Remember caps lock mode and reset alphabet shift state.
-        prevMainKeyboardWasShiftLocked = alphabetShiftState.isShiftLocked
         alphabetShiftState.setShiftLocked(false)
         switchActions.setEmojiKeyboard()
     }
@@ -293,10 +295,11 @@ class KeyboardState(private val switchActions: SwitchActions) {
         if (DebugFlags.DEBUG_ENABLED) {
             Log.d(TAG, "setClipboardKeyboard")
         }
+        clipboardFromEmoji = mode == Mode.EMOJI
+        // Remember caps lock mode and reset alphabet shift state (from the emoji view it's remembered already)
+        if (mode != Mode.EMOJI) prevMainKeyboardWasShiftLocked = alphabetShiftState.isShiftLocked
         mode = Mode.CLIPBOARD
         recapitalizeMode = null
-        // Remember caps lock mode and reset alphabet shift state.
-        prevMainKeyboardWasShiftLocked = alphabetShiftState.isShiftLocked
         alphabetShiftState.setShiftLocked(false)
         switchActions.setClipboardKeyboard()
     }
@@ -659,7 +662,8 @@ class KeyboardState(private val switchActions: SwitchActions) {
             updateAlphabetShiftState(autoCapsFlags, recapitalizeMode)
         } else when (code) {
             KeyCode.EMOJI -> setEmojiKeyboard()
-            KeyCode.ALPHA -> setAlphabetKeyboard(autoCapsFlags, recapitalizeMode)
+            KeyCode.ALPHA -> if (mode == Mode.CLIPBOARD && clipboardFromEmoji) setEmojiKeyboard()
+                else setAlphabetKeyboard(autoCapsFlags, recapitalizeMode)
             // Note: Printing clipboard content is handled in InputLogic.handleFunctionalEvent
             KeyCode.CLIPBOARD -> if (Settings.getValues().mClipboardHistoryEnabled) setClipboardKeyboard()
             KeyCode.NUMPAD -> toggleNumpad(false, autoCapsFlags, recapitalizeMode, false, true)

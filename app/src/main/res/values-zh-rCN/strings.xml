@@ -233,7 +233,6 @@
     <string name="localized_number_row">本地化数字行</string>
     <string name="localized_number_row_summary">更喜欢本地化数字而不是拉丁数字</string>
     <string name="popup_keys_language_priority" tools:keep="@string/popup_keys_language_priority">语言（优先级）</string>
-    <string name="show_popup_hints_summary">如果长按某个键会触发其他功能，则显示提示</string>
     <string name="emoji" tools:keep="@string/emoji">表情符号</string>
     <string name="show_popup_hints">显示功能提示</string>
     <string name="prefs_long_press_symbol_for_numpad">长按数字键盘符号键</string>

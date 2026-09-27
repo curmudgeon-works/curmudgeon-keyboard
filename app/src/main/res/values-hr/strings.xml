@@ -204,7 +204,6 @@
     <string name="popup_order_and_hint_source">Raspored skočnih tipki i izvor pomoćnih oznaka</string>
     <string name="hint_source">Odaberi izvor pomoćnih oznaka</string>
     <string name="show_popup_hints">Prikaži funkcionalne pomoćne oznake</string>
-    <string name="show_popup_hints_summary">Prikazuje pomoćne oznake, ako dugi pritisak neke tipke pokreće dodatnu funkcionalnost</string>
     <string name="select_color_key_hint">Tekst pomoćnih oznaka tipki</string>
     <string name="gesture_fast_typing_cooldown_instant">Uvijek pokreni odmah</string>
     <string name="backup_restore_message">Spremi u ili učitaj iz datoteke. Upozorenje: vraćanje podataka će pisati preko postojećih podataka</string>

@@ -61,7 +61,7 @@ class AppearanceDraft private constructor(
         private fun liveFiles(ctx: Context) = listOf(
             Settings.getCustomBackgroundFile(ctx, false, false), Settings.getCustomBackgroundFile(ctx, false, true),
             Settings.getCustomBackgroundFile(ctx, true, false), Settings.getCustomBackgroundFile(ctx, true, true),
-            Settings.getCustomFontFile(ctx), Settings.getCustomEmojiFontFile(ctx), Settings.getCustomHintFontFile(ctx), Settings.getCustomSuggestionFontFile(ctx),
+            Settings.getCustomEmojiFontFile(ctx), // (the text fonts are a list of files kept by name: only the choices change)
         )
 
         /** The draft of the open Appearance screen; it outlives the screen's composition (rotation, search). */

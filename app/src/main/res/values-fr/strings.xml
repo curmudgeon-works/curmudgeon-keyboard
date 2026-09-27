@@ -190,7 +190,6 @@ Nouveau dictionnaire:
     <string name="undo">Annuler</string>
     <string name="redo">Restaurer</string>
     <string name="show_popup_hints">Afficher les indices sur les touches fonctionnelles</string>
-    <string name="show_popup_hints_summary">Affiche un signe ( <b>…</b> ) sur les touches où un appui long déclenche une fonctionnalité supplémentaire</string>
     <string name="prefs_keyboard_height_scale">Échelle de hauteur du clavier</string>
     <string name="prefs_bottom_padding_scale">Échelle d\'espacement en bas du clavier</string>
     <string name="day_night_mode_summary">L\'apparence suivra les paramètres système</string>

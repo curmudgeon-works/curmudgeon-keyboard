@@ -269,6 +269,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
 
     public void onPressKey(final int code, final boolean isSinglePointer,
             final int currentAutoCapsState, @Nullable final RecapitalizeMode currentRecapitalizeState) {
+        mKeyPresses++;
         mState.onPressKey(code, isSinglePointer, currentAutoCapsState, currentRecapitalizeState);
     }
 
@@ -282,17 +283,12 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         mState.onFinishSlidingInput(currentAutoCapsState, currentRecapitalizeState);
     }
 
-    private boolean mClipboardOpenedFromEmoji = false;
+    // key presses and events so far: a delayed panel re-open after a theme reload checks nothing happened since
+    private int mKeyPresses = 0;
 
     // Implements {@link KeyboardState.SwitchActions}.
     @Override
     public void setAlphabetKeyboard() {
-        if (mClipboardOpenedFromEmoji && isShowingClipboardHistory()) {
-            mClipboardOpenedFromEmoji = false;
-            setEmojiKeyboard();
-            return;
-        }
-        mClipboardOpenedFromEmoji = false;
         if (DEBUG_ACTION) {
             Log.d(TAG, "setAlphabetKeyboard");
         }
@@ -423,12 +419,14 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (DEBUG_ACTION) {
             Log.d(TAG, "setClipboardKeyboard");
         }
-        mClipboardOpenedFromEmoji = isShowingEmojiPalettes(); // closing the clipboard then goes back to the emojis
         mMainKeyboardFrame.setVisibility(View.VISIBLE);
         // The visibility of {@link #mKeyboardView} must be aligned with {@link #MainKeyboardFrame}.
         // @see #getVisibleKeyboardView() and
         // @see LatinIME#onComputeInset(android.inputmethodservice.InputMethodService.Insets)
         mKeyboardView.setVisibility(View.GONE);
+        // the emoji view's toolbar closes properly (its space above the tabs and its arrow went stale otherwise);
+        // back in the emoji view it stays closed
+        if (mSuggestionStripView.isToolbarOnly()) mSuggestionStripView.setToolbarOnly(false, mEmojiTabStripView);
         mEmojiTabStripView.setVisibility(View.GONE);
         mSuggestionStripView.setVisibility(View.GONE);
         mStripContainer.setVisibility(getSecondaryStripVisibility());
@@ -678,6 +676,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
      */
     public void onEvent(final Event event, final int currentAutoCapsState,
             @Nullable final RecapitalizeMode currentRecapitalizeState) {
+        mKeyPresses++; // (panel keys like ABC on the emoji / clipboard views come only through here)
         mState.onEvent(event, currentAutoCapsState, currentRecapitalizeState);
     }
 
@@ -858,7 +857,10 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (wasEmoji) setEmojiKeyboard();
         else if (wasClipboard) setClipboardKeyboard();
         // the input view is started again a moment later and that puts the letters back: check again then
+        // (only if nobody pressed a key or hid the keyboard in between: an ABC tap must stay)
+        final int keyPresses = mKeyPresses;
         if (wasEmoji || wasClipboard) new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            if (keyPresses != mKeyPresses || mLatinIME == null || !mLatinIME.isInputViewShown()) return;
             if (wasEmoji && !isShowingEmojiPalettes()) setEmojiKeyboard();
             else if (wasClipboard && !isShowingClipboardHistory()) setClipboardKeyboard();
         }, 250);

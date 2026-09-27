@@ -129,7 +129,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
         var pendingChange: Pair<String, List<String>?>? by remember { mutableStateOf(null) }
         var showSaveAsDialog by remember { mutableStateOf(false) }
         val presets = listOf(
-            // the Curmudgeon default: every variant a key has, plus the symbol map (Rahul 2026-09-26: "a lot richer")
+            // the Curmudgeon default: every variant a key has, plus the symbol map (owner's call 2026-09-26: "a lot richer")
             Preset(R.string.key_popups_preset_standard, POPUP_KEYS_ALL, null, symbolMap = Defaults.PREF_SYMBOL_POPUP_MAP),
             Preset(R.string.key_popups_preset_heliboard, POPUP_KEYS_MAIN, null, symbolMap = ""), // upstream's real default level
             Preset(R.string.key_popups_preset_main, POPUP_KEYS_MAIN, null),

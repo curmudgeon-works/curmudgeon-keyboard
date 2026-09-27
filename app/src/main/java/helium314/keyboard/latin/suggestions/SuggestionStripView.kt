@@ -284,6 +284,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             params?.topMargin = 0
             setToolbarVisibility(false)
         }
+        emojiToolbarKey?.rotation = if (show) 90f else -90f
         tabStrip?.requestLayout()
     }
 
@@ -303,10 +304,14 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         colors.setBackground(key, ColorType.STRIP_BACKGROUND)
         colors.setColor(key, ColorType.TOOL_BAR_EXPAND_KEY)
         colors.setColor(key.background, ColorType.TOOL_BAR_EXPAND_KEY_BACKGROUND)
-        key.rotation = -90f
-        key.setOnClickListener { onClick(); key.rotation = if (isToolbarOnly) 90f else -90f }
+        key.rotation = if (isToolbarOnly) 90f else -90f
+        key.setOnClickListener { onClick() }
+        emojiToolbarKey = key
         return key
     }
+
+    // the emoji tab strip's toolbar key: its arrow follows setToolbarOnly
+    private var emojiToolbarKey: ImageButton? = null
 
     /** The expand key's arrow points up while the toolbar is hidden, down while it is shown above the suggestions. */
     private fun setExpandKeyDirection(toolbarShown: Boolean) {

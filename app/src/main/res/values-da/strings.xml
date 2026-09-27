@@ -257,7 +257,6 @@
     <string name="left" tools:keep="@string/left">Venstre</string>
     <string name="right" tools:keep="@string/right">Højre</string>
     <string name="up" tools:keep="@string/up">Op</string>
-    <string name="show_popup_hints_summary">Vis hints, hvis langt tryk på en tast udløser ekstra funktionalitet</string>
     <string name="subtype_dru">Dargwa (Urakhi)</string>
     <string name="center_suggestion_text_to_enter_summary">Ved tryk på mellemrum eller skilletegn indsættes det midterste forslag</string>
     <string name="show_popup_keys_more">Tilføj almindelige varianter</string>

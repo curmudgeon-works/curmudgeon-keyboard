@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Words the user types often that the engine can't rank early: long ones and addresses. The native scoring
- * charges every completed character, so "mailer.rahul.jain@gmail.com" only wins after several letters no
+ * charges every completed character, so "someone.long.name@example.com" only wins after several letters no
  * matter how often it was typed. These are matched by prefix instead and get an early slot in the strip.
  *
  * Per locale, read from the user history dictionary (level = how often typed, decays), refreshed in the
@@ -76,8 +76,8 @@ object FrequentLongWords {
                     else Entry(word, word.lowercase(), wp.probability, history)
                 }.distinctBy { it.word }
                 caches[key] = Cache(entries, SystemClock.elapsedRealtime())
-                Log.i(TAG, "$key: ${entries.size} frequent long words of ${props.size} history words (${props.distinctBy { it.mWord }.size} distinct), " +
-                        "top: " + entries.sortedByDescending { it.probability }.take(5).joinToString { "${it.word}=${it.probability}" })
+                // counts only: the words are the user's own and never go to the log
+                Log.d(TAG, "$key: ${entries.size} frequent long words of ${props.size} history words (${props.distinctBy { it.mWord }.size} distinct)")
             } catch (t: Throwable) {
                 Log.w(TAG, "could not read user history for $key", t)
             } finally {
