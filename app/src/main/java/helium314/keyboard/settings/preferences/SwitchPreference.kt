@@ -29,6 +29,7 @@ fun SwitchPreference(
     setting: Setting,
     default: Boolean,
     allowCheckedChange: (Boolean) -> Boolean = { true },
+    inverted: Boolean = false, // the switch shows the opposite of the stored value ("Hide …" for a "show" preference)
     onCheckedChange: (Boolean) -> Unit = { }
 ) {
     SwitchPreference(
@@ -37,6 +38,7 @@ fun SwitchPreference(
         key = setting.key,
         default = default,
         allowCheckedChange = allowCheckedChange,
+        inverted = inverted,
         onCheckedChange = onCheckedChange
     )
 }
@@ -49,6 +51,7 @@ fun SwitchPreference(
     default: Boolean,
     description: String? = null,
     allowCheckedChange: (Boolean) -> Boolean = { true }, // true means ok, usually for showing some dialog
+    inverted: Boolean = false,
     onCheckedChange: (Boolean) -> Unit = { },
 ) {
     val ctx = LocalContext.current
@@ -56,15 +59,15 @@ fun SwitchPreference(
     val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
     if ((b?.value ?: 0) < 0)
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
-    var value = prefs.getBoolean(key, default)
+    var value = prefs.getBoolean(key, default) xor inverted
     fun switched(newValue: Boolean) {
         if (!allowCheckedChange(newValue)) {
             value = !newValue
             return
         }
         value = newValue
-        prefs.edit { putBoolean(key, newValue) }
-        onCheckedChange(newValue)
+        prefs.edit { putBoolean(key, newValue xor inverted) }
+        onCheckedChange(newValue xor inverted)
     }
     Preference(
         name = name,

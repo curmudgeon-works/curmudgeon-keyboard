@@ -154,21 +154,53 @@ public class KeyboardParams {
     }
 
     public void removeRedundantPopupKeys() {
-        if (mAllowRedundantPopupKeys || baseKeys == null) {
+        if (mAllowRedundantPopupKeys) {
             return;
         }
-        final PopupKeySpec.LettersOnBaseLayout lettersOnBaseLayout =
-                new PopupKeySpec.LettersOnBaseLayout();
-        for (final Key.KeyParams key : baseKeys) {
-            lettersOnBaseLayout.addLetter(key);
-        }
+        // one rule: letter and number keys in spiral order (see below); a popup that an earlier key already has,
+        // as its own character or as a popup, is dropped. Shift, delete, the bottom row and the like take no part.
+        final PopupKeySpec.LettersOnBaseLayout seen = new PopupKeySpec.LettersOnBaseLayout();
         final ArrayList<Key> allKeys = new ArrayList<>(mSortedKeys);
+        final java.util.HashMap<Key, Key> filtered = new java.util.HashMap<>();
+        for (final Key key : spiralOrder(allKeys)) {
+            if (!Character.isLetterOrDigit(key.getCode())) continue;
+            final Key filteredKey = Key.removeRedundantPopupKeys(key, seen);
+            filtered.put(key, filteredKey);
+            seen.addCode(key.getCode());
+            final PopupKeySpec[] popups = filteredKey.getPopupKeys();
+            if (popups != null) for (final PopupKeySpec popup : popups) seen.addPopup(popup);
+        }
         mSortedKeys.clear();
         for (final Key key : allKeys) {
-            final Key filteredKey = Key.removeRedundantPopupKeys(key, lettersOnBaseLayout);
-            mSortedKeys.add(mUniqueKeysCache.getUniqueKey(filteredKey));
+            final Key filteredKey = filtered.get(key);
+            mSortedKeys.add(mUniqueKeysCache.getUniqueKey(filteredKey == null ? key : filteredKey));
         }
         baseKeys = null;
+    }
+
+    /**
+     * The keys from the bottom left, counter-clockwise around the edge and spiralling inwards: bottom row left to
+     * right, then the right end of each row upwards, the top row right to left, the left end of each row downwards,
+     * and again for what is left inside.
+     */
+    private static List<Key> spiralOrder(final List<Key> keys) {
+        final java.util.TreeMap<Integer, ArrayList<Key>> byRow = new java.util.TreeMap<>();
+        for (final Key key : keys) byRow.computeIfAbsent(key.getY(), y -> new ArrayList<>()).add(key);
+        final ArrayList<ArrayList<Key>> rows = new ArrayList<>(byRow.values()); // top to bottom
+        for (final ArrayList<Key> row : rows) row.sort((a, b) -> Integer.compare(a.getX(), b.getX()));
+        final ArrayList<Key> order = new ArrayList<>(keys.size());
+        while (!rows.isEmpty()) {
+            // bottom row, left to right
+            order.addAll(rows.remove(rows.size() - 1));
+            // right end of every remaining row, bottom to top
+            for (int i = rows.size() - 1; i >= 0; i--) { final ArrayList<Key> row = rows.get(i); if (!row.isEmpty()) order.add(row.remove(row.size() - 1)); }
+            // top row, right to left
+            if (!rows.isEmpty()) { final ArrayList<Key> top = rows.remove(0); java.util.Collections.reverse(top); order.addAll(top); }
+            // left end of every remaining row, top to bottom
+            for (final ArrayList<Key> row : rows) if (!row.isEmpty()) order.add(row.remove(0));
+            rows.removeIf(ArrayList::isEmpty);
+        }
+        return order;
     }
 
     private int mMaxHeightCount = 0;

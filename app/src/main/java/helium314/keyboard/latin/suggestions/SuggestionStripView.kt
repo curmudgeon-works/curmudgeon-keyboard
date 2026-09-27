@@ -267,6 +267,47 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         setExpandKeyDirection(show)
     }
 
+    /**
+     * In the emoji view the suggestions row is replaced by the emoji tabs, but the toolbar is still wanted: this shows
+     * the strip with only its toolbar, above [tabStrip] (pushed down by a top margin), or puts everything back.
+     */
+    fun setToolbarOnly(show: Boolean, tabStrip: View?) {
+        val wrapper: View = findViewById(R.id.suggestions_strip_wrapper)
+        val params = tabStrip?.layoutParams as? ViewGroup.MarginLayoutParams
+        if (show) {
+            isVisible = true
+            wrapper.isVisible = false
+            setToolbarVisibility(true)
+            params?.topMargin = toolbarContainer.layoutParams.height
+        } else {
+            wrapper.isVisible = true
+            params?.topMargin = 0
+            setToolbarVisibility(false)
+        }
+        tabStrip?.requestLayout()
+    }
+
+    /** True while [setToolbarOnly] shows the toolbar alone. */
+    val isToolbarOnly: Boolean get() = isVisible && !findViewById<View>(R.id.suggestions_strip_wrapper).isVisible
+
+    /** A key for the start of the emoji tab strip that opens the toolbar there, drawn like the strip's own expand key. */
+    fun createEmojiToolbarKey(onClick: () -> Unit): ImageButton {
+        val key = ImageButton(context, null, R.attr.suggestionWordStyle)
+        val size = toolbarExpandKey.layoutParams.height
+        key.layoutParams = LinearLayout.LayoutParams(size, size).apply { gravity = Gravity.CENTER_VERTICAL }
+        key.background = defaultToolbarBackground.constantState?.newDrawable()?.mutate() ?: defaultToolbarBackground
+        key.setImageDrawable(toolbarArrowIcon?.constantState?.newDrawable()?.mutate() ?: toolbarArrowIcon)
+        key.scaleType = ImageView.ScaleType.CENTER
+        key.contentDescription = resources.getString(R.string.more_keys_strip_description)
+        val colors = Settings.getValues().mColors
+        colors.setBackground(key, ColorType.STRIP_BACKGROUND)
+        colors.setColor(key, ColorType.TOOL_BAR_EXPAND_KEY)
+        colors.setColor(key.background, ColorType.TOOL_BAR_EXPAND_KEY_BACKGROUND)
+        key.rotation = -90f
+        key.setOnClickListener { onClick(); key.rotation = if (isToolbarOnly) 90f else -90f }
+        return key
+    }
+
     /** The expand key's arrow points up while the toolbar is hidden, down while it is shown above the suggestions. */
     private fun setExpandKeyDirection(toolbarShown: Boolean) {
         toolbarExpandKey.scaleX = 1f

@@ -53,7 +53,6 @@ class ClipboardDao private constructor(private val db: Database) {
     }
 
     fun addClip(timestamp: Long, pinned: Boolean, text: String) {
-        clearOldClips()
         val existingIndex = cache.indexOfFirst { it.text == text }
         if (existingIndex >= 0 && cache[existingIndex].timeStamp == timestamp)
             return // nothing to do
@@ -75,6 +74,7 @@ class ClipboardDao private constructor(private val db: Database) {
         cache.add(entry)
         cache.sort()
         listener?.onClipInserted(cache.indexOf(entry))
+        clearOldClips()
     }
 
     private fun updateTimestampAt(index: Int, timestamp: Long) {
@@ -122,6 +122,7 @@ class ClipboardDao private constructor(private val db: Database) {
         db.writableDatabase.delete(TABLE, "$COLUMN_ID = ${entry.id}", null)
     }
 
+    /** Keeps the newest [Settings.PREF_CLIPBOARD_HISTORY_SIZE] unpinned entries; nothing expires by age. */
     fun clearOldClips(now: Boolean = false) {
         if (listener != null)
             return // never clear when clipboard is visible
@@ -129,13 +130,12 @@ class ClipboardDao private constructor(private val db: Database) {
             return
 
         lastClearOldClips = SystemClock.elapsedRealtime()
-        val retentionTime = Settings.getValues()?.mClipboardHistoryRetentionTime ?: 121L
-        if (retentionTime > 120) return
-        val minTime = System.currentTimeMillis() - retentionTime * 60 * 1000L
-        if (!cache.removeAll { it.timeStamp < minTime && !it.isPinned })
-            return // nothing was removed
-
-        db.writableDatabase.delete(TABLE, "$COLUMN_TIMESTAMP < $minTime AND $COLUMN_PINNED = 0", null)
+        val size = Settings.getValues()?.mClipboardHistorySize ?: return
+        val unpinned = cache.filter { !it.isPinned }.sortedByDescending { it.timeStamp }
+        if (unpinned.size <= size) return
+        val old = unpinned.drop(size)
+        cache.removeAll(old.toSet())
+        db.writableDatabase.delete(TABLE, "$COLUMN_ID IN (${old.joinToString { it.id.toString() }})", null)
     }
 
     fun clearNonPinned() {

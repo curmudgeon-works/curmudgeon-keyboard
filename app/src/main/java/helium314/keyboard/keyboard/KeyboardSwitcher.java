@@ -254,9 +254,17 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         mState.onFinishSlidingInput(currentAutoCapsState, currentRecapitalizeState);
     }
 
+    private boolean mClipboardOpenedFromEmoji = false;
+
     // Implements {@link KeyboardState.SwitchActions}.
     @Override
     public void setAlphabetKeyboard() {
+        if (mClipboardOpenedFromEmoji && isShowingClipboardHistory()) {
+            mClipboardOpenedFromEmoji = false;
+            setEmojiKeyboard();
+            return;
+        }
+        mClipboardOpenedFromEmoji = false;
         if (DEBUG_ACTION) {
             Log.d(TAG, "setAlphabetKeyboard");
         }
@@ -339,6 +347,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         mEmojiPalettesView.stopEmojiPalettes();
         mEmojiTabStripView.setVisibility(View.GONE);
         mClipboardStripScrollView.setVisibility(View.GONE);
+        if (mSuggestionStripView.isToolbarOnly()) mSuggestionStripView.setToolbarOnly(false, mEmojiTabStripView);
         mSuggestionStripView.setVisibility(stripVisibility);
         mClipboardHistoryView.setVisibility(View.GONE);
         mClipboardHistoryView.stopClipboardHistory();
@@ -363,7 +372,22 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         mEmojiPalettesView.startEmojiPalettes(mKeyboardView.getKeyVisualAttribute(),
                 mLatinIME.getCurrentInputEditorInfo(), mLatinIME.mKeyboardActionListener);
         mEmojiPalettesView.setVisibility(View.VISIBLE);
+        addEmojiToolbarKey();
     }
+
+    /** The toolbar is reachable in the emoji view too: an expand key at the start of the tab strip opens it above the tabs. */
+    private void addEmojiToolbarKey() {
+        if (!(mEmojiTabStripView instanceof LinearLayout strip) || strip.getChildCount() == 0) return;
+        if (strip.getChildAt(0).getTag() == EMOJI_TOOLBAR_KEY_TAG) return;
+        final View key = mSuggestionStripView.createEmojiToolbarKey(() -> {
+            mSuggestionStripView.setToolbarOnly(!mSuggestionStripView.isToolbarOnly(), mEmojiTabStripView);
+            return kotlin.Unit.INSTANCE;
+        });
+        key.setTag(EMOJI_TOOLBAR_KEY_TAG);
+        strip.addView(key, 0);
+    }
+
+    private static final Object EMOJI_TOOLBAR_KEY_TAG = new Object();
 
     // Implements {@link KeyboardState.SwitchActions}.
     @Override
@@ -371,6 +395,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (DEBUG_ACTION) {
             Log.d(TAG, "setClipboardKeyboard");
         }
+        mClipboardOpenedFromEmoji = isShowingEmojiPalettes(); // closing the clipboard then goes back to the emojis
         mMainKeyboardFrame.setVisibility(View.VISIBLE);
         // The visibility of {@link #mKeyboardView} must be aligned with {@link #MainKeyboardFrame}.
         // @see #getVisibleKeyboardView() and
@@ -776,11 +801,17 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
 
         // Hide and show IME, showing will trigger the reload.
         // Reloading while IME is shown is glitchy, and hiding / showing is so fast the user shouldn't notice.
+        // The emoji or clipboard view comes back afterwards: a settings preview keeps showing what it showed.
+        final boolean wasEmoji = isShowingEmojiPalettes();
+        final boolean wasClipboard = isShowingClipboardHistory();
         mLatinIME.hideWindow();
         try {
             mLatinIME.showWindow(true);
         } catch (IllegalStateException e) {
             // in tests isInputViewShown returns true, but showWindow throws "IllegalStateException: Window token is not set yet."
+            return;
         }
+        if (wasEmoji) setEmojiKeyboard();
+        else if (wasClipboard) setClipboardKeyboard();
     }
 }
