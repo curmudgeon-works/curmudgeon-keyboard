@@ -2,8 +2,6 @@
 
 package helium314.keyboard.latin
 
-import helium314.keyboard.latin.settings.Settings
-
 class ClipboardHistoryEntry(
     val id: Long,
     var timeStamp: Long,
@@ -11,9 +9,9 @@ class ClipboardHistoryEntry(
     val text: String
 ) : Comparable<ClipboardHistoryEntry> {
     override fun compareTo(other: ClipboardHistoryEntry): Int {
+        // pinned entries first, then newest first
         val result = other.isPinned.compareTo(isPinned)
         if (result == 0) return other.timeStamp.compareTo(timeStamp)
-        if (Settings.getValues()?.mClipboardHistoryPinnedFirst == false) return -result
         return result
     }
 }
