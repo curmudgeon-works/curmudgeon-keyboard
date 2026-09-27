@@ -274,7 +274,8 @@ fun NavRow(title: String, summary: String? = null, onClick: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = ROW_HEIGHT).padding(vertical = 4.dp).padding(start = 10.dp)) {
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(title, style = MaterialTheme.typography.bodyLarge,
+                fontStyle = if (helium314.keyboard.settings.preferences.LocalPendingChange.current) androidx.compose.ui.text.font.FontStyle.Italic else null)
             if (summary != null)
                 Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

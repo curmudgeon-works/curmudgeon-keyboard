@@ -54,7 +54,8 @@ fun WithSmallTitle(
     content: @Composable () -> Unit,
 ) {
     Column {
-        Text(description, style = MaterialTheme.typography.titleSmall)
+        Text(description, style = MaterialTheme.typography.titleSmall,
+            fontStyle = if (helium314.keyboard.settings.preferences.LocalPendingChange.current) androidx.compose.ui.text.font.FontStyle.Italic else null)
         content()
     }
 }

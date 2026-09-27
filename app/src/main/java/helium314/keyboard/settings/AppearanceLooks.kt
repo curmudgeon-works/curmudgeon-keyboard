@@ -30,20 +30,20 @@ object AppearanceLooks {
     private val keys = setOf(
         Settings.PREF_THEME_STYLE, Settings.PREF_ICON_STYLE, Settings.PREF_CUSTOM_ICON_NAMES, Settings.PREF_THEME_COLORS,
         Settings.PREF_THEME_KEY_BORDERS, Settings.PREF_THEME_DAY_NIGHT, Settings.PREF_THEME_COLORS_NIGHT,
-        Settings.PREF_ENABLE_SPLIT_KEYBOARD, Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED,
-        Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE, Settings.PREF_SPACE_BAR_TEXT,
+        Settings.PREF_SPACE_BAR_TEXT,
         Settings.PREF_FONT_SCALE, Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT, Settings.PREF_EMOJI_SKIN_TONE,
         Settings.PREF_SUGGESTION_TEXT_SIZE, Settings.PREF_SUGGESTION_BOLD, Settings.PREF_SUGGESTION_ITALIC,
         Settings.PREF_SUGGESTION_UNDERLINE, Settings.PREF_SUGGESTION_WORD_PADDING, Settings.PREF_TOOLBAR_EXPAND_ICON,
         Settings.PREF_KEY_HORIZONTAL_GAP, Settings.PREF_KEY_VERTICAL_GAP,
         Settings.PREF_KEY_TEXT_BOLD, Settings.PREF_KEY_TEXT_ITALIC, Settings.PREF_KEY_TEXT_UNDERLINE, Settings.PREF_HINT_FONT_SCALE,
         Settings.PREF_SHOW_NUMBER_ROW_HINTS, Settings.PREF_SHOW_HINTS, Settings.PREF_SHOW_POPUP_HINTS,
-        Settings.PREF_SHOW_NUMBER_ROW, Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS, Settings.PREF_SHOW_EMOJI_DESCRIPTIONS,
+        Settings.PREF_SHOW_EMOJI_DESCRIPTIONS,
         Settings.PREF_KEY_FONT, Settings.PREF_HINT_FONT, Settings.PREF_SUGGESTION_FONT, Settings.PREF_FONT_FOLLOWS_KEY_TEXT, Settings.PREF_HINT_TEXT_BOLD, Settings.PREF_HINT_TEXT_ITALIC, Settings.PREF_HINT_TEXT_UNDERLINE,
     )
     // the scales have a key per orientation / fold state, the custom colors one per theme
     private val prefixes = listOf(
-        Settings.PREF_SPLIT_SPACER_SCALE_PREFIX, Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, Settings.PREF_BOTTOM_ROW_SCALE_PREFIX,
+        // (keyboard height, split and the numbers row are Layout & Typing's: not in themes, see LayoutDraft)
+        Settings.PREF_BOTTOM_ROW_SCALE_PREFIX,
         Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX, Settings.PREF_SIDE_PADDING_SCALE_PREFIX,
         Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX,
     )
@@ -84,7 +84,8 @@ object AppearanceLooks {
         val now = current(prefs)
         prefs.edit {
             for (key in now.keys) if (key !in values) remove(key)
-            for ((key, value) in values) if (now[key] != value) KeyboardProfiles.put(this, key, value)
+            // only what themes cover: themes saved before hold keys that moved out (keyboard height, split, numbers row)
+            for ((key, value) in values) if (inScope(key) && now[key] != value) KeyboardProfiles.put(this, key, value)
         }
         reload(ctx)
     }

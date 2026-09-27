@@ -1,5 +1,9 @@
 package helium314.keyboard.settings.screens
 
+import helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog
+import helium314.keyboard.settings.preferences.LocalPendingChange
+import helium314.keyboard.settings.LayoutDraft
+import helium314.keyboard.latin.utils.LayoutType.Companion.folder
 import helium314.keyboard.settings.advancedTint
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
@@ -153,6 +157,19 @@ fun SubtypeScreen(
     val reservedBottom = if (holdSpace) previewHeight else 0
     var currentSubtypeString by rememberSaveable { mutableStateOf(initialSubtype.toPref()) }
     val currentSubtype = currentSubtypeString.toSettingsSubtype()
+    // Keep / Discard like Appearance: the screen's settings (and its sub-screens') as they were when it opened
+    var draft by remember { mutableStateOf(LayoutDraft.of(ctx, currentSubtypeString)) }
+    val changedKeys = draft.changedKeys(ctx)
+    val changedFolders = draft.changedLayoutFolders(ctx)
+    val changed = changedKeys.isNotEmpty() || changedFolders.isNotEmpty()
+    val openedSubtype = draft.subtype.toSettingsSubtype()
+    fun keyChanged(vararg keys: String) = keys.any { it in changedKeys }
+    fun prefixChanged(prefix: String) = changedKeys.any { it.startsWith(prefix) }
+    fun layoutChanged(type: LayoutType) = currentSubtype.layoutName(type) != openedSubtype.layoutName(type)
+        || type.folder.substringAfterLast(java.io.File.separator) in changedFolders || keyChanged(Settings.PREF_LAYOUT_PREFIX + type.name)
+    var askOnLeave by remember { mutableStateOf(false) }
+    var askReject by remember { mutableStateOf(false) }
+    var askAccept by remember { mutableStateOf(false) }
     fun setCurrentSubtype(subtype: SettingsSubtype) {
         SubtypeUtilsAdditional.changeAdditionalSubtype(currentSubtype, subtype, ctx)
         currentSubtypeString = subtype.toPref()
@@ -204,11 +221,74 @@ fun SubtypeScreen(
     val preview = remember { PreviewKeyboard(tryIt, scope, showIme = { softKeyboard?.show() }, reveal = { }) {
         focusManager.clearFocus(); softKeyboard?.hide() } }
     var bottomBarTop by remember { mutableIntStateOf(-1) }
+    // a numbers row or split switch brings the keyboard up for a moment, as on Appearance (dialogs report themselves)
+    fun shape() = listOf(Settings.PREF_SHOW_NUMBER_ROW, Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS, Settings.PREF_ENABLE_SPLIT_KEYBOARD,
+        Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED,
+        Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE).map { prefs.all[it] }
+    var lastShape by remember { mutableStateOf(shape()) }
+    LaunchedEffect(b?.value) {
+        val now = shape()
+        if (now != lastShape) { lastShape = now; preview.changed(emoji = false) }
+    }
     DisposableEffect(Unit) { onDispose { (ctx.getActivity() as? SettingsActivity)?.touchPassFromY = Int.MAX_VALUE } }
     val customMainLayouts = LayoutUtilsCustom.getLayoutFiles(LayoutType.MAIN, ctx, currentSubtype.locale).map { it.name }
+    // checked when leaving (the top bar's arrow may hold an older copy of this function)
+    fun leave() { if (draft.hasChanges(ctx)) askOnLeave = true else { LayoutDraft.close(); onClickBack() } }
+    fun discardChanges() {
+        draft.reject(ctx)
+        currentSubtypeString = draft.subtype
+        if (RichInputMethodManager.isInitialized())
+            KeyboardSwitcher.getInstance().switchToSubtype(draft.subtype.toSettingsSubtype().toAdditionalSubtype())
+    }
+    // back in the app after leaving it (the changes were undone then): a new snapshot of what is there now
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                val fresh = LayoutDraft.of(ctx, currentSubtypeString)
+                if (fresh !== draft) { currentSubtypeString = fresh.subtype; draft = fresh }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    if (askReject)
+        ConfirmationDialog(
+            onDismissRequest = { askReject = false },
+            title = { Text(stringResource(R.string.appearance_reject_title)) },
+            content = { Text(stringResource(R.string.layout_reject_message)) },
+            cancelButtonText = stringResource(R.string.appearance_keep_working),
+            confirmButtonText = stringResource(R.string.appearance_discard_all),
+            onConfirmed = { discardChanges(); draft = LayoutDraft.of(ctx, currentSubtypeString) },
+        )
+    if (askAccept)
+        ConfirmationDialog(
+            onDismissRequest = { askAccept = false },
+            title = { Text(stringResource(R.string.appearance_accept_title)) },
+            cancelButtonText = stringResource(R.string.appearance_keep_working),
+            confirmButtonText = stringResource(R.string.appearance_accept_all),
+            onConfirmed = { draft.accept(); draft = LayoutDraft.of(ctx, currentSubtypeString) },
+        )
+    if (askOnLeave)
+        ThreeButtonAlertDialog(
+            onDismissRequest = { askOnLeave = false },
+            title = { Text(stringResource(R.string.layout_keep_title)) },
+            content = { Text(stringResource(R.string.layout_keep_message)) },
+            confirmButtonText = stringResource(R.string.appearance_keep),
+            onConfirmed = { draft.accept(); onClickBack() },
+            neutralButtonText = stringResource(R.string.appearance_discard),
+            onNeutral = { discardChanges(); askOnLeave = false; onClickBack() },
+        )
     SearchScreen(
-        onClickBack = onClickBack,
+        onClickBack = ::leave,
+        // cross and tick: discard or keep everything changed since the screen opened, each asks first
+        leadingActions = {
+            if (changed) {
+                IconButton({ askReject = true }) { Icon(painterResource(R.drawable.ic_close), stringResource(R.string.appearance_reject)) }
+                IconButton({ askAccept = true }) { Icon(painterResource(R.drawable.ic_check), stringResource(R.string.appearance_accept)) }
+            }
+        },
         icon = { if (SubtypeSettings.getEnabledSubtypes(true).size > 1 && SubtypeSettings.isEnabled(currentSubtype.toAdditionalSubtype())) DeleteButton {
+            LayoutDraft.close() // deleting keeps the changes so far: a Discard mustn't bring the keyboard back
             if (currentSubtype.isAdditionalSubtype(prefs)) SubtypeUtilsAdditional.removeAdditionalSubtype(ctx, currentSubtype.toAdditionalSubtype())
             SubtypeSettings.removeEnabledSubtype(ctx, currentSubtype.toAdditionalSubtype())
             KeyboardProfiles.onKeyboardDeleted(ctx.realPrefs(), currentSubtype)
@@ -238,11 +318,80 @@ fun SubtypeScreen(
             ) {
                 val advanced by SettingsMode.state(ctx)
                 // two groups, one row style (label 10 dp in, rows 56 dp high): see LocalCompactPreferences, SwitchRow
-                // ---- input: key-press popup, vibration, sound, per-app keyboard, localized number row
+                // ---- the layout: first the layout and its popups, then the other layouts, the five key switches last
+                WithBigTitle(stringResource(R.string.keyboard_layout_set)) {
+                    // the keyboard's shape first (moved from Appearance): height, numbers row, split keyboard;
+                    // their dialogs keep the preview keyboard up
+                    CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
+                        LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
+                        Pending(prefixChanged(Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX)) {
+                            SettingsActivity.settingsContainer[Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX]?.Preference() }
+                        Pending(keyChanged(Settings.PREF_SHOW_NUMBER_ROW)) {
+                            SettingsActivity.settingsContainer[Settings.PREF_SHOW_NUMBER_ROW]?.Preference() }
+                        if (!prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW))
+                            Pending(keyChanged(Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS)) { Box(Modifier.padding(start = 16.dp)) {
+                                SettingsActivity.settingsContainer[Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS]?.Preference() } }
+                        Pending(keyChanged(Settings.PREF_ENABLE_SPLIT_KEYBOARD, Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE,
+                            Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE)) {
+                            SettingsActivity.settingsContainer[Settings.PREF_ENABLE_SPLIT_KEYBOARD]?.Preference() }
+                        if (listOf(Settings.PREF_ENABLE_SPLIT_KEYBOARD, Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE,
+                                Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE)
+                                .any { prefs.getBoolean(it, Defaults.PREF_ENABLE_SPLIT_KEYBOARD) })
+                            Pending(prefixChanged(Settings.PREF_SPLIT_SPACER_SCALE_PREFIX)) { Box(Modifier.padding(start = 16.dp)) {
+                                SettingsActivity.settingsContainer[Settings.PREF_SPLIT_SPACER_SCALE_PREFIX]?.Preference() } }
+                    }
+                    // then the plain switches: emoji key, send key on the emoji and clipboard panels, TLD popups
+                    Pending(keyChanged(Settings.PREF_SHOW_EMOJI_KEY)) {
+                        PrefSwitchRow(Settings.PREF_SHOW_EMOJI_KEY, Defaults.PREF_SHOW_EMOJI_KEY, R.string.show_emoji_key) {
+                            holdPreview()
+                            KeyboardSwitcher.getInstance().reloadKeyboard()
+                        }
+                    }
+                    // the send/enter key on the rows under the emoji and clipboard panels: one switch for both
+                    val withAction = (currentSubtype.layoutName(LayoutType.EMOJI_BOTTOM) ?: Settings.readDefaultLayoutName(LayoutType.EMOJI_BOTTOM, prefs)) == "emoji_bottom_row_with_action"
+                    Pending(layoutChanged(LayoutType.EMOJI_BOTTOM)) { SwitchRow(stringResource(R.string.bottom_rows_action_key), withAction) { on ->
+                        setCurrentSubtype(
+                            if (on) currentSubtype.withLayout(LayoutType.EMOJI_BOTTOM, "emoji_bottom_row_with_action").withLayout(LayoutType.CLIPBOARD_BOTTOM, "clip_bottom_row_with_action")
+                            else currentSubtype.withLayout(LayoutType.EMOJI_BOTTOM, "emoji_bottom_row").withLayout(LayoutType.CLIPBOARD_BOTTOM, "clip_bottom_row")
+                        )
+                    } }
+                    Pending(keyChanged(Settings.PREF_SHOW_TLD_POPUP_KEYS)) {
+                        PrefSwitchRow(Settings.PREF_SHOW_TLD_POPUP_KEYS, Defaults.PREF_SHOW_TLD_POPUP_KEYS, R.string.show_tld_popup_keys) { holdPreview(); reloadPreview() } }
+                    // preset popup layouts, customize popups, customize keys and popups with JSON (all advanced);
+                    // italic as a whole when any of it changed
+                    Pending(keyChanged("key_popups", "key_popup_set_selected", "key_popup_sets", Settings.PREF_SYMBOL_POPUP_MAP)
+                            || currentSubtype.getExtraValueOf(ExtraValue.MORE_POPUPS) != openedSubtype.getExtraValueOf(ExtraValue.MORE_POPUPS)
+                            || layoutChanged(LayoutType.SYMBOLS) || changedFolders.any { it != "main" } || prefixChanged(Settings.PREF_LAYOUT_PREFIX)) {
+                        KeyPopupsSection(currentSubtype) { setCurrentSubtype(it) } }
+                    // the other layouts, only when there is a choice (custom layout files; Bengali has khipro)
+                    val tabletOnly = currentSubtype.locale.script() != ScriptUtils.SCRIPT_BENGALI && LayoutUtilsCustom.getLayoutFiles(LayoutType.FUNCTIONAL, ctx).isEmpty()
+                    if (!tabletOnly) Pending(layoutChanged(LayoutType.FUNCTIONAL))
+                        { SecondaryLayoutRow(currentSubtype, LayoutType.FUNCTIONAL, ::setCurrentSubtype,
+                            builtIns = { all -> all.filter { it != "functional_keys_khipro" || currentSubtype.locale.script() == ScriptUtils.SCRIPT_BENGALI } }) }
+                    for (type in listOf(LayoutType.MORE_SYMBOLS, LayoutType.NUMBER, LayoutType.NUMBER_ROW, LayoutType.NUMPAD, LayoutType.NUMPAD_LANDSCAPE, LayoutType.PHONE, LayoutType.PHONE_SYMBOLS))
+                        if (LayoutUtilsCustom.getLayoutFiles(type, ctx).isNotEmpty())
+                            Pending(layoutChanged(type)) { SecondaryLayoutRow(currentSubtype, type, ::setCurrentSubtype) }
+                    // advanced: remove redundant popups, tablet-style bottom row (on phones), the main layout last
+                    if (advanced) AdvancedBlock {
+                        Pending(keyChanged(Settings.PREF_REMOVE_REDUNDANT_POPUPS)) {
+                            PrefSwitchRow(Settings.PREF_REMOVE_REDUNDANT_POPUPS, Defaults.PREF_REMOVE_REDUNDANT_POPUPS, R.string.remove_redundant_popups) { holdPreview(); reloadPreview() } }
+                    }
+                    if (tabletOnly) {
+                        @Composable fun tabletRow() = Pending(layoutChanged(LayoutType.FUNCTIONAL)) {
+                            SwitchRow(stringResource(R.string.bottom_row_tablet), currentSubtype.layoutName(LayoutType.FUNCTIONAL) == "functional_keys_tablet") { on ->
+                                setCurrentSubtype(if (on) currentSubtype.withLayout(LayoutType.FUNCTIONAL, "functional_keys_tablet") else currentSubtype.withoutLayout(LayoutType.FUNCTIONAL))
+                            } }
+                        if (Settings.getInstance().isTablet) tabletRow()
+                        else if (advanced) AdvancedBlock { tabletRow() }
+                    }
+                    if (advanced) AdvancedBlock { Pending(layoutChanged(LayoutType.MAIN)) { MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) } } }
+                }
+                // ---- typing: key-press popup, vibration, sound, per-app keyboard, localized number row
                 WithBigTitle(stringResource(R.string.settings_category_input)) {
                     CompositionLocalProvider(LocalCompactPreferences provides true) {
                         (if (resumed >= 0) preferencesInputItems(prefs, ctx) else emptyList()).filter { it !in advancedInputItems }.forEach {
                             if (it !is String) return@forEach
+                            CompositionLocalProvider(LocalPendingChange provides keyChanged(it)) {
                             // the rows that appear under Vibrate / Sound when they're on sit a little in
                             if (it in soundPreviewItems) CompositionLocalProvider(LocalKeepKeyboard provides true,
                                 LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
@@ -250,10 +399,12 @@ fun SubtypeScreen(
                             }
                             else if (it in dependentInputItems) Box(Modifier.padding(start = 16.dp)) { SettingsActivity.settingsContainer[it]?.Preference() }
                             else SettingsActivity.settingsContainer[it]?.Preference()
+                            }
                         }
                     }
-                    // (show numbers row and its symbols-page twin are on Appearance; the localized digits are per language, so here)
-                    if (hasLocalizedNumberRow(currentSubtype.locale, ctx)) {
+                    // (show numbers row and its symbols-page twin are in the Layout group; the localized digits are per language)
+                    if (hasLocalizedNumberRow(currentSubtype.locale, ctx)) Pending(
+                        currentSubtype.getExtraValueOf(ExtraValue.LOCALIZED_NUMBER_ROW) != openedSubtype.getExtraValueOf(ExtraValue.LOCALIZED_NUMBER_ROW)) {
                         val checked = currentSubtype.getExtraValueOf(ExtraValue.LOCALIZED_NUMBER_ROW)?.toBoolean()
                         SwitchRow(stringResource(R.string.localized_number_row),
                             checked ?: prefs.getBoolean(Settings.PREF_LOCALIZED_NUMBER_ROW, Defaults.PREF_LOCALIZED_NUMBER_ROW),
@@ -263,49 +414,9 @@ fun SubtypeScreen(
                     // (the symbol switches — hide on the number row / other keys, long-press dots — are on Appearance)
                     if (advanced) AdvancedBlock {
                         CompositionLocalProvider(LocalCompactPreferences provides true) {
-                            advancedInputItems.forEach { SettingsActivity.settingsContainer[it]?.Preference() }
+                            advancedInputItems.forEach { Pending(keyChanged(it)) { SettingsActivity.settingsContainer[it]?.Preference() } }
                         }
                     }
-                }
-                // ---- the layout: first the layout and its popups, then the other layouts, the five key switches last
-                WithBigTitle(stringResource(R.string.keyboard_layout_set)) {
-                    // the three plain switches first: emoji key, send key on the emoji and clipboard panels, TLD popups
-                    PrefSwitchRow(Settings.PREF_SHOW_EMOJI_KEY, Defaults.PREF_SHOW_EMOJI_KEY, R.string.show_emoji_key) {
-                        holdPreview()
-                        KeyboardSwitcher.getInstance().reloadKeyboard()
-                    }
-                    // the send/enter key on the rows under the emoji and clipboard panels: one switch for both
-                    val withAction = (currentSubtype.layoutName(LayoutType.EMOJI_BOTTOM) ?: Settings.readDefaultLayoutName(LayoutType.EMOJI_BOTTOM, prefs)) == "emoji_bottom_row_with_action"
-                    SwitchRow(stringResource(R.string.bottom_rows_action_key), withAction) { on ->
-                        setCurrentSubtype(
-                            if (on) currentSubtype.withLayout(LayoutType.EMOJI_BOTTOM, "emoji_bottom_row_with_action").withLayout(LayoutType.CLIPBOARD_BOTTOM, "clip_bottom_row_with_action")
-                            else currentSubtype.withLayout(LayoutType.EMOJI_BOTTOM, "emoji_bottom_row").withLayout(LayoutType.CLIPBOARD_BOTTOM, "clip_bottom_row")
-                        )
-                    }
-                    PrefSwitchRow(Settings.PREF_SHOW_TLD_POPUP_KEYS, Defaults.PREF_SHOW_TLD_POPUP_KEYS, R.string.show_tld_popup_keys) { holdPreview(); reloadPreview() }
-                    // preset popup layouts, customize popups, customize keys and popups with JSON (all advanced)
-                    KeyPopupsSection(currentSubtype) { setCurrentSubtype(it) }
-                    // the other layouts, only when there is a choice (custom layout files; Bengali has khipro)
-                    val tabletOnly = currentSubtype.locale.script() != ScriptUtils.SCRIPT_BENGALI && LayoutUtilsCustom.getLayoutFiles(LayoutType.FUNCTIONAL, ctx).isEmpty()
-                    if (!tabletOnly)
-                        SecondaryLayoutRow(currentSubtype, LayoutType.FUNCTIONAL, ::setCurrentSubtype,
-                            builtIns = { all -> all.filter { it != "functional_keys_khipro" || currentSubtype.locale.script() == ScriptUtils.SCRIPT_BENGALI } })
-                    for (type in listOf(LayoutType.MORE_SYMBOLS, LayoutType.NUMBER, LayoutType.NUMBER_ROW, LayoutType.NUMPAD, LayoutType.NUMPAD_LANDSCAPE, LayoutType.PHONE, LayoutType.PHONE_SYMBOLS))
-                        if (LayoutUtilsCustom.getLayoutFiles(type, ctx).isNotEmpty())
-                            SecondaryLayoutRow(currentSubtype, type, ::setCurrentSubtype)
-                    // advanced: remove redundant popups, tablet-style bottom row (on phones), the main layout last
-                    if (advanced) AdvancedBlock {
-                        PrefSwitchRow(Settings.PREF_REMOVE_REDUNDANT_POPUPS, Defaults.PREF_REMOVE_REDUNDANT_POPUPS, R.string.remove_redundant_popups) { holdPreview(); reloadPreview() }
-                    }
-                    if (tabletOnly) {
-                        @Composable fun tabletRow() =
-                            SwitchRow(stringResource(R.string.bottom_row_tablet), currentSubtype.layoutName(LayoutType.FUNCTIONAL) == "functional_keys_tablet") { on ->
-                                setCurrentSubtype(if (on) currentSubtype.withLayout(LayoutType.FUNCTIONAL, "functional_keys_tablet") else currentSubtype.withoutLayout(LayoutType.FUNCTIONAL))
-                            }
-                        if (Settings.getInstance().isTablet) tabletRow()
-                        else if (advanced) AdvancedBlock { tabletRow() }
-                    }
-                    if (advanced) AdvancedBlock { MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) } }
                 }
                 // ---- backspace and clipboard history: advanced groups, heading included, in one tinted block
                 if (advanced) AdvancedBlock {
@@ -313,15 +424,22 @@ fun SubtypeScreen(
                         CompositionLocalProvider(LocalCompactPreferences provides true) {
                             listOf(Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS, Settings.PREF_BACKSPACE_REPEAT_INTERVAL,
                                 Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD, Settings.PREF_DELETE_SWIPE)
-                                .forEach { SettingsActivity.settingsContainer[it]?.Preference() }
+                                .forEach { key ->
+                                    // the repeat interval row also sets the speed-up
+                                    val pending = if (key == Settings.PREF_BACKSPACE_REPEAT_INTERVAL) keyChanged(key, Settings.PREF_BACKSPACE_SPEED_UP,
+                                        Settings.PREF_BACKSPACE_SPEED_UP_AFTER, Settings.PREF_BACKSPACE_TOP_INTERVAL) else keyChanged(key)
+                                    Pending(pending) { SettingsActivity.settingsContainer[key]?.Preference() }
+                                }
                             // only meaningful with autocorrect on (as on the Text correction screen it came from)
                             if (prefs.getBoolean(Settings.PREF_AUTO_CORRECTION, Defaults.PREF_AUTO_CORRECTION))
-                                SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT]?.Preference()
+                                Pending(keyChanged(Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT)) {
+                                    SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT]?.Preference() }
                         }
                     }
                     WithBigTitle(stringResource(R.string.settings_category_clipboard_history)) {
                         CompositionLocalProvider(LocalCompactPreferences provides true) {
-                            clipboardHistoryItems(prefs).filterIsInstance<String>().forEach { SettingsActivity.settingsContainer[it]?.Preference() }
+                            clipboardHistoryItems(prefs).filterIsInstance<String>().forEach {
+                                Pending(keyChanged(it)) { SettingsActivity.settingsContainer[it]?.Preference() } }
                         }
                     }
                 }
@@ -504,7 +622,7 @@ private fun SwitchRow(title: String, checked: Boolean, summary: String? = null, 
     Row(verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().clickable { onChange(!checked) }.heightIn(min = ROW_HEIGHT).padding(vertical = 4.dp)) {
         Column(Modifier.weight(1f).padding(start = 10.dp, end = 8.dp)) {
-            Text(title)
+            Text(title, fontStyle = if (LocalPendingChange.current) androidx.compose.ui.text.font.FontStyle.Italic else null)
             if (summary != null)
                 Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -544,10 +662,13 @@ val ROW_HEIGHT = 56.dp
 /** A switch bound to a boolean preference (per keyboard when settings are separate). */
 @Composable
 private fun PrefSwitchRow(key: String, default: Boolean, titleId: Int, summaryId: Int? = null, inverted: Boolean = false, onChanged: () -> Unit) {
-    val prefs = LocalContext.current.prefs()
-    var checked by remember(key) { mutableStateOf(prefs.getBoolean(key, default) xor inverted) }
+    val ctx = LocalContext.current
+    val prefs = ctx.prefs()
+    // read each time (a Discard puts values back behind this row's back)
+    val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
+    if ((b?.value ?: 0) < 0) Log.v("irrelevant", "recompose on preference change")
+    val checked = prefs.getBoolean(key, default) xor inverted
     SwitchRow(stringResource(titleId), checked, summaryId?.let { stringResource(it) }) {
-        checked = it
         prefs.edit { putBoolean(key, it xor inverted) }
         onChanged()
     }
@@ -557,3 +678,8 @@ private fun reloadPreview() = KeyboardSwitcher.getInstance().setThemeNeedsReload
 
 /** Hold the preview's space for a moment, so a reload doesn't shorten the list and lose the scroll position. */
 private fun holdPreviewSpace(set: (Boolean) -> Unit) = set(true)
+
+/** [content] with its title in italics while [pending]: changed since the screen opened, not kept yet. */
+@Composable
+private fun Pending(pending: Boolean, content: @Composable () -> Unit) =
+    CompositionLocalProvider(LocalPendingChange provides pending, content = content)
