@@ -39,6 +39,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import helium314.keyboard.accessibility.AccessibilityUtils;
+import helium314.keyboard.keyboard.FontLibrary;
 import helium314.keyboard.keyboard.KeyboardTypeface;
 import helium314.keyboard.latin.PunctuationSuggestions;
 import helium314.keyboard.latin.R;
@@ -524,8 +525,7 @@ final class SuggestionStripLayoutHelper {
             wordView.setTag(indexInSuggestedWords);
             wordView.setText(getStyledSuggestedWord(suggestedWords, indexInSuggestedWords));
             wordView.setTextColor(SUGGESTION_STRIP_ORANGE);
-            KeyboardTypeface.applyToTextView(wordView);
-            applyCustomSuggestionStyle(wordView, prefs);
+            applyCustomSuggestionStyle(wordView, prefs); // sets the font too (emoji font for emojis)
             if (SuggestionStripView.DEBUG_SUGGESTIONS) {
                 mDebugInfoViews.get(positionInStrip).setText(suggestedWords.getDebugString(indexInSuggestedWords));
             }
@@ -588,8 +588,11 @@ final class SuggestionStripLayoutHelper {
         // font as chosen in the Suggestion strip dialog, bold / italic applied to it (also un-bolds, which the old
         // setTypeface(current, style) couldn't)
         final String font = prefs.getString(Settings.PREF_SUGGESTION_FONT, "auto");
-        wordView.setTypeface(KeyboardTypeface.styled(null, Typeface.DEFAULT, font,
-                KeyboardTypeface.suggestionTypeface(), bold, italic));
+        // the key text's font while "use key text font" is on, else the strip's own; emojis get the emoji font
+        final Typeface family = KeyboardTypeface.ownOrKeyFamily(font, FontLibrary.SLOT_SUGGESTION,
+                prefs.getString(Settings.PREF_KEY_FONT, "auto"),
+                prefs.getBoolean(Settings.PREF_FONT_FOLLOWS_KEY_TEXT, Defaults.PREF_FONT_FOLLOWS_KEY_TEXT));
+        wordView.setTypeface(KeyboardTypeface.styled(wordView.getText(), family, false, bold, italic));
 
         if (underline) {
             wordView.setPaintFlags(wordView.getPaintFlags() | Paint.UNDERLINE_TEXT_FLAG);

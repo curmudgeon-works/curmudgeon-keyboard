@@ -132,6 +132,7 @@ fun <T>DropDownField(
     selectedItem: T,
     onSelected: (T) -> Unit,
     extraButton: @Composable (() -> Unit)? = null,
+    itemTrailing: @Composable ((T) -> Unit)? = null, // e.g. a delete button, in the menu only
     itemContent: @Composable (T) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -159,7 +160,8 @@ fun <T>DropDownField(
         items.forEach {
             DropdownMenuItem(
                 text = { itemContent(it) },
-                onClick = { expanded = false; onSelected(it) }
+                onClick = { expanded = false; onSelected(it) },
+                trailingIcon = itemTrailing?.let { trailing -> { trailing(it) } },
             )
         }
     }

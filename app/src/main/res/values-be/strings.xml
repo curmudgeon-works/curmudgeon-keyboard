@@ -241,7 +241,6 @@
     <string name="action_none">Бяздзейнасць</string>
     <string name="show_horizontal_space_swipe">Гарызантальны свайп па прабелу</string>
     <string name="localized_number_row_summary">Аддаваць перавагу лакалізаваныя лацінскія лічбы</string>
-    <string name="show_popup_hints_summary">Паказваць падказкі, калі працяглы націск клавішы запускае дадатковыя функцыі</string>
     <string name="layout_error">Памылка раскладкі: %s</string>
     <string name="edit_layout">Націсніце, каб адрэдагаваць базавую раскладку</string>
     <string name="layout_symbols_shifted" tools:keep="@string/layout_symbols_shifted">Больш сімвалаў</string>

@@ -71,7 +71,6 @@ public class SettingsValues {
     public final boolean mLocalizedNumberRow;
     public final boolean mShowNumberRowHints;
     public final boolean mShowsHints;
-    public final boolean mShowLetterHints;
     public final boolean mShowsPopupHints;
     public final boolean mShowTldPopupKeys;
     public final boolean mRecordGestureCorpus; // opt-in local JSONL log of real swipes (M4 tuning data)
@@ -154,6 +153,7 @@ public class SettingsValues {
     public final boolean mSecondaryStripVisible;
     public final int mKeypressVibrationDuration;
     public final float mKeypressSoundVolume;
+    public final String mKeypressSound;
     public final boolean mAutoCorrectionEnabledPerUserSettings;
     public final boolean mAutoCorrectEnabled;
     public final float mAutoCorrectionThreshold;
@@ -162,6 +162,8 @@ public class SettingsValues {
     public final boolean mBackspaceDeletesSwipedWord;
     public final boolean mAutoCorrectWithDigits;
     public final boolean mKeyTextBold;
+    public final boolean mKeyTextBoldSet; // false: the key style decides (Holo bold)
+    public final boolean mFontFollowsKeyText;
     public final boolean mKeyTextItalic;
     public final boolean mKeyTextUnderline;
     public final float mHintFontScale;
@@ -220,7 +222,6 @@ public class SettingsValues {
         mLocalizedNumberRow = SubtypeUtilsKt.getHasLocalizedNumberRow(selectedSubtype, prefs);
         mShowNumberRowHints = prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW_HINTS, Defaults.PREF_SHOW_NUMBER_ROW_HINTS);
         mShowsHints = prefs.getBoolean(Settings.PREF_SHOW_HINTS, Defaults.PREF_SHOW_HINTS);
-        mShowLetterHints = prefs.getBoolean(Settings.PREF_SHOW_LETTER_HINTS, Defaults.PREF_SHOW_LETTER_HINTS);
         mShowsPopupHints = prefs.getBoolean(Settings.PREF_SHOW_POPUP_HINTS, Defaults.PREF_SHOW_POPUP_HINTS);
         mShowTldPopupKeys = prefs.getBoolean(Settings.PREF_SHOW_TLD_POPUP_KEYS, Defaults.PREF_SHOW_TLD_POPUP_KEYS);
         mRecordGestureCorpus = prefs.getBoolean(Settings.PREF_RECORD_GESTURE_CORPUS, Defaults.PREF_RECORD_GESTURE_CORPUS);
@@ -248,6 +249,8 @@ public class SettingsValues {
         mBackspaceDeletesSwipedWord = prefs.getBoolean(Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD, Defaults.PREF_BACKSPACE_DELETES_SWIPED_WORD);
         mAutoCorrectWithDigits = prefs.getBoolean(Settings.PREF_AUTOCORRECT_WITH_DIGITS, Defaults.PREF_AUTOCORRECT_WITH_DIGITS);
         mKeyTextBold = prefs.getBoolean(Settings.PREF_KEY_TEXT_BOLD, Defaults.PREF_KEY_TEXT_BOLD);
+        mKeyTextBoldSet = prefs.contains(Settings.PREF_KEY_TEXT_BOLD);
+        mFontFollowsKeyText = prefs.getBoolean(Settings.PREF_FONT_FOLLOWS_KEY_TEXT, Defaults.PREF_FONT_FOLLOWS_KEY_TEXT);
         mKeyTextItalic = prefs.getBoolean(Settings.PREF_KEY_TEXT_ITALIC, Defaults.PREF_KEY_TEXT_ITALIC);
         mKeyTextUnderline = prefs.getBoolean(Settings.PREF_KEY_TEXT_UNDERLINE, Defaults.PREF_KEY_TEXT_UNDERLINE);
         mHintFontScale = prefs.getFloat(Settings.PREF_HINT_FONT_SCALE, Defaults.PREF_HINT_FONT_SCALE);
@@ -280,6 +283,7 @@ public class SettingsValues {
         mKeyLongpressTimeout = prefs.getInt(Settings.PREF_KEY_LONGPRESS_TIMEOUT, Defaults.PREF_KEY_LONGPRESS_TIMEOUT);
         mKeypressVibrationDuration = prefs.getInt(Settings.PREF_VIBRATION_DURATION_SETTINGS, Defaults.PREF_VIBRATION_DURATION_SETTINGS);
         mKeypressSoundVolume = prefs.getFloat(Settings.PREF_KEYPRESS_SOUND_VOLUME, Defaults.PREF_KEYPRESS_SOUND_VOLUME);
+        mKeypressSound = prefs.getString(Settings.PREF_KEYPRESS_SOUND, Defaults.PREF_KEYPRESS_SOUND);
         mEnableEmojiAltPhysicalKey = prefs.getBoolean(Settings.PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY, Defaults.PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY);
         // lab flavor: gesture input also works without the proprietary lib, using the in-tree decoder
         mGestureInputEnabled = (JniUtils.sHaveGestureLib || BuildConfig.USE_OWN_GESTURE_DECODER)

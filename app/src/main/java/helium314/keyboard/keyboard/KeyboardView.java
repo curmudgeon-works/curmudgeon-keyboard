@@ -394,8 +394,10 @@ public class KeyboardView extends View {
             // the user's text style (Key text dialog): font, bold, italic, underline; undone before the hint is drawn
             final SettingsValues textStyle = Settings.getValues();
             if (textStyle != null) {
-                final Typeface tf = KeyboardTypeface.styled(label, key.selectTypeface(params), textStyle.mKeyFont,
-                        KeyboardTypeface.customTypeface(), textStyle.mKeyTextBold, textStyle.mKeyTextItalic);
+                // until the Bold switch is set, the key style's own bold stays (Holo); once set, the switch decides
+                final Typeface tf = KeyboardTypeface.styled(label,
+                        KeyboardTypeface.keyTextFamily(textStyle.mKeyFont, key.selectTypeface(params)),
+                        !textStyle.mKeyTextBoldSet, textStyle.mKeyTextBold, textStyle.mKeyTextItalic);
                 paint.setTypeface(tf);
                 // a font without a bold or italic face gets them drawn
                 paint.setFakeBoldText(textStyle.mKeyTextBold && !tf.isBold());
@@ -476,8 +478,9 @@ public class KeyboardView extends View {
             paint.setColor(key.selectHintTextColor(params));
             // the symbols' style (Symbols dialog): their own font, bold by default, italic, underline
             if (sv != null) {
-                final Typeface tf = KeyboardTypeface.styled(hintLabel, Typeface.DEFAULT, sv.mHintFont,
-                        KeyboardTypeface.hintTypeface(), sv.mHintTextBold, sv.mHintTextItalic);
+                final Typeface tf = KeyboardTypeface.styled(hintLabel,
+                        KeyboardTypeface.ownOrKeyFamily(sv.mHintFont, FontLibrary.SLOT_HINT, sv.mKeyFont, sv.mFontFollowsKeyText),
+                        false, sv.mHintTextBold, sv.mHintTextItalic);
                 paint.setTypeface(tf);
                 paint.setFakeBoldText(sv.mHintTextBold && !tf.isBold());
                 paint.setTextSkewX(sv.mHintTextItalic && !tf.isItalic() ? -0.25f : 0f);
@@ -523,6 +526,10 @@ public class KeyboardView extends View {
                     ? hintBaseline * 0.5f
                     : params.mHintLabelVerticalAdjustment * labelCharHeight;
             canvas.drawText(hintLabel, 0, hintLabel.length(), hintX, hintBaseline + adjustmentY, paint);
+            // the symbols' italic / underline / drawn bold must not reach what's drawn next (space bar language name)
+            paint.setFakeBoldText(false);
+            paint.setTextSkewX(0f);
+            paint.setUnderlineText(false);
         }
 
         // Draw key icon.

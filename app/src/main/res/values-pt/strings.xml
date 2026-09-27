@@ -328,7 +328,6 @@
     <string name="dictionary_file_wrong_script">Erro: script não compatível com este teclado</string>
     <string name="dictionary_load_error">Erro ao carregar o ficheiro do dicionário</string>
     <string name="day_or_night_day">Dia</string>
-    <string name="show_popup_hints_summary">Mostra dicas se pressionar uma tecla ativa funcionalidade extra</string>
     <string name="day_or_night_night">Noite</string>
     <string name="dictionary_settings_category">Dicionários</string>
     <string name="no_dictionary_message">"Sem um dicionário, apenas obterá sugestões de texto digitado anteriormente.&lt;br&gt; \n        Pode descarregar dicionários %1$s, ou verificar se um dicionário para \"%2$s\" pode ser descarregado diretamente %3$s."</string>

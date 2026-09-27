@@ -92,6 +92,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_KEY_FONT = "key_font";
     public static final String PREF_HINT_FONT = "hint_font";
     public static final String PREF_SUGGESTION_FONT = "suggestion_font";
+    public static final String PREF_FONT_FOLLOWS_KEY_TEXT = "font_follows_key_text";
     public static final String PREF_HINT_TEXT_BOLD = "hint_text_bold";
     public static final String PREF_HINT_TEXT_ITALIC = "hint_text_italic";
     public static final String PREF_HINT_TEXT_UNDERLINE = "hint_text_underline";
@@ -151,6 +152,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_GESTURE_INPUT = "gesture_input";
     public static final String PREF_VIBRATION_DURATION_SETTINGS = "vibration_duration_settings";
     public static final String PREF_KEYPRESS_SOUND_VOLUME = "keypress_sound_volume";
+    public static final String PREF_KEYPRESS_SOUND = "keypress_sound";
     public static final String PREF_KEY_LONGPRESS_TIMEOUT = "key_longpress_timeout";
     public static final String PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY = "enable_emoji_alt_physical_key";
     public static final String PREF_GESTURE_PREVIEW_TRAIL = "gesture_preview_trail";
@@ -184,7 +186,6 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_CUSTOM_CURRENCY_KEY = "custom_currency_key";
 
     public static final String PREF_SHOW_HINTS = "show_hints";
-    public static final String PREF_SHOW_LETTER_HINTS = "show_letter_hints";
     public static final String PREF_POPUP_KEYS_ORDER = "popup_keys_order";
     public static final String PREF_POPUP_KEYS_LABELS_ORDER = "popup_keys_labels_order";
     public static final String PREF_SHOW_POPUP_HINTS = "show_popup_hints";
@@ -301,6 +302,9 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
             }
             ToolbarUtilsKt.clearCustomToolbarKeyCodes();
             loadSettings(mContext, mSettingsValues.mLocale, mSettingsValues.mInputAttributes);
+            // key-press vibration and sound keep their own copy: without this the keyboard already up (e.g. the
+            // settings preview) went on with the old values until it restarted
+            AudioAndHapticFeedbackManager.getInstance().onSettingsChanged(mSettingsValues);
             StatsUtils.onLoadSettings(mSettingsValues);
         } finally {
             mSettingsValuesLock.unlock();

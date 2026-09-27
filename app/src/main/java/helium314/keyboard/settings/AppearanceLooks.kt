@@ -38,7 +38,8 @@ object AppearanceLooks {
         Settings.PREF_KEY_HORIZONTAL_GAP, Settings.PREF_KEY_VERTICAL_GAP,
         Settings.PREF_KEY_TEXT_BOLD, Settings.PREF_KEY_TEXT_ITALIC, Settings.PREF_KEY_TEXT_UNDERLINE, Settings.PREF_HINT_FONT_SCALE,
         Settings.PREF_SHOW_NUMBER_ROW_HINTS, Settings.PREF_SHOW_HINTS, Settings.PREF_SHOW_POPUP_HINTS,
-        Settings.PREF_KEY_FONT, Settings.PREF_HINT_FONT, Settings.PREF_SUGGESTION_FONT, Settings.PREF_HINT_TEXT_BOLD, Settings.PREF_HINT_TEXT_ITALIC, Settings.PREF_HINT_TEXT_UNDERLINE,
+        Settings.PREF_SHOW_NUMBER_ROW, Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS,
+        Settings.PREF_KEY_FONT, Settings.PREF_HINT_FONT, Settings.PREF_SUGGESTION_FONT, Settings.PREF_FONT_FOLLOWS_KEY_TEXT, Settings.PREF_HINT_TEXT_BOLD, Settings.PREF_HINT_TEXT_ITALIC, Settings.PREF_HINT_TEXT_UNDERLINE,
     )
     // the scales have a key per orientation / fold state, the custom colors one per theme
     private val prefixes = listOf(
@@ -53,7 +54,7 @@ object AppearanceLooks {
     fun builtIn(ctx: Context): List<Look> = listOf(
         Look(ctx.getString(R.string.theme_preset_midnight), mapOf(
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
-            Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_MIDNIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_MIDNIGHT,
+            Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_BLACK, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_BLACK,
             Settings.PREF_THEME_KEY_BORDERS to true)),
         Look(ctx.getString(R.string.theme_preset_daylight), mapOf(
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
@@ -76,7 +77,8 @@ object AppearanceLooks {
     /** The appearance values as they are now (plain keys, the current keyboard's set). */
     fun current(prefs: SharedPreferences): Map<String, Any?> = prefs.all.filterKeys { inScope(it) }
 
-    /** [values] replace the current appearance values as a whole; the live keyboard reloads. */
+    /** [values] replace the current appearance values as a whole (keys missing from it go back to default);
+     *  to apply a theme on top of the current values, pass `current + theme`. The live keyboard reloads. */
     fun apply(ctx: Context, values: Map<String, Any?>) {
         val prefs = ctx.prefs()
         val now = current(prefs)

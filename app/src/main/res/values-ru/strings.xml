@@ -222,7 +222,6 @@
     <string name="day_or_night_image">Установить изображение для дневного или ночного режима?</string>
     <string name="toolbar_keys">Выбрать клавиши панели инструментов</string>
     <string name="theme_name_ocean" tools:keep="@string/theme_name_ocean">Океан</string>
-    <string name="show_popup_hints_summary">Показывать подсказки, если долгое нажатие на клавишу вызывает дополнительные функции</string>
     <string name="theme_name_sand" tools:keep="@string/theme_name_sand">Песок</string>
     <string name="select_word" tools:keep="@string/select_word">Выбрать слово</string>
     <string name="all_colors">Показывать все цвета</string>

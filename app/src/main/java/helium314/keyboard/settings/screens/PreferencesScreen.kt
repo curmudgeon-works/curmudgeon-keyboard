@@ -34,7 +34,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import helium314.keyboard.keyboard.KeyboardLayoutSet
 import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.latin.AudioAndHapticFeedbackManager
+import helium314.keyboard.latin.KeypressSounds
 import helium314.keyboard.latin.R
+import helium314.keyboard.settings.preferences.reloadSymbolHints
+import androidx.compose.foundation.layout.Box
 import helium314.keyboard.latin.database.ClipboardDao
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
@@ -50,6 +53,8 @@ import helium314.keyboard.settings.SearchSettingsScreen
 import helium314.keyboard.settings.SettingsActivity
 import helium314.keyboard.settings.preferences.SliderPreference
 import helium314.keyboard.settings.preferences.SwitchPreference
+import helium314.keyboard.settings.preferences.SystemFeedback
+import helium314.keyboard.settings.preferences.SystemFeedbackNote
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.settings.initPreview
 import helium314.keyboard.settings.preferences.SwitchPreferenceWithEmojiDictWarning
@@ -88,9 +93,16 @@ fun preferencesInputItems(prefs: SharedPreferences): List<Any?> =
             Settings.PREF_VIBRATE_IN_DND_MODE else null,
         Settings.PREF_SOUND_ON,
         if (prefs.getBoolean(Settings.PREF_SOUND_ON, Defaults.PREF_SOUND_ON))
+            Settings.PREF_KEYPRESS_SOUND else null,
+        if (prefs.getBoolean(Settings.PREF_SOUND_ON, Defaults.PREF_SOUND_ON))
             Settings.PREF_KEYPRESS_SOUND_VOLUME else null,
         Settings.PREF_SAVE_SUBTYPE_PER_APP,
     )
+
+/** Rows shown only while the switch above them is on; drawn indented under it. */
+val dependentInputItems = setOf(
+    Settings.PREF_VIBRATION_DURATION_SETTINGS, Settings.PREF_VIBRATE_IN_DND_MODE, Settings.PREF_KEYPRESS_SOUND, Settings.PREF_KEYPRESS_SOUND_VOLUME,
+)
 
 fun clipboardHistoryItems(prefs: SharedPreferences): List<Any?> {
     val clipboardHistoryEnabled = prefs.getBoolean(Settings.PREF_ENABLE_CLIPBOARD_HISTORY, Defaults.PREF_ENABLE_CLIPBOARD_HISTORY)
@@ -120,17 +132,12 @@ fun createPreferencesSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_SAVE_SUBTYPE_PER_APP, R.string.save_subtype_per_app) {
         SwitchPreference(it, Defaults.PREF_SAVE_SUBTYPE_PER_APP)
     },
+    // the three under Appearance's "Hide symbols on keys", a little in
     Setting(context, Settings.PREF_SHOW_HINTS, R.string.hints_other_keys) {
-        SwitchPreference(it, Defaults.PREF_SHOW_HINTS, inverted = true) {
-            // the hints are set when a keyboard is built, and built keyboards are cached
-            KeyboardLayoutSet.onSystemLocaleChanged(); KeyboardSwitcher.getInstance().setThemeNeedsReload()
-        }
+        Box(Modifier.padding(start = 16.dp)) { SwitchPreference(it, Defaults.PREF_SHOW_HINTS, inverted = true) { reloadSymbolHints() } }
     },
     Setting(context, Settings.PREF_REMOVE_REDUNDANT_POPUPS, R.string.remove_redundant_popups) {
         SwitchPreference(it, Defaults.PREF_REMOVE_REDUNDANT_POPUPS) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
-    },
-    Setting(context, Settings.PREF_SHOW_LETTER_HINTS, R.string.letter_hints) {
-        SwitchPreference(it, Defaults.PREF_SHOW_LETTER_HINTS, inverted = true) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
     Setting(context, Settings.PREF_POPUP_KEYS_ORDER, R.string.popup_order) {
         ReorderSwitchPreference(it, Defaults.PREF_POPUP_KEYS_ORDER)
@@ -164,24 +171,30 @@ fun createPreferencesSettings(context: Context) = listOf(
         }
     },
     Setting(context, Settings.PREF_SHOW_POPUP_HINTS, R.string.show_popup_hints) {
-        SwitchPreference(it, Defaults.PREF_SHOW_POPUP_HINTS, inverted = true) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+        Box(Modifier.padding(start = 16.dp)) { SwitchPreference(it, Defaults.PREF_SHOW_POPUP_HINTS, inverted = true) { reloadSymbolHints() } }
     },
     Setting(context, Settings.PREF_POPUP_ON, R.string.popup_on_keypress) {
         SwitchPreference(it, Defaults.PREF_POPUP_ON) { KeyboardSwitcher.getInstance().reloadKeyboard() }
     },
     Setting(context, Settings.PREF_VIBRATE_ON, R.string.vibrate_on_keypress) {
-        SwitchPreference(it, Defaults.PREF_VIBRATE_ON)
+        SystemFeedbackNote(
+            blocked = { ctx -> SystemFeedback.vibrationBlockers(ctx).firstOrNull()?.let { r -> ctx.getString(r) } },
+            open = SystemFeedback::openVibrationSettings,
+        ) { onSwitched -> SwitchPreference(it, Defaults.PREF_VIBRATE_ON) { on -> onSwitched(on) } }
     },
     Setting(context, Settings.PREF_VIBRATE_IN_DND_MODE, R.string.vibrate_in_dnd_mode) {
         SwitchPreference(it, Defaults.PREF_VIBRATE_IN_DND_MODE)
     },
     Setting(context, Settings.PREF_SOUND_ON, R.string.sound_on_keypress) {
-        SwitchPreference(it, Defaults.PREF_SOUND_ON)
+        SystemFeedbackNote(
+            blocked = { ctx -> SystemFeedback.soundBlocker(ctx)?.let { r -> ctx.getString(r) } },
+            open = SystemFeedback::openSoundSettings,
+        ) { onSwitched -> SwitchPreference(it, Defaults.PREF_SOUND_ON) { on -> onSwitched(on) } }
     },
     Setting(context, Settings.PREF_SHOW_EMOJI_DESCRIPTIONS, R.string.show_emoji_descriptions) {
         SwitchPreferenceWithEmojiDictWarning(it, Defaults.PREF_SHOW_EMOJI_DESCRIPTIONS)
     },
-    Setting(context, Settings.PREF_SHOW_NUMBER_ROW, R.string.number_row, R.string.number_row_summary) {
+    Setting(context, Settings.PREF_SHOW_NUMBER_ROW, R.string.show_numbers_row) {
         SwitchPreference(it, Defaults.PREF_SHOW_NUMBER_ROW) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
     Setting(context, Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS, R.string.number_row_in_symbols) {
@@ -194,7 +207,7 @@ fun createPreferencesSettings(context: Context) = listOf(
         }
     },
     Setting(context, Settings.PREF_SHOW_NUMBER_ROW_HINTS, R.string.number_row_hints) {
-        SwitchPreference(it, Defaults.PREF_SHOW_NUMBER_ROW_HINTS, inverted = true) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+        Box(Modifier.padding(start = 16.dp)) { SwitchPreference(it, Defaults.PREF_SHOW_NUMBER_ROW_HINTS, inverted = true) { reloadSymbolHints() } }
     },
     Setting(context, Settings.PREF_SHOW_LANGUAGE_SWITCH_KEY, R.string.show_language_switch_key) {
         SwitchPreference(it, Defaults.PREF_SHOW_LANGUAGE_SWITCH_KEY) { KeyboardSwitcher.getInstance().reloadKeyboard() }
@@ -245,6 +258,7 @@ fun createPreferencesSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_KEYPRESS_SOUND_VOLUME, R.string.prefs_keypress_sound_volume_settings) { setting ->
         val audioManager = LocalContext.current.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val prefs = LocalContext.current.prefs()
         SliderPreference(
             name = setting.title,
             key = setting.key,
@@ -254,8 +268,26 @@ fun createPreferencesSettings(context: Context) = listOf(
                 else (it * 100).toInt().toString()
             },
             range = -0.01f..1f,
-            onValueChanged = { it?.let { audioManager.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD, it) } }
+            onValueChanged = { it?.let {
+                val sound = prefs.getString(Settings.PREF_KEYPRESS_SOUND, Defaults.PREF_KEYPRESS_SOUND)!!
+                if (!KeypressSounds.play(sound, it)) audioManager.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD, it)
+            } }
         )
+    },
+    Setting(context, Settings.PREF_KEYPRESS_SOUND, R.string.keypress_sound) { setting ->
+        val ctx = LocalContext.current
+        val names = mapOf(
+            KeypressSounds.ANDROID to R.string.keypress_sound_android, "click" to R.string.keypress_sound_click,
+            "tick" to R.string.keypress_sound_tick, "lock" to R.string.keypress_sound_lock, "unlock" to R.string.keypress_sound_unlock,
+            "camera" to R.string.keypress_sound_camera, KeypressSounds.BEEP to R.string.keypress_sound_beep,
+        )
+        val volume = ctx.prefs().getFloat(Settings.PREF_KEYPRESS_SOUND_VOLUME, Defaults.PREF_KEYPRESS_SOUND_VOLUME)
+        val audioManager = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        // a tap plays the sound; OK keeps it
+        ListPreference(setting, KeypressSounds.available().map { stringResource(names[it]!!) to it }, Defaults.PREF_KEYPRESS_SOUND,
+            live = true) { sound ->
+            if (!KeypressSounds.play(sound, volume)) audioManager.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD, volume)
+        }
     },
 )
 

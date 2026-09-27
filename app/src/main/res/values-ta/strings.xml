@@ -244,7 +244,6 @@
     <string name="quick_pin_toolbar_keys">நீண்ட அழுத்தத்தில் கருவிப்பட்டி விசையை பின் செய்யவும்</string>
     <string name="quick_pin_toolbar_keys_summary">இது பின் செய்யப்படாத கருவிப்பட்டி விசைகளுக்கான பிற நீண்ட அழுத்த செயல்களை முடக்கும்</string>
     <string name="show_popup_hints">செயல்பாட்டு குறிப்புகளைக் காட்டு</string>
-    <string name="show_popup_hints_summary">விசையை நீண்ட நேரம் அழுத்துவது கூடுதல் செயல்பாட்டைத் தூண்டினால், குறிப்புகளைக் காட்டு</string>
     <string name="remove_redundant_popups">தேவையற்ற பாப்அப்களை அகற்று</string>
     <string name="remove_redundant_popups_summary">அடிப்படை அமைப்பில் ஏற்கனவே இருக்கும் மேல்தோன்றல் விசைகளை அடக்கவும்</string>
     <string name="prefs_long_press_keyboard_to_change_lang">ச்பேச் கீ மூலம் உள்ளீட்டு முறையை மாற்றவும்</string>

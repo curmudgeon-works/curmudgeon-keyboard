@@ -6,6 +6,12 @@ import kotlin.math.roundToInt
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
+import android.provider.OpenableColumns
+import androidx.compose.material3.MaterialTheme
+import helium314.keyboard.keyboard.FontLibrary
+import helium314.keyboard.latin.settings.Defaults
+import helium314.keyboard.latin.settings.Settings
 import android.graphics.Typeface
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -39,6 +45,7 @@ import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.keyboard.KeyboardTypeface
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.common.FileUtils
+import helium314.keyboard.latin.utils.DeleteButton
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.settings.DropDownField
@@ -48,35 +55,41 @@ import helium314.keyboard.settings.dialogs.InfoDialog
 import helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog
 import java.io.File
 
-/** The preferences behind one text style dialog: the key labels, or the symbols (hints) on the keys. */
+/** The preferences behind one text style dialog: the key labels, the symbols (hints) on the keys, or the suggestions. */
 class TextStyleKeys(
     val font: String,
-    val fontFile: (Context) -> File,
+    val slot: String, // FontLibrary.SLOT_…: which file of before a stored "file" means
     val size: String,
     val sizeDefault: Float,
     val sizeRange: ClosedFloatingPointRange<Float>,
     val bold: String,
-    val boldDefault: Boolean,
+    val boldDefault: (SharedPreferences) -> Boolean,
     val italic: String,
     val underline: String,
     val sizeIsInt: Boolean = false, // stored as an Int (dp) rather than a Float scale
     val sizeText: (Float) -> String = { "${(it * 100).toInt()}%" },
     val extraKeys: List<String> = emptyList(), // more preferences the extra rows change, restored on Cancel too
     val extra: (@Composable (reload: () -> Unit) -> Unit)? = null, // rows under B I U
+    // symbols and suggestions: the other one's font preference. While "use key text font" is on they show the key
+    // text's font; picking one here turns that off, and the other one keeps the key text's font as its own choice
+    val otherFont: String? = null,
 )
 
-/** Font choices; "auto" (nothing chosen yet) means the loaded file when there is one, else the default. */
+/** Font choices: the default, three system families, the loaded fonts ("font:<name>"), and loading a new one. */
 object TextFonts {
-    const val AUTO = "auto"
+    const val AUTO = "auto" // nothing chosen yet
     const val DEFAULT = "default"
     const val SANS = "sans"
     const val SERIF = "serif"
     const val MONO = "mono"
-    const val FILE = "file"
-    val choices = listOf(DEFAULT, SANS, SERIF, MONO, FILE)
+    const val LOAD = "load"
+    val system = listOf(DEFAULT, SANS, SERIF, MONO)
 
-    /** The choice as the dialog shows it: "auto" resolved to the file or the default. */
-    fun shown(stored: String, fileExists: Boolean) = if (stored == AUTO) (if (fileExists) FILE else DEFAULT) else stored
+    /** The choice as the dialog shows it: a stored "auto" / "file" resolved to the file it means, or the default. */
+    fun shown(ctx: Context, stored: String, slot: String): String = when (stored) {
+        AUTO, "file" -> FontLibrary.fileFor(ctx, stored, slot)?.let { FontLibrary.PREFIX + it.name } ?: DEFAULT
+        else -> if (stored.startsWith(FontLibrary.PREFIX) && FontLibrary.fileFor(ctx, stored, slot) == null) DEFAULT else stored
+    }
 }
 
 /**
@@ -91,10 +104,12 @@ fun TextStylePreference(setting: Setting, keys: TextStyleKeys) {
     var showDialog by rememberSaveable { mutableStateOf(false) }
     var generation by remember { mutableIntStateOf(0) }
     @Suppress("UNUSED_EXPRESSION") generation
-    val fileExists = keys.fontFile(ctx).exists()
-    val font = TextFonts.shown(prefs.getString(keys.font, TextFonts.AUTO)!!, fileExists)
+    val follows = keys.otherFont != null && prefs.getBoolean(Settings.PREF_FONT_FOLLOWS_KEY_TEXT, Defaults.PREF_FONT_FOLLOWS_KEY_TEXT)
+    val keyFont = prefs.getString(Settings.PREF_KEY_FONT, TextFonts.AUTO)!!
+    val font = if (follows) TextFonts.shown(ctx, keyFont, FontLibrary.SLOT_KEY)
+        else TextFonts.shown(ctx, prefs.getString(keys.font, TextFonts.AUTO)!!, keys.slot)
     val size = if (keys.sizeIsInt) prefs.getInt(keys.size, keys.sizeDefault.toInt()).toFloat() else prefs.getFloat(keys.size, keys.sizeDefault)
-    val bold = prefs.getBoolean(keys.bold, keys.boldDefault)
+    val bold = prefs.getBoolean(keys.bold, keys.boldDefault(prefs))
     val italic = prefs.getBoolean(keys.italic, false)
     val underline = prefs.getBoolean(keys.underline, false)
     val summary = listOfNotNull(fontName(font), keys.sizeText(size),
@@ -108,11 +123,24 @@ fun TextStylePreference(setting: Setting, keys: TextStyleKeys) {
         KeyboardSwitcher.getInstance().setThemeNeedsReload()
         generation++
     }
-    val allKeys = listOf(keys.font, keys.size, keys.bold, keys.italic, keys.underline) + keys.extraKeys
+    val allKeys = listOf(keys.font, keys.size, keys.bold, keys.italic, keys.underline) + keys.extraKeys +
+        listOfNotNull(keys.otherFont, keys.otherFont?.let { Settings.PREF_FONT_FOLLOWS_KEY_TEXT })
     val initial = remember { allKeys.associateWith { prefs.all[it] } }
     var confirmed by remember { mutableStateOf(false) }
     var sizePosition by remember { mutableFloatStateOf(size) }
     var showError by remember { mutableStateOf(false) }
+    fun choose(choice: String) {
+        prefs.edit {
+            if (follows) {
+                putBoolean(Settings.PREF_FONT_FOLLOWS_KEY_TEXT, false)
+                putString(keys.otherFont!!, keyFont) // the other one looks as before
+            }
+            putString(keys.font, choice)
+        }
+        if (!FontLibrary.isPending(choice)) FontLibrary.discardPending(ctx)
+        reload()
+    }
+    // a loaded file previews at once but joins the font list only on OK
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (it.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
         val uri = it.data?.data ?: return@rememberLauncherForActivityResult
@@ -120,16 +148,18 @@ fun TextStylePreference(setting: Setting, keys: TextStyleKeys) {
         FileUtils.copyContentUriToNewFile(uri, ctx, tempFile)
         try {
             Typeface.createFromFile(tempFile)
-            keys.fontFile(ctx).delete()
-            tempFile.renameTo(keys.fontFile(ctx))
-            prefs.edit { putString(keys.font, TextFonts.FILE) }
-            reload()
+            val name = ctx.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                ?.use { c -> if (c.moveToFirst()) c.getString(0) else null } ?: "font"
+            choose(FontLibrary.addPending(ctx, tempFile, name))
         } catch (_: Exception) {
             showError = true
+        } finally {
             tempFile.delete()
         }
     }
     val pickFile = { launcher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")) }
+    val choices = TextFonts.system + FontLibrary.names(ctx).map { FontLibrary.PREFIX + it } +
+        listOfNotNull(font.takeIf { FontLibrary.isPending(it) }) + TextFonts.LOAD
 
     ThreeButtonAlertDialog(
         onDismissRequest = {
@@ -143,9 +173,14 @@ fun TextStylePreference(setting: Setting, keys: TextStyleKeys) {
                 } } }
                 reload()
             }
+            FontLibrary.discardPending(ctx) // after OK it's in the list already
             showDialog = false
         },
-        onConfirmed = { confirmed = true },
+        onConfirmed = {
+            confirmed = true
+            val chosen = prefs.getString(keys.font, TextFonts.AUTO)!!
+            if (FontLibrary.isPending(chosen)) { prefs.edit { putString(keys.font, FontLibrary.commit(ctx, chosen)) }; reload() }
+        },
         title = { Text(setting.title) },
         content = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -153,15 +188,18 @@ fun TextStylePreference(setting: Setting, keys: TextStyleKeys) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             DropDownField(
-                                items = TextFonts.choices,
+                                items = choices,
                                 selectedItem = font,
-                                onSelected = { choice ->
-                                    if (choice == TextFonts.FILE && !fileExists) pickFile()
-                                    else { prefs.edit { putString(keys.font, choice) }; reload() }
+                                onSelected = { choice -> if (choice == TextFonts.LOAD) pickFile() else choose(choice) },
+                                itemTrailing = { choice ->
+                                    if (choice.startsWith(FontLibrary.PREFIX) && !FontLibrary.isPending(choice))
+                                        DeleteButton { FontLibrary.delete(ctx, FontLibrary.displayName(choice)); reload() }
                                 },
                             ) { Text(fontName(it)) }
+                            if (follows) Text(stringResource(R.string.text_font_follows_key_text),
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 8.dp))
                         }
-                        if (font == TextFonts.FILE) TextButton(onClick = pickFile) { Text(stringResource(R.string.load)) }
                     }
                 }
                 WithSmallTitle(stringResource(R.string.text_style_size, keys.sizeText(sizePosition))) {
@@ -195,10 +233,14 @@ fun TextStylePreference(setting: Setting, keys: TextStyleKeys) {
 }
 
 @Composable
-private fun fontName(font: String): String = stringResource(when (font) {
-    TextFonts.SANS -> R.string.text_font_sans
-    TextFonts.SERIF -> R.string.text_font_serif
-    TextFonts.MONO -> R.string.text_font_mono
-    TextFonts.FILE -> R.string.text_font_file
-    else -> R.string.text_font_default
-})
+private fun fontName(font: String): String = when {
+    font == TextFonts.LOAD -> stringResource(R.string.text_font_load)
+    FontLibrary.isPending(font) -> stringResource(R.string.text_font_new, FontLibrary.displayName(font))
+    font.startsWith(FontLibrary.PREFIX) -> FontLibrary.displayName(font)
+    else -> stringResource(when (font) {
+        TextFonts.SANS -> R.string.text_font_sans
+        TextFonts.SERIF -> R.string.text_font_serif
+        TextFonts.MONO -> R.string.text_font_mono
+        else -> R.string.text_font_default
+    })
+}

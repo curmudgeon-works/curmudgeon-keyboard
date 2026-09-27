@@ -178,7 +178,6 @@
     <string name="left" tools:keep="@string/left">Kiri</string>
     <string name="right" tools:keep="@string/right">Kanan</string>
     <string name="up" tools:keep="@string/up">Atas</string>
-    <string name="show_popup_hints_summary">Tampilkan petunjuk jika menekan suatu tombol dengan lama memicu fungsi tambahan</string>
     <string name="prefs_narrow_key_gaps">Sempitkan jarak antara tombol</string>
     <string name="prefs_bottom_padding_scale">Skala bantalan bawah</string>
     <string name="subtype_generic_sebeolsik_final">%s (Sebeolsik Final)</string>

@@ -170,7 +170,6 @@
     <string name="right" tools:keep="@string/right">Dreapta</string>
     <string name="up" tools:keep="@string/up">Sus</string>
     <string name="down" tools:keep="@string/down">Jos</string>
-    <string name="show_popup_hints_summary">Afișează sugestii dacă apăsarea lungă a unei taste declanșează funcționalități suplimentare</string>
     <string name="prefs_long_press_keyboard_to_change_lang">Schimbă metoda de introducere cu tasta spațiu</string>
     <string name="prefs_narrow_key_gaps">Goluri înguste ale tastelor</string>
     <string name="load_gesture_library_message">Vei avea nevoie de biblioteca pentru „%s”. Bibliotecile incompatibile se pot bloca atunci când utilizezi tastarea prin gesturi.

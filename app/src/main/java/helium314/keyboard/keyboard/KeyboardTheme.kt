@@ -49,7 +49,6 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
         const val STYLE_ROUNDED = "Rounded"
 
         // new themes that are just colors
-        const val THEME_MIDNIGHT = "midnight" // Curmudgeon default look (same colours as black)
         const val THEME_LIGHT = "light"
         const val THEME_HOLO_WHITE = "holo_white"
         const val THEME_DARK = "dark"
@@ -67,7 +66,6 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
         const val THEME_SAND = "sand"
         const val THEME_VIOLETTE = "violette"
         fun getAvailableDefaultColors(prefs: SharedPreferences, isNight: Boolean) = listOfNotNull(
-            THEME_MIDNIGHT,
             THEME_LIGHT, THEME_DARK,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) THEME_DYNAMIC else null,
             THEME_HOLO_WHITE, // (upstream: only with the Holo key style)
@@ -149,25 +147,15 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
         private fun getThemeColors(themeName: String, themeStyle: String, context: Context, prefs: SharedPreferences, isNight: Boolean): Colors {
             val hasBorders = prefs.getBoolean(Settings.PREF_THEME_KEY_BORDERS, Defaults.PREF_THEME_KEY_BORDERS)
             val backgroundImage = Settings.readUserBackgroundImage(context, isNight)
+            val holo = themeStyle == STYLE_HOLO
             return when (themeName) {
                 "daylight", "paper" -> getThemeColors(THEME_LIGHT, themeStyle, context, prefs, isNight) // short-lived palettes
+                "midnight" -> getThemeColors(THEME_BLACK, themeStyle, context, prefs, isNight) // was black under another name
                 "classic" -> getThemeColors(THEME_HOLO_WHITE, themeStyle, context, prefs, isNight)
                 THEME_DYNAMIC -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) DynamicColors(context, themeStyle, hasBorders, backgroundImage)
                     else getThemeColors(THEME_LIGHT, themeStyle, context, prefs, isNight)
                 }
-                THEME_MIDNIGHT -> DefaultColors( // our own daily-driver look: identical to "black" (with key borders on by default)
-                    themeStyle,
-                    hasBorders,
-                    ContextCompat.getColor(context, R.color.gesture_trail_color_lxx_dark),
-                    ContextCompat.getColor(context, R.color.background_amoled_black),
-                    ContextCompat.getColor(context, R.color.background_amoled_dark),
-                    ContextCompat.getColor(context, R.color.background_amoled_dark),
-                    ContextCompat.getColor(context, R.color.background_amoled_dark),
-                    ContextCompat.getColor(context, R.color.key_text_color_lxx_dark),
-                    ContextCompat.getColor(context, R.color.key_hint_letter_color_lxx_dark),
-                    keyboardBackground = backgroundImage
-                )
                 THEME_LIGHT -> DefaultColors(
                     themeStyle,
                     hasBorders,
@@ -192,14 +180,16 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                     ContextCompat.getColor(context, R.color.key_hint_letter_color_lxx_dark),
                     keyboardBackground = backgroundImage
                 )
+                // the Holo key drawables are grey already, so Holo tints them white; the other styles paint their keys
+                // in these colours as they are, so they get the grey Holo keys look (white keys = white on white)
                 THEME_HOLO_WHITE -> DefaultColors(
                     themeStyle,
                     hasBorders,
                     Color.WHITE,
                     "#282828".toColorInt(),
-                    Color.WHITE, // drawable is transparent
-                    "#444444".toColorInt(), // should be 222222, but the key drawable is already grey
-                    Color.WHITE,
+                    if (holo) Color.WHITE else "#4a4a4a".toColorInt(), // Holo: drawable is transparent
+                    if (holo) "#444444".toColorInt() else "#383838".toColorInt(), // Holo: should be 222222, but the key drawable is already grey
+                    if (holo) Color.WHITE else "#4a4a4a".toColorInt(),
                     Color.WHITE,
                     "#282828".toColorInt(),
                     Color.WHITE,

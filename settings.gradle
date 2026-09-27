@@ -3,5 +3,4 @@ plugins {
 }
 include ':app'
 include ':gesture'
-include ':gesturelab'
 include ':tools:make-emoji-keys'

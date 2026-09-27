@@ -89,6 +89,10 @@ public final class AudioAndHapticFeedbackManager {
         if (hapticEvent != HapticEvent.KEY_PRESS) {
             return;
         }
+        // a sound of the phone's own chosen in the settings; else Android's key clicks (quiet, need Touch sounds)
+        if (KeypressSounds.INSTANCE.play(mSettingsValues.mKeypressSound, mSettingsValues.mKeypressSoundVolume)) {
+            return;
+        }
         final int sound = switch (code) {
             case KeyCode.DELETE -> AudioManager.FX_KEYPRESS_DELETE;
             case Constants.CODE_ENTER -> AudioManager.FX_KEYPRESS_RETURN;
@@ -121,6 +125,7 @@ public final class AudioAndHapticFeedbackManager {
     public void onSettingsChanged(final SettingsValues settingsValues) {
         mSettingsValues = settingsValues;
         mSoundOn = reevaluateIfSoundIsOn();
+        if (mSoundOn) KeypressSounds.INSTANCE.load(settingsValues.mKeypressSound);
     }
 
     public void onRingerModeChanged(boolean doNotDisturb) {

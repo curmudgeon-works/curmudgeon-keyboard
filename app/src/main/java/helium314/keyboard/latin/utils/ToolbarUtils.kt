@@ -150,7 +150,12 @@ fun upgradeToolbarPrefs(prefs: SharedPreferences) {
 }
 
 /** The old default put voice second; a toolbar still in that order gets voice as the last enabled key (once). */
+private const val VOICE_MOVED_PREF = "toolbar_voice_moved_to_end"
+
 private fun moveVoiceToEnd(prefs: SharedPreferences) {
+    // one look per install: a user who puts voice back second keeps it there
+    if (prefs.getBoolean(VOICE_MOVED_PREF, false)) return
+    prefs.edit().putBoolean(VOICE_MOVED_PREF, true).apply()
     val stored = prefs.getString(Settings.PREF_TOOLBAR_KEYS, null) ?: return
     val list = stored.split(Separators.ENTRY).toMutableList()
     val enabled = list.filter { it.endsWith(Separators.KV + "true") }.map { it.substringBefore(Separators.KV) }

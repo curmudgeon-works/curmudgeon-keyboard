@@ -2,6 +2,7 @@ package helium314.keyboard.latin
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.core.content.edit
 import helium314.keyboard.compat.isDeviceLocked
 import helium314.keyboard.compat.isUserLocked
@@ -53,6 +54,15 @@ fun checkVersionUpgrade(context: Context) {
     val oldVersion = prefs.getInt(Settings.PREF_VERSION_CODE, 0)
     if (oldVersion != BuildConfig.MIGRATION_VERSION)
         AppUpgrade.onUpgrade(context)
+    curmudgeonUpgrades(prefs)
+}
+
+/** Our own settings changes: each checks its own state, so running them on every start is cheap and safe
+ *  (MIGRATION_VERSION stays at upstream's, so onUpgrade doesn't run for them). */
+private fun curmudgeonUpgrades(prefs: SharedPreferences) {
+    // "midnight" was always black's colours under another name: the colour is black now (the Midnight theme stays)
+    for (key in listOf(Settings.PREF_THEME_COLORS, Settings.PREF_THEME_COLORS_NIGHT))
+        if (prefs.getString(key, null) == "midnight") prefs.edit { putString(key, KeyboardTheme.THEME_BLACK) }
 }
 
 fun transferOldPinnedClips(context: Context) {

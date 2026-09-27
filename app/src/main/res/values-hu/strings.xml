@@ -168,7 +168,6 @@
     <string name="prefs_bottom_padding_scale">Alsó margó mérete</string>
     <string name="full_left" tools:keep="@string/full_left">Teljesen balra</string>
     <string name="up" tools:keep="@string/up">Felfelé</string>
-    <string name="show_popup_hints_summary">Tippek megjelenítése, ha egy billentyű nyomva tartása további funkciókat indít el</string>
     <string name="prefs_narrow_key_gaps">Keskeny billentyűhézagok</string>
     <string name="localized_number_row">Helyi számsor</string>
     <string name="localized_number_row_summary">A latin számok helyett a helyi számok előnyben részesítése</string>

@@ -25,6 +25,16 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import helium314.keyboard.settings.dialogs.LocalBottomBarTop
+import helium314.keyboard.settings.dialogs.LocalPreviewKeyboard
+import helium314.keyboard.settings.dialogs.LocalKeepKeyboard
+import kotlin.math.roundToInt
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -178,6 +188,14 @@ fun SubtypeScreen(
     // moment while it reloads (otherwise the content is short again, maxValue drops to 0 and the position is lost)
     val scrollState = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) }
     val tryIt = remember { TryItState() }
+    // the key sound settings preview on the keyboard like Appearance's: their dialogs bring it up and keep it
+    val focusManager = LocalFocusManager.current
+    val softKeyboard = LocalSoftwareKeyboardController.current
+    val scope = rememberCoroutineScope()
+    val preview = remember { PreviewKeyboard(tryIt, scope, showIme = { softKeyboard?.show() }, reveal = { }) {
+        focusManager.clearFocus(); softKeyboard?.hide() } }
+    var bottomBarTop by remember { mutableIntStateOf(-1) }
+    DisposableEffect(Unit) { onDispose { (ctx.getActivity() as? SettingsActivity)?.touchPassFromY = Int.MAX_VALUE } }
     val customMainLayouts = LayoutUtilsCustom.getLayoutFiles(LayoutType.MAIN, ctx, currentSubtype.locale).map { it.name }
     SearchScreen(
         onClickBack = onClickBack,
@@ -194,8 +212,12 @@ fun SubtypeScreen(
         Scaffold(
             contentWindowInsets = WindowInsets(0),
             bottomBar = {
-                Box(Modifier.onSizeChanged { if (it.height > previewHeight) previewHeight = it.height }) {
-                    TryItBar(currentSubtype, tryIt)
+                Box(Modifier.onSizeChanged { if (it.height > previewHeight) previewHeight = it.height }.onGloballyPositioned {
+                    bottomBarTop = it.positionInWindow().y.roundToInt()
+                    // the try-it bar stays usable while a key sound dialog is open
+                    (ctx.getActivity() as? SettingsActivity)?.touchPassFromY = bottomBarTop
+                }) {
+                    TryItBar(currentSubtype, tryIt, onFocus = preview::onFocus)
                 }
             }
         ) { innerPadding ->
@@ -207,16 +229,21 @@ fun SubtypeScreen(
             ) {
                 val advanced by SettingsMode.state(ctx)
                 // two groups, one row style (label 10 dp in, rows 56 dp high): see LocalCompactPreferences, SwitchRow
-                // ---- input: key-press popup, vibration, sound, per-app keyboard, emoji descriptions, number row, hints
+                // ---- input: key-press popup, vibration, sound, per-app keyboard, localized number row
                 WithBigTitle(stringResource(R.string.settings_category_input)) {
                     CompositionLocalProvider(LocalCompactPreferences provides true) {
                         preferencesInputItems(prefs).filter { it !in advancedInputItems }.forEach {
-                            if (it is String) SettingsActivity.settingsContainer[it]?.Preference()
+                            if (it !is String) return@forEach
+                            // the rows that appear under Vibrate / Sound when they're on sit a little in
+                            if (it in soundPreviewItems) CompositionLocalProvider(LocalKeepKeyboard provides true,
+                                LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
+                                Box(Modifier.padding(start = 16.dp)) { SettingsActivity.settingsContainer[it]?.Preference() }
+                            }
+                            else if (it in dependentInputItems) Box(Modifier.padding(start = 16.dp)) { SettingsActivity.settingsContainer[it]?.Preference() }
+                            else SettingsActivity.settingsContainer[it]?.Preference()
                         }
                     }
-                    PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW, R.string.number_row_summary) { holdPreview(); reloadPreview() }
-                    if (!prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW))
-                        PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS, Defaults.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS, R.string.number_row_in_symbols) { holdPreview(); reloadPreview() }
+                    // (show numbers row and its symbols-page twin are on Appearance; the localized digits are per language, so here)
                     if (hasLocalizedNumberRow(currentSubtype.locale, ctx)) {
                         val checked = currentSubtype.getExtraValueOf(ExtraValue.LOCALIZED_NUMBER_ROW)?.toBoolean()
                         SwitchRow(stringResource(R.string.localized_number_row),
@@ -478,6 +505,9 @@ private fun SwitchRow(title: String, checked: Boolean, summary: String? = null, 
 }
 
 /** The Input items shown only in advanced mode, last in the group (see [AdvancedBlock]). */
+/** Settings whose dialogs keep the preview keyboard up (to hear the key sound while choosing it). */
+private val soundPreviewItems = setOf(Settings.PREF_KEYPRESS_SOUND, Settings.PREF_KEYPRESS_SOUND_VOLUME)
+
 private val advancedInputItems = listOf(Settings.PREF_SAVE_SUBTYPE_PER_APP) // (emoji descriptions: Appearance, Emoji group)
 
 /** Advanced items on a slightly different background, so toggling the mode shows what it adds (last in the Input

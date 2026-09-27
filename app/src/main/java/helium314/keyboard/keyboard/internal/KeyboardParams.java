@@ -104,9 +104,6 @@ public class KeyboardParams {
     // should be enabled for all alphabet layouts, except for specific layouts when shifted
     public boolean mProximityCharsCorrectionEnabled;
 
-    // only for removing redundant popup keys
-    public List<Key.KeyParams> baseKeys;
-
     @NonNull
     public final TouchPositionCorrection mTouchPositionCorrection = new TouchPositionCorrection();
 
@@ -162,8 +159,10 @@ public class KeyboardParams {
         final PopupKeySpec.LettersOnBaseLayout seen = new PopupKeySpec.LettersOnBaseLayout();
         final ArrayList<Key> allKeys = new ArrayList<>(mSortedKeys);
         final java.util.HashMap<Key, Key> filtered = new java.util.HashMap<>();
-        for (final Key key : spiralOrder(allKeys)) {
-            if (!Character.isLetterOrDigit(key.getCode())) continue;
+        // only letter and number keys make up the rows, so the bottom letter row is the first one walked
+        final ArrayList<Key> letterKeys = new ArrayList<>();
+        for (final Key key : allKeys) if (Character.isLetterOrDigit(key.getCode())) letterKeys.add(key);
+        for (final Key key : spiralOrder(letterKeys)) {
             final Key filteredKey = Key.removeRedundantPopupKeys(key, seen);
             filtered.put(key, filteredKey);
             seen.addCode(key.getCode());
@@ -175,7 +174,6 @@ public class KeyboardParams {
             final Key filteredKey = filtered.get(key);
             mSortedKeys.add(mUniqueKeysCache.getUniqueKey(filteredKey == null ? key : filteredKey));
         }
-        baseKeys = null;
     }
 
     /**
