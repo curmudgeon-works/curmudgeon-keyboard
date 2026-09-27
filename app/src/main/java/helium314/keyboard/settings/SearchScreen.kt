@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -67,6 +70,8 @@ fun SearchSettingsScreen(
     settings: List<Any?>,
     simpleModeKeys: Set<String>? = null, // when set, only these are shown while the settings menu is in simple mode
     content: @Composable (ColumnScope.() -> Unit)? = null, // overrides settings if not null
+    bottomBar: @Composable () -> Unit = {}, // pinned under the list, e.g. a try-it field
+    topActions: @Composable RowScope.() -> Unit = {}, // top bar buttons before the advanced switch
 ) {
     val ctx = LocalContext.current
     val advanced by SettingsMode.state(ctx)
@@ -74,11 +79,13 @@ fun SearchSettingsScreen(
     SearchScreen(
         onClickBack = onClickBack,
         title = { Text(title) },
+        leadingActions = topActions,
         content = {
             if (content != null) content()
             else {
                 Scaffold(
-                    contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
+                    contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
+                    bottomBar = bottomBar,
                 ) { innerPadding ->
                     Column(
                         Modifier.verticalScroll(rememberScrollState()).then(Modifier.padding(innerPadding))
@@ -132,13 +139,14 @@ fun SearchSettingsScreen(
 /** The simple / advanced settings menu switch, shown in the top bar of every settings screen. */
 @Composable
 private fun AdvancedModeSwitch(advanced: Boolean, onChange: (Boolean) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(stringResource(R.string.settings_mode_advanced), style = MaterialTheme.typography.labelMedium)
-        Switch(
-            checked = advanced,
-            onCheckedChange = onChange,
-            modifier = Modifier.padding(start = 4.dp, end = 4.dp).scale(0.8f)
-        )
+    // the word above a small switch, together no taller than the bar's icons
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(horizontal = 4.dp)) {
+        Text(stringResource(R.string.settings_mode_advanced), style = MaterialTheme.typography.labelSmall)
+        CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+            Box(Modifier.requiredHeight(24.dp).wrapContentHeight(Alignment.CenterVertically, unbounded = true)) {
+                Switch(checked = advanced, onCheckedChange = onChange, modifier = Modifier.scale(0.65f))
+            }
+        }
     }
 }
 
@@ -152,6 +160,7 @@ fun <T: Any?> SearchScreen(
     icon: @Composable (() -> Unit)? = null,
     menu: List<Pair<String, () -> Unit>>? = null,
     showAdvancedSwitch: Boolean = true, // the simple / advanced settings switch, on every screen
+    leadingActions: @Composable RowScope.() -> Unit = {}, // top bar buttons before the advanced switch
     content: @Composable (ColumnScope.() -> Unit)? = null,
 ) {
     val switchCtx = LocalContext.current
@@ -187,6 +196,7 @@ fun <T: Any?> SearchScreen(
                             }
                         },
                         actions = {
+                            leadingActions()
                             if (showAdvancedSwitch) AdvancedModeSwitch(advancedMode) { SettingsMode.set(switchCtx, it) }
                             if (icon == null)
                                 IconButton(onClick = { setShowSearch(!showSearch) }) { SearchIcon() }

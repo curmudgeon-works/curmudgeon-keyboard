@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -28,6 +29,7 @@ fun <T: Number> SliderPreference(
     range: ClosedFloatingPointRange<Float>,
     stepSize: Int? = null,
     onValueChanged: (Float?) -> Unit = { },
+    live: Boolean = false, // the value is written while dragging (the live keyboard shows it); Cancel puts the old one back
     onConfirmed: (T) -> Unit = { },
 ) {
     val ctx = LocalContext.current
@@ -40,6 +42,14 @@ fun <T: Number> SliderPreference(
     else throw IllegalArgumentException("only float and int are supported")
 
     var showDialog by rememberSaveable { mutableStateOf(false) }
+    val hadValue = remember(showDialog) { prefs.contains(key) }
+    @Suppress("UNCHECKED_CAST")
+    fun write(value: Float) {
+        if (live && !hadValue && value == initialValue.toFloat()) prefs.edit { remove(key) } // Cancel: unset stays unset
+        else if (default is Int) prefs.edit { putInt(key, value.toInt()) }
+        else prefs.edit { putFloat(key, value) }
+        onConfirmed((if (default is Int) value.toInt() else value) as T)
+    }
     Preference(
         name = name,
         onClick = { showDialog = true },
@@ -64,8 +74,9 @@ fun <T: Number> SliderPreference(
                 @Suppress("UNCHECKED_CAST")
                 description((if (default is Int) it.toInt() else it) as T)
             },
-            onValueChanged = onValueChanged,
+            onValueChanged = { if (live && it != null) write(it); onValueChanged(it) },
             showDefault = true,
+            live = live,
             onDefault = { prefs.edit { remove(key) }; onConfirmed(default) },
             intermediateSteps = stepSize?.let {
                 // this is not nice, but slider wants it like this...

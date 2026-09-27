@@ -49,6 +49,7 @@ fun ToolbarKeysCustomizer(
     var showKeyCustomizer: ToolbarKey? by rememberSaveable { mutableStateOf(null) }
     var showDeletePrefConfirmDialog by rememberSaveable { mutableStateOf(false) }
     ThreeButtonAlertDialog(
+        keepKeyboard = false, // has a text field, needs the focus
         onDismissRequest = onDismissRequest,
         cancelButtonText = stringResource(R.string.dialog_close),
         confirmButtonText = null,
@@ -99,6 +100,7 @@ private fun ToolbarKeyCustomizer(
     var code by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue(getCodeForToolbarKey(key).toString())) }
     var longPressCode by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue(getCodeForToolbarKeyLongClick(key).toString())) }
     ThreeButtonAlertDialog(
+        keepKeyboard = false, // has a text field, needs the focus
         onDismissRequest = onDismissRequest,
         onConfirmed = {
             val codes = readCustomKeyCodes(prefs)

@@ -124,8 +124,8 @@ android {
             dimension = "distribution"
             applicationId = "app.curmudgeon.keyboard"
             // versionName major.minor.build, build always 3 digits; versionCode = minor * 1000 + build (+ major * 100000)
-            versionCode = 1002
-            versionName = "0.1.002"
+            versionCode = 1003
+            versionName = "0.1.003"
             buildConfigField("boolean", "USE_OWN_GESTURE_DECODER", "true")
             if (playKeyProps.isNotEmpty()) signingConfig = signingConfigs.getByName("play")
         }

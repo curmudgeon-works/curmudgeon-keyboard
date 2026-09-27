@@ -28,9 +28,18 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.compositionLocalOf
+import android.view.Gravity
+import android.view.WindowManager
 import androidx.compose.ui.window.DialogProperties
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.latin.utils.previewDark
+
+/** True on screens whose live keyboard is the preview: their dialogs keep it up unless they need focus for a text field. */
+val LocalKeepKeyboard = compositionLocalOf { false }
 
 @Composable
 fun ThreeButtonAlertDialog(
@@ -48,11 +57,19 @@ fun ThreeButtonAlertDialog(
     reducePadding: Boolean = false,
     properties: DialogProperties = DialogProperties(),
     confirmFirst: Boolean = false, // OK left of Cancel, for dialogs whose buttons are spelled out as "Ok: …" / "Cancel: …"
+    keepKeyboard: Boolean = LocalKeepKeyboard.current, // the keyboard stays up (the dialog takes no focus) and the dialog sits at the top, clear of it
 ) {
     Dialog(
         onDismissRequest = onDismissRequest,
         properties = properties
     ) {
+        if (keepKeyboard) {
+            val window = (LocalView.current.parent as? DialogWindowProvider)?.window
+            SideEffect {
+                window?.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
+                window?.setGravity(Gravity.TOP)
+            }
+        }
         Box(
             modifier = modifier.widthIn(min = 280.dp, max = 560.dp),
             propagateMinConstraints = true

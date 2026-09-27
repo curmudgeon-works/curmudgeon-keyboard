@@ -129,6 +129,7 @@ fun ColorPickerDialog(
         )
     }
     ThreeButtonAlertDialog(
+        keepKeyboard = false, // has a text field, needs the focus
         onDismissRequest = onDismissRequest,
         onConfirmed = { onConfirmed(controller.selectedColor.value.toArgb()) },
         title = { Text(title) },

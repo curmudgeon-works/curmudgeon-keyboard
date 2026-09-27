@@ -83,6 +83,7 @@ fun LayoutPickerDialog(
         newLayoutDialog = (name ?: layoutType.default) to content
     }
     ThreeButtonAlertDialog(
+        keepKeyboard = false, // has a text field, needs the focus
         onDismissRequest = onDismissRequest,
         cancelButtonText = stringResource(R.string.dialog_close),
         onConfirmed = { },
