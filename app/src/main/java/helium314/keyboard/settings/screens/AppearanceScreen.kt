@@ -16,6 +16,15 @@ import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSub
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.settings.AppearanceDraft
 import helium314.keyboard.settings.AppearanceLooks
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CoroutineScope
+import helium314.keyboard.settings.dialogs.PreviewKeyboardHooks
+import helium314.keyboard.settings.dialogs.LocalPreviewKeyboard
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalFocusManager
 import helium314.keyboard.settings.painterResourceCompat
 import helium314.keyboard.latin.utils.NextScreenIcon
 import helium314.keyboard.settings.dialogs.ConfirmationDialog
@@ -35,6 +44,7 @@ import helium314.keyboard.settings.dialogs.LocalKeepKeyboard
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -141,9 +151,19 @@ fun AppearanceScreen(
     var askAccept by remember { mutableStateOf(false) }
     val tryIt = remember { TryItState() }
     val keyboard = SubtypeSettings.getSelectedSubtype(prefs).toSettingsSubtype()
+    val focusManager = LocalFocusManager.current
+    val softKeyboard = LocalSoftwareKeyboardController.current
+    val scope = rememberCoroutineScope()
+    val preview = remember { PreviewKeyboard(tryIt, scope) { focusManager.clearFocus(); softKeyboard?.hide() } }
+    // a changed appearance value (a switch, say) brings the keyboard up for a moment; dialogs report themselves
+    var lastValues by remember { mutableStateOf(AppearanceLooks.current(prefs)) }
+    LaunchedEffect(b?.value) {
+        val now = AppearanceLooks.current(prefs)
+        if (now != lastValues) { lastValues = now; preview.changed() }
+    }
     fun leave() { if (changed) askOnLeave = true else onClickBack() }
     BackHandler(enabled = changed) { leave() }
-    CompositionLocalProvider(LocalKeepKeyboard provides true) { SearchSettingsScreen(
+    CompositionLocalProvider(LocalKeepKeyboard provides true, LocalPreviewKeyboard provides preview) { SearchSettingsScreen(
         onClickBack = ::leave,
         title = stringResource(R.string.settings_screen_appearance),
         settings = items,
@@ -158,7 +178,7 @@ fun AppearanceScreen(
                 IconButton({ askAccept = true }) { Icon(painterResource(R.drawable.ic_check), stringResource(R.string.appearance_accept)) }
             }
         },
-        bottomBar = { TryItBar(keyboard, tryIt) },
+        bottomBar = { TryItBar(keyboard, tryIt, onFocus = preview::onFocus) },
     )
     if (askReject)
         ConfirmationDialog(
@@ -224,6 +244,7 @@ fun createAppearanceSettings(context: Context) = listOf(
             items,
             Defaults.PREF_ICON_STYLE,
             live = true,
+            previewKeyboard = false, // the rows show the icons
             itemTrailing = { (_, style) ->
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(end = 8.dp)) {
@@ -570,5 +591,44 @@ private fun SavedLooksPreference(setting: Setting) {
             confirmButtonText = stringResource(R.string.delete),
             onConfirmed = { store(looks.filter { it !== look }) },
         )
+    }
+}
+
+/**
+ * The keyboard as the Appearance preview: up while a dialog is open or for a few seconds after a change, and
+ * gone again afterwards; only when the user put the cursor in the try-it field themselves does it stay.
+ */
+private class PreviewKeyboard(private val tryIt: TryItState, private val scope: CoroutineScope, private val hide: () -> Unit) : PreviewKeyboardHooks {
+    private var focused = false
+    private var byUs = false // we brought it up, so we take it down
+    private var dialogs = 0
+    private var hideJob: Job? = null
+
+    fun onFocus(isFocused: Boolean) {
+        focused = isFocused
+        if (!isFocused) byUs = false
+    }
+
+    private fun show() {
+        hideJob?.cancel()
+        if (!focused) { byUs = true; tryIt.show(TryItMode.TEXT) }
+    }
+
+    private fun hideIfOurs() {
+        if (!byUs) return
+        byUs = false
+        hide()
+    }
+
+    override fun dialogOpened() { dialogs++; show() }
+    override fun dialogClosed() {
+        dialogs = (dialogs - 1).coerceAtLeast(0)
+        if (dialogs == 0) hideIfOurs()
+    }
+
+    fun changed() {
+        if (dialogs > 0) return
+        show()
+        hideJob = scope.launch { delay(3000); hideIfOurs() }
     }
 }

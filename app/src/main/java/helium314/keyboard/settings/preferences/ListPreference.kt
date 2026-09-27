@@ -22,6 +22,7 @@ fun <T: Any> ListPreference(
     default: T,
     live: Boolean = false, // a tap applies the value at once (the live keyboard shows it); OK keeps it, Cancel puts the old one back
     itemTrailing: (@Composable (Pair<String, T>) -> Unit)? = null, // shown at the end of each row, e.g. a preview of the choice
+    previewKeyboard: Boolean = true, // off: the rows preview the choice themselves, the keyboard needn't come up
     onChanged: (T) -> Unit = { }
 ) {
     var showDialog by rememberSaveable { mutableStateOf(false) }
@@ -57,6 +58,7 @@ fun <T: Any> ListPreference(
             title = { Text(setting.title) },
             getItemName = { it.first },
             trailing = itemTrailing,
+            summonKeyboard = previewKeyboard,
         )
     }
 }

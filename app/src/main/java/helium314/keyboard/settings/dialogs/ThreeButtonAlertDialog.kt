@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.compositionLocalOf
 import android.view.Gravity
@@ -40,6 +41,14 @@ import helium314.keyboard.latin.utils.previewDark
 
 /** True on screens whose live keyboard is the preview: their dialogs keep it up unless they need focus for a text field. */
 val LocalKeepKeyboard = compositionLocalOf { false }
+
+/** A screen's preview keyboard, told when a keyboard-keeping dialog opens and closes (see PreviewKeyboard). */
+val LocalPreviewKeyboard = compositionLocalOf<PreviewKeyboardHooks?> { null }
+
+interface PreviewKeyboardHooks {
+    fun dialogOpened()
+    fun dialogClosed()
+}
 
 @Composable
 fun ThreeButtonAlertDialog(
@@ -58,12 +67,18 @@ fun ThreeButtonAlertDialog(
     properties: DialogProperties = DialogProperties(),
     confirmFirst: Boolean = false, // OK left of Cancel, for dialogs whose buttons are spelled out as "Ok: …" / "Cancel: …"
     keepKeyboard: Boolean = LocalKeepKeyboard.current, // the keyboard stays up (the dialog takes no focus) and the dialog sits at the top, clear of it
+    summonKeyboard: Boolean = true, // with [keepKeyboard]: the screen's preview keyboard comes up for this dialog (off when the dialog previews itself)
 ) {
     Dialog(
         onDismissRequest = onDismissRequest,
         properties = properties
     ) {
         if (keepKeyboard) {
+            val preview = if (summonKeyboard) LocalPreviewKeyboard.current else null
+            DisposableEffect(preview) {
+                preview?.dialogOpened()
+                onDispose { preview?.dialogClosed() }
+            }
             val window = (LocalView.current.parent as? DialogWindowProvider)?.window
             SideEffect {
                 // the dialog stays focusable (back and outside taps work as usual) but tells the system it has no use

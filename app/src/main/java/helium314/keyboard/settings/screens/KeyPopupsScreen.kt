@@ -368,7 +368,7 @@ class TryItState {
 }
 
 @Composable
-fun TryItBar(keyboard: SettingsSubtype, state: TryItState) {
+fun TryItBar(keyboard: SettingsSubtype, state: TryItState, onFocus: (Boolean) -> Unit = {}) {
     var tryText by remember { mutableStateOf("") }
     Surface(tonalElevation = 3.dp, shadowElevation = 8.dp) {
         Row(
@@ -389,7 +389,7 @@ fun TryItBar(keyboard: SettingsSubtype, state: TryItState) {
                 modifier = Modifier
                     .weight(1f)
                     .focusRequester(state.focusRequester)
-                    .onFocusChanged { if (it.isFocused) showKeyboardForPreview(keyboard) }
+                    .onFocusChanged { onFocus(it.isFocused); if (it.isFocused) showKeyboardForPreview(keyboard) }
             )
             // which keyboard the preview shows: letters, the number pad, the phone pad
             SingleChoiceSegmentedButtonRow(Modifier.padding(start = 8.dp)) {

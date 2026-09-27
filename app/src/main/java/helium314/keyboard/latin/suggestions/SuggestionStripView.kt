@@ -161,7 +161,11 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         val mToolbarMode = if (isGone) ToolbarMode.HIDDEN else Settings.getValues().mToolbarMode
         if (mToolbarMode == ToolbarMode.TOOLBAR_KEYS) {
             setToolbarVisibility(true)
+        } else if (mToolbarMode == ToolbarMode.EXPANDABLE && toolbarVisibleAfterReload) {
+            setToolbarVisibility(true) // the strip was rebuilt (a theme change): the toolbar stays as it was
         }
+        toolbarVisibleAfterReload = false
+        current = this
 
         // toolbar keys setup
         if (mToolbarMode == ToolbarMode.TOOLBAR_KEYS || mToolbarMode == ToolbarMode.EXPANDABLE) {
@@ -621,6 +625,14 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     companion object {
         @JvmField
         var DEBUG_SUGGESTIONS = false
+        private var current: SuggestionStripView? = null
+        private var toolbarVisibleAfterReload = false
+
+        /** Called before the theme reloads the input view, so the new strip can show the toolbar again if it was open. */
+        @JvmStatic
+        fun rememberToolbarForReload() {
+            toolbarVisibleAfterReload = current?.toolbarContainer?.isVisible == true
+        }
         private const val DEBUG_INFO_TEXT_SIZE_IN_DIP = 6.5f
         private val TAG = SuggestionStripView::class.java.simpleName
     }
