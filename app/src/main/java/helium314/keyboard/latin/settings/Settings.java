@@ -84,6 +84,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_BACKSPACE_REVERTS_AUTOCORRECT = "backspace_reverts_autocorrect";
     public static final String PREF_BACKSPACE_HOLD_DELETES_WORDS = "backspace_hold_deletes_words";
     public static final String PREF_BACKSPACE_DELETES_SWIPED_WORD = "backspace_deletes_swiped_word";
+    public static final String PREF_AUTOCORRECT_WITH_DIGITS = "autocorrect_with_digits";
     public static final String PREF_BACKSPACE_REPEAT_INTERVAL = "backspace_repeat_interval";
     public static final String PREF_BACKSPACE_SPEED_UP = "backspace_speed_up";
     public static final String PREF_BACKSPACE_SPEED_UP_AFTER = "backspace_speed_up_after";

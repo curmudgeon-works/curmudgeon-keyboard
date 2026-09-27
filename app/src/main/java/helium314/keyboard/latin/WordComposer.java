@@ -363,14 +363,6 @@ public final class WordComposer {
     }
 
     /**
-     * True when a digit in the word may well be a slip onto the number row: the row is shown, there is one
-     * digit, and at least two letters around it ("th3"). A number, "3rd" or "mp3" don't qualify.
-     */
-    public boolean digitMayBeMistap(final boolean numberRowShown) {
-        return numberRowShown && mDigitsCount == 1 && size() - 1 >= 2;
-    }
-
-    /**
      * Saves the caps mode at the start of composing.
      * <p>
      * WordComposer needs to know about the caps mode for several reasons. The first is, we need

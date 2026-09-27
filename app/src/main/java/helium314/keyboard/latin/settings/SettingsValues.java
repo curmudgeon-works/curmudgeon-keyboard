@@ -160,6 +160,7 @@ public class SettingsValues {
     public final boolean mBackspaceRevertsAutocorrect;
     public final boolean mBackspaceHoldDeletesWords;
     public final boolean mBackspaceDeletesSwipedWord;
+    public final boolean mAutoCorrectWithDigits;
     public final int mBackspaceRepeatInterval;
     public final boolean mBackspaceSpeedUp;
     public final int mBackspaceSpeedUpAfter;
@@ -236,6 +237,7 @@ public class SettingsValues {
         mBackspaceRevertsAutocorrect = prefs.getBoolean(Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT, Defaults.PREF_BACKSPACE_REVERTS_AUTOCORRECT);
         mBackspaceHoldDeletesWords = prefs.getBoolean(Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS, Defaults.PREF_BACKSPACE_HOLD_DELETES_WORDS);
         mBackspaceDeletesSwipedWord = prefs.getBoolean(Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD, Defaults.PREF_BACKSPACE_DELETES_SWIPED_WORD);
+        mAutoCorrectWithDigits = prefs.getBoolean(Settings.PREF_AUTOCORRECT_WITH_DIGITS, Defaults.PREF_AUTOCORRECT_WITH_DIGITS);
         mBackspaceRepeatInterval = prefs.getInt(Settings.PREF_BACKSPACE_REPEAT_INTERVAL, Defaults.PREF_BACKSPACE_REPEAT_INTERVAL);
         mBackspaceSpeedUp = prefs.getBoolean(Settings.PREF_BACKSPACE_SPEED_UP, Defaults.PREF_BACKSPACE_SPEED_UP);
         mBackspaceSpeedUpAfter = prefs.getInt(Settings.PREF_BACKSPACE_SPEED_UP_AFTER, Defaults.PREF_BACKSPACE_SPEED_UP_AFTER);

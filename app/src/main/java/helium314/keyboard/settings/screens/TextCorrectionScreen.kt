@@ -66,6 +66,7 @@ fun TextCorrectionScreen(
         Settings.PREF_AUTO_CORRECTION,
         if (autocorrectEnabled) Settings.PREF_MORE_AUTO_CORRECTION else null,
         if (autocorrectEnabled) Settings.PREF_AUTOCORRECT_SHORTCUTS else null,
+        if (autocorrectEnabled) Settings.PREF_AUTOCORRECT_WITH_DIGITS else null,
         if (autocorrectEnabled) Settings.PREF_AUTO_CORRECT_THRESHOLD else null,
         // (backspace reverts autocorrect: in the Backspace group of the Preferences screen)
         Settings.PREF_AUTO_CAP,
@@ -134,6 +135,11 @@ fun createCorrectionSettings(context: Context) = listOf(
         R.string.auto_correct_shortcuts, R.string.auto_correct_shortcuts_summary
     ) {
         SwitchPreference(it, Defaults.PREF_AUTOCORRECT_SHORTCUTS)
+    },
+    Setting(context, Settings.PREF_AUTOCORRECT_WITH_DIGITS,
+        R.string.autocorrect_with_digits, R.string.autocorrect_with_digits_summary
+    ) {
+        SwitchPreference(it, Defaults.PREF_AUTOCORRECT_WITH_DIGITS)
     },
     Setting(context, Settings.PREF_AUTO_CORRECT_THRESHOLD, R.string.auto_correction_confidence) {
         val items = listOf(

@@ -237,8 +237,8 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
             || !wordComposer.isComposingWord // If we don't have suggestion results, we can't evaluate the first suggestion
             // for auto-correction
             || suggestionResults.isEmpty() // If the word has digits, we never auto-correct because it's likely the word
-            // was type with a lot of care - unless the one digit looks like a slip from a letter onto the number row
-            || (wordComposer.hasDigits() && !wordComposer.digitMayBeMistap(Settings.getValues().mShowsNumberRow))
+            // was type with a lot of care - it is still suggested; the advanced switch allows the correction too
+            || (wordComposer.hasDigits() && !Settings.getValues().mAutoCorrectWithDigits)
             // If the word is mostly caps, we never auto-correct because this is almost
             // certainly intentional (and careful input)
             || wordComposer.isMostlyCaps // We never auto-correct when suggestions are resumed because it would be unexpected

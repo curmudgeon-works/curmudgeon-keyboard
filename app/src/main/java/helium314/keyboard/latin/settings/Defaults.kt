@@ -67,6 +67,7 @@ object Defaults {
     const val PREF_BACKSPACE_REVERTS_AUTOCORRECT = true
     const val PREF_BACKSPACE_HOLD_DELETES_WORDS = true // holding backspace deletes a word per repeat, not a character
     const val PREF_BACKSPACE_DELETES_SWIPED_WORD = true // a tap right after a swipe deletes the swiped word
+    const val PREF_AUTOCORRECT_WITH_DIGITS = false // a word with a digit is suggested, not replaced
     const val PREF_BACKSPACE_REPEAT_INTERVAL = 200 // ms between deletions while backspace is held
     const val PREF_BACKSPACE_SPEED_UP = false // held long enough, backspace ramps to the top speed
     const val PREF_BACKSPACE_SPEED_UP_AFTER = 2000 // ms of holding before the speed-up starts
