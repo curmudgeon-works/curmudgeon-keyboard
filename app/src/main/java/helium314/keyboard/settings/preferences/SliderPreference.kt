@@ -80,6 +80,7 @@ fun <T: Number> SliderPreference(
             live = live,
             applyOnRelease = applyOnRelease,
             onDefault = { prefs.edit { remove(key) }; onConfirmed(default) },
+            defaultValue = default.toFloat(),
             intermediateSteps = stepSize?.let {
                 // this is not nice, but slider wants it like this...
                 ((range.endInclusive - range.start) / it - 1).toInt()
