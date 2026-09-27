@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.dialogs
 
+import helium314.keyboard.settings.rememberPrefSnapshot
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -102,15 +103,12 @@ fun ColorThemePickerDialog(
     var showLoadDialog by remember { mutableStateOf(false) }
     val targetScreen = if (isNight) SettingsDestination.ColorsNight else SettingsDestination.Colors
     // a tap shows the colors on the live keyboard; OK keeps them, Cancel puts back what was set when the dialog opened
-    val initial = remember { if (prefs.contains(setting.key)) prefs.getString(setting.key, default) else null }
+    val snapshot = rememberPrefSnapshot(prefs, listOf(setting.key))
     var confirmed by remember { mutableStateOf(false) }
     val close = { confirmed = true; onDismissRequest() }
     ThreeButtonAlertDialog(
         onDismissRequest = {
-            if (!confirmed && prefs.getString(setting.key, default) != (initial ?: default)) {
-                prefs.edit { if (initial == null) remove(setting.key) else putString(setting.key, initial) }
-                KeyboardSwitcher.getInstance().setThemeNeedsReload()
-            }
+            if (!confirmed && snapshot.restore()) KeyboardSwitcher.getInstance().setThemeNeedsReload()
             onDismissRequest()
         },
         onConfirmed = { confirmed = true },

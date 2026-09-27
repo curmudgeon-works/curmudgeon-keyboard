@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.preferences
 
+import helium314.keyboard.settings.rememberPrefSnapshot
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -119,11 +120,11 @@ private fun KeyboardScaleDialog(
     val prefs = ctx.prefs()
     val done = remember { mutableMapOf<String, () -> Unit>() }
     // what the keys held when the dialog opened, so Cancel can put it back in live mode
-    val original = remember { allKeys.associateWith { if (prefs.contains(it)) prefs.getFloat(it, 0f) else null } }
+    val snapshot = rememberPrefSnapshot(prefs, allKeys)
     var confirmed by remember { mutableStateOf(false) }
     fun write(key: String, value: Float?) = prefs.edit { if (value == null) remove(key) else putFloat(key, value) }
     val dismiss = {
-        if (live && !confirmed) { original.forEach { (key, value) -> write(key, value) }; onDone() }
+        if (live && !confirmed && snapshot.restore()) onDone()
         onDismissRequest()
     }
 
