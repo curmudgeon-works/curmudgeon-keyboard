@@ -83,7 +83,8 @@ object SystemFeedback {
 /** [switch] with a tappable line below it when the user switches it on while Android keeps that feedback off.
  *  The line stays for this visit until switched off again or Android's setting is fixed (checked on every return). */
 @Composable
-fun SystemFeedbackNote(blocked: (Context) -> String?, open: (Context) -> Unit, switch: @Composable (onSwitched: (Boolean) -> Unit) -> Unit) {
+fun SystemFeedbackNote(blocked: (Context) -> String?, open: (Context) -> Unit,
+    switch: @Composable (onSwitched: (Boolean) -> Unit, blockedNow: Boolean) -> Unit) {
     val ctx = LocalContext.current
     var switchedOn by rememberSaveable { mutableStateOf(false) }
     var resumed by remember { mutableIntStateOf(0) }
@@ -94,9 +95,10 @@ fun SystemFeedbackNote(blocked: (Context) -> String?, open: (Context) -> Unit, s
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
     Column {
-        switch { switchedOn = it }
         // cheap reads, done on every recomposition; reading `resumed` recomposes when the screen comes back from Android's settings
-        val text = if (switchedOn && resumed >= 0) blocked(ctx) else null
+        val reason = if (resumed >= 0) blocked(ctx) else null
+        switch({ switchedOn = it }, reason != null)
+        val text = if (switchedOn) reason else null
         if (text != null)
             Text(
                 text = text, // each says what's off and what to turn on

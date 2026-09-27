@@ -69,7 +69,7 @@ fun PreferencesScreen(
     if ((b?.value ?: 0) < 0)
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
     // input and clipboard history; the additional keys are on each keyboard's Layout screen
-    val items = preferencesInputItems(prefs) + clipboardHistoryItems(prefs)
+    val items = preferencesInputItems(prefs, LocalContext.current) + clipboardHistoryItems(prefs)
     SearchSettingsScreen(
         onClickBack = onClickBack,
         title = stringResource(R.string.settings_screen_preferences),
@@ -81,8 +81,10 @@ fun PreferencesScreen(
 /** The input group, shown at the top of the Layout screen (the Preferences screen stays reachable through search);
  *  hints, the symbol map, the per-key popups (which replaced the popup order) and the TLD popups
  *  are on the Layout screen. */
-fun preferencesInputItems(prefs: SharedPreferences): List<Any?> =
-    listOf(
+fun preferencesInputItems(prefs: SharedPreferences, ctx: Context): List<Any?> {
+    // key sound and volume only while sound can actually play (see SystemFeedback)
+    val soundRows = prefs.getBoolean(Settings.PREF_SOUND_ON, Defaults.PREF_SOUND_ON) && SystemFeedback.soundBlocker(ctx) == null
+    return listOf(
         R.string.settings_category_input,
         Settings.PREF_POPUP_ON,
         if (AudioAndHapticFeedbackManager.getInstance().hasVibrator())
@@ -92,12 +94,11 @@ fun preferencesInputItems(prefs: SharedPreferences): List<Any?> =
         if (prefs.getBoolean(Settings.PREF_VIBRATE_ON, Defaults.PREF_VIBRATE_ON))
             Settings.PREF_VIBRATE_IN_DND_MODE else null,
         Settings.PREF_SOUND_ON,
-        if (prefs.getBoolean(Settings.PREF_SOUND_ON, Defaults.PREF_SOUND_ON))
-            Settings.PREF_KEYPRESS_SOUND else null,
-        if (prefs.getBoolean(Settings.PREF_SOUND_ON, Defaults.PREF_SOUND_ON))
-            Settings.PREF_KEYPRESS_SOUND_VOLUME else null,
+        if (soundRows) Settings.PREF_KEYPRESS_SOUND else null,
+        if (soundRows) Settings.PREF_KEYPRESS_SOUND_VOLUME else null,
         Settings.PREF_SAVE_SUBTYPE_PER_APP,
     )
+}
 
 /** Rows shown only while the switch above them is on; drawn indented under it. */
 val dependentInputItems = setOf(
@@ -180,7 +181,7 @@ fun createPreferencesSettings(context: Context) = listOf(
         SystemFeedbackNote(
             blocked = { ctx -> SystemFeedback.vibrationBlockers(ctx).firstOrNull()?.let { r -> ctx.getString(r) } },
             open = SystemFeedback::openVibrationSettings,
-        ) { onSwitched -> SwitchPreference(it, Defaults.PREF_VIBRATE_ON) { on -> onSwitched(on) } }
+        ) { onSwitched, _ -> SwitchPreference(it, Defaults.PREF_VIBRATE_ON) { on -> onSwitched(on) } }
     },
     Setting(context, Settings.PREF_VIBRATE_IN_DND_MODE, R.string.vibrate_in_dnd_mode) {
         SwitchPreference(it, Defaults.PREF_VIBRATE_IN_DND_MODE)
@@ -189,7 +190,11 @@ fun createPreferencesSettings(context: Context) = listOf(
         SystemFeedbackNote(
             blocked = { ctx -> SystemFeedback.soundBlocker(ctx)?.let { r -> ctx.getString(r) } },
             open = SystemFeedback::openSoundSettings,
-        ) { onSwitched -> SwitchPreference(it, Defaults.PREF_SOUND_ON) { on -> onSwitched(on) } }
+        ) { onSwitched, blockedNow ->
+            // Android keeps key sounds off: the switch stays as set, greyed (its sound and volume rows are hidden)
+            val on = LocalContext.current.prefs().getBoolean(Settings.PREF_SOUND_ON, Defaults.PREF_SOUND_ON)
+            SwitchPreference(it, Defaults.PREF_SOUND_ON, dimmed = on && blockedNow) { on -> onSwitched(on) }
+        }
     },
     Setting(context, Settings.PREF_SHOW_EMOJI_DESCRIPTIONS, R.string.show_emoji_descriptions) {
         SwitchPreferenceWithEmojiDictWarning(it, Defaults.PREF_SHOW_EMOJI_DESCRIPTIONS)

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.preferences
 
+import androidx.compose.ui.draw.alpha
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -30,6 +31,7 @@ fun SwitchPreference(
     default: Boolean,
     allowCheckedChange: (Boolean) -> Boolean = { true },
     inverted: Boolean = false, // the switch shows the opposite of the stored value ("Hide …" for a "show" preference)
+    dimmed: Boolean = false, // greyed while something outside the app keeps it from working; it still switches
     onCheckedChange: (Boolean) -> Unit = { }
 ) {
     SwitchPreference(
@@ -39,6 +41,7 @@ fun SwitchPreference(
         default = default,
         allowCheckedChange = allowCheckedChange,
         inverted = inverted,
+        dimmed = dimmed,
         onCheckedChange = onCheckedChange
     )
 }
@@ -52,6 +55,7 @@ fun SwitchPreference(
     description: String? = null,
     allowCheckedChange: (Boolean) -> Boolean = { true }, // true means ok, usually for showing some dialog
     inverted: Boolean = false,
+    dimmed: Boolean = false,
     onCheckedChange: (Boolean) -> Unit = { },
 ) {
     val ctx = LocalContext.current
@@ -78,6 +82,7 @@ fun SwitchPreference(
         Switch(
             checked = value,
             onCheckedChange = { switched(it) },
+            modifier = if (dimmed) Modifier.alpha(0.38f) else Modifier,
         )
     }
 }
