@@ -90,33 +90,23 @@ android {
             // the play flavor ships all bundled dictionaries, like upstream (~40 MB APK; en-US only was ~9 MB)
             variant.outputs.forEach { output ->
                 if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
-                    output.outputFileName = when (variant.flavorName) {
-                        "play" -> "Curmudgeon_Keyboard_${output.versionName.get()}-${variant.buildType}.apk"
-                        else -> "HeliBoard_Lab_${defaultConfig.versionName}-${variant.buildType}.apk"
-                    }
+                    output.outputFileName = "Curmudgeon_Keyboard_${output.versionName.get()}-${variant.buildType}.apk"
                 }
             }
         }
     }
 
-    // "play" is the app (phones, testers, Google Play); "lab" installs side by side ("HeliBoard Lab", labels
-    // overridden in src/lab/res) for swipe experiments before they reach play. Both swipe-decode with the in-tree
-    // :gesture decoder (docs/gesture-decoder-spec.md). Upstream's "normal" flavor (Google's closed swipe library,
-    // which can't ship) was removed in 0.1.004.
+    // "play" is the only flavor: the app for phones, testers and Google Play, swipe-decoding with the in-tree
+    // :gesture decoder (docs/gesture-decoder-spec.md). Upstream's "normal" (Google's closed swipe library, which
+    // can't ship) and our side-by-side "lab" were removed in 0.1.004; the debug build type installs side by side
+    // (app.curmudgeon.keyboard.debug) for experiments, with the Swipe Trainer under Debug settings.
     flavorDimensions += "distribution"
     productFlavors {
-        create("lab") {
-            dimension = "distribution"
-            isDefault = true
-            applicationIdSuffix = ".lab"
-            buildConfigField("boolean", "USE_OWN_GESTURE_DECODER", "true")
-        }
-        // "play" is the Google Play build of the Lab keyboard: own package name and label,
-        // own gesture decoder (Google's library can't ship on Play), en-US dictionary only.
-        // Build it with the nouserlib build type so the "load gesture library" setting is gone:
+        // Build releases with the nouserlib build type so the "load gesture library" setting is gone:
         //   ./gradlew :app:bundlePlayNouserlib
         create("play") {
             dimension = "distribution"
+            isDefault = true
             applicationId = "app.curmudgeon.keyboard"
             // versionName major.minor.build, build always 3 digits; versionCode = minor * 1000 + build (+ major * 100000)
             versionCode = 1004
