@@ -879,6 +879,10 @@ language, hence "No language". -->
     <!-- The label of the button that triggers the settings screen for the keyboard. -->
     <string name="setup_step3_action">Configure the keyboard</string>
     <!-- The label of the button that finishes the setup wizard. -->
+    <!-- welcome wizard, last step: the phone's languages without a dictionary (only English is built in) -->
+    <string name="setup_missing_dictionaries">These languages of your phone have no built-in dictionary. Download one, then import it:</string>
+    <string name="setup_dictionary_download">Download</string>
+    <string name="setup_dictionary_import">Import</string>
     <string name="setup_finish_action">Finished</string>
     <!-- Option to show setup wizard icon. Legacy setting only displayed for Android 9 and older. -->
     <string name="show_setup_wizard_icon">Show app icon</string>

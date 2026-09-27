@@ -173,6 +173,8 @@ fun WelcomeWizard(
                         painterResource(R.drawable.sym_keyboard_language_switch),
                         close
                     )
+                    // the phone's languages without a built-in dictionary can get theirs here
+                    MissingDictionariesPrompt(Modifier.padding(top = 8.dp))
                     Spacer(Modifier.height(4.dp))
                     Row(
                         Modifier.clickable { finish() }
