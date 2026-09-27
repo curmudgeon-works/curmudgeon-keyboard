@@ -5,6 +5,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
@@ -19,11 +20,20 @@ fun <T: Any> ListPreference(
     setting: Setting,
     items: List<Pair<String, T>>,
     default: T,
+    live: Boolean = false, // a tap applies the value at once (the live keyboard shows it); OK keeps it, Cancel puts the old one back
     onChanged: (T) -> Unit = { }
 ) {
     var showDialog by rememberSaveable { mutableStateOf(false) }
     val prefs = LocalContext.current.prefs()
     val selected = items.firstOrNull { it.second == getPrefOfType(prefs, setting.key, default) }
+    // what was set when the dialog opened, for Cancel in live mode (unset stays unset)
+    val initial = remember(showDialog) { if (prefs.contains(setting.key)) getPrefOfType(prefs, setting.key, default) else null }
+    var confirmed by remember(showDialog) { mutableStateOf(false) }
+    fun apply(value: T) {
+        if (value == getPrefOfType(prefs, setting.key, default)) return
+        putPrefOfType(prefs, setting.key, value)
+        onChanged(value)
+    }
     Preference(
         name = setting.title,
         description = selected?.first,
@@ -31,13 +41,17 @@ fun <T: Any> ListPreference(
     )
     if (showDialog) {
         ListPickerDialog(
-            onDismissRequest = { showDialog = false },
-            items = items,
-            onItemSelected = {
-                if (it == selected) return@ListPickerDialog
-                putPrefOfType(prefs, setting.key, it.second)
-                onChanged(it.second)
+            onDismissRequest = {
+                if (live && !confirmed) {
+                    if (initial == null) { if (prefs.contains(setting.key)) { prefs.edit { remove(setting.key) }; onChanged(default) } }
+                    else apply(initial)
+                }
+                showDialog = false
             },
+            items = items,
+            confirmImmediately = !live,
+            onItemHighlighted = if (live) { { apply(it.second) } } else null,
+            onItemSelected = { confirmed = true; apply(it.second) },
             selectedItem = selected,
             title = { Text(setting.title) },
             getItemName = { it.first }

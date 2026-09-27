@@ -198,7 +198,8 @@ fun createAppearanceSettings(context: Context) = listOf(
         ListPreference(
             setting,
             items,
-            Defaults.PREF_ICON_STYLE
+            Defaults.PREF_ICON_STYLE,
+            live = true,
         ) {
             if (it != KeyboardTheme.STYLE_HOLO) {
                 if (prefs.getString(Settings.PREF_THEME_COLORS, Defaults.PREF_THEME_COLORS) == KeyboardTheme.THEME_HOLO_WHITE)
@@ -216,7 +217,8 @@ fun createAppearanceSettings(context: Context) = listOf(
         ListPreference(
             setting,
             items,
-            Defaults.PREF_ICON_STYLE
+            Defaults.PREF_ICON_STYLE,
+            live = true,
         ) {
             KeyboardIconsSet.needsReload = true // only relevant for Settings.PREF_CUSTOM_ICON_NAMES
             KeyboardSwitcher.getInstance().setThemeNeedsReload()
@@ -422,7 +424,7 @@ fun createAppearanceSettings(context: Context) = listOf(
             "\uD83C\uDFFE" to "\uD83C\uDFFE",
             "\uD83C\uDFFF" to "\uD83C\uDFFF"
         )
-        ListPreference(setting, items, Defaults.PREF_EMOJI_SKIN_TONE) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+        ListPreference(setting, items, Defaults.PREF_EMOJI_SKIN_TONE, live = true) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
     Setting(context, Settings.PREF_SUGGESTION_TEXT_SIZE, R.string.pref_suggestion_text_size) { setting ->
         SliderPreference(
@@ -480,7 +482,7 @@ fun createAppearanceSettings(context: Context) = listOf(
             stringResource(R.string.pref_toolbar_expand_icon_settings) to "settings",
             stringResource(R.string.pref_toolbar_expand_icon_none) to "none",
         )
-        ListPreference(setting, items, Defaults.PREF_TOOLBAR_EXPAND_ICON) {
+        ListPreference(setting, items, Defaults.PREF_TOOLBAR_EXPAND_ICON, live = true) {
             KeyboardSwitcher.getInstance().setThemeNeedsReload()
         }
     },
