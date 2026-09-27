@@ -42,8 +42,8 @@ fun DebugScreen(
         DebugSettings.PREF_SHOW_SUGGESTION_INFOS,
         DebugSettings.PREF_FORCE_NON_DISTINCT_MULTITOUCH,
         DebugSettings.PREF_SLIDING_KEY_INPUT_PREVIEW,
-        if (BuildConfig.USE_OWN_GESTURE_DECODER) DebugSettings.PREF_GESTURE_DECODER_SCORER else null,
-        if (BuildConfig.USE_OWN_GESTURE_DECODER) DebugSettings.PREF_KEY_SWIPE_TRAINER else null,
+        DebugSettings.PREF_GESTURE_DECODER_SCORER,
+        DebugSettings.PREF_KEY_SWIPE_TRAINER,
         R.string.prefs_dump_dynamic_dicts
     ) + DictionaryFacilitator.DYNAMIC_DICTIONARY_TYPES.map { DebugSettings.PREF_KEY_DUMP_DICT_PREFIX + it }
     SearchSettingsScreen(

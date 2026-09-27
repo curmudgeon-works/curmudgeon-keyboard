@@ -5,7 +5,6 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import androidx.core.database.sqlite.transaction
-import helium314.keyboard.latin.utils.GestureDataDao
 import helium314.keyboard.latin.utils.Log
 import java.io.File
 
@@ -16,9 +15,8 @@ class Database private constructor(context: Context, name: String = NAME) : SQLi
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (oldVersion <= 1) {
-            db.execSQL(GestureDataDao.CREATE_TABLE)
-        }
+        // version 2 added upstream's gesture data table (its data gathering study, removed in 0.1.004):
+        // no longer created; an existing one stays unused
     }
 
     companion object {

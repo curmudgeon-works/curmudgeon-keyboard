@@ -27,7 +27,7 @@ object KeyboardProfiles {
     /** Keys that are never per keyboard: the keyboards themselves, app-level state, data. */
     private val globalKeys = setOf(
         Settings.PREF_ENABLED_SUBTYPES, Settings.PREF_ADDITIONAL_SUBTYPES, Settings.PREF_SELECTED_SUBTYPE,
-        Settings.PREF_ADVANCED_SETTINGS, Settings.PREF_VERSION_CODE, Settings.PREF_LIBRARY_CHECKSUM,
+        Settings.PREF_ADVANCED_SETTINGS, Settings.PREF_VERSION_CODE,
         Settings.PREF_SHOW_SETUP_WIZARD_ICON, Settings.PREF_ENABLE_CLIPBOARD_HISTORY,
         Settings.PREF_CLIPBOARD_HISTORY_SIZE, Settings.PREF_CLIPBOARD_HISTORY_PINNED_FIRST,
         PREF_SEPARATE, PREF_IDS, PREF_NEXT_ID,

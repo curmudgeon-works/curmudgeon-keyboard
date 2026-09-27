@@ -403,8 +403,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         repeat(extraUses) {
             UserHistoryDictionary.addToDictionary(userHistoryDictionary, NgramContext.EMPTY_PREV_WORDS_INFO, wordToUse, isValid, timeStampInSeconds)
         }
-        if (BuildConfig.USE_OWN_GESTURE_DECODER)
-            GestureDecoderVocabulary.onWordLearned(userHistoryDictionary.mContext, dictionaryGroup.locale, wordToUse)
+        GestureDecoderVocabulary.onWordLearned(userHistoryDictionary.mContext, dictionaryGroup.locale, wordToUse)
     }
 
     private fun addToPersonalDictionaryIfInvalidButInHistory(word: String) {

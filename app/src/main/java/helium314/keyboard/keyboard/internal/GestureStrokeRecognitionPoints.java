@@ -75,9 +75,7 @@ public final class GestureStrokeRecognitionPoints {
     // TODO: Make this package private
     public void setKeyboardGeometry(final int keyWidth, final int keyboardHeight) {
         mKeyWidth = keyWidth;
-        final float extraAreaAboveKeyboardRatio = helium314.keyboard.latin.BuildConfig.USE_OWN_GESTURE_DECODER
-                ? EXTRA_GESTURE_AREA_ABOVE_KEYBOARD_RATIO_OWN_DECODER
-                : EXTRA_GESTURE_TRAIL_AREA_ABOVE_KEYBOARD_RATIO;
+        final float extraAreaAboveKeyboardRatio = EXTRA_GESTURE_AREA_ABOVE_KEYBOARD_RATIO_OWN_DECODER;
         mMinYCoordinate = -(int)(keyboardHeight * extraAreaAboveKeyboardRatio);
         mMaxYCoordinate = keyboardHeight;
         // TODO: Find an appropriate base metric for these length. Maybe diagonal length of the key?
