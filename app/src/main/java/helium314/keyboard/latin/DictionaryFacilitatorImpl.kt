@@ -537,11 +537,9 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         proximityInfoHandle: Long, weightOfLangModelVsSpatialModel: FloatArray, dictGroup: DictionaryGroup
     ): List<SuggestedWordInfo> {
         val suggestions = ArrayList<SuggestedWordInfo>()
-        val prefs = Settings.getCurrentContext()?.prefs()
-        // the user's fixed priority for the language, on top of the automatic confidence
-        val groupWeight = dictGroup.getWeightForLocale(dictionaryGroups, composedData.mIsBatchMode) *
-                (prefs?.let { LanguagePriority.factor(it, dictGroup.locale) } ?: 1f)
-        val historyShared = prefs?.let { LanguagePriority.sharesUserHistory(it, dictGroup.locale) } ?: false
+        // the user's fixed priority for the language, on top of the automatic confidence (cached, see LanguagePriority)
+        val (priorityFactor, historyShared) = LanguagePriority.forSuggestions(dictGroup.locale) { Settings.getCurrentContext()?.prefs() }
+        val groupWeight = dictGroup.getWeightForLocale(dictionaryGroups, composedData.mIsBatchMode) * priorityFactor
         for (dictType in DictionaryFacilitator.ALL_DICTIONARY_TYPES) {
             val dictionary = dictGroup.getDict(dictType) ?: continue
             // words learned in a language that shares them count like the highest priority language

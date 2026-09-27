@@ -59,6 +59,18 @@ object LanguagePriority {
     fun markAdded(prefs: SharedPreferences, locale: Locale) =
         prefs.edit().putLong(PREF_ADDED_PREFIX + locale.toLanguageTag(), System.currentTimeMillis()).apply()
 
+    // what suggestions need per language (score factor, share switch), read once instead of on every request;
+    // emptied whenever a language key changes (Settings.onSharedPreferenceChanged), so changes apply at once
+    private val cache = java.util.concurrent.ConcurrentHashMap<String, Pair<Float, Boolean>>()
+
+    /** The language's score factor and share switch, from the cache ([prefs] is only asked on a miss). */
+    fun forSuggestions(locale: Locale, prefs: () -> SharedPreferences?): Pair<Float, Boolean> =
+        cache[locale.toLanguageTag()] ?: prefs()?.let { p ->
+            (factor(p, locale) to sharesUserHistory(p, locale)).also { cache[locale.toLanguageTag()] = it }
+        } ?: (1f to false)
+
+    fun clearCache() = cache.clear()
+
     /** Short label for settings rows. */
     fun label(priority: Int): String = when (priority) {
         LOW -> "L"
