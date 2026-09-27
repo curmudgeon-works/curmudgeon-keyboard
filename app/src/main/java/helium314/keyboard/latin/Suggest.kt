@@ -306,20 +306,14 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
         settingsValuesForSuggestion: SettingsValuesForSuggestion,
         inputStyle: Int, sequenceNumber: Int
     ): SuggestedWords {
-        // lab flavor: swipe decoding via the in-tree decoder instead of the proprietary lib
-        // (constant-false flag in the normal flavor, so R8 keeps the native path only)
-        val suggestionResults = if (BuildConfig.USE_OWN_GESTURE_DECODER)
-            OwnGestureDecoder.getSuggestionResults(wordComposer.composedDataSnapshot, keyboard,
-                mDictionaryFacilitator.locales, Settings.getValues().mGestureDecoderScorer,
-                Settings.getValues().mGestureCapsHeight)
-        else mDictionaryFacilitator.getSuggestionResults(
-            wordComposer.composedDataSnapshot, ngramContext, keyboard,
-            settingsValuesForSuggestion, SESSION_ID_GESTURE, inputStyle
-        )
+        // swipes are decoded by the in-tree decoder (the :gesture module)
+        val suggestionResults = OwnGestureDecoder.getSuggestionResults(wordComposer.composedDataSnapshot, keyboard,
+            mDictionaryFacilitator.locales, Settings.getValues().mGestureDecoderScorer,
+            Settings.getValues().mGestureCapsHeight)
         if (inputStyle == SuggestedWords.INPUT_STYLE_TAIL_BATCH && GestureCorpusRecorder.isEnabled())
             GestureCorpusRecorder.onSwipe(wordComposer.composedDataSnapshot, keyboard, suggestionResults,
                 mDictionaryFacilitator.mainLocale.toLanguageTag())
-        if (inputStyle == SuggestedWords.INPUT_STYLE_TAIL_BATCH && BuildConfig.USE_OWN_GESTURE_DECODER && suggestionResults.isNotEmpty())
+        if (inputStyle == SuggestedWords.INPUT_STYLE_TAIL_BATCH && suggestionResults.isNotEmpty())
             GestureStats.onSwipe(OwnGestureDecoder.currentTuning.key)
 
         // For transforming words that don't come from a dictionary, because it's our best bet

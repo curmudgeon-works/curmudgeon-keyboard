@@ -98,8 +98,8 @@ android {
 
     // "play" is the only flavor: the app for phones, testers and Google Play, swipe-decoding with the in-tree
     // :gesture decoder (docs/gesture-decoder-spec.md). Upstream's "normal" (Google's closed swipe library, which
-    // can't ship) and our side-by-side "lab" were removed in 0.1.004; the debug build type installs side by side
-    // (app.curmudgeon.keyboard.debug) for experiments, with the Swipe Trainer under Debug settings.
+    // can't ship) and our side-by-side "lab" were removed in 0.1.004. One app on the phones: the debug build type
+    // is compiled by CI but not installed; the Swipe Trainer is under Debug settings.
     flavorDimensions += "distribution"
     productFlavors {
         // Build releases with the nouserlib build type so the "load gesture library" setting is gone:
@@ -111,7 +111,6 @@ android {
             // versionName major.minor.build, build always 3 digits; versionCode = minor * 1000 + build (+ major * 100000)
             versionCode = 1004
             versionName = "0.1.004"
-            buildConfigField("boolean", "USE_OWN_GESTURE_DECODER", "true")
             if (playKeyProps.isNotEmpty()) signingConfig = signingConfigs.getByName("play")
         }
     }

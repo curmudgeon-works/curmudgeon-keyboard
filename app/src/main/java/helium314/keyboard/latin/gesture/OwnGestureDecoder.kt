@@ -32,8 +32,7 @@ import java.util.Locale
 
 /**
  * Bridge between HeliBoard's batch-input pipeline and the in-tree gesture decoder
- * (:gesture module). Only reachable when BuildConfig.USE_OWN_GESTURE_DECODER (lab
- * flavor); in the normal flavor every call site is behind the constant-false flag.
+ * (:gesture module), which decodes every swipe.
  *
  * Runs on the InputLogicHandler non-UI thread (same thread the native decoder is
  * queried on), so no extra threading is needed — but decode latency is logged so

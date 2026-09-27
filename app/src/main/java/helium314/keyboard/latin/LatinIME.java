@@ -70,8 +70,6 @@ import helium314.keyboard.latin.suggestions.SuggestionStripViewAccessor;
 import helium314.keyboard.latin.touchinputconsumer.GestureConsumer;
 import helium314.keyboard.latin.utils.ColorUtilKt;
 import helium314.keyboard.latin.utils.FoldableUtils;
-import helium314.keyboard.latin.utils.GestureDataGatheringKt;
-import helium314.keyboard.latin.utils.GestureDataGatheringSettings;
 import helium314.keyboard.latin.utils.InlineAutofillUtils;
 import helium314.keyboard.latin.utils.ClipboardDialogsKt;
 import helium314.keyboard.latin.utils.InputMethodPickerKt;
@@ -129,9 +127,7 @@ public class LatinIME extends InputMethodService implements
 
     // UIHandler is needed when creating InputLogic
     public final UIHandler mHandler = new UIHandler(this);
-    private DictionaryFacilitator mDictionaryFacilitator = // non-final for active gesture data gathering, revert when data gathering phase is done (end of 2026 latest)
-            DictionaryFacilitatorProvider.getDictionaryFacilitator(false);
-    private final DictionaryFacilitator mOriginalDictionaryFacilitator = mDictionaryFacilitator;
+    private final DictionaryFacilitator mDictionaryFacilitator = DictionaryFacilitatorProvider.getDictionaryFacilitator(false);
     final InputLogic mInputLogic = new InputLogic(this, this, mDictionaryFacilitator);
 
     // TODO: Move these {@link View}s to {@link KeyboardSwitcher}.
@@ -678,11 +674,9 @@ public class LatinIME extends InputMethodService implements
         mDictionaryFacilitator.resetDictionaries(this, mDictionaryFacilitator.getMainLocale(),
                 settingsValues.mUseContactsDictionary, settingsValues.mUseAppsDictionary,
                 settingsValues.mUsePersonalizedDicts, true, "", this);
-        if (BuildConfig.USE_OWN_GESTURE_DECODER) {
-            // dictionaries changed: reload the gesture decoder's vocabulary (memory only —
-            // the disk cache self-detects a changed main dict and keeps serving meanwhile)
-            helium314.keyboard.latin.gesture.GestureDecoderVocabulary.INSTANCE.clear();
-        }
+        // dictionaries changed: reload the gesture decoder's vocabulary (memory only —
+        // the disk cache self-detects a changed main dict and keeps serving meanwhile)
+        helium314.keyboard.latin.gesture.GestureDecoderVocabulary.INSTANCE.clear();
         mKeyboardSwitcher.setThemeNeedsReload(); // necessary for emoji search
         EmojiPalettesView.closeDictionaryFacilitator();
         EmojiSearchActivity.Companion.closeDictionaryFacilitator();
@@ -854,17 +848,13 @@ public class LatinIME extends InputMethodService implements
     void onStartInputViewInternal(final EditorInfo editorInfo, final boolean restarting) {
         super.onStartInputView(editorInfo, restarting);
 
-        setGestureDataGatheringMode(editorInfo);
-
         mDictionaryFacilitator.onStartInput();
-        if (BuildConfig.USE_OWN_GESTURE_DECODER) {
-            // warm the gesture vocabulary when the keyboard opens instead of on the first
-            // swipe, so the disk-cache load (or the one-time build) overlaps with typing
-            final SettingsValues sv = mSettings.getCurrent();
-            final Locale mainLocale = mDictionaryFacilitator.getMainLocale();
-            if (sv != null && sv.mGestureInputEnabled && mainLocale != null) {
-                helium314.keyboard.latin.gesture.GestureDecoderVocabulary.INSTANCE.getOrBuildAsync(mainLocale);
-            }
+        // warm the gesture vocabulary when the keyboard opens instead of on the first
+        // swipe, so the disk-cache load (or the one-time build) overlaps with typing
+        final SettingsValues sv = mSettings.getCurrent();
+        final Locale mainLocale = mDictionaryFacilitator.getMainLocale();
+        if (sv != null && sv.mGestureInputEnabled && mainLocale != null) {
+            helium314.keyboard.latin.gesture.GestureDecoderVocabulary.INSTANCE.getOrBuildAsync(mainLocale);
         }
         // Switch to the null consumer to handle cases leading to early exit below, for which we
         // also wouldn't be consuming gesture data.
@@ -1864,16 +1854,5 @@ public class LatinIME extends InputMethodService implements
             }
             // deallocateMemory always called on hiding, and should not be called when showing
         }
-    }
-
-    private void setGestureDataGatheringMode(EditorInfo editorInfo) {
-        // only for active gesture data gathering, remove when data gathering phase is done (end of 2026 latest)
-        if (GestureDataGatheringSettings.INSTANCE.isInActiveGatheringMode(editorInfo)) {
-            mDictionaryFacilitator = GestureDataGatheringKt.getGestureDataActiveFacilitator();
-        } else {
-            mDictionaryFacilitator = mOriginalDictionaryFacilitator;
-        }
-        GestureDataGatheringSettings.INSTANCE.showEndNotificationIfNecessary(this); // will do nothing for a long time
-        mInputLogic.setFacilitator(mDictionaryFacilitator);
     }
 }

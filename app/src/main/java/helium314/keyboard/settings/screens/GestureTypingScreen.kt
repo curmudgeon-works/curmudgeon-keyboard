@@ -28,23 +28,7 @@ import helium314.keyboard.settings.initPreview
 import helium314.keyboard.latin.utils.previewDark
 import androidx.core.content.edit
 
-@Composable
-fun GestureTypingScreen(
-    onClickBack: () -> Unit,
-) {
-    val prefs = LocalContext.current.prefs()
-    val b = (LocalContext.current.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
-    if ((b?.value ?: 0) < 0)
-        Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
-    SearchSettingsScreen(
-        onClickBack = onClickBack,
-        title = stringResource(R.string.settings_screen_gesture),
-        settings = gestureTypingItems(prefs),
-        simpleModeKeys = gestureTypingSimpleModeKeys,
-    )
-}
-
-/** The gesture typing items; with the own decoder they are on the Swiping screen instead of their own. */
+/** The gesture typing items, shown on the Swiping screen. */
 fun gestureTypingItems(prefs: SharedPreferences): List<String?> {
     val gestureFloatingPreviewEnabled = prefs.getBoolean(Settings.PREF_GESTURE_FLOATING_PREVIEW_TEXT, Defaults.PREF_GESTURE_FLOATING_PREVIEW_TEXT)
     val gestureEnabled = prefs.getBoolean(Settings.PREF_GESTURE_INPUT, Defaults.PREF_GESTURE_INPUT)
@@ -56,9 +40,6 @@ fun gestureTypingItems(prefs: SharedPreferences): List<String?> {
             Settings.PREF_GESTURE_FLOATING_PREVIEW_TEXT else null,
         if (gestureEnabled && gestureFloatingPreviewEnabled)
             Settings.PREF_GESTURE_FLOATING_PREVIEW_DYNAMIC else null,
-        // phrase gesture is a feature of the native gesture library, the own decoder ignores it
-        if (gestureEnabled && !BuildConfig.USE_OWN_GESTURE_DECODER)
-            Settings.PREF_GESTURE_SPACE_AWARE else null,
         // the own decoder's swipe-up capitals and apostrophe are on the keyboard's Swipe screen
         if (gestureEnabled)
             Settings.PREF_GESTURE_FAST_TYPING_COOLDOWN else null,
@@ -141,15 +122,3 @@ fun createGestureTypingSettings(context: Context) = listOf(
         ) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
 )
-
-@Preview
-@Composable
-private fun Preview() {
-    JniUtils.sHaveGestureLib = true
-    initPreview(LocalContext.current)
-    Theme(previewDark) {
-        Surface {
-            GestureTypingScreen { }
-        }
-    }
-}
