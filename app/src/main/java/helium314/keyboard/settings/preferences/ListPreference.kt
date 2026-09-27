@@ -21,6 +21,7 @@ fun <T: Any> ListPreference(
     items: List<Pair<String, T>>,
     default: T,
     live: Boolean = false, // a tap applies the value at once (the live keyboard shows it); OK keeps it, Cancel puts the old one back
+    itemTrailing: (@Composable (Pair<String, T>) -> Unit)? = null, // shown at the end of each row, e.g. a preview of the choice
     onChanged: (T) -> Unit = { }
 ) {
     var showDialog by rememberSaveable { mutableStateOf(false) }
@@ -54,7 +55,8 @@ fun <T: Any> ListPreference(
             onItemSelected = { confirmed = true; apply(it.second) },
             selectedItem = selected,
             title = { Text(setting.title) },
-            getItemName = { it.first }
+            getItemName = { it.first },
+            trailing = itemTrailing,
         )
     }
 }
