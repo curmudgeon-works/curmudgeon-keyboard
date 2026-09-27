@@ -46,6 +46,7 @@ fun <T: Any> ListPickerDialog(
     footer: (@Composable () -> Unit)? = null,
     /** Without [confirmImmediately]: called on every tap, so the choice can show before OK. */
     onItemHighlighted: ((T) -> Unit)? = null,
+    summonKeyboard: Boolean = true, // see ThreeButtonAlertDialog
 ) {
     var selected by remember { mutableStateOf(selectedItem) }
     val state = rememberLazyListState()
@@ -57,6 +58,7 @@ fun <T: Any> ListPickerDialog(
     ThreeButtonAlertDialog(
         onDismissRequest = onDismissRequest,
         onConfirmed = { selected?.let { onItemSelected(it) } },
+        summonKeyboard = summonKeyboard,
         confirmButtonText = if (confirmImmediately) null else stringResource(android.R.string.ok),
         checkOk = { selected != null },
         modifier = modifier,

@@ -770,6 +770,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
      *  If the keyboard is currently showing, theme will be reloaded immediately. */
     public void setThemeNeedsReload() {
         mThemeNeedsReload = true;
+        SuggestionStripView.rememberToolbarForReload();
         if (mLatinIME == null || !mLatinIME.isInputViewShown())
             return; // will be reloaded right before showing IME
 
