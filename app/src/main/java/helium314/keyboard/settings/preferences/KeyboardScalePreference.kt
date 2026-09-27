@@ -56,6 +56,8 @@ fun KeyboardScalePreference(
     range:  ClosedFloatingPointRange<Float>,
     description: (Float) -> String,
     live: Boolean = false, // values are written while dragging (the live keyboard shows them); Cancel puts the old ones back
+    alwaysShown: Set<String> = emptySet(), // dimensions without a checkbox: their sliders are always there
+    baseVariantName: String? = null, // the name of the plain slider (the one without any dimension); "Default" if null
     onDone: () -> Unit
 ) {
     if (defaults.size != 1.shl(dimensions.size))
@@ -77,6 +79,8 @@ fun KeyboardScalePreference(
             dimensions = dimensions,
             positionString = description,
             live = live,
+            alwaysShown = alwaysShown,
+            baseVariantName = baseVariantName,
         )
 }
 
@@ -93,11 +97,13 @@ private fun KeyboardScaleDialog(
     modifier: Modifier = Modifier,
     positionString: (Float) -> String,
     live: Boolean = false,
+    alwaysShown: Set<String> = emptySet(),
+    baseVariantName: String? = null,
 ) {
     val (variants, keys) = createVariantsAndKeys(dimensions, baseKey)
     val foldedString = stringResource(R.string.folded) // we want to hide foldable settings for non-foldable phones
     val ctx = LocalContext.current
-    var checked by remember { mutableStateOf(dimensions.map { FoldableUtils.isFoldable || !it.contains(foldedString) }) }
+    var checked by remember { mutableStateOf(dimensions.map { it in alwaysShown || FoldableUtils.isFoldable || !it.contains(foldedString) }) }
     val prefs = ctx.prefs()
     val done = remember { mutableMapOf<String, () -> Unit>() }
     // what the keys held when the dialog opened, so Cancel can put it back in live mode
@@ -123,8 +129,8 @@ private fun KeyboardScaleDialog(
                 Column(Modifier.verticalScroll(state)) {
                     if (dimensions.size > 1) {
                         dimensions.forEachIndexed { i, dimension ->
-                            // hide "folded" box for non-foldables
-                            if (FoldableUtils.isFoldable || !dimension.contains(foldedString))
+                            // hide "folded" box for non-foldables, and no box for a dimension that is always shown
+                            if (dimension !in alwaysShown && (FoldableUtils.isFoldable || !dimension.contains(foldedString)))
                                 DimensionCheckbox(checked[i], dimension) {
                                     checked = checked.mapIndexed { j, c -> if (i == j) it else c }
                                 }
@@ -150,7 +156,7 @@ private fun KeyboardScaleDialog(
                         val visible = variant.split(SPLIT).none { it in forbiddenDimensions }
                         // default animations make the dialog flash (see also DictionaryDialog)
                         AnimatedVisibility(visible, exit = fadeOut(), enter = fadeIn()) {
-                            WithSmallTitle(variant.ifEmpty { stringResource(R.string.button_default) }) {
+                            WithSmallTitle(variant.ifEmpty { baseVariantName ?: stringResource(R.string.button_default) }) {
                                 Slider(
                                     value = sliderPosition,
                                     onValueChange = { sliderPosition = it; touched = true },

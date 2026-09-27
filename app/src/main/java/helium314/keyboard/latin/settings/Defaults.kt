@@ -172,7 +172,7 @@ object Defaults {
     // letter followed by its popup symbols, entries separated by whitespace; only used when the number row is on
     const val PREF_SYMBOL_POPUP_MAP = "q~` w× e÷ r{ t} y[ u] i| o_ p- a@ s+ d—– f… g: h; j' k\" l/ z= x\\ c< v> b, n! m?"
     const val PREF_RECORD_GESTURE_CORPUS = false
-    const val PREF_MORE_POPUP_KEYS = "main"
+    const val PREF_MORE_POPUP_KEYS = "all" // matches the Standard popup preset (upstream: "main")
     const val PREF_SPACE_TO_CHANGE_LANG = true
     const val PREF_LANGUAGE_SWIPE_DISTANCE = 5
     const val PREF_TOUCHPAD_SENSITIVITY = 50

@@ -237,7 +237,7 @@ fun SubtypeScreen(
                 // ---- the layout: first the layout and its popups, then the other layouts, the five key switches last
                 WithBigTitle(stringResource(R.string.keyboard_layout_set)) {
                     MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) }
-                    // customize popups, customize keys and popups with JSON (both advanced), preset popup layouts
+                    // preset popup layouts, customize popups, customize keys and popups with JSON (all advanced)
                     KeyPopupsSection(currentSubtype) { setCurrentSubtype(it) }
                     // the other layouts, only when there is a choice (custom layout files; Bengali has khipro)
                     val tabletOnly = currentSubtype.locale.script() != ScriptUtils.SCRIPT_BENGALI && LayoutUtilsCustom.getLayoutFiles(LayoutType.FUNCTIONAL, ctx).isEmpty()

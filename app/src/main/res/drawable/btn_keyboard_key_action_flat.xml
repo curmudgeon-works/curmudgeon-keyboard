@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    SPDX-License-Identifier: GPL-3.0-only
+    The action (enter / send) key without key borders: a plain fill of the whole key, like the other keys,
+    instead of the 35 dp circle of the borderless styles. Colored by the theme's action key state list.
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true" android:drawable="@color/key_background_lxx_base" />
+    <item android:drawable="@color/key_background_lxx_base" />
+</selector>

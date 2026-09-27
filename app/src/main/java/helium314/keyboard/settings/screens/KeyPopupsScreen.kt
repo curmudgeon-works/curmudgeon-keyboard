@@ -123,7 +123,8 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
         var pendingChange: Pair<String, List<String>?>? by remember { mutableStateOf(null) }
         var showSaveAsDialog by remember { mutableStateOf(false) }
         val presets = listOf(
-            Preset(R.string.key_popups_preset_standard, POPUP_KEYS_NORMAL, null, symbolMap = Defaults.PREF_SYMBOL_POPUP_MAP),
+            // the Curmudgeon default: every variant a key has, plus the symbol map (Rahul 2026-09-26: "a lot richer")
+            Preset(R.string.key_popups_preset_standard, POPUP_KEYS_ALL, null, symbolMap = Defaults.PREF_SYMBOL_POPUP_MAP),
             Preset(R.string.key_popups_preset_heliboard, POPUP_KEYS_NORMAL, null, symbolMap = ""),
             Preset(R.string.key_popups_preset_main, POPUP_KEYS_MAIN, null),
             Preset(R.string.key_popups_preset_more, POPUP_KEYS_MORE, null),
@@ -232,11 +233,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
         // the deep customization, advanced only: every key's popups (a tab per key group), the keys and popups as JSON
         val advanced by SettingsMode.state(ctx)
         if (advanced) AdvancedBlock {
-            NavRow(stringResource(R.string.key_popups_full), stringResource(R.string.key_popups_full_summary)) {
-                SettingsDestination.navigateTo(SettingsDestination.CustomizePopups + keyboard.toPref())
-            }
-            LayoutFilesRow()
-            // the preset layouts under the full customization, with saving the current one
+            // the preset layouts first (with saving the current one), then the full customization under them
             Row(verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth().clickable { showAccentsDialog = true }.heightIn(min = ROW_HEIGHT).padding(vertical = 4.dp).padding(start = 10.dp)) {
                 Column(Modifier.weight(1f)) {
@@ -246,6 +243,10 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                 }
                 NextScreenIcon()
             }
+            NavRow(stringResource(R.string.key_popups_full), stringResource(R.string.key_popups_full_summary)) {
+                SettingsDestination.navigateTo(SettingsDestination.CustomizePopups + keyboard.toPref())
+            }
+            LayoutFilesRow()
         }
         // own sets are saved (last entry), renamed (pencil) and deleted (trash icon) in the preset list
     }
