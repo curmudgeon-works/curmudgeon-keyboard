@@ -185,6 +185,34 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                 Log.e(TAG, "even fallback to defaults failed: " + e2.mKeyboardId, e2.getCause());
             }
         }
+        applyPendingPanel();
+    }
+
+    // a panel the settings' try-it bar asked for: the keyboard opens on it when it starts (no letters first)
+    private static int sPendingPanel = 0; // 1 emoji, 2 clipboard, 3 emoji on the people page
+    private static long sPendingPanelTime = 0;
+
+    /** The next keyboard start (within a second) opens the emoji ([emoji] true) or clipboard panel; also switches now if up. */
+    public void openPanelOnStart(final boolean emoji) { openPanelOnStart(emoji, false); }
+
+    /** As above; [people] opens the emoji panel on its people page (a skin tone preview). */
+    public void openPanelOnStart(final boolean emoji, final boolean people) {
+        sPendingPanel = emoji ? (people ? 3 : 1) : 2;
+        sPendingPanelTime = android.os.SystemClock.uptimeMillis();
+        if (getKeyboardSwitchState() != KeyboardSwitchState.HIDDEN) {
+            if (emoji) {
+                if (!isShowingEmojiPalettes()) setEmojiKeyboard();
+                if (people) mEmojiPalettesView.showPeopleCategory();
+            } else if (!isShowingClipboardHistory()) setClipboardKeyboard();
+        }
+    }
+
+    private void applyPendingPanel() {
+        final int panel = sPendingPanel;
+        sPendingPanel = 0;
+        if (panel == 0 || android.os.SystemClock.uptimeMillis() - sPendingPanelTime > 1000) return;
+        if (panel == 2) setClipboardKeyboard();
+        else { setEmojiKeyboard(); if (panel == 3) mEmojiPalettesView.showPeopleCategory(); }
     }
 
     public void saveKeyboardState() {
@@ -558,6 +586,19 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         reloadKeyboard();
     }
 
+    /** The emoji panel on its people page (a skin tone preview). */
+    public void showEmojiPeople() {
+        setEmojiKeyboard();
+        mEmojiPalettesView.showPeopleCategory();
+    }
+
+    /** Emoji pages are built once and cached: the settings drop them so a changed size or skin tone shows. */
+    public void clearEmojiCache() {
+        if (mEmojiPalettesView != null) mEmojiPalettesView.clearKeyboardCache();
+        // the skin tone table is otherwise only reloaded when emoji suggestions are on
+        if (mThemeContext != null) EmojiParserKt.loadEmojiDefaultVersionsAndPopupSpecs(mThemeContext);
+    }
+
     public void reloadKeyboard() {
         if (mCurrentInputView == null)
             return;
@@ -783,6 +824,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     }
 
     public void switchToSubtype(InputMethodSubtype subtype) {
+        // the settings call this for their preview, also before the keyboard service ever ran (fresh install): the
+        // service then picks the subtype up when it starts
+        if (mLatinIME == null) return;
         mLatinIME.switchToSubtype(subtype);
     }
 
@@ -813,5 +857,10 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         }
         if (wasEmoji) setEmojiKeyboard();
         else if (wasClipboard) setClipboardKeyboard();
+        // the input view is started again a moment later and that puts the letters back: check again then
+        if (wasEmoji || wasClipboard) new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            if (wasEmoji && !isShowingEmojiPalettes()) setEmojiKeyboard();
+            else if (wasClipboard && !isShowingClipboardHistory()) setClipboardKeyboard();
+        }, 250);
     }
 }

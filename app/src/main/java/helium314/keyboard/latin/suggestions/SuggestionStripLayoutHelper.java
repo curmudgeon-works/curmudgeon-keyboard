@@ -585,12 +585,11 @@ final class SuggestionStripLayoutHelper {
 
         wordView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, (float) textSizeDp);
 
-        final int style;
-        if (bold && italic) style = Typeface.BOLD_ITALIC;
-        else if (bold) style = Typeface.BOLD;
-        else if (italic) style = Typeface.ITALIC;
-        else style = Typeface.NORMAL;
-        wordView.setTypeface(wordView.getTypeface(), style);
+        // font as chosen in the Suggestion strip dialog, bold / italic applied to it (also un-bolds, which the old
+        // setTypeface(current, style) couldn't)
+        final String font = prefs.getString(Settings.PREF_SUGGESTION_FONT, "auto");
+        wordView.setTypeface(KeyboardTypeface.styled(null, Typeface.DEFAULT, font,
+                KeyboardTypeface.suggestionTypeface(), bold, italic));
 
         if (underline) {
             wordView.setPaintFlags(wordView.getPaintFlags() | Paint.UNDERLINE_TEXT_FLAG);

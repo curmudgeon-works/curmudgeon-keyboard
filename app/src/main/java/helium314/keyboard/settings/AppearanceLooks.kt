@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings
 
+import helium314.keyboard.latin.R
+
+import helium314.keyboard.keyboard.KeyboardTheme
+
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
@@ -25,13 +29,16 @@ object AppearanceLooks {
 
     private val keys = setOf(
         Settings.PREF_THEME_STYLE, Settings.PREF_ICON_STYLE, Settings.PREF_CUSTOM_ICON_NAMES, Settings.PREF_THEME_COLORS,
-        Settings.PREF_THEME_KEY_BORDERS, Settings.PREF_THEME_DAY_NIGHT, Settings.PREF_THEME_COLORS_NIGHT, Settings.PREF_NAVBAR_COLOR,
+        Settings.PREF_THEME_KEY_BORDERS, Settings.PREF_THEME_DAY_NIGHT, Settings.PREF_THEME_COLORS_NIGHT,
         Settings.PREF_ENABLE_SPLIT_KEYBOARD, Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED,
-        Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE, Settings.PREF_NARROW_KEY_GAPS, Settings.PREF_SPACE_BAR_TEXT,
+        Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE, Settings.PREF_SPACE_BAR_TEXT,
         Settings.PREF_FONT_SCALE, Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT, Settings.PREF_EMOJI_SKIN_TONE,
         Settings.PREF_SUGGESTION_TEXT_SIZE, Settings.PREF_SUGGESTION_BOLD, Settings.PREF_SUGGESTION_ITALIC,
         Settings.PREF_SUGGESTION_UNDERLINE, Settings.PREF_SUGGESTION_WORD_PADDING, Settings.PREF_TOOLBAR_EXPAND_ICON,
         Settings.PREF_KEY_HORIZONTAL_GAP, Settings.PREF_KEY_VERTICAL_GAP,
+        Settings.PREF_KEY_TEXT_BOLD, Settings.PREF_KEY_TEXT_ITALIC, Settings.PREF_KEY_TEXT_UNDERLINE, Settings.PREF_HINT_FONT_SCALE,
+        Settings.PREF_SHOW_NUMBER_ROW_HINTS, Settings.PREF_SHOW_HINTS, Settings.PREF_SHOW_POPUP_HINTS,
+        Settings.PREF_KEY_FONT, Settings.PREF_HINT_FONT, Settings.PREF_SUGGESTION_FONT, Settings.PREF_HINT_TEXT_BOLD, Settings.PREF_HINT_TEXT_ITALIC, Settings.PREF_HINT_TEXT_UNDERLINE,
     )
     // the scales have a key per orientation / fold state, the custom colors one per theme
     private val prefixes = listOf(
@@ -41,6 +48,30 @@ object AppearanceLooks {
     )
 
     fun inScope(key: String) = key in keys || prefixes.any { key.startsWith(it) }
+
+    /** The four themes that ship with the app: some variety in style, colours, borders and spacing. */
+    fun builtIn(ctx: Context): List<Look> = listOf(
+        Look(ctx.getString(R.string.theme_preset_midnight), mapOf(
+            Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
+            Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_MIDNIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_MIDNIGHT,
+            Settings.PREF_THEME_KEY_BORDERS to true)),
+        Look(ctx.getString(R.string.theme_preset_daylight), mapOf(
+            Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
+            Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_LIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_LIGHT,
+            Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to false)),
+        Look(ctx.getString(R.string.theme_preset_holo), mapOf(
+            Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_HOLO, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_HOLO,
+            Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_HOLO_WHITE, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_BLACK,
+            Settings.PREF_THEME_KEY_BORDERS to true)),
+        Look(ctx.getString(R.string.theme_preset_paper), mapOf(
+            Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
+            Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_LIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_DARK,
+            Settings.PREF_THEME_KEY_BORDERS to false, Settings.PREF_THEME_DAY_NIGHT to true)),
+        Look(ctx.getString(R.string.theme_preset_ocean), mapOf(
+            Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_ROUNDED, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_ROUNDED,
+            Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_OCEAN, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_OCEAN,
+            Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_KEY_HORIZONTAL_GAP to 1.0f, Settings.PREF_KEY_VERTICAL_GAP to 1.5f)),
+    )
 
     /** The appearance values as they are now (plain keys, the current keyboard's set). */
     fun current(prefs: SharedPreferences): Map<String, Any?> = prefs.all.filterKeys { inScope(it) }

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Checkbox
@@ -47,6 +48,15 @@ import androidx.core.content.edit
 // actual key for each setting is baseKey with one _true/_false appended per dimension (need to keep order!)
 // should dimension checkboxes have any other effect than just showing / hiding sliders?
 //  one could argue that e.g. when disabling the split checkbox, then split mode should not affect the setting
+/** One setting shown in a [KeyboardScalePreference] dialog: its sliders, one per variant, under [title]. */
+class ScalePart(
+    val title: String?,
+    val baseKey: String,
+    val defaults: Array<Float>,
+    val range: ClosedFloatingPointRange<Float>,
+    val description: (Float) -> String,
+)
+
 @Composable
 fun KeyboardScalePreference(
     name: String,
@@ -56,12 +66,17 @@ fun KeyboardScalePreference(
     range:  ClosedFloatingPointRange<Float>,
     description: (Float) -> String,
     live: Boolean = false, // values are written while dragging (the live keyboard shows them); Cancel puts the old ones back
-    alwaysShown: Set<String> = emptySet(), // dimensions without a checkbox: their sliders are always there
-    baseVariantName: String? = null, // the name of the plain slider (the one without any dimension); "Default" if null
+    alwaysShown: Set<String> = emptySet(), // dimensions without a checkbox: their sliders are always there (landscape always is)
+    baseVariantName: String? = null, // the name of the plain slider (the one without any dimension); "Portrait" if null
+    firstTitle: String? = null, // with [more]: the heading over this setting's sliders
+    more: List<ScalePart> = emptyList(), // further settings in the same dialog (same dimensions)
     onDone: () -> Unit
 ) {
-    if (defaults.size != 1.shl(dimensions.size))
-        throw ArithmeticException("defaults size does not match with dimensions, expected ${1.shl(dimensions.size)}, got ${defaults.size}")
+    val parts = listOf(ScalePart(firstTitle, baseKey, defaults, range, description)) + more
+    parts.forEach {
+        if (it.defaults.size != 1.shl(dimensions.size))
+            throw ArithmeticException("defaults size does not match with dimensions, expected ${1.shl(dimensions.size)}, got ${it.defaults.size}")
+    }
     var showDialog by remember { mutableStateOf(false) }
     Preference(
         name = name,
@@ -72,42 +87,39 @@ fun KeyboardScalePreference(
         KeyboardScaleDialog(
             onDismissRequest = { showDialog = false },
             title = { Text(name) },
-            baseKey = baseKey,
+            parts = parts,
             onDone = onDone,
-            defaultValues = defaults,
-            range = range,
             dimensions = dimensions,
-            positionString = description,
             live = live,
-            alwaysShown = alwaysShown,
-            baseVariantName = baseVariantName,
+            alwaysShown = alwaysShown + stringResource(R.string.landscape),
+            baseVariantName = baseVariantName ?: stringResource(R.string.portrait),
         )
 }
 
-// SliderDialog specialized for keyboard scale settings using multiple sliders with same range, each with a different setting and title
+// SliderDialog specialized for keyboard scale settings: per setting ([parts]) one slider per variant (portrait,
+// landscape, split, folded ...), each variant stored under its own key
 @Composable
 private fun KeyboardScaleDialog(
     onDismissRequest: () -> Unit,
     title: @Composable () -> Unit,
-    baseKey: String,
+    parts: List<ScalePart>,
     onDone: () -> Unit,
-    defaultValues: Array<Float>,
-    range: ClosedFloatingPointRange<Float>,
     dimensions: List<String>,
     modifier: Modifier = Modifier,
-    positionString: (Float) -> String,
     live: Boolean = false,
     alwaysShown: Set<String> = emptySet(),
-    baseVariantName: String? = null,
+    baseVariantName: String,
 ) {
-    val (variants, keys) = createVariantsAndKeys(dimensions, baseKey)
+    val variantsAndKeys = parts.map { createVariantsAndKeys(dimensions, it.baseKey) }
+    val variants = variantsAndKeys.first().first
+    val allKeys = variantsAndKeys.flatMap { it.second }
     val foldedString = stringResource(R.string.folded) // we want to hide foldable settings for non-foldable phones
     val ctx = LocalContext.current
     var checked by remember { mutableStateOf(dimensions.map { it in alwaysShown || FoldableUtils.isFoldable || !it.contains(foldedString) }) }
     val prefs = ctx.prefs()
     val done = remember { mutableMapOf<String, () -> Unit>() }
     // what the keys held when the dialog opened, so Cancel can put it back in live mode
-    val original = remember { keys.associateWith { if (prefs.contains(it)) prefs.getFloat(it, 0f) else null } }
+    val original = remember { allKeys.associateWith { if (prefs.contains(it)) prefs.getFloat(it, 0f) else null } }
     var confirmed by remember { mutableStateOf(false) }
     fun write(key: String, value: Float?) = prefs.edit { if (value == null) remove(key) else putFloat(key, value) }
     val dismiss = {
@@ -136,41 +148,45 @@ private fun KeyboardScaleDialog(
                                 }
                         }
                     }
-                    variants.forEachIndexed { i, variant ->
-                        val key = keys[i]
-                        var sliderPosition by remember { mutableFloatStateOf(prefs.getFloat(key, defaultValues[i])) }
-                        var touched by remember { mutableStateOf(false) }
-                        if (live && touched) LaunchedEffect(sliderPosition) {
-                            delay(80)
-                            write(key, if (sliderPosition == defaultValues[i]) null else sliderPosition)
-                            onDone()
-                        }
-                        if (!done.contains(variant))
-                            done[variant] = {
-                                if (sliderPosition == defaultValues[i])
-                                    prefs.edit { remove(key) }
-                                else
-                                    prefs.edit { putFloat(key, sliderPosition) }
+                    parts.forEachIndexed { p, part ->
+                        val keys = variantsAndKeys[p].second
+                        if (parts.size > 1 && part.title != null)
+                            Text(part.title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = if (p == 0) 0.dp else 12.dp, bottom = 4.dp))
+                        variants.forEachIndexed { i, variant ->
+                            val key = keys[i]
+                            val default = part.defaults[i]
+                            var sliderPosition by remember(key) { mutableFloatStateOf(prefs.getFloat(key, default)) }
+                            var touched by remember(key) { mutableStateOf(false) }
+                            if (live && touched) LaunchedEffect(key, sliderPosition) {
+                                delay(80)
+                                write(key, if (sliderPosition == default) null else sliderPosition)
+                                onDone()
                             }
-                        val forbiddenDimensions = dimensions.filterIndexed { index, _ -> !checked[index] }
-                        val visible = variant.split(SPLIT).none { it in forbiddenDimensions }
-                        // default animations make the dialog flash (see also DictionaryDialog)
-                        AnimatedVisibility(visible, exit = fadeOut(), enter = fadeIn()) {
-                            WithSmallTitle(variant.ifEmpty { baseVariantName ?: stringResource(R.string.button_default) }) {
-                                Slider(
-                                    value = sliderPosition,
-                                    onValueChange = { sliderPosition = it; touched = true },
-                                    valueRange = range,
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(positionString(sliderPosition))
-                                    TextButton({ sliderPosition = defaultValues[i]; touched = true }) { Text(stringResource(R.string.button_default)) }
+                            done[key] = {
+                                if (sliderPosition == default) prefs.edit { remove(key) }
+                                else prefs.edit { putFloat(key, sliderPosition) }
+                            }
+                            val forbiddenDimensions = dimensions.filterIndexed { index, _ -> !checked[index] }
+                            val visible = variant.split(SPLIT).none { it in forbiddenDimensions }
+                            // default animations make the dialog flash (see also DictionaryDialog)
+                            AnimatedVisibility(visible, exit = fadeOut(), enter = fadeIn()) {
+                                WithSmallTitle(variant.ifEmpty { baseVariantName }) {
+                                    Slider(
+                                        value = sliderPosition,
+                                        onValueChange = { sliderPosition = it; touched = true },
+                                        valueRange = part.range,
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(part.description(sliderPosition))
+                                        TextButton({ sliderPosition = default; touched = true }) { Text(stringResource(R.string.button_default)) }
+                                    }
+                                    Spacer(Modifier.height(6.dp))
                                 }
-                                Spacer(Modifier.height(6.dp))
                             }
                         }
                     }
@@ -218,12 +234,10 @@ private fun Preview() {
         KeyboardScaleDialog(
             onDismissRequest = { },
             onDone = { },
-            positionString = { "${it.toInt()}%"},
-            defaultValues = Array(8) { 100f - it % 2 * 50f },
-            range = 0f..500f,
+            parts = listOf(ScalePart(null, "", Array(8) { 100f - it % 2 * 50f }, 0f..500f) { "${it.toInt()}%" }),
             title = { Text("bottom padding scale") },
             dimensions = listOf("landscape", "split", "folded"),
-            baseKey = ""
+            baseVariantName = "Portrait",
         )
     }
 }

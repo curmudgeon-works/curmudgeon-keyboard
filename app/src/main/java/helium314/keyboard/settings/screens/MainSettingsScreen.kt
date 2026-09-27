@@ -109,19 +109,6 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
         onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Subtype + keyboard.toPref()) },
         icon = R.drawable.ic_settings_preferences
     ) { NextScreenIcon() }
-    // (no Preferences: its input and clipboard history groups are on the Layout screen)
-    Preference(
-        name = stringResource(R.string.settings_screen_appearance),
-        onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Appearance) },
-        icon = R.drawable.ic_settings_appearance
-    ) { NextScreenIcon() }
-    if (advanced) AdvancedTint {
-        Preference(
-            name = stringResource(R.string.settings_screen_toolbar),
-            onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Toolbar) },
-            icon = R.drawable.ic_settings_toolbar
-        ) { NextScreenIcon() }
-    }
     // with the own decoder, gesture typing's items are on the Swiping screen
     if (JniUtils.sHaveGestureLib && !BuildConfig.USE_OWN_GESTURE_DECODER)
         Preference(
@@ -143,6 +130,19 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
             onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.DataGathering) },
             icon = R.drawable.ic_settings_gesture
         ) { NextScreenIcon() }
+    // (no Preferences: its input and clipboard history groups are on the Layout screen)
+    Preference(
+        name = stringResource(R.string.settings_screen_appearance),
+        onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Appearance) },
+        icon = R.drawable.ic_settings_appearance
+    ) { NextScreenIcon() }
+    if (advanced) AdvancedTint {
+        Preference(
+            name = stringResource(R.string.settings_screen_toolbar),
+            onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Toolbar) },
+            icon = R.drawable.ic_settings_toolbar
+        ) { NextScreenIcon() }
+    }
     Preference(
         name = stringResource(R.string.settings_screen_correction),
         onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.TextCorrection) },

@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.screens
 
+import androidx.compose.foundation.layout.PaddingValues
+
+import kotlinx.coroutines.delay
+
+import androidx.compose.runtime.LaunchedEffect
+
 import android.content.Context
 import android.text.InputType
 import android.view.inputmethod.EditorInfo
@@ -359,17 +365,36 @@ fun CustomizePopupsScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
 }
 
 /** A text field to try the keyboard being edited: focusing it opens that keyboard, changes rebuild it live. */
-enum class TryItMode { TEXT, NUMBER, PHONE }
+enum class TryItMode { TEXT, NUMBER, PHONE, EMOJI, CLIPBOARD }
 
 /** What the try-it field asks the keyboard for; items on the screen set it (e.g. the number pad item) and focus the field. */
 class TryItState {
     var mode by mutableStateOf(TryItMode.TEXT)
     val focusRequester = FocusRequester()
-    fun show(mode: TryItMode) { this.mode = mode; runCatching { focusRequester.requestFocus() } }
+    fun show(mode: TryItMode, people: Boolean = false) {
+        this.mode = mode
+        // emoji / clipboard: the keyboard is told before the field's focus starts it, so it opens on that panel
+        if (mode == TryItMode.EMOJI || mode == TryItMode.CLIPBOARD)
+            runCatching { KeyboardSwitcher.getInstance().openPanelOnStart(mode == TryItMode.EMOJI, people) }
+        runCatching { focusRequester.requestFocus() }
+    }
 }
 
 @Composable
 fun TryItBar(keyboard: SettingsSubtype, state: TryItState, onFocus: (Boolean) -> Unit = {}) {
+    // the emoji tab: a text field whose keyboard is switched to the emoji panel once it is up; leaving the tab
+    // switches back to the letters
+    var wasEmoji by remember { mutableStateOf(false) }
+    LaunchedEffect(state.mode) {
+        if (state.mode == TryItMode.EMOJI || state.mode == TryItMode.CLIPBOARD) {
+            wasEmoji = true
+            // the keyboard opens straight on the panel when it starts, or switches now if it is already up
+            // (the note for the keyboard is left by TryItState.show)
+        } else if (wasEmoji) {
+            wasEmoji = false
+            runCatching { KeyboardSwitcher.getInstance().setAlphabetKeyboard() }
+        }
+    }
     var tryText by remember { mutableStateOf("") }
     Surface(tonalElevation = 3.dp, shadowElevation = 8.dp) {
         Row(
@@ -392,15 +417,19 @@ fun TryItBar(keyboard: SettingsSubtype, state: TryItState, onFocus: (Boolean) ->
                     .focusRequester(state.focusRequester)
                     .onFocusChanged { onFocus(it.isFocused); if (it.isFocused) showKeyboardForPreview(keyboard) }
             )
-            // which keyboard the preview shows: letters, the number pad, the phone pad
+            // which keyboard the preview shows: letters, the number pad, the phone pad, the emoji panel, the clipboard;
+            // no check mark on the selected one (its background shows it) and tight padding, so five fit
             SingleChoiceSegmentedButtonRow(Modifier.padding(start = 8.dp)) {
-                val modes = listOf(TryItMode.TEXT to "ABC", TryItMode.NUMBER to "123", TryItMode.PHONE to "\u260E")
+                val modes = listOf(TryItMode.TEXT to "ABC", TryItMode.NUMBER to "123", TryItMode.PHONE to "\u260E",
+                    TryItMode.EMOJI to "\uD83D\uDE00", TryItMode.CLIPBOARD to "\uD83D\uDCCB")
                 modes.forEachIndexed { index, (mode, label) ->
                     SegmentedButton(
                         selected = state.mode == mode,
                         onClick = { state.show(mode) },
                         shape = SegmentedButtonDefaults.itemShape(index, modes.size),
-                        label = { Text(label) }
+                        icon = {},
+                        contentPadding = PaddingValues(horizontal = 6.dp),
+                        label = { Text(label, maxLines = 1) }
                     )
                 }
             }

@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.preferences
 
+import androidx.compose.runtime.compositionLocalOf
+
+import androidx.compose.ui.text.font.FontStyle
+
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -55,6 +59,9 @@ fun PreferenceCategory(
 val LocalCompactPreferences = androidx.compose.runtime.compositionLocalOf { false }
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+/** True for a settings row whose value was changed and not yet accepted: its title is drawn in italics. */
+val LocalPendingChange = compositionLocalOf { false }
+
 @Composable
 fun Preference(
     name: String,
@@ -77,7 +84,9 @@ fun Preference(
         if (icon != null)
             IconOrImage(icon, name, 32)
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = name, style = MaterialTheme.typography.bodyLarge)
+            // italic while the setting has a change not yet accepted (Appearance's tick / cross)
+            Text(text = name, style = MaterialTheme.typography.bodyLarge.let {
+                if (LocalPendingChange.current) it.copy(fontStyle = FontStyle.Italic) else it })
             if (description != null) {
                 CompositionLocalProvider(
                     LocalTextStyle provides MaterialTheme.typography.bodyMedium,

@@ -32,6 +32,7 @@ import helium314.keyboard.keyboard.internal.KeyDrawParams;
 import helium314.keyboard.keyboard.internal.KeyVisualAttributes;
 import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode;
 import helium314.keyboard.latin.R;
+import helium314.keyboard.latin.settings.SettingsValues;
 import helium314.keyboard.latin.common.ColorType;
 import helium314.keyboard.latin.common.Colors;
 import helium314.keyboard.latin.common.Constants;
@@ -389,8 +390,18 @@ public class KeyboardView extends View {
         float labelBaseline = centerY;
         final String label = key.getLabel();
         if (label != null) {
-            paint.setTypeface(KeyboardTypeface.resolve(label, key.selectTypeface(params)));
             paint.setTextSize(key.selectTextSize(params) * mFontSizeMultiplier);
+            // the user's text style (Key text dialog): font, bold, italic, underline; undone before the hint is drawn
+            final SettingsValues textStyle = Settings.getValues();
+            if (textStyle != null) {
+                final Typeface tf = KeyboardTypeface.styled(label, key.selectTypeface(params), textStyle.mKeyFont,
+                        KeyboardTypeface.customTypeface(), textStyle.mKeyTextBold, textStyle.mKeyTextItalic);
+                paint.setTypeface(tf);
+                // a font without a bold or italic face gets them drawn
+                paint.setFakeBoldText(textStyle.mKeyTextBold && !tf.isBold());
+                paint.setTextSkewX(textStyle.mKeyTextItalic && !tf.isItalic() ? -0.25f : 0f);
+                paint.setUnderlineText(textStyle.mKeyTextUnderline);
+            } else paint.setTypeface(KeyboardTypeface.resolve(label, key.selectTypeface(params)));
             final float labelCharHeight = TypefaceUtils.getReferenceCharHeight(paint);
             final float labelCharWidth = TypefaceUtils.getReferenceCharWidth(paint);
 
@@ -451,15 +462,27 @@ public class KeyboardView extends View {
             // Turn off drop shadow and reset x-scale.
             paint.clearShadowLayer();
             paint.setTextScaleX(1.0f);
+            paint.setFakeBoldText(false);
+            paint.setTextSkewX(0f);
+            paint.setUnderlineText(false);
         }
 
         // Draw hint label.
         final String hintLabel = key.getHintLabel();
         if (hintLabel != null && mShowsHints) {
-            paint.setTextSize(key.selectHintTextSize(params) * mFontSizeMultiplier); // maybe take sqrt to not have such extreme changes?
+            final SettingsValues sv = Settings.getValues();
+            final float hintScale = sv == null ? 1f : sv.mHintFontScale;
+            paint.setTextSize(key.selectHintTextSize(params) * mFontSizeMultiplier * hintScale); // maybe take sqrt to not have such extreme changes?
             paint.setColor(key.selectHintTextColor(params));
-            // TODO: Should add a way to specify type face for hint letters
-            paint.setTypeface(KeyboardTypeface.resolve(hintLabel, Typeface.DEFAULT_BOLD));
+            // the symbols' style (Symbols dialog): their own font, bold by default, italic, underline
+            if (sv != null) {
+                final Typeface tf = KeyboardTypeface.styled(hintLabel, Typeface.DEFAULT, sv.mHintFont,
+                        KeyboardTypeface.hintTypeface(), sv.mHintTextBold, sv.mHintTextItalic);
+                paint.setTypeface(tf);
+                paint.setFakeBoldText(sv.mHintTextBold && !tf.isBold());
+                paint.setTextSkewX(sv.mHintTextItalic && !tf.isItalic() ? -0.25f : 0f);
+                paint.setUnderlineText(sv.mHintTextUnderline);
+            } else paint.setTypeface(KeyboardTypeface.resolve(hintLabel, Typeface.DEFAULT_BOLD));
             blendAlpha(paint, params.mAnimAlpha);
             final float labelCharHeight = TypefaceUtils.getReferenceCharHeight(paint);
             final float labelCharWidth = TypefaceUtils.getReferenceCharWidth(paint);
@@ -533,6 +556,10 @@ public class KeyboardView extends View {
         if (TextUtils.isEmpty(mKeyPopupHintLetter)) {
             return;
         }
+        // the "…" is drawn plain, whatever style the label and the symbol had
+        paint.setFakeBoldText(false);
+        paint.setTextSkewX(0f);
+        paint.setUnderlineText(false);
         final int keyWidth = key.getDrawWidth();
         final int keyHeight = key.getHeight();
         final float labelCharWidth = TypefaceUtils.getReferenceCharWidth(paint);

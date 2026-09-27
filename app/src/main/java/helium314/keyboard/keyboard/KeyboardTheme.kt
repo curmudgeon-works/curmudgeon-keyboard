@@ -68,20 +68,20 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
         const val THEME_VIOLETTE = "violette"
         fun getAvailableDefaultColors(prefs: SharedPreferences, isNight: Boolean) = listOfNotNull(
             THEME_MIDNIGHT,
-            if (!isNight) THEME_LIGHT else null, THEME_DARK,
+            THEME_LIGHT, THEME_DARK,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) THEME_DYNAMIC else null,
-            if (prefs.getString(Settings.PREF_THEME_STYLE, Defaults.PREF_THEME_STYLE) == STYLE_HOLO) THEME_HOLO_WHITE else null,
+            THEME_HOLO_WHITE, // (upstream: only with the Holo key style)
             THEME_DARKER,
             THEME_BLACK,
-            if (!isNight) THEME_BLUE_GRAY else null,
-            if (!isNight) THEME_BROWN else null,
+            THEME_BLUE_GRAY,
+            THEME_BROWN,
             THEME_CHOCOLATE,
             THEME_CLOUDY,
             THEME_FOREST,
-            if (!isNight) THEME_INDIGO else null,
-            if (!isNight) THEME_PINK else null,
+            THEME_INDIGO,
+            THEME_PINK,
             THEME_OCEAN,
-            if (!isNight) THEME_SAND else null,
+            THEME_SAND,
             THEME_VIOLETTE
         )
         val STYLES = arrayOf(STYLE_MATERIAL, STYLE_HOLO, STYLE_ROUNDED)
@@ -150,6 +150,8 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             val hasBorders = prefs.getBoolean(Settings.PREF_THEME_KEY_BORDERS, Defaults.PREF_THEME_KEY_BORDERS)
             val backgroundImage = Settings.readUserBackgroundImage(context, isNight)
             return when (themeName) {
+                "daylight", "paper" -> getThemeColors(THEME_LIGHT, themeStyle, context, prefs, isNight) // short-lived palettes
+                "classic" -> getThemeColors(THEME_HOLO_WHITE, themeStyle, context, prefs, isNight)
                 THEME_DYNAMIC -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) DynamicColors(context, themeStyle, hasBorders, backgroundImage)
                     else getThemeColors(THEME_LIGHT, themeStyle, context, prefs, isNight)

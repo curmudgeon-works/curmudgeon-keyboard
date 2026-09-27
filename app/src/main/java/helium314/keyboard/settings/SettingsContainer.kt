@@ -75,5 +75,9 @@ object SettingsWithoutKey {
     const val BACKGROUND_IMAGE_LANDSCAPE = "background_image_landscape"
     const val CUSTOM_FONT = "custom_font"
     const val CUSTOM_EMOJI_FONT = "custom_emoji_font"
+    const val CUSTOM_HINT_FONT = "custom_hint_font"
+    const val KEY_TEXT_STYLE = "key_text_style"
+    const val HINT_TEXT_STYLE = "hint_text_style"
+    const val SUGGESTION_TEXT_STYLE = "suggestion_text_style"
     const val APPEARANCE_LOOKS = "appearance_looks_list"
 }

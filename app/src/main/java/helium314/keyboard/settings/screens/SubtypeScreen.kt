@@ -224,16 +224,11 @@ fun SubtypeScreen(
                             extra = { DefaultButton(checked == null) { setCurrentSubtype(currentSubtype.without(ExtraValue.LOCALIZED_NUMBER_ROW)) } },
                         ) { setCurrentSubtype(currentSubtype.with(ExtraValue.LOCALIZED_NUMBER_ROW, it.toString())) }
                     }
-                    // two independent hint switches; the popups behind long-press stay either way
-                    PrefSwitchRow(Settings.PREF_SHOW_NUMBER_ROW_HINTS, Defaults.PREF_SHOW_NUMBER_ROW_HINTS, R.string.hints_number_row, inverted = true) { holdPreview(); reloadPreview() }
-                    PrefSwitchRow(Settings.PREF_SHOW_HINTS, Defaults.PREF_SHOW_HINTS, R.string.hints_other_keys, inverted = true) { holdPreview(); reloadPreview() }
+                    // (the symbol switches — hide on the number row / other keys, long-press dots — are on Appearance)
                     if (advanced) AdvancedBlock {
                         CompositionLocalProvider(LocalCompactPreferences provides true) {
                             advancedInputItems.forEach { SettingsActivity.settingsContainer[it]?.Preference() }
                         }
-                        // the "…" on keys whose long-press does something
-                        PrefSwitchRow(Settings.PREF_SHOW_POPUP_HINTS, Defaults.PREF_SHOW_POPUP_HINTS, R.string.show_popup_hints,
-                            R.string.show_popup_hints_summary) { holdPreview(); reloadPreview() }
                     }
                 }
                 // ---- the layout: first the layout and its popups, then the other layouts, the five key switches last
@@ -483,7 +478,7 @@ private fun SwitchRow(title: String, checked: Boolean, summary: String? = null, 
 }
 
 /** The Input items shown only in advanced mode, last in the group (see [AdvancedBlock]). */
-private val advancedInputItems = listOf(Settings.PREF_SAVE_SUBTYPE_PER_APP, Settings.PREF_SHOW_EMOJI_DESCRIPTIONS)
+private val advancedInputItems = listOf(Settings.PREF_SAVE_SUBTYPE_PER_APP) // (emoji descriptions: Appearance, Emoji group)
 
 /** Advanced items on a slightly different background, so toggling the mode shows what it adds (last in the Input
  *  group, in place elsewhere). */

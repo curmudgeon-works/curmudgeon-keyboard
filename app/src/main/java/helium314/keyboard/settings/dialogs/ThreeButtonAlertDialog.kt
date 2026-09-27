@@ -5,6 +5,25 @@
  */
 package helium314.keyboard.settings.dialogs
 
+import helium314.keyboard.settings.SettingsActivity
+
+import androidx.compose.runtime.getValue
+
+import androidx.compose.runtime.rememberUpdatedState
+
+
+import helium314.keyboard.latin.utils.getActivity
+
+import androidx.compose.ui.platform.LocalDensity
+
+import androidx.compose.ui.platform.LocalContext
+
+import android.view.ViewTreeObserver
+
+import androidx.core.view.WindowInsetsCompat
+
+import androidx.core.view.ViewCompat
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,13 +61,22 @@ import helium314.keyboard.latin.utils.previewDark
 /** True on screens whose live keyboard is the preview: their dialogs keep it up unless they need focus for a text field. */
 val LocalKeepKeyboard = compositionLocalOf { false }
 
+/** Where (window y) a screen's try-it bar begins: keyboard-keeping dialogs end above it. -1 = none, end above the keyboard. */
+val LocalBottomBarTop = compositionLocalOf { -1 }
+
 /** A screen's preview keyboard, told when a keyboard-keeping dialog opens and closes (see PreviewKeyboard). */
 val LocalPreviewKeyboard = compositionLocalOf<PreviewKeyboardHooks?> { null }
 
 interface PreviewKeyboardHooks {
-    fun dialogOpened()
+    fun dialogOpened(emoji: Boolean, people: Boolean)
     fun dialogClosed()
 }
+
+/** True around settings about emojis: their dialogs preview on the emoji panel instead of the letters. */
+val LocalPreviewEmoji = compositionLocalOf { false }
+
+/** True around the skin tone setting: its preview is the emoji panel's people page. */
+val LocalPreviewEmojiPeople = compositionLocalOf { false }
 
 @Composable
 fun ThreeButtonAlertDialog(
@@ -69,14 +97,23 @@ fun ThreeButtonAlertDialog(
     keepKeyboard: Boolean = LocalKeepKeyboard.current, // the keyboard stays up (the dialog takes no focus) and the dialog sits at the top, clear of it
     summonKeyboard: Boolean = true, // with [keepKeyboard]: the screen's preview keyboard comes up for this dialog (off when the dialog previews itself)
 ) {
+    // the preview keyboard is used while its dialog is open (typing, emoji tabs): a tap on it mustn't close the
+    // dialog. The platform's outside-tap closing is off; the dialog closes itself on a tap on the settings screen
+    // (see below), while the keyboard, drawn above the dialog, gets its own taps and never reaches it
     Dialog(
         onDismissRequest = onDismissRequest,
-        properties = properties
+        properties = if (!keepKeyboard) properties else DialogProperties(
+            dismissOnBackPress = properties.dismissOnBackPress,
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = properties.usePlatformDefaultWidth,
+        )
     ) {
         if (keepKeyboard) {
             val preview = if (summonKeyboard) LocalPreviewKeyboard.current else null
+            val emoji = LocalPreviewEmoji.current
+            val people = LocalPreviewEmojiPeople.current
             DisposableEffect(preview) {
-                preview?.dialogOpened()
+                preview?.dialogOpened(emoji, people)
                 onDispose { preview?.dialogClosed() }
             }
             val window = (LocalView.current.parent as? DialogWindowProvider)?.window
@@ -85,7 +122,49 @@ fun ThreeButtonAlertDialog(
                 // for the keyboard, so the one below stays up; no dim, the keyboard is the preview
                 window?.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
                 window?.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-                window?.setGravity(Gravity.TOP)
+            }
+            // touches outside the dialog go to the window under them: the keyboard gets its taps (typing, emoji tabs);
+            // the settings screen, while this dialog is open, turns a tap into closing the dialog
+            val currentDismiss by rememberUpdatedState(onDismissRequest)
+            val activity = LocalContext.current.getActivity() as? SettingsActivity
+            DisposableEffect(window, activity) {
+                window?.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL)
+                val previous = activity?.outsideTapHandler
+                val handler: () -> Unit = { currentDismiss() }
+                activity?.outsideTapHandler = handler
+                onDispose { if (activity?.outsideTapHandler === handler) activity.outsideTapHandler = previous }
+            }
+            // placed right above the keyboard (and the toolbar); on a small screen it may overlap the keyboard, but
+            // its top stays below the screen's header. Re-placed whenever the keyboard or the dialog changes size.
+            val activityDecor = LocalContext.current.getActivity()?.window?.decorView
+            val headerHeight = with(LocalDensity.current) { 64.dp.roundToPx() }
+            val barTop = LocalBottomBarTop.current
+            DisposableEffect(window, activityDecor, barTop) {
+                val dialogDecor = window?.decorView
+                fun place() {
+                    if (window == null || activityDecor == null || dialogDecor == null) return
+                    val insets = ViewCompat.getRootWindowInsets(activityDecor) ?: return
+                    val ime = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+                    val headerBottom = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top + headerHeight
+                    // the dialog's bottom edge: at the try-it bar's top when the screen has one, else just above the keyboard
+                    val bottomLimit = if (barTop > 0) barTop else activityDecor.height - ime
+                    val room = (activityDecor.height - headerBottom - dialogDecor.height).coerceAtLeast(0)
+                    val y = minOf(activityDecor.height - bottomLimit, room).coerceAtLeast(0)
+                    val params = window.attributes
+                    if (params.gravity != Gravity.BOTTOM || params.y != y) {
+                        params.gravity = Gravity.BOTTOM
+                        params.y = y
+                        window.attributes = params
+                    }
+                }
+                val listener = ViewTreeObserver.OnGlobalLayoutListener { place() }
+                activityDecor?.viewTreeObserver?.addOnGlobalLayoutListener(listener)
+                dialogDecor?.viewTreeObserver?.addOnGlobalLayoutListener(listener)
+                place()
+                onDispose {
+                    activityDecor?.viewTreeObserver?.removeOnGlobalLayoutListener(listener)
+                    dialogDecor?.viewTreeObserver?.removeOnGlobalLayoutListener(listener)
+                }
             }
         }
         Box(

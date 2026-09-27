@@ -21,6 +21,42 @@ object KeyboardTypeface {
     @Volatile
     private var emojiTypefaceLoaded = false
 
+    private var cachedSuggestionTypeface: Typeface? = null
+    @Volatile
+    private var suggestionTypefaceLoaded = false
+
+    /** The font the user set for the suggestion strip, or null. */
+    @JvmStatic
+    fun suggestionTypeface(): Typeface? {
+        if (suggestionTypefaceLoaded) return cachedSuggestionTypeface
+        val context = Settings.getCurrentContext() ?: return null
+        synchronized(lock) {
+            if (!suggestionTypefaceLoaded) {
+                cachedSuggestionTypeface = runCatching { Typeface.createFromFile(Settings.getCustomSuggestionFontFile(context)) }.getOrNull()
+                suggestionTypefaceLoaded = true
+            }
+            return cachedSuggestionTypeface
+        }
+    }
+
+    private var cachedHintTypeface: Typeface? = null
+    @Volatile
+    private var hintTypefaceLoaded = false
+
+    /** The font the user set for the symbols on the keys, or null for the default (bold). */
+    @JvmStatic
+    fun hintTypeface(): Typeface? {
+        if (hintTypefaceLoaded) return cachedHintTypeface
+        val context = Settings.getCurrentContext() ?: return null
+        synchronized(lock) {
+            if (!hintTypefaceLoaded) {
+                cachedHintTypeface = runCatching { Typeface.createFromFile(Settings.getCustomHintFontFile(context)) }.getOrNull()
+                hintTypefaceLoaded = true
+            }
+            return cachedHintTypeface
+        }
+    }
+
     private fun loadCustomTypeface(context: Context): Typeface? {
         return runCatching {
             Typeface.createFromFile(Settings.getCustomFontFile(context))
@@ -89,6 +125,26 @@ object KeyboardTypeface {
         textView.typeface = resolve(text, defaultTypeface = defaultTypeface)
     }
 
+    /**
+     * The typeface for a label under the user's text style: [font] as chosen in the text style dialog ("auto" = the
+     * loaded file if any, else [base]), made bold / italic. Emojis keep the emoji font.
+     */
+    @JvmStatic
+    fun styled(text: CharSequence?, base: Typeface, font: String, file: Typeface?, bold: Boolean, italic: Boolean): Typeface {
+        val emoji = emojiTypeface()
+        if (emoji != null && text != null && isEmoji(text)) return emoji
+        val family = when (font) {
+            "sans" -> Typeface.SANS_SERIF
+            "serif" -> Typeface.SERIF
+            "mono" -> Typeface.MONOSPACE
+            "file" -> file ?: base
+            "default" -> base
+            else -> file ?: base
+        }
+        val style = (if (bold) Typeface.BOLD else 0) or (if (italic) Typeface.ITALIC else 0)
+        return Typeface.create(family, style)
+    }
+
     @JvmStatic
     fun clearCache() {
         synchronized(lock) {
@@ -97,6 +153,10 @@ object KeyboardTypeface {
             customTypefaceLoaded = false
             cachedEmojiTypeface = null
             emojiTypefaceLoaded = false
+            cachedHintTypeface = null
+            hintTypefaceLoaded = false
+            cachedSuggestionTypeface = null
+            suggestionTypefaceLoaded = false
         }
     }
 }

@@ -90,7 +90,6 @@ fun preferencesInputItems(prefs: SharedPreferences): List<Any?> =
         if (prefs.getBoolean(Settings.PREF_SOUND_ON, Defaults.PREF_SOUND_ON))
             Settings.PREF_KEYPRESS_SOUND_VOLUME else null,
         Settings.PREF_SAVE_SUBTYPE_PER_APP,
-        Settings.PREF_SHOW_EMOJI_DESCRIPTIONS,
     )
 
 fun clipboardHistoryItems(prefs: SharedPreferences): List<Any?> {
@@ -122,7 +121,10 @@ fun createPreferencesSettings(context: Context) = listOf(
         SwitchPreference(it, Defaults.PREF_SAVE_SUBTYPE_PER_APP)
     },
     Setting(context, Settings.PREF_SHOW_HINTS, R.string.hints_other_keys) {
-        SwitchPreference(it, Defaults.PREF_SHOW_HINTS, inverted = true) { KeyboardSwitcher.getInstance().reloadKeyboard() }
+        SwitchPreference(it, Defaults.PREF_SHOW_HINTS, inverted = true) {
+            // the hints are set when a keyboard is built, and built keyboards are cached
+            KeyboardLayoutSet.onSystemLocaleChanged(); KeyboardSwitcher.getInstance().setThemeNeedsReload()
+        }
     },
     Setting(context, Settings.PREF_REMOVE_REDUNDANT_POPUPS, R.string.remove_redundant_popups) {
         SwitchPreference(it, Defaults.PREF_REMOVE_REDUNDANT_POPUPS) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
@@ -161,8 +163,8 @@ fun createPreferencesSettings(context: Context) = listOf(
             )
         }
     },
-    Setting(context, Settings.PREF_SHOW_POPUP_HINTS, R.string.show_popup_hints, R.string.show_popup_hints_summary) {
-        SwitchPreference(it, Defaults.PREF_SHOW_POPUP_HINTS) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+    Setting(context, Settings.PREF_SHOW_POPUP_HINTS, R.string.show_popup_hints) {
+        SwitchPreference(it, Defaults.PREF_SHOW_POPUP_HINTS, inverted = true) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
     Setting(context, Settings.PREF_POPUP_ON, R.string.popup_on_keypress) {
         SwitchPreference(it, Defaults.PREF_POPUP_ON) { KeyboardSwitcher.getInstance().reloadKeyboard() }

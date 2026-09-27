@@ -1,6 +1,46 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings
 
+import helium314.keyboard.settings.preferences.LocalPendingChange
+
+import kotlin.math.roundToInt
+
+import androidx.compose.ui.layout.positionInWindow
+
+import androidx.compose.ui.layout.onSizeChanged
+
+import androidx.compose.ui.layout.onGloballyPositioned
+
+import androidx.compose.ui.layout.LayoutCoordinates
+
+import androidx.compose.foundation.gestures.animateScrollBy
+
+import android.os.SystemClock
+
+import kotlinx.coroutines.launch
+
+import androidx.compose.runtime.rememberCoroutineScope
+
+import androidx.compose.ui.input.pointer.PointerEventPass
+
+import kotlinx.coroutines.delay
+
+import androidx.compose.runtime.mutableIntStateOf
+
+import androidx.compose.ui.platform.LocalDensity
+
+import androidx.compose.foundation.layout.ime
+
+import androidx.compose.ui.input.pointer.pointerInput
+
+import androidx.compose.foundation.gestures.awaitFirstDown
+
+import androidx.compose.foundation.gestures.awaitEachGesture
+
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Box
@@ -71,11 +111,29 @@ fun SearchSettingsScreen(
     simpleModeKeys: Set<String>? = null, // when set, only these are shown while the settings menu is in simple mode
     bottomBar: @Composable () -> Unit = {}, // pinned under the list, e.g. a try-it field
     topActions: @Composable RowScope.() -> Unit = {}, // top bar buttons before the advanced switch
+    revealer: TapRevealer? = null, // a screen with a preview keyboard: moves the tapped row above where the keyboard will end
+    isPending: ((String) -> Boolean)? = null, // rows with a change not yet accepted, drawn with an italic title
     content: @Composable (ColumnScope.() -> Unit)? = null, // overrides settings if not null; LAST: callers pass it as the trailing lambda
 ) {
     val ctx = LocalContext.current
     val advanced by SettingsMode.state(ctx)
     val shownSettings = SettingsMode.filter(settings, simpleModeKeys, advanced)
+    // the setting last tapped is kept out from under a preview keyboard: moved above where the keyboard will end
+    // when the screen raises it ([revealer]), and brought into view again if the list then shrinks further
+    val lastTapped = remember { mutableStateOf<TappedRow?>(null) }
+    val tapScope = rememberCoroutineScope()
+    val scrollState = rememberScrollState()
+    // the row stays the one to protect until another row is tapped or the list is scrolled by hand (then it's the
+    // user's position): a slider dragged much later still changes the keyboard's height
+    fun recentTap() = lastTapped.value
+    revealer?.reveal = { lineY ->
+        val coords = recentTap()?.coords?.takeIf { it.isAttached }
+        if (coords != null) {
+            val bottom = (coords.positionInWindow().y + coords.size.height).roundToInt()
+            if (bottom > lineY) tapScope.launch { scrollState.animateScrollBy((bottom - lineY).toFloat()) }
+        }
+    }
+    var viewportHeight by remember { mutableIntStateOf(0) }
     SearchScreen(
         onClickBack = onClickBack,
         title = { Text(title) },
@@ -88,7 +146,15 @@ fun SearchSettingsScreen(
                     bottomBar = bottomBar,
                 ) { innerPadding ->
                     Column(
-                        Modifier.verticalScroll(rememberScrollState()).then(Modifier.padding(innerPadding))
+                        // the padding (try-it bar, keyboard) outside the scroll: the visible area ends above them, so a row
+                        // scrolled "into view" really is visible
+                        Modifier.padding(innerPadding)
+                            .onSizeChanged {
+                                // the list got shorter (the keyboard ended taller than expected): the tapped row into view
+                                if (it.height < viewportHeight) recentTap()?.let { row -> tapScope.launch { row.requester.bringIntoView() } }
+                                viewportHeight = it.height
+                            }
+                            .verticalScroll(scrollState)
                     ) {
                         // advanced-only items (and headings whose items all are) on the advanced tint; not on screens
                         // that are advanced as a whole (empty simple set), whose entry carries the tint instead
@@ -105,8 +171,27 @@ fun SearchSettingsScreen(
                                 // a solution would be using a list(visible to key)
                                 AnimatedVisibility(visible = it != null) {
                                     if (it != null) {
-                                        if (isAdvanced(it)) AdvancedTint { SettingsActivity.settingsContainer[it]?.Preference() }
-                                        else SettingsActivity.settingsContainer[it]?.Preference()
+                                        val row = remember { TappedRow(BringIntoViewRequester()) }
+                                        Box(Modifier.bringIntoViewRequester(row.requester).onGloballyPositioned { row.coords = it }.pointerInput(Unit) {
+                                            awaitEachGesture {
+                                                // a tap only, watched before the row handles it (the row consumes the release):
+                                                // a press that moves beyond the touch slop is a scroll and doesn't count
+                                                val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                                                var moved = false
+                                                while (true) {
+                                                    val change = awaitPointerEvent(PointerEventPass.Initial).changes
+                                                        .firstOrNull { c -> c.id == down.id } ?: break
+                                                    if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) moved = true
+                                                    if (!change.pressed) break
+                                                }
+                                                if (!moved) { row.time = SystemClock.uptimeMillis(); lastTapped.value = row } else lastTapped.value = null
+                                            }
+                                        }) {
+                                            CompositionLocalProvider(LocalPendingChange provides ((it as? String)?.let { key -> isPending?.invoke(key) } == true)) {
+                                                if (isAdvanced(it)) AdvancedTint { SettingsActivity.settingsContainer[it]?.Preference() }
+                                                else SettingsActivity.settingsContainer[it]?.Preference()
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -290,4 +375,16 @@ fun ExpandableSearchField(
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)
         )
     }
+}
+
+/** A settings row as last tapped: where it is, to move it clear of the keyboard. */
+class TappedRow(val requester: BringIntoViewRequester) {
+    var coords: LayoutCoordinates? = null
+    var time = 0L
+}
+
+/** Lets a screen with a preview keyboard move the tapped row above the line (window y) where the keyboard will end. */
+class TapRevealer {
+    internal var reveal: ((Int) -> Unit)? = null
+    fun revealAbove(lineY: Int) = reveal?.invoke(lineY)
 }
