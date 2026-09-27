@@ -73,6 +73,7 @@ import helium314.keyboard.latin.utils.FoldableUtils;
 import helium314.keyboard.latin.utils.GestureDataGatheringKt;
 import helium314.keyboard.latin.utils.GestureDataGatheringSettings;
 import helium314.keyboard.latin.utils.InlineAutofillUtils;
+import helium314.keyboard.latin.utils.ClipboardDialogsKt;
 import helium314.keyboard.latin.utils.InputMethodPickerKt;
 import helium314.keyboard.latin.utils.JniUtils;
 import helium314.keyboard.latin.utils.KtxKt;
@@ -1361,6 +1362,13 @@ public class LatinIME extends InputMethodService implements
             return true;
         }
         return false;
+    }
+
+    /** Clearing the clipboard history is not undoable, so it asks first; the dialog hangs off the keyboard window. */
+    public void showClearClipboardDialog() {
+        if (isShowingOptionDialog()) return;
+        mOptionsDialog = ClipboardDialogsKt.createClearClipboardDialog(this, mKeyboardSwitcher.getMainKeyboardView().getWindowToken());
+        mOptionsDialog.show();
     }
 
     private boolean isShowingOptionDialog() {
