@@ -125,7 +125,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
         val presets = listOf(
             // the Curmudgeon default: every variant a key has, plus the symbol map (Rahul 2026-09-26: "a lot richer")
             Preset(R.string.key_popups_preset_standard, POPUP_KEYS_ALL, null, symbolMap = Defaults.PREF_SYMBOL_POPUP_MAP),
-            Preset(R.string.key_popups_preset_heliboard, POPUP_KEYS_NORMAL, null, symbolMap = ""),
+            Preset(R.string.key_popups_preset_heliboard, POPUP_KEYS_MAIN, null, symbolMap = ""), // upstream's real default level
             Preset(R.string.key_popups_preset_main, POPUP_KEYS_MAIN, null),
             Preset(R.string.key_popups_preset_more, POPUP_KEYS_MORE, null),
             Preset(R.string.key_popups_preset_all, POPUP_KEYS_ALL, null),
