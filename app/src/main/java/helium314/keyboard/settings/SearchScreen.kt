@@ -69,9 +69,9 @@ fun SearchSettingsScreen(
     title: String,
     settings: List<Any?>,
     simpleModeKeys: Set<String>? = null, // when set, only these are shown while the settings menu is in simple mode
-    content: @Composable (ColumnScope.() -> Unit)? = null, // overrides settings if not null
     bottomBar: @Composable () -> Unit = {}, // pinned under the list, e.g. a try-it field
     topActions: @Composable RowScope.() -> Unit = {}, // top bar buttons before the advanced switch
+    content: @Composable (ColumnScope.() -> Unit)? = null, // overrides settings if not null; LAST: callers pass it as the trailing lambda
 ) {
     val ctx = LocalContext.current
     val advanced by SettingsMode.state(ctx)
