@@ -33,6 +33,11 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.compositionLocalOf
 import android.view.Gravity
+import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalContext
+import helium314.keyboard.latin.utils.getActivity
 import android.view.WindowManager
 import androidx.compose.ui.window.DialogProperties
 import helium314.keyboard.latin.utils.Theme
@@ -66,8 +71,18 @@ fun ThreeButtonAlertDialog(
         if (keepKeyboard) {
             val window = (LocalView.current.parent as? DialogWindowProvider)?.window
             SideEffect {
-                window?.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
+                // no focus: the keyboard stays with the screen behind; outside taps are reported so they still dismiss
+                window?.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH)
                 window?.setGravity(Gravity.TOP)
+            }
+            // back goes to the screen behind too, so the screen's activity dismisses the dialog while it is open
+            val activity = LocalContext.current.getActivity() as? ComponentActivity
+            DisposableEffect(activity, properties.dismissOnBackPress) {
+                val callback = object : OnBackPressedCallback(properties.dismissOnBackPress) {
+                    override fun handleOnBackPressed() = onDismissRequest()
+                }
+                activity?.onBackPressedDispatcher?.addCallback(callback)
+                onDispose { callback.remove() }
             }
         }
         Box(
