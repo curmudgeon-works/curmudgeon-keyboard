@@ -135,6 +135,7 @@ fun KeyboardsScreen(
                     SubtypeSettings.reloadEnabledSubtypes(ctx)
                     generation++
                 }
+                HorizontalDivider() // under the title bar, above the first keyboard (like the other screens' first group)
                 for (keyboard in order) key(keyboard) { // stable identity: a reorder moves the block instead of recreating it (which killed the drag)
                     val subtype = keyboard.toAdditionalSubtype()
                     val isDragged = dragging == keyboard
