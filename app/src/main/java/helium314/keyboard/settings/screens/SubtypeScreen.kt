@@ -318,7 +318,6 @@ fun SubtypeScreen(
                 val advanced by SettingsMode.state(ctx)
                 // two groups, one row style (label 10 dp in, rows 56 dp high): see LocalCompactPreferences, SwitchRow
                 // ---- the layout, with the toolbar (then typing with backspace, popups, clipboard history): main layout (advanced), shape, emoji key, split, send key, other layouts, bottom row
-                androidx.compose.material3.HorizontalDivider() // (the list screens have one above their first heading too)
                 WithBigTitle(stringResource(R.string.keyboard_layout_set)) {
                     // the main layout (QWERTY, QWERTZ, AZERTY, …) on top, advanced
                     if (advanced) AdvancedBlock { Pending(layoutChanged(LayoutType.MAIN)) { MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) } } }

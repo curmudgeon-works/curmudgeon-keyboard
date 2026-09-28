@@ -49,9 +49,12 @@ import androidx.core.content.edit
 import kotlin.math.roundToInt
 
 @Composable
-private fun GroupTitle(titleId: Int) =
-    Text(stringResource(titleId), style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp))
+private fun GroupTitle(titleId: Int) = Column {
+    // the same heading as everywhere: a line above, flush at the edge, the rows indented under it
+    androidx.compose.material3.HorizontalDivider(Modifier.padding(top = 8.dp))
+    Text(stringResource(titleId), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary,
+        modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 4.dp))
+}
 
 /**
  * The swipe settings (capitalizing by swiping up, the apostrophe via the period key), then the own swipe decoder's inflection weights and scorer blend for one keyboard, with the statistics of every
@@ -75,6 +78,7 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     ) {
         // the content is taller than a screen now that the gesture typing items are here
         Column(Modifier.verticalScroll(rememberScrollState()).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))) {
+          androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.preferences.LocalRowStart provides 22.dp) {
             // ---- what a swipe can do: gesture typing itself (its own screen without the own decoder), then the extras
             GroupTitle(R.string.swipe_settings)
             val advanced by SettingsMode.state(ctx)
@@ -95,7 +99,7 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
             // on = move cursor, off = nothing; the other spacebar swipe actions stay in Advanced (shown off here)
             val moveCursor = Settings.readHorizontalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.MOVE_CURSOR
             Row(verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                modifier = Modifier.fillMaxWidth().padding(start = 22.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.space_swipe_move_cursor), style = MaterialTheme.typography.bodyLarge)
                     Text(stringResource(R.string.space_swipe_move_cursor_summary), style = MaterialTheme.typography.bodyMedium,
@@ -159,7 +163,8 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
                 }
             }
         }
-    }
+      }
+        }
 }
 
 /** The learned-word boost: whole numbers, shown as the summary explains. */
