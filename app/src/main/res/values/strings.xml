@@ -306,7 +306,7 @@
     <string name="swipe_tuning_summary">How much the decoder trusts the points where your finger turns, stops or slows down, and how much of a word\'s score comes from those points rather than from the overall shape. Try a setting for a while: the results below show how each one did for you.</string>
     <string name="swipe_tuning_turns">Turns</string>
     <string name="swipe_tuning_pauses">Pauses (stopping on a key)</string>
-    <string name="swipe_tuning_slowdowns">Slowdowns (lingering on a key)</string>
+    <string name="swipe_tuning_slowdowns">Slowdowns (slowing over a key favours its letter)</string>
     <string name="swipe_tuning_blend">Inflections vs. shape</string>
     <string name="swipe_tuning_blend_summary">1 = only the inflection points count, 0 = only the shape</string>
     <string name="swipe_tuning_history_boost">Learned-word boost</string>

@@ -10,6 +10,7 @@ import helium314.keyboard.gesture.GesturePreprocessor
 import helium314.keyboard.gesture.HybridScorer
 import helium314.keyboard.gesture.KeyInfo
 import helium314.keyboard.gesture.KeyboardGeometry
+import helium314.keyboard.gesture.KushlerConfig
 import helium314.keyboard.gesture.KushlerScorer
 import helium314.keyboard.gesture.PreprocessorConfig
 import helium314.keyboard.gesture.Scorer
@@ -96,12 +97,12 @@ object OwnGestureDecoder {
     @Synchronized
     private fun decoderFor(capsHeight: Float, capsSwipe: Boolean, tuning: Tuning): GestureDecoder {
         if (capsHeight != decoderCapsHeight || capsSwipe != decoderCapsSwipe || tuning != decoderTuning) {
-            val hybrid = HybridScorer(kushlerWeight = tuning.kushler, shark2Weight = 1f - tuning.kushler)
-            scorers = listOf(hybrid, KushlerScorer(), Shark2Scorer())
+            val kushler = KushlerScorer(KushlerConfig(slowEmphasis = tuning.slowdown))
+            val hybrid = HybridScorer(kushler, kushlerWeight = tuning.kushler, shark2Weight = 1f - tuning.kushler)
+            scorers = listOf(hybrid, kushler, Shark2Scorer())
             decoder = GestureDecoder(hybrid, DecoderConfig(capsExcursions = capsSwipe),
                 preprocessor = GesturePreprocessor(PreprocessorConfig(excursionMinHeightKeyHeights = capsHeight,
-                    turnConfidenceScale = tuning.turn, pauseConfidence = tuning.pause, pauseDtFactor = 2.5f,
-                    slowdownConfidence = tuning.slowdown)))
+                    turnConfidenceScale = tuning.turn, pauseConfidence = tuning.pause, pauseDtFactor = 2.5f)))
             decoderCapsHeight = capsHeight
             decoderCapsSwipe = capsSwipe
             decoderTuning = tuning

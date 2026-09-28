@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Location-channel scorer per US7098896 / US7453439: classified inflection points
 // are matched to key centers with weighted x/y distances (y heavier), thresholds
-// scale with stroke speed, and skipped inflection points draw penalties.
+// scale with stroke speed, and skipped inflection points draw penalties. Slowing down over a
+// key is a soft bonus for words with that letter, not a point to match.
 package helium314.keyboard.gesture
 
 class KushlerConfig(
@@ -35,6 +36,16 @@ class KushlerConfig(
      */
     val apostropheFreeRadius: Float = 0.25f,
     val apostropheOffPathWeight: Float = 1.2f,
+    /**
+     * Soft slowdown weight (the user's "slowdowns" tuning; 0 = off): a word earns a bonus for letters
+     * whose key the finger passed slowly. Deliberately NOT an inflection point: nothing is
+     * selected at a slow spot, a slow pass only favours words that have a letter there.
+     */
+    val slowEmphasis: Float = 0f,
+    /** Bonus (key widths) when every letter of a word sits where the path was at full slowness, at emphasis 1. */
+    val slowBonus: Float = 0.3f,
+    /** A letter's key "sees" path points within this many key widths of its center. */
+    val slowRadius: Float = 0.6f,
 )
 
 class KushlerScorer(private val config: KushlerConfig = KushlerConfig()) : Scorer {
@@ -102,7 +113,15 @@ class KushlerScorer(private val config: KushlerConfig = KushlerConfig()) : Score
         }
         val total = dp[m][n]
         if (total >= big) return Float.MAX_VALUE
-        return (total / maxOf(m, n)).coerceAtLeast(Scorer.MIN_SCORE)
+        return (total / maxOf(m, n) - slowBonus(gesture, letters, kw)).coerceAtLeast(Scorer.MIN_SCORE)
+    }
+
+    /** Bonus for letters sitting where the finger moved slowly (mean slowness over the word's letters). */
+    private fun slowBonus(gesture: PreprocessedGesture, letters: List<SokPoint>, kw: Float): Float {
+        if (config.slowEmphasis <= 0f || gesture.slowness.isEmpty()) return 0f
+        var sum = 0f
+        for (l in letters) sum += gesture.slownessNear(l.char, l.x, l.y, config.slowRadius * kw)
+        return config.slowEmphasis * config.slowBonus * sum / letters.size
     }
 
     /** Match cost with endpoint pinning: PEN_DOWN↔first letter, PEN_UP↔last letter. */
