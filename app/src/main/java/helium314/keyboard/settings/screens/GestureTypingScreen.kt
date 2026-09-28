@@ -60,8 +60,7 @@ fun createGestureTypingSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_GESTURE_PREVIEW_TRAIL, R.string.gesture_preview_trail) {
         SwitchPreference(it, Defaults.PREF_GESTURE_PREVIEW_TRAIL)
     },
-    Setting(context, Settings.PREF_GESTURE_FLOATING_PREVIEW_TEXT,
-        R.string.gesture_floating_preview_static, R.string.gesture_floating_preview_static_summary)
+    Setting(context, Settings.PREF_GESTURE_FLOATING_PREVIEW_TEXT, R.string.gesture_floating_preview_static)
     {
         SwitchPreference(it, Defaults.PREF_GESTURE_FLOATING_PREVIEW_TEXT)
     },
