@@ -17,7 +17,8 @@ import helium314.keyboard.settings.SettingsActivity
 /**
  * Settings few people need, kept out of the way (advanced only): the toolbar opening and closing by itself and
  * pinning a toolbar key by long-press (only for a toolbar that opens with the arrow), custom toolbar key codes, the
- * toolbar reversed for right-to-left languages, the emoji key of a physical keyboard, the timestamp key's format.
+ * toolbar reversed for right-to-left languages, the emoji key of a physical keyboard, the timestamp key's format, the
+ * currencies on the symbols pages' currency key.
  */
 @Composable
 fun OthersScreen(onClickBack: () -> Unit) {
@@ -33,6 +34,7 @@ fun OthersScreen(onClickBack: () -> Unit) {
         if (Settings.readToolbarMode(prefs) != ToolbarMode.HIDDEN) Settings.PREF_VARIABLE_TOOLBAR_DIRECTION else null,
         Settings.PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY,
         Settings.PREF_TIMESTAMP_FORMAT,
+        Settings.PREF_CUSTOM_CURRENCY_KEY, // the symbols pages' currency key and its popup
     )
     SearchSettingsScreen(
         onClickBack = onClickBack,
