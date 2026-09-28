@@ -48,12 +48,16 @@ fun PreferenceCategory(
         HorizontalDivider()
         Text(
             text = title,
-            modifier = modifier.padding(top = 12.dp, start = 16.dp, end = 8.dp, bottom = 8.dp),
+            // like Layout & Typing's headings: flush with the screen's edge, the rows indented under it
+            modifier = modifier.padding(top = 12.dp, start = 12.dp, end = 8.dp, bottom = 4.dp),
             color = MaterialTheme.colorScheme.secondary,
-            style = MaterialTheme.typography.titleSmall
+            style = MaterialTheme.typography.titleMedium
         )
     }
 }
+
+/** Where a row's text starts (not compact): the list screens indent their rows under the headings. */
+val LocalRowStart = androidx.compose.runtime.compositionLocalOf { 12.dp }
 
 /** Rows set as compact take the spacing of the Layout screen's own rows (less padding, no minimum height). */
 val LocalCompactPreferences = androidx.compose.runtime.compositionLocalOf { false }
@@ -77,7 +81,7 @@ fun Preference(
             .fillMaxWidth()
             .combinedClickable(onClick = { onClick() }, onLongClick = onLongClick)
             .then(if (LocalCompactPreferences.current) Modifier.heightIn(min = 56.dp).padding(vertical = 4.dp).padding(start = 10.dp)
-                else Modifier.heightIn(min = 44.dp).padding(vertical = 10.dp, horizontal = 12.dp)),
+                else Modifier.heightIn(min = 44.dp).padding(vertical = 10.dp).padding(start = LocalRowStart.current, end = 12.dp)),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

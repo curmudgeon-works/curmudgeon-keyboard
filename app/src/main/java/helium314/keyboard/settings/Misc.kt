@@ -67,7 +67,7 @@ fun WithBigTitle(
     content: @Composable () -> Unit,
 ) {
     Column {
-        Text(title, style = MaterialTheme.typography.titleMedium,
+        Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary,
             modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
         content()
     }

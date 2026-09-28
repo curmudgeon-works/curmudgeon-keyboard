@@ -160,6 +160,8 @@ fun SearchSettingsScreen(
                         // that are advanced as a whole (empty simple set), whose entry carries the tint instead
                         val tinting = advanced && !simpleModeKeys.isNullOrEmpty()
                         fun isAdvanced(item: Any?) = tinting && item is String && item !in simpleModeKeys!!
+                        // rows indented under the flush headings (Preference reads it), like Layout & Typing
+                        androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.preferences.LocalRowStart provides 22.dp) {
                         shownSettings.forEachIndexed { index, it ->
                             if (it is Int) {
                                 val categoryItems = shownSettings.drop(index + 1).takeWhile { next -> next !is Int }.filterIsInstance<String>()
@@ -195,6 +197,7 @@ fun SearchSettingsScreen(
                                     }
                                 }
                             }
+                        }
                         }
                     }
                     // lazyColumn has janky scroll for a while (not sure why compose gets smoother after a while)
