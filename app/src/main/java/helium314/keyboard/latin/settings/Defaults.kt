@@ -19,7 +19,6 @@ import helium314.keyboard.latin.utils.defaultToolbarPref
 
 object Defaults {
     fun initDynamicDefaults(context: Context) {
-        PREF_GESTURE_DYNAMIC_PREVIEW_FOLLOW_SYSTEM = getTransitionAnimationScale(context) != 0.0f
         val dm = context.resources.displayMetrics
         val px600 = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 600f, dm)
         PREF_POPUP_ON = dm.widthPixels >= px600 || dm.heightPixels >= px600
@@ -144,10 +143,6 @@ object Defaults {
     const val PREF_KEY_LONGPRESS_TIMEOUT = 300
     const val PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY = true
     const val PREF_GESTURE_PREVIEW_TRAIL = true
-    const val PREF_GESTURE_FLOATING_PREVIEW_TEXT = true
-    const val PREF_GESTURE_FLOATING_PREVIEW_DYNAMIC = true
-    @JvmField
-    var PREF_GESTURE_DYNAMIC_PREVIEW_FOLLOW_SYSTEM = true
     const val PREF_GESTURE_SPACE_AWARE = false
     const val PREF_GESTURE_CAPS_SWIPE = true // swiping up above the keyboard capitalizes the letter left from (own gesture decoder)
     const val PREF_GESTURE_APOSTROPHE_VIA_PERIOD = true // apostrophes are swiped through the period key; off = skipped (own gesture decoder)

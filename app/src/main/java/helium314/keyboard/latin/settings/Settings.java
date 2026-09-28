@@ -167,9 +167,6 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_KEY_LONGPRESS_TIMEOUT = "key_longpress_timeout";
     public static final String PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY = "enable_emoji_alt_physical_key";
     public static final String PREF_GESTURE_PREVIEW_TRAIL = "gesture_preview_trail";
-    public static final String PREF_GESTURE_FLOATING_PREVIEW_TEXT = "gesture_floating_preview_text";
-    public static final String PREF_GESTURE_FLOATING_PREVIEW_DYNAMIC = "gesture_floating_preview_dynamic";
-    public static final String PREF_GESTURE_DYNAMIC_PREVIEW_FOLLOW_SYSTEM = "gesture_dynamic_preview_follow_system";
     public static final String PREF_GESTURE_SPACE_AWARE = "gesture_space_aware";
     public static final String PREF_GESTURE_CAPS_HEIGHT = "gesture_caps_height";
     public static final String PREF_GESTURE_CAPS_SWIPE = "gesture_caps_swipe";
@@ -375,18 +372,6 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public void toggleAutoCorrect() {
         final boolean oldValue = mPrefs.getBoolean(PREF_AUTO_CORRECTION, Defaults.PREF_AUTO_CORRECTION);
         mPrefs.edit().putBoolean(Settings.PREF_AUTO_CORRECTION, !oldValue).apply();
-    }
-
-    public static boolean readGestureDynamicPreviewEnabled(final SharedPreferences prefs) {
-        final boolean followSystem = prefs.getBoolean(PREF_GESTURE_DYNAMIC_PREVIEW_FOLLOW_SYSTEM, Defaults.PREF_GESTURE_DYNAMIC_PREVIEW_FOLLOW_SYSTEM);
-        final boolean defValue = Defaults.PREF_GESTURE_DYNAMIC_PREVIEW_FOLLOW_SYSTEM;
-        final boolean curValue = prefs.getBoolean(Settings.PREF_GESTURE_FLOATING_PREVIEW_DYNAMIC, defValue);
-        return followSystem ? defValue : curValue;
-    }
-
-    public static boolean readGestureDynamicPreviewDefault(final Context context) {
-        // if transitions are disabled for the system (reduced motion), moving preview should be disabled
-        return SettingsKt.getTransitionAnimationScale(context) != 0.0f;
     }
 
     public static int readDefaultGestureFastTypingCooldown(final Resources res) {
