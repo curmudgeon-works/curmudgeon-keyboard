@@ -131,17 +131,28 @@ val abcAfterKeys = listOf(
     Triple(Settings.PREF_ABC_AFTER_EMOJI, Defaults.PREF_ABC_AFTER_EMOJI, R.string.after_emoji),
     Triple(Settings.PREF_ABC_AFTER_CLIP, Defaults.PREF_ABC_AFTER_CLIP, R.string.after_clip),
 )
-private val abcAfterShort = listOf(R.string.abc_after_symbols, R.string.abc_after_numpad, R.string.abc_after_emoji, R.string.abc_after_clipboard)
 
 fun createPreferencesSettings(context: Context) = listOf(
     Setting(context, SettingsWithoutKey.ABC_AFTER, R.string.switch_keyboard_after) { setting ->
         val prefs = LocalContext.current.prefs()
         abcAfterKeys.forEach { (key, default, _) -> helium314.keyboard.settings.KnownDefaults.note(key, default) }
         var show by rememberSaveable { mutableStateOf(false) }
-        // which of the four are on, in short
-        val on = abcAfterKeys.zip(abcAfterShort).filter { (k, _) -> prefs.getBoolean(k.first, k.second) }.map { stringResource(it.second) }
-        Preference(name = setting.title, description = on.joinToString(", ").ifEmpty { stringResource(R.string.abc_after_none) },
-            onClick = { show = true })
+        // which are on, in words: "Space/enter after symbols or numpad; Selecting emoji or clipboard entry"
+        val (symbols, numpad, emoji, clip) = abcAfterKeys.map { (key, default, _) -> prefs.getBoolean(key, default) }
+        val space = when {
+            symbols && numpad -> stringResource(R.string.abc_after_space_both)
+            symbols -> stringResource(R.string.abc_after_space_symbols)
+            numpad -> stringResource(R.string.abc_after_space_numpad)
+            else -> null
+        }
+        val selecting = when {
+            emoji && clip -> stringResource(R.string.abc_after_select_both)
+            emoji -> stringResource(R.string.abc_after_select_emoji)
+            clip -> stringResource(R.string.abc_after_select_clip)
+            else -> null
+        }
+        Preference(name = setting.title, onClick = { show = true },
+            description = listOfNotNull(space, selecting).joinToString("; ").ifEmpty { stringResource(R.string.abc_after_none) })
         if (show) ThreeButtonAlertDialog(
             onDismissRequest = { show = false },
             onConfirmed = { },

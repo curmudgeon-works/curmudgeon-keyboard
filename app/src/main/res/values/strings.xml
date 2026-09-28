@@ -846,10 +846,12 @@ language, hence "No language". -->
     <string name="customize_currencies_detail">Set main and up to 6 secondary currency symbols, separated with space</string>
     <!-- Title setting / dialog for selecting when to switch to main keyboard -->
     <string name="switch_keyboard_after">Switch back to letters after…</string>
-    <string name="abc_after_symbols">Symbols</string>
-    <string name="abc_after_numpad">Number pad</string>
-    <string name="abc_after_emoji">Emoji</string>
-    <string name="abc_after_clipboard">Clipboard</string>
+    <string name="abc_after_space_symbols">Space/enter after symbols</string>
+    <string name="abc_after_space_numpad">Space/enter after numpad</string>
+    <string name="abc_after_space_both">Space/enter after symbols or numpad</string>
+    <string name="abc_after_select_emoji">Selecting emoji</string>
+    <string name="abc_after_select_clip">Selecting clipboard entry</string>
+    <string name="abc_after_select_both">Selecting emoji or clipboard entry</string>
     <string name="abc_after_none">Never</string>
     <!-- Switch to main keyboard after selecting emoji from emoji view -->
     <string name="after_emoji">Selecting emoji in emoji view</string>
