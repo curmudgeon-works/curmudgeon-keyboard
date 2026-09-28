@@ -81,4 +81,5 @@ object SettingsWithoutKey {
     const val APPEARANCE_LOOKS = "appearance_looks_list"
     const val HIDE_ALL_SYMBOLS = "hide_all_symbols"
     const val ABC_AFTER = "abc_after"
+    const val TOOLBAR_KEYS_ALL = "toolbar_keys_all"
 }

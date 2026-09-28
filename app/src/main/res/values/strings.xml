@@ -517,6 +517,12 @@
     <string name="toolbar_hiding_global">Hide clipboard and emoji toolbars too</string>
     <!-- Title of the setting to set toolbar keys -->
     <string name="toolbar_keys">Select toolbar keys</string>
+    <string name="main_toolbar_keys">Select main toolbar keys</string>
+    <string name="toolbar_keys_summary">Main %1$d · Clipboard %2$d · Pinned %3$d</string>
+    <string name="toolbar_keys_legend">M: main toolbar · C: clipboard toolbar · P: pinned next to the suggestions. Long-press a key to drag it.</string>
+    <string name="toolbar_keys_main">M</string>
+    <string name="toolbar_keys_clipboard">C</string>
+    <string name="toolbar_keys_pinned">P</string>
     <!-- Names of the toolbar keys-->
     <string name="paste" tools:keep="@string/paste" translatable="false">@android:string/paste</string>
     <string name="copy" tools:keep="@string/copy" translatable="false">@android:string/copy</string>
