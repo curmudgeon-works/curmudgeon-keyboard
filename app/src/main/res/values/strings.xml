@@ -72,7 +72,7 @@
     <!-- Settings category title for Appearance & Layout/Misc -->
     <string name="settings_category_miscellaneous">Miscellaneous</string>
     <!-- Option for enabling or disabling the split keyboard layout in portrait mode.-->
-    <string name="enable_split_keyboard">Enable split keyboard</string>
+    <string name="enable_split_keyboard">Split keyboard</string>
     <!-- Option for setting distance for split keyboard in portrait mode -->
     <string name="split_spacer_scale">Split distance</string>
     <!-- Option name for including other IMEs in the language key switch list -->
@@ -457,7 +457,7 @@
     <!-- Title of the setting to enable number row -->
     <string name="number_row">Number row</string>
     <!-- Description of the settings to enable number row -->
-    <string name="show_numbers_row">Show numbers row</string>
+    <string name="show_numbers_row">Numbers row</string>
     <string name="number_row_summary">Always show number row</string>
     <!-- Title of the setting to replace the top row in symbols layout with number row -->
     <string name="number_row_in_symbols">Show number row in symbols view</string>
