@@ -227,7 +227,8 @@
     <!-- Preferences item for showing pinned clipboard items first -->
     <string name="clipboard_history_pinned_first">Show pinned items on top</string>
     <!-- Preferences item for enabling swipe deletion -->
-    <string name="delete_swipe">Delete swipe</string>
+    <string name="delete_swipe_speed">Speed</string>
+    <string name="delete_swipe">Swipe left from backspace to delete longer portions</string>
     <!-- Description for "delete_swipe" option. -->
     <string name="delete_swipe_summary">Perform a swipe from the delete key to select and remove bigger portions of text at once</string>
     <!-- Preferences item and dialog title for backup and restore -->
@@ -273,13 +274,13 @@
     <string name="factory_reset_backup_hint">To be able to go back, make a backup first (Backup and restore, above).</string>
     <string name="factory_reset_done">Reset done</string>
     <string name="backspace_settings">Backspace</string>
-    <string name="backspace_hold_deletes_words">Hold to delete whole words</string>
+    <string name="backspace_hold_deletes_words">Long-press backspace deletes whole words</string>
     <string name="backspace_hold_deletes_words_summary">Off: holding backspace deletes a character at a time</string>
     <string name="backspace_repeat_interval">Hold-to-delete speed</string>
     <!-- Value of the hold-to-delete speed; %d is milliseconds -->
     <string name="backspace_repeat_interval_value">One deletion every %d ms</string>
     <string name="backspace_start_speed">Speed</string>
-    <string name="backspace_speed_up">Speed up deleting while held</string>
+    <string name="backspace_speed_up">Holding backspace accelerates deletion</string>
     <string name="backspace_speed_up_after">Speed up after</string>
     <string name="backspace_top_speed">Top speed</string>
     <!-- %s is a number of seconds like 2.0 -->

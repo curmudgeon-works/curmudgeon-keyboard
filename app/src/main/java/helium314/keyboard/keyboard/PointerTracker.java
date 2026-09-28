@@ -967,14 +967,15 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
                 }
             }
         } else if (code == KeyCode.DELETE) {
-            // Delete slider
-            int steps = (x - mStartX) / sPointerStep;
+            // Delete slider: one character per step of finger movement, the step shorter the faster it's set
+            final int deleteStep = Math.max(1, Math.round(sPointerStep / Math.max(0.1f, sv.mDeleteSwipeSpeed)));
+            int steps = (x - mStartX) / deleteStep;
             if (steps != 0) {
                 if (!mInHorizontalSwipe) {
                     sTimerProxy.cancelKeyTimersOf(this);
                     mInHorizontalSwipe = true;
                 }
-                mStartX += steps * sPointerStep;
+                mStartX += steps * deleteStep;
                 sListener.onMoveDeletePointer(steps);
             }
         }

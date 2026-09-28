@@ -144,8 +144,8 @@ fun createAdvancedSettings(context: Context) = listOf(
             description = { value -> value.toInt().toString() }
         )
     },
-    Setting(context, Settings.PREF_DELETE_SWIPE, R.string.delete_swipe, R.string.delete_swipe_summary) {
-        SwitchPreference(it, Defaults.PREF_DELETE_SWIPE)
+    Setting(context, Settings.PREF_DELETE_SWIPE, R.string.delete_swipe) {
+        DeleteSwipePreference(it)
     },
     Setting(context, Settings.PREF_SPACE_TO_CHANGE_LANG,
         R.string.prefs_long_press_keyboard_to_change_lang,
