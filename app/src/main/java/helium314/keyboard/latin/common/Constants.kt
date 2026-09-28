@@ -10,6 +10,8 @@ object Links {
     const val GITHUB = "https://github.com/HeliBorg/HeliBoard"
     const val CURMUDGEON_SOURCE = "https://github.com/curmudgeon-works/curmudgeon-keyboard" // source of this fork; keep this attribution in derived works
     const val LICENSE = "$GITHUB/blob/main/LICENSE"
+    const val PLAY_STORE = "https://play.google.com/store/apps/details?id=app.curmudgeon.keyboard"
+    const val PLAY_STORE_APP = "market://details?id=app.curmudgeon.keyboard" // opens the Play Store app directly
     const val WIKI_URL = "$GITHUB/wiki"
     const val LAYOUT_WIKI_URL = "$WIKI_URL/2.-Layouts"
     const val CUSTOM_LAYOUTS = "$GITHUB/discussions/categories/custom-layout"
