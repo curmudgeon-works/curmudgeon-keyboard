@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.screens
 
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.PaddingValues
 
 import kotlinx.coroutines.delay
@@ -407,7 +409,8 @@ fun TryItBar(keyboard: SettingsSubtype, state: TryItState, onFocus: (Boolean) ->
         ) {
             OutlinedTextField(
                 value = tryText, onValueChange = { tryText = it },
-                label = { Text(stringResource(R.string.key_popups_try)) },
+                label = { Text(stringResource(R.string.key_popups_try), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = when (state.mode) {
                     TryItMode.NUMBER -> KeyboardType.Number
                     TryItMode.PHONE -> KeyboardType.Phone
@@ -419,7 +422,8 @@ fun TryItBar(keyboard: SettingsSubtype, state: TryItState, onFocus: (Boolean) ->
                     .onFocusChanged { onFocus(it.isFocused); if (it.isFocused) showKeyboardForPreview(keyboard) }
             )
             // which keyboard the preview shows: letters, the number pad, the phone pad, the emoji panel, the clipboard;
-            // no check mark on the selected one (its background shows it) and tight padding, so five fit
+            // no check mark on the selected one (its background shows it), tight padding and at most 48 dp each, so five
+            // fit and still leave the field room on a 411 dp phone (Material's 58 dp minimum squeezed it to a column)
             SingleChoiceSegmentedButtonRow(Modifier.padding(start = 8.dp)) {
                 val modes = listOf(TryItMode.TEXT to "ABC", TryItMode.NUMBER to "123", TryItMode.PHONE to "\u260E",
                     TryItMode.EMOJI to "\uD83D\uDE00", TryItMode.CLIPBOARD to "\uD83D\uDCCB")
@@ -428,6 +432,7 @@ fun TryItBar(keyboard: SettingsSubtype, state: TryItState, onFocus: (Boolean) ->
                         selected = state.mode == mode,
                         onClick = { state.show(mode) },
                         shape = SegmentedButtonDefaults.itemShape(index, modes.size),
+                        modifier = Modifier.widthIn(max = 48.dp),
                         icon = {},
                         contentPadding = PaddingValues(horizontal = 6.dp),
                         label = { Text(label, maxLines = 1) }
