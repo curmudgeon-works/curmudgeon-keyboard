@@ -63,7 +63,7 @@ fun AdvancedSettingsScreen(
     if ((b?.value ?: 0) < 0)
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
     val items = listOf(
-        Settings.PREF_ALWAYS_INCOGNITO_MODE,
+        // (force incognito: on Text correction, next to learning from what you type)
         // (on Layout & Typing: long-press delay and symbols-key numpad (Typing), space key changes input method
         //  (Layout), delete swipe (Backspace); space bar swipes on Swiping; "more diacritics" is the popup presets)
         Settings.PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY,
