@@ -190,6 +190,14 @@ object KeyboardProfiles {
         imeId = if (isSeparate(real)) idFor(real, selectedKeyboard(real)) else SHARED
     }
 
+    /** The keyboard whose settings the screens edit (separate settings on), or null (shared settings). */
+    fun editingKeyboard(real: SharedPreferences): SettingsSubtype? {
+        val id = editingId
+        if (id == SHARED || !isSeparate(real)) return null
+        val map = ids(real)
+        return map.keys().asSequence().firstOrNull { map.optInt(it, -1) == id }?.toSettingsSubtype()
+    }
+
     fun selectedKeyboard(real: SharedPreferences): SettingsSubtype =
         real.getString(Settings.PREF_SELECTED_SUBTYPE, Defaults.PREF_SELECTED_SUBTYPE)!!.toSettingsSubtype()
 }

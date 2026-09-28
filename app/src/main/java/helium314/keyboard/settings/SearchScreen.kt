@@ -275,7 +275,18 @@ fun <T: Any?> SearchScreen(
             ) {
                 Column {
                     TopAppBar(
-                        title = title,
+                        // with separate settings per keyboard: the keyboard these settings belong to, under the title
+                        title = {
+                            val ctx = androidx.compose.ui.platform.LocalContext.current
+                            val keyboard = remember { helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(
+                                helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)) }
+                            if (keyboard == null) title()
+                            else Column {
+                                title()
+                                Text(helium314.keyboard.settings.screens.keyboardName(keyboard, ctx),
+                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        },
                         windowInsets = WindowInsets(0),
                         navigationIcon = {
                             BackButton {
