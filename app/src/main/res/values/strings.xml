@@ -644,6 +644,11 @@
     <string name="text_font_follows_key_text">Following the key font</string>
     <string name="background_whole_picture">Don\'t show the picture on keys, only in the gaps between them</string>
     <string name="background_whole_picture_summary">Off: the keys are clear, the whole picture shows and a key shows only while pressed</string>
+    <string name="appearance_group_keys">Keys</string>
+    <string name="appearance_group_theme">Theme</string>
+    <!-- after the chosen theme's name on the Themes row: "Midnight (tweaked, unsaved)" -->
+    <string name="theme_tweaked">tweaked</string>
+    <string name="theme_unsaved">unsaved</string>
     <string name="font_follows_key_text">Use same font for symbols and suggestions</string>
     <string name="key_text_bold">Bold</string>
     <string name="key_text_italic">Italic</string>

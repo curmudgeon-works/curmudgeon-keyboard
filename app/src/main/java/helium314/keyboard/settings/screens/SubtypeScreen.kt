@@ -346,6 +346,10 @@ fun SubtypeScreen(
                         Pending(keyChanged(Settings.PREF_SPACE_TO_CHANGE_LANG)) {
                             CompositionLocalProvider(LocalCompactPreferences provides true) {
                                 SettingsActivity.settingsContainer[Settings.PREF_SPACE_TO_CHANGE_LANG]?.Preference() } }
+                        // the currency key on the symbols pages (and its popup, the numpad's %) (from Advanced)
+                        Pending(keyChanged(Settings.PREF_CUSTOM_CURRENCY_KEY)) {
+                            CompositionLocalProvider(LocalCompactPreferences provides true) {
+                                SettingsActivity.settingsContainer[Settings.PREF_CUSTOM_CURRENCY_KEY]?.Preference() } }
                         Pending(layoutChanged(LayoutType.EMOJI_BOTTOM)) { SwitchRow(stringResource(R.string.bottom_rows_action_key), withAction) { on ->
                             setCurrentSubtype(
                                 if (on) currentSubtype.withLayout(LayoutType.EMOJI_BOTTOM, "emoji_bottom_row_with_action").withLayout(LayoutType.CLIPBOARD_BOTTOM, "clip_bottom_row_with_action")

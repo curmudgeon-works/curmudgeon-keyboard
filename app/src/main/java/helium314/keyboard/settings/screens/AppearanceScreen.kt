@@ -144,37 +144,12 @@ fun AppearanceScreen(
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
     val dayNightMode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && prefs.getBoolean(Settings.PREF_THEME_DAY_NIGHT, Defaults.PREF_THEME_DAY_NIGHT)
     val items = listOf(
-        // a theme saves everything on this screen, so it comes first
-        SettingsWithoutKey.APPEARANCE_LOOKS,
-        R.string.appearance_group_colors,
-        // light / dark following the system first; when on, the light and the dark colours sit under it
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
-            Settings.PREF_THEME_DAY_NIGHT else null,
-        Settings.PREF_THEME_COLORS,
-        if (dayNightMode) Settings.PREF_THEME_COLORS_NIGHT else null,
-        SettingsWithoutKey.BACKGROUND_IMAGE,
-        SettingsWithoutKey.BACKGROUND_IMAGE_LANDSCAPE,
-        // only with a picture set: keys clear on it, so the whole picture shows
-        if (listOf(false, true).any { night -> listOf(false, true).any { land -> Settings.getCustomBackgroundFile(ctx, night, land).exists() } })
-            Settings.PREF_BACKGROUND_WHOLE_PICTURE else null,
-        R.string.appearance_group_style,
+        // ---- typing preferences first (not part of themes)
+        R.string.appearance_group_keys,
         SettingsWithoutKey.HIDE_ALL_SYMBOLS, // the three below it are advanced
         Settings.PREF_SHOW_NUMBER_ROW_HINTS,
         Settings.PREF_SHOW_HINTS,
         Settings.PREF_SHOW_POPUP_HINTS,
-        // (keyboard height, numbers row, split keyboard, bottom row and side padding are on Layout & Typing: the shape, not the look)
-        Settings.PREF_THEME_KEY_BORDERS,
-        Settings.PREF_KEY_HORIZONTAL_GAP,
-        Settings.PREF_KEY_VERTICAL_GAP,
-        Settings.PREF_THEME_STYLE,
-        Settings.PREF_ICON_STYLE,
-        Settings.PREF_CUSTOM_ICON_NAMES,
-        R.string.appearance_group_fonts,
-        SettingsWithoutKey.KEY_TEXT_STYLE,
-        // the same font for symbols and suggestions: then their own tiles are advanced, else in simple mode too
-        Settings.PREF_FONT_FOLLOWS_KEY_TEXT,
-        SettingsWithoutKey.HINT_TEXT_STYLE,
-        SettingsWithoutKey.SUGGESTION_TEXT_STYLE,
         Settings.PREF_SPACE_BAR_TEXT,
         R.string.appearance_group_emoji,
         Settings.PREF_EMOJI_FONT_SCALE,
@@ -184,6 +159,31 @@ fun AppearanceScreen(
             Settings.PREF_EMOJI_SKIN_TONE else null,
         SettingsWithoutKey.CUSTOM_EMOJI_FONT,
         Settings.PREF_SHOW_EMOJI_DESCRIPTIONS,
+        // ---- the theme: the saved themes, then everything a theme sets
+        // (keyboard height, numbers row, split keyboard, bottom row and side padding are on Layout & Typing)
+        R.string.appearance_group_theme,
+        SettingsWithoutKey.APPEARANCE_LOOKS,
+        // light / dark following the system first; when on, the light and the dark colours sit under it
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
+            Settings.PREF_THEME_DAY_NIGHT else null,
+        Settings.PREF_THEME_COLORS,
+        if (dayNightMode) Settings.PREF_THEME_COLORS_NIGHT else null,
+        SettingsWithoutKey.BACKGROUND_IMAGE,
+        SettingsWithoutKey.BACKGROUND_IMAGE_LANDSCAPE,
+        // only with a picture set: keys painted or clear on it
+        if (listOf(false, true).any { night -> listOf(false, true).any { land -> Settings.getCustomBackgroundFile(ctx, night, land).exists() } })
+            Settings.PREF_BACKGROUND_WHOLE_PICTURE else null,
+        Settings.PREF_THEME_KEY_BORDERS,
+        Settings.PREF_KEY_HORIZONTAL_GAP,
+        Settings.PREF_KEY_VERTICAL_GAP,
+        Settings.PREF_THEME_STYLE,
+        Settings.PREF_ICON_STYLE,
+        Settings.PREF_CUSTOM_ICON_NAMES,
+        SettingsWithoutKey.KEY_TEXT_STYLE,
+        // the same font for symbols and suggestions: then their own tiles are advanced, else in simple mode too
+        Settings.PREF_FONT_FOLLOWS_KEY_TEXT,
+        SettingsWithoutKey.HINT_TEXT_STYLE,
+        SettingsWithoutKey.SUGGESTION_TEXT_STYLE,
     )
     // every change shows on the live keyboard at once; the draft remembers how things were when the screen opened
     // after Accept or Reject the current state is the new starting point: a fresh snapshot
@@ -604,7 +604,16 @@ private fun SavedLooksPreference(setting: Setting) {
     var toRename: AppearanceLooks.Look? by remember { mutableStateOf(null) }
     var toDelete: AppearanceLooks.Look? by remember { mutableStateOf(null) }
     fun store(list: List<AppearanceLooks.Look>) { AppearanceLooks.save(prefs, list); generation++ }
-    Preference(name = setting.title, description = setting.description, onClick = { showList = true }) { NextScreenIcon() }
+    // the chosen theme's name; "tweaked" when a value it sets (or its pictures) differs now, "unsaved" while the
+    // theme's part of the screen has changes not saved yet
+    val chosen = prefs.getString(AppearanceLooks.PREF_SELECTED, null)?.let { name -> (builtIn + looks).firstOrNull { it.name == name } }
+    val tweaked = chosen != null && AppearanceLooks.isTweaked(ctx, chosen)
+    val draft = AppearanceDraft.of(ctx)
+    val unsaved = draft.changedKeys(ctx).any { AppearanceLooks.inScope(it) || it == AppearanceLooks.PREF_SELECTED }
+        || draft.changedFiles().any { it.startsWith("custom_background") }
+    val state = listOfNotNull(stringResource(R.string.theme_tweaked).takeIf { tweaked }, stringResource(R.string.theme_unsaved).takeIf { unsaved })
+    val summary = chosen?.let { if (state.isEmpty()) it.name else it.name + " (" + state.joinToString(", ") + ")" }
+    Preference(name = setting.title, description = summary, onClick = { showList = true }) { NextScreenIcon() }
     if (showList)
         ListPickerDialog(
             onDismissRequest = {
@@ -622,7 +631,7 @@ private fun SavedLooksPreference(setting: Setting) {
             // a theme only changes what it lists: the rest stays as it was when the list opened (height, fonts, switches…);
             // starting from `initial` on every tap also means one previewed theme never leaks into the next
             onItemHighlighted = { AppearanceLooks.apply(ctx, initial + it.values); AppearanceLooks.applyPictures(ctx, it) },
-            onItemSelected = { confirmed = true },
+            onItemSelected = { confirmed = true; prefs.edit { putString(AppearanceLooks.PREF_SELECTED, it.name) } },
             // the built-in themes come first and can't be changed; the user's own are renamed and deleted here
             trailing = { look -> if (look !in builtIn) {
                 IconButton({ confirmed = true; showList = false; toRename = look }) { Icon(painterResource(R.drawable.ic_edit), stringResource(R.string.appearance_look_rename)) }
@@ -643,8 +652,11 @@ private fun SavedLooksPreference(setting: Setting) {
             title = { Text(stringResource(R.string.appearance_look_save)) },
             initialText = stringResource(R.string.appearance_look_default_name, looks.size + 1),
             checkTextValid = { name -> name.isNotBlank() && looks.none { it.name == name } },
-            onConfirmed = { name -> store(looks + AppearanceLooks.Look(name,
-                AppearanceLooks.current(prefs) + (AppearanceLooks.PICTURES to AppearanceLooks.savePictures(ctx)))) },
+            onConfirmed = { name ->
+                store(looks + AppearanceLooks.Look(name,
+                    AppearanceLooks.current(prefs) + (AppearanceLooks.PICTURES to AppearanceLooks.savePictures(ctx))))
+                prefs.edit { putString(AppearanceLooks.PREF_SELECTED, name) } // what's on the keyboard now is this theme
+            },
         )
     toRename?.let { look ->
         TextInputDialog(
@@ -652,7 +664,10 @@ private fun SavedLooksPreference(setting: Setting) {
             title = { Text(stringResource(R.string.appearance_look_rename)) },
             initialText = look.name,
             checkTextValid = { name -> name.isNotBlank() && looks.none { it !== look && it.name == name } },
-            onConfirmed = { name -> store(looks.map { if (it === look) AppearanceLooks.Look(name, it.values) else it }) },
+            onConfirmed = { name ->
+                store(looks.map { if (it === look) AppearanceLooks.Look(name, it.values) else it })
+                if (prefs.getString(AppearanceLooks.PREF_SELECTED, null) == look.name) prefs.edit { putString(AppearanceLooks.PREF_SELECTED, name) }
+            },
         )
     }
     toDelete?.let { look ->
@@ -660,7 +675,10 @@ private fun SavedLooksPreference(setting: Setting) {
             onDismissRequest = { toDelete = null },
             title = { Text(stringResource(R.string.appearance_look_delete, look.name)) },
             confirmButtonText = stringResource(R.string.delete),
-            onConfirmed = { AppearanceLooks.deletePictures(ctx, look); store(looks.filter { it !== look }) },
+            onConfirmed = {
+                AppearanceLooks.deletePictures(ctx, look); store(looks.filter { it !== look })
+                if (prefs.getString(AppearanceLooks.PREF_SELECTED, null) == look.name) prefs.edit { remove(AppearanceLooks.PREF_SELECTED) }
+            },
         )
     }
 }
