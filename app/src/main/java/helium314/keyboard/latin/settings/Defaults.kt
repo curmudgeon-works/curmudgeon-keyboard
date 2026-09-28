@@ -150,7 +150,7 @@ object Defaults {
     // own gesture decoder tuning (see OwnGestureDecoder.Tuning): inflection confidences and the scorer blend
     const val PREF_GESTURE_TURN_WEIGHT = 1.0f // multiplier on the confidence of turn inflections
     const val PREF_GESTURE_SLOWDOWN_WEIGHT = 0.5f // how much slowing down over a key favours words with that letter (soft weight); 0 = off
-    const val PREF_GESTURE_KUSHLER_WEIGHT = 0.5f // share of the inflection scorer in the blend; the rest is the whole-path location scorer
+    const val PREF_GESTURE_KUSHLER_WEIGHT = 0.4f // share of the inflection scorer in the blend; the rest is the whole-path location scorer (replay 2026-09-28: 0.4 beat 0.5)
     const val PREF_GESTURE_HISTORY_BOOST = 64 // added to a learned word's frequency (0..255 scale) in the swipe vocabulary
     const val PREF_GESTURE_FAST_TYPING_COOLDOWN = 500
     const val PREF_GESTURE_TRAIL_FADEOUT_DURATION = 800
