@@ -67,8 +67,10 @@ fun WithBigTitle(
     content: @Composable () -> Unit,
 ) {
     Column {
+        // a line above every group, as on the list screens
+        androidx.compose.material3.HorizontalDivider(Modifier.padding(top = 8.dp))
         Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary,
-            modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
+            modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
         content()
     }
 }
