@@ -68,10 +68,7 @@ fun AdvancedSettingsScreen(
         //  (Layout), delete swipe (Backspace); space bar swipes on Swiping; "more diacritics" is the popup presets)
         Settings.PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY,
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) Settings.PREF_SHOW_SETUP_WIZARD_ICON else null,
-        Settings.PREF_ABC_AFTER_SYMBOL_SPACE,
-        Settings.PREF_ABC_AFTER_NUMPAD_SPACE,
-        Settings.PREF_ABC_AFTER_EMOJI,
-        Settings.PREF_ABC_AFTER_CLIP,
+        // (switching back to letters after…: one row with a dialog on Layout & Typing's Typing group)
         Settings.PREF_TIMESTAMP_FORMAT,
         SettingsWithoutKey.BACKUP_RESTORE,
         SettingsWithoutKey.FACTORY_RESET, // advanced only (not in the simple set below): tinted
@@ -182,7 +179,7 @@ fun createAdvancedSettings(context: Context) = listOf(
         SwitchPreference(it, Defaults.PREF_ABC_AFTER_EMOJI)
     },
     Setting(context, Settings.PREF_ABC_AFTER_CLIP, R.string.switch_keyboard_after, R.string.after_clip) {
-        SwitchPreference(it, Defaults.PREF_ABC_AFTER_EMOJI)
+        SwitchPreference(it, Defaults.PREF_ABC_AFTER_CLIP)
     },
     Setting(context, Settings.PREF_CUSTOM_CURRENCY_KEY, R.string.customize_currencies) { setting ->
         var showDialog by rememberSaveable { mutableStateOf(false) }

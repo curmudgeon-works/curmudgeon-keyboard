@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.screens
 
+import helium314.keyboard.settings.SettingsWithoutKey
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import androidx.compose.foundation.layout.Column
@@ -123,7 +124,35 @@ val preferencesSimpleModeKeys = setOf(
     Settings.PREF_SHOW_EMOJI_KEY, Settings.PREF_ENABLE_CLIPBOARD_HISTORY,
 )
 
+/** The four "back to letters after…" switches: one row, a dialog with the four. */
+val abcAfterKeys = listOf(
+    Triple(Settings.PREF_ABC_AFTER_SYMBOL_SPACE, Defaults.PREF_ABC_AFTER_SYMBOL_SPACE, R.string.after_symbol_and_space),
+    Triple(Settings.PREF_ABC_AFTER_NUMPAD_SPACE, Defaults.PREF_ABC_AFTER_NUMPAD_SPACE, R.string.after_numpad_and_space),
+    Triple(Settings.PREF_ABC_AFTER_EMOJI, Defaults.PREF_ABC_AFTER_EMOJI, R.string.after_emoji),
+    Triple(Settings.PREF_ABC_AFTER_CLIP, Defaults.PREF_ABC_AFTER_CLIP, R.string.after_clip),
+)
+private val abcAfterShort = listOf(R.string.abc_after_symbols, R.string.abc_after_numpad, R.string.abc_after_emoji, R.string.abc_after_clipboard)
+
 fun createPreferencesSettings(context: Context) = listOf(
+    Setting(context, SettingsWithoutKey.ABC_AFTER, R.string.switch_keyboard_after) { setting ->
+        val prefs = LocalContext.current.prefs()
+        abcAfterKeys.forEach { (key, default, _) -> helium314.keyboard.settings.KnownDefaults.note(key, default) }
+        var show by rememberSaveable { mutableStateOf(false) }
+        // which of the four are on, in short
+        val on = abcAfterKeys.zip(abcAfterShort).filter { (k, _) -> prefs.getBoolean(k.first, k.second) }.map { stringResource(it.second) }
+        Preference(name = setting.title, description = on.joinToString(", ").ifEmpty { stringResource(R.string.abc_after_none) },
+            onClick = { show = true })
+        if (show) ThreeButtonAlertDialog(
+            onDismissRequest = { show = false },
+            onConfirmed = { },
+            confirmButtonText = null,
+            cancelButtonText = stringResource(R.string.dialog_close),
+            title = { Text(setting.title) },
+            content = { Column { abcAfterKeys.forEach { (key, default, label) ->
+                SwitchPreference(name = stringResource(label), key = key, default = default)
+            } } },
+        )
+    },
     Setting(context, Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS, R.string.backspace_hold_deletes_words, R.string.backspace_hold_deletes_words_summary) {
         SwitchPreference(it, Defaults.PREF_BACKSPACE_HOLD_DELETES_WORDS)
     },

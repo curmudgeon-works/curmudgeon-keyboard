@@ -144,22 +144,7 @@ fun AppearanceScreen(
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
     val dayNightMode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && prefs.getBoolean(Settings.PREF_THEME_DAY_NIGHT, Defaults.PREF_THEME_DAY_NIGHT)
     val items = listOf(
-        // ---- typing preferences first (not part of themes)
-        R.string.appearance_group_keys,
-        SettingsWithoutKey.HIDE_ALL_SYMBOLS, // the three below it are advanced
-        Settings.PREF_SHOW_NUMBER_ROW_HINTS,
-        Settings.PREF_SHOW_HINTS,
-        Settings.PREF_SHOW_POPUP_HINTS,
-        Settings.PREF_SPACE_BAR_TEXT,
-        R.string.appearance_group_emoji,
-        Settings.PREF_EMOJI_FONT_SCALE,
-        if (prefs.getFloat(Settings.PREF_EMOJI_FONT_SCALE, Defaults.PREF_EMOJI_FONT_SCALE) != 1f)
-            Settings.PREF_EMOJI_KEY_FIT else null,
-        if (prefs.getInt(Settings.PREF_EMOJI_MAX_SDK, 0) >= 24)
-            Settings.PREF_EMOJI_SKIN_TONE else null,
-        SettingsWithoutKey.CUSTOM_EMOJI_FONT,
-        Settings.PREF_SHOW_EMOJI_DESCRIPTIONS,
-        // ---- the theme: the saved themes, then everything a theme sets
+        // ---- the theme first: the saved themes, then everything a theme sets
         // (keyboard height, numbers row, split keyboard, bottom row and side padding are on Layout & Typing)
         R.string.appearance_group_theme,
         SettingsWithoutKey.APPEARANCE_LOOKS,
@@ -184,6 +169,21 @@ fun AppearanceScreen(
         Settings.PREF_FONT_FOLLOWS_KEY_TEXT,
         SettingsWithoutKey.HINT_TEXT_STYLE,
         SettingsWithoutKey.SUGGESTION_TEXT_STYLE,
+        // ---- then the typing preferences (not part of themes)
+        R.string.appearance_group_keys,
+        SettingsWithoutKey.HIDE_ALL_SYMBOLS, // the three below it are advanced
+        Settings.PREF_SHOW_NUMBER_ROW_HINTS,
+        Settings.PREF_SHOW_HINTS,
+        Settings.PREF_SHOW_POPUP_HINTS,
+        Settings.PREF_SPACE_BAR_TEXT,
+        R.string.appearance_group_emoji,
+        Settings.PREF_EMOJI_FONT_SCALE,
+        if (prefs.getFloat(Settings.PREF_EMOJI_FONT_SCALE, Defaults.PREF_EMOJI_FONT_SCALE) != 1f)
+            Settings.PREF_EMOJI_KEY_FIT else null,
+        if (prefs.getInt(Settings.PREF_EMOJI_MAX_SDK, 0) >= 24)
+            Settings.PREF_EMOJI_SKIN_TONE else null,
+        SettingsWithoutKey.CUSTOM_EMOJI_FONT,
+        Settings.PREF_SHOW_EMOJI_DESCRIPTIONS,
     )
     // every change shows on the live keyboard at once; the draft remembers how things were when the screen opened
     // after Accept or Reject the current state is the new starting point: a fresh snapshot
