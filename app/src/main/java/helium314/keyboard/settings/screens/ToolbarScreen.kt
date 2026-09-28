@@ -2,6 +2,7 @@
 package helium314.keyboard.settings.screens
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -41,10 +42,21 @@ fun ToolbarScreen(
     val b = (LocalContext.current.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
     if ((b?.value ?: 0) < 0)
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
+    val items = toolbarItems(prefs)
+    SearchSettingsScreen(
+        onClickBack = onClickBack,
+        title = stringResource(R.string.settings_screen_toolbar),
+        settings = items,
+        simpleModeKeys = emptySet(), // advanced-only screen: empties if the switch is turned off while here
+    )
+}
+
+/** The toolbar's rows as they apply now (they depend on the toolbar mode); on Layout & Typing's Toolbar group. */
+fun toolbarItems(prefs: SharedPreferences): List<String?> {
     val toolbarMode = Settings.readToolbarMode(prefs)
     val clipboardToolbarVisible = toolbarMode != ToolbarMode.HIDDEN
         || !prefs.getBoolean(Settings.PREF_TOOLBAR_HIDING_GLOBAL, Defaults.PREF_TOOLBAR_HIDING_GLOBAL)
-    val items = listOf(
+    return listOf(
         Settings.PREF_TOOLBAR_MODE,
         if (toolbarMode == ToolbarMode.HIDDEN) Settings.PREF_TOOLBAR_HIDING_GLOBAL else null,
         if (toolbarMode != ToolbarMode.HIDDEN) Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE else null,
@@ -65,13 +77,15 @@ fun ToolbarScreen(
         // the button that opens and closes the toolbar (moved here from the Suggestion strip font dialog)
         if (toolbarMode == ToolbarMode.EXPANDABLE) Settings.PREF_TOOLBAR_EXPAND_ICON else null,
     )
-    SearchSettingsScreen(
-        onClickBack = onClickBack,
-        title = stringResource(R.string.settings_screen_toolbar),
-        settings = items,
-        simpleModeKeys = emptySet(), // advanced-only screen: empties if the switch is turned off while here
-    )
 }
+
+/** Every key the toolbar rows write (Layout & Typing's Keep / Discard). */
+val toolbarKeys = listOf(
+    Settings.PREF_TOOLBAR_MODE, Settings.PREF_TOOLBAR_HIDING_GLOBAL, Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE,
+    Settings.PREF_TOOLBAR_KEYS, Settings.PREF_PINNED_TOOLBAR_KEYS, Settings.PREF_CLIPBOARD_TOOLBAR_KEYS,
+    Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES, Settings.PREF_QUICK_PIN_TOOLBAR_KEYS, Settings.PREF_AUTO_SHOW_TOOLBAR,
+    Settings.PREF_AUTO_HIDE_TOOLBAR, Settings.PREF_VARIABLE_TOOLBAR_DIRECTION, Settings.PREF_TOOLBAR_EXPAND_ICON,
+)
 
 fun createToolbarSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_TOOLBAR_EXPAND_ICON, R.string.toolbar_button) {
