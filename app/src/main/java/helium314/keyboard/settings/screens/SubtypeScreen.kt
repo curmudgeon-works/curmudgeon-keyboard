@@ -304,7 +304,7 @@ fun SubtypeScreen(
             ) { androidx.compose.runtime.key(rebuild) {
                 val advanced by SettingsMode.state(ctx)
                 // two groups, one row style (label 10 dp in, rows 56 dp high): see LocalCompactPreferences, SwitchRow
-                // ---- the layout: main layout (advanced), shape, emoji key, split, send key, other layouts, bottom row
+                // ---- the layout (then typing, then popups): main layout (advanced), shape, emoji key, split, send key, other layouts, bottom row
                 WithBigTitle(stringResource(R.string.keyboard_layout_set)) {
                     // the main layout (QWERTY, QWERTZ, AZERTY, …) on top, advanced
                     if (advanced) AdvancedBlock { Pending(layoutChanged(LayoutType.MAIN)) { MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) } } }
@@ -378,21 +378,6 @@ fun SubtypeScreen(
                         }
                     }
                 }
-                // ---- popups: what holding a key offers (every row is advanced, so the group is too)
-                if (advanced) AdvancedBlock { WithBigTitle(stringResource(R.string.key_popups_group)) {
-                    // preset popup layouts, customize popups, customize keys and popups with JSON (all advanced);
-                    // italic as a whole when any of it changed
-                    Pending(keyChanged("key_popups", "key_popup_set_selected", "key_popup_sets", Settings.PREF_SYMBOL_POPUP_MAP)
-                            || currentSubtype.getExtraValueOf(ExtraValue.MORE_POPUPS) != openedSubtype.getExtraValueOf(ExtraValue.MORE_POPUPS)
-                            || layoutChanged(LayoutType.SYMBOLS) || changedFolders.any { it != "main" } || prefixChanged(Settings.PREF_LAYOUT_PREFIX)) {
-                        KeyPopupsSection(currentSubtype) { setCurrentSubtype(it) } }
-                    run {
-                        Pending(keyChanged(Settings.PREF_SHOW_TLD_POPUP_KEYS)) {
-                            PrefSwitchRow(Settings.PREF_SHOW_TLD_POPUP_KEYS, Defaults.PREF_SHOW_TLD_POPUP_KEYS, R.string.show_tld_popup_keys) { holdPreview(); reloadPreview() } }
-                        Pending(keyChanged(Settings.PREF_REMOVE_REDUNDANT_POPUPS)) {
-                            PrefSwitchRow(Settings.PREF_REMOVE_REDUNDANT_POPUPS, Defaults.PREF_REMOVE_REDUNDANT_POPUPS, R.string.remove_redundant_popups) { holdPreview(); reloadPreview() } }
-                    }
-                } }
                 // ---- typing: key-press popup, vibration, sound, per-app keyboard, localized number row
                 WithBigTitle(stringResource(R.string.settings_category_input)) {
                     CompositionLocalProvider(LocalCompactPreferences provides true) {
@@ -425,6 +410,21 @@ fun SubtypeScreen(
                         }
                     }
                 }
+                // ---- popups: what holding a key offers (every row is advanced, so the group is too)
+                if (advanced) AdvancedBlock { WithBigTitle(stringResource(R.string.key_popups_group)) {
+                    // preset popup layouts, customize popups, customize keys and popups with JSON (all advanced);
+                    // italic as a whole when any of it changed
+                    Pending(keyChanged("key_popups", "key_popup_set_selected", "key_popup_sets", Settings.PREF_SYMBOL_POPUP_MAP)
+                            || currentSubtype.getExtraValueOf(ExtraValue.MORE_POPUPS) != openedSubtype.getExtraValueOf(ExtraValue.MORE_POPUPS)
+                            || layoutChanged(LayoutType.SYMBOLS) || changedFolders.any { it != "main" } || prefixChanged(Settings.PREF_LAYOUT_PREFIX)) {
+                        KeyPopupsSection(currentSubtype) { setCurrentSubtype(it) } }
+                    run {
+                        Pending(keyChanged(Settings.PREF_SHOW_TLD_POPUP_KEYS)) {
+                            PrefSwitchRow(Settings.PREF_SHOW_TLD_POPUP_KEYS, Defaults.PREF_SHOW_TLD_POPUP_KEYS, R.string.show_tld_popup_keys) { holdPreview(); reloadPreview() } }
+                        Pending(keyChanged(Settings.PREF_REMOVE_REDUNDANT_POPUPS)) {
+                            PrefSwitchRow(Settings.PREF_REMOVE_REDUNDANT_POPUPS, Defaults.PREF_REMOVE_REDUNDANT_POPUPS, R.string.remove_redundant_popups) { holdPreview(); reloadPreview() } }
+                    }
+                } }
                 // ---- backspace and clipboard history: advanced groups, heading included, in one tinted block
                 if (advanced) AdvancedBlock {
                     WithBigTitle(stringResource(R.string.backspace_settings)) {
