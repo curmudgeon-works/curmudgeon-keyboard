@@ -2,8 +2,11 @@
 // Trie vocabulary for the gesture decoder, populated from the binary dictionary /
 // user history. Children are stored as parallel arrays (char + node) instead of a
 // HashMap: at 50k words the trie has ~150k nodes, and boxed-char hash maps cost
-// several times the memory and iterate slower in the decoder's hot trie walk.
+// several times the memory. The decoder looks words up by their first and last
+// letters ([wordsByEnds]), Swype-style, not by walking the trie.
 package helium314.keyboard.gesture
+
+import java.util.concurrent.ConcurrentHashMap
 
 /** Trie of (word, frequency). Frequencies must be positive. */
 class Vocabulary(entries: Iterable<Pair<String, Int>>) {
@@ -53,13 +56,61 @@ class Vocabulary(entries: Iterable<Pair<String, Int>>) {
         for ((word, freq) in entries) add(word, freq)
     }
 
+    /**
+     * Words by (first char, last char) of their lowercased form, built on first use and then kept up to date by
+     * [add]. Buckets are replaced, never changed in place, so a decode on another thread always reads a whole array.
+     */
+    @Volatile private var ends: Ends? = null
+
+    private class Ends(
+        val buckets: ConcurrentHashMap<Int, Array<Node>>,
+        @Volatile var firstChars: CharArray,
+        @Volatile var lastChars: CharArray,
+    )
+
+    /** The distinct first chars of all words (lowercase). */
+    fun firstChars(): CharArray = endsIndex().firstChars
+
+    /** The distinct last chars of all words (lowercase). */
+    fun lastChars(): CharArray = endsIndex().lastChars
+
+    /** The words starting with [first] and ending with [last] (lowercase chars); read [Node.word] and [Node.frequency] live. */
+    fun wordsByEnds(first: Char, last: Char): Array<Node> = endsIndex().buckets[endsKey(first, last)] ?: NO_NODES
+
+    private fun endsIndex(): Ends = ends ?: buildEnds()
+
+    @Synchronized
+    private fun buildEnds(): Ends {
+        ends?.let { return it }
+        val lists = HashMap<Int, ArrayList<Node>>()
+        fun collect(node: Node, first: Char, c: Char) {
+            if (node.word != null) lists.getOrPut(endsKey(first, c)) { ArrayList() }.add(node)
+            for (i in 0 until node.childCount) collect(node.childAt(i), first, node.childCharAt(i))
+        }
+        for (i in 0 until root.childCount) collect(root.childAt(i), root.childCharAt(i), root.childCharAt(i))
+        val buckets = ConcurrentHashMap<Int, Array<Node>>(lists.size * 2)
+        for ((k, v) in lists) buckets[k] = v.toTypedArray()
+        return Ends(buckets, lists.keys.map { (it ushr 16).toChar() }.distinct().toCharArray(),
+            lists.keys.map { (it and 0xFFFF).toChar() }.distinct().toCharArray()).also { ends = it }
+    }
+
     /** Adds a word or raises its frequency. Safe while other threads read the trie; callers must not add concurrently. */
     @Synchronized
     fun add(word: String, frequency: Int) {
         if (word.isEmpty() || frequency <= 0) return
         var node = root
         for (c in word) node = node.getOrPut(c.lowercaseChar())
-        if (node.word == null) size++
+        if (node.word == null) {
+            size++
+            ends?.let { e ->
+                val first = word.first().lowercaseChar()
+                val last = word.last().lowercaseChar()
+                val k = endsKey(first, last)
+                e.buckets[k] = (e.buckets[k] ?: NO_NODES) + node
+                if (first !in e.firstChars) e.firstChars += first
+                if (last !in e.lastChars) e.lastChars += last
+            }
+        }
         // keep the casing of the highest-frequency variant (trie keys are lowercased,
         // stored words keep original casing so e.g. proper nouns display correctly)
         if (frequency >= node.frequency) {
@@ -77,5 +128,10 @@ class Vocabulary(entries: Iterable<Pair<String, Int>>) {
         var node = root
         for (c in word) node = node.child(c.lowercaseChar()) ?: return null
         return node
+    }
+
+    private companion object {
+        val NO_NODES = arrayOf<Node>()
+        fun endsKey(first: Char, last: Char): Int = (first.code shl 16) or last.code
     }
 }

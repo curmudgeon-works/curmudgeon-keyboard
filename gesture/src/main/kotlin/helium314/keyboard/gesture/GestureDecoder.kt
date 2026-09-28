@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Shared decode pipeline: capture → preprocess → prune → score → rank.
-// Pruning per spec: start/end key neighborhoods, sokgraph path-length ratio band,
-// minimum letters from inflection count, trie walk restricted to key-neighborhood
-// transitions. Ranking per the patent formula (lower is better).
+// Word picking per US7453439: first and last letters pinned to the start / end of the
+// swipe, then each word's letters matched in order along the path within a corridor,
+// plus the sokgraph path-length ratio band and a minimum letter count from the
+// inflections; nothing fits → search again with wider thresholds.
+// Ranking per the patent formula (lower is better).
 package helium314.keyboard.gesture
 
 import kotlin.math.ln
@@ -10,7 +12,7 @@ import kotlin.math.ln
 class DecoderConfig(
     /** First/last letter must be within this many key widths of PEN_DOWN / PEN_UP. */
     val endpointRadiusKeyWidths: Float = 1.6f,
-    /** Mid letters must be within this many key widths of the drawn path (trie-walk corridor). */
+    /** Mid letters must be within this many key widths of the drawn path (the corridor). */
     val corridorRadiusKeyWidths: Float = 1.4f,
     /** Allowed backtrack (key widths) when requiring letters to progress along the path. */
     val progressSlackKeyWidths: Float = 1.2f,
@@ -25,7 +27,12 @@ class DecoderConfig(
     /** Slack subtracted from the strong-inflection count for min-letter pruning. */
     val minLetterSlack: Int = 1,
     /**
-     * Hard cap on candidates sent to the scorer (safety net for huge vocabularies). The cut is in trie-walk order,
+     * When no word fits, the endpoint radii and the corridor are multiplied by this and the search runs once more
+     * (Swype's retry with larger letter-to-path thresholds). 1 = no retry.
+     */
+    val retryWidening: Float = 1.5f,
+    /**
+     * Hard cap on candidates sent to the scorer (safety net for huge vocabularies). The cut is in lookup order,
      * not by merit: at 512 a long swipe lost words like "removed" before scoring (2026-09-23), so it sits high
      * enough to be a pure safety net. Scoring cost is ~linear and small (73k-word vocabulary: ~1 ms per swipe).
      */
@@ -76,7 +83,9 @@ class GestureDecoder(
         val gesture = preprocessor.preprocess(points, geometry)
         if (gesture.points.isEmpty()) return out
 
-        val candidates = collectCandidates(gesture, geometry, vocabulary)
+        var candidates = collectCandidates(gesture, geometry, vocabulary, 1f)
+        if (candidates.isEmpty() && config.retryWidening > 1f)
+            candidates = collectCandidates(gesture, geometry, vocabulary, config.retryWidening)
         if (candidates.isEmpty()) return out
 
         // caps-excursion: uppercase the letter matched nearest before each excursion.
@@ -137,84 +146,77 @@ class GestureDecoder(
     private class Candidate(
         val sokgraph: Sokgraph,
         val frequency: Int,
-        /** matched arc position along the drawn path per word character (trie-walk order) */
+        /** matched arc position along the drawn path per word character */
         val letterArcs: FloatArray,
     )
 
+    /** [widen] multiplies the endpoint radii and the corridor (1 = the normal search). */
     private fun collectCandidates(
         gesture: PreprocessedGesture,
         geometry: KeyboardGeometry,
         vocabulary: Vocabulary,
+        widen: Float,
     ): List<Candidate> {
         val kw = geometry.keyWidth
         val start = gesture.points.first()
         val end = gesture.points.last()
-        val endpointRadius = config.endpointRadiusKeyWidths * kw
-        val corridorRadius = config.corridorRadiusKeyWidths * kw
+        val endpointRadius = config.endpointRadiusKeyWidths * kw * widen
+        val corridorRadius = config.corridorRadiusKeyWidths * kw * widen
         val progressSlack = config.progressSlackKeyWidths * kw
         val drawnLength = gesture.pathLength
         val minLetters = (gesture.strongInflectionCount(config.strongInflectionConfidence)
                 - config.minLetterSlack).coerceAtLeast(1)
 
-        // prune 1: first letter within neighborhood of PEN_DOWN
-        val startChars = geometry.keysNear(start.x, start.y, endpointRadius).map { it.char }.toHashSet()
-        // last-letter neighborhood, checked when a word node is reached
-        val endChars = geometry.keysNear(end.x, end.y, (config.penUpRadiusKeyWidths ?: config.endpointRadiusKeyWidths) * kw).map { it.char }.toHashSet()
+        // prune 1: the first letter's key near where the swipe started, the last letter's near where it ended
+        val startKeys = geometry.keysNear(start.x, start.y, endpointRadius).map { it.char }.toHashSet()
+        val endKeys = geometry.keysNear(end.x, end.y, (config.penUpRadiusKeyWidths ?: config.endpointRadiusKeyWidths) * kw * widen)
+            .map { it.char }.toHashSet()
+        fun onKeys(c: Char, keys: Set<Char>) = !geometry.isSkippedWordChar(c) && geometry.keyForWordChar(c)?.char in keys
+        val firsts = vocabulary.firstChars().filter { onKeys(it, startKeys) }
+        val lasts = vocabulary.lastChars().filter { onKeys(it, endKeys) }
 
-        val out = ArrayList<Candidate>()
-
-        // cache per character: (distance to path, arc position) starting from a given arc — memoized coarsely
+        // distance from each key to the path, once per character
         // (apostrophes map to the period key via keyForWordChar, so they cache separately)
         val distCache = HashMap<Char, Float>()
-
         fun distToPath(c: Char): Float = distCache.getOrPut(c) {
             val k = geometry.keyForWordChar(c) ?: return@getOrPut Float.MAX_VALUE
             gesture.distanceToPath(k.centerX, k.centerY)
         }
 
-        // matched arc position per character on the current trie path (for excursion caps)
-        val arcStack = ArrayList<Float>()
-
-        // prune 4: trie walk restricted to key-neighborhood transitions,
-        // with letters required to progress (with slack) along the path
-        fun walk(node: Vocabulary.Node, c: Char, arcPos: Float, depth: Int) {
-            if (out.size >= config.maxCandidates) return
-            if (geometry.isSkippedWordChar(c)) {
-                // not on the path: holds the previous letter's position (a word can't end here, its last key is a letter)
-                arcStack.add(arcPos)
-                for (i in 0 until node.childCount) walk(node.childAt(i), node.childCharAt(i), arcPos, depth + 1)
-                arcStack.removeAt(arcStack.size - 1)
-                return
-            }
-            val key = geometry.keyForWordChar(c) ?: return
-            // corridor check: key must be near the drawn path at all
-            if (distToPath(c) > corridorRadius) return
-            // ordering check: key must be reachable at/after the previous letter's position
-            val (d, newArc) = gesture.nearestArcPositionFrom(
-                key.centerX, key.centerY, (arcPos - progressSlack).coerceAtLeast(0f), corridorRadius
-            )
-            if (d > corridorRadius) return
-
-            arcStack.add(newArc)
-            val word = node.word
-            if (word != null && word.length >= minLetters && key.char in endChars) {
-                // prune 2: sokgraph length within ratio band of drawn length
-                val sok = SokgraphBuilder.build(word, geometry)
-                if (sok != null && lengthBandOk(sok, drawnLength, kw)) {
-                    out.add(Candidate(sok, node.frequency, arcStack.toFloatArray()))
+        /**
+         * prune 3: each letter's key near the path, in order: at or after (with slack) the previous letter's
+         * position. Returns the matched arc position per character, or null if the word doesn't fit.
+         */
+        fun matchAlongPath(word: String): FloatArray? {
+            val arcs = FloatArray(word.length)
+            var arcPos = 0f
+            for (i in word.indices) {
+                val c = word[i].lowercaseChar()
+                if (geometry.isSkippedWordChar(c)) { // not on the path: holds the previous letter's position
+                    arcs[i] = arcPos
+                    continue
                 }
+                val key = geometry.keyForWordChar(c) ?: return null
+                if (distToPath(c) > corridorRadius) return null
+                val (d, newArc) = gesture.nearestArcPositionFrom(
+                    key.centerX, key.centerY, (arcPos - progressSlack).coerceAtLeast(0f), corridorRadius
+                )
+                if (d > corridorRadius) return null
+                arcs[i] = newArc
+                arcPos = newArc
             }
-            for (i in 0 until node.childCount) {
-                walk(node.childAt(i), node.childCharAt(i), newArc, depth + 1)
-            }
-            arcStack.removeAt(arcStack.size - 1)
+            return arcs
         }
 
-        val root = vocabulary.root
-        for (i in 0 until root.childCount) {
-            val c = root.childCharAt(i)
-            val key = geometry.keyForWordChar(c) ?: continue
-            if (key.char in startChars) walk(root.childAt(i), c, 0f, 1)
+        val out = ArrayList<Candidate>()
+        for (f in firsts) for (l in lasts) for (node in vocabulary.wordsByEnds(f, l)) {
+            if (out.size >= config.maxCandidates) return out
+            val word = node.word ?: continue
+            if (word.length < minLetters) continue
+            val arcs = matchAlongPath(word) ?: continue
+            // prune 2: sokgraph length within ratio band of drawn length
+            val sok = SokgraphBuilder.build(word, geometry) ?: continue
+            if (lengthBandOk(sok, drawnLength, kw)) out.add(Candidate(sok, node.frequency, arcs))
         }
         return out
     }
