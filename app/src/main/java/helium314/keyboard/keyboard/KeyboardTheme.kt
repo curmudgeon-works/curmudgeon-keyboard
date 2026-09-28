@@ -18,6 +18,7 @@ import helium314.keyboard.latin.R
 import helium314.keyboard.latin.common.AllColors
 import helium314.keyboard.latin.common.ColorType
 import helium314.keyboard.latin.common.Colors
+import helium314.keyboard.latin.common.SeeThroughKeys
 import helium314.keyboard.latin.common.DefaultColors
 import helium314.keyboard.latin.common.DynamicColors
 import helium314.keyboard.latin.settings.Defaults
@@ -145,7 +146,11 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                 prefs.getString(Settings.PREF_THEME_COLORS, Defaults.PREF_THEME_COLORS)
             val themeStyle = prefs.getString(Settings.PREF_THEME_STYLE, Defaults.PREF_THEME_STYLE)
 
-            return getThemeColors(themeName!!, themeStyle!!, context, prefs, isNight)
+            val colors = getThemeColors(themeName!!, themeStyle!!, context, prefs, isNight)
+            // a background picture shown whole: the keys are clear on it
+            return if (prefs.getBoolean(Settings.PREF_BACKGROUND_WHOLE_PICTURE, Defaults.PREF_BACKGROUND_WHOLE_PICTURE)
+                    && Settings.readUserBackgroundImage(context, isNight) != null) SeeThroughKeys(colors)
+                else colors
         }
 
         private fun getThemeColors(themeName: String, themeStyle: String, context: Context, prefs: SharedPreferences, isNight: Boolean): Colors {

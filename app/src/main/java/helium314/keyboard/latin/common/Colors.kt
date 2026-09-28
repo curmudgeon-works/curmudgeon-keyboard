@@ -667,3 +667,24 @@ enum class ColorType {
 
 // this is not used any more, but we keep in case a colorMap does not get filled for whatever reason
 fun ColorType.default() = ColorUtils.setAlphaComponent(name.hashCode() and 0xffffff, 255)
+
+/**
+ * A background picture shown whole ("Show the whole picture", Appearance): the keys are clear on it and only show
+ * their colour, lighter, while pressed; everything else is [base]'s.
+ */
+class SeeThroughKeys(private val base: Colors) : Colors by base {
+    private val keyTypes = setOf(KEY_BACKGROUND, FUNCTIONAL_KEY_BACKGROUND, SPACE_BAR_BACKGROUND, ACTION_KEY_BACKGROUND)
+
+    private fun clear(drawable: Drawable, color: ColorType) {
+        val pressed = ColorUtils.setAlphaComponent(base.get(color), 0x80)
+        DrawableCompat.setTintMode(drawable, PorterDuff.Mode.SRC_IN)
+        DrawableCompat.setTintList(drawable, ColorStateList(arrayOf(intArrayOf(android.R.attr.state_pressed), intArrayOf()),
+            intArrayOf(pressed, Color.TRANSPARENT)))
+    }
+
+    override fun setColor(drawable: Drawable, color: ColorType) =
+        if (color in keyTypes) clear(drawable, color) else base.setColor(drawable, color)
+
+    override fun selectAndColorDrawable(attr: TypedArray, color: ColorType): Drawable =
+        base.selectAndColorDrawable(attr, color).also { if (color in keyTypes) clear(it, color) }
+}
