@@ -97,7 +97,6 @@
     <string name="settings_category_miscellaneous">Diverse</string>
     <string name="abbreviation_unit_minutes">%s min</string>
     <string name="settings_no_limit">Ingen gräns</string>
-    <string name="prefs_long_press_keyboard_to_change_lang_summary">Långtryckning på mellanslagstangenten öppnar menyn för val av inmatningsmetod</string>
     <string name="prefs_long_press_keyboard_to_change_lang">Ändra inmatningsmetod med mellanslagstangenten</string>
     <string name="spell_checker_service_name">HeliBoards stavningskontroll</string>
     <string name="android_spell_checker_settings">Inställningar för HeliBoards stavningskontroll</string>

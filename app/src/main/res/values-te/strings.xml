@@ -97,7 +97,6 @@
     <string name="prefs_force_incognito_mode_summary">కొత్త పదముల అభ్యాసమును ఆపండి</string>
     <string name="prefs_long_press_keyboard_to_change_lang">ఇన్పుట్ పద్దతి మార్చుటకు స్పేస్ కీ వాడండి</string>
     <string name="prefs_keyboard_height_scale">కీబోర్డ్ ఎత్తు కొలత</string>
-    <string name="prefs_long_press_keyboard_to_change_lang_summary">ఇన్పుట్ పద్దతి ఎంపిక కొరకు స్పేస్ కీ ని కొద్ది సేపు నొక్కి ఉంచండి</string>
     <string name="settings_category_clipboard_history">క్లిప్ బోర్డ్ హిస్టరీ</string>
     <string name="settings_category_suggestions">సూచనలు</string>
     <string name="settings_category_experimental">ప్రయోగాత్మకము</string>

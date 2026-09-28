@@ -165,7 +165,6 @@ Nouveau dictionnaire:
     <string name="localized_number_row">Ligne de chiffres en language local</string>
     <string name="localized_number_row_summary">Privilégie les chiffres en language local à la place des chiffres latins</string>
     <string name="prefs_long_press_keyboard_to_change_lang">Changer le mode de saisie avec la barre d\'espace</string>
-    <string name="prefs_long_press_keyboard_to_change_lang_summary">Un appui long sur la barre d\'espace fera apparaître le menu de sélection des claviers</string>
     <string name="show_hints">Afficher les indices de touches</string>
     <string name="show_hints_summary">Affiche les caractères alternatifs lors d\'un appui long</string>
     <string name="hint_source">Sélectionner la source des indices</string>

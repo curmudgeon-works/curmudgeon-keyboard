@@ -115,7 +115,6 @@
     <string name="select_color_background">Klahvistiku taust</string>
     <string name="var_toolbar_direction_summary">Vastupidine suund, kui klahvistiku paremalt-vasakule alamtüüp on valitud</string>
     <string name="prefs_keyboard_height_scale">Klahvistiku kõrguse proportsioonid</string>
-    <string name="prefs_long_press_keyboard_to_change_lang_summary">Pika vajutusega tühikuklahvile avaneb sisestusmeetodite valiku menüü</string>
     <string name="dictionary_file_wrong_script">Viga: märgistik ei ühildu selle klahvistikuga</string>
     <string name="number_row">Numbririda</string>
     <string name="gesture_floating_preview_static">Ujuv eelvaade</string>

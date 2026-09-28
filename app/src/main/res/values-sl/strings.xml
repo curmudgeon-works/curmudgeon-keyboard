@@ -125,7 +125,6 @@
     <string name="delete_swipe">Podrsaj za izbris</string>
     <string name="show_hints_summary">Prikaži namige z dolgim pritiskom</string>
     <string name="day_night_mode_summary">Izgled bo sledil sistemskim nastavitvam</string>
-    <string name="prefs_long_press_keyboard_to_change_lang_summary">Dolg pritisk na preslednico bo priklical meni za izbiro načina vnosa</string>
     <string name="undo">"Razveljavi"</string>
     <string name="redo">"Uveljavi"</string>
     <string name="use_personalized_dicts_summary">"Vaša sporočila in vnesene podatke uporabi za boljše predloge"</string>

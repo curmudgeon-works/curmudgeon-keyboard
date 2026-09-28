@@ -244,7 +244,6 @@
     <string name="pinned_toolbar_keys">Pasirinkti prisegtus įrankių juostos mygtukus</string>
     <string name="quick_pin_toolbar_keys">Ilgai paspaudus prisegti įrankių juostos mygtuką</string>
     <string name="prefs_long_press_keyboard_to_change_lang">Pakeisti įvesties režimą su tarpo klavišu</string>
-    <string name="prefs_long_press_keyboard_to_change_lang_summary">Ilgai paspaudus tarpą atsiras kalbos pasirinkimo meniu</string>
     <string name="prefs_narrow_key_gaps">Sumažinti klavišų tarpus</string>
     <string name="prefs_keyboard_height_scale">Klaviatūros dydžio keitimas</string>
     <string name="prefs_bottom_padding_scale">Apačios dydžio keitimas</string>

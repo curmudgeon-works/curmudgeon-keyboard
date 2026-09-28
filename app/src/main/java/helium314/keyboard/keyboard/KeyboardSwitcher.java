@@ -836,6 +836,11 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
 
     /** Marks the theme as outdated. The theme will be reloaded next time the keyboard is shown.
      *  If the keyboard is currently showing, theme will be reloaded immediately. */
+    /** The keyboard's frame (suggestions and keys: what the background picture covers), null before the keyboard is shown. */
+    @Nullable public View getMainKeyboardFrame() {
+        return mMainKeyboardFrame;
+    }
+
     public void setThemeNeedsReload() {
         mThemeNeedsReload = true;
         SuggestionStripView.rememberToolbarForReload();

@@ -44,7 +44,6 @@
     <string name="more_keys_strip_description">Mais teclas</string>
     <string name="show_hints">Mostrar dicas de teclas</string>
     <string name="show_hints_summary">Mostrar dicas com toque longo</string>
-    <string name="prefs_long_press_keyboard_to_change_lang_summary">Segurar na tecla de espaço mostrará um menu de seleção de metódo de entrada</string>
     <string name="prefs_keyboard_height_scale">Escala da altura do teclado</string>
     <string name="number_row_summary">Sempre mostrar a linha de números</string>
     <string name="subtype_en_GB">Inglês (Reino Unido)</string>

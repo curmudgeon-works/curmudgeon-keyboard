@@ -120,7 +120,6 @@
     <string name="show_hints">أظهِر تلميحات المفاتيح</string>
     <string name="select_input_method">"اختيار أسلوب الإدخال"</string>
     <string name="show_hints_summary">أظهِر تلميحات المفاتيح عند الضغط لفترة طويلة</string>
-    <string name="prefs_long_press_keyboard_to_change_lang_summary">سيقوم الضغط المطول على مفتاح المسافة بإظهار قائمة اختيار أساليب الإدخال</string>
     <string name="subtype_akkhor_bn_BD">%s (أخور)</string>
     <string name="autospace_after_punctuation">ضع مسافةً بعد علامات الترقيم تلقائيًا</string>
     <string name="autospace_after_punctuation_summary">أدرج مسافةً تلقائيًا بعد علامة الترقيم عند كتابة كلمة جديدة</string>

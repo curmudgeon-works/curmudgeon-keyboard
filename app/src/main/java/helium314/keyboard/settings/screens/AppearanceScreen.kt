@@ -413,7 +413,7 @@ fun createAppearanceSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_THEME_DAY_NIGHT, R.string.day_night_mode) {
         SwitchPreference(it, Defaults.PREF_THEME_DAY_NIGHT) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
-    Setting(context, Settings.PREF_BACKGROUND_WHOLE_PICTURE, R.string.background_whole_picture, R.string.background_whole_picture_summary) {
+    Setting(context, Settings.PREF_BACKGROUND_WHOLE_PICTURE, R.string.background_whole_picture) {
         Box(Modifier.padding(start = 16.dp)) {
             // shown the other way round: on (the default) = keys painted over the picture
             SwitchPreference(it, Defaults.PREF_BACKGROUND_WHOLE_PICTURE, inverted = true) { KeyboardSwitcher.getInstance().setThemeNeedsReload() } }

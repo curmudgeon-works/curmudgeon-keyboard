@@ -112,7 +112,6 @@
     <string name="delete_swipe_summary">Przesuń palcem od klawisza usuwania, aby zaznaczyć i usunąć większe fragmenty tekstu za jednym razem</string>
     <string name="enable_clipboard_history_summary">Po wyłączeniu, klawisz schowka będzie wklejał zawartość schowka, jeśli taka istnieje</string>
     <string name="delete_swipe">Gest usunięcia</string>
-    <string name="prefs_long_press_keyboard_to_change_lang_summary">Długie naciśnięcie klawisza spacji spowoduje wyświetlenie menu wyboru metody wprowadzania tekstu</string>
     <string name="show_hints">Pokazuj wskazówki klawiszy</string>
     <string name="prefs_keyboard_height_scale">Skala wysokości klawiatury</string>
     <string name="subtype_akkhor_bn_BD">%s (Akkhor)</string>

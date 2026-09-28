@@ -156,7 +156,6 @@
     <string name="show_hints">Паказваць ключавыя падказкі</string>
     <string name="show_hints_summary">Паказваць падказкі пры доўгім націску</string>
     <string name="prefs_long_press_keyboard_to_change_lang">Змяніць метад ўводу з дапамогай клавішы прабел</string>
-    <string name="prefs_long_press_keyboard_to_change_lang_summary">Доўгі націск клавішы прабел адкрые меню выбару метаду ўводу</string>
     <string name="day_night_mode">Выкарыстоўваць тэму сістэмы</string>
     <string name="theme_style">Стыль тэмы</string>
     <string name="style_name_Rounded">Закруглены</string>

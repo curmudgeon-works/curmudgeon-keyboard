@@ -112,7 +112,6 @@
     <string name="show_hints">Mostra indicatori sui tasti</string>
     <string name="show_hints_summary">Suggerisce in piccolo sul tasto il carattere ottenibile con la pressione lunga</string>
     <string name="prefs_long_press_keyboard_to_change_lang">Cambia metodo di immissione con la barra spaziatrice</string>
-    <string name="prefs_long_press_keyboard_to_change_lang_summary">Premendo a lungo la barra spaziatrice si attiva il menu di selezione del metodo di immissione</string>
     <string name="subtype_akkhor_bn_BD">%s (Akkhor)</string>
     <string name="day_night_mode_summary">Il tema seguirà le impostazioni di sistema</string>
     <string name="settings_category_additional_keys">Tasti aggiuntivi</string>

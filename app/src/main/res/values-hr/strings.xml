@@ -119,7 +119,6 @@
     <string name="show_hints">Pokaži pomoćne oznake tipki</string>
     <string name="show_hints_summary">Pokazuje pomoćne oznake za dugi pritisak tipki</string>
     <string name="prefs_long_press_keyboard_to_change_lang">Promijeni način unosa s razmaknicom</string>
-    <string name="prefs_long_press_keyboard_to_change_lang_summary">Dugi pritisak razmaknice prikazat će izbornik za način unosa</string>
     <string name="prefs_keyboard_height_scale">Visine tipkovnice</string>
     <string name="key_borders">Rubovi tipki</string>
     <string name="day_night_mode">Automatski danji/noćni način rada</string>

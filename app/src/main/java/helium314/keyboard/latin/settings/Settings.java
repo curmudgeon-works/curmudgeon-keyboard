@@ -12,8 +12,8 @@ import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.res.Configuration;
 import android.content.res.Resources;
-import android.graphics.BitmapFactory;
-import android.graphics.drawable.BitmapDrawable;
+import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.view.ContextThemeWrapper;
 import android.view.inputmethod.EditorInfo;
@@ -32,6 +32,8 @@ import helium314.keyboard.latin.PunctuationSuggestions;
 import helium314.keyboard.latin.R;
 import helium314.keyboard.latin.RichInputMethodManager;
 import helium314.keyboard.latin.RichInputMethodSubtype;
+import helium314.keyboard.latin.common.FramedPicture;
+import helium314.keyboard.latin.common.PictureFraming;
 import helium314.keyboard.latin.common.StringUtils;
 import helium314.keyboard.latin.utils.DeviceProtectedUtils;
 import helium314.keyboard.latin.utils.FoldableUtils;
@@ -566,7 +568,9 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
             image = getCustomBackgroundFile(context, night, false); // fall back to portrait image for historic reasons
         if (!image.isFile()) return null;
         try {
-            sCachedBackgroundImages[index] = new BitmapDrawable(context.getResources(), BitmapFactory.decodeFile(image.getAbsolutePath()));
+            final Bitmap bitmap = PictureFraming.Companion.decode(image, 4096);
+            if (bitmap == null) return null;
+            sCachedBackgroundImages[index] = new FramedPicture(bitmap, PictureFraming.Companion.read(image), Color.TRANSPARENT);
             return sCachedBackgroundImages[index];
         } catch (Exception e) {
             return null;
