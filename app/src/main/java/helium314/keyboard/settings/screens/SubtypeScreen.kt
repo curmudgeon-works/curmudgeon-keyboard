@@ -424,9 +424,7 @@ fun SubtypeScreen(
                     // (the symbol switches — hide on the number row / other keys, long-press dots — are on Appearance)
                     if (advanced) AdvancedBlock {
                         CompositionLocalProvider(LocalCompactPreferences provides true) {
-                            // backspace, advanced: a tap after a swipe, swiping left, undoing an autocorrection
-                            Pending(keyChanged(Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD)) {
-                                SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD]?.Preference() }
+                            // backspace, advanced: swiping left, undoing an autocorrection (a tap after a swipe: on Swiping)
                             Pending(keyChanged(Settings.PREF_DELETE_SWIPE, Settings.PREF_DELETE_SWIPE_SPEED)) {
                                 SettingsActivity.settingsContainer[Settings.PREF_DELETE_SWIPE]?.Preference() }
                             if (prefs.getBoolean(Settings.PREF_AUTO_CORRECTION, Defaults.PREF_AUTO_CORRECTION))

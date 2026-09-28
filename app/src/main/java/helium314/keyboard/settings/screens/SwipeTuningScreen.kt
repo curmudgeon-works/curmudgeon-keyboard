@@ -87,6 +87,8 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
             if (prefs.getBoolean(Settings.PREF_GESTURE_CAPS_SWIPE, Defaults.PREF_GESTURE_CAPS_SWIPE))
                 SettingsActivity.settingsContainer[Settings.PREF_GESTURE_CAPS_HEIGHT]?.Preference()
             SettingsActivity.settingsContainer[Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD]?.Preference()
+            // a backspace tap right after a swipe takes the whole swiped word (moved from Layout & Typing; advanced)
+            if (advanced) AdvancedTint { SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD]?.Preference() }
             // on = move cursor, off = nothing; the other spacebar swipe actions stay in Advanced (shown off here)
             val moveCursor = Settings.readHorizontalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.MOVE_CURSOR
             Row(verticalAlignment = Alignment.CenterVertically,
