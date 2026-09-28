@@ -388,6 +388,7 @@
     <string name="no_dictionary_short">No dictionary</string>
     <string name="keyboard_languages">Languages</string>
     <string name="key_popups_title">Long-press popups</string>
+    <string name="key_popups_group">Popups</string>
     <string name="key_popups_summary">What holding a key offers. Switch popups off or drag them into the order you want; the first one is shown as the key\'s hint.</string>
     <string name="key_popups_letters">Letters and numbers</string>
     <string name="key_popups_contextual">Keys that change with the text field</string>
