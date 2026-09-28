@@ -66,10 +66,9 @@ fun AdvancedSettingsScreen(
         // (force incognito: on Text correction, next to learning from what you type)
         // (on Layout & Typing: long-press delay and symbols-key numpad (Typing), space key changes input method
         //  (Layout), delete swipe (Backspace); space bar swipes on Swiping; "more diacritics" is the popup presets)
-        Settings.PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY,
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) Settings.PREF_SHOW_SETUP_WIZARD_ICON else null,
         // (switching back to letters after…: one row with a dialog on Layout & Typing's Typing group)
-        Settings.PREF_TIMESTAMP_FORMAT,
+        // (the physical keyboard's emoji key and the timestamp format: on Others)
         SettingsWithoutKey.BACKUP_RESTORE,
         SettingsWithoutKey.FACTORY_RESET, // advanced only (not in the simple set below): tinted
         if (BuildConfig.DEBUG || prefs.getBoolean(DebugSettings.PREF_SHOW_DEBUG_SETTINGS, Defaults.PREF_SHOW_DEBUG_SETTINGS))

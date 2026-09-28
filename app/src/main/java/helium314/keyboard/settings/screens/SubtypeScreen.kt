@@ -378,6 +378,16 @@ fun SubtypeScreen(
                         if (Settings.getInstance().isTablet) tabletRow()
                         else if (advanced) AdvancedBlock { tabletRow() }
                     }
+                    // advanced: bottom row size (with its padding) and side padding, moved from Appearance
+                    if (advanced) AdvancedBlock {
+                        CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
+                            LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
+                        Pending(prefixChanged(Settings.PREF_BOTTOM_ROW_SCALE_PREFIX) || prefixChanged(Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX)) {
+                            SettingsActivity.settingsContainer[Settings.PREF_BOTTOM_ROW_SCALE_PREFIX]?.Preference() }
+                        Pending(prefixChanged(Settings.PREF_SIDE_PADDING_SCALE_PREFIX)) {
+                            SettingsActivity.settingsContainer[Settings.PREF_SIDE_PADDING_SCALE_PREFIX]?.Preference() }
+                        }
+                    }
                     // the toolbar (was its own screen, then its own group): visibility in simple mode, the rest advanced
                     CompositionLocalProvider(LocalCompactPreferences provides true) {
                         Pending(keyChanged(Settings.PREF_TOOLBAR_VISIBILITY)) {
@@ -390,16 +400,6 @@ fun SubtypeScreen(
                                     Settings.PREF_CLIPBOARD_TOOLBAR_KEYS, Settings.PREF_PINNED_TOOLBAR_KEYS) else keyChanged(it)
                                 Pending(pending) { SettingsActivity.settingsContainer[it]?.Preference() }
                             }
-                        }
-                    }
-                    // advanced: bottom row size (with its padding) and side padding, moved from Appearance
-                    if (advanced) AdvancedBlock {
-                        CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
-                            LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
-                        Pending(prefixChanged(Settings.PREF_BOTTOM_ROW_SCALE_PREFIX) || prefixChanged(Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX)) {
-                            SettingsActivity.settingsContainer[Settings.PREF_BOTTOM_ROW_SCALE_PREFIX]?.Preference() }
-                        Pending(prefixChanged(Settings.PREF_SIDE_PADDING_SCALE_PREFIX)) {
-                            SettingsActivity.settingsContainer[Settings.PREF_SIDE_PADDING_SCALE_PREFIX]?.Preference() }
                         }
                     }
                 }

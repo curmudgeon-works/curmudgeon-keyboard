@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings
 
+import helium314.keyboard.settings.screens.OthersScreen
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -99,6 +100,9 @@ fun SettingsNavHost(
         composable(SettingsDestination.DataReview) {
             ReviewScreen(onClickBack = ::goBack)
         }*/
+        composable(SettingsDestination.Others) {
+            OthersScreen(onClickBack = ::goBack)
+        }
         composable(SettingsDestination.Advanced) {
             AdvancedSettingsScreen(onClickBack = ::goBack)
         }
@@ -159,6 +163,7 @@ object SettingsDestination {
     const val Preferences = "preferences"
     const val Toolbar = "toolbar"
     const val Advanced = "advanced"
+    const val Others = "others"
     const val Debug = "debug"
     const val Appearance = "appearance"
     const val Colors = "colors/"

@@ -662,6 +662,7 @@
     <string name="toolbar_visibility_in_place">Opens in place of suggestions</string>
     <string name="toolbar_visibility_from_key">Opens from the top-left key\'s long-press</string>
     <string name="toolbar_visibility_hidden">Hidden</string>
+    <string name="settings_screen_others">Others</string>
     <string name="font_follows_key_text">Use same font for symbols and suggestions</string>
     <string name="key_text_bold">Bold</string>
     <string name="key_text_italic">Italic</string>
