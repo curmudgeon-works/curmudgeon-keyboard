@@ -18,9 +18,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * A "look" is everything the Appearance screen sets, saved under a name: theme, colors, sizes, gaps, suggestion
- * strip style. Saved looks are one JSON list in the preferences, shared by all keyboards. The custom background
- * image and fonts are files and are not part of a look.
+ * A "look" (theme) is the keyboard's styling saved under a name: colours, background pictures, key borders and gaps,
+ * key and icon style, icons, fonts. Saved looks are one JSON list in the preferences, shared by all keyboards; a
+ * look's background pictures are copies in their own folder (see [PICTURES]). Not in looks: space bar text, the
+ * hide-symbols switches and the emoji settings (typing preferences, on Appearance but kept by its Save / Discard
+ * only, see [onScreen]).
  */
 object AppearanceLooks {
     const val PREF = "appearance_looks"
@@ -30,14 +32,12 @@ object AppearanceLooks {
     private val keys = setOf(
         Settings.PREF_THEME_STYLE, Settings.PREF_ICON_STYLE, Settings.PREF_CUSTOM_ICON_NAMES, Settings.PREF_THEME_COLORS,
         Settings.PREF_THEME_KEY_BORDERS, Settings.PREF_THEME_DAY_NIGHT, Settings.PREF_THEME_COLORS_NIGHT,
-        Settings.PREF_SPACE_BAR_TEXT, Settings.PREF_BACKGROUND_WHOLE_PICTURE,
-        Settings.PREF_FONT_SCALE, Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT, Settings.PREF_EMOJI_SKIN_TONE,
+        Settings.PREF_BACKGROUND_WHOLE_PICTURE,
+        Settings.PREF_FONT_SCALE,
         Settings.PREF_SUGGESTION_TEXT_SIZE, Settings.PREF_SUGGESTION_BOLD, Settings.PREF_SUGGESTION_ITALIC,
         Settings.PREF_SUGGESTION_UNDERLINE, Settings.PREF_SUGGESTION_WORD_PADDING,
         Settings.PREF_KEY_HORIZONTAL_GAP, Settings.PREF_KEY_VERTICAL_GAP,
         Settings.PREF_KEY_TEXT_BOLD, Settings.PREF_KEY_TEXT_ITALIC, Settings.PREF_KEY_TEXT_UNDERLINE, Settings.PREF_HINT_FONT_SCALE,
-        Settings.PREF_SHOW_NUMBER_ROW_HINTS, Settings.PREF_SHOW_HINTS, Settings.PREF_SHOW_POPUP_HINTS,
-        Settings.PREF_SHOW_EMOJI_DESCRIPTIONS,
         Settings.PREF_KEY_FONT, Settings.PREF_HINT_FONT, Settings.PREF_SUGGESTION_FONT, Settings.PREF_FONT_FOLLOWS_KEY_TEXT, Settings.PREF_HINT_TEXT_BOLD, Settings.PREF_HINT_TEXT_ITALIC, Settings.PREF_HINT_TEXT_UNDERLINE,
     )
     // the scales have a key per orientation / fold state, the custom colors one per theme
@@ -48,28 +48,84 @@ object AppearanceLooks {
 
     fun inScope(key: String) = key in keys || prefixes.any { key.startsWith(it) }
 
+    // on the Appearance screen but not in looks: its Save / Discard (AppearanceDraft) keeps them too
+    private val screenOnlyKeys = setOf(
+        Settings.PREF_SPACE_BAR_TEXT, Settings.PREF_SHOW_NUMBER_ROW_HINTS, Settings.PREF_SHOW_HINTS, Settings.PREF_SHOW_POPUP_HINTS,
+        Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT, Settings.PREF_EMOJI_SKIN_TONE, Settings.PREF_SHOW_EMOJI_DESCRIPTIONS,
+    )
+    fun onScreen(key: String) = inScope(key) || key in screenOnlyKeys
+
+    /** Everything the Appearance screen sets, as it is now (the draft's snapshot). */
+    fun screenValues(prefs: SharedPreferences): Map<String, Any?> = prefs.all.filterKeys { onScreen(it) }
+
+    /** Back to [values] for everything on the Appearance screen (the draft's Discard). */
+    fun applyScreen(ctx: Context, values: Map<String, Any?>) {
+        val prefs = ctx.prefs()
+        val now = screenValues(prefs)
+        prefs.edit {
+            for (key in now.keys) if (key !in values) remove(key)
+            for ((key, value) in values) if (onScreen(key) && now[key] != value) KeyboardProfiles.put(this, key, value)
+        }
+        reload(ctx)
+    }
+
+    // ---- background pictures: a look saved since 0.1.004 names its picture folder under this key ----
+    const val PICTURES = "look_pictures" // (not a preference: never written to the settings)
+    private const val NO_PICTURES = "" // the built-in looks: no background picture
+
+    private fun livePictures(ctx: Context) = listOf(false, true).flatMap { night -> listOf(false, true).map { land ->
+        Settings.getCustomBackgroundFile(ctx, night, land) } }
+    private fun picturesDir(ctx: Context, id: String) = java.io.File(ctx.filesDir, "looks" + java.io.File.separator + id)
+
+    /** Copies the background pictures there are now into a new folder; returns its id, to store in the look. */
+    fun savePictures(ctx: Context): String {
+        val id = java.util.UUID.randomUUID().toString()
+        val dir = picturesDir(ctx, id).apply { mkdirs() }
+        livePictures(ctx).filter { it.exists() }.forEach { it.copyTo(java.io.File(dir, it.name), overwrite = true) }
+        return id
+    }
+
+    /** The look's pictures become the background ones (a built-in look: none); a look saved before pictures were
+     *  part of looks leaves them as they are. */
+    fun applyPictures(ctx: Context, look: Look) {
+        val id = look.values[PICTURES] as? String ?: return
+        val dir = if (id == NO_PICTURES) null else picturesDir(ctx, id)
+        for (live in livePictures(ctx)) {
+            val saved = dir?.let { java.io.File(it, live.name) }
+            if (saved?.exists() == true) saved.copyTo(live, overwrite = true) else live.delete()
+        }
+        reload(ctx)
+    }
+
+    fun deletePictures(ctx: Context, look: Look) {
+        (look.values[PICTURES] as? String)?.takeIf { it != NO_PICTURES }?.let { picturesDir(ctx, it).deleteRecursively() }
+    }
+
+    /** The pictures as they are now, as a look of their own (for putting them back on Cancel). */
+    fun currentPictures(ctx: Context): Look = Look("", mapOf(PICTURES to savePictures(ctx)))
+
     /** The themes that ship with the app: Midnight and Daylight one colour set each, the others a light and a dark one
      *  following the system. */
     fun builtIn(ctx: Context): List<Look> = listOf(
-        Look(ctx.getString(R.string.theme_preset_midnight), mapOf(
+        Look(ctx.getString(R.string.theme_preset_midnight), mapOf(PICTURES to NO_PICTURES,
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
             // one colour set, always (the light / dark switch off)
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_BLACK, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_BLACK,
             Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to false)),
-        Look(ctx.getString(R.string.theme_preset_daylight), mapOf(
+        Look(ctx.getString(R.string.theme_preset_daylight), mapOf(PICTURES to NO_PICTURES,
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
             // one colour set, always (the light / dark switch off)
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_LIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_LIGHT,
             Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to false)),
-        Look(ctx.getString(R.string.theme_preset_holo), mapOf(
+        Look(ctx.getString(R.string.theme_preset_holo), mapOf(PICTURES to NO_PICTURES,
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_HOLO, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_HOLO,
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_HOLO_LIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_HOLO_WHITE,
             Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to true)),
-        Look(ctx.getString(R.string.theme_preset_paper), mapOf(
+        Look(ctx.getString(R.string.theme_preset_paper), mapOf(PICTURES to NO_PICTURES,
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_LIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_DARK,
             Settings.PREF_THEME_KEY_BORDERS to false, Settings.PREF_THEME_DAY_NIGHT to true)),
-        Look(ctx.getString(R.string.theme_preset_ocean), mapOf(
+        Look(ctx.getString(R.string.theme_preset_ocean), mapOf(PICTURES to NO_PICTURES,
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_ROUNDED, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_ROUNDED,
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_OCEAN_LIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_OCEAN,
             Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_KEY_HORIZONTAL_GAP to 1.0f, Settings.PREF_KEY_VERTICAL_GAP to 1.5f,

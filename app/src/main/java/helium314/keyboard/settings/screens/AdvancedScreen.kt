@@ -64,17 +64,8 @@ fun AdvancedSettingsScreen(
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
     val items = listOf(
         Settings.PREF_ALWAYS_INCOGNITO_MODE,
-        Settings.PREF_KEY_LONGPRESS_TIMEOUT,
-        Settings.PREF_SPACE_HORIZONTAL_SWIPE,
-        Settings.PREF_SPACE_VERTICAL_SWIPE,
-        if (Settings.readHorizontalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.SWITCH_LANGUAGE
-            || Settings.readVerticalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.SWITCH_LANGUAGE)
-            Settings.PREF_LANGUAGE_SWIPE_DISTANCE else null,
-        if (Settings.readVerticalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.TOUCHPAD_MODE)
-            Settings.PREF_TOUCHPAD_SENSITIVITY else null,
-        // (delete swipe: in the Backspace group of the Preferences screen)
-        Settings.PREF_SPACE_TO_CHANGE_LANG,
-        Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD,
+        // (on Layout & Typing: long-press delay and symbols-key numpad (Typing), space key changes input method
+        //  (Layout), delete swipe (Backspace); space bar swipes on Swiping; "more diacritics" is the popup presets)
         Settings.PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY,
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) Settings.PREF_SHOW_SETUP_WIZARD_ICON else null,
         Settings.PREF_ABC_AFTER_SYMBOL_SPACE,
@@ -82,7 +73,6 @@ fun AdvancedSettingsScreen(
         Settings.PREF_ABC_AFTER_EMOJI,
         Settings.PREF_ABC_AFTER_CLIP,
         Settings.PREF_CUSTOM_CURRENCY_KEY,
-        Settings.PREF_MORE_POPUP_KEYS,
         Settings.PREF_TIMESTAMP_FORMAT,
         SettingsWithoutKey.BACKUP_RESTORE,
         SettingsWithoutKey.FACTORY_RESET, // advanced only (not in the simple set below): tinted
@@ -98,7 +88,7 @@ fun AdvancedSettingsScreen(
         title = stringResource(R.string.settings_screen_advanced),
         settings = items,
         simpleModeKeys = setOf(
-            Settings.PREF_KEY_LONGPRESS_TIMEOUT, SettingsWithoutKey.BACKUP_RESTORE,
+            SettingsWithoutKey.BACKUP_RESTORE,
             DebugSettings.PREF_SHOW_DEBUG_SETTINGS, SettingsWithoutKey.DEBUG_SETTINGS,
         ),
     )

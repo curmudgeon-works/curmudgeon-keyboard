@@ -642,8 +642,8 @@
     <!-- a font file just loaded in the dialog, kept only on OK -->
     <string name="text_font_new">%s (new)</string>
     <string name="text_font_follows_key_text">Following the key font</string>
-    <string name="background_whole_picture">Show the whole picture</string>
-    <string name="background_whole_picture_summary">Keys are clear on the picture and only show while pressed</string>
+    <string name="background_whole_picture">Don\'t show the picture on keys, only in the gaps between them</string>
+    <string name="background_whole_picture_summary">Off: the keys are clear, the whole picture shows and a key shows only while pressed</string>
     <string name="font_follows_key_text">Use same font for symbols and suggestions</string>
     <string name="key_text_bold">Bold</string>
     <string name="key_text_italic">Italic</string>

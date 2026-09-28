@@ -415,7 +415,8 @@ fun createAppearanceSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_BACKGROUND_WHOLE_PICTURE, R.string.background_whole_picture, R.string.background_whole_picture_summary) {
         Box(Modifier.padding(start = 16.dp)) {
-            SwitchPreference(it, Defaults.PREF_BACKGROUND_WHOLE_PICTURE) { KeyboardSwitcher.getInstance().setThemeNeedsReload() } }
+            // shown the other way round: on (the default) = keys painted over the picture
+            SwitchPreference(it, Defaults.PREF_BACKGROUND_WHOLE_PICTURE, inverted = true) { KeyboardSwitcher.getInstance().setThemeNeedsReload() } }
     },
     Setting(context, SettingsWithoutKey.BACKGROUND_IMAGE, R.string.customize_background_image) {
         BackgroundImagePref(it, false)
@@ -596,6 +597,8 @@ private fun SavedLooksPreference(setting: Setting) {
     var showList by remember { mutableStateOf(false) }
     // a tap shows the theme on the live keyboard; OK keeps it, Cancel puts back what was set when the list opened
     val initial = remember(showList) { AppearanceLooks.current(prefs) }
+    // the background pictures when the list opened, to put back on Cancel (a copy, made only while the list is open)
+    val initialPictures = remember(showList) { if (showList) AppearanceLooks.currentPictures(ctx) else null }
     var confirmed by remember(showList) { mutableStateOf(false) }
     var saveAs by remember { mutableStateOf(false) }
     var toRename: AppearanceLooks.Look? by remember { mutableStateOf(null) }
@@ -605,7 +608,11 @@ private fun SavedLooksPreference(setting: Setting) {
     if (showList)
         ListPickerDialog(
             onDismissRequest = {
-                if (!confirmed && AppearanceLooks.current(prefs) != initial) AppearanceLooks.apply(ctx, initial)
+                if (!confirmed) {
+                    if (AppearanceLooks.current(prefs) != initial) AppearanceLooks.apply(ctx, initial)
+                    initialPictures?.let { AppearanceLooks.applyPictures(ctx, it) }
+                }
+                initialPictures?.let { AppearanceLooks.deletePictures(ctx, it) }
                 showList = false
             },
             title = { Text(setting.title) },
@@ -614,7 +621,7 @@ private fun SavedLooksPreference(setting: Setting) {
             confirmImmediately = false,
             // a theme only changes what it lists: the rest stays as it was when the list opened (height, fonts, switches…);
             // starting from `initial` on every tap also means one previewed theme never leaks into the next
-            onItemHighlighted = { AppearanceLooks.apply(ctx, initial + it.values) },
+            onItemHighlighted = { AppearanceLooks.apply(ctx, initial + it.values); AppearanceLooks.applyPictures(ctx, it) },
             onItemSelected = { confirmed = true },
             // the built-in themes come first and can't be changed; the user's own are renamed and deleted here
             trailing = { look -> if (look !in builtIn) {
@@ -636,7 +643,8 @@ private fun SavedLooksPreference(setting: Setting) {
             title = { Text(stringResource(R.string.appearance_look_save)) },
             initialText = stringResource(R.string.appearance_look_default_name, looks.size + 1),
             checkTextValid = { name -> name.isNotBlank() && looks.none { it.name == name } },
-            onConfirmed = { name -> store(looks + AppearanceLooks.Look(name, AppearanceLooks.current(prefs))) },
+            onConfirmed = { name -> store(looks + AppearanceLooks.Look(name,
+                AppearanceLooks.current(prefs) + (AppearanceLooks.PICTURES to AppearanceLooks.savePictures(ctx)))) },
         )
     toRename?.let { look ->
         TextInputDialog(
@@ -652,7 +660,7 @@ private fun SavedLooksPreference(setting: Setting) {
             onDismissRequest = { toDelete = null },
             title = { Text(stringResource(R.string.appearance_look_delete, look.name)) },
             confirmButtonText = stringResource(R.string.delete),
-            onConfirmed = { store(looks.filter { it !== look }) },
+            onConfirmed = { AppearanceLooks.deletePictures(ctx, look); store(looks.filter { it !== look }) },
         )
     }
 }

@@ -47,7 +47,7 @@ class AppearanceDraft private constructor(
             if (saved == null) live.delete()
             else { saved.copy.copyTo(live, overwrite = true); live.setLastModified(saved.modified) }
         }
-        AppearanceLooks.apply(ctx, prefs)
+        AppearanceLooks.applyScreen(ctx, prefs)
         discard()
     }
 
@@ -60,7 +60,7 @@ class AppearanceDraft private constructor(
     }
 
     companion object {
-        private fun currentPrefs(ctx: Context): Map<String, Any?> = AppearanceLooks.current(ctx.prefs())
+        private fun currentPrefs(ctx: Context): Map<String, Any?> = AppearanceLooks.screenValues(ctx.prefs())
 
         private fun liveFiles(ctx: Context) = listOf(
             Settings.getCustomBackgroundFile(ctx, false, false), Settings.getCustomBackgroundFile(ctx, false, true),
