@@ -1,5 +1,8 @@
 package helium314.keyboard.settings.screens
 
+import helium314.keyboard.settings.dialogs.UnsavedChangesDialog
+import helium314.keyboard.settings.dialogs.SaveChangesDialog
+import helium314.keyboard.settings.dialogs.DiscardChangesDialog
 import helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog
 import helium314.keyboard.settings.preferences.LocalPendingChange
 import helium314.keyboard.settings.LayoutDraft
@@ -254,33 +257,13 @@ fun SubtypeScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-    if (askReject)
-        ConfirmationDialog(
-            onDismissRequest = { askReject = false },
-            title = { Text(stringResource(R.string.appearance_reject_title)) },
-            content = { Text(stringResource(R.string.layout_reject_message)) },
-            cancelButtonText = stringResource(R.string.appearance_keep_working),
-            confirmButtonText = stringResource(R.string.appearance_discard_all),
-            onConfirmed = { discardChanges(); draft = LayoutDraft.of(ctx, currentSubtypeString) },
-        )
-    if (askAccept)
-        ConfirmationDialog(
-            onDismissRequest = { askAccept = false },
-            title = { Text(stringResource(R.string.appearance_accept_title)) },
-            cancelButtonText = stringResource(R.string.appearance_keep_working),
-            confirmButtonText = stringResource(R.string.appearance_accept_all),
-            onConfirmed = { draft.accept(); draft = LayoutDraft.of(ctx, currentSubtypeString) },
-        )
-    if (askOnLeave)
-        ThreeButtonAlertDialog(
-            onDismissRequest = { askOnLeave = false },
-            title = { Text(stringResource(R.string.layout_keep_title)) },
-            content = { Text(stringResource(R.string.layout_keep_message)) },
-            confirmButtonText = stringResource(R.string.appearance_keep),
-            onConfirmed = { draft.accept(); onClickBack() },
-            neutralButtonText = stringResource(R.string.appearance_discard),
-            onNeutral = { discardChanges(); askOnLeave = false; onClickBack() },
-        )
+    if (askReject) DiscardChangesDialog({ askReject = false }) { discardChanges(); draft = LayoutDraft.of(ctx, currentSubtypeString) }
+    if (askAccept) SaveChangesDialog({ askAccept = false }) { draft.accept(); draft = LayoutDraft.of(ctx, currentSubtypeString) }
+    if (askOnLeave) UnsavedChangesDialog(
+        onKeepWorking = { askOnLeave = false },
+        onDiscardAndExit = { discardChanges(); askOnLeave = false; onClickBack() },
+        onSaveAndExit = { draft.accept(); askOnLeave = false; onClickBack() },
+    )
     SearchScreen(
         onClickBack = ::leave,
         // cross and tick: discard or keep everything changed since the screen opened, each asks first

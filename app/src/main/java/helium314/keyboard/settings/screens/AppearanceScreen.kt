@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.screens
 
+import androidx.compose.ui.layout.layout
+import helium314.keyboard.settings.dialogs.UnsavedChangesDialog
+import helium314.keyboard.settings.dialogs.SaveChangesDialog
+import helium314.keyboard.settings.dialogs.DiscardChangesDialog
 import androidx.compose.runtime.DisposableEffect
 
 import helium314.keyboard.settings.dialogs.LocalPreviewEmojiPeople
@@ -258,34 +262,14 @@ fun AppearanceScreen(
         revealer = revealer,
         isPending = { tile -> tileChanged(tile, pendingKeys, pendingFiles) },
     )
-    if (askReject)
-        ConfirmationDialog(
-            onDismissRequest = { askReject = false },
-            title = { Text(stringResource(R.string.appearance_reject_title)) },
-            content = { Text(stringResource(R.string.appearance_reject_message)) },
-            cancelButtonText = stringResource(R.string.appearance_keep_working),
-            confirmButtonText = stringResource(R.string.appearance_discard_all),
-            onConfirmed = { draft.reject(ctx); draft = AppearanceDraft.of(ctx) },
-        )
-    if (askAccept)
-        ConfirmationDialog(
-            onDismissRequest = { askAccept = false },
-            title = { Text(stringResource(R.string.appearance_accept_title)) },
-            cancelButtonText = stringResource(R.string.appearance_keep_working),
-            confirmButtonText = stringResource(R.string.appearance_accept_all),
-            onConfirmed = { draft.accept(); draft = AppearanceDraft.of(ctx) },
-        )
+    if (askReject) DiscardChangesDialog({ askReject = false }) { draft.reject(ctx); draft = AppearanceDraft.of(ctx) }
+    if (askAccept) SaveChangesDialog({ askAccept = false }) { draft.accept(); draft = AppearanceDraft.of(ctx) }
     }
-    if (askOnLeave)
-        ThreeButtonAlertDialog(
-            onDismissRequest = { askOnLeave = false },
-            title = { Text(stringResource(R.string.appearance_keep_title)) },
-            content = { Text(stringResource(R.string.appearance_keep_message)) },
-            confirmButtonText = stringResource(R.string.appearance_keep),
-            onConfirmed = { draft.accept(); onClickBack() },
-            neutralButtonText = stringResource(R.string.appearance_discard),
-            onNeutral = { draft.reject(ctx); askOnLeave = false; onClickBack() },
-        )
+    if (askOnLeave) UnsavedChangesDialog(
+        onKeepWorking = { askOnLeave = false },
+        onDiscardAndExit = { draft.reject(ctx); askOnLeave = false; onClickBack() },
+        onSaveAndExit = { draft.accept(); askOnLeave = false; onClickBack() },
+    )
 }
 
 /** Settings whose change is best seen on the emoji panel. */
@@ -383,7 +367,7 @@ fun createAppearanceSettings(context: Context) = listOf(
         var showDialog by rememberSaveable { mutableStateOf(false) }
         // "Colors (light)" under the light / dark switch when it's on, plain "Colors" otherwise
         val dayNight = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && prefs.getBoolean(Settings.PREF_THEME_DAY_NIGHT, Defaults.PREF_THEME_DAY_NIGHT)
-        Box(if (dayNight) Modifier.padding(start = 16.dp) else Modifier) {
+        Box(if (dayNight) Modifier.tuckedUnder().padding(start = 16.dp) else Modifier) {
             Preference(
                 name = if (dayNight) stringResource(R.string.theme_colors_light) else setting.title,
                 description = prefs.getString(setting.key, Defaults.PREF_THEME_COLORS)!!.getStringResourceOrName("theme_name_", ctx),
@@ -405,7 +389,7 @@ fun createAppearanceSettings(context: Context) = listOf(
         if ((b?.value ?: 0) < 0)
             Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
         var showDialog by rememberSaveable { mutableStateOf(false) }
-        Box(Modifier.padding(start = 16.dp)) { // (shown only under the light / dark switch, when it's on)
+        Box(Modifier.tuckedUnder().padding(start = 16.dp)) { // (shown only under the light / dark switch, when it's on)
             Preference(
                 name = setting.title,
                 description = prefs.getString(setting.key, Defaults.PREF_THEME_COLORS_NIGHT)!!.getStringResourceOrName("theme_name_", ctx),
@@ -762,4 +746,11 @@ private fun tileChanged(tile: String, keys: Set<String>, files: Set<String>): Bo
             || prefix(Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
         else -> tile in keys || keys.any { it.startsWith(tile) } // the scales keep a key per orientation after their prefix
     }
+}
+
+/** A row that belongs to the one above it (the colours under the light / dark switch): 8 dp closer to it. */
+private fun Modifier.tuckedUnder(): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    val pull = 8.dp.roundToPx()
+    layout(placeable.width, (placeable.height - pull).coerceAtLeast(0)) { placeable.place(0, -pull) }
 }
