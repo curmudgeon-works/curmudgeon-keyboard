@@ -61,8 +61,8 @@ class ReplayTest {
         return vocab
     }
 
-    private val normalizeScales = System.getenv("GESTURE_REPLAY_NORMALIZE") == "1"
-    private val hiFactor = System.getenv("GESTURE_REPLAY_HI_FACTOR")?.toFloatOrNull() ?: 0.65f
+    private val normalizeScales = System.getenv("GESTURE_REPLAY_NORMALIZE") != "0"
+    private val hiFactor = System.getenv("GESTURE_REPLAY_HI_FACTOR")?.toFloatOrNull() ?: 0.85f
 
     private fun corpus(dir: File): List<Swipe> = File(dir, "corpus.tsv").readLines().map { line ->
         val f = line.split('\t')
@@ -74,46 +74,50 @@ class ReplayTest {
         Swipe(f[0].toInt(), f[1], f[2], f[3], f[4], KeyboardGeometry(keys), points)
     }
 
-    private fun variants(): List<Variant> {
-        fun decoder(endpointRadius: Float = 1.6f, penUp: Float? = null, endPenalty: Float = 0f, endFree: Float = 0.4f, startShare: Float = 1f, cap: Int = 512) =
-            GestureDecoder(
-                HybridScorer(KushlerScorer(KushlerConfig(slowEmphasis = 0.5f))),
-                DecoderConfig(endpointRadiusKeyWidths = endpointRadius, penUpRadiusKeyWidths = penUp,
-                    endpointPenaltyPerKeyWidth = endPenalty, endpointFreeKeyWidths = endFree, startPenaltyShare = startShare, maxCandidates = cap),
-                GesturePreprocessor(PreprocessorConfig(pauseConfidence = 0.9f, pauseDtFactor = 2.5f)),
-            )
-        fun plain(d: GestureDecoder): (Swipe, Vocabulary) -> List<ScoredWord> = { s, v -> d.decode(s.points, s.geometry, v, 10) }
-        val history = (System.getenv("GESTURE_REPLAY_HISTORY") ?: "").split(',').mapNotNull { it.trim().toIntOrNull() }
-        if (history.isNotEmpty())
-            return listOf(Variant("phone (new defaults), no learned words", plain(decoder()))) +
-                history.map { Variant("phone, learned words at $it", plain(decoder()), learnedFreq = it) }
-        /** The normal top [keep], then the strict-ends ranking's words not yet listed, then the rest of the normal list. */
-        fun merged(base: GestureDecoder, strict: GestureDecoder, keep: Int = 3): (Swipe, Vocabulary) -> List<ScoredWord> = { s, v ->
-            val b = base.decode(s.points, s.geometry, v, 10)
-            val st = strict.decode(s.points, s.geometry, v, 10)
-            val out = b.take(keep).toMutableList()
-            for (w in st) if (out.none { it.word == w.word }) out.add(w)
-            for (w in b) if (out.none { it.word == w.word }) out.add(w)
-            out
-        }
-        return listOf(
-            Variant("phone (new defaults)", plain(decoder())),
-            Variant("candidate cap 1024", plain(decoder(cap = 1024))),
-            Variant("candidate cap 2048", plain(decoder(cap = 2048))),
-            Variant("candidate cap 4096", plain(decoder(cap = 4096))),
-            Variant("candidate cap 16384", plain(decoder(cap = 16384))),
-            Variant("top 3 normal, then strict pen-up 1.1", merged(decoder(), decoder(penUp = 1.1f))),
-            Variant("top 3 normal, then strict pen-up 1.3", merged(decoder(), decoder(penUp = 1.3f))),
-            Variant("top 2 normal, then strict pen-up 1.1", merged(decoder(), decoder(penUp = 1.1f), keep = 2)),
-            Variant("pen-up radius 1.3", plain(decoder(penUp = 1.3f))),
-            Variant("pen-up radius 1.1", plain(decoder(penUp = 1.1f))),
-            Variant("end-only penalty 0.5 free 0.4", plain(decoder(endPenalty = 0.5f, startShare = 0f))),
-            Variant("end-only penalty 1.0 free 0.4", plain(decoder(endPenalty = 1f, startShare = 0f))),
-            Variant("end-only penalty 1.0 free 0.6", plain(decoder(endPenalty = 1f, endFree = 0.6f, startShare = 0f))),
-            Variant("end-only penalty 0.5 + pen-up 1.3", plain(decoder(endPenalty = 0.5f, startShare = 0f, penUp = 1.3f))),
-            Variant("start share 0.3, penalty 0.5", plain(decoder(endPenalty = 0.5f, startShare = 0.3f))),
+    /**
+     * A decoder from a spec like "k=0.4 slow=1": the phone's defaults with the named settings changed.
+     * k = inflection scorer's share of the blend (the rest is the location scorer), slow = slowdown soft weight,
+     * turn = turn confidence scale, ends = location scorer's end emphasis, samples = its resampled points,
+     * endR = start/end key radius, corridor = how far off the path a letter may be, stop = stop detection (dt factor),
+     * skip = penalty for an inflection no letter uses, cap = candidates scored.
+     */
+    private fun decoder(spec: String): GestureDecoder {
+        val v = spec.split(' ').filter { '=' in it }.associate { it.substringBefore('=') to it.substringAfter('=').toFloat() }
+        fun f(key: String, default: Float) = v[key] ?: default
+        val k = f("k", 0.4f)
+        return GestureDecoder(
+            HybridScorer(
+                KushlerScorer(KushlerConfig(slowEmphasis = f("slow", 0.5f), skipInflectionPenalty = f("skip", 0.9f))),
+                LocationScorer(LocationConfig(sampleCount = f("samples", 40f).toInt(), endpointEmphasis = f("ends", 2f))),
+                kushlerWeight = k, locationWeight = 1f - k,
+            ),
+            DecoderConfig(endpointRadiusKeyWidths = f("endR", 1.6f), corridorRadiusKeyWidths = f("corridor", 1.4f),
+                maxCandidates = f("cap", 4096f).toInt()),
+            GesturePreprocessor(PreprocessorConfig(turnConfidenceScale = f("turn", 1f), stopDtFactor = f("stop", 2.5f))),
         )
     }
+
+    // the phone's settings, then one setting at a time
+    private val sweep = listOf(
+        "phone", "k=0", "k=1", "k=0.3", "k=0.5", "k=0.6", "k=0.7",
+        "slow=0", "slow=1", "slow=1.5", "turn=0.7", "turn=1.3",
+        "ends=1", "ends=3", "ends=4", "samples=24", "samples=64",
+        "endR=1.3", "endR=2", "corridor=1.2", "corridor=1.8", "stop=3.5", "skip=0.6", "skip=1.2",
+    )
+
+    private fun variants(): List<Variant> {
+        fun plain(d: GestureDecoder): (Swipe, Vocabulary) -> List<ScoredWord> = { s, v -> d.decode(s.points, s.geometry, v, 10) }
+        // GESTURE_REPLAY_SPECS="k=0.4 slow=1;k=0.4": these instead of the sweep
+        val specs = System.getenv("GESTURE_REPLAY_SPECS")?.split(';')?.map { it.trim() }?.filter { it.isNotEmpty() } ?: sweep
+        val history = (System.getenv("GESTURE_REPLAY_HISTORY") ?: "").split(',').mapNotNull { it.trim().toIntOrNull() }
+        return specs.flatMap { spec ->
+            listOf(Variant(spec, plain(decoder(spec)))) +
+                history.map { Variant("$spec, learned words at $it", plain(decoder(spec)), learnedFreq = it) }
+        }
+    }
+
+    /** Which phone recorded a swipe: make_corpus.py shifts each phone's ids. */
+    private fun device(id: Int) = when { id >= 200000 -> "P8lab"; id >= 100000 -> "P8"; else -> "P11" }
 
     @Test
     fun `replay recorded swipes`() {
@@ -130,10 +134,13 @@ class ReplayTest {
         val watch = (System.getenv("GESTURE_REPLAY_WORDS") ?: "").split(',').filter { it.isNotBlank() }.toSet()
         val details = mutableListOf<String>()
         val misses = LinkedHashMap<String, MutableList<String>>()
+        var baseline: BooleanArray? = null // the first variant's top-1 hits, for the head-to-head count
         for (v in variants()) {
             val all = Tally()
             val bySource = sortedMapOf<String, Tally>()
+            val byDevice = sortedMapOf<String, Tally>()
             val missList = mutableListOf<String>()
+            val hits = BooleanArray(swipes.size)
             // a learned-words model needs its own vocabulary, grown as the replay goes
             val vocabForVariant = if (v.learnedFreq > 0) vocabulary(dir, mapOf("en-US" to 1f, "hi-Latn" to hiFactor)) else vocab
             var nanos = 0L
@@ -152,16 +159,22 @@ class ReplayTest {
                     details.add(String.format("%-44s #%-4d label=%-9s phone=%-9s -> %s", v.name, s.id, s.label, s.phoneGot,
                         results.take(6).joinToString(", ") { it.word }))
                 val rank = results.indexOfFirst { it.word.equals(s.label, ignoreCase = true) }
+                hits[swipes.indexOf(s)] = rank == 0
                 all.add(rank)
                 bySource.getOrPut(s.labelSource) { Tally() }.add(rank)
+                byDevice.getOrPut(device(s.id)) { Tally() }.add(rank)
                 if (rank != 0) missList.add("#${s.id} ${s.label} -> ${results.take(3).joinToString(",") { it.word }} (rank ${if (rank < 0) "-" else rank + 1})")
             }
-            println(String.format("%-42s %s   %s   %.1f ms/swipe", v.name, all, bySource.entries.joinToString("  ") { "${it.key}: ${String.format("%.1f", it.value.pct(it.value.top1))}" }, nanos / 1e6 / swipes.size))
+            fun top1s(m: Map<String, Tally>) = m.entries.joinToString("  ") { "${it.key}: ${String.format("%.1f", it.value.pct(it.value.top1))}" }
+            // swipes this variant gets right that the first one misses, and the other way round
+            val b = baseline ?: hits.also { baseline = it }
+            val vs = String.format("+%d -%d", hits.indices.count { hits[it] && !b[it] }, hits.indices.count { !hits[it] && b[it] })
+            println(String.format("%-42s %s  %-9s  %s   %s   %.1f ms/swipe", v.name, all, vs, top1s(bySource), top1s(byDevice), nanos / 1e6 / swipes.size))
             misses[v.name] = missList
         }
         if (details.isNotEmpty()) { println("\n--- watched words ---"); details.sortedBy { it.substringAfter('#').substringBefore(' ').toInt() }.forEach { println(it) } }
         for ((name, list) in misses) {
-            if (name != "phone (new defaults)") continue
+            if (name != "phone" || System.getenv("GESTURE_REPLAY_MISSES") != "1") continue
             println("\n--- misses, $name (${list.size}) ---")
             list.forEach { println(it) }
         }
