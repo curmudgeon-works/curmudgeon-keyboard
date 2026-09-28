@@ -119,13 +119,7 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
             onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.SwipeTuning + keyboard.toPref()) },
             icon = R.drawable.ic_settings_gesture
         ) { NextScreenIcon() }
-    if (advanced) AdvancedTint {
-        Preference(
-            name = stringResource(R.string.settings_screen_toolbar),
-            onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Toolbar) },
-            icon = R.drawable.ic_settings_toolbar
-        ) { NextScreenIcon() }
-    }
+    // (the toolbar is a group on Layout & Typing)
     Preference(
         name = stringResource(R.string.settings_screen_correction),
         onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.TextCorrection) },
