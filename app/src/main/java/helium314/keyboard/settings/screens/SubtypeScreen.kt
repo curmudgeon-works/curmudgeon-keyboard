@@ -308,7 +308,7 @@ fun SubtypeScreen(
             ) { androidx.compose.runtime.key(rebuild) {
                 val advanced by SettingsMode.state(ctx)
                 // two groups, one row style (label 10 dp in, rows 56 dp high): see LocalCompactPreferences, SwitchRow
-                // ---- the layout (then typing, backspace, popups, toolbar, clipboard history): main layout (advanced), shape, emoji key, split, send key, other layouts, bottom row
+                // ---- the layout (then typing with backspace, popups, toolbar, clipboard history): main layout (advanced), shape, emoji key, split, send key, other layouts, bottom row
                 WithBigTitle(stringResource(R.string.keyboard_layout_set)) {
                     // the main layout (QWERTY, QWERTZ, AZERTY, …) on top, advanced
                     if (advanced) AdvancedBlock { Pending(layoutChanged(LayoutType.MAIN)) { MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) } } }
@@ -414,33 +414,28 @@ fun SubtypeScreen(
                             extra = { DefaultButton(checked == null) { setCurrentSubtype(currentSubtype.without(ExtraValue.LOCALIZED_NUMBER_ROW)) } },
                         ) { setCurrentSubtype(currentSubtype.with(ExtraValue.LOCALIZED_NUMBER_ROW, it.toString())) }
                     }
+                    // backspace (was its own group): whole words and speeding up in simple mode
+                    CompositionLocalProvider(LocalCompactPreferences provides true) {
+                        Pending(keyChanged(Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS)) {
+                            SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS]?.Preference() }
+                        Pending(keyChanged(Settings.PREF_BACKSPACE_SPEED_UP, Settings.PREF_BACKSPACE_SPEED_UP_AFTER, Settings.PREF_BACKSPACE_TOP_INTERVAL)) {
+                            SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_SPEED_UP]?.Preference() }
+                    }
                     // (the symbol switches — hide on the number row / other keys, long-press dots — are on Appearance)
                     if (advanced) AdvancedBlock {
                         CompositionLocalProvider(LocalCompactPreferences provides true) {
+                            // backspace, advanced: a tap after a swipe, swiping left, undoing an autocorrection
+                            Pending(keyChanged(Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD)) {
+                                SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD]?.Preference() }
+                            Pending(keyChanged(Settings.PREF_DELETE_SWIPE, Settings.PREF_DELETE_SWIPE_SPEED)) {
+                                SettingsActivity.settingsContainer[Settings.PREF_DELETE_SWIPE]?.Preference() }
+                            if (prefs.getBoolean(Settings.PREF_AUTO_CORRECTION, Defaults.PREF_AUTO_CORRECTION))
+                                Pending(keyChanged(Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT)) {
+                                    SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT]?.Preference() }
                             advancedInputItems.forEach {
                                 val pending = if (it == SettingsWithoutKey.ABC_AFTER) abcAfterKeys.any { k -> keyChanged(k.first) } else keyChanged(it)
                                 Pending(pending) { SettingsActivity.settingsContainer[it]?.Preference() }
                             }
-                        }
-                    }
-                }
-                // ---- backspace: whole words in simple mode, the rest advanced
-                WithBigTitle(stringResource(R.string.backspace_settings)) {
-                    CompositionLocalProvider(LocalCompactPreferences provides true) {
-                        Pending(keyChanged(Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS)) {
-                            SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS]?.Preference() }
-                    }
-                    if (advanced) AdvancedBlock {
-                        CompositionLocalProvider(LocalCompactPreferences provides true) {
-                            // speeding up while held: its own switch, independent of whole words
-                            Pending(keyChanged(Settings.PREF_BACKSPACE_SPEED_UP, Settings.PREF_BACKSPACE_SPEED_UP_AFTER, Settings.PREF_BACKSPACE_TOP_INTERVAL)) {
-                                SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_SPEED_UP]?.Preference() }
-                            listOf(Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD, Settings.PREF_DELETE_SWIPE).forEach {
-                                Pending(keyChanged(it)) { SettingsActivity.settingsContainer[it]?.Preference() } }
-                            // only meaningful with autocorrect on (as on the Text correction screen it came from)
-                            if (prefs.getBoolean(Settings.PREF_AUTO_CORRECTION, Defaults.PREF_AUTO_CORRECTION))
-                                Pending(keyChanged(Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT)) {
-                                    SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT]?.Preference() }
                         }
                     }
                 }

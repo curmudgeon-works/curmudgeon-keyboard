@@ -153,7 +153,7 @@ fun createPreferencesSettings(context: Context) = listOf(
             } } },
         )
     },
-    Setting(context, Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS, R.string.backspace_hold_deletes_words, R.string.backspace_hold_deletes_words_summary) {
+    Setting(context, Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS, R.string.backspace_hold_deletes_words) {
         SwitchPreference(it, Defaults.PREF_BACKSPACE_HOLD_DELETES_WORDS)
     },
     // (the interval between deletions while held is the key long-press delay; only the speed-up is set here)
@@ -350,53 +350,77 @@ private fun Preview() {
  * Hold-to-delete speed: the interval between deletions, and optionally a speed-up — after holding for a while
  * the interval ramps (over a second) to a faster top speed. All in one dialog.
  */
+/**
+ * A switch whose details live in a dialog: switching it on opens the dialog; tapping the row while on opens it too;
+ * switching off just switches off. [dialogContent] gets the values being edited; OK writes them via [save].
+ */
 @Composable
-/** Speeding up while backspace is held: a switch; the row opens the two sliders (when, and how fast). */
-private fun BackspaceSpeedUpPreference(setting: Setting) {
+private fun SwitchWithDialogPreference(
+    setting: Setting, key: String, default: Boolean,
+    dialogContent: @Composable () -> Unit, save: () -> Unit, onDefault: (() -> Unit)? = null,
+) {
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
     val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
-    if ((b?.value ?: 0) < 0)
-        Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
-    helium314.keyboard.settings.KnownDefaults.note(Settings.PREF_BACKSPACE_SPEED_UP, Defaults.PREF_BACKSPACE_SPEED_UP)
-    helium314.keyboard.settings.KnownDefaults.note(Settings.PREF_BACKSPACE_SPEED_UP_AFTER, Defaults.PREF_BACKSPACE_SPEED_UP_AFTER)
-    helium314.keyboard.settings.KnownDefaults.note(Settings.PREF_BACKSPACE_TOP_INTERVAL, Defaults.PREF_BACKSPACE_TOP_INTERVAL)
-    val speedUp = prefs.getBoolean(Settings.PREF_BACKSPACE_SPEED_UP, Defaults.PREF_BACKSPACE_SPEED_UP)
-    val after = prefs.getInt(Settings.PREF_BACKSPACE_SPEED_UP_AFTER, Defaults.PREF_BACKSPACE_SPEED_UP_AFTER)
-    val top = prefs.getInt(Settings.PREF_BACKSPACE_TOP_INTERVAL, Defaults.PREF_BACKSPACE_TOP_INTERVAL)
-    fun seconds(ms: Int) = String.format(java.util.Locale.getDefault(), "%.1f", ms / 1000f)
+    if ((b?.value ?: 0) < 0) Log.v("irrelevant", "recompose on preference change")
+    helium314.keyboard.settings.KnownDefaults.note(key, default)
+    val on = prefs.getBoolean(key, default)
     var showDialog by rememberSaveable { mutableStateOf(false) }
-    Preference(
-        name = setting.title,
-        onClick = { showDialog = true },
-        description = if (speedUp) stringResource(R.string.backspace_speed_up_value, top, seconds(after)) else null,
-    ) { Switch(checked = speedUp, onCheckedChange = { prefs.edit { putBoolean(Settings.PREF_BACKSPACE_SPEED_UP, it) } }) }
-    if (!showDialog) return
-    var newAfter by rememberSaveable { mutableFloatStateOf(after.toFloat()) }
-    var newTop by rememberSaveable { mutableFloatStateOf(top.toFloat()) }
-    ThreeButtonAlertDialog(
+    Preference(name = setting.title, onClick = { if (on) showDialog = true else { prefs.edit { putBoolean(key, true) }; showDialog = true } }) {
+        Switch(checked = on, onCheckedChange = { turnOn ->
+            prefs.edit { putBoolean(key, turnOn) }
+            if (turnOn) showDialog = true
+        })
+    }
+    if (showDialog) ThreeButtonAlertDialog(
         onDismissRequest = { showDialog = false },
         title = { Text(setting.title) },
-        neutralButtonText = stringResource(R.string.button_default),
-        onNeutral = { newAfter = Defaults.PREF_BACKSPACE_SPEED_UP_AFTER.toFloat(); newTop = Defaults.PREF_BACKSPACE_TOP_INTERVAL.toFloat() },
-        onConfirmed = {
-            prefs.edit {
-                putBoolean(Settings.PREF_BACKSPACE_SPEED_UP, true) // setting the speed-up means wanting it
-                putInt(Settings.PREF_BACKSPACE_SPEED_UP_AFTER, newAfter.toInt())
-                putInt(Settings.PREF_BACKSPACE_TOP_INTERVAL, newTop.toInt())
-            }
-        },
-        content = {
-            Column {
-                Text(stringResource(R.string.backspace_speed_up_after))
-                Slider(value = newAfter, onValueChange = { newAfter = it }, valueRange = 500f..5000f, steps = 8)
-                Text(stringResource(R.string.backspace_seconds_value, seconds(newAfter.toInt())),
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(stringResource(R.string.backspace_top_speed), Modifier.padding(top = 8.dp))
-                Slider(value = newTop, onValueChange = { newTop = it }, valueRange = 25f..200f, steps = 6)
-                Text(stringResource(R.string.backspace_repeat_interval_value, newTop.toInt()),
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        },
+        neutralButtonText = onDefault?.let { stringResource(R.string.button_default) },
+        onNeutral = { onDefault?.invoke() },
+        onConfirmed = save,
+        content = { dialogContent() },
+    )
+}
+
+/** Holding backspace speeds up: when it starts, and the top speed. */
+@Composable
+private fun BackspaceSpeedUpPreference(setting: Setting) {
+    val prefs = LocalContext.current.prefs()
+    helium314.keyboard.settings.KnownDefaults.note(Settings.PREF_BACKSPACE_SPEED_UP_AFTER, Defaults.PREF_BACKSPACE_SPEED_UP_AFTER)
+    helium314.keyboard.settings.KnownDefaults.note(Settings.PREF_BACKSPACE_TOP_INTERVAL, Defaults.PREF_BACKSPACE_TOP_INTERVAL)
+    fun seconds(ms: Int) = String.format(java.util.Locale.getDefault(), "%.1f", ms / 1000f)
+    var newAfter by rememberSaveable { mutableFloatStateOf(prefs.getInt(Settings.PREF_BACKSPACE_SPEED_UP_AFTER, Defaults.PREF_BACKSPACE_SPEED_UP_AFTER).toFloat()) }
+    var newTop by rememberSaveable { mutableFloatStateOf(prefs.getInt(Settings.PREF_BACKSPACE_TOP_INTERVAL, Defaults.PREF_BACKSPACE_TOP_INTERVAL).toFloat()) }
+    SwitchWithDialogPreference(setting, Settings.PREF_BACKSPACE_SPEED_UP, Defaults.PREF_BACKSPACE_SPEED_UP,
+        dialogContent = { Column {
+            Text(stringResource(R.string.backspace_speed_up_after))
+            Slider(value = newAfter, onValueChange = { newAfter = it }, valueRange = 500f..5000f, steps = 8)
+            Text(stringResource(R.string.backspace_seconds_value, seconds(newAfter.toInt())),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.backspace_top_speed), Modifier.padding(top = 8.dp))
+            Slider(value = newTop, onValueChange = { newTop = it }, valueRange = 25f..200f, steps = 6)
+            Text(stringResource(R.string.backspace_repeat_interval_value, newTop.toInt()),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } },
+        save = { prefs.edit {
+            putInt(Settings.PREF_BACKSPACE_SPEED_UP_AFTER, newAfter.toInt()); putInt(Settings.PREF_BACKSPACE_TOP_INTERVAL, newTop.toInt()) } },
+        onDefault = { newAfter = Defaults.PREF_BACKSPACE_SPEED_UP_AFTER.toFloat(); newTop = Defaults.PREF_BACKSPACE_TOP_INTERVAL.toFloat() },
+    )
+}
+
+/** Swiping left from backspace selects more text to delete: how fast the selection grows with the finger. */
+@Composable
+internal fun DeleteSwipePreference(setting: Setting) {
+    val prefs = LocalContext.current.prefs()
+    helium314.keyboard.settings.KnownDefaults.note(Settings.PREF_DELETE_SWIPE_SPEED, Defaults.PREF_DELETE_SWIPE_SPEED)
+    var speed by rememberSaveable { mutableFloatStateOf(prefs.getFloat(Settings.PREF_DELETE_SWIPE_SPEED, Defaults.PREF_DELETE_SWIPE_SPEED)) }
+    SwitchWithDialogPreference(setting, Settings.PREF_DELETE_SWIPE, Defaults.PREF_DELETE_SWIPE,
+        dialogContent = { Column {
+            Text(stringResource(R.string.delete_swipe_speed))
+            Slider(value = speed, onValueChange = { speed = it }, valueRange = 0.5f..3f, steps = 9)
+            Text("${(speed * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } },
+        save = { prefs.edit { putFloat(Settings.PREF_DELETE_SWIPE_SPEED, speed) } },
+        onDefault = { speed = Defaults.PREF_DELETE_SWIPE_SPEED },
     )
 }

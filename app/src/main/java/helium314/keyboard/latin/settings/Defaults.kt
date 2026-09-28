@@ -69,6 +69,7 @@ object Defaults {
     const val PREF_BACKSPACE_DELETES_SWIPED_WORD = true // a tap right after a swipe deletes the swiped word
     const val PREF_AUTOCORRECT_WITH_DIGITS = false // a word with a digit is suggested, not replaced
     const val PREF_KEY_TEXT_BOLD = false // until set, the key style decides (Holo draws bold)
+    const val PREF_DELETE_SWIPE_SPEED = 1f // characters per finger step of swiping left from backspace, times this
     const val PREF_BACKGROUND_WHOLE_PICTURE = true // keys clear on the background picture (the switch, shown inverted, reads off)
     const val PREF_FONT_FOLLOWS_KEY_TEXT = true // symbols and suggestions use the key text font
     const val PREF_KEY_TEXT_ITALIC = false
