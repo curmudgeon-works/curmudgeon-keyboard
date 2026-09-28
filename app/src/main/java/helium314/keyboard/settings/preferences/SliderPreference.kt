@@ -33,6 +33,7 @@ fun <T: Number> SliderPreference(
     applyOnRelease: Boolean = false, // with [live]: written when the slider is let go
     onConfirmed: (T) -> Unit = { },
 ) {
+    helium314.keyboard.settings.KnownDefaults.note(key, default)
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
     val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()

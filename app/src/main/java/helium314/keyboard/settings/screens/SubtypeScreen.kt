@@ -675,6 +675,7 @@ val ROW_HEIGHT = 56.dp
 private fun PrefSwitchRow(key: String, default: Boolean, titleId: Int, summaryId: Int? = null, inverted: Boolean = false, onChanged: () -> Unit) {
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
+    helium314.keyboard.settings.KnownDefaults.note(key, default)
     // read each time (a Discard puts values back behind this row's back)
     val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
     if ((b?.value ?: 0) < 0) Log.v("irrelevant", "recompose on preference change")
