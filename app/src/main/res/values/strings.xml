@@ -279,7 +279,7 @@
     <!-- Value of the hold-to-delete speed; %d is milliseconds -->
     <string name="backspace_repeat_interval_value">One deletion every %d ms</string>
     <string name="backspace_start_speed">Speed</string>
-    <string name="backspace_speed_up">Speed up while held</string>
+    <string name="backspace_speed_up">Speed up deleting while held</string>
     <string name="backspace_speed_up_after">Speed up after</string>
     <string name="backspace_top_speed">Top speed</string>
     <!-- %s is a number of seconds like 2.0 -->
