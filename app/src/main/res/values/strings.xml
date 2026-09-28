@@ -589,7 +589,7 @@
     <!-- Title of the setting to show "..." as hints for more functionality on long-press -->
     <string name="show_popup_hints">Hide bottom-right ellipsis symbols</string>
     <!-- Option to remove popup keys that already exist on the base keyboard -->
-    <string name="remove_redundant_popups">Remove duplicates from letters &amp; numbers</string>
+    <string name="remove_redundant_popups">Remove duplicate popups from letters &amp; numbers</string>
     <!-- Description of the remove_redundant_popups setting -->
     <string name="remove_redundant_popups_summary">Each character on the letter and number keys only once: a popup that is a key, or a popup of an earlier key (counting from the bottom left, around the edge and inwards), is dropped</string>
     <!-- Title of the setting enabling long press on space key to change IME -->
