@@ -150,7 +150,11 @@ fun AppearanceScreen(
         SettingsWithoutKey.BACKGROUND_IMAGE,
         SettingsWithoutKey.BACKGROUND_IMAGE_LANDSCAPE,
         R.string.appearance_group_style,
-        // (keyboard height, numbers row and split keyboard are on Layout & Typing: the keyboard's shape, not its look)
+        SettingsWithoutKey.HIDE_ALL_SYMBOLS, // the three below it are advanced
+        Settings.PREF_SHOW_NUMBER_ROW_HINTS,
+        Settings.PREF_SHOW_HINTS,
+        Settings.PREF_SHOW_POPUP_HINTS,
+        // (keyboard height, numbers row, split keyboard, bottom row and side padding are on Layout & Typing: the shape, not the look)
         Settings.PREF_THEME_KEY_BORDERS,
         Settings.PREF_KEY_HORIZONTAL_GAP,
         Settings.PREF_KEY_VERTICAL_GAP,
@@ -158,10 +162,6 @@ fun AppearanceScreen(
         Settings.PREF_ICON_STYLE,
         Settings.PREF_CUSTOM_ICON_NAMES,
         R.string.appearance_group_fonts,
-        SettingsWithoutKey.HIDE_ALL_SYMBOLS, // the three below it are advanced
-        Settings.PREF_SHOW_NUMBER_ROW_HINTS,
-        Settings.PREF_SHOW_HINTS,
-        Settings.PREF_SHOW_POPUP_HINTS,
         SettingsWithoutKey.KEY_TEXT_STYLE,
         SettingsWithoutKey.HINT_TEXT_STYLE,
         SettingsWithoutKey.SUGGESTION_TEXT_STYLE,
