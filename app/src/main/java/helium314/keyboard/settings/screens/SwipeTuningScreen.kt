@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.screens
 
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import helium314.keyboard.settings.AdvancedTint
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -71,10 +73,26 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     val rows = remember(statsGeneration, b?.value) { GestureStats.read(ctx.realPrefs()) }
     val current = OwnGestureDecoder.Tuning.read(prefs)
     val recommended = GestureStats.recommended(rows)
+    // a try-it bar to swipe in, and the dialogs keep the keyboard up (like Appearance and Layout & Typing)
+    val tryIt = remember { TryItState() }
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    val softKeyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val preview = remember { PreviewKeyboard(tryIt, scope, showIme = { softKeyboard?.show() }, reveal = { }) {
+        focusManager.clearFocus(); softKeyboard?.hide() } }
+    var bottomBarTop by remember { mutableIntStateOf(-1) }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { (ctx.getActivity() as? SettingsActivity)?.touchPassFromY = Int.MAX_VALUE } }
+    androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.dialogs.LocalKeepKeyboard provides true,
+        helium314.keyboard.settings.dialogs.LocalPreviewKeyboard provides preview,
+        helium314.keyboard.settings.dialogs.LocalBottomBarTop provides bottomBarTop) {
     SearchSettingsScreen(
         onClickBack = onClickBack,
         title = stringResource(R.string.swipe_screen),
         settings = emptyList(),
+        bottomBar = { androidx.compose.foundation.layout.Box(Modifier.onGloballyPositioned {
+            bottomBarTop = it.positionInWindow().y.toInt()
+            (ctx.getActivity() as? SettingsActivity)?.touchPassFromY = bottomBarTop
+        }) { TryItBar(keyboard, tryIt, onFocus = preview::onFocus) } },
     ) {
         // the content is taller than a screen now that the gesture typing items are here
         Column(Modifier.verticalScroll(rememberScrollState()).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))) {
@@ -165,6 +183,7 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
         }
       }
         }
+    }
 }
 
 /** The learned-word boost: whole numbers, shown as the summary explains. */
