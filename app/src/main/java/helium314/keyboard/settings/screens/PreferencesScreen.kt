@@ -88,6 +88,7 @@ fun preferencesInputItems(prefs: SharedPreferences, ctx: Context): List<Any?> {
     val soundRows = prefs.getBoolean(Settings.PREF_SOUND_ON, Defaults.PREF_SOUND_ON) && SystemFeedback.soundBlocker(ctx) == null
     return listOf(
         R.string.settings_category_input,
+        Settings.PREF_KEY_LONGPRESS_TIMEOUT, // (from Advanced)
         Settings.PREF_POPUP_ON,
         if (AudioAndHapticFeedbackManager.getInstance().hasVibrator())
             Settings.PREF_VIBRATE_ON else null,

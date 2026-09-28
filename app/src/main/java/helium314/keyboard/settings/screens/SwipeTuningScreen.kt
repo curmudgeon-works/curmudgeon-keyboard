@@ -101,6 +101,16 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
                         (if (on) KeyboardActionListener.SwipeAction.MOVE_CURSOR else KeyboardActionListener.SwipeAction.NONE).name) }
                 })
             }
+            // advanced: every space bar swipe (moved from Advanced), with the distance / sensitivity their actions use
+            if (advanced) AdvancedTint {
+                listOfNotNull(Settings.PREF_SPACE_HORIZONTAL_SWIPE, Settings.PREF_SPACE_VERTICAL_SWIPE,
+                    if (Settings.readHorizontalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.SWITCH_LANGUAGE
+                        || Settings.readVerticalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.SWITCH_LANGUAGE)
+                        Settings.PREF_LANGUAGE_SWIPE_DISTANCE else null,
+                    if (Settings.readVerticalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.TOUCHPAD_MODE)
+                        Settings.PREF_TOUCHPAD_SENSITIVITY else null,
+                ).forEach { SettingsActivity.settingsContainer[it]?.Preference() }
+            }
 
             // ---- how the decoder weighs a swipe, and how each weighting did
             GroupTitle(R.string.swipe_tuning)

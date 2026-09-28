@@ -341,8 +341,11 @@ fun SubtypeScreen(
                     }
                     // the send/enter key on the rows under the emoji and clipboard panels: one switch for both
                     val withAction = (currentSubtype.layoutName(LayoutType.EMOJI_BOTTOM) ?: Settings.readDefaultLayoutName(LayoutType.EMOJI_BOTTOM, prefs)) == "emoji_bottom_row_with_action"
-                    // advanced: the send key on the emoji and clipboard panels
+                    // advanced: the send key on the emoji and clipboard panels, long-press space to change input method
                     if (advanced) AdvancedBlock {
+                        Pending(keyChanged(Settings.PREF_SPACE_TO_CHANGE_LANG)) {
+                            CompositionLocalProvider(LocalCompactPreferences provides true) {
+                                SettingsActivity.settingsContainer[Settings.PREF_SPACE_TO_CHANGE_LANG]?.Preference() } }
                         Pending(layoutChanged(LayoutType.EMOJI_BOTTOM)) { SwitchRow(stringResource(R.string.bottom_rows_action_key), withAction) { on ->
                             setCurrentSubtype(
                                 if (on) currentSubtype.withLayout(LayoutType.EMOJI_BOTTOM, "emoji_bottom_row_with_action").withLayout(LayoutType.CLIPBOARD_BOTTOM, "clip_bottom_row_with_action")
@@ -646,7 +649,7 @@ private fun SwitchRow(title: String, checked: Boolean, summary: String? = null, 
 /** Settings whose dialogs keep the preview keyboard up (to hear the key sound or feel the vibration while choosing it). */
 private val soundPreviewItems = setOf(Settings.PREF_KEYPRESS_SOUND, Settings.PREF_KEYPRESS_SOUND_VOLUME, Settings.PREF_VIBRATION_DURATION_SETTINGS)
 
-private val advancedInputItems = listOf(Settings.PREF_SAVE_SUBTYPE_PER_APP) // (emoji descriptions: Appearance, Emoji group)
+private val advancedInputItems = listOf(Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, Settings.PREF_SAVE_SUBTYPE_PER_APP) // (emoji descriptions: Appearance, Emoji group)
 
 /** Advanced items on a slightly different background, so toggling the mode shows what it adds (last in the Input
  *  group, in place elsewhere). */
