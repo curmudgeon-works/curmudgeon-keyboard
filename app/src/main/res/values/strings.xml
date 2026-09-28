@@ -188,13 +188,13 @@
     <!-- Option to enable gesture trail preview. The user can see a trail of the gesture during gesture input.-->
     <string name="gesture_preview_trail">Show swipe trail</string>
     <!-- Option to enable gesture floating text preview. The user can see a suggested word floating above the keyboard during a gesture input.-->
-    <string name="gesture_floating_preview_static">Floating preview</string>
+    <string name="gesture_floating_preview_static">Suggested word follows your finger while swiping</string>
     <!-- Description for "gesture_floating_preview_static" option. The user can see a suggested word floating above the keyboard during a gesture input.-->
     <string name="gesture_floating_preview_static_summary">See the suggested word while gesturing</string>
     <!-- Option to enable gesture dynamic floating preview. The user can see a suggested word floating above the moving finger during a gesture input.-->
-    <string name="gesture_floating_preview_text">Dynamic floating preview</string>
+    <string name="gesture_floating_preview_text">…and moves with your finger</string>
     <!-- Description for "gesture_floating_preview_text" option. The user can see a suggested word floating above the moving finger during a gesture input.-->
-    <string name="gesture_floating_preview_dynamic_summary">Move the preview while swiping</string>
+    <string name="gesture_floating_preview_dynamic_summary">Off: it stays where the swipe started</string>
     <!-- Option to enable space aware gesture input. The user can input multiple words by gliding through the space key during a gesture input.-->
     <string name="gesture_space_aware">Phrase gesture</string>
     <!-- Description for "gesture_space_aware" option. The user can input multiple words by gliding through the space key during a gesture input.-->
@@ -1206,9 +1206,9 @@ New dictionary:
     <!-- Label for bin (delete) key, currently used only for showing the icon name -->
     <string name="label_bin" tools:keep="@string/label_bin">Bin</string>
     <!-- Title of the setting for horizontal spacebar swipe gesture -->
-    <string name="show_horizontal_space_swipe">Horizontal spacebar swipe gesture</string>
+    <string name="show_horizontal_space_swipe">Horizontal spacebar swipe</string>
     <!-- Title of the setting for vertical spacebar swipe gesture -->
-    <string name="show_vertical_space_swipe">Vertical spacebar swipe gesture</string>
+    <string name="show_vertical_space_swipe">Vertical spacebar swipe</string>
     <!-- Option for no action when (currently only used for swiping the spacebar) -->
     <string name="action_none">None</string>
     <!-- Option to move the cursor when swiping the spacebar -->
