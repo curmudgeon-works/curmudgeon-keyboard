@@ -66,9 +66,7 @@ fun toolbarItems(prefs: SharedPreferences): List<String?> {
         // (swipe down on it to hide the keyboard: on Swiping)
         // the main, clipboard and pinned toolbars' keys in one list (M / C / P on each key)
         SettingsWithoutKey.TOOLBAR_KEYS_ALL,
-        if (clipboardToolbarVisible) Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES else null,
-        // (auto show / auto hide and pinning by long-press: on Others)
-        if (toolbarMode != ToolbarMode.HIDDEN) Settings.PREF_VARIABLE_TOOLBAR_DIRECTION else null,
+        // (auto show / auto hide, pinning by long-press, custom key codes, variable direction: on Others)
         // the button that opens and closes the toolbar (moved here from the Suggestion strip font dialog)
         if (toolbarMode == ToolbarMode.EXPANDABLE) Settings.PREF_TOOLBAR_EXPAND_ICON else null,
     )

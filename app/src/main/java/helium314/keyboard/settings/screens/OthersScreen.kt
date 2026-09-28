@@ -16,8 +16,8 @@ import helium314.keyboard.settings.SettingsActivity
 
 /**
  * Settings few people need, kept out of the way (advanced only): the toolbar opening and closing by itself and
- * pinning a toolbar key by long-press (only for a toolbar that opens with the arrow), the emoji key of a physical
- * keyboard, the timestamp key's format.
+ * pinning a toolbar key by long-press (only for a toolbar that opens with the arrow), custom toolbar key codes, the
+ * toolbar reversed for right-to-left languages, the emoji key of a physical keyboard, the timestamp key's format.
  */
 @Composable
 fun OthersScreen(onClickBack: () -> Unit) {
@@ -29,6 +29,8 @@ fun OthersScreen(onClickBack: () -> Unit) {
         if (expandable) Settings.PREF_AUTO_SHOW_TOOLBAR else null,
         if (expandable) Settings.PREF_AUTO_HIDE_TOOLBAR else null,
         if (expandable) Settings.PREF_QUICK_PIN_TOOLBAR_KEYS else null,
+        Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES, // what a toolbar key sends on tap / long-press
+        if (Settings.readToolbarMode(prefs) != ToolbarMode.HIDDEN) Settings.PREF_VARIABLE_TOOLBAR_DIRECTION else null,
         Settings.PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY,
         Settings.PREF_TIMESTAMP_FORMAT,
     )
