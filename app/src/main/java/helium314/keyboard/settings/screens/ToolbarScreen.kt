@@ -76,6 +76,8 @@ fun toolbarItems(prefs: SharedPreferences): List<String?> {
         if (toolbarMode != ToolbarMode.HIDDEN) Settings.PREF_VARIABLE_TOOLBAR_DIRECTION else null,
         // the button that opens and closes the toolbar (moved here from the Suggestion strip font dialog)
         if (toolbarMode == ToolbarMode.EXPANDABLE) Settings.PREF_TOOLBAR_EXPAND_ICON else null,
+        // where it opens: in a row above the suggestions (default) or in their place
+        if (toolbarMode == ToolbarMode.EXPANDABLE) Settings.PREF_TOOLBAR_IN_STRIP_ROW else null,
     )
 }
 
@@ -85,9 +87,13 @@ val toolbarKeys = listOf(
     Settings.PREF_TOOLBAR_KEYS, Settings.PREF_PINNED_TOOLBAR_KEYS, Settings.PREF_CLIPBOARD_TOOLBAR_KEYS,
     Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES, Settings.PREF_QUICK_PIN_TOOLBAR_KEYS, Settings.PREF_AUTO_SHOW_TOOLBAR,
     Settings.PREF_AUTO_HIDE_TOOLBAR, Settings.PREF_VARIABLE_TOOLBAR_DIRECTION, Settings.PREF_TOOLBAR_EXPAND_ICON,
+    Settings.PREF_TOOLBAR_IN_STRIP_ROW,
 )
 
 fun createToolbarSettings(context: Context) = listOf(
+    Setting(context, Settings.PREF_TOOLBAR_IN_STRIP_ROW, R.string.toolbar_in_strip_row) {
+        SwitchPreference(it, Defaults.PREF_TOOLBAR_IN_STRIP_ROW) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+    },
     Setting(context, Settings.PREF_TOOLBAR_EXPAND_ICON, R.string.toolbar_button) {
         ListPreference(it, listOf(
             stringResource(R.string.pref_toolbar_expand_icon_arrow) to "arrow",
