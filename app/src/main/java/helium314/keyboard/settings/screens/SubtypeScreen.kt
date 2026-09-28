@@ -321,9 +321,11 @@ fun SubtypeScreen(
             ) { androidx.compose.runtime.key(rebuild) {
                 val advanced by SettingsMode.state(ctx)
                 // two groups, one row style (label 10 dp in, rows 56 dp high): see LocalCompactPreferences, SwitchRow
-                // ---- the layout: the keyboard's shape, the emoji and send keys, the other layouts, the main layout last
+                // ---- the layout: main layout (advanced), shape, emoji key, split, send key, other layouts, bottom row
                 WithBigTitle(stringResource(R.string.keyboard_layout_set)) {
-                    // the keyboard's shape first (moved from Appearance): height, numbers row, split keyboard;
+                    // the main layout (QWERTY, QWERTZ, AZERTY, …) on top, advanced
+                    if (advanced) AdvancedBlock { Pending(layoutChanged(LayoutType.MAIN)) { MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) } } }
+                    // the keyboard's shape first (moved from Appearance): height, numbers row;
                     // their dialogs keep the preview keyboard up
                     CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
                         LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
@@ -334,6 +336,17 @@ fun SubtypeScreen(
                         if (!prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW))
                             Pending(keyChanged(Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS)) { Box(Modifier.padding(start = 16.dp)) {
                                 SettingsActivity.settingsContainer[Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS]?.Preference() } }
+                    }
+                    // then the emoji key switch
+                    Pending(keyChanged(Settings.PREF_SHOW_EMOJI_KEY)) {
+                        PrefSwitchRow(Settings.PREF_SHOW_EMOJI_KEY, Defaults.PREF_SHOW_EMOJI_KEY, R.string.show_emoji_key) {
+                            holdPreview()
+                            KeyboardSwitcher.getInstance().reloadKeyboard()
+                        }
+                    }
+                    // split keyboard (and its gap), with the preview keyboard
+                    CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
+                        LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
                         Pending(keyChanged(Settings.PREF_ENABLE_SPLIT_KEYBOARD, Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE,
                             Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE)) {
                             SettingsActivity.settingsContainer[Settings.PREF_ENABLE_SPLIT_KEYBOARD]?.Preference() }
@@ -342,13 +355,6 @@ fun SubtypeScreen(
                                 .any { prefs.getBoolean(it, Defaults.PREF_ENABLE_SPLIT_KEYBOARD) })
                             Pending(prefixChanged(Settings.PREF_SPLIT_SPACER_SCALE_PREFIX)) { Box(Modifier.padding(start = 16.dp)) {
                                 SettingsActivity.settingsContainer[Settings.PREF_SPLIT_SPACER_SCALE_PREFIX]?.Preference() } }
-                    }
-                    // then the emoji key switch
-                    Pending(keyChanged(Settings.PREF_SHOW_EMOJI_KEY)) {
-                        PrefSwitchRow(Settings.PREF_SHOW_EMOJI_KEY, Defaults.PREF_SHOW_EMOJI_KEY, R.string.show_emoji_key) {
-                            holdPreview()
-                            KeyboardSwitcher.getInstance().reloadKeyboard()
-                        }
                     }
                     // the send/enter key on the rows under the emoji and clipboard panels: one switch for both
                     val withAction = (currentSubtype.layoutName(LayoutType.EMOJI_BOTTOM) ?: Settings.readDefaultLayoutName(LayoutType.EMOJI_BOTTOM, prefs)) == "emoji_bottom_row_with_action"
@@ -369,7 +375,7 @@ fun SubtypeScreen(
                     for (type in listOf(LayoutType.MORE_SYMBOLS, LayoutType.NUMBER, LayoutType.NUMBER_ROW, LayoutType.NUMPAD, LayoutType.NUMPAD_LANDSCAPE, LayoutType.PHONE, LayoutType.PHONE_SYMBOLS))
                         if (LayoutUtilsCustom.getLayoutFiles(type, ctx).isNotEmpty())
                             Pending(layoutChanged(type)) { SecondaryLayoutRow(currentSubtype, type, ::setCurrentSubtype) }
-                    // tablet-style bottom row (advanced on phones), then bottom row size and side padding, the main layout last
+                    // tablet-style bottom row (advanced on phones), then bottom row size and side padding
                     if (tabletOnly) {
                         @Composable fun tabletRow() = Pending(layoutChanged(LayoutType.FUNCTIONAL)) {
                             SwitchRow(stringResource(R.string.bottom_row_tablet), currentSubtype.layoutName(LayoutType.FUNCTIONAL) == "functional_keys_tablet") { on ->
@@ -388,23 +394,22 @@ fun SubtypeScreen(
                             SettingsActivity.settingsContainer[Settings.PREF_SIDE_PADDING_SCALE_PREFIX]?.Preference() }
                         }
                     }
-                    if (advanced) AdvancedBlock { Pending(layoutChanged(LayoutType.MAIN)) { MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) } } }
                 }
                 // ---- popups: what holding a key offers (every row is advanced, so the group is too)
-                if (advanced) WithBigTitle(stringResource(R.string.key_popups_group)) {
+                if (advanced) AdvancedBlock { WithBigTitle(stringResource(R.string.key_popups_group)) {
                     // preset popup layouts, customize popups, customize keys and popups with JSON (all advanced);
                     // italic as a whole when any of it changed
                     Pending(keyChanged("key_popups", "key_popup_set_selected", "key_popup_sets", Settings.PREF_SYMBOL_POPUP_MAP)
                             || currentSubtype.getExtraValueOf(ExtraValue.MORE_POPUPS) != openedSubtype.getExtraValueOf(ExtraValue.MORE_POPUPS)
                             || layoutChanged(LayoutType.SYMBOLS) || changedFolders.any { it != "main" } || prefixChanged(Settings.PREF_LAYOUT_PREFIX)) {
                         KeyPopupsSection(currentSubtype) { setCurrentSubtype(it) } }
-                    if (advanced) AdvancedBlock {
+                    run {
                         Pending(keyChanged(Settings.PREF_SHOW_TLD_POPUP_KEYS)) {
                             PrefSwitchRow(Settings.PREF_SHOW_TLD_POPUP_KEYS, Defaults.PREF_SHOW_TLD_POPUP_KEYS, R.string.show_tld_popup_keys) { holdPreview(); reloadPreview() } }
                         Pending(keyChanged(Settings.PREF_REMOVE_REDUNDANT_POPUPS)) {
                             PrefSwitchRow(Settings.PREF_REMOVE_REDUNDANT_POPUPS, Defaults.PREF_REMOVE_REDUNDANT_POPUPS, R.string.remove_redundant_popups) { holdPreview(); reloadPreview() } }
                     }
-                }
+                } }
                 // ---- typing: key-press popup, vibration, sound, per-app keyboard, localized number row
                 WithBigTitle(stringResource(R.string.settings_category_input)) {
                     CompositionLocalProvider(LocalCompactPreferences provides true) {
