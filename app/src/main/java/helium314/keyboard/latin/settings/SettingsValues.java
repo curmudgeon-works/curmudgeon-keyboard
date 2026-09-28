@@ -299,9 +299,9 @@ public class SettingsValues {
         mGestureDecoderScorer = prefs.getString(DebugSettings.PREF_GESTURE_DECODER_SCORER, Defaults.PREF_GESTURE_DECODER_SCORER);
         mGestureCapsHeight = prefs.getInt(Settings.PREF_GESTURE_CAPS_HEIGHT, Defaults.PREF_GESTURE_CAPS_HEIGHT) / 100f;
         mGestureTrailEnabled = prefs.getBoolean(Settings.PREF_GESTURE_PREVIEW_TRAIL, Defaults.PREF_GESTURE_PREVIEW_TRAIL);
-        mGestureFloatingPreviewTextEnabled = !mInputAttributes.mDisableGestureFloatingPreviewText
-                && prefs.getBoolean(Settings.PREF_GESTURE_FLOATING_PREVIEW_TEXT, Defaults.PREF_GESTURE_FLOATING_PREVIEW_TEXT);
-        mGestureFloatingPreviewDynamicEnabled = Settings.readGestureDynamicPreviewEnabled(prefs);
+        // swiped words show in the suggestion strip only, never floating over the keyboard
+        mGestureFloatingPreviewTextEnabled = false;
+        mGestureFloatingPreviewDynamicEnabled = false;
         mGestureFastTypingCooldown = prefs.getInt(Settings.PREF_GESTURE_FAST_TYPING_COOLDOWN, Defaults.PREF_GESTURE_FAST_TYPING_COOLDOWN);
         mGestureTrailFadeoutDuration = prefs.getInt(Settings.PREF_GESTURE_TRAIL_FADEOUT_DURATION, Defaults.PREF_GESTURE_TRAIL_FADEOUT_DURATION);
         mSuggestionStripHiddenPerUserSettings = mToolbarMode == ToolbarMode.HIDDEN || mToolbarMode == ToolbarMode.TOOLBAR_KEYS;
