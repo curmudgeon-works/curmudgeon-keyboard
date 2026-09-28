@@ -177,7 +177,15 @@ fun SubtypeScreen(
     var askReject by remember { mutableStateOf(false) }
     var askAccept by remember { mutableStateOf(false) }
     fun setCurrentSubtype(subtype: SettingsSubtype) {
-        SubtypeUtilsAdditional.changeAdditionalSubtype(currentSubtype, subtype, ctx)
+        // the keyboard being edited must be one in the list: after the app was killed (an update) and the screen came
+        // back, or after an undo, it can hold an older definition; changing that one added a second keyboard. Then
+        // the change replaces the list's keyboard of the same language instead.
+        val enabled = SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }
+        val from = if (currentSubtype in enabled) currentSubtype
+            else enabled.firstOrNull { it.locale == currentSubtype.locale }?.also {
+                Log.w("SubtypeScreen", "edited keyboard not in the list (${currentSubtype.toPref()}), changing ${it.toPref()} instead")
+            } ?: currentSubtype
+        SubtypeUtilsAdditional.changeAdditionalSubtype(from, subtype, ctx)
         currentSubtypeString = subtype.toPref()
         holdPreview()
         // the live keyboard runs the changed definition right away (the try-it preview)
@@ -396,9 +404,14 @@ fun SubtypeScreen(
                     if (advanced) AdvancedBlock {
                         CompositionLocalProvider(LocalCompactPreferences provides true) {
                             toolbarItems(prefs).filterNotNull().filter { it != Settings.PREF_TOOLBAR_VISIBILITY }.forEach {
-                                val pending = if (it == SettingsWithoutKey.TOOLBAR_KEYS_ALL) keyChanged(Settings.PREF_TOOLBAR_KEYS,
-                                    Settings.PREF_CLIPBOARD_TOOLBAR_KEYS, Settings.PREF_PINNED_TOOLBAR_KEYS) else keyChanged(it)
-                                Pending(pending) { SettingsActivity.settingsContainer[it]?.Preference() }
+                                if (it == SettingsWithoutKey.TOOLBAR_KEYS_ALL) {
+                                    // the keys list previews on the keyboard (its toolbar opened), like the sound settings
+                                    CompositionLocalProvider(LocalKeepKeyboard provides true, LocalPreviewKeyboard provides preview,
+                                        LocalBottomBarTop provides bottomBarTop) {
+                                        Pending(keyChanged(Settings.PREF_TOOLBAR_KEYS, Settings.PREF_CLIPBOARD_TOOLBAR_KEYS,
+                                            Settings.PREF_PINNED_TOOLBAR_KEYS)) { SettingsActivity.settingsContainer[it]?.Preference() }
+                                    }
+                                } else Pending(keyChanged(it)) { SettingsActivity.settingsContainer[it]?.Preference() }
                             }
                         }
                     }

@@ -76,6 +76,13 @@ fun ToolbarKeysPreference(setting: Setting) {
         description = stringResource(R.string.toolbar_keys_summary, summary[0], summary[1], summary[2]))
     if (!showDialog) return
 
+    // the preview keyboard (the screen's) comes up with the dialog; its toolbar opens, so the keys can be seen
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        val open = Runnable { helium314.keyboard.latin.suggestions.SuggestionStripView.showToolbarForPreview(true) }
+        handler.postDelayed(open, 700) // once the keyboard is up
+        onDispose { handler.removeCallbacks(open); helium314.keyboard.latin.suggestions.SuggestionStripView.showToolbarForPreview(false) }
+    }
     val lists = remember { (0..2).map { read(it) } }
     val on = remember { (0..2).map { t -> mutableStateListOf<String>().apply { addAll(lists[t].filter { it.second }.map { it.first }) } } }
     fun section(key: String) = when { key in on[0] -> 0; key in on[1] -> 1; key in on[2] -> 2; else -> 3 }
