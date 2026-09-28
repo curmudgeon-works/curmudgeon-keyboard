@@ -28,6 +28,7 @@ fun <T: Any> ListPreference(
 ) {
     var showDialog by rememberSaveable { mutableStateOf(false) }
     val prefs = LocalContext.current.prefs()
+    helium314.keyboard.settings.KnownDefaults.note(setting.key, default)
     val selected = items.firstOrNull { it.second == getPrefOfType(prefs, setting.key, default) }
     // what was set when the dialog opened, for Cancel in live mode (unset stays unset)
     val snapshot = rememberPrefSnapshot(prefs, listOf(setting.key), showDialog)

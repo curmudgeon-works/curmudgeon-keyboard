@@ -33,7 +33,7 @@ class LayoutDraft private constructor(
     /** The changed preferences, as plain keys (without a keyboard's p<id>/ prefix). */
     fun changedKeys(ctx: Context): Set<String> {
         val now = scoped(ctx)
-        return (now.keys + prefs.keys).filterTo(HashSet()) { now[it] != prefs[it] }.mapTo(HashSet()) { plain(it) }
+        return (now.keys + prefs.keys).filterTo(HashSet()) { !KnownDefaults.same(plain(it), now[it], prefs[it]) }.mapTo(HashSet()) { plain(it) }
     }
 
     /** The layout types (folder names, e.g. "main", "symbols") whose custom files changed. */

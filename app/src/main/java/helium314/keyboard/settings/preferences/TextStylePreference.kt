@@ -124,6 +124,12 @@ fun TextStylePreference(setting: Setting, keys: TextStyleKeys) {
         KeyboardSwitcher.getInstance().setThemeNeedsReload()
         generation++
     }
+    // their defaults, so setting one back counts as no change (Appearance's italics)
+    helium314.keyboard.settings.KnownDefaults.note(keys.font, TextFonts.AUTO)
+    helium314.keyboard.settings.KnownDefaults.note(keys.size, if (keys.sizeIsInt) keys.sizeDefault.toInt() else keys.sizeDefault)
+    helium314.keyboard.settings.KnownDefaults.note(keys.bold, keys.boldDefault(prefs))
+    helium314.keyboard.settings.KnownDefaults.note(keys.italic, false)
+    helium314.keyboard.settings.KnownDefaults.note(keys.underline, false)
     val allKeys = listOf(keys.font, keys.size, keys.bold, keys.italic, keys.underline) + keys.extraKeys +
         listOfNotNull(keys.otherFont, keys.otherFont?.let { Settings.PREF_FONT_FOLLOWS_KEY_TEXT })
     val snapshot = rememberPrefSnapshot(prefs, allKeys)

@@ -24,7 +24,7 @@ class AppearanceDraft private constructor(
 
     /** True when a preference or file in the snapshot's scope differs from it. */
     fun hasChanges(ctx: Context): Boolean {
-        if (currentPrefs(ctx) != prefs) return true
+        if (changedKeys(ctx).isNotEmpty()) return true
         return files.any { (live, saved) ->
             if (saved == null) live.exists() else !live.exists() || live.length() != saved.length || live.lastModified() != saved.modified
         }
@@ -33,7 +33,7 @@ class AppearanceDraft private constructor(
     /** The preferences whose value differs from the snapshot. */
     fun changedKeys(ctx: Context): Set<String> {
         val now = currentPrefs(ctx)
-        return (now.keys + prefs.keys).filterTo(HashSet()) { now[it] != prefs[it] }
+        return (now.keys + prefs.keys).filterTo(HashSet()) { !KnownDefaults.same(it, now[it], prefs[it]) }
     }
 
     /** The names of the custom files (background images, fonts) that differ from the snapshot. */
