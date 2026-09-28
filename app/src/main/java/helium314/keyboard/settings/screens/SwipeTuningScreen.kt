@@ -145,7 +145,6 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
             Text(stringResource(R.string.swipe_tuning_summary), Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 style = MaterialTheme.typography.bodySmall)
             WeightSlider(Settings.PREF_GESTURE_TURN_WEIGHT, Defaults.PREF_GESTURE_TURN_WEIGHT, R.string.swipe_tuning_turns, 0f..1.5f)
-            WeightSlider(Settings.PREF_GESTURE_PAUSE_WEIGHT, Defaults.PREF_GESTURE_PAUSE_WEIGHT, R.string.swipe_tuning_pauses, 0f..1f)
             WeightSlider(Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Defaults.PREF_GESTURE_SLOWDOWN_WEIGHT, R.string.swipe_tuning_slowdowns, 0f..1f)
             WeightSlider(Settings.PREF_GESTURE_KUSHLER_WEIGHT, Defaults.PREF_GESTURE_KUSHLER_WEIGHT, R.string.swipe_tuning_blend, 0f..1f,
                 R.string.swipe_tuning_blend_summary)

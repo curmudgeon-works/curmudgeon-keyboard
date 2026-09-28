@@ -107,7 +107,7 @@ public class SettingsValues {
     public final boolean mCenterSuggestionTextToEnter;
     public final boolean mGestureInputEnabled;
     public final float mGestureCapsHeight; // in key heights, see Defaults.PREF_GESTURE_CAPS_HEIGHT
-    public final String mGestureDecoderScorer; // scorer of the in-tree gesture decoder (lab flavor): hybrid | kushler | shark2
+    public final String mGestureDecoderScorer; // scorer of the in-tree gesture decoder: hybrid | kushler | location
     public final boolean mGestureTrailEnabled;
     public final boolean mGestureFloatingPreviewTextEnabled;
     public final boolean mGestureFloatingPreviewDynamicEnabled;

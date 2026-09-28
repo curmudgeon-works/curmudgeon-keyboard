@@ -64,14 +64,15 @@ class GesturePreprocessorTest {
     }
 
     @Test
-    fun `dwell shows up as a PAUSE inflection`() {
-        // move, dwell mid-path (time passes, position steady), move on
+    fun `a stop marks no letter and no slowness`() {
+        // move, stop mid-path (time passes, position steady), move on: reads as hesitation
         val leg1 = linePath(50f, 60f, 450f, 60f, 20, 10)
         val dwellT0 = leg1.last().t
         val leg2 = linePath(450f, 60f, 850f, 60f, 20, 10).map { GesturePoint(it.x, it.y, it.t + dwellT0 + 600) }
         val g = preprocessor.preprocess(leg1 + leg2.drop(1), geometry)
-        assertTrue(g.inflections.any { it.type == InflectionType.PAUSE },
-            "expected PAUSE inflection, got ${g.inflections.map { it.type }}")
+        val interior = g.inflections.filter { it.type != InflectionType.PEN_DOWN && it.type != InflectionType.PEN_UP }
+        assertTrue(interior.isEmpty(), "a stop on a straight line should add no inflection, got $interior")
+        assertTrue(g.slowness.all { it == 0f }, "a stop should add no slowness, got ${g.slowness.toList()}")
     }
 
     @Test

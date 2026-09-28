@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Gesture decoder core types. Pure Kotlin — no Android framework imports so the
 // decoder is unit-testable on the JVM. See docs/gesture-decoder-spec.md.
-// Implemented from expired patents US7098896 / US7453439 and the SHARK² paper
-// (Kristensson & Zhai, UIST 2004) only.
+// Implemented from expired patents US7098896 / US7453439 and the location channel
+// of the SHARK² paper (Kristensson & Zhai, UIST 2004), plus our own slowdown weight.
 package helium314.keyboard.gesture
 
 import kotlin.math.abs
@@ -77,7 +77,6 @@ enum class InflectionType {
     PEN_DOWN,        // stroke start — must match the first letter
     PEN_UP,          // stroke end — must match the last letter
     ANGLE_THRESHOLD, // direction change above a (speed-adaptive) angle threshold
-    PAUSE,           // dwell: finger stopped over a key (slowing down is a soft weight, see PreprocessedGesture.slowness)
     ROW_CHANGE,      // vertical direction reversal crossing row boundaries
     DOUBLE_LETTER,   // small loop or tight back-and-forth (Swype's double-letter gesture)
 }

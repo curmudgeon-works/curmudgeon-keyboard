@@ -12,9 +12,9 @@ import helium314.keyboard.gesture.KeyInfo
 import helium314.keyboard.gesture.KeyboardGeometry
 import helium314.keyboard.gesture.KushlerConfig
 import helium314.keyboard.gesture.KushlerScorer
+import helium314.keyboard.gesture.LocationScorer
 import helium314.keyboard.gesture.PreprocessorConfig
 import helium314.keyboard.gesture.Scorer
-import helium314.keyboard.gesture.Shark2Scorer
 import helium314.keyboard.keyboard.Keyboard
 import helium314.keyboard.latin.NgramContext
 import helium314.keyboard.latin.SuggestedWords
@@ -39,7 +39,7 @@ import java.util.Locale
  * queried on), so no extra threading is needed — but decode latency is logged so
  * it can be profiled on device.
  *
- * Every decode scores with ALL THREE scorers (the shared pipeline runs once; scoring
+ * Every decode scores with ALL THREE scorers (hybrid, kushler, location; the shared pipeline runs once; scoring
  * is the cheap stage). The active scorer's results drive the keyboard; the per-scorer
  * top-4 lists are published as a [LastDecodeRecord] for the Swipe Trainer.
  */
@@ -48,34 +48,32 @@ object OwnGestureDecoder {
     private const val MAX_RESULTS = 10
 
     /** The user's inflection weights and scorer blend, read from the (per keyboard) preferences on every swipe. */
-    class Tuning(val turn: Float, val pause: Float, val slowdown: Float, val kushler: Float, val historyBoost: Int) {
+    class Tuning(val turn: Float, val slowdown: Float, val kushler: Float, val historyBoost: Int) {
         /** One decimal each; the label the statistics are kept under. */
-        val key: String = String.format(Locale.ROOT, "T%.1f P%.1f S%.1f K%.1f H%d", turn, pause, slowdown, kushler, historyBoost)
+        val key: String = String.format(Locale.ROOT, "T%.1f S%.1f K%.1f H%d", turn, slowdown, kushler, historyBoost)
         override fun equals(other: Any?) = other is Tuning && other.key == key
         override fun hashCode() = key.hashCode()
 
         companion object {
-            val DEFAULT = Tuning(Defaults.PREF_GESTURE_TURN_WEIGHT, Defaults.PREF_GESTURE_PAUSE_WEIGHT,
+            val DEFAULT = Tuning(Defaults.PREF_GESTURE_TURN_WEIGHT,
                 Defaults.PREF_GESTURE_SLOWDOWN_WEIGHT, Defaults.PREF_GESTURE_KUSHLER_WEIGHT, Defaults.PREF_GESTURE_HISTORY_BOOST)
 
             fun read(prefs: SharedPreferences) = Tuning(
                 prefs.getFloat(Settings.PREF_GESTURE_TURN_WEIGHT, Defaults.PREF_GESTURE_TURN_WEIGHT),
-                prefs.getFloat(Settings.PREF_GESTURE_PAUSE_WEIGHT, Defaults.PREF_GESTURE_PAUSE_WEIGHT),
                 prefs.getFloat(Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Defaults.PREF_GESTURE_SLOWDOWN_WEIGHT),
                 prefs.getFloat(Settings.PREF_GESTURE_KUSHLER_WEIGHT, Defaults.PREF_GESTURE_KUSHLER_WEIGHT),
                 prefs.getInt(Settings.PREF_GESTURE_HISTORY_BOOST, Defaults.PREF_GESTURE_HISTORY_BOOST),
             )
 
-            /** The tuning a [key] stands for, or null if it isn't one. */
+            /** The tuning a [key] stands for, or null if it isn't one; keys from before pauses were dropped carry a P, ignored. */
             fun parse(key: String): Tuning? {
-                val m = Regex("T([\\d.]+) P([\\d.]+) S([\\d.]+) K([\\d.]+) H(\\d+)").matchEntire(key) ?: return null
+                val m = Regex("T([\\d.]+)(?: P[\\d.]+)? S([\\d.]+) K([\\d.]+) H(\\d+)").matchEntire(key) ?: return null
                 val v = m.groupValues.drop(1).map { it.toFloatOrNull() ?: return null }
-                return Tuning(v[0], v[1], v[2], v[3], v[4].toInt())
+                return Tuning(v[0], v[1], v[2], v[3].toInt())
             }
 
             fun write(prefs: SharedPreferences, tuning: Tuning) = prefs.edit()
                 .putFloat(Settings.PREF_GESTURE_TURN_WEIGHT, tuning.turn)
-                .putFloat(Settings.PREF_GESTURE_PAUSE_WEIGHT, tuning.pause)
                 .putFloat(Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, tuning.slowdown)
                 .putFloat(Settings.PREF_GESTURE_KUSHLER_WEIGHT, tuning.kushler)
                 .putInt(Settings.PREF_GESTURE_HISTORY_BOOST, tuning.historyBoost)
@@ -87,7 +85,7 @@ object OwnGestureDecoder {
     @Volatile var currentTuning: Tuning = Tuning.DEFAULT
         private set
 
-    private var scorers: List<Scorer> = listOf(HybridScorer(), KushlerScorer(), Shark2Scorer())
+    private var scorers: List<Scorer> = listOf(HybridScorer(), KushlerScorer(), LocationScorer())
     // the caps settings and the tuning are part of the immutable configs, so the decoder is rebuilt when they change
     private var decoderCapsHeight = Float.NaN
     private var decoderCapsSwipe = true
@@ -98,11 +96,12 @@ object OwnGestureDecoder {
     private fun decoderFor(capsHeight: Float, capsSwipe: Boolean, tuning: Tuning): GestureDecoder {
         if (capsHeight != decoderCapsHeight || capsSwipe != decoderCapsSwipe || tuning != decoderTuning) {
             val kushler = KushlerScorer(KushlerConfig(slowEmphasis = tuning.slowdown))
-            val hybrid = HybridScorer(kushler, kushlerWeight = tuning.kushler, shark2Weight = 1f - tuning.kushler)
-            scorers = listOf(hybrid, kushler, Shark2Scorer())
+            val location = LocationScorer()
+            val hybrid = HybridScorer(kushler, location, kushlerWeight = tuning.kushler, locationWeight = 1f - tuning.kushler)
+            scorers = listOf(hybrid, kushler, location)
             decoder = GestureDecoder(hybrid, DecoderConfig(capsExcursions = capsSwipe),
                 preprocessor = GesturePreprocessor(PreprocessorConfig(excursionMinHeightKeyHeights = capsHeight,
-                    turnConfidenceScale = tuning.turn, pauseConfidence = tuning.pause, pauseDtFactor = 2.5f)))
+                    turnConfidenceScale = tuning.turn, stopDtFactor = 2.5f)))
             decoderCapsHeight = capsHeight
             decoderCapsSwipe = capsSwipe
             decoderTuning = tuning
