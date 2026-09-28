@@ -66,6 +66,8 @@ object SettingsWithoutKey {
     const val HIDDEN_FEATURES = "hidden_features"
     const val GITHUB = "github"
     const val GITHUB_WIKI = "github_wiki"
+    const val RATE = "rate"
+    const val SHARE = "share"
     const val SAVE_LOG = "save_log"
     const val BACKUP_RESTORE = "backup_restore"
     const val FACTORY_RESET = "factory_reset"

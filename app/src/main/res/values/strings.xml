@@ -1091,6 +1091,11 @@ New dictionary:
     <string name="version">Version</string>
     <!-- github repo link for about screen -->
     <string name="about_github_link">View on GitHub</string>
+    <string name="about_rate">Rate on Google Play</string>
+    <string name="about_rate_summary">A review helps other people find it</string>
+    <string name="about_share">Share Curmudgeon Keyboard</string>
+    <!-- Text sent when sharing the app; %s is the Play Store link -->
+    <string name="about_share_text">Curmudgeon Keyboard: a privacy keyboard with swipe typing, no ads and no internet access. Open source. %s</string>
     <!-- link to the wiki for about screen -->
     <string name="about_wiki_link">Go to Wiki</string>
     <!-- description for wiki link -->

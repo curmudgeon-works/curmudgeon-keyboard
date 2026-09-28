@@ -4,6 +4,7 @@ package helium314.keyboard.settings.screens
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.text.method.LinkMovementMethod
 import android.view.View
@@ -58,6 +59,8 @@ fun AboutScreen(
         SettingsWithoutKey.HIDDEN_FEATURES,
         SettingsWithoutKey.GITHUB_WIKI,
         SettingsWithoutKey.GITHUB,
+        SettingsWithoutKey.RATE,
+        SettingsWithoutKey.SHARE,
         SettingsWithoutKey.SAVE_LOG,
     )
     SearchSettingsScreen(
@@ -172,6 +175,36 @@ fun createAboutSettings(context: Context) = listOf(
                 ctx.startActivity(intent)
             },
             icon = R.drawable.ic_settings_about_github
+        )
+    },
+    Setting(context, SettingsWithoutKey.RATE, R.string.about_rate, R.string.about_rate_summary) {
+        val ctx = LocalContext.current
+        Preference(
+            name = it.title,
+            description = it.description,
+            onClick = {
+                // the Play Store app if there is one, else the store page in a browser
+                try {
+                    ctx.startActivity(Intent(Intent.ACTION_VIEW, Links.PLAY_STORE_APP.toUri()))
+                } catch (_: ActivityNotFoundException) {
+                    ctx.startActivity(Intent(Intent.ACTION_VIEW, Links.PLAY_STORE.toUri()))
+                }
+            },
+            icon = R.drawable.ic_settings_about_rate
+        )
+    },
+    Setting(context, SettingsWithoutKey.SHARE, R.string.about_share) {
+        val ctx = LocalContext.current
+        Preference(
+            name = it.title,
+            description = it.description,
+            onClick = {
+                val intent = Intent(Intent.ACTION_SEND)
+                    .setType("text/plain")
+                    .putExtra(Intent.EXTRA_TEXT, ctx.getString(R.string.about_share_text, Links.PLAY_STORE))
+                ctx.startActivity(Intent.createChooser(intent, null))
+            },
+            icon = R.drawable.ic_settings_about_share
         )
     },
     Setting(context, SettingsWithoutKey.SAVE_LOG, R.string.save_log) { setting ->
