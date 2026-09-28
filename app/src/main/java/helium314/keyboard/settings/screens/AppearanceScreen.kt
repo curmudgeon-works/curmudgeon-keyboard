@@ -154,6 +154,9 @@ fun AppearanceScreen(
         if (dayNightMode) Settings.PREF_THEME_COLORS_NIGHT else null,
         SettingsWithoutKey.BACKGROUND_IMAGE,
         SettingsWithoutKey.BACKGROUND_IMAGE_LANDSCAPE,
+        // only with a picture set: keys clear on it, so the whole picture shows
+        if (listOf(false, true).any { night -> listOf(false, true).any { land -> Settings.getCustomBackgroundFile(ctx, night, land).exists() } })
+            Settings.PREF_BACKGROUND_WHOLE_PICTURE else null,
         R.string.appearance_group_style,
         SettingsWithoutKey.HIDE_ALL_SYMBOLS, // the three below it are advanced
         Settings.PREF_SHOW_NUMBER_ROW_HINTS,
@@ -409,6 +412,10 @@ fun createAppearanceSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_THEME_DAY_NIGHT, R.string.day_night_mode) {
         SwitchPreference(it, Defaults.PREF_THEME_DAY_NIGHT) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+    },
+    Setting(context, Settings.PREF_BACKGROUND_WHOLE_PICTURE, R.string.background_whole_picture, R.string.background_whole_picture_summary) {
+        Box(Modifier.padding(start = 16.dp)) {
+            SwitchPreference(it, Defaults.PREF_BACKGROUND_WHOLE_PICTURE) { KeyboardSwitcher.getInstance().setThemeNeedsReload() } }
     },
     Setting(context, SettingsWithoutKey.BACKGROUND_IMAGE, R.string.customize_background_image) {
         BackgroundImagePref(it, false)
