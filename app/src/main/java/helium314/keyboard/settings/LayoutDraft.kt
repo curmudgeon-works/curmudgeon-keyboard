@@ -94,6 +94,7 @@ class LayoutDraft private constructor(
             Settings.PREF_TOOLBAR_KEYS, Settings.PREF_PINNED_TOOLBAR_KEYS, Settings.PREF_CLIPBOARD_TOOLBAR_KEYS,
             Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES, Settings.PREF_QUICK_PIN_TOOLBAR_KEYS, Settings.PREF_AUTO_SHOW_TOOLBAR,
             Settings.PREF_AUTO_HIDE_TOOLBAR, Settings.PREF_VARIABLE_TOOLBAR_DIRECTION, Settings.PREF_TOOLBAR_EXPAND_ICON,
+            Settings.PREF_TOOLBAR_IN_STRIP_ROW,
             // layout
             Settings.PREF_SHOW_NUMBER_ROW, Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS,
             Settings.PREF_ENABLE_SPLIT_KEYBOARD, Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE,

@@ -122,6 +122,10 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     // toolbar views, drawables and setup
     private val toolbar: ViewGroup = findViewById(R.id.toolbar)
     private val toolbarContainer: View = findViewById(R.id.toolbar_container)
+    // the expanded toolbar replaces the suggestions in their row instead of opening a row above them
+    private val toolbarInRow = context.prefs().getBoolean(Settings.PREF_TOOLBAR_IN_STRIP_ROW, Defaults.PREF_TOOLBAR_IN_STRIP_ROW)
+    // the emoji view shows the toolbar alone (see setToolbarOnly)
+    private var toolbarOnlyShown = false
     private val pinnedKeys: ViewGroup = findViewById(R.id.pinned_keys)
     private val suggestionsStrip: ViewGroup = findViewById(R.id.suggestions_strip)
     private val toolbarExpandKey = findViewById<ImageButton>(R.id.suggestions_strip_toolbar_key)
@@ -151,6 +155,13 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         colors.setBackground(toolbarExpandKey, ColorType.STRIP_BACKGROUND) // necessary because background is re-used for defaultToolbarBackground
         colors.setColor(toolbarExpandKey, ColorType.TOOL_BAR_EXPAND_KEY)
         colors.setColor(toolbarExpandKey.background, ColorType.TOOL_BAR_EXPAND_KEY_BACKGROUND)
+
+        // the toolbar in place of the suggestions (upstream's way): it moves into the suggestions' row, after the expand key
+        if (toolbarInRow) {
+            (toolbarContainer.parent as ViewGroup).removeView(toolbarContainer)
+            findViewById<LinearLayout>(R.id.suggestions_strip_wrapper)
+                .addView(toolbarContainer, 1, LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
+        }
 
         // background indicator for pinned keys
         val color = colors.get(ColorType.TOOL_BAR_KEY_ENABLED_BACKGROUND) or -0x1000000 // ignore alpha (in Java this is more readable 0xFF000000)
@@ -243,6 +254,14 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         // avoid showing toolbar keys when locked
         val locked = isDeviceLocked(context)
         val show = !locked && toolbarVisible
+        if (toolbarInRow) {
+            // in the suggestions' row: the toolbar takes their place while open
+            toolbarContainer.isVisible = show
+            (suggestionsStrip.parent as View).isVisible = !show
+            pinnedKeys.isVisible = !locked && !toolbarOnlyShown
+            setExpandKeyDirection(show)
+            return
+        }
         // the toolbar slides up above the suggestions, which stay where they are
         if (show && !toolbarContainer.isVisible) {
             toolbarContainer.isVisible = true
@@ -274,7 +293,14 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     fun setToolbarOnly(show: Boolean, tabStrip: View?) {
         val wrapper: View = findViewById(R.id.suggestions_strip_wrapper)
         val params = tabStrip?.layoutParams as? ViewGroup.MarginLayoutParams
-        if (show) {
+        toolbarOnlyShown = show
+        if (toolbarInRow) {
+            // the toolbar lives in the suggestions' row: that row stays, without its expand key (the tabs have one)
+            if (show) isVisible = true
+            toolbarExpandKey.isVisible = !show
+            setToolbarVisibility(show)
+            params?.topMargin = if (show) toolbarContainer.layoutParams.height else 0
+        } else if (show) {
             isVisible = true
             wrapper.isVisible = false
             setToolbarVisibility(true)
@@ -289,7 +315,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     }
 
     /** True while [setToolbarOnly] shows the toolbar alone. */
-    val isToolbarOnly: Boolean get() = isVisible && !findViewById<View>(R.id.suggestions_strip_wrapper).isVisible
+    val isToolbarOnly: Boolean get() = isVisible && toolbarOnlyShown
 
     /** A key for the start of the emoji tab strip that opens the toolbar there, drawn like the strip's own expand key. */
     fun createEmojiToolbarKey(onClick: () -> Unit): ImageButton {
