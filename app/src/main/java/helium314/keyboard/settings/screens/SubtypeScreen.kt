@@ -425,7 +425,7 @@ fun SubtypeScreen(
                             PrefSwitchRow(Settings.PREF_REMOVE_REDUNDANT_POPUPS, Defaults.PREF_REMOVE_REDUNDANT_POPUPS, R.string.remove_redundant_popups) { holdPreview(); reloadPreview() } }
                     }
                 } }
-                // ---- backspace and clipboard history: advanced groups, heading included, in one tinted block
+                // ---- backspace and clipboard history: advanced groups, heading included, each in its own tinted block
                 if (advanced) AdvancedBlock {
                     WithBigTitle(stringResource(R.string.backspace_settings)) {
                         CompositionLocalProvider(LocalCompactPreferences provides true) {
@@ -443,6 +443,9 @@ fun SubtypeScreen(
                                     SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT]?.Preference() }
                         }
                     }
+                }
+                // (its own tinted block: the screen's gap between blocks shows as a thin line, like above Backspace)
+                if (advanced) AdvancedBlock {
                     WithBigTitle(stringResource(R.string.settings_category_clipboard_history)) {
                         CompositionLocalProvider(LocalCompactPreferences provides true) {
                             clipboardHistoryItems(prefs).filterIsInstance<String>().forEach {
