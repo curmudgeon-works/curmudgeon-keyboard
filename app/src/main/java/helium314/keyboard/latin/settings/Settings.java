@@ -172,7 +172,6 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_GESTURE_CAPS_SWIPE = "gesture_caps_swipe";
     public static final String PREF_GESTURE_APOSTROPHE_VIA_PERIOD = "gesture_apostrophe_via_period";
     public static final String PREF_GESTURE_TURN_WEIGHT = "gesture_turn_weight";
-    public static final String PREF_GESTURE_PAUSE_WEIGHT = "gesture_pause_weight";
     public static final String PREF_GESTURE_SLOWDOWN_WEIGHT = "gesture_slowdown_weight";
     public static final String PREF_GESTURE_KUSHLER_WEIGHT = "gesture_kushler_weight";
     public static final String PREF_GESTURE_HISTORY_BOOST = "gesture_history_boost";

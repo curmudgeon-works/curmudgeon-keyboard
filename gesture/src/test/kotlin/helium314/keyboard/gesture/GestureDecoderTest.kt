@@ -9,7 +9,7 @@ class GestureDecoderTest {
     private val geometry = QwertyFixture.geometry
     private val vocab = TestVocabulary.vocabulary
 
-    private val scorers = listOf(KushlerScorer(), Shark2Scorer(), HybridScorer())
+    private val scorers = listOf(KushlerScorer(), LocationScorer(), HybridScorer())
 
     private fun decode(scorer: Scorer, word: String, seed: Long? = null): List<ScoredWord> {
         val path = if (seed == null) SyntheticPathGenerator.idealPath(word, geometry)

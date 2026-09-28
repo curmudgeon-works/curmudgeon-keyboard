@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
  */
 class DecodeLatencyBenchmarkTest {
     private val geometry = QwertyFixture.geometry
-    private val scorers = listOf(KushlerScorer(), Shark2Scorer(), HybridScorer())
+    private val scorers = listOf(KushlerScorer(), LocationScorer(), HybridScorer())
     private val decoder = GestureDecoder(HybridScorer())
 
     // words the timed decodes swipe; mix of lengths and regions of the keyboard

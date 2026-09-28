@@ -2,22 +2,22 @@
 package helium314.keyboard.gesture
 
 /**
- * Blend of [KushlerScorer] (inflection/location channel) and [Shark2Scorer]
- * (shape + location channels). Weights are configurable; bakeoff data from the
- * two pure scorers feeds the defaults (spec: v1 default scorer).
+ * Blend of [KushlerScorer] (inflection points matched to keys) and [LocationScorer]
+ * (the whole path against the word's ideal path). Weights are configurable; the
+ * default (half each) is what did best on replayed real swipes.
  */
 class HybridScorer(
     private val kushler: KushlerScorer = KushlerScorer(),
-    private val shark2: Shark2Scorer = Shark2Scorer(),
+    private val location: LocationScorer = LocationScorer(),
     private val kushlerWeight: Float = 0.5f,
-    private val shark2Weight: Float = 0.5f,
+    private val locationWeight: Float = 0.5f,
 ) : Scorer {
     override val name = "hybrid"
 
     override fun score(gesture: PreprocessedGesture, sokgraph: Sokgraph, geometry: KeyboardGeometry): Float {
         val k = kushler.score(gesture, sokgraph, geometry)
-        val s = shark2.score(gesture, sokgraph, geometry)
-        if (k == Float.MAX_VALUE || s == Float.MAX_VALUE) return Float.MAX_VALUE
-        return (kushlerWeight * k + shark2Weight * s).coerceAtLeast(Scorer.MIN_SCORE)
+        val l = location.score(gesture, sokgraph, geometry)
+        if (k == Float.MAX_VALUE || l == Float.MAX_VALUE) return Float.MAX_VALUE
+        return (kushlerWeight * k + locationWeight * l).coerceAtLeast(Scorer.MIN_SCORE)
     }
 }

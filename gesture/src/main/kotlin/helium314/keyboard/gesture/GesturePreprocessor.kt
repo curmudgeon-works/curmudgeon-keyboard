@@ -16,10 +16,11 @@ class PreprocessorConfig(
     val angleWindow: Int = 2,
     /** Minimum sample separation between two reported inflection points. */
     val minInflectionSeparation: Int = 3,
-    /** A resampled-point dwell longer than this multiple of the median dt is a PAUSE. */
-    val pauseDtFactor: Float = 3.5f,
-    /** Confidence of a PAUSE inflection (at or above DecoderConfig.strongInflectionConfidence it demands a letter). */
-    val pauseConfidence: Float = 0.7f,
+    /**
+     * A resampled-point dwell longer than this multiple of the median dt is a stop. Stops mark no letter: they read
+     * as hesitation, so they are left out of the slowness weight too.
+     */
+    val stopDtFactor: Float = 3.5f,
     /**
      * Local speed (relative to the stroke's mean) below which a point counts as slow; slowness
      * then grows linearly to 1 at a standstill. Slowness is a soft scoring weight only: it never
@@ -234,7 +235,6 @@ class GesturePreprocessor(private val config: PreprocessorConfig = PreprocessorC
             val turnAngles = turnAngles(pts)
             addAngleAndCuspInflections(pts, turnAngles, speedFactors, result)
             addLoopInflections(pts, geometry, speedFactors, result)
-            addPauseInflections(pts, speedFactors, result)
             addRowChangeInflections(pts, geometry, speedFactors, result)
         }
 
@@ -332,28 +332,10 @@ class GesturePreprocessor(private val config: PreprocessorConfig = PreprocessorC
         }
     }
 
-    /** Dwell points: uniform arc-length resampling makes a pause show up as a large dt. */
-    private fun addPauseInflections(
-        pts: List<GesturePoint>,
-        speedFactors: FloatArray,
-        out: MutableList<InflectionPoint>,
-    ) {
-        if (pts.size < 4) return
-        val dts = (1 until pts.size).map { (pts[it].t - pts[it - 1].t).toFloat() }.sorted()
-        val median = dts[dts.size / 2]
-        if (median <= 0f) return
-        for (i in 1 until pts.size - 1) {
-            val dt = (pts[i + 1].t - pts[i].t).toFloat()
-            if (dt > config.pauseDtFactor * median) {
-                out.add(InflectionPoint(i, pts[i].x, pts[i].y, InflectionType.PAUSE, config.pauseConfidence, speedFactors[i]))
-            }
-        }
-    }
-
     /**
      * Per point, how deliberately slowly the finger moved there: 0 at or above
      * [PreprocessorConfig.slowSpeedRatio] of the mean speed, rising to 1 at a standstill.
-     * Stops (dwells, as for PAUSE) and the slow start and end of the stroke count as 0:
+     * Stops (dwells, see [PreprocessorConfig.stopDtFactor]) and the slow start and end of the stroke count as 0:
      * a stop reads more like hesitation than intent.
      */
     private fun slowness(pts: List<GesturePoint>, speedFactors: FloatArray, endSkip: Float): FloatArray {
@@ -366,7 +348,8 @@ class GesturePreprocessor(private val config: PreprocessorConfig = PreprocessorC
         val total = cum.last()
         for (i in 1 until pts.size - 1) {
             if (cum[i] < endSkip || total - cum[i] < endSkip) continue
-            if (median > 0f && (pts[i + 1].t - pts[i].t) > config.pauseDtFactor * median) continue // a stop
+            // a stop: a dwell on either side (the speed of the point after a stop is measured across it too)
+            if (median > 0f && maxOf(pts[i + 1].t - pts[i].t, pts[i].t - pts[i - 1].t) > config.stopDtFactor * median) continue
             out[i] = ((config.slowSpeedRatio - speedFactors[i]) / config.slowSpeedRatio).coerceIn(0f, 1f)
         }
         return out
@@ -403,13 +386,13 @@ class GesturePreprocessor(private val config: PreprocessorConfig = PreprocessorC
 
     /**
      * Keep at most one inflection per neighborhood ([PreprocessorConfig.minInflectionSeparation]),
-     * preferring endpoints, then DOUBLE_LETTER > ANGLE_THRESHOLD > PAUSE > ROW_CHANGE.
+     * preferring endpoints, then DOUBLE_LETTER > ANGLE_THRESHOLD > ROW_CHANGE.
      */
     private fun dedupe(inflections: List<InflectionPoint>): List<InflectionPoint> {
         val priority = mapOf(
             InflectionType.PEN_DOWN to 5, InflectionType.PEN_UP to 5,
             InflectionType.DOUBLE_LETTER to 4, InflectionType.ANGLE_THRESHOLD to 3,
-            InflectionType.PAUSE to 2, InflectionType.ROW_CHANGE to 1,
+            InflectionType.ROW_CHANGE to 1,
         )
         val sorted = inflections.sortedWith(compareBy({ it.index }, { -(priority[it.type] ?: 0) }))
         val out = ArrayList<InflectionPoint>()

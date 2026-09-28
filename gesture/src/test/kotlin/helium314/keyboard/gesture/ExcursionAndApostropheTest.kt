@@ -15,7 +15,7 @@ class ExcursionAndApostropheTest {
     private val geometry = QwertyFixture.geometry
     private val vocab = TestVocabulary.vocabulary
     private val preprocessor = GesturePreprocessor()
-    private val scorers = listOf(KushlerScorer(), Shark2Scorer(), HybridScorer())
+    private val scorers = listOf(KushlerScorer(), LocationScorer(), HybridScorer())
 
     private fun decode(scorer: Scorer, path: List<GesturePoint>) =
         GestureDecoder(scorer).decode(path, geometry, vocab, maxResults = 10)

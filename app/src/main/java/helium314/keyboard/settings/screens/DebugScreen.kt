@@ -100,7 +100,7 @@ private fun createDebugSettings(context: Context) = listOf(
     },
     Setting(context, DebugSettings.PREF_GESTURE_DECODER_SCORER, R.string.prefs_gesture_decoder_scorer, R.string.prefs_gesture_decoder_scorer_summary) { setting ->
         // only listed in the lab flavor (see items in DebugScreen)
-        val items = listOf("Hybrid" to "hybrid", "Kushler (patent)" to "kushler", "SHARK²" to "shark2")
+        val items = listOf("Hybrid" to "hybrid", "Kushler (inflections)" to "kushler", "Location (whole path)" to "location")
         ListPreference(setting, items, Defaults.PREF_GESTURE_DECODER_SCORER)
     },
     Setting(context, DebugSettings.PREF_KEY_SWIPE_TRAINER, R.string.swipe_trainer, R.string.swipe_trainer_summary) { setting ->

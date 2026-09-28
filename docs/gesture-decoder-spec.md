@@ -12,11 +12,13 @@ decompiled proprietary code:
 - **US 7,098,896** (Kushler & Marsden, filed 2003-01-16) — "System and method for
   continuous stroke word-based text input". The core Swype algorithm.
   **Expired 2024-04-30.**
-- **US 7,453,439** (continuation) — speed-adaptive matching, inflection-point
-  classification, penalty system, language-model ranking. **Expired 2025-02-14**
-  (fee-related lapse).
-- **SHARK² paper** (Kristensson & Zhai, UIST 2004) — two-channel (shape +
-  location) scoring, template pruning, channel fusion.
+- **US 7,453,439** (continuation-in-part) — speed-adaptive matching, inflection-point
+  classification, penalty system, language-model ranking, word picking by first and
+  last letter. **Lapsed 2020-11-18** (maintenance fee not paid).
+- **SHARK² paper** (Kristensson & Zhai, UIST 2004) — its **location channel only**
+  (the whole path against the word's ideal path in keyboard coordinates). The
+  paper's shape channel and its fusion of shape with location are not used (since
+  0.2.000, 2026-09-28).
 - The Swype APK is used **only as a black-box behavioral benchmark** (candidate
   ordering, sloppiness tolerance, loop gestures). No decompilation.
 
@@ -24,17 +26,17 @@ decompiled proprietary code:
 
 Three scorers behind one shared pipeline (capture → preprocess → prune → score →
 rank). Selectable via pref `gesture_decoder_scorer` = `hybrid` | `kushler` |
-`shark2` (surfaced in debug settings first; promote to a normal setting if the
-choice proves worth keeping long-term):
+`location` (debug settings):
 
 - **KushlerScorer** — pure patent method: classified inflection points matched to
   key centers, weighted x/y distances, speed-adaptive thresholds, penalty system.
   Forgiving of sloppy path middles; sensitive to corner quality.
-- **Shark2Scorer** — pure SHARK²: normalized whole-path shape channel + absolute
-  location channel, Gaussian channel fusion. Holistic trajectory matching; less
-  dependent on crisp corners.
-- **HybridScorer** — the blend below (v1 default). Bakeoff data from the two pure
-  scorers feeds its weights.
+- **LocationScorer** — the whole drawn path and the word's ideal path resampled to
+  N points each and compared point by point in keyboard coordinates, ends weighted
+  more. Holistic; less dependent on crisp corners.
+- **HybridScorer** — Kushler and location, half each (the default; the Swipe
+  tuning blend slider moves it). On a replay of 469 recorded swipes: top-1 67.8 %,
+  top-3 85.1 %, top-8 92.5 %.
 
 All three share the ranking formula and the frequency/user-history integration.
 
@@ -50,24 +52,32 @@ All three share the ranking formula and the frequency/user-history integration.
 1. Resample path to uniform arc-length spacing; light smoothing.
 2. Detect **inflection points**, classified (per US7453439) as:
    `PEN_DOWN`, `PEN_UP`, `ANGLE_THRESHOLD` (direction change above threshold),
-   `PAUSE` (dwell), `ROW_CHANGE`, `DOUBLE_LETTER` (small loop / back-and-forth).
-   Each class carries its own confidence weight.
+   `ROW_CHANGE`, `DOUBLE_LETTER` (small loop / back-and-forth).
+   Each class carries its own confidence weight. Stops (dwells) mark no letter:
+   they read as hesitation.
+3. Per point, a **slowness** (0 at normal speed, rising as the finger crawls; 0 at
+   stops and at the slow start and end of every swipe). A soft weight only: the
+   Kushler scorer gives a word a small bonus for letters whose key the finger
+   passed slowly; a slow spot never has to match a letter.
 
 ### Candidate pruning (cheap → expensive)
 1. First/last letter must be within a neighborhood of PEN_DOWN / PEN_UP keys.
 2. Path length must fall within a ratio band of the candidate's ideal polyline
    ("sokgraph") length.
 3. Word must have ≥ letters than detected inflection points require.
-4. Trie walk over the dictionary restricted to key-neighborhood transitions —
-   avoids scoring the full vocabulary.
+4. Swype-style word picking (US 7,453,439): the vocabulary is indexed by first and
+   last letter, only words whose ends fit (1.) are looked at, and each is matched
+   letter by letter along the path, in order, within a corridor. If no word fits,
+   the search runs once more with 1.5× wider thresholds.
 
 ### Scoring (two channels + penalties)
 - **Location channel** (patent): weighted sum of distances from each inflection
   point to its matched key center. Separate x/y weights — **y weighted heavier**
   (row position is more reliable than column). Thresholds scale with stroke
   speed: faster ⇒ more tolerant (US7453439).
-- **Shape channel** (SHARK²): normalize (translate/scale) both drawn path and
-  sokgraph template, resample both to N points, mean point-wise distance.
+- **Location channel** (SHARK² paper, location only): resample both drawn path
+  and sokgraph template to N points, weighted mean point-wise distance in key
+  widths, ends weighted more.
 - **Penalties**: skipped inflection points, letters far off-path, transpositions.
 - **Ranking** (patent formula):
   `score = Weighted_Sum_of_Distances * (log(MAX_FREQ / word_frequency) + 1)`
@@ -103,14 +113,14 @@ All three share the ranking formula and the frequency/user-history integration.
   core so it's unit-testable on JVM.
   - `GestureDecoder`: `decode(pointers, keyboard, vocab): List<ScoredWord>` —
     owns the shared pipeline, delegates scoring to a `Scorer`.
-  - `Scorer` interface with `KushlerScorer`, `Shark2Scorer`, `HybridScorer`
+  - `Scorer` interface with `KushlerScorer`, `LocationScorer`, `HybridScorer`
     implementations (see "Decoder variants"). Pure functions of
     (preprocessed path, candidate sokgraph) → score, so all three are
     unit-testable and benchmarkable on the same corpus.
-  - `Vocabulary`: trie of (word, frequency), built per-locale at dictionary load.
+  - `Vocabulary`: trie of (word, frequency) with a first-and-last-letter index, built per-locale at dictionary load.
     Source: iterate the binary dictionary via existing word-property/dump APIs
     (same mechanism the personal-dict export uses); merge user history.
-  - Sokgraph templates computed lazily during trie walk (never precompute the
+  - Sokgraph templates computed lazily during word picking (never precompute the
     full vocabulary).
 
 ## Integration points (verified against code, 2026-08-08)
