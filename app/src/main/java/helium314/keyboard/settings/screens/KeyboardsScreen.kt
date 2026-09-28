@@ -236,8 +236,7 @@ fun KeyboardsScreen(
                 title = { Text(stringResource(R.string.separate_settings_per_keyboard)) },
                 content = { Text(stringResource(R.string.separate_settings_enable_message)) },
                 confirmButtonText = stringResource(R.string.separate_settings_turn_on),
-                cancelButtonText = stringResource(R.string.separate_settings_keep_one),
-                confirmFirst = true,
+                cancelButtonText = stringResource(R.string.separate_settings_keep_one), // (Android's order: Cancel, then OK)
             )
         if (askDisable) {
             // the primary keyboard: the first in the list (and in the switching order)
@@ -248,8 +247,7 @@ fun KeyboardsScreen(
                 title = { Text(stringResource(R.string.separate_settings_disable_title)) },
                 content = { Text(stringResource(R.string.separate_settings_disable_message, keyboardName(primary, ctx))) },
                 confirmButtonText = stringResource(R.string.separate_settings_use_primary),
-                cancelButtonText = stringResource(R.string.separate_settings_keep_separate),
-                confirmFirst = true,
+                cancelButtonText = stringResource(R.string.separate_settings_keep_separate), // (Android's order: Cancel, then OK)
             )
         }
         keyboardToDelete?.let { keyboard ->
