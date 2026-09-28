@@ -424,18 +424,19 @@ fun SubtypeScreen(
                         }
                     }
                 }
-                // ---- backspace and clipboard history: advanced groups, heading included, each in its own tinted block
-                if (advanced) AdvancedBlock {
-                    WithBigTitle(stringResource(R.string.backspace_settings)) {
+                // ---- backspace: whole words in simple mode, the rest advanced
+                WithBigTitle(stringResource(R.string.backspace_settings)) {
+                    CompositionLocalProvider(LocalCompactPreferences provides true) {
+                        Pending(keyChanged(Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS)) {
+                            SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS]?.Preference() }
+                    }
+                    if (advanced) AdvancedBlock {
                         CompositionLocalProvider(LocalCompactPreferences provides true) {
-                            listOf(Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS, Settings.PREF_BACKSPACE_REPEAT_INTERVAL,
-                                Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD, Settings.PREF_DELETE_SWIPE)
-                                .forEach { key ->
-                                    // the repeat interval row also sets the speed-up
-                                    val pending = if (key == Settings.PREF_BACKSPACE_REPEAT_INTERVAL) keyChanged(key, Settings.PREF_BACKSPACE_SPEED_UP,
-                                        Settings.PREF_BACKSPACE_SPEED_UP_AFTER, Settings.PREF_BACKSPACE_TOP_INTERVAL) else keyChanged(key)
-                                    Pending(pending) { SettingsActivity.settingsContainer[key]?.Preference() }
-                                }
+                            // speeding up while held: its own switch, independent of whole words
+                            Pending(keyChanged(Settings.PREF_BACKSPACE_SPEED_UP, Settings.PREF_BACKSPACE_SPEED_UP_AFTER, Settings.PREF_BACKSPACE_TOP_INTERVAL)) {
+                                SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_SPEED_UP]?.Preference() }
+                            listOf(Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD, Settings.PREF_DELETE_SWIPE).forEach {
+                                Pending(keyChanged(it)) { SettingsActivity.settingsContainer[it]?.Preference() } }
                             // only meaningful with autocorrect on (as on the Text correction screen it came from)
                             if (prefs.getBoolean(Settings.PREF_AUTO_CORRECTION, Defaults.PREF_AUTO_CORRECTION))
                                 Pending(keyChanged(Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT)) {

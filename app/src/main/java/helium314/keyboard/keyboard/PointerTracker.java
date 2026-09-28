@@ -1317,10 +1317,9 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         callListenerOnCodeInput(key, code, mKeyX, mKeyY, SystemClock.uptimeMillis(), true);
     }
 
-    // Backspace hold cadence: first deletion (a word, or a character if so set) after BACKSPACE_FIRST_DELAY_MS, then
-    // one every Settings.PREF_BACKSPACE_REPEAT_INTERVAL ms while held. Other repeatable keys
+    // Backspace hold cadence: first deletion (a word, or a character if so set) after the key long-press delay, then
+    // one every long-press delay while held (sped up if so set). Other repeatable keys
     // continue to use the global mKeyRepeatStartTimeout / mKeyRepeatInterval.
-    private static final int BACKSPACE_FIRST_DELAY_MS = 300;
     // with the speed-up on: after the set time of holding, the interval ramps to the top speed over this long
     private static final int BACKSPACE_SPEED_UP_RAMP_MS = 1000;
     private long mBackspaceHoldStart;
@@ -1335,7 +1334,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         final int delay;
         if (repeatCount == 1) {
             if (isDelete) mBackspaceHoldStart = SystemClock.uptimeMillis();
-            delay = isDelete ? BACKSPACE_FIRST_DELAY_MS : sParams.mKeyRepeatStartTimeout;
+            delay = isDelete ? Settings.getValues().mKeyLongpressTimeout : sParams.mKeyRepeatStartTimeout;
         } else if (isDelete) {
             delay = backspaceInterval(Settings.getValues(), SystemClock.uptimeMillis() - mBackspaceHoldStart);
         } else {
@@ -1344,9 +1343,10 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         sTimerProxy.startKeyRepeatTimerOf(this, repeatCount, delay);
     }
 
-    /** The interval between deletions [held] ms into holding backspace: the set one, ramping to the top speed if on. */
+    /** The interval between deletions [held] ms into holding backspace: the long-press delay, ramping to the top speed
+     *  if the speed-up is on (whether a hold deletes words or letters doesn't matter). */
     private static int backspaceInterval(final helium314.keyboard.latin.settings.SettingsValues sv, final long held) {
-        final int start = sv.mBackspaceRepeatInterval;
+        final int start = sv.mKeyLongpressTimeout;
         if (!sv.mBackspaceSpeedUp || sv.mBackspaceTopInterval >= start || held <= sv.mBackspaceSpeedUpAfter)
             return start;
         final float t = Math.min(1f, (held - sv.mBackspaceSpeedUpAfter) / (float) BACKSPACE_SPEED_UP_RAMP_MS);
