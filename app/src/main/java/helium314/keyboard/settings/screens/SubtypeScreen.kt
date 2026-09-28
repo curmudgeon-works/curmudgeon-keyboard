@@ -385,8 +385,11 @@ fun SubtypeScreen(
                     }
                     if (advanced) AdvancedBlock {
                         CompositionLocalProvider(LocalCompactPreferences provides true) {
-                            toolbarItems(prefs).filterNotNull().filter { it != Settings.PREF_TOOLBAR_VISIBILITY }
-                                .forEach { Pending(keyChanged(it)) { SettingsActivity.settingsContainer[it]?.Preference() } }
+                            toolbarItems(prefs).filterNotNull().filter { it != Settings.PREF_TOOLBAR_VISIBILITY }.forEach {
+                                val pending = if (it == SettingsWithoutKey.TOOLBAR_KEYS_ALL) keyChanged(Settings.PREF_TOOLBAR_KEYS,
+                                    Settings.PREF_CLIPBOARD_TOOLBAR_KEYS, Settings.PREF_PINNED_TOOLBAR_KEYS) else keyChanged(it)
+                                Pending(pending) { SettingsActivity.settingsContainer[it]?.Preference() }
+                            }
                         }
                     }
                     // advanced: bottom row size (with its padding) and side padding, moved from Appearance

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.screens
 
+import helium314.keyboard.settings.SettingsWithoutKey
+import helium314.keyboard.settings.preferences.ToolbarKeysPreference
 import androidx.core.content.edit
 import helium314.keyboard.keyboard.KeyboardLayoutSet
 import android.content.Context
@@ -62,15 +64,8 @@ fun toolbarItems(prefs: SharedPreferences): List<String?> {
         Settings.PREF_TOOLBAR_VISIBILITY, // (with Text correction's Show suggestions: what the row above the keys shows)
         if (toolbarMode == ToolbarMode.HIDDEN) Settings.PREF_TOOLBAR_HIDING_GLOBAL else null,
         // (swipe down on it to hide the keyboard: on Swiping)
-        when (toolbarMode) {
-             ToolbarMode.EXPANDABLE, ToolbarMode.TOOLBAR_KEYS -> Settings.PREF_TOOLBAR_KEYS
-             else -> null
-        },
-        when (toolbarMode) {
-            ToolbarMode.EXPANDABLE, ToolbarMode.SUGGESTION_STRIP -> Settings.PREF_PINNED_TOOLBAR_KEYS
-            else -> null
-        },
-        if (clipboardToolbarVisible) Settings.PREF_CLIPBOARD_TOOLBAR_KEYS else null,
+        // the main, clipboard and pinned toolbars' keys in one list (M / C / P on each key)
+        SettingsWithoutKey.TOOLBAR_KEYS_ALL,
         if (clipboardToolbarVisible) Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES else null,
         if (toolbarMode == ToolbarMode.EXPANDABLE) Settings.PREF_QUICK_PIN_TOOLBAR_KEYS else null,
         if (toolbarMode == ToolbarMode.EXPANDABLE) Settings.PREF_AUTO_SHOW_TOOLBAR else null,
@@ -131,7 +126,11 @@ fun createToolbarSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE, R.string.toolbar_swipe_down_to_hide, R.string.toolbar_swipe_down_to_hide_summary) {
         SwitchPreference(it, Defaults.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE)
     },
-    Setting(context, Settings.PREF_TOOLBAR_KEYS, R.string.toolbar_keys) {
+    Setting(context, SettingsWithoutKey.TOOLBAR_KEYS_ALL, R.string.toolbar_keys) {
+        ToolbarKeysPreference(it)
+    },
+    // (each list on its own too, found by search)
+    Setting(context, Settings.PREF_TOOLBAR_KEYS, R.string.main_toolbar_keys) {
         ReorderSwitchPreference(it, Defaults.PREF_TOOLBAR_KEYS)
     },
     Setting(context, Settings.PREF_PINNED_TOOLBAR_KEYS, R.string.pinned_toolbar_keys) {
