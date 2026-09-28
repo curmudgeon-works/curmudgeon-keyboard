@@ -62,6 +62,8 @@ fun ToolbarScreen(
         if (toolbarMode == ToolbarMode.EXPANDABLE) Settings.PREF_AUTO_SHOW_TOOLBAR else null,
         if (toolbarMode == ToolbarMode.EXPANDABLE) Settings.PREF_AUTO_HIDE_TOOLBAR else null,
         if (toolbarMode != ToolbarMode.HIDDEN) Settings.PREF_VARIABLE_TOOLBAR_DIRECTION else null,
+        // the button that opens and closes the toolbar (moved here from the Suggestion strip font dialog)
+        if (toolbarMode == ToolbarMode.EXPANDABLE) Settings.PREF_TOOLBAR_EXPAND_ICON else null,
     )
     SearchSettingsScreen(
         onClickBack = onClickBack,
@@ -72,6 +74,14 @@ fun ToolbarScreen(
 }
 
 fun createToolbarSettings(context: Context) = listOf(
+    Setting(context, Settings.PREF_TOOLBAR_EXPAND_ICON, R.string.toolbar_button) {
+        ListPreference(it, listOf(
+            stringResource(R.string.pref_toolbar_expand_icon_arrow) to "arrow",
+            stringResource(R.string.pref_toolbar_expand_icon_incognito) to "incognito",
+            stringResource(R.string.pref_toolbar_expand_icon_settings) to "settings",
+            stringResource(R.string.pref_toolbar_expand_icon_none) to "none",
+        ), Defaults.PREF_TOOLBAR_EXPAND_ICON) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+    },
     Setting(context, Settings.PREF_TOOLBAR_MODE, R.string.toolbar_mode) { setting ->
         val ctx = LocalContext.current
         val items =

@@ -33,7 +33,7 @@ object AppearanceLooks {
         Settings.PREF_SPACE_BAR_TEXT,
         Settings.PREF_FONT_SCALE, Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT, Settings.PREF_EMOJI_SKIN_TONE,
         Settings.PREF_SUGGESTION_TEXT_SIZE, Settings.PREF_SUGGESTION_BOLD, Settings.PREF_SUGGESTION_ITALIC,
-        Settings.PREF_SUGGESTION_UNDERLINE, Settings.PREF_SUGGESTION_WORD_PADDING, Settings.PREF_TOOLBAR_EXPAND_ICON,
+        Settings.PREF_SUGGESTION_UNDERLINE, Settings.PREF_SUGGESTION_WORD_PADDING,
         Settings.PREF_KEY_HORIZONTAL_GAP, Settings.PREF_KEY_VERTICAL_GAP,
         Settings.PREF_KEY_TEXT_BOLD, Settings.PREF_KEY_TEXT_ITALIC, Settings.PREF_KEY_TEXT_UNDERLINE, Settings.PREF_HINT_FONT_SCALE,
         Settings.PREF_SHOW_NUMBER_ROW_HINTS, Settings.PREF_SHOW_HINTS, Settings.PREF_SHOW_POPUP_HINTS,
@@ -42,9 +42,7 @@ object AppearanceLooks {
     )
     // the scales have a key per orientation / fold state, the custom colors one per theme
     private val prefixes = listOf(
-        // (keyboard height, split and the numbers row are Layout & Typing's: not in themes, see LayoutDraft)
-        Settings.PREF_BOTTOM_ROW_SCALE_PREFIX,
-        Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX, Settings.PREF_SIDE_PADDING_SCALE_PREFIX,
+        // (keyboard height, split, numbers row, bottom row size and side padding are Layout & Typing's: not in themes)
         Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX,
     )
 
