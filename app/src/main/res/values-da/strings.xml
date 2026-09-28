@@ -110,7 +110,6 @@
     <string name="prefs_keyboard_height_scale">Skala for tastaturhøjde</string>
     <string name="show_emoji_key">Emoji-tast</string>
     <string name="prefs_long_press_keyboard_to_change_lang">Skift inputmetode med mellemrumstasten</string>
-    <string name="prefs_long_press_keyboard_to_change_lang_summary">Langt tryk på mellemrumstasten åbner menuen til valg af inputmetode</string>
     <string name="android_spell_checker_settings">Indstillinger for HeliBoard-stavekontrol</string>
     <string name="autospace_after_punctuation_summary">Indsæt automatisk mellemrum efter skilletegn, når du skriver et nyt ord</string>
     <string name="autospace_after_punctuation">Auto-mellemrum efter skilletegn</string>

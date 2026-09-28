@@ -107,7 +107,6 @@
     <string name="autospace_after_punctuation">Espacio después del punto</string>
     <string name="incognito">Forzar modo incógnito</string>
     <string name="number_row_summary">Mostrar siempre la fila de números</string>
-    <string name="prefs_long_press_keyboard_to_change_lang_summary">Mantener presionada la barra espaciadora nos mostrará los distintos métodos de entrada disponibles</string>
     <string name="delete_swipe_summary">Deslice el dedo desde la tecla eliminar para seleccionar y eliminar porciones más grandes de texto a la vez</string>
     <string name="autospace_after_punctuation_summary">Insertar automáticamente un espacio después del punto al escribir una palabra nueva</string>
     <string name="show_hints_summary">Mostrar sugerencias al mantener pulsadas ciertas teclas</string>

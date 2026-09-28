@@ -147,8 +147,7 @@ fun createAdvancedSettings(context: Context) = listOf(
         DeleteSwipePreference(it)
     },
     Setting(context, Settings.PREF_SPACE_TO_CHANGE_LANG,
-        R.string.prefs_long_press_keyboard_to_change_lang,
-        R.string.prefs_long_press_keyboard_to_change_lang_summary)
+        R.string.prefs_long_press_keyboard_to_change_lang)
     {
         SwitchPreference(it, Defaults.PREF_SPACE_TO_CHANGE_LANG)
     },

@@ -122,7 +122,6 @@
     <string name="settings_category_input">输入</string>
     <string name="ime_settings">设置</string>
     <string name="settings_category_additional_keys">额外键</string>
-    <string name="prefs_long_press_keyboard_to_change_lang_summary">长按空格键将提示输入法选择菜单</string>
     <string name="prefs_long_press_keyboard_to_change_lang">使用空格键更改输入法</string>
     <string name="prefs_keyboard_height_scale">键盘高度比例</string>
     <string name="auto_correction_confidence">自动更正置信度</string>

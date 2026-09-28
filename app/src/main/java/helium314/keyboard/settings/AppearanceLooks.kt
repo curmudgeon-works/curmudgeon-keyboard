@@ -10,6 +10,7 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.keyboard.internal.KeyboardIconsSet
+import helium314.keyboard.latin.common.PictureFraming
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.getActivity
@@ -75,8 +76,9 @@ object AppearanceLooks {
     const val PICTURES = "look_pictures" // (not a preference: never written to the settings)
     private const val NO_PICTURES = "" // the built-in looks: no background picture
 
-    private fun livePictures(ctx: Context) = listOf(false, true).flatMap { night -> listOf(false, true).map { land ->
-        Settings.getCustomBackgroundFile(ctx, night, land) } }
+    // each picture with its framing (how it sits on the keyboard, see PictureFraming)
+    private fun livePictures(ctx: Context) = listOf(false, true).flatMap { night -> listOf(false, true).flatMap { land ->
+        Settings.getCustomBackgroundFile(ctx, night, land).let { listOf(it, PictureFraming.fileFor(it)) } } }
     private fun picturesDir(ctx: Context, id: String) = java.io.File(ctx.filesDir, "looks" + java.io.File.separator + id)
 
     /** Copies the background pictures there are now into a new folder; returns its id, to store in the look. */
@@ -104,8 +106,10 @@ object AppearanceLooks {
         val now = ctx.prefs().all
         if (look.values.any { (key, value) -> inScope(key) && !KnownDefaults.same(key, now[key], value) }) return true
         val id = look.values[PICTURES] as? String ?: return false // saved before pictures were in themes: not compared
-        val saved = if (id == NO_PICTURES) emptyMap() else picturesDir(ctx, id).listFiles()?.associate { it.name to it.length() } ?: emptyMap()
-        val live = livePictures(ctx).filter { it.exists() }.associate { it.name to it.length() }
+        // a picture by its size, a framing (a few bytes of the same length whatever it says) by its content
+        fun sig(f: java.io.File): Any = if (f.name.endsWith(".framing")) f.readText() else f.length()
+        val saved = if (id == NO_PICTURES) emptyMap() else picturesDir(ctx, id).listFiles()?.associate { it.name to sig(it) } ?: emptyMap()
+        val live = livePictures(ctx).filter { it.exists() }.associate { it.name to sig(it) }
         return saved != live
     }
 

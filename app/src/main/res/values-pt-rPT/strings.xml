@@ -113,7 +113,6 @@
     <string name="number_row_summary">Mostrar sempre linha de números</string>
     <string name="show_hints">Mostrar dicas de teclas</string>
     <string name="prefs_long_press_keyboard_to_change_lang">Alterar método de entrada com a tecla de Espaço</string>
-    <string name="prefs_long_press_keyboard_to_change_lang_summary">Toque longo na tecla de Espaço abre o menu de seleção do método de entrada</string>
     <string name="prefs_keyboard_height_scale">Altura do teclado</string>
     <string name="key_borders">Limite das teclas</string>
     <string name="android_spell_checker_settings">Definições do corretor ortográfico HeliBoard</string>

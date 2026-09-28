@@ -2,6 +2,7 @@
 package helium314.keyboard.settings
 
 import android.content.Context
+import helium314.keyboard.latin.common.PictureFraming
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.prefs
 import org.json.JSONObject
@@ -65,6 +66,7 @@ class AppearanceDraft private constructor(
         private fun liveFiles(ctx: Context) = listOf(
             Settings.getCustomBackgroundFile(ctx, false, false), Settings.getCustomBackgroundFile(ctx, false, true),
             Settings.getCustomBackgroundFile(ctx, true, false), Settings.getCustomBackgroundFile(ctx, true, true),
+        ).flatMap { listOf(it, PictureFraming.fileFor(it)) } + listOf( // each picture with its framing
             Settings.getCustomEmojiFontFile(ctx), // (the text fonts are a list of files kept by name: only the choices change)
         )
 

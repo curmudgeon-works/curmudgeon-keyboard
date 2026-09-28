@@ -109,7 +109,6 @@
     <string name="number_row_summary">A számsor mindig jelenjen meg</string>
     <string name="show_hints">Billentyűtippek megjelenítése</string>
     <string name="show_hints_summary">Nyomva tartási tippek megjelenítése</string>
-    <string name="prefs_long_press_keyboard_to_change_lang_summary">A szóközbillentyű nyomva tartásával a beviteli mód kiválasztási menüje jelenik meg</string>
     <string name="prefs_long_press_keyboard_to_change_lang">Beviteli mód megváltoztatása a szóközzel</string>
     <string name="day_night_mode">Automatikus nappali/éjszakai mód</string>
     <string name="spell_checker_service_name">HeliBoard helyesírás-ellenőrző</string>

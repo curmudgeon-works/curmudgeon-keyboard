@@ -606,9 +606,7 @@
     <!-- Description of the remove_redundant_popups setting -->
     <string name="remove_redundant_popups_summary">Each character on the letter and number keys only once: a popup that is a key, or a popup of an earlier key (counting from the bottom left, around the edge and inwards), is dropped</string>
     <!-- Title of the setting enabling long press on space key to change IME -->
-    <string name="prefs_long_press_keyboard_to_change_lang">Change input method with space key</string>
-    <!-- Description of the settings to change IME indicating long press triggers change. -->
-    <string name="prefs_long_press_keyboard_to_change_lang_summary">Long pressing space key will prompt input method selection menu</string>
+    <string name="prefs_long_press_keyboard_to_change_lang">Long-press space to change input method</string>
     <!-- Title of the setting enabling long press on symbols key to switch to numpad -->
     <string name="prefs_long_press_symbol_for_numpad">Long press symbols key for numpad</string>
     <!-- Title of the setting for reduced distance between keys -->
@@ -650,7 +648,6 @@
     <string name="text_font_new">%s (new)</string>
     <string name="text_font_follows_key_text">Following the key font</string>
     <string name="background_whole_picture">Don\'t show the picture on keys, only in the gaps between them</string>
-    <string name="background_whole_picture_summary">Off: the keys are clear, the whole picture shows and a key shows only while pressed</string>
     <string name="appearance_group_keys">Keys</string>
     <string name="appearance_group_theme">Theme</string>
     <!-- after the chosen theme's name on the Themes row: "Midnight (tweaked, unsaved)" -->
@@ -836,6 +833,12 @@ language, hence "No language". -->
     <string name="layout_clip_bottom_row_with_action" tools:keep="@string/layout_clip_bottom_row_with_action">Clipboard bottom row with action key</string>
     <!-- Title for customizing background image -->
     <string name="customize_background_image">Set background image</string>
+    <!-- The background picture dialog: the picture in a keyboard-shaped frame -->
+    <string name="background_picture_hint">Pinch to zoom, drag to move. Zoomed out, the rest is the background colour.</string>
+    <string name="background_picture_stretched_hint">The whole picture, squeezed to the keyboard\'s shape.</string>
+    <string name="background_picture_stretch">Stretch to fit</string>
+    <string name="background_picture_other">Other picture</string>
+    <string name="background_picture_remove">Remove</string>
     <!-- Title for customizing background image in landscape mode -->
     <string name="customize_background_image_landscape">Set background image (landscape)</string>
     <!-- Description for customize_background_image_landscape -->

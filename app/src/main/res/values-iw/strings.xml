@@ -98,7 +98,6 @@
     <string name="clipboard_history_retention_time">שמירת זמן היסטוריה</string>
     <string name="number_row">שורת מספרים</string>
     <string name="number_row_summary">הצגת שורת מספרים קבועה</string>
-    <string name="prefs_long_press_keyboard_to_change_lang_summary">לחיצה ארוכה על מקש הרווח תציג תפריט בחירת שיטת הזנה</string>
     <string name="show_hints">הצגת רמזים עיקריים</string>
     <string name="show_hints_summary">הצגת רמזים בלחיצה ארוכה</string>
     <string name="prefs_keyboard_height_scale">קנה-מידה גובה המקלדת</string>

@@ -109,7 +109,6 @@
     <string name="incognito">Омогући режим без архивирања</string>
     <string name="number_row">Ред бројева</string>
     <string name="prefs_long_press_keyboard_to_change_lang">Промените начин уноса помоћу тастера за размак</string>
-    <string name="prefs_long_press_keyboard_to_change_lang_summary">Дуг притисак на тастер за размак ће приказати мени за избор метода уноса</string>
     <string name="day_night_mode">Аутоматски режим дан/ноћ</string>
     <string name="day_night_mode_summary">Изглед ће пратити подешавања система</string>
     <string name="subtype_akkhor_bn_BD">%s (Акхор)</string>
