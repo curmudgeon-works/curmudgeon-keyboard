@@ -308,7 +308,7 @@ fun SubtypeScreen(
             ) { androidx.compose.runtime.key(rebuild) {
                 val advanced by SettingsMode.state(ctx)
                 // two groups, one row style (label 10 dp in, rows 56 dp high): see LocalCompactPreferences, SwitchRow
-                // ---- the layout (then typing with backspace, popups, toolbar, clipboard history): main layout (advanced), shape, emoji key, split, send key, other layouts, bottom row
+                // ---- the layout, with the toolbar (then typing with backspace, popups, clipboard history): main layout (advanced), shape, emoji key, split, send key, other layouts, bottom row
                 WithBigTitle(stringResource(R.string.keyboard_layout_set)) {
                     // the main layout (QWERTY, QWERTZ, AZERTY, …) on top, advanced
                     if (advanced) AdvancedBlock { Pending(layoutChanged(LayoutType.MAIN)) { MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) } } }
@@ -377,6 +377,17 @@ fun SubtypeScreen(
                             } }
                         if (Settings.getInstance().isTablet) tabletRow()
                         else if (advanced) AdvancedBlock { tabletRow() }
+                    }
+                    // the toolbar (was its own screen, then its own group): visibility in simple mode, the rest advanced
+                    CompositionLocalProvider(LocalCompactPreferences provides true) {
+                        Pending(keyChanged(Settings.PREF_TOOLBAR_VISIBILITY)) {
+                            SettingsActivity.settingsContainer[Settings.PREF_TOOLBAR_VISIBILITY]?.Preference() }
+                    }
+                    if (advanced) AdvancedBlock {
+                        CompositionLocalProvider(LocalCompactPreferences provides true) {
+                            toolbarItems(prefs).filterNotNull().filter { it != Settings.PREF_TOOLBAR_VISIBILITY }
+                                .forEach { Pending(keyChanged(it)) { SettingsActivity.settingsContainer[it]?.Preference() } }
+                        }
                     }
                     // advanced: bottom row size (with its padding) and side padding, moved from Appearance
                     if (advanced) AdvancedBlock {
@@ -450,12 +461,6 @@ fun SubtypeScreen(
                             PrefSwitchRow(Settings.PREF_SHOW_TLD_POPUP_KEYS, Defaults.PREF_SHOW_TLD_POPUP_KEYS, R.string.show_tld_popup_keys) { holdPreview(); reloadPreview() } }
                         Pending(keyChanged(Settings.PREF_REMOVE_REDUNDANT_POPUPS)) {
                             PrefSwitchRow(Settings.PREF_REMOVE_REDUNDANT_POPUPS, Defaults.PREF_REMOVE_REDUNDANT_POPUPS, R.string.remove_redundant_popups) { holdPreview(); reloadPreview() } }
-                    }
-                } }
-                // ---- toolbar (was its own screen; advanced like it): the rows depend on the toolbar mode
-                if (advanced) AdvancedBlock { WithBigTitle(stringResource(R.string.settings_screen_toolbar)) {
-                    CompositionLocalProvider(LocalCompactPreferences provides true) {
-                        toolbarItems(prefs).filterNotNull().forEach { Pending(keyChanged(it)) { SettingsActivity.settingsContainer[it]?.Preference() } }
                     }
                 } }
                 // (its own tinted block: the screen's gap between blocks shows as a thin line, like above Backspace)

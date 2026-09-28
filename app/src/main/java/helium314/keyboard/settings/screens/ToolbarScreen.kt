@@ -61,7 +61,7 @@ fun toolbarItems(prefs: SharedPreferences): List<String?> {
     return listOf(
         Settings.PREF_TOOLBAR_VISIBILITY, // (with Text correction's Show suggestions: what the row above the keys shows)
         if (toolbarMode == ToolbarMode.HIDDEN) Settings.PREF_TOOLBAR_HIDING_GLOBAL else null,
-        if (toolbarMode != ToolbarMode.HIDDEN) Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE else null,
+        // (swipe down on it to hide the keyboard: on Swiping)
         when (toolbarMode) {
              ToolbarMode.EXPANDABLE, ToolbarMode.TOOLBAR_KEYS -> Settings.PREF_TOOLBAR_KEYS
              else -> null
