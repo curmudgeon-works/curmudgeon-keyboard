@@ -107,18 +107,18 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
         onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Subtype + keyboard.toPref()) },
         icon = R.drawable.ic_settings_preferences
     ) { NextScreenIcon() }
-    // gesture typing, the swipe extras and the tuning in one screen
-    Preference(
-            name = stringResource(R.string.swipe_screen),
-            onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.SwipeTuning + keyboard.toPref()) },
-            icon = R.drawable.ic_settings_gesture
-        ) { NextScreenIcon() }
     // (no Preferences: its input and clipboard history groups are on the Layout screen)
     Preference(
         name = stringResource(R.string.settings_screen_appearance),
         onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Appearance) },
         icon = R.drawable.ic_settings_appearance
     ) { NextScreenIcon() }
+    // gesture typing, the swipe extras and the tuning in one screen
+    Preference(
+            name = stringResource(R.string.swipe_screen),
+            onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.SwipeTuning + keyboard.toPref()) },
+            icon = R.drawable.ic_settings_gesture
+        ) { NextScreenIcon() }
     if (advanced) AdvancedTint {
         Preference(
             name = stringResource(R.string.settings_screen_toolbar),

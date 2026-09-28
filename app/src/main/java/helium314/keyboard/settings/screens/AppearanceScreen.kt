@@ -143,9 +143,10 @@ fun AppearanceScreen(
         // a theme saves everything on this screen, so it comes first
         SettingsWithoutKey.APPEARANCE_LOOKS,
         R.string.appearance_group_colors,
-        Settings.PREF_THEME_COLORS,
+        // light / dark following the system first; when on, the light and the dark colours sit under it
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
             Settings.PREF_THEME_DAY_NIGHT else null,
+        Settings.PREF_THEME_COLORS,
         if (dayNightMode) Settings.PREF_THEME_COLORS_NIGHT else null,
         SettingsWithoutKey.BACKGROUND_IMAGE,
         SettingsWithoutKey.BACKGROUND_IMAGE_LANDSCAPE,
@@ -163,9 +164,10 @@ fun AppearanceScreen(
         Settings.PREF_CUSTOM_ICON_NAMES,
         R.string.appearance_group_fonts,
         SettingsWithoutKey.KEY_TEXT_STYLE,
+        // the same font for symbols and suggestions: then their own tiles are advanced, else in simple mode too
+        Settings.PREF_FONT_FOLLOWS_KEY_TEXT,
         SettingsWithoutKey.HINT_TEXT_STYLE,
         SettingsWithoutKey.SUGGESTION_TEXT_STYLE,
-        Settings.PREF_FONT_FOLLOWS_KEY_TEXT, // advanced
         Settings.PREF_SPACE_BAR_TEXT,
         R.string.appearance_group_emoji,
         Settings.PREF_EMOJI_FONT_SCALE,
@@ -235,9 +237,10 @@ fun AppearanceScreen(
         settings = items,
         simpleModeKeys = setOf(
             SettingsWithoutKey.APPEARANCE_LOOKS, Settings.PREF_THEME_STYLE, Settings.PREF_THEME_COLORS, Settings.PREF_THEME_KEY_BORDERS, Settings.PREF_THEME_DAY_NIGHT,
-            Settings.PREF_THEME_COLORS_NIGHT, SettingsWithoutKey.KEY_TEXT_STYLE, SettingsWithoutKey.HINT_TEXT_STYLE, SettingsWithoutKey.SUGGESTION_TEXT_STYLE,
+            Settings.PREF_THEME_COLORS_NIGHT, SettingsWithoutKey.KEY_TEXT_STYLE, Settings.PREF_FONT_FOLLOWS_KEY_TEXT,
             SettingsWithoutKey.HIDE_ALL_SYMBOLS,
-        ),
+        ) + (if (prefs.getBoolean(Settings.PREF_FONT_FOLLOWS_KEY_TEXT, Defaults.PREF_FONT_FOLLOWS_KEY_TEXT)) emptySet()
+            else setOf(SettingsWithoutKey.HINT_TEXT_STYLE, SettingsWithoutKey.SUGGESTION_TEXT_STYLE)),
         // cross and tick: reject or accept everything changed since the screen opened, each asks first
         topActions = {
             if (changed) {
@@ -378,11 +381,15 @@ fun createAppearanceSettings(context: Context) = listOf(
         if ((b?.value ?: 0) < 0)
             Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
         var showDialog by rememberSaveable { mutableStateOf(false) }
-        Preference(
-            name = setting.title,
-            description = prefs.getString(setting.key, Defaults.PREF_THEME_COLORS)!!.getStringResourceOrName("theme_name_", ctx),
-            onClick = { showDialog = true }
-        )
+        // "Colors (light)" under the light / dark switch when it's on, plain "Colors" otherwise
+        val dayNight = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && prefs.getBoolean(Settings.PREF_THEME_DAY_NIGHT, Defaults.PREF_THEME_DAY_NIGHT)
+        Box(if (dayNight) Modifier.padding(start = 16.dp) else Modifier) {
+            Preference(
+                name = if (dayNight) stringResource(R.string.theme_colors_light) else setting.title,
+                description = prefs.getString(setting.key, Defaults.PREF_THEME_COLORS)!!.getStringResourceOrName("theme_name_", ctx),
+                onClick = { showDialog = true }
+            )
+        }
         if (showDialog)
             ColorThemePickerDialog(
                 onDismissRequest = { showDialog = false },
@@ -398,11 +405,13 @@ fun createAppearanceSettings(context: Context) = listOf(
         if ((b?.value ?: 0) < 0)
             Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
         var showDialog by rememberSaveable { mutableStateOf(false) }
-        Preference(
-            name = setting.title,
-            description = prefs.getString(setting.key, Defaults.PREF_THEME_COLORS_NIGHT)!!.getStringResourceOrName("theme_name_", ctx),
-            onClick = { showDialog = true }
-        )
+        Box(Modifier.padding(start = 16.dp)) { // (shown only under the light / dark switch, when it's on)
+            Preference(
+                name = setting.title,
+                description = prefs.getString(setting.key, Defaults.PREF_THEME_COLORS_NIGHT)!!.getStringResourceOrName("theme_name_", ctx),
+                onClick = { showDialog = true }
+            )
+        }
         if (showDialog)
             ColorThemePickerDialog(
                 onDismissRequest = { showDialog = false },

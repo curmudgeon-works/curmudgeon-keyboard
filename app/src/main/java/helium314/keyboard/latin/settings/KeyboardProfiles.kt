@@ -28,6 +28,7 @@ object KeyboardProfiles {
     private val globalKeys = setOf(
         Settings.PREF_ENABLED_SUBTYPES, Settings.PREF_ADDITIONAL_SUBTYPES, Settings.PREF_SELECTED_SUBTYPE,
         Settings.PREF_ADVANCED_SETTINGS, Settings.PREF_VERSION_CODE,
+        Settings.PREF_SAVE_SUBTYPE_PER_APP, // it picks which keyboard comes up in an app: one switch for all of them
         Settings.PREF_SHOW_SETUP_WIZARD_ICON, Settings.PREF_ENABLE_CLIPBOARD_HISTORY,
         Settings.PREF_CLIPBOARD_HISTORY_SIZE, Settings.PREF_CLIPBOARD_HISTORY_PINNED_FIRST,
         PREF_SEPARATE, PREF_IDS, PREF_NEXT_ID,
