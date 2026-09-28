@@ -157,8 +157,6 @@ fun AppearanceScreen(
         Settings.PREF_THEME_STYLE,
         Settings.PREF_ICON_STYLE,
         Settings.PREF_CUSTOM_ICON_NAMES,
-        Settings.PREF_BOTTOM_ROW_SCALE_PREFIX,
-        Settings.PREF_SIDE_PADDING_SCALE_PREFIX,
         R.string.appearance_group_fonts,
         SettingsWithoutKey.HIDE_ALL_SYMBOLS, // the three below it are advanced
         Settings.PREF_SHOW_NUMBER_ROW_HINTS,
@@ -303,7 +301,7 @@ fun createAppearanceSettings(context: Context) = listOf(
             Settings.PREF_SUGGESTION_TEXT_SIZE, Defaults.PREF_SUGGESTION_TEXT_SIZE.toFloat(), 10f..32f,
             Settings.PREF_SUGGESTION_BOLD, { Defaults.PREF_SUGGESTION_BOLD }, Settings.PREF_SUGGESTION_ITALIC, Settings.PREF_SUGGESTION_UNDERLINE,
             sizeIsInt = true, sizeText = { "${it.roundToInt()} dp" },
-            extraKeys = listOf(Settings.PREF_SUGGESTION_WORD_PADDING, Settings.PREF_TOOLBAR_EXPAND_ICON),
+            extraKeys = listOf(Settings.PREF_SUGGESTION_WORD_PADDING),
             extra = { reload -> SuggestionStripExtras(reload) }, otherFont = Settings.PREF_HINT_FONT))
     },
     Setting(context, SettingsWithoutKey.HINT_TEXT_STYLE, R.string.hint_text_style) {
@@ -719,7 +717,7 @@ internal class PreviewKeyboard( // (also the Preferences screen's, for the key s
     }
 }
 
-/** Under the Suggestion strip dialog's B I U: the spacing between suggestions and the toolbar button. */
+/** Under the Suggestion strip dialog's B I U: the spacing between suggestions. */
 @Composable
 private fun SuggestionStripExtras(reload: () -> Unit) {
     val prefs = LocalContext.current.prefs()
@@ -728,16 +726,7 @@ private fun SuggestionStripExtras(reload: () -> Unit) {
         Slider(value = spacing, onValueChange = { spacing = it }, valueRange = 0f..30f,
             onValueChangeFinished = { prefs.edit { putInt(Settings.PREF_SUGGESTION_WORD_PADDING, spacing.roundToInt()) }; reload() })
     }
-    val icons = listOf("arrow" to R.string.pref_toolbar_expand_icon_arrow, "incognito" to R.string.pref_toolbar_expand_icon_incognito,
-        "settings" to R.string.pref_toolbar_expand_icon_settings, "none" to R.string.pref_toolbar_expand_icon_none)
-    val current = prefs.getString(Settings.PREF_TOOLBAR_EXPAND_ICON, Defaults.PREF_TOOLBAR_EXPAND_ICON)
-    WithSmallTitle(stringResource(R.string.toolbar_button)) {
-        DropDownField(
-            items = icons,
-            selectedItem = icons.firstOrNull { it.first == current } ?: icons.first(),
-            onSelected = { prefs.edit { putString(Settings.PREF_TOOLBAR_EXPAND_ICON, it.first) }; reload() },
-        ) { Text(stringResource(it.second)) }
-    }
+    // (the toolbar button's icon is on the Toolbar screen)
 }
 
 /** Whether a tile on this screen covers a preference or file changed since the draft's snapshot. */
@@ -753,8 +742,7 @@ private fun tileChanged(tile: String, keys: Set<String>, files: Set<String>): Bo
         SettingsWithoutKey.HINT_TEXT_STYLE -> any(Settings.PREF_HINT_FONT, Settings.PREF_HINT_FONT_SCALE, Settings.PREF_HINT_TEXT_BOLD,
             Settings.PREF_HINT_TEXT_ITALIC, Settings.PREF_HINT_TEXT_UNDERLINE)
         SettingsWithoutKey.SUGGESTION_TEXT_STYLE -> any(Settings.PREF_SUGGESTION_FONT, Settings.PREF_SUGGESTION_TEXT_SIZE, Settings.PREF_SUGGESTION_BOLD,
-            Settings.PREF_SUGGESTION_ITALIC, Settings.PREF_SUGGESTION_UNDERLINE, Settings.PREF_SUGGESTION_WORD_PADDING,
-            Settings.PREF_TOOLBAR_EXPAND_ICON)
+            Settings.PREF_SUGGESTION_ITALIC, Settings.PREF_SUGGESTION_UNDERLINE, Settings.PREF_SUGGESTION_WORD_PADDING)
         SettingsWithoutKey.CUSTOM_EMOJI_FONT -> "custom_emoji_font" in files
         SettingsWithoutKey.BACKGROUND_IMAGE -> files.any { it.startsWith("custom_background_image") && !it.contains("landscape") }
         SettingsWithoutKey.BACKGROUND_IMAGE_LANDSCAPE -> files.any { it.startsWith("custom_background_image_landscape") }

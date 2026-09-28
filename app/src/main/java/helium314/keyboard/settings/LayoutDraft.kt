@@ -97,6 +97,7 @@ class LayoutDraft private constructor(
         )
         private val prefixes = listOf(
             Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, Settings.PREF_SPLIT_SPACER_SCALE_PREFIX, Settings.PREF_LAYOUT_PREFIX,
+            Settings.PREF_BOTTOM_ROW_SCALE_PREFIX, Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX, Settings.PREF_SIDE_PADDING_SCALE_PREFIX,
             Settings.PREF_SAVED_APP_SUBTYPE_PREFIX,
         )
         private val profileKey = Regex("^p\\d+/")

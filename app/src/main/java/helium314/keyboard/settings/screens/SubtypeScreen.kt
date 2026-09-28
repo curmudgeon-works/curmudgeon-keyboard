@@ -342,6 +342,11 @@ fun SubtypeScreen(
                                 .any { prefs.getBoolean(it, Defaults.PREF_ENABLE_SPLIT_KEYBOARD) })
                             Pending(prefixChanged(Settings.PREF_SPLIT_SPACER_SCALE_PREFIX)) { Box(Modifier.padding(start = 16.dp)) {
                                 SettingsActivity.settingsContainer[Settings.PREF_SPLIT_SPACER_SCALE_PREFIX]?.Preference() } }
+                        // bottom row size (with its padding) and side padding, also moved from Appearance
+                        Pending(prefixChanged(Settings.PREF_BOTTOM_ROW_SCALE_PREFIX) || prefixChanged(Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX)) {
+                            SettingsActivity.settingsContainer[Settings.PREF_BOTTOM_ROW_SCALE_PREFIX]?.Preference() }
+                        Pending(prefixChanged(Settings.PREF_SIDE_PADDING_SCALE_PREFIX)) {
+                            SettingsActivity.settingsContainer[Settings.PREF_SIDE_PADDING_SCALE_PREFIX]?.Preference() }
                     }
                     // then the emoji key switch
                     Pending(keyChanged(Settings.PREF_SHOW_EMOJI_KEY)) {
