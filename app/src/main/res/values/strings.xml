@@ -525,13 +525,13 @@
     <string name="clear_clipboard_message">Removes every entry from the clipboard history except pinned ones. This can\'t be undone.</string>
     <string name="clear_clipboard_confirm">Clear</string>
     <!-- Appearance screen: the live keyboard is the preview, changes can be taken back as a whole -->
-    <string name="appearance_accept">Accept all changes</string>
-    <string name="appearance_accept_title">Accept all changes?</string>
-    <string name="appearance_accept_all">Accept all</string>
+    <string name="appearance_accept">Save changes</string>
+    <string name="appearance_accept_title">Save all changes?</string>
+    <string name="appearance_accept_all">Save</string>
     <string name="appearance_reject_title">Discard all changes?</string>
-    <string name="appearance_discard_all">Discard all</string>
+    <string name="appearance_discard_all">Discard</string>
     <string name="appearance_keep_working">Keep working</string>
-    <string name="appearance_reject">Reject all changes</string>
+    <string name="appearance_reject">Discard changes</string>
     <string name="appearance_reject_message">The keyboard goes back to how it looked when you opened Appearance.</string>
     <string name="appearance_looks">Themes</string>
     <string name="appearance_looks_summary">Built-in themes, and your own: save how the keyboard looks under a name</string>
@@ -551,6 +551,10 @@
     <string name="layout_keep_title">Keep the layout and typing changes?</string>
     <string name="layout_keep_message">Keep: the keyboard stays as it is now. Discard: it goes back to how it was when you opened Layout &amp; Typing.</string>
     <string name="layout_reject_message">The keyboard goes back to how it was when you opened Layout &amp; Typing.</string>
+    <!-- leaving Appearance or Layout & Typing with changes not saved -->
+    <string name="unsaved_changes_title">There are unsaved changes</string>
+    <string name="discard_and_exit">"Discard\nand exit"</string>
+    <string name="save_and_exit">"Save\nand exit"</string>
     <string name="appearance_keep_title">Keep the appearance changes?</string>
     <string name="appearance_keep_message">Keep: the keyboard stays as it looks now. Discard: it goes back to how it looked when you opened Appearance.</string>
     <string name="appearance_keep">Keep</string>
@@ -982,6 +986,7 @@ New dictionary:
     <string name="theme_name_light" tools:keep="@string/theme_name_light">Light</string>
     <!-- Theme name for holo white theme -->
     <string name="theme_name_holo_white" tools:keep="@string/theme_name_holo_white">Holo White</string>
+    <string name="theme_name_holo_light" tools:keep="@string/theme_name_holo_light">Holo Light</string>
     <!-- Theme name for dark theme (based on old no-border dark) -->
     <string name="theme_name_dark" tools:keep="@string/theme_name_dark">Dark</string>
     <!-- Theme name for darker theme (based on old border dark), todo: re-consider that stupid name -->
@@ -1004,6 +1009,7 @@ New dictionary:
     <string name="theme_name_indigo" tools:keep="@string/theme_name_indigo">Indigo</string>
     <!-- Theme name for ocean theme -->
     <string name="theme_name_ocean" tools:keep="@string/theme_name_ocean">Ocean</string>
+    <string name="theme_name_ocean_light" tools:keep="@string/theme_name_ocean_light">Ocean Light</string>
     <!-- Theme name for pink theme -->
     <string name="theme_name_pink" tools:keep="@string/theme_name_pink">Pink</string>
     <!-- Theme name for sand theme -->

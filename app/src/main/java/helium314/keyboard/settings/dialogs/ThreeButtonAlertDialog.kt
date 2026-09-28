@@ -87,6 +87,7 @@ fun ThreeButtonAlertDialog(
     content: @Composable (() -> Unit)? = null,
     scrollContent: Boolean = false,
     onNeutral: () -> Unit = { },
+    onCancel: (() -> Unit)? = null, // the cancel button's own action (default: dismiss, like a tap outside)
     checkOk: () -> Boolean = { true },
     confirmButtonText: String? = stringResource(android.R.string.ok),
     cancelButtonText: String = stringResource(android.R.string.cancel),
@@ -221,7 +222,7 @@ fun ThreeButtonAlertDialog(
                                 ) { Text(confirmButtonText) }
                         }
                         if (confirmFirst) confirm()
-                        TextButton(onClick = onDismissRequest) { Text(cancelButtonText) }
+                        TextButton(onClick = onCancel ?: onDismissRequest) { Text(cancelButtonText) }
                         if (!confirmFirst) confirm()
                     }
                 }

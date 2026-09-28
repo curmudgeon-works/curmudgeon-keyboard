@@ -48,28 +48,32 @@ object AppearanceLooks {
 
     fun inScope(key: String) = key in keys || prefixes.any { key.startsWith(it) }
 
-    /** The four themes that ship with the app: some variety in style, colours, borders and spacing. */
+    /** The themes that ship with the app: Midnight and Daylight one colour set each, the others a light and a dark one
+     *  following the system. */
     fun builtIn(ctx: Context): List<Look> = listOf(
         Look(ctx.getString(R.string.theme_preset_midnight), mapOf(
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
+            // one colour set, always (the light / dark switch off)
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_BLACK, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_BLACK,
-            Settings.PREF_THEME_KEY_BORDERS to true)),
+            Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to false)),
         Look(ctx.getString(R.string.theme_preset_daylight), mapOf(
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
+            // one colour set, always (the light / dark switch off)
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_LIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_LIGHT,
             Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to false)),
         Look(ctx.getString(R.string.theme_preset_holo), mapOf(
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_HOLO, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_HOLO,
-            Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_HOLO_WHITE, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_BLACK,
-            Settings.PREF_THEME_KEY_BORDERS to true)),
+            Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_HOLO_LIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_HOLO_WHITE,
+            Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to true)),
         Look(ctx.getString(R.string.theme_preset_paper), mapOf(
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_LIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_DARK,
             Settings.PREF_THEME_KEY_BORDERS to false, Settings.PREF_THEME_DAY_NIGHT to true)),
         Look(ctx.getString(R.string.theme_preset_ocean), mapOf(
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_ROUNDED, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_ROUNDED,
-            Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_OCEAN, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_OCEAN,
-            Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_KEY_HORIZONTAL_GAP to 1.0f, Settings.PREF_KEY_VERTICAL_GAP to 1.5f)),
+            Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_OCEAN_LIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_OCEAN,
+            Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_KEY_HORIZONTAL_GAP to 1.0f, Settings.PREF_KEY_VERTICAL_GAP to 1.5f,
+            Settings.PREF_THEME_DAY_NIGHT to true)),
     )
 
     /** The appearance values as they are now (plain keys, the current keyboard's set). */

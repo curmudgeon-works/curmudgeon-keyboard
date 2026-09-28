@@ -51,6 +51,7 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
         // new themes that are just colors
         const val THEME_LIGHT = "light"
         const val THEME_HOLO_WHITE = "holo_white"
+        const val THEME_HOLO_LIGHT = "holo_light" // light twin of Holo White (the Holo classic theme's light colours)
         const val THEME_DARK = "dark"
         const val THEME_DARKER = "darker"
         const val THEME_BLACK = "black"
@@ -62,6 +63,7 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
         const val THEME_FOREST = "forest"
         const val THEME_INDIGO = "indigo"
         const val THEME_OCEAN = "ocean"
+        const val THEME_OCEAN_LIGHT = "ocean_light" // light twin of Ocean (the Rounded ocean theme's light colours)
         const val THEME_PINK = "pink"
         const val THEME_SAND = "sand"
         const val THEME_VIOLETTE = "violette"
@@ -69,6 +71,7 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             THEME_LIGHT, THEME_DARK,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) THEME_DYNAMIC else null,
             THEME_HOLO_WHITE, // (upstream: only with the Holo key style)
+            THEME_HOLO_LIGHT,
             THEME_DARKER,
             THEME_BLACK,
             THEME_BLUE_GRAY,
@@ -79,6 +82,7 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             THEME_INDIGO,
             THEME_PINK,
             THEME_OCEAN,
+            THEME_OCEAN_LIGHT,
             THEME_SAND,
             THEME_VIOLETTE
         )
@@ -196,6 +200,18 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                     "#80FFFFFF".toColorInt(),
                     keyboardBackground = backgroundImage
                 )
+                THEME_HOLO_LIGHT -> DefaultColors(
+                    themeStyle,
+                    hasBorders,
+                    "#33B5E5".toColorInt(), // Holo blue
+                    "#E4E4E4".toColorInt(),
+                    Color.WHITE,
+                    "#D0D0D0".toColorInt(),
+                    Color.WHITE,
+                    "#202020".toColorInt(),
+                    "#808080".toColorInt(),
+                    keyboardBackground = backgroundImage
+                )
                 THEME_DARKER -> DefaultColors(
                     themeStyle,
                     hasBorders,
@@ -304,6 +320,18 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                     Color.rgb(132, 157, 212),
                     Color.WHITE,
                     Color.WHITE,
+                    keyboardBackground = backgroundImage
+                )
+                THEME_OCEAN_LIGHT -> DefaultColors(
+                    themeStyle,
+                    hasBorders,
+                    Color.rgb(255, 124, 0), // Ocean's orange accent
+                    Color.rgb(197, 212, 240),
+                    Color.WHITE,
+                    Color.rgb(165, 190, 235),
+                    Color.WHITE,
+                    Color.rgb(40, 60, 110),
+                    Color.rgb(90, 110, 160),
                     keyboardBackground = backgroundImage
                 )
                 THEME_PINK -> DefaultColors(
