@@ -77,10 +77,10 @@ class ReplayTest {
     private fun variants(): List<Variant> {
         fun decoder(endpointRadius: Float = 1.6f, penUp: Float? = null, endPenalty: Float = 0f, endFree: Float = 0.4f, startShare: Float = 1f, cap: Int = 512) =
             GestureDecoder(
-                HybridScorer(),
+                HybridScorer(KushlerScorer(KushlerConfig(slowEmphasis = 0.5f))),
                 DecoderConfig(endpointRadiusKeyWidths = endpointRadius, penUpRadiusKeyWidths = penUp,
                     endpointPenaltyPerKeyWidth = endPenalty, endpointFreeKeyWidths = endFree, startPenaltyShare = startShare, maxCandidates = cap),
-                GesturePreprocessor(PreprocessorConfig(pauseConfidence = 0.9f, pauseDtFactor = 2.5f, slowdownConfidence = 0.5f)),
+                GesturePreprocessor(PreprocessorConfig(pauseConfidence = 0.9f, pauseDtFactor = 2.5f)),
             )
         fun plain(d: GestureDecoder): (Swipe, Vocabulary) -> List<ScoredWord> = { s, v -> d.decode(s.points, s.geometry, v, 10) }
         val history = (System.getenv("GESTURE_REPLAY_HISTORY") ?: "").split(',').mapNotNull { it.trim().toIntOrNull() }

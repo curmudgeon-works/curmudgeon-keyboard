@@ -77,8 +77,7 @@ enum class InflectionType {
     PEN_DOWN,        // stroke start — must match the first letter
     PEN_UP,          // stroke end — must match the last letter
     ANGLE_THRESHOLD, // direction change above a (speed-adaptive) angle threshold
-    PAUSE,           // dwell: finger slowed/stopped over a key
-    SLOWDOWN,        // local speed minimum well below the stroke's mean, without a stop
+    PAUSE,           // dwell: finger stopped over a key (slowing down is a soft weight, see PreprocessedGesture.slowness)
     ROW_CHANGE,      // vertical direction reversal crossing row boundaries
     DOUBLE_LETTER,   // small loop or tight back-and-forth (Swype's double-letter gesture)
 }
@@ -112,7 +111,28 @@ class PreprocessedGesture(
      * corrupt both scoring channels), so these junctions are the only trace left.
      */
     val excursionArcs: List<Float> = emptyList(),
+    /**
+     * Per point, 0..1: how deliberately slowly the finger moved there (0 at normal speed, at stops
+     * and at the stroke's ends). A soft weight for the scorers, never a point that must match a letter.
+     */
+    val slowness: FloatArray = FloatArray(0),
 ) {
+    private val slownessByChar = HashMap<Char, Float>()
+
+    /** The highest [slowness] of the path within [radius] of (x, y), the center of [c]'s key; cached per key. */
+    fun slownessNear(c: Char, x: Float, y: Float, radius: Float): Float = slownessByChar.getOrPut(c) {
+        var best = 0f
+        val r2 = radius * radius
+        for (i in slowness.indices) {
+            val s = slowness[i]
+            if (s <= best) continue
+            val dx = points[i].x - x
+            val dy = points[i].y - y
+            if (dx * dx + dy * dy <= r2) best = s
+        }
+        best
+    }
+
     /** Cumulative arc length up to each point (size == points.size). */
     val cumulativeLength: FloatArray = FloatArray(points.size).also { cum ->
         var acc = 0f

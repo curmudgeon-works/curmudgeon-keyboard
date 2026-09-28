@@ -20,10 +20,14 @@ class PreprocessorConfig(
     val pauseDtFactor: Float = 3.5f,
     /** Confidence of a PAUSE inflection (at or above DecoderConfig.strongInflectionConfidence it demands a letter). */
     val pauseConfidence: Float = 0.7f,
-    /** A local speed minimum at or below this fraction of the stroke's mean speed is a SLOWDOWN. */
-    val slowdownSpeedRatio: Float = 0.45f,
-    /** Confidence of a SLOWDOWN inflection; 0 switches slowdown detection off. */
-    val slowdownConfidence: Float = 0f,
+    /**
+     * Local speed (relative to the stroke's mean) below which a point counts as slow; slowness
+     * then grows linearly to 1 at a standstill. Slowness is a soft scoring weight only: it never
+     * makes a point that must match a letter (see [PreprocessedGesture.slowness]).
+     */
+    val slowSpeedRatio: Float = 0.7f,
+    /** Arc length (key widths) at each end of the stroke whose slowness is ignored: every swipe starts and ends slowly. */
+    val slowEndSkipKeyWidths: Float = 0.5f,
     /** Multiplier on the confidence of turn (ANGLE_THRESHOLD) inflections. */
     val turnConfidenceScale: Float = 1f,
     /** Prominence (in key heights) a y-extremum needs to count as ROW_CHANGE. */
@@ -68,12 +72,14 @@ class GesturePreprocessor(private val config: PreprocessorConfig = PreprocessorC
         val pathLength = polylineLength(resampled)
         val duration = (resampled.last().t - resampled.first().t).coerceAtLeast(1L)
         val meanSpeed = pathLength / duration
-        val inflections = detectInflections(resampled, geometry, meanSpeed)
+        val speedFactors = localSpeedFactors(resampled, meanSpeed)
+        val inflections = detectInflections(resampled, geometry, speedFactors)
         // scale excursion arc positions from the raw kept polyline onto the
         // (slightly shorter, smoothed) resampled path
         val scale = if (keptLength <= 0f) 0f else pathLength / keptLength
         val excursionArcs = rawExcursionArcs.map { it * scale }
-        return PreprocessedGesture(resampled, inflections, pathLength, meanSpeed, excursionArcs)
+        val slowness = slowness(resampled, speedFactors, geometry.keyWidth * config.slowEndSkipKeyWidths)
+        return PreprocessedGesture(resampled, inflections, pathLength, meanSpeed, excursionArcs, slowness)
     }
 
     /**
@@ -216,13 +222,11 @@ class GesturePreprocessor(private val config: PreprocessorConfig = PreprocessorC
     private fun detectInflections(
         pts: List<GesturePoint>,
         geometry: KeyboardGeometry,
-        meanSpeed: Float,
+        speedFactors: FloatArray,
     ): List<InflectionPoint> {
         val result = ArrayList<InflectionPoint>()
         if (pts.isEmpty()) return result
         val last = pts.size - 1
-
-        val speedFactors = localSpeedFactors(pts, meanSpeed)
 
         result.add(InflectionPoint(0, pts[0].x, pts[0].y, InflectionType.PEN_DOWN, 1f, speedFactors[0]))
 
@@ -231,7 +235,6 @@ class GesturePreprocessor(private val config: PreprocessorConfig = PreprocessorC
             addAngleAndCuspInflections(pts, turnAngles, speedFactors, result)
             addLoopInflections(pts, geometry, speedFactors, result)
             addPauseInflections(pts, speedFactors, result)
-            addSlowdownInflections(pts, speedFactors, result)
             addRowChangeInflections(pts, geometry, speedFactors, result)
         }
 
@@ -348,21 +351,25 @@ class GesturePreprocessor(private val config: PreprocessorConfig = PreprocessorC
     }
 
     /**
-     * Clear local minima of speed, well below the stroke's mean but not a stop (those are PAUSE):
-     * the finger lingering over a key it means. Off unless [PreprocessorConfig.slowdownConfidence] > 0.
+     * Per point, how deliberately slowly the finger moved there: 0 at or above
+     * [PreprocessorConfig.slowSpeedRatio] of the mean speed, rising to 1 at a standstill.
+     * Stops (dwells, as for PAUSE) and the slow start and end of the stroke count as 0:
+     * a stop reads more like hesitation than intent.
      */
-    private fun addSlowdownInflections(
-        pts: List<GesturePoint>,
-        speedFactors: FloatArray,
-        out: MutableList<InflectionPoint>,
-    ) {
-        if (config.slowdownConfidence <= 0f || pts.size < 4) return
+    private fun slowness(pts: List<GesturePoint>, speedFactors: FloatArray, endSkip: Float): FloatArray {
+        val out = FloatArray(pts.size)
+        if (pts.size < 4) return out
+        val dts = (1 until pts.size).map { (pts[it].t - pts[it - 1].t).toFloat() }.sorted()
+        val median = dts[dts.size / 2]
+        val cum = FloatArray(pts.size)
+        for (i in 1 until pts.size) cum[i] = cum[i - 1] + PreprocessedGesture.dist(pts[i - 1], pts[i])
+        val total = cum.last()
         for (i in 1 until pts.size - 1) {
-            val v = speedFactors[i]
-            if (v > config.slowdownSpeedRatio) continue
-            if (speedFactors[i - 1] < v || speedFactors[i + 1] < v) continue // local minimum only
-            out.add(InflectionPoint(i, pts[i].x, pts[i].y, InflectionType.SLOWDOWN, config.slowdownConfidence, v))
+            if (cum[i] < endSkip || total - cum[i] < endSkip) continue
+            if (median > 0f && (pts[i + 1].t - pts[i].t) > config.pauseDtFactor * median) continue // a stop
+            out[i] = ((config.slowSpeedRatio - speedFactors[i]) / config.slowSpeedRatio).coerceIn(0f, 1f)
         }
+        return out
     }
 
     /** Vertical direction reversals with row-scale prominence. */
