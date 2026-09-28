@@ -650,7 +650,12 @@
     <!-- after the chosen theme's name on the Themes row: "Midnight (tweaked, unsaved)" -->
     <string name="theme_tweaked">tweaked</string>
     <string name="theme_unsaved">unsaved</string>
-    <string name="toolbar_in_strip_row">Open the toolbar in place of the suggestions</string>
+    <string name="toolbar_visibility">Toolbar visibility</string>
+    <string name="toolbar_visibility_always">Always visible</string>
+    <string name="toolbar_visibility_above">Opens above suggestions</string>
+    <string name="toolbar_visibility_in_place">Opens in place of suggestions</string>
+    <string name="toolbar_visibility_from_key">Opens from the top-left key\'s long-press</string>
+    <string name="toolbar_visibility_hidden">Hidden</string>
     <string name="font_follows_key_text">Use same font for symbols and suggestions</string>
     <string name="key_text_bold">Bold</string>
     <string name="key_text_italic">Italic</string>

@@ -50,6 +50,7 @@ import helium314.keyboard.latin.common.StringUtilsKt;
 import helium314.keyboard.latin.common.SuggestionSpanUtilsKt;
 import helium314.keyboard.latin.define.DebugFlags;
 import helium314.keyboard.latin.settings.Settings;
+import helium314.keyboard.latin.utils.KtxKt;
 import helium314.keyboard.latin.settings.SettingsValues;
 import helium314.keyboard.latin.gesture.GestureCorpusRecorder;
 import helium314.keyboard.latin.gesture.GestureStats;
@@ -881,6 +882,14 @@ public final class InputLogic {
             case KeyCode.IME_HIDE_UI:
                 mLatinIME.requestHideSelf(0);
                 break;
+            case KeyCode.TOGGLE_TOOLBAR: {
+                // suggestions off: the toolbar row comes (or goes); the keyboard is rebuilt with it
+                final android.content.SharedPreferences prefs = KtxKt.prefs(mLatinIME);
+                prefs.edit().putBoolean(Settings.PREF_TOOLBAR_OPENED_BY_KEY,
+                        !prefs.getBoolean(Settings.PREF_TOOLBAR_OPENED_BY_KEY, false)).apply();
+                helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().setThemeNeedsReload();
+                break;
+            }
             case KeyCode.INLINE_EMOJI_SEARCH_DONE:
                 setInlineEmojiSearchAction(false);
                 inputTransaction.setRequiresUpdateSuggestions();

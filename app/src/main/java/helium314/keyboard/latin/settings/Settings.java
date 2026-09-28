@@ -96,7 +96,12 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_FONT_FOLLOWS_KEY_TEXT = "font_follows_key_text";
     public static final String PREF_BACKGROUND_WHOLE_PICTURE = "background_whole_picture";
     public static final String PREF_DELETE_SWIPE_SPEED = "delete_swipe_speed";
-    public static final String PREF_TOOLBAR_IN_STRIP_ROW = "toolbar_in_strip_row";
+    public static final String PREF_TOOLBAR_IN_STRIP_ROW = "toolbar_in_strip_row"; // (before toolbar visibility; migrated)
+    public static final String PREF_TOOLBAR_VISIBILITY = "toolbar_visibility";
+    // not a setting: the toolbar opened from the top-left key's long-press (suggestions off); closed when the keyboard goes
+    public static final String PREF_TOOLBAR_OPENED_BY_KEY = "toolbar_opened_by_key";
+    public static final String TOOLBAR_ALWAYS = "always", TOOLBAR_ABOVE = "above", TOOLBAR_IN_PLACE = "in_place",
+        TOOLBAR_FROM_KEY = "from_key", TOOLBAR_HIDDEN = "hidden";
     public static final String PREF_HINT_TEXT_BOLD = "hint_text_bold";
     public static final String PREF_HINT_TEXT_ITALIC = "hint_text_italic";
     public static final String PREF_HINT_TEXT_UNDERLINE = "hint_text_underline";
@@ -391,8 +396,33 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
         mPrefs.edit().putBoolean(Settings.PREF_ALWAYS_INCOGNITO_MODE, !oldValue).apply();
     }
 
+    /** Toolbar visibility (always / above / in_place / from_key / hidden); before it existed: from the old toolbar mode. */
+    public static String readToolbarVisibility(final SharedPreferences prefs) {
+        final String v = prefs.getString(PREF_TOOLBAR_VISIBILITY, null);
+        if (v != null) return v;
+        return switch (prefs.getString(PREF_TOOLBAR_MODE, Defaults.PREF_TOOLBAR_MODE)) {
+            case "TOOLBAR_KEYS" -> TOOLBAR_ALWAYS;
+            case "SUGGESTION_STRIP", "HIDDEN" -> TOOLBAR_HIDDEN;
+            default -> prefs.getBoolean(PREF_TOOLBAR_IN_STRIP_ROW, false) ? TOOLBAR_IN_PLACE : TOOLBAR_ABOVE;
+        };
+    }
+
+    /** With suggestions off, the arrow has no row: "above" and "in place" open from the top-left key's long-press. */
+    public static boolean isToolbarFromKey(final SharedPreferences prefs) {
+        if (prefs.getBoolean(PREF_SHOW_SUGGESTIONS, Defaults.PREF_SHOW_SUGGESTIONS)) return false;
+        final String v = readToolbarVisibility(prefs);
+        return !v.equals(TOOLBAR_ALWAYS) && !v.equals(TOOLBAR_HIDDEN);
+    }
+
+    /** The mode the keyboard works with, from Show suggestions and Toolbar visibility. */
     public static ToolbarMode readToolbarMode(final SharedPreferences prefs) {
-        return ToolbarMode.valueOf(prefs.getString(PREF_TOOLBAR_MODE, Defaults.PREF_TOOLBAR_MODE));
+        final boolean suggestions = prefs.getBoolean(PREF_SHOW_SUGGESTIONS, Defaults.PREF_SHOW_SUGGESTIONS);
+        final String v = readToolbarVisibility(prefs);
+        if (suggestions) return v.equals(TOOLBAR_HIDDEN) ? ToolbarMode.SUGGESTION_STRIP : ToolbarMode.EXPANDABLE;
+        if (v.equals(TOOLBAR_ALWAYS)) return ToolbarMode.TOOLBAR_KEYS;
+        if (v.equals(TOOLBAR_HIDDEN)) return ToolbarMode.HIDDEN;
+        // opens from the top-left key: the toolbar row only while opened
+        return prefs.getBoolean(PREF_TOOLBAR_OPENED_BY_KEY, false) ? ToolbarMode.TOOLBAR_KEYS : ToolbarMode.HIDDEN;
     }
 
     public static KeyboardActionListener.SwipeAction readHorizontalSpaceSwipe(SharedPreferences prefs) {

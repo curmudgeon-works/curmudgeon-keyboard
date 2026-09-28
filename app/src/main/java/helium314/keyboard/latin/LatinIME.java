@@ -1032,6 +1032,9 @@ public class LatinIME extends InputMethodService implements
     void onFinishInputViewInternal(final boolean finishingInput) {
         super.onFinishInputView(finishingInput);
         Log.i(TAG, "onFinishInputView");
+        // a toolbar opened from the top-left key closes with its text field (not on the hide / show of a reload)
+        if (finishingInput && KtxKt.prefs(this).getBoolean(Settings.PREF_TOOLBAR_OPENED_BY_KEY, false))
+            KtxKt.prefs(this).edit().putBoolean(Settings.PREF_TOOLBAR_OPENED_BY_KEY, false).apply();
         cleanupInternalStateForFinishInput();
     }
 
