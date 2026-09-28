@@ -242,6 +242,7 @@ fun SubtypeScreen(
     fun leave() { if (draft.hasChanges(ctx)) askOnLeave = true else { LayoutDraft.close(); onClickBack() } }
     fun discardChanges() {
         draft.reject(ctx)
+        LayoutDraft.takeRejectedSubtype() // (handled right here)
         rebuild++
         currentSubtypeString = draft.subtype
         if (RichInputMethodManager.isInitialized())
@@ -251,6 +252,8 @@ fun SubtypeScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                // undone while away (the app was left): edit the keyboard as it was put back
+                LayoutDraft.takeRejectedSubtype()?.let { currentSubtypeString = it }
                 val fresh = LayoutDraft.of(ctx, currentSubtypeString)
                 if (fresh !== draft) { currentSubtypeString = fresh.subtype; draft = fresh; rebuild++ }
             }

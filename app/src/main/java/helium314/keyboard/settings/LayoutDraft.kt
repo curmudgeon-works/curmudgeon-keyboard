@@ -63,6 +63,7 @@ class LayoutDraft private constructor(
         SubtypeSettings.reloadEnabledSubtypes(ctx)
         KeyboardLayoutSet.onSystemLocaleChanged()
         runCatching { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+        rejectedSubtype = subtype
         discard()
     }
 
@@ -124,6 +125,11 @@ class LayoutDraft private constructor(
         private const val PREFS_FILE = "draft_prefs.json" // written last: its presence means a complete snapshot
 
         private var active: LayoutDraft? = null
+
+        // the keyboard as it was put back by the last undo: the open screen must edit that one again, not the changed
+        // one it still holds (changing a keyboard that isn't in the list any more adds a second one)
+        private var rejectedSubtype: String? = null
+        fun takeRejectedSubtype(): String? = rejectedSubtype.also { rejectedSubtype = null }
 
         /** The running draft for [subtype], or a fresh snapshot. */
         fun of(ctx: Context, subtype: String): LayoutDraft = active ?: start(ctx, subtype).also { active = it }
