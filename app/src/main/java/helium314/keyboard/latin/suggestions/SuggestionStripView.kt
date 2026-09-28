@@ -5,6 +5,7 @@
  */
 package helium314.keyboard.latin.suggestions
 
+import androidx.core.content.edit
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
@@ -123,7 +124,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     private val toolbar: ViewGroup = findViewById(R.id.toolbar)
     private val toolbarContainer: View = findViewById(R.id.toolbar_container)
     // the expanded toolbar replaces the suggestions in their row instead of opening a row above them
-    private val toolbarInRow = context.prefs().getBoolean(Settings.PREF_TOOLBAR_IN_STRIP_ROW, Defaults.PREF_TOOLBAR_IN_STRIP_ROW)
+    private val toolbarInRow = Settings.getValues().mToolbarInRow
     // the emoji view shows the toolbar alone (see setToolbarOnly)
     private var toolbarOnlyShown = false
     private val pinnedKeys: ViewGroup = findViewById(R.id.pinned_keys)
@@ -170,8 +171,8 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         enabledToolKeyBackground.gradientRadius = resources.getDimensionPixelSize(R.dimen.config_suggestions_strip_height) / 2.1f
 
         val mToolbarMode = if (isGone) ToolbarMode.HIDDEN else Settings.getValues().mToolbarMode
-        if (mToolbarMode == ToolbarMode.TOOLBAR_KEYS) {
-            setToolbarVisibility(true)
+        if (mToolbarMode == ToolbarMode.TOOLBAR_KEYS || (mToolbarMode == ToolbarMode.EXPANDABLE && Settings.getValues().mToolbarAlwaysOpen)) {
+            setToolbarVisibility(true) // (always visible: with suggestions on it sits above them, without an arrow)
         } else if (mToolbarMode == ToolbarMode.EXPANDABLE && toolbarVisibleAfterReload) {
             setToolbarVisibility(true) // the strip was rebuilt (a theme change): the toolbar stays as it was
         }
@@ -253,7 +254,8 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     fun setToolbarVisibility(toolbarVisible: Boolean) {
         // avoid showing toolbar keys when locked
         val locked = isDeviceLocked(context)
-        val show = !locked && toolbarVisible
+        // always visible (Toolbar visibility): nothing closes it, except the emoji view putting everything back
+        val show = !locked && (toolbarVisible || (Settings.getValues().mToolbarAlwaysOpen && !toolbarOnlyShown))
         if (toolbarInRow) {
             // in the suggestions' row: the toolbar takes their place while open
             toolbarContainer.isVisible = show
@@ -661,7 +663,20 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
                 "none" -> { /* hidden below */ }
                 else -> toolbarExpandKey.setImageDrawable(toolbarArrowIcon)
             }
-            toolbarExpandKey.isVisible = (expandIconChoice != "none") && toolbarIsExpandable
+            toolbarExpandKey.isVisible = (expandIconChoice != "none") && toolbarIsExpandable && !settingsValues.mToolbarAlwaysOpen
+        }
+        // opened from the top-left key (suggestions off): the arrow, pointing down, closes it again
+        if (settingsValues.mToolbarOpenedByKey) {
+            toolbarExpandKey.setImageDrawable(toolbarArrowIcon)
+            toolbarExpandKey.isVisible = true
+            setExpandKeyDirection(true)
+            toolbarExpandKey.setOnClickListener {
+                context.prefs().edit { putBoolean(Settings.PREF_TOOLBAR_OPENED_BY_KEY, false) }
+                KeyboardSwitcher.getInstance().setThemeNeedsReload()
+            }
+            pinnedKeys.visibility = GONE
+            isExternalSuggestionVisible = false
+            return
         }
 
         // hide pinned keys if device is locked, and avoid expanding toolbar

@@ -55,7 +55,8 @@ fun TextCorrectionScreen(
     if ((b?.value ?: 0) < 0)
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
     val autocorrectEnabled = prefs.getBoolean(Settings.PREF_AUTO_CORRECTION, Defaults.PREF_AUTO_CORRECTION)
-    val suggestionsVisible = Settings.readToolbarMode(prefs).let { it == ToolbarMode.SUGGESTION_STRIP || it == ToolbarMode.EXPANDABLE }
+    // Show suggestions is the one switch for suggestions (the toolbar's visibility no longer hides this row)
+    val suggestionsVisible = true
     val suggestionsEnabled = suggestionsVisible && prefs.getBoolean(Settings.PREF_SHOW_SUGGESTIONS, Defaults.PREF_SHOW_SUGGESTIONS)
     val gestureEnabled = prefs.getBoolean(Settings.PREF_GESTURE_INPUT, Defaults.PREF_GESTURE_INPUT)
     val items = listOf(
@@ -183,7 +184,11 @@ fun createCorrectionSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_SHOW_SUGGESTIONS,
         R.string.prefs_show_suggestions, R.string.prefs_show_suggestions_summary
     ) {
-        SwitchPreference(it, Defaults.PREF_SHOW_SUGGESTIONS)
+        SwitchPreference(it, Defaults.PREF_SHOW_SUGGESTIONS) {
+            // the row above the keys changes with it (and, toolbar opening from a key, the top-left key's popup)
+            helium314.keyboard.keyboard.KeyboardLayoutSet.onSystemLocaleChanged()
+            helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().setThemeNeedsReload()
+        }
     },
     Setting(context, Settings.PREF_ALWAYS_SHOW_SUGGESTIONS,
         R.string.prefs_always_show_suggestions, R.string.prefs_always_show_suggestions_summary

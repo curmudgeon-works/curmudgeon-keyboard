@@ -130,6 +130,10 @@ public class SettingsValues {
     public final float mBottomPaddingScale;
     public final float mSidePaddingScale;
     public final ToolbarMode mToolbarMode;
+    public final boolean mToolbarAlwaysOpen; // suggestions on, toolbar always visible: open above them, no arrow
+    public final boolean mToolbarInRow; // the toolbar opens in place of the suggestions
+    public final boolean mToolbarFromKey; // suggestions off: the top-left key's long-press opens the toolbar
+    public final boolean mToolbarOpenedByKey;
     public final boolean mToolbarSwipeDownToHide;
     public final boolean mToolbarHidingGlobal;
     public final boolean mAutoShowToolbar;
@@ -201,6 +205,11 @@ public class SettingsValues {
 
         // Get the settings preferences
         mToolbarMode = Settings.readToolbarMode(prefs);
+        final String toolbarVisibility = Settings.readToolbarVisibility(prefs);
+        mToolbarAlwaysOpen = mToolbarMode == ToolbarMode.EXPANDABLE && toolbarVisibility.equals(Settings.TOOLBAR_ALWAYS);
+        mToolbarInRow = mToolbarMode == ToolbarMode.EXPANDABLE && toolbarVisibility.equals(Settings.TOOLBAR_IN_PLACE);
+        mToolbarFromKey = Settings.isToolbarFromKey(prefs);
+        mToolbarOpenedByKey = mToolbarFromKey && prefs.getBoolean(Settings.PREF_TOOLBAR_OPENED_BY_KEY, false);
         mToolbarSwipeDownToHide = prefs.getBoolean(Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE, Defaults.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE);
         mToolbarHidingGlobal = prefs.getBoolean(Settings.PREF_TOOLBAR_HIDING_GLOBAL, Defaults.PREF_TOOLBAR_HIDING_GLOBAL);
         mAutoCap = prefs.getBoolean(Settings.PREF_AUTO_CAP, Defaults.PREF_AUTO_CAP) && ScriptUtils.scriptSupportsUppercase(mLocale);

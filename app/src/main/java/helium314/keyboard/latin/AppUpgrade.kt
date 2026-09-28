@@ -60,6 +60,15 @@ fun checkVersionUpgrade(context: Context) {
 /** Our own settings changes: each checks its own state, so running them on every start is cheap and safe
  *  (MIGRATION_VERSION stays at upstream's, so onUpgrade doesn't run for them). */
 private fun curmudgeonUpgrades(prefs: SharedPreferences, freshInstall: Boolean) {
+    // 0.1.004: toolbar mode → Toolbar visibility + Show suggestions (the only suggestions switch)
+    if (!prefs.contains(Settings.PREF_TOOLBAR_VISIBILITY) && prefs.contains(Settings.PREF_TOOLBAR_MODE)) {
+        val old = prefs.getString(Settings.PREF_TOOLBAR_MODE, null)
+        prefs.edit {
+            putString(Settings.PREF_TOOLBAR_VISIBILITY, Settings.readToolbarVisibility(prefs))
+            // these showed no suggestions: they stay without them
+            if (old == "TOOLBAR_KEYS" || old == "HIDDEN") putBoolean(Settings.PREF_SHOW_SUGGESTIONS, false)
+        }
+    }
     // 0.1.004: key-press vibration and sound became on by default; installs from before keep what they had
     if (!prefs.getBoolean("defaults_feedback_on_done", false)) {
         prefs.edit {

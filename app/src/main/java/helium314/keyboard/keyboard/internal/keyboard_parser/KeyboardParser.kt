@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.keyboard.internal.keyboard_parser
 
+import helium314.keyboard.keyboard.internal.KeyboardIconsSet
 import android.content.Context
 import android.content.res.Configuration
 import helium314.keyboard.latin.utils.Log
@@ -113,6 +114,14 @@ class KeyboardParser(private val params: KeyboardParams, private val context: Co
             val newLabelFlags = defaultLabelFlags or
                     if (Settings.getValues().mShowNumberRowHints) 0 else Key.LABEL_FLAGS_DISABLE_HINT_LABEL
             baseKeys.add(0, numberRow.mapTo(mutableListOf()) { it.copy(newLabelFlags = newLabelFlags) })
+        }
+
+        // suggestions off, toolbar opening from a key: the top-left key's long-press ends with the toolbar arrow
+        if (params.mId.isAlphabetKeyboard && Settings.getValues().mToolbarFromKey) {
+            val row = baseKeys.firstOrNull()
+            val i = row?.indexOfFirst { it.type == null || it.type == KeyType.CHARACTER } ?: -1
+            if (row != null && i >= 0)
+                row[i] = row[i].copy(newPopup = row[i].popup.merge(SimplePopups(listOf("!icon/${KeyboardIconsSet.NAME_TOOLBAR_KEY}|!code/${KeyCode.TOGGLE_TOOLBAR}"))))
         }
 
         val allFunctionalKeys = LayoutParser.parseLayout(LayoutType.FUNCTIONAL, params, context)

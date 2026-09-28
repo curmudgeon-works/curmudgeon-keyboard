@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.screens
 
+import androidx.core.content.edit
+import helium314.keyboard.keyboard.KeyboardLayoutSet
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.material3.Surface
@@ -57,7 +59,7 @@ fun toolbarItems(prefs: SharedPreferences): List<String?> {
     val clipboardToolbarVisible = toolbarMode != ToolbarMode.HIDDEN
         || !prefs.getBoolean(Settings.PREF_TOOLBAR_HIDING_GLOBAL, Defaults.PREF_TOOLBAR_HIDING_GLOBAL)
     return listOf(
-        Settings.PREF_TOOLBAR_MODE,
+        Settings.PREF_TOOLBAR_VISIBILITY, // (with Text correction's Show suggestions: what the row above the keys shows)
         if (toolbarMode == ToolbarMode.HIDDEN) Settings.PREF_TOOLBAR_HIDING_GLOBAL else null,
         if (toolbarMode != ToolbarMode.HIDDEN) Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE else null,
         when (toolbarMode) {
@@ -76,8 +78,6 @@ fun toolbarItems(prefs: SharedPreferences): List<String?> {
         if (toolbarMode != ToolbarMode.HIDDEN) Settings.PREF_VARIABLE_TOOLBAR_DIRECTION else null,
         // the button that opens and closes the toolbar (moved here from the Suggestion strip font dialog)
         if (toolbarMode == ToolbarMode.EXPANDABLE) Settings.PREF_TOOLBAR_EXPAND_ICON else null,
-        // where it opens: in a row above the suggestions (default) or in their place
-        if (toolbarMode == ToolbarMode.EXPANDABLE) Settings.PREF_TOOLBAR_IN_STRIP_ROW else null,
     )
 }
 
@@ -87,12 +87,33 @@ val toolbarKeys = listOf(
     Settings.PREF_TOOLBAR_KEYS, Settings.PREF_PINNED_TOOLBAR_KEYS, Settings.PREF_CLIPBOARD_TOOLBAR_KEYS,
     Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES, Settings.PREF_QUICK_PIN_TOOLBAR_KEYS, Settings.PREF_AUTO_SHOW_TOOLBAR,
     Settings.PREF_AUTO_HIDE_TOOLBAR, Settings.PREF_VARIABLE_TOOLBAR_DIRECTION, Settings.PREF_TOOLBAR_EXPAND_ICON,
-    Settings.PREF_TOOLBAR_IN_STRIP_ROW,
+    Settings.PREF_TOOLBAR_VISIBILITY, Settings.PREF_TOOLBAR_OPENED_BY_KEY,
 )
 
 fun createToolbarSettings(context: Context) = listOf(
-    Setting(context, Settings.PREF_TOOLBAR_IN_STRIP_ROW, R.string.toolbar_in_strip_row) {
-        SwitchPreference(it, Defaults.PREF_TOOLBAR_IN_STRIP_ROW) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+    Setting(context, Settings.PREF_TOOLBAR_VISIBILITY, R.string.toolbar_visibility) {
+        // with suggestions off there is no row for an arrow: the toolbar opens from the top-left key's long-press
+        val suggestions = LocalContext.current.prefs().getBoolean(Settings.PREF_SHOW_SUGGESTIONS, Defaults.PREF_SHOW_SUGGESTIONS)
+        val items = if (suggestions) listOf(
+            stringResource(R.string.toolbar_visibility_always) to Settings.TOOLBAR_ALWAYS,
+            stringResource(R.string.toolbar_visibility_above) to Settings.TOOLBAR_ABOVE,
+            stringResource(R.string.toolbar_visibility_in_place) to Settings.TOOLBAR_IN_PLACE,
+            stringResource(R.string.toolbar_visibility_hidden) to Settings.TOOLBAR_HIDDEN,
+        ) else listOf(
+            stringResource(R.string.toolbar_visibility_always) to Settings.TOOLBAR_ALWAYS,
+            stringResource(R.string.toolbar_visibility_from_key) to Settings.TOOLBAR_FROM_KEY,
+            stringResource(R.string.toolbar_visibility_hidden) to Settings.TOOLBAR_HIDDEN,
+        )
+        // shown as what applies: "above" / "in place" read as "from the top-left key" while suggestions are off
+        val prefs = LocalContext.current.prefs()
+        val stored = Settings.readToolbarVisibility(prefs)
+        val shown = if (!suggestions && stored != Settings.TOOLBAR_ALWAYS && stored != Settings.TOOLBAR_HIDDEN) Settings.TOOLBAR_FROM_KEY
+            else if (suggestions && stored == Settings.TOOLBAR_FROM_KEY) Settings.TOOLBAR_ABOVE else stored
+        if (shown != prefs.getString(Settings.PREF_TOOLBAR_VISIBILITY, null)) prefs.edit { putString(Settings.PREF_TOOLBAR_VISIBILITY, shown) }
+        ListPreference(it, items, shown) {
+            KeyboardLayoutSet.onSystemLocaleChanged() // (the top-left key's popup comes and goes)
+            KeyboardSwitcher.getInstance().setThemeNeedsReload()
+        }
     },
     Setting(context, Settings.PREF_TOOLBAR_EXPAND_ICON, R.string.toolbar_button) {
         ListPreference(it, listOf(
@@ -101,18 +122,6 @@ fun createToolbarSettings(context: Context) = listOf(
             stringResource(R.string.pref_toolbar_expand_icon_settings) to "settings",
             stringResource(R.string.pref_toolbar_expand_icon_none) to "none",
         ), Defaults.PREF_TOOLBAR_EXPAND_ICON) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
-    },
-    Setting(context, Settings.PREF_TOOLBAR_MODE, R.string.toolbar_mode) { setting ->
-        val ctx = LocalContext.current
-        val items =
-            ToolbarMode.entries.map { it.name.lowercase().getStringResourceOrName("toolbar_mode_", ctx) to it.name }
-        ListPreference(
-            setting,
-            items,
-            Defaults.PREF_TOOLBAR_MODE
-        ) {
-            KeyboardSwitcher.getInstance().setThemeNeedsReload()
-        }
     },
     Setting(context, Settings.PREF_TOOLBAR_HIDING_GLOBAL, R.string.toolbar_hiding_global) {
         SwitchPreference(it, Defaults.PREF_TOOLBAR_HIDING_GLOBAL) {
