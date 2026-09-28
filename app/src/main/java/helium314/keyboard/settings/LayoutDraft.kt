@@ -86,6 +86,7 @@ class LayoutDraft private constructor(
             Settings.PREF_DELETE_SWIPE, Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT,
             Settings.PREF_ENABLE_CLIPBOARD_HISTORY, Settings.PREF_CLIPBOARD_HISTORY_SIZE,
             Settings.PREF_KEY_LONGPRESS_TIMEOUT, Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, Settings.PREF_SPACE_TO_CHANGE_LANG,
+            Settings.PREF_CUSTOM_CURRENCY_KEY,
             // layout
             Settings.PREF_SHOW_NUMBER_ROW, Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS,
             Settings.PREF_ENABLE_SPLIT_KEYBOARD, Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE,

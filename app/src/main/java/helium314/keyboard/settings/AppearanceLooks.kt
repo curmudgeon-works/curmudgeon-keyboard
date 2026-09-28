@@ -26,6 +26,7 @@ import org.json.JSONObject
  */
 object AppearanceLooks {
     const val PREF = "appearance_looks"
+    const val PREF_SELECTED = "appearance_look_selected" // the theme last chosen (its name), for the Themes row
 
     class Look(val name: String, val values: Map<String, Any?>)
 
@@ -52,6 +53,7 @@ object AppearanceLooks {
     private val screenOnlyKeys = setOf(
         Settings.PREF_SPACE_BAR_TEXT, Settings.PREF_SHOW_NUMBER_ROW_HINTS, Settings.PREF_SHOW_HINTS, Settings.PREF_SHOW_POPUP_HINTS,
         Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT, Settings.PREF_EMOJI_SKIN_TONE, Settings.PREF_SHOW_EMOJI_DESCRIPTIONS,
+        PREF_SELECTED, // Discard puts the chosen theme back too
     )
     fun onScreen(key: String) = inScope(key) || key in screenOnlyKeys
 
@@ -95,6 +97,16 @@ object AppearanceLooks {
             if (saved?.exists() == true) saved.copyTo(live, overwrite = true) else live.delete()
         }
         reload(ctx)
+    }
+
+    /** Whether what [look] sets differs from what is set now (a value, or the background pictures). */
+    fun isTweaked(ctx: Context, look: Look): Boolean {
+        val now = ctx.prefs().all
+        if (look.values.any { (key, value) -> inScope(key) && !KnownDefaults.same(key, now[key], value) }) return true
+        val id = look.values[PICTURES] as? String ?: return false // saved before pictures were in themes: not compared
+        val saved = if (id == NO_PICTURES) emptyMap() else picturesDir(ctx, id).listFiles()?.associate { it.name to it.length() } ?: emptyMap()
+        val live = livePictures(ctx).filter { it.exists() }.associate { it.name to it.length() }
+        return saved != live
     }
 
     fun deletePictures(ctx: Context, look: Look) {
