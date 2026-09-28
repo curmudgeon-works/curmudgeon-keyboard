@@ -720,6 +720,13 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         fun rememberToolbarForReload() {
             toolbarVisibleAfterReload = current?.toolbarContainer?.isVisible == true
         }
+        /** The settings' preview (toolbar keys dialog): the toolbar opens on the live keyboard, or closes again. */
+        @JvmStatic
+        fun showToolbarForPreview(show: Boolean) {
+            val strip = current ?: return
+            if (Settings.getValues().mToolbarMode == ToolbarMode.EXPANDABLE && !Settings.getValues().mToolbarAlwaysOpen)
+                strip.setToolbarVisibility(show)
+        }
         private const val DEBUG_INFO_TEXT_SIZE_IN_DIP = 6.5f
         private val TAG = SuggestionStripView::class.java.simpleName
     }
