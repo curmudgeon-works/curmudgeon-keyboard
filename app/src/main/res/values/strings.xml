@@ -1095,7 +1095,7 @@ New dictionary:
     <string name="about_rate_summary">A review helps other people find it</string>
     <string name="about_share">Share Curmudgeon Keyboard</string>
     <!-- Text sent when sharing the app; %s is the Play Store link -->
-    <string name="about_share_text">Curmudgeon Keyboard: a privacy keyboard with swipe typing, no ads and no internet access. Open source. %s</string>
+    <string name="about_share_text">Curmudgeon Keyboard: careful swipe typing, and a keyboard you can change down to every key. Open source, no ads. %s</string>
     <!-- link to the wiki for about screen -->
     <string name="about_wiki_link">Go to Wiki</string>
     <!-- description for wiki link -->
