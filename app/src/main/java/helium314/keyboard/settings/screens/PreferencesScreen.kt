@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.screens
 
+import helium314.keyboard.latin.utils.realPrefs
+import helium314.keyboard.latin.settings.KeyboardProfiles
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -131,7 +133,10 @@ fun createPreferencesSettings(context: Context) = listOf(
         SwitchPreference(it, Defaults.PREF_BACKSPACE_DELETES_SWIPED_WORD)
     },
     Setting(context, Settings.PREF_SAVE_SUBTYPE_PER_APP, R.string.save_subtype_per_app) {
-        SwitchPreference(it, Defaults.PREF_SAVE_SUBTYPE_PER_APP)
+        // with separate settings per keyboard, say this one isn't (with shared settings everything is shared anyway)
+        val separate = KeyboardProfiles.isSeparate(LocalContext.current.realPrefs())
+        SwitchPreference(it.title, key = it.key, default = Defaults.PREF_SAVE_SUBTYPE_PER_APP,
+            description = if (separate) stringResource(R.string.setting_shared_by_keyboards) else null)
     },
     // the three under Appearance's "Hide symbols on keys", a little in
     Setting(context, Settings.PREF_SHOW_HINTS, R.string.hints_other_keys) {

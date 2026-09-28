@@ -468,6 +468,7 @@
     <string name="number_row_hints">Hide symbols on the number row</string>
     <!-- Title and description of the setting to show long-press hints on the letter keys -->
     <!-- Title of the setting to save subtype per app -->
+    <string name="setting_shared_by_keyboards">Shared by all keyboards</string>
     <string name="save_subtype_per_app">Remember keyboard per app</string>
     <!-- Title of the setting to show key hints -->
     <string name="show_hints">Hide symbols on keys</string>
@@ -637,7 +638,7 @@
     <!-- a font file just loaded in the dialog, kept only on OK -->
     <string name="text_font_new">%s (new)</string>
     <string name="text_font_follows_key_text">Following the key font</string>
-    <string name="font_follows_key_text">Use key font for symbols and suggestions</string>
+    <string name="font_follows_key_text">Use same font for symbols and suggestions</string>
     <string name="key_text_bold">Bold</string>
     <string name="key_text_italic">Italic</string>
     <string name="key_text_underline">Underlined</string>
@@ -964,7 +965,8 @@ New dictionary:
     <!-- Option for choosing colors -->
     <string name="theme_colors">Colors</string>
     <!-- Option for choosing colors for night mode -->
-    <string name="theme_colors_night">Colors (night)</string>
+    <string name="theme_colors_night">Colors (dark)</string>
+    <string name="theme_colors_light">Colors (light)</string>
     <!-- Option for choosing whether we use a theme that provides borders to keys -->
     <string name="key_borders">Key borders</string>
     <!-- Option for choosing auto day/night theme switch -->
