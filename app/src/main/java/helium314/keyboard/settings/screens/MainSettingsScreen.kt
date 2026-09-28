@@ -131,5 +131,13 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
         onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Advanced) },
         icon = R.drawable.ic_settings_advanced
     ) { NextScreenIcon() }
+    // the settings few need (advanced only)
+    if (advanced) AdvancedTint {
+        Preference(
+            name = stringResource(R.string.settings_screen_others),
+            onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Others) },
+            icon = R.drawable.ic_settings_default
+        ) { NextScreenIcon() }
+    }
     }
 }

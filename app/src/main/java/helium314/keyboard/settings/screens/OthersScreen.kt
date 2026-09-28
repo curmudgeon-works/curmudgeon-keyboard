@@ -1,0 +1,41 @@
+// SPDX-License-Identifier: GPL-3.0-only
+package helium314.keyboard.settings.screens
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import helium314.keyboard.latin.R
+import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.utils.Log
+import helium314.keyboard.latin.utils.ToolbarMode
+import helium314.keyboard.latin.utils.getActivity
+import helium314.keyboard.latin.utils.prefs
+import helium314.keyboard.settings.SearchSettingsScreen
+import helium314.keyboard.settings.SettingsActivity
+
+/**
+ * Settings few people need, kept out of the way (advanced only): the toolbar opening and closing by itself and
+ * pinning a toolbar key by long-press (only for a toolbar that opens with the arrow), the emoji key of a physical
+ * keyboard, the timestamp key's format.
+ */
+@Composable
+fun OthersScreen(onClickBack: () -> Unit) {
+    val prefs = LocalContext.current.prefs()
+    val b = (LocalContext.current.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
+    if ((b?.value ?: 0) < 0) Log.v("irrelevant", "recompose on preference change")
+    val expandable = Settings.readToolbarMode(prefs) == ToolbarMode.EXPANDABLE
+    val items = listOf(
+        if (expandable) Settings.PREF_AUTO_SHOW_TOOLBAR else null,
+        if (expandable) Settings.PREF_AUTO_HIDE_TOOLBAR else null,
+        if (expandable) Settings.PREF_QUICK_PIN_TOOLBAR_KEYS else null,
+        Settings.PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY,
+        Settings.PREF_TIMESTAMP_FORMAT,
+    )
+    SearchSettingsScreen(
+        onClickBack = onClickBack,
+        title = stringResource(R.string.settings_screen_others),
+        settings = items,
+        simpleModeKeys = emptySet(), // advanced-only screen
+    )
+}

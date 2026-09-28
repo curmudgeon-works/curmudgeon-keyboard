@@ -67,9 +67,7 @@ fun toolbarItems(prefs: SharedPreferences): List<String?> {
         // the main, clipboard and pinned toolbars' keys in one list (M / C / P on each key)
         SettingsWithoutKey.TOOLBAR_KEYS_ALL,
         if (clipboardToolbarVisible) Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES else null,
-        if (toolbarMode == ToolbarMode.EXPANDABLE) Settings.PREF_QUICK_PIN_TOOLBAR_KEYS else null,
-        if (toolbarMode == ToolbarMode.EXPANDABLE) Settings.PREF_AUTO_SHOW_TOOLBAR else null,
-        if (toolbarMode == ToolbarMode.EXPANDABLE) Settings.PREF_AUTO_HIDE_TOOLBAR else null,
+        // (auto show / auto hide and pinning by long-press: on Others)
         if (toolbarMode != ToolbarMode.HIDDEN) Settings.PREF_VARIABLE_TOOLBAR_DIRECTION else null,
         // the button that opens and closes the toolbar (moved here from the Suggestion strip font dialog)
         if (toolbarMode == ToolbarMode.EXPANDABLE) Settings.PREF_TOOLBAR_EXPAND_ICON else null,
