@@ -392,10 +392,6 @@ fun SubtypeScreen(
                 }
                 // ---- popups: what holding a key offers (every row is advanced, so the group is too)
                 if (advanced) WithBigTitle(stringResource(R.string.key_popups_group)) {
-                    if (advanced) AdvancedBlock {
-                        Pending(keyChanged(Settings.PREF_SHOW_TLD_POPUP_KEYS)) {
-                            PrefSwitchRow(Settings.PREF_SHOW_TLD_POPUP_KEYS, Defaults.PREF_SHOW_TLD_POPUP_KEYS, R.string.show_tld_popup_keys) { holdPreview(); reloadPreview() } }
-                    }
                     // preset popup layouts, customize popups, customize keys and popups with JSON (all advanced);
                     // italic as a whole when any of it changed
                     Pending(keyChanged("key_popups", "key_popup_set_selected", "key_popup_sets", Settings.PREF_SYMBOL_POPUP_MAP)
@@ -403,6 +399,8 @@ fun SubtypeScreen(
                             || layoutChanged(LayoutType.SYMBOLS) || changedFolders.any { it != "main" } || prefixChanged(Settings.PREF_LAYOUT_PREFIX)) {
                         KeyPopupsSection(currentSubtype) { setCurrentSubtype(it) } }
                     if (advanced) AdvancedBlock {
+                        Pending(keyChanged(Settings.PREF_SHOW_TLD_POPUP_KEYS)) {
+                            PrefSwitchRow(Settings.PREF_SHOW_TLD_POPUP_KEYS, Defaults.PREF_SHOW_TLD_POPUP_KEYS, R.string.show_tld_popup_keys) { holdPreview(); reloadPreview() } }
                         Pending(keyChanged(Settings.PREF_REMOVE_REDUNDANT_POPUPS)) {
                             PrefSwitchRow(Settings.PREF_REMOVE_REDUNDANT_POPUPS, Defaults.PREF_REMOVE_REDUNDANT_POPUPS, R.string.remove_redundant_popups) { holdPreview(); reloadPreview() } }
                     }
