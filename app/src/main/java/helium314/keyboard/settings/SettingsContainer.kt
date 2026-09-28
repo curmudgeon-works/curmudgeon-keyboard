@@ -80,4 +80,5 @@ object SettingsWithoutKey {
     const val SUGGESTION_TEXT_STYLE = "suggestion_text_style"
     const val APPEARANCE_LOOKS = "appearance_looks_list"
     const val HIDE_ALL_SYMBOLS = "hide_all_symbols"
+    const val ABC_AFTER = "abc_after"
 }

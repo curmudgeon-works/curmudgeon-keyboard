@@ -1,5 +1,6 @@
 package helium314.keyboard.settings.screens
 
+import helium314.keyboard.settings.SettingsWithoutKey
 import helium314.keyboard.settings.dialogs.UnsavedChangesDialog
 import helium314.keyboard.settings.dialogs.SaveChangesDialog
 import helium314.keyboard.settings.dialogs.DiscardChangesDialog
@@ -413,7 +414,10 @@ fun SubtypeScreen(
                     // (the symbol switches — hide on the number row / other keys, long-press dots — are on Appearance)
                     if (advanced) AdvancedBlock {
                         CompositionLocalProvider(LocalCompactPreferences provides true) {
-                            advancedInputItems.forEach { Pending(keyChanged(it)) { SettingsActivity.settingsContainer[it]?.Preference() } }
+                            advancedInputItems.forEach {
+                                val pending = if (it == SettingsWithoutKey.ABC_AFTER) abcAfterKeys.any { k -> keyChanged(k.first) } else keyChanged(it)
+                                Pending(pending) { SettingsActivity.settingsContainer[it]?.Preference() }
+                            }
                         }
                     }
                 }
@@ -653,7 +657,7 @@ private fun SwitchRow(title: String, checked: Boolean, summary: String? = null, 
 /** Settings whose dialogs keep the preview keyboard up (to hear the key sound or feel the vibration while choosing it). */
 private val soundPreviewItems = setOf(Settings.PREF_KEYPRESS_SOUND, Settings.PREF_KEYPRESS_SOUND_VOLUME, Settings.PREF_VIBRATION_DURATION_SETTINGS)
 
-private val advancedInputItems = listOf(Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, Settings.PREF_SAVE_SUBTYPE_PER_APP) // (emoji descriptions: Appearance, Emoji group)
+private val advancedInputItems = listOf(Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, SettingsWithoutKey.ABC_AFTER, Settings.PREF_SAVE_SUBTYPE_PER_APP) // (emoji descriptions: Appearance, Emoji group)
 
 /** Advanced items on a slightly different background, so toggling the mode shows what it adds (last in the Input
  *  group, in place elsewhere). */
