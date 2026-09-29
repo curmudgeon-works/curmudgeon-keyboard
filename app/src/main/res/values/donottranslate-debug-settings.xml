@@ -20,5 +20,5 @@
     <string name="prefs_dump_dynamic_dicts" translatable="false">Dump dictionary</string>
     <!-- Scorer for the in-tree gesture decoder, only relevant in the lab flavor -->
     <string name="prefs_gesture_decoder_scorer" translatable="false">Gesture decoder scorer</string>
-    <string name="prefs_gesture_decoder_scorer_summary" translatable="false">Scorer used by the in-tree swipe decoder (HeliBoard Lab)</string>
+    <string name="prefs_gesture_decoder_scorer_summary" translatable="false">Scorer used by the in-tree swipe decoder</string>
 </resources>

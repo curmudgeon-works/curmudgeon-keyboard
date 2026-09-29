@@ -95,8 +95,8 @@
     <string name="number_row_summary">Mostrar siempre la fila de números</string>
     <string name="settings_category_additional_keys">Teclas adicionales</string>
     <string name="prefs_long_press_keyboard_to_change_lang">Cambiar método de entrada con la barra espaciadora</string>
-    <string name="spell_checker_service_name">Corrector ortográfico de HeliBoard</string>
-    <string name="android_spell_checker_settings">Ajustes del corrector ortográfico de HeliBoard</string>
+    <string name="spell_checker_service_name">Corrector ortográfico de Curmudgeon Keyboard</string>
+    <string name="android_spell_checker_settings">Ajustes del corrector ortográfico de Curmudgeon Keyboard</string>
     <string name="prefs_keyboard_height_scale">Escala de altura del teclado</string>
     <string name="delete_swipe">Borrar deslizando</string>
     <string name="delete_swipe_summary">Deslice el dedo por la tecla Borrar para seleccionar y eliminar porciones más grandes de texto de una vez</string>
@@ -107,7 +107,7 @@
     <string name="settings_category_correction">Correcciones</string>
     <string name="settings_category_experimental">Experimental</string>
     <string name="settings_category_input">Entrada</string>
-    <string name="ime_settings">Ajustes de HeliBoard</string>
+    <string name="ime_settings">Ajustes de Curmudgeon Keyboard</string>
     <string name="settings_category_suggestions">Sugerencias</string>
     <string name="settings_category_miscellaneous">Otros</string>
     <string name="number_row">Fila de números</string>
