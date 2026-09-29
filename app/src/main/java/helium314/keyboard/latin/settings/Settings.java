@@ -234,6 +234,8 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_UNDO_HISTORY_LENGTH = "undo_history_length";
     public static final String PREF_UNDO_UNIT = "undo_unit";
     public static final String PREF_REDO_UNIT = "redo_unit";
+    public static final String PREF_SUGGESTION_COUNT = "suggestion_count";
+    public static final String PREF_SUGGESTION_RULES = "suggestion_rules";
     public static final String PREF_TOOLBAR_MODE = "toolbar_mode";
     public static final String PREF_TOOLBAR_HIDING_GLOBAL = "toolbar_hiding_global";
     public static final String PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE = "toolbar_swipe_down_to_hide";

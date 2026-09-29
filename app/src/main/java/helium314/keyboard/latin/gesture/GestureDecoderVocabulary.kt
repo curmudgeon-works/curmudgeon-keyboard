@@ -106,6 +106,21 @@ object GestureDecoderVocabulary {
         return vocab
     }
 
+    private const val COMMON_WORDS = 10_000
+    private val common = ConcurrentHashMap<String, Set<String>>()
+
+    /**
+     * The [COMMON_WORDS] most frequent words of [locale]'s main dictionary, lowercase: what the suggestion rules call
+     * common. Null while that word list isn't loaded yet (loading is kicked off).
+     */
+    fun commonWords(locale: Locale): Set<String>? {
+        val key = locale.toLanguageTag()
+        common[key]?.let { return it }
+        val entries = mainEntries[key] ?: run { getOrBuildAsync(locale); return null }
+        return entries.sortedByDescending { it.second }.take(COMMON_WORDS)
+            .mapTo(HashSet(COMMON_WORDS * 2)) { it.first.lowercase(locale) }.also { common[key] = it }
+    }
+
     /** Cached vocabulary for [locale], or null (and an async build is kicked off). */
     fun getOrBuildAsync(locale: Locale): Vocabulary? {
         val key = locale.toLanguageTag()
@@ -133,6 +148,7 @@ object GestureDecoderVocabulary {
      */
     fun clear() {
         cache.clear()
+        common.clear()
         merged.clear()
         mergedSpecs.clear()
     }
@@ -205,6 +221,7 @@ object GestureDecoderVocabulary {
         if (vocab.size > 0) {
             cache[key] = vocab
             this.mainEntries[key] = mainEntries
+            common.remove(key)
             merged.clear() // multilingual vocabularies containing this locale are rebuilt on the next swipe
         }
         return history.size

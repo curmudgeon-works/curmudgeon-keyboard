@@ -34,6 +34,7 @@ fun OthersScreen(onClickBack: () -> Unit) {
         if (Settings.readToolbarMode(prefs) != ToolbarMode.HIDDEN) Settings.PREF_VARIABLE_TOOLBAR_DIRECTION else null,
         Settings.PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY,
         Settings.PREF_TIMESTAMP_FORMAT,
+        Settings.PREF_SUGGESTION_RULES, // Customize suggestions: how many, and rules for the 2nd one on
         Settings.PREF_UNDO_HISTORY_LENGTH, // the keyboard's own undo / redo
         Settings.PREF_UNDO_UNIT,
         Settings.PREF_REDO_UNIT,

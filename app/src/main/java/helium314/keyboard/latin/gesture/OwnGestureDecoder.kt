@@ -45,7 +45,7 @@ import java.util.Locale
  */
 object OwnGestureDecoder {
     private const val TAG = "OwnGestureDecoder"
-    private const val MAX_RESULTS = 10
+    private const val MAX_RESULTS = 10 // at least; more when the user asks for more suggestions (up to 40)
 
     /** The user's inflection weights and scorer blend, read from the (per keyboard) preferences on every swipe. */
     class Tuning(val turn: Float, val slowdown: Float, val kushler: Float, val historyBoost: Int) {
@@ -128,6 +128,7 @@ object OwnGestureDecoder {
         locales: List<Locale>,
         activeScorerPref: String?,
         capsHeight: Float,
+        wanted: Int = 0,
     ): SuggestionResults {
         val results = SuggestionResults(SuggestedWords.MAX_SUGGESTIONS, false, false)
         val locale = locales.first()
@@ -153,7 +154,7 @@ object OwnGestureDecoder {
         }
 
         val start = SystemClock.elapsedRealtime()
-        val all = decoderFor(capsHeight, capsSwipe, tuning).decodeWithScorers(points, geometry, vocabulary, scorers, MAX_RESULTS)
+        val all = decoderFor(capsHeight, capsSwipe, tuning).decodeWithScorers(points, geometry, vocabulary, scorers, wanted.coerceIn(MAX_RESULTS, 40))
         val elapsed = SystemClock.elapsedRealtime() - start
 
         val activeName = if (activeScorerPref != null && all.containsKey(activeScorerPref)) activeScorerPref

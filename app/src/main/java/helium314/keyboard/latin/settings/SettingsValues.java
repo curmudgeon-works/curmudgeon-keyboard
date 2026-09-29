@@ -22,6 +22,7 @@ import helium314.keyboard.compat.ConfigurationCompatKt;
 import helium314.keyboard.keyboard.KeyboardActionListener;
 import helium314.keyboard.keyboard.KeyboardTheme;
 import helium314.keyboard.keyboard.internal.keyboard_parser.LocaleKeyboardInfosKt;
+import helium314.keyboard.latin.SuggestionRules;
 import helium314.keyboard.latin.BuildConfig;
 import helium314.keyboard.latin.InputAttributes;
 import helium314.keyboard.latin.PunctuationSuggestions;
@@ -96,6 +97,8 @@ public class SettingsValues {
     public final int mUndoHistoryLength;
     public final boolean mUndoByCharacter;
     public final boolean mRedoByCharacter;
+    public final int mSuggestionCount; // 0 = automatic
+    public final List<SuggestionRules.Rule> mSuggestionRules;
     public final boolean mClipboardHistoryPinnedFirst;
     public final boolean mOneHandedModeEnabled;
     public final int mOneHandedModeGravity;
@@ -337,6 +340,8 @@ public class SettingsValues {
         mUndoHistoryLength = prefs.getInt(Settings.PREF_UNDO_HISTORY_LENGTH, Defaults.PREF_UNDO_HISTORY_LENGTH);
         mUndoByCharacter = "character".equals(prefs.getString(Settings.PREF_UNDO_UNIT, Defaults.PREF_UNDO_UNIT));
         mRedoByCharacter = "character".equals(prefs.getString(Settings.PREF_REDO_UNIT, Defaults.PREF_REDO_UNIT));
+        mSuggestionCount = prefs.getInt(Settings.PREF_SUGGESTION_COUNT, Defaults.PREF_SUGGESTION_COUNT);
+        mSuggestionRules = SuggestionRules.INSTANCE.parse(prefs.getString(Settings.PREF_SUGGESTION_RULES, Defaults.PREF_SUGGESTION_RULES));
         mClipboardHistoryPinnedFirst = prefs.getBoolean(Settings.PREF_CLIPBOARD_HISTORY_PINNED_FIRST, Defaults.PREF_CLIPBOARD_HISTORY_PINNED_FIRST);
 
         mOneHandedModeEnabled = Settings.readOneHandedModeEnabled(prefs, isLandscape, mIsSplitKeyboardEnabled, isFolded);
