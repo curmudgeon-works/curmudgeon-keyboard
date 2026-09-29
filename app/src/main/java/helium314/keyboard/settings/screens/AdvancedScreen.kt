@@ -214,6 +214,24 @@ fun createAdvancedSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_TIMESTAMP_FORMAT, R.string.timestamp_format_title) { setting ->
         TextInputPreference(setting, Defaults.PREF_TIMESTAMP_FORMAT, stringResource(R.string.timestamp_description)) { checkTimestampFormat(it) }
     },
+    // the keyboard's own undo / redo (EditHistory): how many steps back, and a whole step or one character per press
+    Setting(context, Settings.PREF_UNDO_HISTORY_LENGTH, R.string.undo_history_length) { setting ->
+        SliderPreference(
+            name = setting.title,
+            key = setting.key,
+            default = Defaults.PREF_UNDO_HISTORY_LENGTH,
+            description = { stringResource(R.string.undo_history_length_steps, it.toString()) },
+            range = 1f..100f,
+        )
+    },
+    Setting(context, Settings.PREF_UNDO_UNIT, R.string.undo_unit) {
+        ListPreference(it, listOf(stringResource(R.string.undo_unit_word) to "word",
+            stringResource(R.string.undo_unit_character) to "character"), Defaults.PREF_UNDO_UNIT)
+    },
+    Setting(context, Settings.PREF_REDO_UNIT, R.string.redo_unit) {
+        ListPreference(it, listOf(stringResource(R.string.undo_unit_word) to "word",
+            stringResource(R.string.undo_unit_character) to "character"), Defaults.PREF_REDO_UNIT)
+    },
     Setting(context, SettingsWithoutKey.DEBUG_SETTINGS, R.string.debug_settings_title) {
         Preference(
             name = it.title,

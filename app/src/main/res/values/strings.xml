@@ -320,6 +320,13 @@
     <string name="swipe_tuning_current">Current setting</string>
     <!-- Preferences item for format for timestamp keycode -->
     <string name="timestamp_format_title">Format for timestamp key</string>
+    <!-- The keyboard's own undo / redo (toolbar keys) -->
+    <string name="undo_history_length">How far back undo remembers</string>
+    <string name="undo_history_length_steps">%s steps</string>
+    <string name="undo_unit">Undo removes</string>
+    <string name="redo_unit">Redo restores</string>
+    <string name="undo_unit_word">A whole word</string>
+    <string name="undo_unit_character">One character</string>
     <!-- Message in preferences how to get timestamp key -->
     <string name="timestamp_description">You can add the timestamp key using a custom layout with \'timestamp\' key, or key code -10043</string>
     <!-- Preferences item for choosing secondary language -->

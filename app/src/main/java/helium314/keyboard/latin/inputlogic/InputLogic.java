@@ -51,6 +51,7 @@ import helium314.keyboard.latin.common.SuggestionSpanUtilsKt;
 import helium314.keyboard.latin.define.DebugFlags;
 import helium314.keyboard.latin.settings.Settings;
 import helium314.keyboard.latin.utils.KtxKt;
+import helium314.keyboard.latin.settings.Defaults;
 import helium314.keyboard.latin.settings.SettingsValues;
 import helium314.keyboard.latin.gesture.GestureCorpusRecorder;
 import helium314.keyboard.latin.gesture.GestureStats;
@@ -69,7 +70,6 @@ import helium314.keyboard.latin.utils.TextPlacement;
 import helium314.keyboard.latin.utils.TextRange;
 import helium314.keyboard.latin.utils.TimestampKt;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Locale;
 import java.util.TreeSet;
@@ -108,13 +108,11 @@ public final class InputLogic {
     private final RecapitalizeStatus mRecapitalizeStatus = new RecapitalizeStatus();
 
     private int mDeleteCount;
-    // Text removed by hold-backspace word-deletes. The in-progress burst accumulates in
-    // mBackspaceBurstText; any non-backspace action seals it into mBackspaceBurstHistory
-    // (newest first, capped). Each Undo press re-commits one entry directly, so recovery
-    // works even in fields without ctrl+z support.
-    private final StringBuilder mBackspaceBurstText = new StringBuilder();
-    private final ArrayDeque<String> mBackspaceBurstHistory = new ArrayDeque<>();
-    private static final int MAX_BACKSPACE_BURST_HISTORY = 10;
+    // The keyboard's own undo / redo: snapshots of the text before the cursor where edit steps begin (a word, a
+    // swipe, a paste, a run of backspaces). Undo and redo delete and type at the cursor only, so they work even in
+    // fields without ctrl+z support; with nothing left, they fall back to the app's ctrl+z / ctrl+shift+z.
+    private final EditHistory mEditHistory = new EditHistory(Defaults.PREF_UNDO_HISTORY_LENGTH);
+    private int mLastEditKeyCode; // a run of backspaces is one step
     private long mLastKeyTime;
     // todo: this is not used, so either remove it or do something with it
     public final TreeSet<Long> mCurrentlyPressedHardwareKeys = new TreeSet<>();
@@ -173,10 +171,8 @@ public final class InputLogic {
         mWordComposer.restartCombining(combiningSpec);
         resetComposingState(true /* alsoResetLastComposedWord */);
         mDeleteCount = 0;
-        // New editor: recovery positions are meaningless and deleted text must not leak
-        // into another field, so drop the whole history.
-        mBackspaceBurstText.setLength(0);
-        mBackspaceBurstHistory.clear();
+        // New editor: its text has nothing to do with the old history, and deleted text must not leak into it.
+        mEditHistory.clear();
         mSpaceState = SpaceState.NONE;
         mRecapitalizeStatus.disable(); // Do not perform recapitalize until the cursor is moved once
         mCurrentlyPressedHardwareKeys.clear();
@@ -240,15 +236,21 @@ public final class InputLogic {
      * @param event the input event containing the data.
      * @return the complete transaction object
      */
-    // Moves the in-progress hold-backspace burst into the history, evicting the oldest
-    // entry beyond the cap. No-op if nothing is accumulating.
-    private void sealBackspaceBurst() {
-        if (mBackspaceBurstText.length() == 0) return;
-        mBackspaceBurstHistory.addFirst(mBackspaceBurstText.toString());
-        mBackspaceBurstText.setLength(0);
-        while (mBackspaceBurstHistory.size() > MAX_BACKSPACE_BURST_HISTORY) {
-            mBackspaceBurstHistory.removeLast();
-        }
+    // The text just before the cursor, for the keyboard's own undo / redo; null if the cursor position isn't known
+    // or text is selected.
+    @Nullable
+    private EditHistory.State currentEditState() {
+        final int cursor = mConnection.getExpectedSelectionStart();
+        if (cursor < 0 || mConnection.hasSelection()) return null;
+        final CharSequence before = mConnection.getTextBeforeCursor(EditHistory.WINDOW, 0);
+        if (before == null) return null;
+        return new EditHistory.State(cursor, before.toString());
+    }
+
+    // An edit step begins: remember the text as it is now.
+    private void editStepStart() {
+        final EditHistory.State state = currentEditState();
+        if (state != null) mEditHistory.onStepStart(state);
     }
 
     public InputTransaction onTextInput(final SettingsValues settingsValues, final Event event,
@@ -257,7 +259,8 @@ public final class InputLogic {
         final InputTransaction inputTransaction = new InputTransaction(settingsValues, event,
                 SystemClock.uptimeMillis(), mSpaceState,
                 getActualCapsMode(settingsValues, keyboardShiftMode));
-        sealBackspaceBurst();
+        editStepStart(); // pasted or multi-character text is a step of its own
+        mLastEditKeyCode = 0;
         mConnection.beginBatchEdit();
         if (mWordComposer.isComposingWord()) {
             if (mWordComposer.isCursorFrontOrMiddleOfComposingWord()) {
@@ -302,6 +305,7 @@ public final class InputLogic {
     public InputTransaction onPickSuggestionManually(final SettingsValues settingsValues,
             final SuggestedWordInfo suggestionInfo, final int keyboardShiftState,
             final String currentKeyboardScript, final LatinIME.UIHandler handler) {
+        mEditHistory.onOtherInput(); // picking a word replaces the one being typed: same step, but no more redo
         if (isInlineEmojiSearchAction()) {
             deleteTextReplacedByEmoji();
         }
@@ -402,9 +406,9 @@ public final class InputLogic {
         // We set this to NONE because after a cursor move, we don't want the space
         // state-related special processing to kick in.
         mSpaceState = SpaceState.NONE;
-        // A genuine cursor move means the in-progress burst would restore at the wrong
-        // position; seal it so it stays reachable through the history.
-        sealBackspaceBurst();
+        // A genuine cursor move: the snapshots no longer describe the text at the cursor.
+        mEditHistory.clear();
+        mLastEditKeyCode = 0;
 
         final boolean selectionChangedOrSafeToReset =
                 oldSelStart != newSelStart || oldSelEnd != newSelEnd // selection changed
@@ -495,12 +499,20 @@ public final class InputLogic {
                 || inputTransaction.getTimestamp() > mLastKeyTime + Constants.LONG_PRESS_MILLISECONDS) {
             mDeleteCount = 0;
         }
-        // Any action besides backspace, undo, or a shift-state change ends the current
-        // hold-backspace burst; seal it into the recovery history.
-        final int burstKeyCode = processedEvent.getKeyCode();
-        if (burstKeyCode != KeyCode.DELETE && burstKeyCode != KeyCode.UNDO
-                && burstKeyCode != KeyCode.SHIFT && burstKeyCode != KeyCode.CAPS_LOCK) {
-            sealBackspaceBurst();
+        // Undo / redo steps: a word starts (also right after a swipe), a run of backspaces starts, or any other
+        // editing key. Undo, redo and keys that only switch layouts or shift don't touch the history.
+        final int editKeyCode = processedEvent.getKeyCode();
+        if (editKeyCode != KeyCode.UNDO && editKeyCode != KeyCode.REDO && editKeyCode != KeyCode.SHIFT
+                && editKeyCode != KeyCode.CAPS_LOCK && editKeyCode != KeyCode.SYMBOL_ALPHA
+                && editKeyCode != KeyCode.ALPHA && editKeyCode != KeyCode.SYMBOL) {
+            final boolean stepStarts;
+            if (editKeyCode == KeyCode.DELETE) stepStarts = mLastEditKeyCode != KeyCode.DELETE;
+            else if (processedEvent.isFunctionalKeyEvent()) stepStarts = true;
+            else stepStarts = settingsValues.isWordCodePoint(processedEvent.getCodePoint())
+                    && (!mWordComposer.isComposingWord() || mWordComposer.isBatchMode());
+            if (stepStarts) editStepStart();
+            else mEditHistory.onOtherInput();
+            mLastEditKeyCode = editKeyCode;
         }
         mLastKeyTime = inputTransaction.getTimestamp();
         mConnection.beginBatchEdit();
@@ -554,7 +566,8 @@ public final class InputLogic {
     public void onStartBatchInput(final SettingsValues settingsValues,
             final KeyboardSwitcher keyboardSwitcher, final LatinIME.UIHandler handler) {
         mWordBeingCorrectedByCursor = null;
-        sealBackspaceBurst();
+        editStepStart(); // each swipe is a step
+        mLastEditKeyCode = 0;
         mInputLogicHandler.onStartBatchInput();
         handler.showGesturePreviewAndSetSuggestions(SuggestedWords.getEmptyBatchInstance(), false);
         handler.cancelUpdateSuggestionStrip();
@@ -846,27 +859,30 @@ public final class InputLogic {
                 }
                 break;
             case KeyCode.UNDO:
-                sealBackspaceBurst();
-                if (!mBackspaceBurstHistory.isEmpty()) {
-                    // Restore what hold-backspace removed, one burst per press, newest first.
-                    // Committing directly works in any field, unlike ctrl+z which needs
-                    // app-side undo support.
-                    final String restoreText = mBackspaceBurstHistory.removeFirst();
-                    if (mWordComposer.isComposingWord()) {
-                        // Suggestions may have resumed composing on the word before the cursor;
-                        // finish it so commitText appends instead of replacing the composition.
-                        commitTyped(inputTransaction.getSettingsValues(), LastComposedWord.NOT_A_SEPARATOR);
-                    }
-                    mConnection.commitText(restoreText, 1);
+            case KeyCode.REDO: {
+                final boolean isUndo = event.getKeyCode() == KeyCode.UNDO;
+                final SettingsValues sv = inputTransaction.getSettingsValues();
+                if (mWordComposer.isComposingWord()) {
+                    // Suggestions may have resumed composing on the word before the cursor; finish it so the edit
+                    // below deletes and types plain text instead of replacing the composition.
+                    commitTyped(sv, LastComposedWord.NOT_A_SEPARATOR);
+                }
+                mEditHistory.setMaxSteps(sv.mUndoHistoryLength);
+                final EditHistory.State live = currentEditState();
+                final EditHistory.Edit edit = live == null ? null
+                        : isUndo ? mEditHistory.undo(live, sv.mUndoByCharacter) : mEditHistory.redo(live, sv.mRedoByCharacter);
+                if (edit != null) {
+                    if (edit.getDelete() > 0) mConnection.deleteTextBeforeCursor(edit.getDelete());
+                    if (!edit.getInsert().isEmpty()) mConnection.commitText(edit.getInsert(), 1);
                     inputTransaction.setDidAffectContents();
                     inputTransaction.setRequiresUpdateSuggestions();
                 } else {
-                    sendDownUpKeyEventWithMetaState(KeyEvent.KEYCODE_Z, KeyEvent.META_CTRL_ON);
+                    // nothing (left) in the keyboard's history: the app's own undo / redo
+                    sendDownUpKeyEventWithMetaState(KeyEvent.KEYCODE_Z,
+                            isUndo ? KeyEvent.META_CTRL_ON : KeyEvent.META_CTRL_ON | KeyEvent.META_SHIFT_ON);
                 }
                 break;
-            case KeyCode.REDO:
-                sendDownUpKeyEventWithMetaState(KeyEvent.KEYCODE_Z, KeyEvent.META_CTRL_ON | KeyEvent.META_SHIFT_ON);
-                break;
+            }
             case KeyCode.SPLIT_LAYOUT:
                 KeyboardSwitcher.getInstance().toggleSplitKeyboardMode();
                 break;
@@ -1335,7 +1351,6 @@ public final class InputLogic {
                     unlearnWord(word, settingsValues, Constants.EVENT_BACKSPACE);
                     mWordComposer.reset();
                     mConnection.commitText("", 1);
-                    mBackspaceBurstText.insert(0, word);
                     inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_LATER);
                     inputTransaction.setRequiresUpdateSuggestions();
                     StatsUtils.onBackspaceWordDelete(word.length());
@@ -1345,9 +1360,7 @@ public final class InputLogic {
                 final int wordLength = computeWordLengthBeforeCursor(settingsValues.mSpacingAndPunctuations);
                 if (wordLength > 0) {
                     unlearnWordBeingDeleted(settingsValues, currentKeyboardScript);
-                    final CharSequence deletedText = mConnection.getTextBeforeCursor(wordLength, 0);
                     mConnection.deleteTextBeforeCursor(wordLength);
-                    if (deletedText != null) mBackspaceBurstText.insert(0, deletedText);
                     inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_LATER);
                     inputTransaction.setRequiresUpdateSuggestions();
                     StatsUtils.onBackspaceWordDelete(wordLength);
