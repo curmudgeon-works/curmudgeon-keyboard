@@ -15,10 +15,8 @@ decompiled proprietary code:
 - **US 7,453,439** (continuation-in-part) — speed-adaptive matching, inflection-point
   classification, penalty system, language-model ranking, word picking by first and
   last letter. **Lapsed 2020-11-18** (maintenance fee not paid).
-- **SHARK² paper** (Kristensson & Zhai, UIST 2004) — its **location channel only**
-  (the whole path against the word's ideal path in keyboard coordinates). The
-  paper's shape channel and its fusion of shape with location are not used (since
-  0.2.000, 2026-09-28).
+- **Kristensson & Zhai, UIST 2004** (published paper) — whole-path location
+  matching: the drawn path against the word's ideal path in keyboard coordinates.
 - The Swype APK is used **only as a black-box behavioral benchmark** (candidate
   ordering, sloppiness tolerance, loop gestures). No decompilation.
 
@@ -40,7 +38,7 @@ rank). Selectable via pref `gesture_decoder_scorer` = `hybrid` | `kushler` |
 
 All three share the ranking formula and the frequency/user-history integration.
 
-## Algorithm (v1 — patent/SHARK² hybrid)
+## Algorithm (Kushler + whole-path location)
 
 ### Input
 - `InputPointers` per stroke: `x[]`, `y[]`, `time[]` (already captured by
@@ -75,7 +73,7 @@ All three share the ranking formula and the frequency/user-history integration.
   point to its matched key center. Separate x/y weights — **y weighted heavier**
   (row position is more reliable than column). Thresholds scale with stroke
   speed: faster ⇒ more tolerant (US7453439).
-- **Location channel** (SHARK² paper, location only): resample both drawn path
+- **Location channel** (Kristensson & Zhai 2004): resample both drawn path
   and sokgraph template to N points, weighted mean point-wise distance in key
   widths, ends weighted more.
 - **Penalties**: skipped inflection points, letters far off-path, transpositions.

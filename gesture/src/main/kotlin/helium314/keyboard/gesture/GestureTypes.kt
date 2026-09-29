@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Gesture decoder core types. Pure Kotlin — no Android framework imports so the
 // decoder is unit-testable on the JVM. See docs/gesture-decoder-spec.md.
-// Implemented from expired patents US7098896 / US7453439 and the location channel
-// of the SHARK² paper (Kristensson & Zhai, UIST 2004), plus our own slowdown weight.
+// Implemented from expired patents US7098896 / US7453439 and whole-path location matching
+// as published by Kristensson & Zhai (UIST 2004), plus our own slowdown weight.
 package helium314.keyboard.gesture
 
 import kotlin.math.abs
