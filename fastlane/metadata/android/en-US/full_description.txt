@@ -10,5 +10,5 @@ Oh, and pressing space after swiping is no longer mandatory.
 
 You're the boss!
 
-Open source (GPL-3.0): https://github.com/curmudgeon-works/curmudgeon-keyboard
+Open source (GPL-3.0), built on the excellent HeliBoard keyboard: https://github.com/curmudgeon-works/curmudgeon-keyboard
 Complaints welcome: support@curmudgeon.works
