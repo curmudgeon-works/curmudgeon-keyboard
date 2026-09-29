@@ -103,8 +103,8 @@ class AccuracyHarnessTest {
         // Floors chosen after observing actual numbers (asserted slightly below achieved
         // values so the tests stay stable against small tuning changes). Achieved 2026-08-08:
         //   kushler: clean 91.6/100.0, noisy 80.0/99.6
-        //   shark2:  clean 95.8/100.0, noisy 94.0/100.0 (shape + location; removed 2026-09-28, location scorer since)
-        //   hybrid:  clean 94.7/100.0, noisy 94.0/100.0 (with shark2)
+        //   location: clean 94.7/100.0, noisy 94.0/100.0 (2026-09-28)
+        //   hybrid:  clean 94.7/100.0, noisy 93.7/100.0 (kushler + location)
         for (r in results) {
             assertTrue(r.clean.top1Pct >= 88.0, "${r.name} clean top1 ${r.clean.top1Pct}")
             assertTrue(r.clean.top4Pct >= 98.0, "${r.name} clean top4 ${r.clean.top4Pct}")
