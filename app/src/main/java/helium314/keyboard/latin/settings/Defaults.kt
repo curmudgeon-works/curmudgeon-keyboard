@@ -208,6 +208,9 @@ object Defaults {
     const val PREF_REMOVE_REDUNDANT_POPUPS = false
     const val PREF_SPACE_BAR_TEXT = ""
     const val PREF_TIMESTAMP_FORMAT = "yyyy-MM-dd HH:mm:ss"
+    const val PREF_UNDO_HISTORY_LENGTH = 20 // steps the keyboard's own undo reaches back (see EditHistory)
+    const val PREF_UNDO_UNIT = "word" // undo takes back a whole step ("word") or one "character" per press
+    const val PREF_REDO_UNIT = "word" // the same for redo
     const val PREF_EMOJI_RECENT_KEYS = ""
     const val PREF_LAST_SHOWN_EMOJI_CATEGORY_PAGE_ID = 0
     const val PREF_SHOW_DEBUG_SETTINGS = false

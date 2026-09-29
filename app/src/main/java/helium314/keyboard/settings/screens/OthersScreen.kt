@@ -34,6 +34,9 @@ fun OthersScreen(onClickBack: () -> Unit) {
         if (Settings.readToolbarMode(prefs) != ToolbarMode.HIDDEN) Settings.PREF_VARIABLE_TOOLBAR_DIRECTION else null,
         Settings.PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY,
         Settings.PREF_TIMESTAMP_FORMAT,
+        Settings.PREF_UNDO_HISTORY_LENGTH, // the keyboard's own undo / redo
+        Settings.PREF_UNDO_UNIT,
+        Settings.PREF_REDO_UNIT,
         Settings.PREF_CUSTOM_CURRENCY_KEY, // the symbols pages' currency key and its popup
     )
     SearchSettingsScreen(

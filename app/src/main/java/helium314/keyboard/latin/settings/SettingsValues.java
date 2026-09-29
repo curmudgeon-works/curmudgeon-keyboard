@@ -93,6 +93,9 @@ public class SettingsValues {
     public final boolean mShiftRemovesAutospace;
     public final boolean mClipboardHistoryEnabled;
     public final int mClipboardHistorySize;
+    public final int mUndoHistoryLength;
+    public final boolean mUndoByCharacter;
+    public final boolean mRedoByCharacter;
     public final boolean mClipboardHistoryPinnedFirst;
     public final boolean mOneHandedModeEnabled;
     public final int mOneHandedModeGravity;
@@ -331,6 +334,9 @@ public class SettingsValues {
         mShiftRemovesAutospace = prefs.getBoolean(Settings.PREF_SHIFT_REMOVES_AUTOSPACE, Defaults.PREF_SHIFT_REMOVES_AUTOSPACE);
         mClipboardHistoryEnabled = prefs.getBoolean(Settings.PREF_ENABLE_CLIPBOARD_HISTORY, Defaults.PREF_ENABLE_CLIPBOARD_HISTORY);
         mClipboardHistorySize = prefs.getInt(Settings.PREF_CLIPBOARD_HISTORY_SIZE, Defaults.PREF_CLIPBOARD_HISTORY_SIZE);
+        mUndoHistoryLength = prefs.getInt(Settings.PREF_UNDO_HISTORY_LENGTH, Defaults.PREF_UNDO_HISTORY_LENGTH);
+        mUndoByCharacter = "character".equals(prefs.getString(Settings.PREF_UNDO_UNIT, Defaults.PREF_UNDO_UNIT));
+        mRedoByCharacter = "character".equals(prefs.getString(Settings.PREF_REDO_UNIT, Defaults.PREF_REDO_UNIT));
         mClipboardHistoryPinnedFirst = prefs.getBoolean(Settings.PREF_CLIPBOARD_HISTORY_PINNED_FIRST, Defaults.PREF_CLIPBOARD_HISTORY_PINNED_FIRST);
 
         mOneHandedModeEnabled = Settings.readOneHandedModeEnabled(prefs, isLandscape, mIsSplitKeyboardEnabled, isFolded);
