@@ -588,6 +588,13 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         return result
     }
 
+    override fun getMainDictionaryFrequency(word: String, locale: Locale): Int {
+        if (word.isEmpty()) return -1
+        val dict = findDictionaryGroupWithLocale(dictionaryGroups, locale)?.getDict(Dictionary.TYPE_MAIN) ?: return -1
+        // a word capitalized at the start of a sentence is in the dictionary lowercase
+        return maxOf(dict.getFrequency(word), dict.getFrequency(word.lowercase(locale)))
+    }
+
     // this is unused, so leave it for now (redirecting to isValidWord seems to defeat the purpose...)
     override fun isValidSuggestionWord(word: String): Boolean {
         return isValidWord(word, DictionaryFacilitator.ALL_DICTIONARY_TYPES, dictionaryGroups[0])

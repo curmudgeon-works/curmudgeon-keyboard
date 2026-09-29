@@ -20,6 +20,7 @@ import helium314.keyboard.latin.define.DecoderSpecificConstants.SHOULD_REMOVE_PR
 import helium314.keyboard.latin.dictionary.Dictionary
 import helium314.keyboard.latin.gesture.GestureCorpusRecorder
 import helium314.keyboard.latin.gesture.GestureStats
+import helium314.keyboard.latin.gesture.GestureDecoderVocabulary
 import helium314.keyboard.latin.gesture.OwnGestureDecoder
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsValuesForSuggestion
@@ -177,6 +178,9 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
                 settingsValuesForSuggestion) {
                 getTransformedSuggestedWordInfoList(wordComposer, it, trailingSingleQuotesCount, mDictionaryFacilitator.mainLocale, keyboard)
             }
+        // the strip shows the typed word first, so the "keep what I typed" copy (and any other repeat) is a duplicate
+        removeLaterDuplicates(suggestionsList)
+        applyUserStripSettings(suggestionsList, applyRules = !resultsArePredictions) // no rules for next-word predictions
         val isTypedWordValid = firstOccurrenceOfTypedWordInSuggestions > -1 || (!resultsArePredictions && !allowsToBeAutoCorrected)
         return SuggestedWords(suggestionsList, suggestionResults.mRawSuggestions,
             typedWordInfo, isTypedWordValid, hasAutoCorrection, false, inputStyle, sequenceNumber)
@@ -309,7 +313,7 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
         // swipes are decoded by the in-tree decoder (the :gesture module)
         val suggestionResults = OwnGestureDecoder.getSuggestionResults(wordComposer.composedDataSnapshot, keyboard,
             mDictionaryFacilitator.locales, Settings.getValues().mGestureDecoderScorer,
-            Settings.getValues().mGestureCapsHeight)
+            Settings.getValues().mGestureCapsHeight, fillTarget())
         if (inputStyle == SuggestedWords.INPUT_STYLE_TAIL_BATCH && GestureCorpusRecorder.isEnabled())
             GestureCorpusRecorder.onSwipe(wordComposer.composedDataSnapshot, keyboard, suggestionResults,
                 mDictionaryFacilitator.mainLocale.toLanguageTag())
@@ -390,6 +394,8 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
             for (i in sizeBefore until suggestionsContainer.size)
                 suggestionsContainer[i] = useDefaultEmojiSkinTone(suggestionsContainer[i])
         }
+        // the rules look words up, so they wait for the finished swipe, like the fillers above
+        applyUserStripSettings(suggestionsContainer, applyRules = inputStyle == SuggestedWords.INPUT_STYLE_TAIL_BATCH)
         val suggestionsList = if (SuggestionStripView.DEBUG_SUGGESTIONS && suggestionsContainer.isNotEmpty()) {
             // firstOrNull: own-decoder results can be empty while its vocabulary is still building
             getSuggestionsInfoListWithDebugInfo(suggestionResults.firstOrNull()?.mWord ?: "", suggestionsContainer)
@@ -415,7 +421,7 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
         suggestions: ArrayList<SuggestedWordInfo>, word: String, ngramContext: NgramContext, keyboard: Keyboard,
         settingsValuesForSuggestion: SettingsValuesForSuggestion, transform: (SuggestionResults) -> List<SuggestedWordInfo>
     ) {
-        val target = min(stripFillTarget, SuggestedWords.MAX_SUGGESTIONS)
+        val target = fillTarget()
         if (suggestions.size >= target) return
         val length = word.codePointCount(0, word.length)
         val seen = suggestions.mapTo(HashSet()) { it.mWord }
@@ -433,6 +439,51 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
                 suggestions.add(info)
                 if (suggestions.size >= target) return
             }
+        }
+    }
+
+    /** Keeps the first appearance of each word. */
+    private fun removeLaterDuplicates(list: MutableList<SuggestedWordInfo>) {
+        val seen = HashSet<String>()
+        val iterator = list.iterator()
+        while (iterator.hasNext()) if (!seen.add(iterator.next().mWord)) iterator.remove()
+    }
+
+    /**
+     * How many words the strip should get: the user's number ("Customise suggestions"), else what fills the strip;
+     * [RULE_POOL] more while rules are set, so they have words further down to pick from.
+     */
+    private fun fillTarget(): Int {
+        val sv = Settings.getValues()
+        val shown = if (sv.mSuggestionCount > 0) sv.mSuggestionCount else min(stripFillTarget, SuggestedWords.MAX_SUGGESTIONS)
+        return if (sv.mSuggestionRules.isEmpty()) shown else shown + RULE_POOL
+    }
+
+    /**
+     * The user's rules for the 2nd suggestion on ([SuggestionRules]; only if [applyRules]), then the user's number of
+     * suggestions: the typed word (and its "keep what I typed" copy) aside, the list is cut to it.
+     */
+    private fun applyUserStripSettings(list: MutableList<SuggestedWordInfo>, applyRules: Boolean) {
+        val sv = Settings.getValues()
+        if (applyRules && sv.mSuggestionRules.isNotEmpty()) {
+            val locales = mDictionaryFacilitator.locales // language 1 is the keyboard's main one, then the others
+            SuggestionRules.apply(list, sv.mSuggestionRules, { it.mWord }, { it.mScore },
+                { it.isKindOf(SuggestedWordInfo.KIND_TYPED) },
+                inLanguage = { word, n ->
+                    locales.getOrNull(n - 1)?.let { mDictionaryFacilitator.getMainDictionaryFrequency(word, it) >= 0 } == true },
+                isCommon = { word, n ->
+                    locales.getOrNull(n - 1)?.let { GestureDecoderVocabulary.commonWords(it)?.contains(word.lowercase(it)) } == true })
+        }
+        val shown = when {
+            sv.mSuggestionCount > 0 -> sv.mSuggestionCount
+            sv.mSuggestionRules.isNotEmpty() -> min(stripFillTarget, SuggestedWords.MAX_SUGGESTIONS) // drop the rules' pool
+            else -> return
+        }
+        var kept = 0
+        val iterator = list.iterator()
+        while (iterator.hasNext()) {
+            if (iterator.next().isKindOf(SuggestedWordInfo.KIND_TYPED)) continue
+            if (++kept > shown) iterator.remove()
         }
     }
 
@@ -462,6 +513,8 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
 
         /** How many words the suggestion strip needs to fill its width twice, kept up to date by SuggestionStripLayoutHelper. */
         @JvmStatic @Volatile var stripFillTarget = 24
+        /** Extra candidates the suggestion rules may pick from, beyond what is shown. */
+        private const val RULE_POOL = 20
 
         private const val MAXIMUM_AUTO_CORRECT_LENGTH_FOR_GERMAN = 12
         // TODO: should we add Finnish here?

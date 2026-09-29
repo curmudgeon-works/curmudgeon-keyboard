@@ -35,6 +35,7 @@ import helium314.keyboard.latin.utils.checkTimestampFormat
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.NextScreenIcon
 import helium314.keyboard.settings.SettingsContainer
+import helium314.keyboard.settings.preferences.CustomizeSuggestionsPreference
 import helium314.keyboard.settings.preferences.ListPreference
 import helium314.keyboard.settings.SettingsWithoutKey
 import helium314.keyboard.settings.preferences.FactoryResetPreference
@@ -227,6 +228,10 @@ fun createAdvancedSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_UNDO_UNIT, R.string.undo_unit) {
         ListPreference(it, listOf(stringResource(R.string.undo_unit_word) to "word",
             stringResource(R.string.undo_unit_character) to "character"), Defaults.PREF_UNDO_UNIT)
+    },
+    // how many suggestions the strip shows, and rules for the 2nd one on (SuggestionRules)
+    Setting(context, Settings.PREF_SUGGESTION_RULES, R.string.customize_suggestions) {
+        CustomizeSuggestionsPreference(it)
     },
     Setting(context, Settings.PREF_REDO_UNIT, R.string.redo_unit) {
         ListPreference(it, listOf(stringResource(R.string.undo_unit_word) to "word",

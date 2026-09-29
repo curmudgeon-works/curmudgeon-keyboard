@@ -130,6 +130,9 @@ class SingleDictionaryFacilitator(private val dict: Dictionary) : DictionaryFaci
 
     override fun isValidSuggestionWord(word: String) = isValidSpellingWord(word)
 
+    override fun getMainDictionaryFrequency(word: String, locale: Locale) =
+        if (locale == dict.mLocale) dict.getFrequency(word) else -1
+
     override fun removeWord(word: String) {}
 
     override fun clearUserHistoryDictionary(context: Context) {}

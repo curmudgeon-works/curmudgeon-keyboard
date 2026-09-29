@@ -214,7 +214,8 @@ final class SuggestionStripLayoutHelper {
         for (int positionInStrip = 0; positionInStrip < countInStrip; positionInStrip++) {
             final TextView wordView = mWordViews.get(positionInStrip);
             if (TextUtils.isEmpty(wordView.getText())) continue;
-            if (wordsWidth >= STRIP_FILL_SCREENS * viewportWidth) break;
+            // a number of suggestions set by the user is shown in full; otherwise words fill the strip twice over
+            if (Settings.getValues().mSuggestionCount == 0 && wordsWidth >= STRIP_FILL_SCREENS * viewportWidth) break;
             if (stripView.getChildCount() > 0) {
                 addDivider(stripView, mDividerViews.get(positionInStrip));
                 wordsWidth += mDividerWidth;

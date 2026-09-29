@@ -154,6 +154,9 @@ public interface DictionaryFacilitator {
 
     boolean isValidSuggestionWord(final String word);
 
+    /** How often [word] occurs in the main dictionary of [locale] (one of {@link #getLocales()}); negative if it isn't in it. */
+    int getMainDictionaryFrequency(final String word, final Locale locale);
+
     void clearUserHistoryDictionary(final Context context);
 
     String dump(final Context context);
