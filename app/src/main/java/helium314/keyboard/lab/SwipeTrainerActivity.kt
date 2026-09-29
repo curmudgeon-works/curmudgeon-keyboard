@@ -25,7 +25,7 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * Swipe Trainer (HeliBoard Lab only): swipe a configurable word list several times
+ * Swipe Trainer (Curmudgeon Keyboard only): swipe a configurable word list several times
  * with the Lab keyboard and compare all three decoder scorers without friction.
  *
  * Flow: config -> run (target word shown, swipe into the field, committed word is
@@ -80,7 +80,7 @@ class SwipeTrainerActivity : Activity() {
             setPadding(dp(16), dp(16), dp(16), dp(16))
         }
         layout.addView(TextView(this).apply {
-            text = "Swipe Trainer\n\nSwipe each word with the HeliBoard Lab keyboard. Edit the word list (whitespace-separated) and reps per word."
+            text = "Swipe Trainer\n\nSwipe each word with Curmudgeon Keyboard. Edit the word list (whitespace-separated) and reps per word."
         })
         val wordsField = EditText(this).apply {
             setText(DEFAULT_WORDS.joinToString(" "))
@@ -135,7 +135,7 @@ class SwipeTrainerActivity : Activity() {
         }
         root.addView(feedbackView)
         inputField = EditText(this).apply {
-            hint = "swipe here with HeliBoard Lab"
+            hint = "swipe here with Curmudgeon Keyboard"
             inputType = InputType.TYPE_CLASS_TEXT
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}

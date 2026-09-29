@@ -7,15 +7,16 @@ object Links {
     const val DICTIONARY_NORMAL_SUFFIX = "dictionaries/"
     const val DICTIONARY_EXPERIMENTAL_SUFFIX = "dictionaries_experimental/"
     const val DICTIONARY_EMOJI_CLDR_SUFFIX = "emoji_cldr_signal_dictionaries/"
-    const val GITHUB = "https://github.com/HeliBorg/HeliBoard"
     const val CURMUDGEON_SOURCE = "https://github.com/curmudgeon-works/curmudgeon-keyboard" // source of this fork; keep this attribution in derived works
+    const val GITHUB = CURMUDGEON_SOURCE
+    const val HELIBOARD_GITHUB = "https://github.com/HeliBorg/HeliBoard" // upstream: its wiki and discussions are the docs we point to
     const val LICENSE = "$GITHUB/blob/main/LICENSE"
     const val PLAY_STORE = "https://play.google.com/store/apps/details?id=app.curmudgeon.keyboard"
     const val PLAY_STORE_APP = "market://details?id=app.curmudgeon.keyboard" // opens the Play Store app directly
-    const val WIKI_URL = "$GITHUB/wiki"
+    const val WIKI_URL = "$HELIBOARD_GITHUB/wiki"
     const val LAYOUT_WIKI_URL = "$WIKI_URL/2.-Layouts"
-    const val CUSTOM_LAYOUTS = "$GITHUB/discussions/categories/custom-layout"
-    const val CUSTOM_COLORS = "$GITHUB/discussions/categories/custom-colors"
+    const val CUSTOM_LAYOUTS = "$HELIBOARD_GITHUB/discussions/categories/custom-layout"
+    const val CUSTOM_COLORS = "$HELIBOARD_GITHUB/discussions/categories/custom-colors"
     const val GESTURE_DATA_VIDEO_PEERTUBE = "https://makertube.net/w/cQECfDkuLGR9eUQquUEo4K"
     const val GESTURE_DATA_VIDEO_YOUTUBE = "https://youtu.be/CyjumVTWtJA"
     const val SWIPE_O_SCOPE = "https://codeberg.org/eclexic/swipe-o-scope"
