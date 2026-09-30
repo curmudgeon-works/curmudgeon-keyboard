@@ -171,6 +171,27 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
                     suggestionsList.add(min(hotSlot, suggestionsList.size), info)
                     hotSlot++
                 }
+                // "you'" → you're, you've, you'll, you'd: the words that apostrophe starts, ahead of the dictionaries'
+                // guesses for "you" (which only get the apostrophe stuck back on). After an incoming auto-correction,
+                // so what space commits doesn't change.
+                if (trailingSingleQuotesCount == 1) {
+                    val allUpperCase = wordComposer.isAllUpperCase && !wordComposer.isResumed
+                        || keyboardShiftMode == WordComposer.CAPS_MODE_MANUAL_SHIFT_LOCKED
+                    val firstCharCapitalized = wordComposer.isOrWillBeOnlyFirstCharCapitalized
+                        || keyboardShiftMode == WordComposer.CAPS_MODE_MANUAL_SHIFTED
+                    var contractionSlot = min(if (hasAutoCorrection) 2 else 1, suggestionsList.size)
+                    for (locale in mDictionaryFacilitator.locales) {
+                        for (word in GestureDecoderVocabulary.contractionsFor(typedWordString, locale)) {
+                            val shown = capitalize(word, allUpperCase, firstCharCapitalized, locale)
+                            if (suggestionsList.take(contractionSlot).any { it.mWord == shown }) continue
+                            suggestionsList.removeAll { it.mWord == shown }
+                            suggestionsList.add(min(contractionSlot, suggestionsList.size),
+                                SuggestedWordInfo(shown, "", SuggestedWordInfo.MAX_SCORE, SuggestedWordInfo.KIND_CORRECTION,
+                                    hotSource, SuggestedWordInfo.NOT_AN_INDEX, SuggestedWordInfo.NOT_A_CONFIDENCE))
+                            contractionSlot++
+                        }
+                    }
+                }
             }
         }
         if (!resultsArePredictions)
