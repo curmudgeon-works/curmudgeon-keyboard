@@ -48,6 +48,16 @@ class DecoderConfig(
     val startPenaltyShare: Float = 1f,
     /** Pen-up radius (key widths) when it should be tighter than [endpointRadiusKeyWidths]; null = the same. */
     val penUpRadiusKeyWidths: Float? = null,
+    /**
+     * People stop short of a key they reach for from far away, more so reaching right than left. A letter whose key is
+     * at least [longReachKeyWidths] from the previous letter's may also be matched this many key widths short of its
+     * key, back along the way in. 0 = off. The two shortfalls are per direction of the reach. Measured on 1,400 of
+     * our own swipes (corners after a 4+ key reach fall 0.3 short at the median, rightward more than leftward) and
+     * replayed on those and on 40,000 FUTO swipes: +9 −2 and +239 −41 top-1 at 0.6 / 0.4 (2026-09-30).
+     */
+    val longReachKeyWidths: Float = 4f,
+    val reachShortfallRightKeyWidths: Float = 0.6f,
+    val reachShortfallLeftKeyWidths: Float = 0.4f,
     /** Capitalize the letter a swipe leaves the keyboard upwards from (the excursion is stripped from the path either way). */
     val capsExcursions: Boolean = true,
 )
@@ -190,6 +200,7 @@ class GestureDecoder(
         fun matchAlongPath(word: String): FloatArray? {
             val arcs = FloatArray(word.length)
             var arcPos = 0f
+            var previous: KeyInfo? = null
             for (i in word.indices) {
                 val c = word[i].lowercaseChar()
                 if (geometry.isSkippedWordChar(c)) { // not on the path: holds the previous letter's position
@@ -197,13 +208,31 @@ class GestureDecoder(
                     continue
                 }
                 val key = geometry.keyForWordChar(c) ?: return null
-                if (distToPath(c) > corridorRadius) return null
-                val (d, newArc) = gesture.nearestArcPositionFrom(
-                    key.centerX, key.centerY, (arcPos - progressSlack).coerceAtLeast(0f), corridorRadius
-                )
+                val from = (arcPos - progressSlack).coerceAtLeast(0f)
+                var (d, newArc) = if (distToPath(c) > corridorRadius) Pair(Float.MAX_VALUE, from)
+                    else gesture.nearestArcPositionFrom(key.centerX, key.centerY, from, corridorRadius)
+                if (previous != null && i < word.lastIndex) {
+                    // a long reach that stopped short: look where the key would be if it sat that much closer. Taken when
+                    // the key itself is out of reach of the path, or was only found much further along it: a corner just
+                    // outside the corridor otherwise matches the letter's NEXT appearance in the word (the second l of
+                    // "analytical") and every letter between the two is then looked for past it
+                    val dx = key.centerX - previous.centerX
+                    val dy = key.centerY - previous.centerY
+                    val reach = Math.hypot(dx.toDouble(), dy.toDouble()).toFloat()
+                    val short = (if (dx > 0) config.reachShortfallRightKeyWidths else config.reachShortfallLeftKeyWidths) * kw
+                    if (short > 0f && reach >= config.longReachKeyWidths * kw) {
+                        val near = gesture.nearestArcPositionFrom(
+                            key.centerX - dx / reach * short, key.centerY - dy / reach * short, from, corridorRadius)
+                        if (near.first <= corridorRadius && (d > corridorRadius || newArc - near.second > SHORT_REACH_JUMP_KEY_WIDTHS * kw)) {
+                            d = near.first
+                            newArc = near.second
+                        }
+                    }
+                }
                 if (d > corridorRadius) return null
                 arcs[i] = newArc
                 arcPos = newArc
+                previous = key
             }
             return arcs
         }
@@ -219,6 +248,11 @@ class GestureDecoder(
             if (lengthBandOk(sok, drawnLength, kw)) out.add(Candidate(sok, node.frequency, arcs))
         }
         return out
+    }
+
+    private companion object {
+        /** A letter found this many key widths further along the path than its stopped-short position was a later pass. */
+        const val SHORT_REACH_JUMP_KEY_WIDTHS = 3f
     }
 
     private fun lengthBandOk(sok: Sokgraph, drawnLength: Float, kw: Float): Boolean {
