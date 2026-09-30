@@ -19,8 +19,9 @@ import java.util.concurrent.atomic.AtomicLong
  *
  * One JSONL line per completed swipe: raw touch path in keyboard pixels, the letter-key geometry
  * of the keyboard it was drawn on, and the decoder's top candidates (top-1 is what got committed,
- * serving as pseudo-label). If the user then picks another suggestion or deletes the swiped word,
- * a follow-up line `{"type":"final","ref":id,...}` records the correction.
+ * serving as pseudo-label). If the user then picks another suggestion, deletes the swiped word, or edits it into
+ * another word (also after committing it, when it is opened for editing again within [RESUME_WINDOW_MS]), a
+ * follow-up line `{"type":"final","ref":id,"how":"pick"|"deleted"|"edited",...}` records the correction.
  *
  * Schema shares `points` / `locale` / `committed` with gesturelab's and the trainer's swipes.jsonl.
  * Everything stays in the app's external files dir (`gesture_corpus.jsonl`); nothing is uploaded.
@@ -34,8 +35,14 @@ object GestureCorpusRecorder {
     private val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "gesture-corpus").apply { isDaemon = true } }
     private val counter = AtomicLong(0)
     @Volatile private var file: File? = null
-    /** id of the most recent swipe that is still the composing word, or -1 */
+    /** id of the most recent swipe whose outcome is still open (its word is being composed or edited), or -1 */
     @Volatile private var pendingId = -1L
+    // the most recent swipe, its word as the keyboard put it in, and when: a committed word opened for editing again
+    // is that swipe's word being corrected, if it is the same text and not long after
+    @Volatile private var lastId = -1L
+    @Volatile private var lastWord = ""
+    @Volatile private var lastTime = 0L
+    private const val RESUME_WINDOW_MS = 60_000L
 
     fun init(context: Context) {
         file = File(context.getExternalFilesDir(null) ?: context.filesDir, FILE_NAME)
@@ -61,8 +68,11 @@ object GestureCorpusRecorder {
         val kbH = keyboard.mOccupiedHeight
         val layoutName = keyboard.mId.mSubtype.mainLayoutName
         val id = counter.incrementAndGet()
-        pendingId = id
         val time = System.currentTimeMillis()
+        pendingId = id
+        lastId = id
+        lastWord = cands.firstOrNull()?.first ?: ""
+        lastTime = time
         executor.execute {
             try {
                 val obj = JSONObject()
@@ -100,6 +110,20 @@ object GestureCorpusRecorder {
 
     /** Any other commit / new word: the pending swipe is settled as-is. */
     fun onWordSettled() { pendingId = -1L }
+
+    /**
+     * The composing word was committed as [word] some way other than a pick from the strip (which reports itself):
+     * the pending swiped word is settled if that is what it still says, else it was edited into [word].
+     */
+    fun onWordCommitted(word: String) {
+        if (pendingId < 0) return
+        if (word == lastWord) pendingId = -1L else correction("edited", word)
+    }
+
+    /** A committed word was opened for editing again, reading [word]: the last swipe's outcome is open again if that is its word. */
+    fun onWordResumed(word: String) {
+        if (lastId >= 0 && word == lastWord && System.currentTimeMillis() - lastTime <= RESUME_WINDOW_MS) pendingId = lastId
+    }
 
     private fun correction(how: String, word: String?) {
         val id = pendingId
