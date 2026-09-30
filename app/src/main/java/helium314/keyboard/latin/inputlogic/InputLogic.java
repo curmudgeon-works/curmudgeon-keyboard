@@ -2039,6 +2039,7 @@ public final class InputLogic {
         final int[] codePoints = StringUtils.toCodePointArray(typedWordString);
         mWordComposer.setComposingWord(codePoints, mLatinIME.getCoordinatesForCurrentKeyboard(codePoints));
         mWordComposer.setCursorPositionWithinWord(typedWordString.codePointCount(0, numberOfCharsInWordBeforeCursor));
+        GestureCorpusRecorder.INSTANCE.onWordResumed(typedWordString);
         mConnection.setComposingRegion(expectedCursorPosition - numberOfCharsInWordBeforeCursor,
                 expectedCursorPosition + range.getNumberOfCharsInWordAfterCursor());
         if (suggestions.size() <= 1) {
@@ -2087,6 +2088,7 @@ public final class InputLogic {
         mConnection.beginBatchEdit();
         mConnection.deleteTextBeforeCursor(word.length());
         mWordComposer.setBatchInputWord(word);
+        GestureCorpusRecorder.INSTANCE.onWordResumed(word);
         setComposingTextInternal(word, 1);
         mConnection.endBatchEdit();
         doShowSuggestionsAndClearAutoCorrectionIndicator(suggestedWords);
@@ -2657,6 +2659,9 @@ public final class InputLogic {
         // strings.
         mLastComposedWord = mWordComposer.commitWord(commitType, chosenWord, separatorString, ngramContext);
         mLastComposedWord.mBatchSuggestedWords = batchSuggestedWords;
+        // a swiped word edited into another word (a pick from the strip reports itself)
+        if (commitType != LastComposedWord.COMMIT_TYPE_MANUAL_PICK)
+            GestureCorpusRecorder.INSTANCE.onWordCommitted(chosenWord);
         if (DebugFlags.DEBUG_ENABLED) {
             long runTimeMillis = SystemClock.elapsedRealtime() - startTimeMillis;
             Log.d(TAG, "commitChosenWord() : " + runTimeMillis + " ms to run "
