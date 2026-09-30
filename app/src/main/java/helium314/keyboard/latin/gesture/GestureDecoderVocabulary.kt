@@ -121,6 +121,34 @@ object GestureDecoderVocabulary {
             .mapTo(HashSet(COMMON_WORDS * 2)) { it.first.lowercase(locale) }.also { common[key] = it }
     }
 
+    private const val MAX_CONTRACTIONS = 5
+    private val contractions = ConcurrentHashMap<String, Map<String, List<String>>>()
+
+    /**
+     * The words of [locale]'s main dictionary that start with [typed], a word ending in its only apostrophe
+     * ("you'" → you're, you've, you'll, you'd), most frequent first. Main dictionary only, so learned typos stay out.
+     * Empty while that word list isn't loaded yet (loading is kicked off).
+     */
+    fun contractionsFor(typed: String, locale: Locale): List<String> {
+        val key = locale.toLanguageTag()
+        val index = contractions[key] ?: run {
+            val entries = mainEntries[key] ?: run { getOrBuildAsync(locale); return emptyList() }
+            contractionIndex(entries, locale).also { contractions[key] = it }
+        }
+        return index[typed.lowercase(locale)].orEmpty()
+    }
+
+    /** Words with an apostrophe inside, by their lowercase beginning up to and including the first apostrophe. */
+    internal fun contractionIndex(entries: List<Pair<String, Int>>, locale: Locale): Map<String, List<String>> {
+        val byStart = HashMap<String, MutableList<Pair<String, Int>>>()
+        for (entry in entries) {
+            val apostrophe = entry.first.indexOf('\'')
+            if (apostrophe <= 0 || apostrophe == entry.first.lastIndex) continue
+            byStart.getOrPut(entry.first.substring(0, apostrophe + 1).lowercase(locale)) { ArrayList() }.add(entry)
+        }
+        return byStart.mapValues { (_, words) -> words.sortedByDescending { it.second }.take(MAX_CONTRACTIONS).map { it.first } }
+    }
+
     /** Cached vocabulary for [locale], or null (and an async build is kicked off). */
     fun getOrBuildAsync(locale: Locale): Vocabulary? {
         val key = locale.toLanguageTag()
@@ -149,6 +177,7 @@ object GestureDecoderVocabulary {
     fun clear() {
         cache.clear()
         common.clear()
+        contractions.clear()
         merged.clear()
         mergedSpecs.clear()
     }
@@ -222,6 +251,7 @@ object GestureDecoderVocabulary {
             cache[key] = vocab
             this.mainEntries[key] = mainEntries
             common.remove(key)
+            contractions.remove(key)
             merged.clear() // multilingual vocabularies containing this locale are rebuilt on the next swipe
         }
         return history.size
