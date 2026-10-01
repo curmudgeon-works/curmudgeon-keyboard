@@ -335,7 +335,8 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
         val suggestionResults = OwnGestureDecoder.getSuggestionResults(wordComposer.composedDataSnapshot, keyboard,
             mDictionaryFacilitator.locales, Settings.getValues().mGestureDecoderScorer,
             Settings.getValues().mGestureCapsHeight, fillTarget())
-        if (inputStyle == SuggestedWords.INPUT_STYLE_TAIL_BATCH && GestureCorpusRecorder.isEnabled())
+        // the recorder follows the swiped word for the corpus and/or the swipe results log; nothing to follow without a word
+        if (inputStyle == SuggestedWords.INPUT_STYLE_TAIL_BATCH && GestureCorpusRecorder.isFollowing() && suggestionResults.isNotEmpty())
             GestureCorpusRecorder.onSwipe(wordComposer.composedDataSnapshot, keyboard, suggestionResults,
                 mDictionaryFacilitator.mainLocale.toLanguageTag())
         if (inputStyle == SuggestedWords.INPUT_STYLE_TAIL_BATCH && suggestionResults.isNotEmpty())

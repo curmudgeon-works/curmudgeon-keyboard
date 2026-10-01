@@ -99,7 +99,8 @@ class KushlerScorer(private val config: KushlerConfig = KushlerConfig()) : Score
                 val cur = dp[i][j]
                 if (cur >= big) continue
                 // match inflection i to letter j
-                val mc = constrainedMatchCost(i, j, m, n, inflections, letters, kw) / relax
+                val mc = constrainedMatchCost(i, j, m, n, inflections, letters, kw)
+                    .let { if (it >= big) it else it / relax } // the forbidden-alignment sentinel stays forbidden
                 if (cur + mc < dp[i + 1][j + 1]) dp[i + 1][j + 1] = cur + mc
                 // skip inflection i (not allowed for endpoints)
                 if (i != 0 && i != m - 1) {

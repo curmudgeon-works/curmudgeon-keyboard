@@ -58,6 +58,8 @@ object GestureDecoderVocabulary {
 
     private val cache = ConcurrentHashMap<String, Vocabulary>()
     private val building = ConcurrentHashMap.newKeySet<String>()
+    // locales whose build found no dictionary: asking again would start a thread per request (e.g. per keystroke)
+    private val noDictionary = ConcurrentHashMap.newKeySet<String>()
     // main-dict entries per locale, kept so multilingual vocabularies can be merged from them
     private val mainEntries = ConcurrentHashMap<String, List<Pair<String, Int>>>()
     private val merged = ConcurrentHashMap<String, Vocabulary>()
@@ -153,6 +155,7 @@ object GestureDecoderVocabulary {
     fun getOrBuildAsync(locale: Locale): Vocabulary? {
         val key = locale.toLanguageTag()
         cache[key]?.let { return it }
+        if (key in noDictionary) return null
         if (building.add(key)) {
             Thread({
                 try {
@@ -178,6 +181,7 @@ object GestureDecoderVocabulary {
         cache.clear()
         common.clear()
         contractions.clear()
+        noDictionary.clear()
         merged.clear()
         mergedSpecs.clear()
     }
@@ -233,7 +237,10 @@ object GestureDecoderVocabulary {
         } else {
             Log.w(TAG, "no main dictionary file found for $locale")
         }
-        if (words.isEmpty()) return // keep whatever the disk cache provided
+        if (words.isEmpty()) { // keep whatever the disk cache provided
+            if (mainDictFile == null && disk == null) noDictionary.add(key)
+            return
+        }
         val top = words.entries.sortedByDescending { it.value }.take(MAX_WORDS).map { it.key to it.value }
         writeCache(cacheFile, expectedHeader, top)
         val merged = publishNow(key, locale, context, top)

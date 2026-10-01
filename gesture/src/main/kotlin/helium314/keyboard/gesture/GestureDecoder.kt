@@ -98,6 +98,10 @@ class GestureDecoder(
     private val preprocessor: GesturePreprocessor = GesturePreprocessor(),
 ) {
 
+    /** The speed of the last swipe decoded (key widths per second, from the preprocessed path), as the thresholds saw it. */
+    @Volatile var lastSpeedKeysPerSecond: Float = 0f
+        private set
+
     fun decode(
         points: List<GesturePoint>,
         geometry: KeyboardGeometry,
@@ -124,6 +128,7 @@ class GestureDecoder(
         if (gesture.points.isEmpty()) return out
 
         val keysPerSecond = gesture.meanSpeed * 1000f / geometry.keyWidth
+        lastSpeedKeysPerSecond = keysPerSecond
         val speedWiden = 1f + config.speedWidenPerKeyPerSecond * (keysPerSecond - config.speedWidenFromKeysPerSecond).coerceAtLeast(0f)
         var candidates = collectCandidates(gesture, geometry, vocabulary, speedWiden)
         if (candidates.isEmpty() && config.retryWidening > 1f)

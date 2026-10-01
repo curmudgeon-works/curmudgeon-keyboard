@@ -359,13 +359,13 @@ public final class InputLogic {
         }
 
         final boolean pickedForBatchWord = mWordComposer.isBatchMode();
-        final int pickedRank = pickedForBatchWord ? rankInStrip(mSuggestedWords, suggestion) : -1;
+        final int pickedRank = rankInStrip(mSuggestedWords, suggestion);
         commitChosenWord(settingsValues, suggestion, LastComposedWord.COMMIT_TYPE_MANUAL_PICK, LastComposedWord.NOT_A_SEPARATOR);
         mConnection.endBatchEdit();
-        if (pickedForBatchWord) {
-            GestureCorpusRecorder.INSTANCE.onSuggestionPicked(suggestion, pickedRank);
-            GestureStats.INSTANCE.onPicked(pickedRank);
-        } else GestureCorpusRecorder.INSTANCE.onWordSettled();
+        // a swiped word still open — including one re-opened for editing and then corrected from the strip — was
+        // picked over; the recorder ignores the call when no swipe is open
+        GestureCorpusRecorder.INSTANCE.onSuggestionPicked(suggestion, pickedRank);
+        if (pickedForBatchWord) GestureStats.INSTANCE.onPicked(pickedRank);
         // Don't allow cancellation of manual pick
         mLastComposedWord.deactivate();
         // Space state must be updated before calling updateShiftState
