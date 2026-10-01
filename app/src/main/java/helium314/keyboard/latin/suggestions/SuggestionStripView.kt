@@ -132,8 +132,6 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     private val toolbarExpandKey = findViewById<ImageButton>(R.id.suggestions_strip_toolbar_key)
     private val incognitoIcon = KeyboardIconsSet.instance.getNewDrawable(ToolbarKey.INCOGNITO.name, context)
     private val toolbarArrowIcon = KeyboardIconsSet.instance.getNewDrawable(KeyboardIconsSet.NAME_TOOLBAR_KEY, context)
-    // User-supplied incognito-style icon (hat + chevron) used when PREF_TOOLBAR_EXPAND_ICON = "incognito".
-    private val customIncognitoIcon = androidx.core.content.ContextCompat.getDrawable(context, R.drawable.toolbar_expand_incognito)
     private val settingsToolbarIcon = KeyboardIconsSet.instance.getNewDrawable(ToolbarKey.SETTINGS.name, context)
     private val defaultToolbarBackground: Drawable = toolbarExpandKey.background
     private val enabledToolKeyBackground = GradientDrawable()
@@ -672,7 +670,9 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
                 Settings.PREF_TOOLBAR_EXPAND_ICON, Defaults.PREF_TOOLBAR_EXPAND_ICON
             ) ?: Defaults.PREF_TOOLBAR_EXPAND_ICON
             when (expandIconChoice) {
-                "incognito" -> toolbarExpandKey.setImageDrawable(customIncognitoIcon)
+                // the icon set's own incognito glyph (hat, glasses, chevron), drawn and tinted like the other toolbar icons
+                // (was a picture with its own white disc and dark square, which sat on the strip like a sticker)
+                "incognito" -> toolbarExpandKey.setImageDrawable(incognitoIcon)
                 "settings" -> toolbarExpandKey.setImageDrawable(settingsToolbarIcon)
                 "none" -> { /* hidden below */ }
                 else -> toolbarExpandKey.setImageDrawable(toolbarArrowIcon)
