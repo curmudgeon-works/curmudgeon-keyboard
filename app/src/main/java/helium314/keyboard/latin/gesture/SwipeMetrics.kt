@@ -26,6 +26,8 @@ object SwipeMetrics {
     const val OUTCOME_PICKED = "picked"
     const val OUTCOME_DELETED = "deleted"
     const val OUTCOME_EDITED = "edited"
+    /** the decoder found no word at all */
+    const val OUTCOME_NONE = "none"
 
     private val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "swipe-metrics").apply { isDaemon = true } }
     @Volatile private var file: File? = null
@@ -87,8 +89,9 @@ object SwipeMetrics {
         return Summary(last.size, first, strip, never, ms)
     }
 
-    /** Deletes the log; synchronous so a summary read right after it sees the empty state. */
+    /** Deletes the log, after any outcome already queued; waits so a summary read right after it sees the empty state. */
     fun clear() {
-        file?.delete()
+        try { executor.submit { file?.delete() }.get(2, java.util.concurrent.TimeUnit.SECONDS) }
+        catch (e: Exception) { Log.w(TAG, "could not clear the swipe results", e) }
     }
 }

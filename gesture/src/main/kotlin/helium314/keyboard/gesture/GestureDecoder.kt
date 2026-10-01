@@ -88,9 +88,9 @@ class DecoderConfig(
  * Bumped whenever the decoder's behaviour changes, so logged swipe results can be told apart by the decoder that
  * produced them. 1 = the 0.2.000 decoder (Swype-style picking, hybrid scorer); 2 = a corner after a long reach may
  * stop short of its key (2026-09-30); 3 = fast swipes lean on word frequency and get relaxed corner matching
- * (2026-10-01).
+ * (2026-10-01, Play 3000); 4 = the relaxation no longer lets forbidden alignments survive on fast swipes (Play 3001).
  */
-const val DECODER_VERSION = 3
+const val DECODER_VERSION = 4
 
 class GestureDecoder(
     private val scorer: Scorer,

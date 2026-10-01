@@ -72,6 +72,11 @@ object GestureCorpusRecorder {
         val ts = pointers.times.copyOf(size)
         // the native decoder reports the same word once per dictionary it was found in; keep the best-ranked
         val cands = candidates.distinctBy { it.mWord }.take(MAX_CANDIDATES).map { it.mWord to it.mScore }
+        if (cands.isEmpty()) { // nothing to follow: a decode failure, logged as such so "never offered" stays honest
+            SwipeMetrics.onOutcome(counter.incrementAndGet(), "", SwipeMetrics.OUTCOME_NONE, -1, null,
+                OwnGestureDecoder.lastDecodeMs, OwnGestureDecoder.lastSpeedKeysPerSecond, OwnGestureDecoder.currentTuning.key)
+            return
+        }
         val keys = letterKeys(keyboard)
         val kbW = keyboard.mOccupiedWidth
         val kbH = keyboard.mOccupiedHeight
@@ -149,7 +154,7 @@ object GestureCorpusRecorder {
 
     /** A committed word was opened for editing again, reading [word]: the last swipe's outcome is open again if that is its word. */
     fun onWordResumed(word: String) {
-        if (lastId >= 0 && word == lastWord && System.currentTimeMillis() - lastTime <= RESUME_WINDOW_MS) pendingId = lastId
+        if (lastId >= 0 && word.equals(lastWord, ignoreCase = true) && System.currentTimeMillis() - lastTime <= RESUME_WINDOW_MS) pendingId = lastId
     }
 
     private fun correction(id: Long, how: String, word: String?) {
