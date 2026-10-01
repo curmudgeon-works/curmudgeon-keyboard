@@ -363,7 +363,7 @@ public final class InputLogic {
         commitChosenWord(settingsValues, suggestion, LastComposedWord.COMMIT_TYPE_MANUAL_PICK, LastComposedWord.NOT_A_SEPARATOR);
         mConnection.endBatchEdit();
         if (pickedForBatchWord) {
-            GestureCorpusRecorder.INSTANCE.onSuggestionPicked(suggestion);
+            GestureCorpusRecorder.INSTANCE.onSuggestionPicked(suggestion, pickedRank);
             GestureStats.INSTANCE.onPicked(pickedRank);
         } else GestureCorpusRecorder.INSTANCE.onWordSettled();
         // Don't allow cancellation of manual pick

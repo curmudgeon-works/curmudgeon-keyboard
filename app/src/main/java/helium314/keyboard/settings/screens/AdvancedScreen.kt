@@ -4,8 +4,17 @@ package helium314.keyboard.settings.screens
 import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Build
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import helium314.keyboard.latin.gesture.SwipeMetrics
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -78,6 +87,7 @@ fun AdvancedSettingsScreen(
         Settings.PREF_EMOJI_MAX_SDK,
         Settings.PREF_URL_DETECTION,
         Settings.PREF_RECORD_GESTURE_CORPUS,
+        Settings.PREF_SWIPE_METRICS,
     )
     SearchSettingsScreen(
         onClickBack = onClickBack,
@@ -282,6 +292,28 @@ fun createAdvancedSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_RECORD_GESTURE_CORPUS, R.string.record_gesture_corpus, R.string.record_gesture_corpus_summary) {
         SwitchPreference(it, Defaults.PREF_RECORD_GESTURE_CORPUS)
+    },
+    Setting(context, Settings.PREF_SWIPE_METRICS, R.string.swipe_metrics, R.string.swipe_metrics_summary) { def ->
+        val ctx = LocalContext.current
+        var generation by remember { mutableIntStateOf(0) }
+        var on by remember { mutableStateOf(ctx.prefs().getBoolean(def.key, Defaults.PREF_SWIPE_METRICS)) }
+        Column {
+            SwitchPreference(def, Defaults.PREF_SWIPE_METRICS) { on = it }
+            if (on) {
+                val week = remember(generation) { SwipeMetrics.summary(7) }
+                val all = remember(generation) { SwipeMetrics.summary(0) }
+                Column(Modifier.padding(start = 22.dp, end = 16.dp, bottom = 8.dp)) {
+                    for ((label, s) in listOf(R.string.swipe_metrics_week to week, R.string.swipe_metrics_all to all)) {
+                        Text(stringResource(label), style = MaterialTheme.typography.labelMedium)
+                        Text(if (s.swipes == 0) stringResource(R.string.swipe_metrics_none)
+                            else stringResource(R.string.swipe_metrics_line, s.swipes, s.pct(s.firstChoice), s.pct(s.fromStrip),
+                                s.pct(s.neverOffered), s.decodeAverage, s.decodeWorst),
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                    TextButton(onClick = { SwipeMetrics.clear(); generation++ }) { Text(stringResource(R.string.swipe_metrics_clear)) }
+                }
+            }
+        }
     },
 )
 

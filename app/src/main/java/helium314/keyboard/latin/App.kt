@@ -29,6 +29,7 @@ class App : Application() {
         helium314.keyboard.settings.LayoutDraft.recoverAfterCrash(this)
         SubtypeSettings.init(this)
         GestureCorpusRecorder.init(this)
+        helium314.keyboard.latin.gesture.SwipeMetrics.init(this)
 
         val scope = CoroutineScope(Dispatchers.Default)
         scope.launch { // do some uncritical work in background for faster startup
