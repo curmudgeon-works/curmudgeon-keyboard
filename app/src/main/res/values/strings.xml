@@ -315,6 +315,8 @@
     <!-- %1$d swipes, then percentages -->
     <string name="swipe_tuning_row">%1$d swipes · first choice right %2$d%% · second choice %3$d%% · later choice %4$d%% · deleted %5$d%%</string>
     <string name="swipe_tuning_recommended">Best so far</string>
+    <!-- how long the phone takes to turn a swipe into words, under this tuning -->
+    <string name="swipe_tuning_time">Decode time: %1$d ms on average, %2$d ms at most</string>
     <string name="swipe_tuning_use">Use</string>
     <string name="swipe_tuning_reset">Reset these results</string>
     <string name="swipe_tuning_current">Current setting</string>
