@@ -11,7 +11,9 @@ import java.util.concurrent.Executors
  * Opt-in local log of how every swipe ended, for the three numbers that say how swiping is going (and the decode
  * time): first choice right (kept as swiped), picked from the strip (with the rank), never offered (deleted,
  * retyped or edited into another word). One tab-separated line per outcome in `swipe_results.tsv` in the app's
- * external files dir; nothing leaves the phone. A swipe whose word is edited again later gets a second line with the
+ * external files dir: time, swipe id, outcome, rank, swiped word, final word, decode ms, speed (key widths per
+ * second), tuning key, decoder version ([helium314.keyboard.gesture.DECODER_VERSION]), app version. Nothing leaves
+ * the phone. A swipe whose word is edited again later gets a second line with the
  * same id; the summary keeps the last.
  *
  * Fed by [GestureCorpusRecorder], which follows each swiped word until it is settled, whether or not the corpus
@@ -41,7 +43,8 @@ object SwipeMetrics {
         executor.execute {
             try {
                 file?.appendText(listOf(time, id, outcome, rank, swiped, finalWord ?: "", decodeMs,
-                    String.format(java.util.Locale.ROOT, "%.1f", keysPerSecond), tuningKey).joinToString("\t") + "\n")
+                    String.format(java.util.Locale.ROOT, "%.1f", keysPerSecond), tuningKey,
+                    helium314.keyboard.gesture.DECODER_VERSION, helium314.keyboard.latin.BuildConfig.VERSION_NAME).joinToString("\t") + "\n")
             } catch (e: Exception) {
                 Log.w(TAG, "could not log a swipe outcome", e)
             }
