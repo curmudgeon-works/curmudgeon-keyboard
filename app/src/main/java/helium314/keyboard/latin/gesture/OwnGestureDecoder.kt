@@ -84,6 +84,9 @@ object OwnGestureDecoder {
     /** The tuning the last swipe was decoded with (the statistics are kept under its key). */
     @Volatile var currentTuning: Tuning = Tuning.DEFAULT
         private set
+    /** How long the last decode took on this phone, for the swipe statistics. */
+    @Volatile var lastDecodeMs: Long = 0
+        private set
 
     private var scorers: List<Scorer> = listOf(HybridScorer(), KushlerScorer(), LocationScorer())
     // the caps settings and the tuning are part of the immutable configs, so the decoder is rebuilt when they change
@@ -156,6 +159,7 @@ object OwnGestureDecoder {
         val start = SystemClock.elapsedRealtime()
         val all = decoderFor(capsHeight, capsSwipe, tuning).decodeWithScorers(points, geometry, vocabulary, scorers, wanted.coerceIn(MAX_RESULTS, 40))
         val elapsed = SystemClock.elapsedRealtime() - start
+        lastDecodeMs = elapsed
 
         val activeName = if (activeScorerPref != null && all.containsKey(activeScorerPref)) activeScorerPref
                          else Defaults.PREF_GESTURE_DECODER_SCORER

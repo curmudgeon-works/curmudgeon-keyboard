@@ -174,6 +174,8 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
                     fun pct(n: Int) = if (row.swipes == 0) 0 else (100f * n / row.swipes).roundToInt()
                     Text(stringResource(R.string.swipe_tuning_row, row.swipes, pct(row.kept), pct(row.pickedSecond),
                         pct(row.pickedThird + row.pickedLater), pct(row.deleted)), style = MaterialTheme.typography.bodySmall)
+                    if (row.timed > 0)
+                        Text(stringResource(R.string.swipe_tuning_time, row.averageMs, row.slowestMs), style = MaterialTheme.typography.bodySmall)
                     if (isCurrent) TextButton(onClick = { GestureStats.clear(ctx.realPrefs(), key); statsGeneration++ }) {
                         Text(stringResource(R.string.swipe_tuning_reset))
                     }

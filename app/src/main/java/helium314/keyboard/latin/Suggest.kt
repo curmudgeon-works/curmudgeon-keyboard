@@ -339,7 +339,7 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
             GestureCorpusRecorder.onSwipe(wordComposer.composedDataSnapshot, keyboard, suggestionResults,
                 mDictionaryFacilitator.mainLocale.toLanguageTag())
         if (inputStyle == SuggestedWords.INPUT_STYLE_TAIL_BATCH && suggestionResults.isNotEmpty())
-            GestureStats.onSwipe(OwnGestureDecoder.currentTuning.key)
+            GestureStats.onSwipe(OwnGestureDecoder.currentTuning.key, OwnGestureDecoder.lastDecodeMs)
 
         // For transforming words that don't come from a dictionary, because it's our best bet
         val locale = mDictionaryFacilitator.mainLocale

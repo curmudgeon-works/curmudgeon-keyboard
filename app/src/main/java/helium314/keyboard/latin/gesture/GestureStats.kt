@@ -20,25 +20,31 @@ object GestureStats {
     class Row(
         var swipes: Int = 0, var kept: Int = 0, var pickedSecond: Int = 0, var pickedThird: Int = 0,
         var pickedLater: Int = 0, var deleted: Int = 0,
+        /** decode time on this phone: how many swipes were timed, their total ms and the slowest */
+        var timed: Int = 0, var timeMs: Long = 0, var slowestMs: Int = 0,
     ) {
+        val averageMs: Int get() = if (timed == 0) 0 else (timeMs / timed).toInt()
         /** Ranking score: a kept swipe counts fully, a second choice half, a third a quarter, the rest nothing. */
         val score: Float get() = if (swipes == 0) 0f else (kept + 0.5f * pickedSecond + 0.25f * pickedThird) / swipes
 
         fun toJson(): JSONObject = JSONObject().put("n", swipes).put("kept", kept).put("p2", pickedSecond)
             .put("p3", pickedThird).put("pl", pickedLater).put("del", deleted)
+            .put("t", timed).put("ms", timeMs).put("max", slowestMs)
 
         companion object {
-            fun fromJson(o: JSONObject) = Row(o.optInt("n"), o.optInt("kept"), o.optInt("p2"), o.optInt("p3"), o.optInt("pl"), o.optInt("del"))
+            fun fromJson(o: JSONObject) = Row(o.optInt("n"), o.optInt("kept"), o.optInt("p2"), o.optInt("p3"), o.optInt("pl"), o.optInt("del"),
+                o.optInt("t"), o.optLong("ms"), o.optInt("max"))
         }
     }
 
     private var pendingKey: String? = null
 
-    /** A swipe was decoded under [tuningKey]; an earlier swipe still pending was kept as it came. */
+    /** A swipe was decoded under [tuningKey] in [decodeMs]; an earlier swipe still pending was kept as it came. */
     @Synchronized
-    fun onSwipe(tuningKey: String) {
+    fun onSwipe(tuningKey: String, decodeMs: Long) {
         pendingKey?.let { update(it) { r -> r.swipes++; r.kept++ } }
         pendingKey = tuningKey
+        update(tuningKey) { r -> r.timed++; r.timeMs += decodeMs; r.slowestMs = maxOf(r.slowestMs, decodeMs.toInt()) }
     }
 
     /** The pending swiped word was replaced from the strip; [rank] is 0-based (0 = the word itself, 1 = second choice). */
