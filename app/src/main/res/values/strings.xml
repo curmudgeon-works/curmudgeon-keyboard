@@ -356,6 +356,14 @@
     <string name="load_gesture_library_summary">Provide a native library to enable gesture typing</string>
     <!-- Title of the setting to record swipes into a local corpus file -->
     <string name="record_gesture_corpus">Record swipe corpus</string>
+    <!-- opt-in local log of swipe outcomes; the summary lines under the switch -->
+    <string name="swipe_metrics">Log swipe results</string>
+    <string name="swipe_metrics_summary">Keep a local log of how each swipe ends: first choice right, picked from the strip, or never offered (deleted, retyped or edited), with the decode time. Nothing leaves the phone.</string>
+    <string name="swipe_metrics_week">Last 7 days</string>
+    <string name="swipe_metrics_all">All time</string>
+    <string name="swipe_metrics_none">No swipes logged yet</string>
+    <string name="swipe_metrics_line">%1$d swipes · first choice right %2$d%% · picked from the strip %3$d%% · never offered %4$d%% · decode %5$d ms on average, %6$d ms at most</string>
+    <string name="swipe_metrics_clear">Clear the log</string>
     <!-- Description of the setting to record swipes into a local corpus file -->
     <string name="record_gesture_corpus_summary">Log every swipe (touch path, keyboard layout, suggested words and your corrections) to gesture_corpus.jsonl in this app\'s external files folder. Local only, never uploaded. Includes the words you swipe.</string>
     <!-- Message in load gesture library dialog -->

@@ -87,6 +87,9 @@ object OwnGestureDecoder {
     /** How long the last decode took on this phone, for the swipe statistics. */
     @Volatile var lastDecodeMs: Long = 0
         private set
+    /** The last swipe's speed (path length over duration, in key widths per second), for the swipe results log. */
+    @Volatile var lastSpeedKeysPerSecond: Float = 0f
+        private set
 
     private var scorers: List<Scorer> = listOf(HybridScorer(), KushlerScorer(), LocationScorer())
     // the caps settings and the tuning are part of the immutable configs, so the decoder is rebuilt when they change
@@ -156,6 +159,7 @@ object OwnGestureDecoder {
             return results
         }
 
+        lastSpeedKeysPerSecond = speedOf(points, geometry.keyWidth)
         val start = SystemClock.elapsedRealtime()
         val all = decoderFor(capsHeight, capsSwipe, tuning).decodeWithScorers(points, geometry, vocabulary, scorers, wanted.coerceIn(MAX_RESULTS, 40))
         val elapsed = SystemClock.elapsedRealtime() - start
@@ -186,6 +190,14 @@ object OwnGestureDecoder {
      */
     private fun toNativeScore(score: Float): Int =
         (1_000_000.0 / (1.0 + score.toDouble())).toInt().coerceAtLeast(1)
+
+    private fun speedOf(points: List<GesturePoint>, keyWidth: Float): Float {
+        val duration = points.last().t - points.first().t
+        if (duration <= 0 || keyWidth <= 0f) return 0f
+        var length = 0.0
+        for (i in 1 until points.size) length += Math.hypot((points[i].x - points[i - 1].x).toDouble(), (points[i].y - points[i - 1].y).toDouble())
+        return (length / keyWidth * 1000.0 / duration).toFloat()
+    }
 
     private fun adaptPointers(composedData: ComposedData): List<GesturePoint> {
         val pointers = composedData.mInputPointers

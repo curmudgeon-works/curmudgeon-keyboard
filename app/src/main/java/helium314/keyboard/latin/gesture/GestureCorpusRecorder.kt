@@ -43,6 +43,10 @@ object GestureCorpusRecorder {
     @Volatile private var lastWord = ""
     @Volatile private var lastTime = 0L
     private const val RESUME_WINDOW_MS = 60_000L
+    // what the swipe results log wants to know about the last swipe
+    @Volatile private var lastDecodeMs = 0L
+    @Volatile private var lastSpeed = 0f
+    @Volatile private var lastTuning = ""
 
     fun init(context: Context) {
         file = File(context.getExternalFilesDir(null) ?: context.filesDir, FILE_NAME)
@@ -50,14 +54,19 @@ object GestureCorpusRecorder {
 
     fun isEnabled(): Boolean = Settings.getValues().mRecordGestureCorpus && file != null
 
+    /** The swiped word is followed to its outcome for the corpus and/or the swipe results log. */
+    private fun following(): Boolean = isEnabled() || SwipeMetrics.isEnabled()
+
     fun corpusFile(): File? = file
 
     /** Called with the final (tail) batch-input decode; [candidates] are the decoder's ranked results. */
     fun onSwipe(composedData: ComposedData, keyboard: Keyboard, candidates: Collection<SuggestedWordInfo>, localeTag: String) {
-        if (!isEnabled()) return
+        if (!following()) return
         val pointers = composedData.mInputPointers
         val size = pointers.pointerSize
         if (size < 2) return
+        // a swipe still open when the next one comes was kept as it came
+        if (pendingId >= 0) finish(SwipeMetrics.OUTCOME_KEPT, -1, null)
         val xs = pointers.xCoordinates.copyOf(size)
         val ys = pointers.yCoordinates.copyOf(size)
         val ts = pointers.times.copyOf(size)
@@ -73,6 +82,10 @@ object GestureCorpusRecorder {
         lastId = id
         lastWord = cands.firstOrNull()?.first ?: ""
         lastTime = time
+        lastDecodeMs = OwnGestureDecoder.lastDecodeMs
+        lastSpeed = OwnGestureDecoder.lastSpeedKeysPerSecond
+        lastTuning = OwnGestureDecoder.currentTuning.key
+        if (!isEnabled()) return
         executor.execute {
             try {
                 val obj = JSONObject()
@@ -102,14 +115,14 @@ object GestureCorpusRecorder {
         }
     }
 
-    /** The user replaced the pending swiped word with [word] via the suggestion strip. */
-    fun onSuggestionPicked(word: String) = correction("pick", word)
+    /** The user replaced the pending swiped word with [word] via the suggestion strip; [rank] 0-based (0 = the word itself). */
+    fun onSuggestionPicked(word: String, rank: Int) = finish(SwipeMetrics.OUTCOME_PICKED, rank, word)
 
     /** The user deleted the pending swiped word (backspace on a batch word). */
-    fun onWordDeleted() = correction("deleted", null)
+    fun onWordDeleted() = finish(SwipeMetrics.OUTCOME_DELETED, -1, null)
 
     /** Any other commit / new word: the pending swipe is settled as-is. */
-    fun onWordSettled() { pendingId = -1L }
+    fun onWordSettled() = finish(SwipeMetrics.OUTCOME_KEPT, -1, null)
 
     /**
      * The composing word was committed as [word] some way other than a pick from the strip (which reports itself):
@@ -117,7 +130,20 @@ object GestureCorpusRecorder {
      */
     fun onWordCommitted(word: String) {
         if (pendingId < 0) return
-        if (word == lastWord) pendingId = -1L else correction("edited", word)
+        if (word == lastWord) finish(SwipeMetrics.OUTCOME_KEPT, -1, null) else finish(SwipeMetrics.OUTCOME_EDITED, -1, word)
+    }
+
+    /** The pending swipe's outcome: to the swipe results log, and (corrections only) to the corpus. */
+    private fun finish(outcome: String, rank: Int, word: String?) {
+        val id = pendingId
+        if (id < 0) return
+        pendingId = -1L
+        SwipeMetrics.onOutcome(id, lastWord, outcome, rank, word, lastDecodeMs, lastSpeed, lastTuning)
+        when (outcome) {
+            SwipeMetrics.OUTCOME_PICKED -> if (rank != 0) correction(id, "pick", word)
+            SwipeMetrics.OUTCOME_DELETED -> correction(id, "deleted", null)
+            SwipeMetrics.OUTCOME_EDITED -> correction(id, "edited", word)
+        }
     }
 
     /** A committed word was opened for editing again, reading [word]: the last swipe's outcome is open again if that is its word. */
@@ -125,10 +151,8 @@ object GestureCorpusRecorder {
         if (lastId >= 0 && word == lastWord && System.currentTimeMillis() - lastTime <= RESUME_WINDOW_MS) pendingId = lastId
     }
 
-    private fun correction(how: String, word: String?) {
-        val id = pendingId
-        if (id < 0 || !isEnabled()) return
-        pendingId = -1L
+    private fun correction(id: Long, how: String, word: String?) {
+        if (!isEnabled()) return
         val time = System.currentTimeMillis()
         executor.execute {
             try {
