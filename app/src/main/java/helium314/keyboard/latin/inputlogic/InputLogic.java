@@ -1337,9 +1337,12 @@ public final class InputLogic {
         // Word-level delete when backspace is held: each repeat tick removes the
         // previous word (plus any trailing whitespace/punctuation) instead of one char.
         // Single tap still deletes one char (event.isKeyRepeat() is false on the initial press).
+        // (an UNKNOWN cursor position must not block this: fields that rewrite their own text, like a chat app's
+        // composer, leave it unknown until the next cursor update, and the text fetch below copes with that —
+        // the hold then fell back to deleting letter by letter)
         if (event.isKeyRepeat() && inputTransaction.getSettingsValues().mBackspaceHoldDeletesWords
                 && !mConnection.hasSelection()
-                && mConnection.getExpectedSelectionStart() > 0) {
+                && mConnection.getExpectedSelectionStart() != 0) {
             final SettingsValues settingsValues = inputTransaction.getSettingsValues();
             if (mWordComposer.isComposingWord()) {
                 // A preceding tap can resume composing on the word before the cursor; without
