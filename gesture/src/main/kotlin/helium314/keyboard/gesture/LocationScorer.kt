@@ -12,6 +12,16 @@ class LocationConfig(
     val sampleCount: Int = 40,
     /** Weight of the first/last sample relative to the middle; the ends are where people land where they mean to. */
     val endpointEmphasis: Float = 2f,
+    /**
+     * Speed awareness (swipe speed in key widths per second above [speedFromKeysPerSecond]): the end emphasis falls
+     * by [endsRelaxPerKeyPerSecond] per key/s (never below 1), since fast swipes land less exactly; and a sample's
+     * distance saturates at [saturationKeyWidths] key widths (0 = off) so one corner a key short cannot sink a
+     * word that fits everywhere else — [saturationPerKeyPerSecond] lowers that cap further for fast swipes.
+     */
+    val speedFromKeysPerSecond: Float = 12f,
+    val endsRelaxPerKeyPerSecond: Float = 0f,
+    val saturationKeyWidths: Float = 0f,
+    val saturationPerKeyPerSecond: Float = 0f,
 )
 
 class LocationScorer(private val config: LocationConfig = LocationConfig()) : Scorer {
@@ -24,18 +34,25 @@ class LocationScorer(private val config: LocationConfig = LocationConfig()) : Sc
             padIfSingle(FloatArray(gesture.points.size) { gesture.points[it].y }), n)
         val (tx, ty) = Geom.resampleToN(padIfSingle(FloatArray(sokgraph.points.size) { sokgraph.points[it].x }),
             padIfSingle(FloatArray(sokgraph.points.size) { sokgraph.points[it].y }), n)
+        val kw = geometry.keyWidth
+        val excess = (gesture.meanSpeed * 1000f / kw - config.speedFromKeysPerSecond).coerceAtLeast(0f)
+        val emphasis = (config.endpointEmphasis - config.endsRelaxPerKeyPerSecond * excess).coerceAtLeast(1f)
+        val cap = if (config.saturationKeyWidths <= 0f) 0f
+            else (config.saturationKeyWidths - config.saturationPerKeyPerSecond * excess).coerceAtLeast(0.5f) * kw
         var dist = 0f
         var weightSum = 0f
         val half = (n - 1) / 2f
         for (i in 0 until n) {
             val u = if (half <= 0f) 0f else (i - half) / half // -1..1
-            val w = 1f + (config.endpointEmphasis - 1f) * u * u
+            val w = 1f + (emphasis - 1f) * u * u
             val dx = gx[i] - tx[i]
             val dy = gy[i] - ty[i]
-            dist += w * sqrt(dx * dx + dy * dy)
+            var d = sqrt(dx * dx + dy * dy)
+            if (cap > 0f) d = cap * (1f - kotlin.math.exp(-d / cap)) // soft cap: linear when small, levels off at cap
+            dist += w * d
             weightSum += w
         }
-        return (dist / weightSum / geometry.keyWidth).coerceAtLeast(Scorer.MIN_SCORE) // in key widths
+        return (dist / weightSum / kw).coerceAtLeast(Scorer.MIN_SCORE) // in key widths
     }
 
     /** resampleToN needs ≥1 point; duplicate a lone point so degenerate templates work. */

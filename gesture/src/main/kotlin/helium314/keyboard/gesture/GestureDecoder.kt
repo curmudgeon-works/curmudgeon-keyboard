@@ -58,6 +58,28 @@ class DecoderConfig(
     val longReachKeyWidths: Float = 4f,
     val reachShortfallRightKeyWidths: Float = 0.6f,
     val reachShortfallLeftKeyWidths: Float = 0.4f,
+    /**
+     * Fast swipes are looser: above [speedWidenFromKeysPerSecond] the corridor and the start/end radii grow by
+     * [speedWidenPerKeyPerSecond] of themselves per key width per second of swipe speed (path length over duration).
+     * A careful 9 keys/s swipe keeps the tight tolerances; a 20 keys/s one gets them widened. 0 = off.
+     */
+    val speedWidenFromKeysPerSecond: Float = 12f,
+    val speedWidenPerKeyPerSecond: Float = 0f,
+    /**
+     * Fast swipes lean more on word frequency (the user's own words carry a boost) and less on exact shape: above
+     * [frequencyEmphasisFromKeysPerSecond] the frequency weight in the ranking grows by [frequencyEmphasisPerKeyPerSecond]
+     * per key width per second. 0 = off (weight 1, the plain Swype-style ranking). 0.05 (weight 1.4 at 20 keys/s):
+     * +1.2 first-choice on Rahul's 1,428 swipes and +1.2 on 40,245 FUTO swipes (+629 −142), slow swipes unchanged
+     * (2026-10-01).
+     */
+    val frequencyEmphasisFromKeysPerSecond: Float = 12f,
+    val frequencyEmphasisPerKeyPerSecond: Float = 0.05f,
+    /**
+     * This share of a word's letters (rounded down; never the first or last) may lie outside the corridor and still
+     * leave the word in the running: the scorer, not the filter, then judges the miss. 0 = off; 0.2 = one letter of a
+     * 5–9 letter word, two of a 10–14 letter word.
+     */
+    val missedLetterShare: Float = 0f,
     /** Capitalize the letter a swipe leaves the keyboard upwards from (the excursion is stripped from the path either way). */
     val capsExcursions: Boolean = true,
 )
@@ -93,9 +115,11 @@ class GestureDecoder(
         val gesture = preprocessor.preprocess(points, geometry)
         if (gesture.points.isEmpty()) return out
 
-        var candidates = collectCandidates(gesture, geometry, vocabulary, 1f)
+        val keysPerSecond = gesture.meanSpeed * 1000f / geometry.keyWidth
+        val speedWiden = 1f + config.speedWidenPerKeyPerSecond * (keysPerSecond - config.speedWidenFromKeysPerSecond).coerceAtLeast(0f)
+        var candidates = collectCandidates(gesture, geometry, vocabulary, speedWiden)
         if (candidates.isEmpty() && config.retryWidening > 1f)
-            candidates = collectCandidates(gesture, geometry, vocabulary, config.retryWidening)
+            candidates = collectCandidates(gesture, geometry, vocabulary, speedWiden * config.retryWidening)
         if (candidates.isEmpty()) return out
 
         // caps-excursion: uppercase the letter matched nearest before each excursion.
@@ -103,13 +127,15 @@ class GestureDecoder(
         val displayWords = candidates.map { if (config.capsExcursions) applyExcursionCaps(it, gesture, geometry) else it.sokgraph.word }
 
         val maxFreq = vocabulary.maxFrequency.toFloat()
+        val frequencyWeight = 1f + config.frequencyEmphasisPerKeyPerSecond * (keysPerSecond - config.frequencyEmphasisFromKeysPerSecond).coerceAtLeast(0f)
         for (s in scorers) {
             val scored = ArrayList<ScoredWord>(candidates.size)
             for ((i, candidate) in candidates.withIndex()) {
                 val raw = s.score(gesture, candidate.sokgraph, geometry)
                 if (raw == Float.MAX_VALUE) continue
-                // patent ranking formula: score * (log(MAX_FREQ / word_frequency) + 1), lower is better
-                var rank = raw * (ln(maxFreq / candidate.frequency) + 1f)
+                // patent ranking formula: score * (log(MAX_FREQ / word_frequency) + 1), lower is better;
+                // the log term weighs more for fast swipes (frequencyWeight 1 = the plain formula)
+                var rank = raw * (frequencyWeight * ln(maxFreq / candidate.frequency) + 1f)
                 if (config.endpointPenaltyPerKeyWidth > 0f) {
                     val sok = candidate.sokgraph.points
                     val p0 = gesture.points.first(); val p1 = gesture.points.last()
@@ -201,6 +227,8 @@ class GestureDecoder(
             val arcs = FloatArray(word.length)
             var arcPos = 0f
             var previous: KeyInfo? = null
+            var missesLeft = if (config.missedLetterShare <= 0f) 0
+                else (word.count { !geometry.isSkippedWordChar(it.lowercaseChar()) } * config.missedLetterShare).toInt()
             for (i in word.indices) {
                 val c = word[i].lowercaseChar()
                 if (geometry.isSkippedWordChar(c)) { // not on the path: holds the previous letter's position
@@ -229,7 +257,13 @@ class GestureDecoder(
                         }
                     }
                 }
-                if (d > corridorRadius) return null
+                if (d > corridorRadius) {
+                    // a letter the path never came near: allowed a few times per word, never at the ends
+                    if (i == 0 || i == word.lastIndex || missesLeft-- <= 0) return null
+                    arcs[i] = arcPos
+                    previous = key
+                    continue
+                }
                 arcs[i] = newArc
                 arcPos = newArc
                 previous = key

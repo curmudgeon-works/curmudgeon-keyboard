@@ -50,6 +50,7 @@ class ReplayTest {
         val vocab = Vocabulary(emptyList())
         var reference: List<Int>? = null
         for ((locale, factor) in factors) {
+            if (factor <= 0f) continue // GESTURE_REPLAY_HI_FACTOR=0: an English-only keyboard
             val entries = File(dir, "$locale.vocab.tsv").readLines().map { line -> val (word, freq) = line.split('\t'); word to freq.toInt() }
                 .sortedByDescending { it.second }
             val freqs = entries.map { it.second }
@@ -82,7 +83,8 @@ class ReplayTest {
      * turn = turn confidence scale, ends = location scorer's end emphasis, samples = its resampled points,
      * endR = start/end key radius, corridor = how far off the path a letter may be, stop = stop detection (dt factor),
      * skip = penalty for an inflection no letter uses, cap = candidates scored, reach / shortR / shortL = the long-reach
-     * corner rule (reach length, allowed shortfall reaching right / left).
+     * corner rule (reach length, allowed shortfall reaching right / left), prog = letter-order slack, band / slack =
+     * the path-length band (ratio, additive key widths).
      */
     private fun decoder(spec: String): GestureDecoder {
         val v = spec.split(' ').filter { '=' in it }.associate { it.substringBefore('=') to it.substringAfter('=').toFloat() }
@@ -90,11 +92,18 @@ class ReplayTest {
         val k = f("k", 0.4f)
         return GestureDecoder(
             HybridScorer(
-                KushlerScorer(KushlerConfig(slowEmphasis = f("slow", 0.5f), skipInflectionPenalty = f("skip", 0.9f))),
-                LocationScorer(LocationConfig(sampleCount = f("samples", 40f).toInt(), endpointEmphasis = f("ends", 2f))),
+                KushlerScorer(KushlerConfig(slowEmphasis = f("slow", 0.5f), skipInflectionPenalty = f("skip", 0.9f),
+                    speedFromKeysPerSecond = f("spdFrom", 12f), matchRelaxPerKeyPerSecond = f("matchRelax", 0.05f))),
+                LocationScorer(LocationConfig(sampleCount = f("samples", 40f).toInt(), endpointEmphasis = f("ends", 2f),
+                    speedFromKeysPerSecond = f("spdFrom", 12f), endsRelaxPerKeyPerSecond = f("endsRelax", 0f),
+                    saturationKeyWidths = f("sat", 0f), saturationPerKeyPerSecond = f("satRate", 0f))),
                 kushlerWeight = k, locationWeight = 1f - k,
             ),
             DecoderConfig(endpointRadiusKeyWidths = f("endR", 1.6f), corridorRadiusKeyWidths = f("corridor", 1.4f),
+                progressSlackKeyWidths = f("prog", 1.2f), lengthRatioBand = f("band", 2f), lengthSlackKeyWidths = f("slack", 2f),
+                missedLetterShare = f("miss", 0f),
+                speedWidenFromKeysPerSecond = f("spdFrom", 12f), speedWidenPerKeyPerSecond = f("spdRate", 0f),
+                frequencyEmphasisFromKeysPerSecond = f("fqFrom", 12f), frequencyEmphasisPerKeyPerSecond = f("fqRate", 0.05f),
                 maxCandidates = f("cap", 4096f).toInt(), longReachKeyWidths = f("reach", 4f),
                 reachShortfallRightKeyWidths = f("shortR", 0.6f), reachShortfallLeftKeyWidths = f("shortL", 0.4f)),
             GesturePreprocessor(PreprocessorConfig(turnConfidenceScale = f("turn", 1f), stopDtFactor = f("stop", 2.5f))),
@@ -110,7 +119,7 @@ class ReplayTest {
     )
 
     private fun variants(): List<Variant> {
-        fun plain(d: GestureDecoder): (Swipe, Vocabulary) -> List<ScoredWord> = { s, v -> d.decode(s.points, s.geometry, v, 10) }
+        fun plain(d: GestureDecoder): (Swipe, Vocabulary) -> List<ScoredWord> = { s, v -> d.decode(s.points, s.geometry, v, 50) }
         // GESTURE_REPLAY_SPECS="k=0.4 slow=1;k=0.4": these instead of the sweep
         val specs = System.getenv("GESTURE_REPLAY_SPECS")?.split(';')?.map { it.trim() }?.filter { it.isNotEmpty() } ?: sweep
         val history = (System.getenv("GESTURE_REPLAY_HISTORY") ?: "").split(',').mapNotNull { it.trim().toIntOrNull() }
@@ -171,6 +180,30 @@ class ReplayTest {
             ranked.take(3).map { row(it.word) }
     }
 
+    /**
+     * GESTURE_REPLAY_REJECTED=1: for every labelled word the first variant rejects before scoring, which single
+     * filter, loosened on its own, lets it in (or that the word is not in the vocabulary, or that no single filter
+     * suffices). Printed as a histogram, overall and per session group when sessions are known.
+     */
+    private val loosenings = listOf(
+        "start/end radius" to DecoderConfig(endpointRadiusKeyWidths = 4f),
+        "corridor" to DecoderConfig(corridorRadiusKeyWidths = 3f),
+        "letter order along the path" to DecoderConfig(progressSlackKeyWidths = 20f),
+        "length band" to DecoderConfig(lengthRatioBand = 10f),
+        "minimum letters" to DecoderConfig(minLetterSlack = 50),
+    )
+
+    private fun rejectedBy(s: Swipe, vocab: Vocabulary): String {
+        if (!vocab.contains(s.label)) return "word not in the vocabulary"
+        val hybrid = HybridScorer(KushlerScorer(KushlerConfig(slowEmphasis = 0.5f, skipInflectionPenalty = 0.9f)),
+            LocationScorer(LocationConfig(sampleCount = 40, endpointEmphasis = 2f)), kushlerWeight = 0.4f, locationWeight = 0.6f)
+        val admits = loosenings.filter { (_, config) ->
+            GestureDecoder(hybrid, config, GesturePreprocessor(PreprocessorConfig(stopDtFactor = 2.5f)))
+                .decode(s.points, s.geometry, vocab, 5000).any { it.word.equals(s.label, ignoreCase = true) }
+        }.map { it.first }
+        return if (admits.isEmpty()) "no single filter (two or more at once)" else admits.joinToString(" or ")
+    }
+
     /** Which phone recorded a swipe: make_corpus.py shifts each phone's ids. */
     private fun device(id: Int) = when { id >= 200000 -> "P8lab"; id >= 100000 -> "P8"; else -> "P11" }
 
@@ -190,7 +223,12 @@ class ReplayTest {
         val details = mutableListOf<String>()
         val misses = LinkedHashMap<String, MutableList<String>>()
         var baseline: BooleanArray? = null // the first variant's top-1 hits, for the head-to-head count
-        for (v in variants()) {
+        val allVariants = variants()
+        val firstVariant = allVariants.first()
+        val dump = System.getenv("GESTURE_REPLAY_DUMP")?.let { StringBuilder() }
+        val attributeRejected = System.getenv("GESTURE_REPLAY_REJECTED") == "1"
+        val rejectedHistogram = ArrayList<String>()
+        for (v in allVariants) {
             val all = Tally()
             val bySource = sortedMapOf<String, Tally>()
             val byDevice = sortedMapOf<String, Tally>()
@@ -215,12 +253,21 @@ class ReplayTest {
                     details.add(String.format("%-44s #%-4d label=%-9s phone=%-9s -> %s", v.name, s.id, s.label, s.phoneGot,
                         results.take(6).joinToString(", ") { it.word }))
                 val rank = results.indexOfFirst { it.word.equals(s.label, ignoreCase = true) }
+                if (rank < 0 && v === firstVariant && attributeRejected) {
+                    val pruned = GestureDecoder(HybridScorer(), DecoderConfig(), GesturePreprocessor(PreprocessorConfig(stopDtFactor = 2.5f)))
+                        .decode(s.points, s.geometry, vocabForVariant, 5000).none { it.word.equals(s.label, ignoreCase = true) }
+                    if (pruned) rejectedHistogram.add(rejectedBy(s, vocabForVariant) + "\t" + s.session + "\t" + s.id)
+                }
                 hits[index] = rank == 0
                 all.add(rank)
                 if (s.session.isNotEmpty()) bySession.getOrPut(s.session) { Tally() }.add(rank)
                 bySource.getOrPut(s.labelSource) { Tally() }.add(rank)
                 byDevice.getOrPut(device(s.id)) { Tally() }.add(rank)
                 if (rank != 0) missList.add("#${s.id} ${s.label} -> ${results.take(3).joinToString(",") { it.word }} (rank ${if (rank < 0) "-" else rank + 1})")
+                // GESTURE_REPLAY_DUMP=<file>: every swipe's outcome under every variant, for analysis elsewhere
+                // (first variant without a name column, so older readers keep working)
+                dump?.appendLine((if (v === firstVariant) "" else "${v.name}\t") +
+                    "${s.id}\t${s.session}\t${s.label}\t${rank + 1}\t${results.take(12).joinToString(",") { it.word }}")
             }
             fun top1s(m: Map<String, Tally>) = m.entries.joinToString("  ") { "${it.key}: ${String.format("%.1f", it.value.pct(it.value.top1))}" }
             // swipes this variant gets right that the first one misses, and the other way round
@@ -235,6 +282,14 @@ class ReplayTest {
                 println(String.format("    per person (%d with 30+ swipes) top1: worst %.0f%%, 10th pct %.0f%%, 25th %.0f%%, median %.0f%%, 75th %.0f%%, best %.0f%%; under 50%%: %d",
                     people.size, people.first(), at(0.10), at(0.25), at(0.5), at(0.75), people.last(), people.count { it < 50 }))
             }
+        }
+        if (dump != null) File(System.getenv("GESTURE_REPLAY_DUMP")).writeText(dump.toString())
+        if (attributeRejected) {
+            val total = swipes.count { it.label != "?" }
+            println("\n--- words rejected before scoring (first variant): ${rejectedHistogram.size} of $total labelled swipes ---")
+            rejectedHistogram.groupingBy { it.substringBefore('\t') }.eachCount().entries.sortedByDescending { it.value }
+                .forEach { println(String.format("    %5.1f%%  %s", 100.0 * it.value / total, it.key)) }
+            System.getenv("GESTURE_REPLAY_REJECTED_FILE")?.let { File(it).writeText(rejectedHistogram.joinToString("\n")) }
         }
         if (details.isNotEmpty()) { println("\n--- watched words ---"); details.sortedBy { it.substringAfter('#').substringBefore(' ').toInt() }.forEach { println(it) } }
         if (System.getenv("GESTURE_REPLAY_BREAKDOWN") == "1") {
