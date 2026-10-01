@@ -235,10 +235,9 @@ fun SubtypeScreen(
     val preview = remember { PreviewKeyboard(tryIt, scope, showIme = { softKeyboard?.show() }, reveal = { }) {
         focusManager.clearFocus(); softKeyboard?.hide() } }
     var bottomBarTop by remember { mutableIntStateOf(-1) }
-    // a numbers row or split switch brings the keyboard up for a moment, as on Appearance (dialogs report themselves)
-    fun shape() = listOf(Settings.PREF_SHOW_NUMBER_ROW, Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS, Settings.PREF_ENABLE_SPLIT_KEYBOARD,
-        Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED,
-        Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE).map { prefs.all[it] }
+    // a switch whose effect shows on the keyboard brings it up for a moment, as on Appearance (dialogs report themselves):
+    // the keyboard's shape, what a key press does (popup, vibration, sound), the emoji key, backspace, popups
+    fun shape() = previewedSwitches.map { prefs.all[it] }
     var lastShape by remember { mutableStateOf(shape()) }
     LaunchedEffect(b?.value) {
         val now = shape()
@@ -419,13 +418,15 @@ fun SubtypeScreen(
                         (if (resumed >= 0) preferencesInputItems(prefs, ctx) else emptyList()).filter { it !in advancedInputItems }.forEach {
                             if (it !is String) return@forEach
                             CompositionLocalProvider(LocalPendingChange provides keyChanged(it)) {
-                            // the rows that appear under Vibrate / Sound when they're on sit a little in
-                            if (it in soundPreviewItems) CompositionLocalProvider(LocalKeepKeyboard provides true,
-                                LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
-                                Box(Modifier.padding(start = 16.dp)) { SettingsActivity.settingsContainer[it]?.Preference() }
+                            // the rows that appear under Vibrate / Sound when they're on sit a little in; the dialogs
+                            // of the long-press delay and the sound / vibration rows keep the keyboard up to try them
+                            val row: @Composable () -> Unit = {
+                                if (it in dependentInputItems) Box(Modifier.padding(start = 16.dp)) { SettingsActivity.settingsContainer[it]?.Preference() }
+                                else SettingsActivity.settingsContainer[it]?.Preference()
                             }
-                            else if (it in dependentInputItems) Box(Modifier.padding(start = 16.dp)) { SettingsActivity.settingsContainer[it]?.Preference() }
-                            else SettingsActivity.settingsContainer[it]?.Preference()
+                            if (it in previewDialogItems) CompositionLocalProvider(LocalKeepKeyboard provides true,
+                                LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) { row() }
+                            else row()
                             }
                         }
                     }
@@ -438,8 +439,10 @@ fun SubtypeScreen(
                             extra = { DefaultButton(checked == null) { setCurrentSubtype(currentSubtype.without(ExtraValue.LOCALIZED_NUMBER_ROW)) } },
                         ) { setCurrentSubtype(currentSubtype.with(ExtraValue.LOCALIZED_NUMBER_ROW, it.toString())) }
                     }
-                    // backspace (was its own group): whole words and speeding up in simple mode
-                    CompositionLocalProvider(LocalCompactPreferences provides true) {
+                    // backspace (was its own group): whole words and speeding up in simple mode; the speed-up dialog
+                    // keeps the keyboard up so holding backspace can be tried
+                    CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
+                        LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
                         Pending(keyChanged(Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS)) {
                             SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS]?.Preference() }
                         Pending(keyChanged(Settings.PREF_BACKSPACE_SPEED_UP, Settings.PREF_BACKSPACE_SPEED_UP_AFTER, Settings.PREF_BACKSPACE_TOP_INTERVAL)) {
@@ -447,7 +450,8 @@ fun SubtypeScreen(
                     }
                     // (the symbol switches — hide on the number row / other keys, long-press dots — are on Appearance)
                     if (advanced) AdvancedBlock {
-                        CompositionLocalProvider(LocalCompactPreferences provides true) {
+                        CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
+                            LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
                             // backspace, advanced: swiping left, undoing an autocorrection (a tap after a swipe: on Swiping)
                             Pending(keyChanged(Settings.PREF_DELETE_SWIPE, Settings.PREF_DELETE_SWIPE_SPEED)) {
                                 SettingsActivity.settingsContainer[Settings.PREF_DELETE_SWIPE]?.Preference() }
@@ -468,7 +472,8 @@ fun SubtypeScreen(
                     Pending(keyChanged("key_popups", "key_popup_set_selected", "key_popup_sets", Settings.PREF_SYMBOL_POPUP_MAP)
                             || currentSubtype.getExtraValueOf(ExtraValue.MORE_POPUPS) != openedSubtype.getExtraValueOf(ExtraValue.MORE_POPUPS)
                             || layoutChanged(LayoutType.SYMBOLS) || changedFolders.any { it != "main" } || prefixChanged(Settings.PREF_LAYOUT_PREFIX)) {
-                        KeyPopupsSection(currentSubtype) { setCurrentSubtype(it) } }
+                        CompositionLocalProvider(LocalKeepKeyboard provides true, LocalPreviewKeyboard provides preview,
+                            LocalBottomBarTop provides bottomBarTop) { KeyPopupsSection(currentSubtype) { setCurrentSubtype(it) } } }
                     run {
                         Pending(keyChanged(Settings.PREF_SHOW_TLD_POPUP_KEYS)) {
                             PrefSwitchRow(Settings.PREF_SHOW_TLD_POPUP_KEYS, Defaults.PREF_SHOW_TLD_POPUP_KEYS, R.string.show_tld_popup_keys) { holdPreview(); reloadPreview() } }
@@ -675,8 +680,19 @@ private fun SwitchRow(title: String, checked: Boolean, summary: String? = null, 
 }
 
 /** The Input items shown only in advanced mode, last in the group (see [AdvancedBlock]). */
-/** Settings whose dialogs keep the preview keyboard up (to hear the key sound or feel the vibration while choosing it). */
-private val soundPreviewItems = setOf(Settings.PREF_KEYPRESS_SOUND, Settings.PREF_KEYPRESS_SOUND_VOLUME, Settings.PREF_VIBRATION_DURATION_SETTINGS)
+/** Settings whose dialogs keep the preview keyboard up: to hear the key sound or feel the vibration while choosing it, to try the long-press delay. */
+private val previewDialogItems = setOf(Settings.PREF_KEYPRESS_SOUND, Settings.PREF_KEYPRESS_SOUND_VOLUME, Settings.PREF_VIBRATION_DURATION_SETTINGS,
+    Settings.PREF_KEY_LONGPRESS_TIMEOUT)
+
+/** Switches that bring the preview keyboard up for a moment when flipped: their effect is seen (or felt, or heard) on a key press. */
+private val previewedSwitches = listOf(
+    Settings.PREF_SHOW_NUMBER_ROW, Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS, Settings.PREF_ENABLE_SPLIT_KEYBOARD,
+    Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE,
+    Settings.PREF_SHOW_EMOJI_KEY, Settings.PREF_SPACE_TO_CHANGE_LANG,
+    Settings.PREF_POPUP_ON, Settings.PREF_VIBRATE_ON, Settings.PREF_SOUND_ON,
+    Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS, Settings.PREF_BACKSPACE_SPEED_UP, Settings.PREF_DELETE_SWIPE,
+    Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, Settings.PREF_REMOVE_REDUNDANT_POPUPS,
+)
 
 private val advancedInputItems = listOf(Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, SettingsWithoutKey.ABC_AFTER, Settings.PREF_SAVE_SUBTYPE_PER_APP) // (emoji descriptions: Appearance, Emoji group)
 
