@@ -56,9 +56,10 @@ private fun allowed(key: String, t: Int) = if (key == ToolbarKey.CLOSE_HISTORY.n
 
 /**
  * One list for the three toolbars' keys (was three reorder lists): each key has M(ain) / C(lipboard) / P(inned)
- * choices. The list sorts itself like the languages list: keys on the main toolbar first, then those only on the
- * clipboard toolbar, then those only pinned, then the unused ones; dragging within a section sets the order, and
- * each toolbar's order is the list's order of its keys.
+ * choices. The list opens sorted (main toolbar keys first, then clipboard-only, pinned-only, unused) and then stays
+ * put while choices change (Rahul: rows jumping away under the finger was worse); dragging sets the order, and each
+ * toolbar's order is the list's order of its keys. Every change shows at once on the preview keyboard's open
+ * toolbar; OK keeps it, Cancel puts the old lists back.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,34 +96,43 @@ fun ToolbarKeysPreference(setting: Setting) {
                 val s = section(k); if (s < 3) on[s].indexOf(k) else keys.indexOf(k) })))
         }
     }
-    fun resort() {
-        val sorted = order.sortedWith(compareBy({ section(it) }, { order.indexOf(it) }))
-        order.clear(); order.addAll(sorted)
+    // what the three prefs held when the dialog opened (null = unset), for Cancel
+    val opened = remember { toolbars.map { prefs.getString(it, null) } }
+    var confirmed by remember { mutableStateOf(false) }
+    fun write() {
+        prefs.edit {
+            for (t in 0..2) {
+                val keys = order.filter { allowed(it, t) }
+                putString(toolbars[t], keys.joinToString(Separators.ENTRY) { it + Separators.KV + (it in on[t]) })
+            }
+        }
+        KeyboardSwitcher.getInstance().setThemeNeedsReload()
+        helium314.keyboard.latin.suggestions.SuggestionStripView.showToolbarForPreview(true) // (a reload closes it)
     }
     val listState = rememberLazyListState()
     val dragState = rememberReorderableLazyListState(listState) { from, to ->
-        // only within a section: a key's section is what its choices say
-        if (section(order[from.index]) == section(order[to.index])) order.add(to.index, order.removeAt(from.index))
+        order.add(to.index, order.removeAt(from.index))
+        write()
     }
     ThreeButtonAlertDialog(
-        onDismissRequest = { showDialog = false },
+        onDismissRequest = {
+            if (!confirmed) { // Cancel / back / outside: the lists as they were
+                prefs.edit { toolbars.forEachIndexed { t, key -> if (opened[t] == null) remove(key) else putString(key, opened[t]) } }
+                KeyboardSwitcher.getInstance().setThemeNeedsReload()
+            }
+            showDialog = false
+        },
         title = { Text(setting.title) },
         neutralButtonText = stringResource(R.string.button_default),
-        onNeutral = { prefs.edit { toolbars.forEach { remove(it) } }; KeyboardSwitcher.getInstance().setThemeNeedsReload() },
-        onConfirmed = {
-            prefs.edit {
-                for (t in 0..2) {
-                    val keys = order.filter { allowed(it, t) }
-                    putString(toolbars[t], keys.joinToString(Separators.ENTRY) { it + Separators.KV + (it in on[t]) })
-                }
-            }
-            KeyboardSwitcher.getInstance().setThemeNeedsReload()
-        },
+        onNeutral = { confirmed = true; prefs.edit { toolbars.forEach { remove(it) } }; KeyboardSwitcher.getInstance().setThemeNeedsReload() },
+        onConfirmed = { confirmed = true; write() },
         content = {
             Column {
                 Text(stringResource(R.string.toolbar_keys_legend), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))
-                LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                // a short list that scrolls inside: the dialog stays small so the preview keyboard's toolbar shows above it
+                LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.heightIn(max = 220.dp)) {
                     items(order.toList(), key = { it }) { key ->
                         ReorderableItem(state = dragState, key = key) { dragging ->
                             val elevation by animateDpAsState(if (dragging) 4.dp else 0.dp)
@@ -142,7 +152,7 @@ fun ToolbarKeysPreference(setting: Setting) {
                                                     enabled = allowed(key, t),
                                                     onCheckedChange = { checked ->
                                                         if (checked) on[t].add(key) else on[t].remove(key)
-                                                        resort()
+                                                        write()
                                                     },
                                                     shape = SegmentedButtonDefaults.itemShape(t, 3),
                                                     icon = { },

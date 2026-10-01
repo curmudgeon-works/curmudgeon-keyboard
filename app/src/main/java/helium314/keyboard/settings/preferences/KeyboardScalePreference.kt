@@ -159,11 +159,8 @@ private fun KeyboardScaleDialog(
                             val default = part.defaults[i]
                             var sliderPosition by remember(key) { mutableFloatStateOf(prefs.getFloat(key, default)) }
                             var touched by remember(key) { mutableStateOf(false) }
-                            if (live && touched) LaunchedEffect(key, sliderPosition) {
-                                delay(80)
-                                write(key, if (sliderPosition == default) null else sliderPosition)
-                                onDone()
-                            }
+                            // live: written when the finger leaves the slider (or Default is tapped), not during the drag
+                            fun applyLive() { if (live && touched) { write(key, if (sliderPosition == default) null else sliderPosition); onDone() } }
                             done[key] = {
                                 if (sliderPosition == default) prefs.edit { remove(key) }
                                 else prefs.edit { putFloat(key, sliderPosition) }
@@ -176,6 +173,7 @@ private fun KeyboardScaleDialog(
                                     Slider(
                                         value = sliderPosition,
                                         onValueChange = { sliderPosition = it; touched = true },
+                                        onValueChangeFinished = { applyLive() },
                                         valueRange = part.range,
                                     )
                                     Row(
@@ -184,7 +182,7 @@ private fun KeyboardScaleDialog(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(part.description(sliderPosition))
-                                        TextButton({ sliderPosition = default; touched = true }) { Text(stringResource(R.string.button_default)) }
+                                        TextButton({ sliderPosition = default; touched = true; applyLive() }) { Text(stringResource(R.string.button_default)) }
                                     }
                                     Spacer(Modifier.height(6.dp))
                                 }

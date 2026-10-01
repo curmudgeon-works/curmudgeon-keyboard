@@ -1344,6 +1344,13 @@ public final class InputLogic {
                 && !mConnection.hasSelection()
                 && mConnection.getExpectedSelectionStart() != 0) {
             final SettingsValues settingsValues = inputTransaction.getSettingsValues();
+            // the cursor dropped inside a word (which then composes around it): the part before the cursor goes
+            // as one piece — leave the composing state, so the plain branch below measures from the cursor
+            if (mWordComposer.isComposingWord() && !mWordComposer.isBatchMode()
+                    && mWordComposer.isCursorFrontOrMiddleOfComposingWord()) {
+                resetEntireInputState(mConnection.getExpectedSelectionStart(),
+                        mConnection.getExpectedSelectionEnd(), true /* clearSuggestionStrip */);
+            }
             if (mWordComposer.isComposingWord()) {
                 // A preceding tap can resume composing on the word before the cursor; without
                 // this branch the repeat ticks would then delete that word one char at a time.

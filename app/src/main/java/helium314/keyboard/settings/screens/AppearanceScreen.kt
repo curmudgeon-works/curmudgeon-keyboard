@@ -507,6 +507,7 @@ fun createAppearanceSettings(context: Context) = listOf(
             name = setting.title,
             baseKey = setting.key,
             dimensions = listOf(stringResource(R.string.landscape), stringResource(R.string.split), stringResource(R.string.folded)),
+            alwaysShown = setOf(stringResource(R.string.split)), // portrait, landscape, split, split landscape: all four, no boxes
             defaults = Defaults.PREF_SIDE_PADDING_SCALE,
             range = 0f..3f,
             description = { "${(100 * it).toInt()}%" }

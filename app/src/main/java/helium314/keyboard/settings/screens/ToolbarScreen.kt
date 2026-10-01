@@ -101,7 +101,7 @@ fun createToolbarSettings(context: Context) = listOf(
         val shown = if (!suggestions && stored != Settings.TOOLBAR_ALWAYS && stored != Settings.TOOLBAR_HIDDEN) Settings.TOOLBAR_FROM_KEY
             else if (suggestions && stored == Settings.TOOLBAR_FROM_KEY) Settings.TOOLBAR_ABOVE else stored
         if (shown != prefs.getString(Settings.PREF_TOOLBAR_VISIBILITY, null)) prefs.edit { putString(Settings.PREF_TOOLBAR_VISIBILITY, shown) }
-        ListPreference(it, items, shown) {
+        ListPreference(it, items, shown, live = true) { // a tap previews on the keyboard, OK keeps, Cancel restores
             KeyboardLayoutSet.onSystemLocaleChanged() // (the top-left key's popup comes and goes)
             KeyboardSwitcher.getInstance().setThemeNeedsReload()
         }
@@ -112,7 +112,7 @@ fun createToolbarSettings(context: Context) = listOf(
             stringResource(R.string.pref_toolbar_expand_icon_incognito) to "incognito",
             stringResource(R.string.pref_toolbar_expand_icon_settings) to "settings",
             stringResource(R.string.pref_toolbar_expand_icon_none) to "none",
-        ), Defaults.PREF_TOOLBAR_EXPAND_ICON) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+        ), Defaults.PREF_TOOLBAR_EXPAND_ICON, live = true) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
     Setting(context, Settings.PREF_TOOLBAR_HIDING_GLOBAL, R.string.toolbar_hiding_global) {
         SwitchPreference(it, Defaults.PREF_TOOLBAR_HIDING_GLOBAL) {

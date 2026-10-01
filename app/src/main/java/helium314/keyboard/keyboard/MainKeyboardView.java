@@ -490,9 +490,9 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
             // though there may be some chances that the value is zero. <code>width == 0</code>
             // will cause zero-division error at
             // {@link PopupKeysKeyboardParams#setParameters(int,int,int,int,int,int,boolean,int)}.
-            final boolean isSinglePopupKeyWithPreview = mKeyPreviewDrawParams.isPopupEnabled()
-                    && key.hasPreview() && popupKeys.length == 1
-                    && mKeyPreviewDrawParams.getVisibleWidth() > 0;
+            // (upstream gave a single long-press key the key-press popup's size; with "popup on key press" on that
+            // made one-key popups like b's tall and narrow, and different from the same popup with it off)
+            final boolean isSinglePopupKeyWithPreview = false;
             final PopupKeysKeyboard.Builder builder = new PopupKeysKeyboard.Builder(
                     getContext(), key, getKeyboard(), isSinglePopupKeyWithPreview,
                     mKeyPreviewDrawParams.getVisibleWidth(),

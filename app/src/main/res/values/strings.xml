@@ -879,7 +879,7 @@ language, hence "No language". -->
     <!-- Info for customizing currencies -->
     <string name="customize_currencies_detail">Set main and up to 6 secondary currency symbols, separated with space</string>
     <!-- Title setting / dialog for selecting when to switch to main keyboard -->
-    <string name="switch_keyboard_after">Switch back to letters after…</string>
+    <string name="switch_keyboard_after">Switch back to ABC keyboard after…</string>
     <string name="abc_after_space_symbols">Space/enter after symbols</string>
     <string name="abc_after_space_numpad">Space/enter after numpad</string>
     <string name="abc_after_space_both">Space/enter after symbols or numpad</string>
