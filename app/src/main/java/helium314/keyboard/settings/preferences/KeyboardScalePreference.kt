@@ -181,7 +181,10 @@ private fun KeyboardScaleDialog(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(part.description(sliderPosition))
+                                        // tap the value to type it
+                                        helium314.keyboard.settings.dialogs.SliderValueText(sliderPosition, part.range, { part.description(it) }) { v ->
+                                            sliderPosition = v; touched = true; applyLive()
+                                        }
                                         TextButton({ sliderPosition = default; touched = true; applyLive() }) { Text(stringResource(R.string.button_default)) }
                                     }
                                     Spacer(Modifier.height(6.dp))

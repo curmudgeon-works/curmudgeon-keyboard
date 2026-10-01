@@ -201,7 +201,17 @@ fun TextStylePreference(setting: Setting, keys: TextStyleKeys) {
                         }
                     }
                 }
-                WithSmallTitle(stringResource(R.string.text_style_size, keys.sizeText(sizePosition))) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.text_style_size, ""), style = MaterialTheme.typography.bodyMedium)
+                    // tap the size to type it
+                    helium314.keyboard.settings.dialogs.SliderValueText(sizePosition, keys.sizeRange, { keys.sizeText(it) },
+                        style = MaterialTheme.typography.bodyMedium) { v ->
+                        sizePosition = v
+                        prefs.edit { if (keys.sizeIsInt) putInt(keys.size, v.roundToInt()) else putFloat(keys.size, v) }
+                        reload()
+                    }
+                }
+                run {
                     Slider(
                         value = sizePosition,
                         onValueChange = { sizePosition = it },
@@ -383,7 +393,15 @@ fun SymbolsSuggestionsFontsPreference(setting: Setting, symbols: TextStyleKeys, 
                     val stored = if (k.sizeIsInt) prefs.getInt(k.size, k.sizeDefault.toInt()).toFloat() else prefs.getFloat(k.size, k.sizeDefault)
                     var position by remember(k.size) { mutableFloatStateOf(stored) }
                     Column(dim) {
-                        Text(stringResource(label, k.sizeText(position)), style = MaterialTheme.typography.bodyMedium)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(stringResource(label, ""), style = MaterialTheme.typography.bodyMedium)
+                            // tap the size to type it
+                            helium314.keyboard.settings.dialogs.SliderValueText(position, k.sizeRange, { k.sizeText(it) },
+                                style = MaterialTheme.typography.bodyMedium) { v ->
+                                position = v
+                                change { if (k.sizeIsInt) putInt(k.size, v.roundToInt()) else putFloat(k.size, v) }
+                            }
+                        }
                         Slider(
                             value = position,
                             onValueChange = { position = it },
