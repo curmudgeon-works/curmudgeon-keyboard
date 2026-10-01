@@ -692,6 +692,14 @@
     <string name="toolbar_visibility_hidden">Hidden</string>
     <string name="settings_screen_others">Others</string>
     <string name="font_follows_key_text">Use same font for symbols and suggestions</string>
+    <!-- the one tile for the symbols' and the suggestions' text -->
+    <string name="symbols_suggestions_fonts">Symbols &amp; suggestions fonts</string>
+    <string name="fonts_same_as_keys">Use the same font as the keys</string>
+    <string name="text_style_symbols">Symbols</string>
+    <string name="text_style_suggestions">Suggestions</string>
+    <string name="text_style_symbols_size">Symbols size: %s</string>
+    <string name="text_style_suggestions_size">Suggestions size: %s</string>
+    <string name="suggestion_spacing_title">Spacing between suggestions</string>
     <string name="key_text_bold">Bold</string>
     <string name="key_text_italic">Italic</string>
     <string name="key_text_underline">Underlined</string>
