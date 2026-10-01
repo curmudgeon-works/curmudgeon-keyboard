@@ -55,13 +55,13 @@ object GestureCorpusRecorder {
     fun isEnabled(): Boolean = Settings.getValues().mRecordGestureCorpus && file != null
 
     /** The swiped word is followed to its outcome for the corpus and/or the swipe results log. */
-    private fun following(): Boolean = isEnabled() || SwipeMetrics.isEnabled()
+    fun isFollowing(): Boolean = isEnabled() || SwipeMetrics.isEnabled()
 
     fun corpusFile(): File? = file
 
     /** Called with the final (tail) batch-input decode; [candidates] are the decoder's ranked results. */
     fun onSwipe(composedData: ComposedData, keyboard: Keyboard, candidates: Collection<SuggestedWordInfo>, localeTag: String) {
-        if (!following()) return
+        if (!isFollowing()) return
         val pointers = composedData.mInputPointers
         val size = pointers.pointerSize
         if (size < 2) return
@@ -83,7 +83,7 @@ object GestureCorpusRecorder {
         lastWord = cands.firstOrNull()?.first ?: ""
         lastTime = time
         lastDecodeMs = OwnGestureDecoder.lastDecodeMs
-        lastSpeed = OwnGestureDecoder.lastSpeedKeysPerSecond
+        lastSpeed = OwnGestureDecoder.lastSpeedKeysPerSecond // the decoder's own figure, from the preprocessed path
         lastTuning = OwnGestureDecoder.currentTuning.key
         if (!isEnabled()) return
         executor.execute {
@@ -130,7 +130,8 @@ object GestureCorpusRecorder {
      */
     fun onWordCommitted(word: String) {
         if (pendingId < 0) return
-        if (word == lastWord) finish(SwipeMetrics.OUTCOME_KEPT, -1, null) else finish(SwipeMetrics.OUTCOME_EDITED, -1, word)
+        // auto-capitalisation ("the" committed as "The") is not an edit
+        if (word.equals(lastWord, ignoreCase = true)) finish(SwipeMetrics.OUTCOME_KEPT, -1, null) else finish(SwipeMetrics.OUTCOME_EDITED, -1, word)
     }
 
     /** The pending swipe's outcome: to the swipe results log, and (corrections only) to the corpus. */

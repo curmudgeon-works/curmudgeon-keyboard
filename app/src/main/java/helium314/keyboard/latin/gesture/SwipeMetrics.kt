@@ -87,7 +87,8 @@ object SwipeMetrics {
         return Summary(last.size, first, strip, never, ms)
     }
 
+    /** Deletes the log; synchronous so a summary read right after it sees the empty state. */
     fun clear() {
-        executor.execute { file?.delete() }
+        file?.delete()
     }
 }
