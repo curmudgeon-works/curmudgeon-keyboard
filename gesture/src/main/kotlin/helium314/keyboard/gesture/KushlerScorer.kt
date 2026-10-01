@@ -46,6 +46,14 @@ class KushlerConfig(
     val slowBonus: Float = 0.3f,
     /** A letter's key "sees" path points within this many key widths of its center. */
     val slowRadius: Float = 0.6f,
+    /**
+     * Speed awareness: above [speedFromKeysPerSecond] (swipe speed, key widths per second) every match cost is divided
+     * by 1 + [matchRelaxPerKeyPerSecond] * excess while skip and off-path penalties stay — a fast swipe's corners are
+     * roughly, not exactly, on their keys. 0 = off. 0.05: +0.6 first-choice on our own swipes, +0.1 on FUTO; with the
+     * decoder's frequency emphasis together +1.7 / +1.3 (2026-10-01).
+     */
+    val speedFromKeysPerSecond: Float = 12f,
+    val matchRelaxPerKeyPerSecond: Float = 0.05f,
 )
 
 class KushlerScorer(private val config: KushlerConfig = KushlerConfig()) : Scorer {
@@ -72,10 +80,12 @@ class KushlerScorer(private val config: KushlerConfig = KushlerConfig()) : Score
 
         val m = inflections.size
         val n = letters.size
+        val excess = (gesture.meanSpeed * 1000f / kw - config.speedFromKeysPerSecond).coerceAtLeast(0f)
+        val relax = 1f + config.matchRelaxPerKeyPerSecond * excess
 
         if (n == 1) {
             // single-letter word: both endpoints match the same letter
-            var total = matchCost(inflections[0], letters[0], kw) + matchCost(inflections[m - 1], letters[0], kw)
+            var total = (matchCost(inflections[0], letters[0], kw) + matchCost(inflections[m - 1], letters[0], kw)) / relax
             for (i in 1 until m - 1) total += skipCost(inflections[i])
             return (total / maxOf(m, 1)).coerceAtLeast(Scorer.MIN_SCORE)
         }
@@ -89,7 +99,7 @@ class KushlerScorer(private val config: KushlerConfig = KushlerConfig()) : Score
                 val cur = dp[i][j]
                 if (cur >= big) continue
                 // match inflection i to letter j
-                val mc = constrainedMatchCost(i, j, m, n, inflections, letters, kw)
+                val mc = constrainedMatchCost(i, j, m, n, inflections, letters, kw) / relax
                 if (cur + mc < dp[i + 1][j + 1]) dp[i + 1][j + 1] = cur + mc
                 // skip inflection i (not allowed for endpoints)
                 if (i != 0 && i != m - 1) {
