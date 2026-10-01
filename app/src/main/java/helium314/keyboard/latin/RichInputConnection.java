@@ -575,7 +575,9 @@ public final class RichInputConnection implements PrivateCommandPerformer {
                     + remainingChars, 0);
             mCommittedTextBeforeComposingText.setLength(len);
         }
-        if (mExpectedSelStart > beforeLength) {
+        if (INVALID_CURSOR_POSITION == mExpectedSelStart) {
+            // Unknown stays unknown: claiming position 0 here would make the next read trust an empty cache.
+        } else if (mExpectedSelStart > beforeLength) {
             mExpectedSelStart -= beforeLength;
             mExpectedSelEnd -= beforeLength;
         } else {

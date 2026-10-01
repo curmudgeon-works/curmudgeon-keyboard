@@ -84,6 +84,26 @@ class InputLogicTest {
         assertEquals("", composingText)
     }
 
+    // hold-backspace after the editor left the cursor position unknown (a chat app's composer rewriting its text):
+    // every repeat tick must take a word, not only the first (d2cc6ea0 fixed the first, the connection's delete
+    // bookkeeping then claimed position 0 and the second tick fell back to a letter)
+    @Test fun `hold backspace with unknown cursor deletes a word on every tick`() {
+        reset()
+        setText("hello there world ")
+        val start = RichInputConnection::class.java.getDeclaredField("mExpectedSelStart").apply { isAccessible = true }
+        val end = RichInputConnection::class.java.getDeclaredField("mExpectedSelEnd").apply { isAccessible = true }
+        start.setInt(connection, -1); end.setInt(connection, -1)
+        repeatBackspace()
+        assertEquals("hello there ", text)
+        repeatBackspace() // the fake editor sends no selection update between ticks
+        assertEquals("hello ", text)
+    }
+
+    private fun repeatBackspace() {
+        latinIME.onEvent(Event.createSoftwareKeypressEvent(Event.NOT_A_CODE_POINT, KeyCode.DELETE, 0, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, true))
+        handleMessages()
+    }
+
     @Test fun delete() {
         reset()
         setText("hello there ")
