@@ -359,6 +359,7 @@ fun SubtypeScreen(
                             CompositionLocalProvider(LocalCompactPreferences provides true) {
                                 SettingsActivity.settingsContainer[Settings.PREF_SPACE_TO_CHANGE_LANG]?.Preference() } }
                         Pending(layoutChanged(LayoutType.EMOJI_BOTTOM)) { SwitchRow(stringResource(R.string.bottom_rows_action_key), withAction) { on ->
+                            preview.changed(emoji = true) // the send key shows on the emoji panel's bottom row
                             setCurrentSubtype(
                                 if (on) currentSubtype.withLayout(LayoutType.EMOJI_BOTTOM, "emoji_bottom_row_with_action").withLayout(LayoutType.CLIPBOARD_BOTTOM, "clip_bottom_row_with_action")
                                 else currentSubtype.withLayout(LayoutType.EMOJI_BOTTOM, "emoji_bottom_row").withLayout(LayoutType.CLIPBOARD_BOTTOM, "clip_bottom_row")
@@ -375,12 +376,18 @@ fun SubtypeScreen(
                             Pending(layoutChanged(type)) { SecondaryLayoutRow(currentSubtype, type, ::setCurrentSubtype) }
                     // tablet-style bottom row (advanced on phones), then bottom row size and side padding
                     if (tabletOnly) {
-                        @Composable fun tabletRow() = Pending(layoutChanged(LayoutType.FUNCTIONAL)) {
-                            SwitchRow(stringResource(R.string.bottom_row_tablet), currentSubtype.layoutName(LayoutType.FUNCTIONAL) == "functional_keys_tablet") { on ->
-                                setCurrentSubtype(if (on) currentSubtype.withLayout(LayoutType.FUNCTIONAL, "functional_keys_tablet") else currentSubtype.withoutLayout(LayoutType.FUNCTIONAL))
-                            } }
-                        if (Settings.getInstance().isTablet) tabletRow()
-                        else if (advanced) AdvancedBlock { tabletRow() }
+                        // (a plain row, not a local composable function: that one was re-created on every recomposition
+                        // and its switch replayed the thumb animation back and forth)
+                        val tablet = currentSubtype.layoutName(LayoutType.FUNCTIONAL) == "functional_keys_tablet"
+                        val onTablet: (Boolean) -> Unit = { on ->
+                            preview.changed(emoji = false)
+                            setCurrentSubtype(if (on) currentSubtype.withLayout(LayoutType.FUNCTIONAL, "functional_keys_tablet") else currentSubtype.withoutLayout(LayoutType.FUNCTIONAL))
+                        }
+                        if (Settings.getInstance().isTablet || advanced) {
+                            val row = @Composable { Pending(layoutChanged(LayoutType.FUNCTIONAL)) {
+                                SwitchRow(stringResource(R.string.bottom_row_tablet), tablet, onChange = onTablet) } }
+                            if (Settings.getInstance().isTablet) row() else AdvancedBlock { row() }
+                        }
                     }
                     // advanced: bottom row size (with its padding) and side padding, moved from Appearance
                     if (advanced) AdvancedBlock {
@@ -393,12 +400,14 @@ fun SubtypeScreen(
                         }
                     }
                     // the toolbar (was its own screen, then its own group): visibility in simple mode, the rest advanced
-                    CompositionLocalProvider(LocalCompactPreferences provides true) {
+                    CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
+                        LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
                         Pending(keyChanged(Settings.PREF_TOOLBAR_VISIBILITY)) {
                             SettingsActivity.settingsContainer[Settings.PREF_TOOLBAR_VISIBILITY]?.Preference() }
                     }
                     if (advanced) AdvancedBlock {
-                        CompositionLocalProvider(LocalCompactPreferences provides true) {
+                        CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
+                            LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
                             toolbarItems(prefs).filterNotNull().filter { it != Settings.PREF_TOOLBAR_VISIBILITY }.forEach {
                                 if (it == SettingsWithoutKey.TOOLBAR_KEYS_ALL) {
                                     // the keys list previews on the keyboard (its toolbar opened), like the sound settings
@@ -688,7 +697,7 @@ private val previewDialogItems = setOf(Settings.PREF_KEYPRESS_SOUND, Settings.PR
 private val previewedSwitches = listOf(
     Settings.PREF_SHOW_NUMBER_ROW, Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS, Settings.PREF_ENABLE_SPLIT_KEYBOARD,
     Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE,
-    Settings.PREF_SHOW_EMOJI_KEY, Settings.PREF_SPACE_TO_CHANGE_LANG,
+    Settings.PREF_SHOW_EMOJI_KEY,
     Settings.PREF_POPUP_ON, Settings.PREF_VIBRATE_ON, Settings.PREF_SOUND_ON,
     Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS, Settings.PREF_BACKSPACE_SPEED_UP, Settings.PREF_DELETE_SWIPE,
     Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, Settings.PREF_REMOVE_REDUNDANT_POPUPS,

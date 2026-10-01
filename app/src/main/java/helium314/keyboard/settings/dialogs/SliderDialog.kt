@@ -43,7 +43,7 @@ fun SliderDialog(
     var touched by remember { mutableStateOf(false) }
     var confirmed by remember { mutableStateOf(false) }
     var atDefault by remember { mutableStateOf(false) } // Default was pressed and the slider not moved since
-    if (live && touched && !applyOnRelease) LaunchedEffect(sliderPosition) { delay(80); onValueChanged(sliderPosition) }
+    // (live sliders apply when the finger leaves the slider, not during the drag: each step would rebuild the preview)
     val dismiss = { if (live && touched && !confirmed) onValueChanged(initialValue); onDismissRequest() }
 
     ThreeButtonAlertDialog(

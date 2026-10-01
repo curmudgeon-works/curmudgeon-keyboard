@@ -99,6 +99,15 @@ class InputLogicTest {
         assertEquals("hello ", text)
     }
 
+    // cursor dropped in the middle of a word, backspace held: the part of the word before the cursor goes at once
+    @Test fun `hold backspace with the cursor inside a word deletes the part before the cursor`() {
+        reset()
+        setText("hello wonderful world")
+        setCursorPosition(10) // after "hello wond"
+        repeatBackspace()
+        assertEquals("hello erful world", text)
+    }
+
     private fun repeatBackspace() {
         latinIME.onEvent(Event.createSoftwareKeypressEvent(Event.NOT_A_CODE_POINT, KeyCode.DELETE, 0, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, true))
         handleMessages()
