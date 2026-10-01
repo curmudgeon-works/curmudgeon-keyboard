@@ -109,8 +109,8 @@ android {
             isDefault = true
             applicationId = "app.curmudgeon.keyboard"
             // versionName major.minor.build, build always 3 digits; versionCode = minor * 1000 + build (+ major * 100000)
-            versionCode = 3000
-            versionName = "0.3.000"
+            versionCode = 3001
+            versionName = "0.3.001"
             if (playKeyProps.isNotEmpty()) signingConfig = signingConfigs.getByName("play")
         }
     }
