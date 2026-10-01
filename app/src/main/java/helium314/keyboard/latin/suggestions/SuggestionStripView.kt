@@ -341,10 +341,24 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     // the emoji tab strip's toolbar key: its arrow follows setToolbarOnly
     private var emojiToolbarKey: ImageButton? = null
 
-    /** The expand key's arrow points up while the toolbar is hidden, down while it is shown above the suggestions. */
+    /**
+     * The expand key's arrow points up while the toolbar is hidden, down while it is shown above the suggestions; when
+     * the toolbar opens in place of the suggestions it points sideways instead: > to open, < to go back.
+     */
     private fun setExpandKeyDirection(toolbarShown: Boolean) {
-        toolbarExpandKey.scaleX = 1f
-        toolbarExpandKey.rotation = if (toolbarShown) 90f else -90f
+        // only the arrow turns: the incognito and settings icons stay upright whatever the toolbar does
+        val arrow = (context.prefs().getString(Settings.PREF_TOOLBAR_EXPAND_ICON, Defaults.PREF_TOOLBAR_EXPAND_ICON)
+            ?: Defaults.PREF_TOOLBAR_EXPAND_ICON) == "arrow"
+        if (!arrow) {
+            toolbarExpandKey.rotation = 0f
+            toolbarExpandKey.scaleX = 1f
+        } else if (toolbarInRow) {
+            toolbarExpandKey.rotation = 0f
+            toolbarExpandKey.scaleX = if (toolbarShown) -1f else 1f
+        } else {
+            toolbarExpandKey.scaleX = 1f
+            toolbarExpandKey.rotation = if (toolbarShown) 90f else -90f
+        }
     }
 
     fun setSuggestions(suggestions: SuggestedWords, isRtlLanguage: Boolean) {

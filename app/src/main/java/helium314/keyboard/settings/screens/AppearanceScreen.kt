@@ -34,6 +34,7 @@ import helium314.keyboard.settings.dialogs.LocalPreviewEmoji
 import helium314.keyboard.settings.preferences.TextStyleKeys
 
 import helium314.keyboard.settings.preferences.TextStylePreference
+import helium314.keyboard.settings.preferences.SymbolsSuggestionsFontsPreference
 
 import androidx.compose.foundation.layout.Box
 
@@ -165,10 +166,7 @@ fun AppearanceScreen(
         Settings.PREF_ICON_STYLE,
         Settings.PREF_CUSTOM_ICON_NAMES,
         SettingsWithoutKey.KEY_TEXT_STYLE,
-        // the same font for symbols and suggestions: then their own tiles are advanced, else in simple mode too
-        Settings.PREF_FONT_FOLLOWS_KEY_TEXT,
-        SettingsWithoutKey.HINT_TEXT_STYLE,
-        SettingsWithoutKey.SUGGESTION_TEXT_STYLE,
+        SettingsWithoutKey.SYMBOLS_SUGGESTIONS_FONTS, // advanced: one dialog for both, starting with "same font as the keys"
         // ---- then the typing preferences (not part of themes)
         R.string.appearance_group_keys,
         SettingsWithoutKey.HIDE_ALL_SYMBOLS, // the three below it are advanced
@@ -244,10 +242,9 @@ fun AppearanceScreen(
         settings = items,
         simpleModeKeys = setOf(
             SettingsWithoutKey.APPEARANCE_LOOKS, Settings.PREF_THEME_STYLE, Settings.PREF_THEME_COLORS, Settings.PREF_THEME_KEY_BORDERS, Settings.PREF_THEME_DAY_NIGHT,
-            Settings.PREF_THEME_COLORS_NIGHT, SettingsWithoutKey.KEY_TEXT_STYLE, Settings.PREF_FONT_FOLLOWS_KEY_TEXT,
+            Settings.PREF_THEME_COLORS_NIGHT, SettingsWithoutKey.KEY_TEXT_STYLE,
             SettingsWithoutKey.HIDE_ALL_SYMBOLS,
-        ) + (if (prefs.getBoolean(Settings.PREF_FONT_FOLLOWS_KEY_TEXT, Defaults.PREF_FONT_FOLLOWS_KEY_TEXT)) emptySet()
-            else setOf(SettingsWithoutKey.HINT_TEXT_STYLE, SettingsWithoutKey.SUGGESTION_TEXT_STYLE)),
+        ),
         // cross and tick: reject or accept everything changed since the screen opened, each asks first
         topActions = {
             if (changed) {
@@ -286,21 +283,15 @@ fun createAppearanceSettings(context: Context) = listOf(
             { p -> p.getString(Settings.PREF_THEME_STYLE, Defaults.PREF_THEME_STYLE) == KeyboardTheme.STYLE_HOLO },
             Settings.PREF_KEY_TEXT_ITALIC, Settings.PREF_KEY_TEXT_UNDERLINE))
     },
-    Setting(context, SettingsWithoutKey.SUGGESTION_TEXT_STYLE, R.string.suggestion_text_style) {
-        TextStylePreference(it, TextStyleKeys(Settings.PREF_SUGGESTION_FONT, FontLibrary.SLOT_SUGGESTION,
-            Settings.PREF_SUGGESTION_TEXT_SIZE, Defaults.PREF_SUGGESTION_TEXT_SIZE.toFloat(), 10f..32f,
-            Settings.PREF_SUGGESTION_BOLD, { Defaults.PREF_SUGGESTION_BOLD }, Settings.PREF_SUGGESTION_ITALIC, Settings.PREF_SUGGESTION_UNDERLINE,
-            sizeIsInt = true, sizeText = { "${it.roundToInt()} dp" },
-            extraKeys = listOf(Settings.PREF_SUGGESTION_WORD_PADDING),
-            extra = { reload -> SuggestionStripExtras(reload) }, otherFont = Settings.PREF_HINT_FONT))
-    },
-    Setting(context, SettingsWithoutKey.HINT_TEXT_STYLE, R.string.hint_text_style) {
-        TextStylePreference(it, TextStyleKeys(Settings.PREF_HINT_FONT, FontLibrary.SLOT_HINT, Settings.PREF_HINT_FONT_SCALE,
-            Defaults.PREF_HINT_FONT_SCALE, 0.5f..2f, Settings.PREF_HINT_TEXT_BOLD, { Defaults.PREF_HINT_TEXT_BOLD },
-            Settings.PREF_HINT_TEXT_ITALIC, Settings.PREF_HINT_TEXT_UNDERLINE, otherFont = Settings.PREF_SUGGESTION_FONT))
-    },
-    Setting(context, Settings.PREF_FONT_FOLLOWS_KEY_TEXT, R.string.font_follows_key_text) {
-        SwitchPreference(it, Defaults.PREF_FONT_FOLLOWS_KEY_TEXT) { KeyboardTypeface.clearCache(); KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+    Setting(context, SettingsWithoutKey.SYMBOLS_SUGGESTIONS_FONTS, R.string.symbols_suggestions_fonts) {
+        SymbolsSuggestionsFontsPreference(it,
+            TextStyleKeys(Settings.PREF_HINT_FONT, FontLibrary.SLOT_HINT, Settings.PREF_HINT_FONT_SCALE,
+                Defaults.PREF_HINT_FONT_SCALE, 0.5f..2f, Settings.PREF_HINT_TEXT_BOLD, { Defaults.PREF_HINT_TEXT_BOLD },
+                Settings.PREF_HINT_TEXT_ITALIC, Settings.PREF_HINT_TEXT_UNDERLINE),
+            TextStyleKeys(Settings.PREF_SUGGESTION_FONT, FontLibrary.SLOT_SUGGESTION,
+                Settings.PREF_SUGGESTION_TEXT_SIZE, Defaults.PREF_SUGGESTION_TEXT_SIZE.toFloat(), 10f..32f,
+                Settings.PREF_SUGGESTION_BOLD, { Defaults.PREF_SUGGESTION_BOLD }, Settings.PREF_SUGGESTION_ITALIC, Settings.PREF_SUGGESTION_UNDERLINE,
+                sizeIsInt = true, sizeText = { "${it.roundToInt()} dp" }))
     },
     Setting(context, SettingsWithoutKey.HIDE_ALL_SYMBOLS, R.string.hide_all_symbols) {
         HideAllSymbolsPreference(it)
@@ -744,18 +735,6 @@ internal class PreviewKeyboard( // (also the Preferences screen's, for the key s
     }
 }
 
-/** Under the Suggestion strip dialog's B I U: the spacing between suggestions. */
-@Composable
-private fun SuggestionStripExtras(reload: () -> Unit) {
-    val prefs = LocalContext.current.prefs()
-    var spacing by remember { mutableFloatStateOf(prefs.getInt(Settings.PREF_SUGGESTION_WORD_PADDING, Defaults.PREF_SUGGESTION_WORD_PADDING).toFloat()) }
-    WithSmallTitle(stringResource(R.string.suggestion_spacing, spacing.roundToInt())) {
-        Slider(value = spacing, onValueChange = { spacing = it }, valueRange = 0f..30f,
-            onValueChangeFinished = { prefs.edit { putInt(Settings.PREF_SUGGESTION_WORD_PADDING, spacing.roundToInt()) }; reload() })
-    }
-    // (the toolbar button's icon is on the Toolbar screen)
-}
-
 /** Whether a tile on this screen covers a preference or file changed since the draft's snapshot. */
 private fun tileChanged(tile: String, keys: Set<String>, files: Set<String>): Boolean {
     if (keys.isEmpty() && files.isEmpty()) return false
@@ -766,10 +745,10 @@ private fun tileChanged(tile: String, keys: Set<String>, files: Set<String>): Bo
         SettingsWithoutKey.HIDE_ALL_SYMBOLS -> symbolHintPrefs.any { it.first in keys }
         SettingsWithoutKey.KEY_TEXT_STYLE -> any(Settings.PREF_KEY_FONT, Settings.PREF_FONT_SCALE, Settings.PREF_KEY_TEXT_BOLD,
             Settings.PREF_KEY_TEXT_ITALIC, Settings.PREF_KEY_TEXT_UNDERLINE)
-        SettingsWithoutKey.HINT_TEXT_STYLE -> any(Settings.PREF_HINT_FONT, Settings.PREF_HINT_FONT_SCALE, Settings.PREF_HINT_TEXT_BOLD,
-            Settings.PREF_HINT_TEXT_ITALIC, Settings.PREF_HINT_TEXT_UNDERLINE)
-        SettingsWithoutKey.SUGGESTION_TEXT_STYLE -> any(Settings.PREF_SUGGESTION_FONT, Settings.PREF_SUGGESTION_TEXT_SIZE, Settings.PREF_SUGGESTION_BOLD,
-            Settings.PREF_SUGGESTION_ITALIC, Settings.PREF_SUGGESTION_UNDERLINE, Settings.PREF_SUGGESTION_WORD_PADDING)
+        SettingsWithoutKey.SYMBOLS_SUGGESTIONS_FONTS -> any(Settings.PREF_FONT_FOLLOWS_KEY_TEXT,
+            Settings.PREF_HINT_FONT, Settings.PREF_HINT_FONT_SCALE, Settings.PREF_HINT_TEXT_BOLD, Settings.PREF_HINT_TEXT_ITALIC,
+            Settings.PREF_HINT_TEXT_UNDERLINE, Settings.PREF_SUGGESTION_FONT, Settings.PREF_SUGGESTION_TEXT_SIZE,
+            Settings.PREF_SUGGESTION_BOLD, Settings.PREF_SUGGESTION_ITALIC, Settings.PREF_SUGGESTION_UNDERLINE)
         SettingsWithoutKey.CUSTOM_EMOJI_FONT -> "custom_emoji_font" in files
         SettingsWithoutKey.BACKGROUND_IMAGE -> files.any { it.startsWith("custom_background_image") && !it.contains("landscape") }
         SettingsWithoutKey.BACKGROUND_IMAGE_LANDSCAPE -> files.any { it.startsWith("custom_background_image_landscape") }

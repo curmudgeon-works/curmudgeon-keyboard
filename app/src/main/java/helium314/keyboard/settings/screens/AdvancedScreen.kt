@@ -243,6 +243,16 @@ fun createAdvancedSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_SUGGESTION_RULES, R.string.customize_suggestions) {
         CustomizeSuggestionsPreference(it)
     },
+    Setting(context, Settings.PREF_SUGGESTION_WORD_PADDING, R.string.suggestion_spacing_title) { setting ->
+        SliderPreference(
+            name = setting.title,
+            key = setting.key,
+            default = Defaults.PREF_SUGGESTION_WORD_PADDING,
+            description = { "$it dp" },
+            range = 0f..30f,
+            onConfirmed = { KeyboardSwitcher.getInstance().setThemeNeedsReload() },
+        )
+    },
     Setting(context, Settings.PREF_REDO_UNIT, R.string.redo_unit) {
         ListPreference(it, listOf(stringResource(R.string.undo_unit_word) to "word",
             stringResource(R.string.undo_unit_character) to "character"), Defaults.PREF_REDO_UNIT)
