@@ -26,6 +26,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -307,7 +308,12 @@ fun FontsPreference(setting: Setting, texts: List<Pair<Int, TextStyleKeys>>) {
         }
     }
 
+    // a dialog of its own opened from a row (the suggestions' colour): this one fades out meanwhile, still open, so
+    // only one set of buttons shows; it comes back as it was
+    val subDialogOpen = remember { mutableStateOf(false) }
+    CompositionLocalProvider(LocalSubDialogOpen provides subDialogOpen) {
     ThreeButtonAlertDialog(
+        modifier = if (subDialogOpen.value) Modifier.alpha(0f) else Modifier,
         onDismissRequest = {
             if (!confirmed && snapshot.restore()) reload()
             FontLibrary.discardPending(ctx)
@@ -374,6 +380,7 @@ fun FontsPreference(setting: Setting, texts: List<Pair<Int, TextStyleKeys>>) {
             }
         },
     )
+    }
     if (showError)
         InfoDialog(stringResource(R.string.file_read_error)) { showError = false }
 }
@@ -459,6 +466,9 @@ fun EmojiFontPreference(setting: Setting) {
         InfoDialog(stringResource(R.string.file_read_error)) { showError = false }
 }
 
+/** Set while a row's own dialog is open over the Fonts dialog, which then fades out (see FontsPreference). */
+val LocalSubDialogOpen = androidx.compose.runtime.compositionLocalOf<androidx.compose.runtime.MutableState<Boolean>?> { null }
+
 /** The suggestion strip words' colour (a theme setting; orange unless chosen): a swatch opening the colour picker. */
 @Composable
 fun SuggestionColorRow(reload: () -> Unit) {
@@ -466,6 +476,12 @@ fun SuggestionColorRow(reload: () -> Unit) {
     val prefs = ctx.prefs()
     helium314.keyboard.settings.KnownDefaults.note(Settings.PREF_SUGGESTION_TEXT_COLOR, Defaults.PREF_SUGGESTION_TEXT_COLOR)
     var showPicker by remember { mutableStateOf(false) }
+    // the Fonts dialog steps aside while the picker is up
+    val parentHidden = LocalSubDialogOpen.current
+    androidx.compose.runtime.DisposableEffect(showPicker) {
+        parentHidden?.value = showPicker
+        onDispose { parentHidden?.value = false }
+    }
     val color = prefs.getInt(Settings.PREF_SUGGESTION_TEXT_COLOR, Defaults.PREF_SUGGESTION_TEXT_COLOR)
     Row(verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().clickable { showPicker = true }.padding(vertical = 6.dp)) {
