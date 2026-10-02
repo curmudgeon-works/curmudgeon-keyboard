@@ -608,6 +608,8 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
 
     private fun isBlacklisted(word: String): Boolean = dictionaryGroups.any { it.isBlacklisted(word) }
 
+    override fun isRemovedWord(word: String): Boolean = isBlacklisted(word) || isBlacklisted(word.lowercase())
+
     override fun removeWord(word: String) {
         for (dictionaryGroup in dictionaryGroups) {
             dictionaryGroup.removeWord(word)

@@ -718,6 +718,7 @@
     <string name="text_style_keys">Keys</string>
     <string name="fonts_same_as_keys">Use the same font as the keys</string>
     <string name="text_style_symbols">Symbols</string>
+    <string name="suggestion_text_color">Colour</string>
     <string name="text_style_suggestions">Suggestions</string>
     <string name="text_style_symbols_size">Symbols size: %s</string>
     <string name="text_style_suggestions_size">Suggestions size: %s</string>

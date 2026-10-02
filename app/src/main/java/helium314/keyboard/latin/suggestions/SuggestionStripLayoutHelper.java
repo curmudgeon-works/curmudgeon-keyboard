@@ -51,7 +51,6 @@ import java.util.ArrayList;
 final class SuggestionStripLayoutHelper {
     // Orange used for all suggestion strip words. Roughly matches the warm
     // orange of common terminal status indicators.
-    private static final int SUGGESTION_STRIP_ORANGE = 0xFFFF8C00;
 
     private static final int DEFAULT_MAX_MORE_SUGGESTIONS_ROW = 2;
     private static final int PUNCTUATIONS_IN_STRIP = 5;
@@ -320,12 +319,14 @@ final class SuggestionStripLayoutHelper {
         int indexInSuggestedWords;
         // looked up once, not per word: finding the preferences is the slow part
         final SharedPreferences prefs = KtxKt.prefs(mWordViews.get(0).getContext());
+        // the theme's suggestion colour (orange unless chosen, see Appearance → Fonts)
+        final int suggestionColor = prefs.getInt(Settings.PREF_SUGGESTION_TEXT_COLOR, Defaults.PREF_SUGGESTION_TEXT_COLOR);
         for (indexInSuggestedWords = 0; indexInSuggestedWords < suggestedWords.size()
                 && positionInStrip < maxSuggestionInStrip; indexInSuggestedWords++) {
             final TextView wordView = mWordViews.get(positionInStrip);
             wordView.setTag(indexInSuggestedWords);
             wordView.setText(getStyledSuggestedWord(suggestedWords, indexInSuggestedWords));
-            wordView.setTextColor(SUGGESTION_STRIP_ORANGE);
+            wordView.setTextColor(suggestionColor);
             applyCustomSuggestionStyle(wordView, prefs); // sets the font too (emoji font for emojis)
             if (SuggestionStripView.DEBUG_SUGGESTIONS) {
                 mDebugInfoViews.get(positionInStrip).setText(suggestedWords.getDebugString(indexInSuggestedWords));

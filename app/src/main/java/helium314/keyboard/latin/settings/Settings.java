@@ -94,6 +94,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_KEY_FONT = "key_font";
     // the emoji font: "font:<name>" from the font list (FontLibrary), "default" for the system's, "auto" = the file of before
     public static final String PREF_EMOJI_FONT = "emoji_font";
+    public static final String PREF_SUGGESTION_TEXT_COLOR = "suggestion_text_color"; // the suggestion strip's words (themes)
     public static final String PREF_HINT_FONT = "hint_font";
     public static final String PREF_SUGGESTION_FONT = "suggestion_font";
     public static final String PREF_FONT_FOLLOWS_KEY_TEXT = "font_follows_key_text";
@@ -317,6 +318,9 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
         if (key == null || LanguagePriority.INSTANCE.isLanguageKey(key))
             LanguagePriority.INSTANCE.clearCache();
         if (dontReloadOnChanged.contains(key) || (key != null && key.startsWith(PREF_SAVED_APP_SUBTYPE_PREFIX)))
+            return;
+        // the swipe results table (written after every swipe) is no setting: reloading them all per swipe was wasted
+        if (key != null && key.startsWith(helium314.keyboard.latin.gesture.GestureStats.PREF_KEY))
             return;
         mSettingsValuesLock.lock();
         try {

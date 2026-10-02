@@ -565,7 +565,8 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         card.addView(icon)
         card.addView(label)
         card.addView(button(android.R.string.cancel, false) { popup.dismiss() })
-        card.addView(button(R.string.remove, true) { removeSuggestion(wordView); popup.dismiss() })
+        // the word the card shows: the strip can have changed under it since the long press
+        card.addView(button(R.string.remove, true) { removeSuggestion(word); popup.dismiss() })
         popup.isOutsideTouchable = true
         popup.setOnDismissListener { wordView.isPressed = false }
         card.measure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.AT_MOST), MeasureSpec.UNSPECIFIED)
@@ -605,8 +606,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         KeyboardSwitcher.getInstance().showToast(text, true)
     }
 
-    private fun removeSuggestion(wordView: TextView) {
-        val word = wordView.text.toString()
+    private fun removeSuggestion(word: String) {
         listener.removeSuggestion(word)
         moreSuggestionsView.dismissPopupKeysPanel()
         // show suggestions, but without the removed word

@@ -167,7 +167,9 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
                 // With an incoming auto-correction that slot is what space commits: your own recent word (it starts with
                 // what was typed) is the correction then, the dictionaries' one right after it (Rahul, 2026-10-02: the
                 // correction should include my word; the review of 2026-10-02 had moved it behind)
-                val hotSource = suggestionsList.firstOrNull()?.mSourceDict ?: typedWordInfo.mSourceDict
+                // (a dictionary's source, not the typed word's: long-press Remove refuses the typed word's)
+                val hotSource = suggestionsList.firstOrNull { it.mSourceDict != Dictionary.DICTIONARY_USER_TYPED }?.mSourceDict
+                    ?: Dictionary.DICTIONARY_APPLICATION_DEFINED
                 var hotSlot = min(1, suggestionsList.size)
                 for (info in HotWords.matching(wordComposer.typedWord, hotSource)) {
                     suggestionsList.removeAll { it.mWord == info.mWord }
@@ -347,7 +349,8 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
 
         // For transforming words that don't come from a dictionary, because it's our best bet
         val locale = mDictionaryFacilitator.mainLocale
-        val suggestionsContainer = ArrayList(suggestionResults)
+        // words the user removed: the swipe decoder's vocabulary still has them, tapping's suggestions are filtered alike
+        val suggestionsContainer = ArrayList(suggestionResults.filterNot { mDictionaryFacilitator.isRemovedWord(it.mWord) })
         replaceSingleLetterFirstSuggestion(suggestionsContainer)
         val suggestionsCount = suggestionsContainer.size
         val keyboardShiftMode = keyboard.mId.keyboardCapsMode

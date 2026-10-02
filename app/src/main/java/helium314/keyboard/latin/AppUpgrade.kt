@@ -38,6 +38,8 @@ import helium314.keyboard.latin.utils.locale
 import helium314.keyboard.latin.utils.mainLayoutNameOrQwerty
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.protectedPrefs
+import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.latin.utils.upgradeToolbarPrefs
 import helium314.keyboard.latin.utils.writeCustomKeyCodes
 import helium314.keyboard.settings.screens.colorPrefsAndResIds
@@ -55,6 +57,37 @@ fun checkVersionUpgrade(context: Context) {
     if (oldVersion != BuildConfig.MIGRATION_VERSION)
         AppUpgrade.onUpgrade(context)
     curmudgeonUpgrades(prefs, freshInstall = oldVersion == 0)
+    ownSetUpgrades(context.realPrefs(), freshInstall = oldVersion == 0)
+}
+
+/**
+ * The steps of [curmudgeonUpgrades] that change a keyboard's look or behaviour, for every keyboard's own set (separate
+ * settings): run on the stored entries of that set ("p<id>/…"), as reading them through the set would see the shared
+ * set's values and its "done" flags. Each set keeps its own flags.
+ */
+private fun ownSetUpgrades(real: SharedPreferences, freshInstall: Boolean) {
+    val ids = runCatching { org.json.JSONObject(real.getString("keyboard_profile_ids", "{}")!!) }.getOrNull() ?: return
+    for (name in ids.keys()) {
+        val id = ids.optInt(name, KeyboardProfiles.SHARED)
+        if (id == KeyboardProfiles.SHARED) continue
+        fun k(key: String) = KeyboardProfiles.prefixedKey(id, key)
+        if (!real.getBoolean(k("fonts_follow_migrated"), false)) real.edit {
+            // its own "same font as the keys" (on unless this set turned it off) and key font (else the shared one)
+            val follows = real.all[k(Settings.PREF_FONT_FOLLOWS_KEY_TEXT)] as? Boolean ?: true
+            val keyFont = real.getString(k(Settings.PREF_KEY_FONT), null) ?: real.getString(Settings.PREF_KEY_FONT, null)
+            if (!freshInstall && follows && keyFont != null) {
+                putString(k(Settings.PREF_HINT_FONT), keyFont)
+                putString(k(Settings.PREF_SUGGESTION_FONT), keyFont)
+            }
+            putBoolean(k(Settings.PREF_FONT_FOLLOWS_KEY_TEXT), false)
+            putBoolean(k("fonts_follow_migrated"), true)
+        }
+        if (!real.getBoolean(k("trail_thickness_migrated"), false)) real.edit {
+            if (real.all[k(Settings.PREF_GESTURE_PREVIEW_TRAIL)] == false) putInt(k(Settings.PREF_GESTURE_TRAIL_THICKNESS), 0)
+            putBoolean(k(Settings.PREF_GESTURE_PREVIEW_TRAIL), true)
+            putBoolean(k("trail_thickness_migrated"), true)
+        }
+    }
 }
 
 /** Our own settings changes: each checks its own state, so running them on every start is cheap and safe

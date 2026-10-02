@@ -288,7 +288,10 @@ fun createAppearanceSettings(context: Context) = listOf(
             R.string.text_style_suggestions to TextStyleKeys(Settings.PREF_SUGGESTION_FONT, FontLibrary.SLOT_SUGGESTION,
                 Settings.PREF_SUGGESTION_TEXT_SIZE, Defaults.PREF_SUGGESTION_TEXT_SIZE.toFloat(), 10f..32f,
                 Settings.PREF_SUGGESTION_BOLD, { Defaults.PREF_SUGGESTION_BOLD }, Settings.PREF_SUGGESTION_ITALIC, Settings.PREF_SUGGESTION_UNDERLINE,
-                sizeIsInt = true, sizeText = { "${it.roundToInt()} dp" }),
+                sizeIsInt = true, sizeText = { "${it.roundToInt()} dp" },
+                // their colour (part of themes), under the size
+                extraKeys = listOf(Settings.PREF_SUGGESTION_TEXT_COLOR),
+                extra = { reload -> helium314.keyboard.settings.preferences.SuggestionColorRow(reload) }),
         ))
     },
     Setting(context, SettingsWithoutKey.HIDE_ALL_SYMBOLS, R.string.hide_all_symbols) {
@@ -779,7 +782,7 @@ private fun tileChanged(tile: String, keys: Set<String>, files: Set<String>): Bo
     return when (tile) {
         SettingsWithoutKey.APPEARANCE_LOOKS -> false
         SettingsWithoutKey.HIDE_ALL_SYMBOLS -> symbolHintPrefs.any { it.first in keys }
-        SettingsWithoutKey.FONTS -> any(Settings.PREF_KEY_FONT, Settings.PREF_FONT_SCALE, Settings.PREF_KEY_TEXT_BOLD,
+        SettingsWithoutKey.FONTS -> any(Settings.PREF_SUGGESTION_TEXT_COLOR, Settings.PREF_KEY_FONT, Settings.PREF_FONT_SCALE, Settings.PREF_KEY_TEXT_BOLD,
             Settings.PREF_KEY_TEXT_ITALIC, Settings.PREF_KEY_TEXT_UNDERLINE,
             Settings.PREF_HINT_FONT, Settings.PREF_HINT_FONT_SCALE, Settings.PREF_HINT_TEXT_BOLD, Settings.PREF_HINT_TEXT_ITALIC,
             Settings.PREF_HINT_TEXT_UNDERLINE, Settings.PREF_SUGGESTION_FONT, Settings.PREF_SUGGESTION_TEXT_SIZE,

@@ -31,6 +31,9 @@ import java.util.concurrent.TimeUnit;
  */
 public interface DictionaryFacilitator {
 
+    /** A word the user removed (long-press Remove): kept out of the suggestions, swiped ones too. */
+    default boolean isRemovedWord(final String word) { return false; }
+
     String[] ALL_DICTIONARY_TYPES = new String[] {
             Dictionary.TYPE_MAIN,
             Dictionary.TYPE_CONTACTS,
