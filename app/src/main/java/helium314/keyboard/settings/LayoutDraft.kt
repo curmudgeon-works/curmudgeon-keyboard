@@ -33,7 +33,18 @@ class LayoutDraft private constructor(
     /** The changed preferences, as plain keys (without a keyboard's p<id>/ prefix). */
     fun changedKeys(ctx: Context): Set<String> {
         val now = scoped(ctx)
-        return (now.keys + prefs.keys).filterTo(HashSet()) { !KnownDefaults.same(plain(it), now[it], prefs[it]) }.mapTo(HashSet()) { plain(it) }
+        // the rows: every key of either snapshot, a "~" mark standing for its key
+        val keys = (now.keys + prefs.keys).mapTo(HashSet()) { base(it) }
+        return keys.filterTo(HashSet()) { !KnownDefaults.same(plain(it), reads(now, it), reads(prefs, it)) }.mapTo(HashSet()) { plain(it) }
+    }
+
+    /** What [key] (full) reads as in [stored]: its value; a keyboard's key "at its default" (its "~" mark, see
+     *  ProfilePreferences) its default; a keyboard's key with neither the shared value. */
+    private fun reads(stored: Map<String, Any?>, key: String): Any? {
+        if (key in stored) return stored[key]
+        if (plain(key) == key) return null
+        if (mark(key) in stored) return KnownDefaults.of(plain(key)) ?: AT_DEFAULT
+        return stored[plain(key)]
     }
 
     /** The layout types (folder names, e.g. "main", "symbols") whose custom files changed. */
@@ -113,6 +124,11 @@ class LayoutDraft private constructor(
         )
         private val profileKey = Regex("^p\\d+/")
         fun plain(key: String) = key.replace(profileKey, "")
+        private val AT_DEFAULT = Any() // a mark whose default isn't known: equal only to itself
+        private val TOMB = KeyboardProfiles.TOMBSTONE
+        /** The key a "~" mark stands for ("p3/~x" -> "p3/x"); other keys as they are. */
+        fun base(key: String) = if (plain(key).startsWith(TOMB)) key.substring(0, key.length - plain(key).length) + plain(key).removePrefix(TOMB) else key
+        fun mark(key: String) = key.substring(0, key.length - plain(key).length) + TOMB + plain(key)
         fun inScope(plainKey: String) = plainKey in keys || prefixes.any { plainKey.startsWith(it) }
 
         // (with the "at its default" marks of a keyboard's own set, so Discard puts those back too)

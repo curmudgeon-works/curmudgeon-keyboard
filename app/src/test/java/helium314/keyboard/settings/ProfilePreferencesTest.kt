@@ -80,5 +80,8 @@ class ProfilePreferencesTest {
         repeat(3) { hw.onWordCommitted("Curmudgeon") }
         assertEquals("Curmudgeon", hw.matching("cur", dict).first().mWord) // a name keeps its capital
         hw.clear()
+        repeat(3) { hw.onWordCommitted("i'm") }
+        assertEquals("I'm", hw.matching("I'", dict).first().mWord) // one capital, not caps lock
+        hw.clear()
     }
 }
