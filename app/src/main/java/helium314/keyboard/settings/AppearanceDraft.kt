@@ -4,6 +4,8 @@ package helium314.keyboard.settings
 import android.content.Context
 import helium314.keyboard.latin.common.PictureFraming
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.settings.ProfilePreferences
+import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.utils.prefs
 import org.json.JSONObject
 import java.io.File
@@ -19,6 +21,7 @@ class AppearanceDraft private constructor(
     private val prefs: Map<String, Any?>,
     private val files: Map<File, Saved?>, // the live file -> its saved copy, null when it didn't exist
     private val dir: File,
+    private val setId: Int = KeyboardProfiles.SHARED, // the set the screen edited (see PrefsDraft)
 ) {
     /** A copy of a custom file, with the size and time the live one had (enough to tell a change, no reading). */
     class Saved(val copy: File, val length: Long, val modified: Long)
@@ -49,7 +52,8 @@ class AppearanceDraft private constructor(
             if (saved == null) live.delete()
             else { saved.copy.copyTo(live, overwrite = true); live.setLastModified(saved.modified) }
         }
-        AppearanceLooks.applyScreen(ctx, prefs)
+        AppearanceLooks.applyScreen(ctx, prefs,
+            ProfilePreferences(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)) { setId })
         discard()
     }
 
@@ -91,13 +95,14 @@ class AppearanceDraft private constructor(
                 if (live.exists()) Saved(live.copyTo(File(dir, live.name), overwrite = true), live.length(), live.lastModified()) else null
             }
             val prefs = currentPrefs(ctx)
-            val json = JSONObject()
+            val setId = PrefsDraft.currentSetId(ctx)
+            val json = JSONObject().put("set", setId)
             json.put("prefs", JSONObject().also { o -> prefs.forEach { (k, v) -> AppearanceLooks.toJson(v)?.let { o.put(k, it) } } })
             json.put("files", JSONObject().also { o -> files.forEach { (live, saved) ->
                 o.put(live.path, saved?.let { JSONObject().put("length", it.length).put("modified", it.modified) } ?: JSONObject.NULL)
             } })
             File(dir, PREFS_FILE).writeText(json.toString())
-            return AppearanceDraft(prefs, files, dir)
+            return AppearanceDraft(prefs, files, dir, setId)
         }
 
         /** A snapshot left on disk by a process that died with Appearance open: put it back. Called at app start. */
@@ -114,7 +119,7 @@ class AppearanceDraft private constructor(
                     val live = File(path)
                     live to (f.optJSONObject(path)?.let { Saved(File(dir, live.name), it.getLong("length"), it.getLong("modified")) })
                 }
-                AppearanceDraft(prefs, files, dir).reject(ctx)
+                AppearanceDraft(prefs, files, dir, json.optInt("set", KeyboardProfiles.SHARED)).reject(ctx)
             }.onFailure { dir.deleteRecursively() }
         }
     }

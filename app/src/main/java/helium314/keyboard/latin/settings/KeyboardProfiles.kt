@@ -95,6 +95,7 @@ object KeyboardProfiles {
         val editor = real.edit().putString(PREF_IDS, map.toString())
         real.all.keys.filter { unprefixedKey(id, it) != null && it.startsWith("$PREFIX$id$SEPARATOR") }.forEach { editor.remove(it) }
         editor.apply()
+        deleteFiles(id) // its own pictures: no keyboard uses them any more
     }
 
     fun hasOwnSettings(real: SharedPreferences, keyboard: SettingsSubtype): Boolean {
@@ -114,10 +115,21 @@ object KeyboardProfiles {
         val editor = real.edit()
         // clear the target first so nothing stale survives
         real.all.keys.filter { if (toId == SHARED) !isGlobal(it) else it.startsWith("$PREFIX$toId$SEPARATOR") }.forEach { editor.remove(it) }
+        // what the source set reads as: the shared values, then its own on top (a profile's reads fall back to the shared
+        // set); before, both were copied in the file's order, so a key in both came out as either at random
+        val values = HashMap<String, Any?>()
         for ((key, value) in real.all) {
-            val plain = unprefixedKey(fromId, key) ?: continue
-            if (fromId == SHARED && (key.startsWith(PREFIX) && key.contains(SEPARATOR))) continue
-            if (isGlobal(plain)) continue
+            if (key.startsWith(PREFIX) && key.contains(SEPARATOR)) continue // another set's
+            if (!isGlobal(key)) values[key] = value
+        }
+        if (fromId != SHARED) for ((key, value) in real.all) {
+            val plain = unprefixedKey(fromId, key)?.takeIf { it != key } ?: continue
+            if (plain.startsWith(TOMBSTONE)) values.remove(plain.removePrefix(TOMBSTONE)) // at its default in the source
+            if (!isGlobal(plain)) values[plain] = value
+        }
+        for ((plain, value) in values) {
+            // a "default" mark only means something in a keyboard's own set
+            if (toId == SHARED && plain.startsWith(TOMBSTONE)) continue
             put(editor, prefixedKey(toId, plain), value)
         }
         editor.apply()
@@ -157,6 +169,13 @@ object KeyboardProfiles {
         val id = map.getInt(pref)
         val start = "$PREFIX$id$SEPARATOR"
         return backup.filterKeys { it.startsWith(start) }.mapKeys { it.key.substring(start.length) }.filterKeys { !isGlobal(it) }
+    }
+
+    /** [keyboard]'s set id inside a backed-up preference map, or null when the backup kept no separate set for it. */
+    fun idIn(backup: Map<String, Any?>, keyboard: SettingsSubtype): Int? {
+        if (backup[PREF_SEPARATE] != true) return null
+        val map = try { JSONObject(backup[PREF_IDS] as? String ?: "{}") } catch (e: Exception) { JSONObject() }
+        return keyboard.toPref().takeIf { map.has(it) }?.let { map.getInt(it) }
     }
 
     /** The shared set of a backed-up preference map: plain, non-global keys. */
@@ -209,6 +228,9 @@ object KeyboardProfiles {
     /** The app's files dir, set at start (App) so [copy] can reach the files without a context. */
     @Volatile var filesDir: java.io.File? = null
 
+    /** Before a plain key in a keyboard's own set: "this one is at its default" (not the shared value). */
+    const val TOMBSTONE = "~"
+
     private val profileFileNames = listOf("custom_background_image", "custom_background_image_night",
         "custom_background_image_landscape", "custom_background_image_landscape_night")
 
@@ -231,6 +253,30 @@ object KeyboardProfiles {
             val from = java.io.File(dir, name + suffix(fromId) + ext)
             val to = java.io.File(dir, name + suffix(toId) + ext)
             runCatching { if (from.exists()) from.copyTo(to, overwrite = true) else to.delete() }
+        }
+    }
+
+    /** The files of set [id] (not the shared set's). */
+    fun deleteFiles(id: Int) {
+        if (id == SHARED) return
+        val dir = filesDir ?: return
+        for (name in profileFileNames) for (ext in listOf("", ".framing")) java.io.File(dir, name + suffix(id) + ext).delete()
+    }
+
+    /** Every keyboard's own picture files and the shared set's (a factory reset of the settings). */
+    fun deleteAllFiles() {
+        val dir = filesDir ?: return
+        dir.listFiles { f -> profileFileNames.any { f.name.startsWith(it) } }?.forEach { it.delete() }
+    }
+
+    /** Backup restore of one keyboard: its pictures from the backup's files (named for the backup's id [fromId]),
+     *  given as name -> bytes, become set [toId]'s. */
+    fun restoreFiles(files: Map<String, ByteArray>, fromId: Int, toId: Int) {
+        val dir = filesDir ?: return
+        for (name in profileFileNames) for (ext in listOf("", ".framing")) {
+            val to = java.io.File(dir, name + suffix(toId) + ext)
+            val bytes = files[name + suffix(fromId) + ext]
+            runCatching { if (bytes != null) to.writeBytes(bytes) else to.delete() }
         }
     }
 
@@ -268,6 +314,10 @@ class ProfilePreferences(private val real: SharedPreferences, private val active
     private fun k(key: String) = KeyboardProfiles.prefixedKey(id(), key)
     // a profile key that was never written falls back to the shared value, so a half-copied set still behaves
     private fun has(key: String) = real.contains(k(key))
+    // set back to its default in this keyboard's own set (the "Default" buttons, Discard, a theme's default): not the
+    // shared value
+    private fun dead(key: String) = id() != KeyboardProfiles.SHARED && !KeyboardProfiles.isGlobal(key)
+        && real.contains(KeyboardProfiles.prefixedKey(id(), KeyboardProfiles.TOMBSTONE + key))
 
     override fun getAll(): MutableMap<String, *> {
         val id = id()
@@ -276,29 +326,38 @@ class ProfilePreferences(private val real: SharedPreferences, private val active
             val plain = KeyboardProfiles.unprefixedKey(KeyboardProfiles.SHARED, key) ?: continue
             if (id == KeyboardProfiles.SHARED || KeyboardProfiles.isGlobal(plain)) { if (!(key.startsWith("p") && key.contains("/"))) result[key] = value }
         }
-        if (id != KeyboardProfiles.SHARED)
+        if (id != KeyboardProfiles.SHARED) {
             for ((key, value) in real.all) { KeyboardProfiles.unprefixedKey(id, key)?.let { if (it != key) result[it] = value } }
+            // at their default here: neither the mark nor the shared value
+            result.keys.filter { it.startsWith(KeyboardProfiles.TOMBSTONE) }.forEach { result.remove(it); result.remove(it.removePrefix(KeyboardProfiles.TOMBSTONE)) }
+        }
         return result
     }
-    override fun getString(key: String, defValue: String?) = if (has(key)) real.getString(k(key), defValue) else real.getString(key, defValue)
-    override fun getStringSet(key: String, defValues: MutableSet<String>?) = if (has(key)) real.getStringSet(k(key), defValues) else real.getStringSet(key, defValues)
-    override fun getInt(key: String, defValue: Int) = if (has(key)) real.getInt(k(key), defValue) else real.getInt(key, defValue)
-    override fun getLong(key: String, defValue: Long) = if (has(key)) real.getLong(k(key), defValue) else real.getLong(key, defValue)
-    override fun getFloat(key: String, defValue: Float) = if (has(key)) real.getFloat(k(key), defValue) else real.getFloat(key, defValue)
-    override fun getBoolean(key: String, defValue: Boolean) = if (has(key)) real.getBoolean(k(key), defValue) else real.getBoolean(key, defValue)
-    override fun contains(key: String) = has(key) || real.contains(key)
+    override fun getString(key: String, defValue: String?) = if (has(key)) real.getString(k(key), defValue) else if (dead(key)) defValue else real.getString(key, defValue)
+    override fun getStringSet(key: String, defValues: MutableSet<String>?) = if (has(key)) real.getStringSet(k(key), defValues) else if (dead(key)) defValues else real.getStringSet(key, defValues)
+    override fun getInt(key: String, defValue: Int) = if (has(key)) real.getInt(k(key), defValue) else if (dead(key)) defValue else real.getInt(key, defValue)
+    override fun getLong(key: String, defValue: Long) = if (has(key)) real.getLong(k(key), defValue) else if (dead(key)) defValue else real.getLong(key, defValue)
+    override fun getFloat(key: String, defValue: Float) = if (has(key)) real.getFloat(k(key), defValue) else if (dead(key)) defValue else real.getFloat(key, defValue)
+    override fun getBoolean(key: String, defValue: Boolean) = if (has(key)) real.getBoolean(k(key), defValue) else if (dead(key)) defValue else real.getBoolean(key, defValue)
+    override fun contains(key: String) = has(key) || (!dead(key) && real.contains(key))
 
     override fun edit(): SharedPreferences.Editor = Editor(real.edit(), id())
 
     private inner class Editor(private val e: SharedPreferences.Editor, private val id: Int) : SharedPreferences.Editor {
         private fun k(key: String) = KeyboardProfiles.prefixedKey(id, key)
-        override fun putString(key: String, value: String?) = apply { e.putString(k(key), value) }
-        override fun putStringSet(key: String, values: MutableSet<String>?) = apply { e.putStringSet(k(key), values) }
-        override fun putInt(key: String, value: Int) = apply { e.putInt(k(key), value) }
-        override fun putLong(key: String, value: Long) = apply { e.putLong(k(key), value) }
-        override fun putFloat(key: String, value: Float) = apply { e.putFloat(k(key), value) }
-        override fun putBoolean(key: String, value: Boolean) = apply { e.putBoolean(k(key), value) }
-        override fun remove(key: String) = apply { e.remove(k(key)) }
+        private val ownSet = id != KeyboardProfiles.SHARED
+        // a value written: no longer "at its default"; removed in a keyboard's own set: at its default, not the shared value
+        private fun alive(key: String) { if (ownSet && !KeyboardProfiles.isGlobal(key)) e.remove(k(KeyboardProfiles.TOMBSTONE + key)) }
+        override fun putString(key: String, value: String?) = apply { e.putString(k(key), value); alive(key) }
+        override fun putStringSet(key: String, values: MutableSet<String>?) = apply { e.putStringSet(k(key), values); alive(key) }
+        override fun putInt(key: String, value: Int) = apply { e.putInt(k(key), value); alive(key) }
+        override fun putLong(key: String, value: Long) = apply { e.putLong(k(key), value); alive(key) }
+        override fun putFloat(key: String, value: Float) = apply { e.putFloat(k(key), value); alive(key) }
+        override fun putBoolean(key: String, value: Boolean) = apply { e.putBoolean(k(key), value); alive(key) }
+        override fun remove(key: String) = apply {
+            e.remove(k(key))
+            if (ownSet && !KeyboardProfiles.isGlobal(key)) e.putBoolean(k(KeyboardProfiles.TOMBSTONE + key), true)
+        }
         override fun clear() = apply { e.clear() }
         override fun commit() = e.commit()
         override fun apply() = e.apply()
@@ -308,11 +367,12 @@ class ProfilePreferences(private val real: SharedPreferences, private val active
 
     override fun registerOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
         val wrapped = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            val plain = if (key == null) null else KeyboardProfiles.unprefixedKey(id(), key)
+            val plain = if (key == null) null else KeyboardProfiles.unprefixedKey(id(), key)?.removePrefix(KeyboardProfiles.TOMBSTONE)
             // keys of other profiles are not this profile's business; shared keys still are (fallback reads)
             if (key == null || plain != null) listener.onSharedPreferenceChanged(this, plain)
         }
-        synchronized(listeners) { listeners[listener] = wrapped }
+        // registered again (a restore restarts the listener without stopping it): one callback, not two
+        synchronized(listeners) { listeners.put(listener, wrapped) }?.let { real.unregisterOnSharedPreferenceChangeListener(it) }
         real.registerOnSharedPreferenceChangeListener(wrapped)
     }
 

@@ -20,6 +20,7 @@ import androidx.core.content.edit
 import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.latin.settings.ProfilePreferences
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.settings.dialogs.DiscardChangesDialog
 import helium314.keyboard.settings.dialogs.SaveChangesDialog
@@ -33,11 +34,17 @@ import java.io.File
  * keeps it and the cross puts this snapshot back. On disk while the screen is open, so changes not accepted are undone
  * when the app is left ([rejectOpen]) or, after a crash, when it starts again ([recoverAfterCrash]).
  */
-class PrefsDraft private constructor(private val name: String, private val values: Map<String, Any?>, private val file: File) {
+class PrefsDraft private constructor(private val name: String, private val values: Map<String, Any?>, private val file: File,
+                                     private val setId: Int) {
+    // the set the screen edited (a keyboard's own, or the shared one): crash recovery at app start puts the snapshot
+    // back there, not into whatever set the app start reads
+    private fun prefs(ctx: Context): android.content.SharedPreferences =
+        ProfilePreferences(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)) { setId }
+
 
     /** The preferences whose value differs from the snapshot. */
     fun changedKeys(ctx: Context): Set<String> {
-        val all = ctx.prefs().all
+        val all = prefs(ctx).all
         return values.keys.filterTo(HashSet()) { !KnownDefaults.same(it, all[it], values[it]) }
     }
 
@@ -47,7 +54,7 @@ class PrefsDraft private constructor(private val name: String, private val value
     fun reject(ctx: Context) {
         helium314.keyboard.latin.utils.SettingsEventLog.log("$name draft put back")
         val changed = changedKeys(ctx)
-        if (changed.isNotEmpty()) ctx.prefs().edit {
+        if (changed.isNotEmpty()) prefs(ctx).edit {
             changed.forEach { key -> values[key].let { if (it == null) remove(key) else KeyboardProfiles.put(this, key, it) } }
         }
         runCatching { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
@@ -66,17 +73,22 @@ class PrefsDraft private constructor(private val name: String, private val value
         private const val PREFIX = "prefs_draft_"
         private val active = HashMap<String, PrefsDraft>()
 
+        /** The set the settings screens edit now. */
+        fun currentSetId(ctx: Context): Int = if (KeyboardProfiles.isSeparate(
+            helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx))) KeyboardProfiles.editingId else KeyboardProfiles.SHARED
+
         private fun file(ctx: Context, name: String) = File(ctx.filesDir, "$PREFIX$name.json")
 
         /** The running draft of screen [name], or a fresh snapshot of [keys]. */
         fun of(ctx: Context, name: String, keys: Collection<String>): PrefsDraft = active[name] ?: run {
             val all = ctx.prefs().all
             val values = keys.associateWith { all[it] }
-            val json = JSONObject().put("name", name)
+            val setId = currentSetId(ctx)
+            val json = JSONObject().put("name", name).put("set", setId)
             json.put("prefs", JSONObject().also { o -> values.forEach { (k, v) ->
                 o.put(k, AppearanceLooks.toJson(v) ?: JSONObject.NULL) } }) // NULL: wasn't set, removed again on reject
             val file = file(ctx, name).apply { writeText(json.toString()) }
-            PrefsDraft(name, values, file).also { active[name] = it }
+            PrefsDraft(name, values, file, setId).also { active[name] = it }
         }
 
         /** The screen is left with nothing changed: the snapshot goes. */
@@ -91,9 +103,10 @@ class PrefsDraft private constructor(private val name: String, private val value
                 val name = file.name.removePrefix(PREFIX).removeSuffix(".json")
                 if (active.containsKey(name)) return@forEach
                 runCatching {
-                    val p = JSONObject(file.readText()).getJSONObject("prefs")
+                    val json = JSONObject(file.readText())
+                    val p = json.getJSONObject("prefs")
                     val values = p.keys().asSequence().associateWith { key -> p.optJSONObject(key)?.let { AppearanceLooks.fromJson(it) } }
-                    PrefsDraft(name, values, file).reject(ctx)
+                    PrefsDraft(name, values, file, json.optInt("set", KeyboardProfiles.SHARED)).reject(ctx)
                 }.onFailure { file.delete() }
             }
         }

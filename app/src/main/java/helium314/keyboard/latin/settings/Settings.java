@@ -49,7 +49,6 @@ import helium314.keyboard.latin.utils.ToolbarUtilsKt;
 import helium314.keyboard.latin.utils.ToolbarMode;
 
 import java.io.File;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.concurrent.locks.ReentrantLock;
@@ -265,7 +264,8 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     private final ReentrantLock mSettingsValuesLock = new ReentrantLock();
 
     // static cache for background images to avoid potentially slow reload on every settings reload
-    private final static Drawable[] sCachedBackgroundImages = new Drawable[4];
+    // by picture file: the keyboard being edited (settings) and the one on screen can each have their own
+    private final static java.util.HashMap<String, Drawable> sCachedBackgroundImages = new java.util.HashMap<>();
 
     private static final Settings sInstance = new Settings();
 
@@ -569,18 +569,21 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
 
     @Nullable public static Drawable readUserBackgroundImage(final Context context, final boolean night) {
         final boolean landscape = context.getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
-        final int index = (night ? 1 : 0) + (landscape ? 2 : 0);
-        if (sCachedBackgroundImages[index] != null) return sCachedBackgroundImages[index];
-
         File image = getCustomBackgroundFile(context, night, landscape);
         if (!image.isFile() && landscape)
             image = getCustomBackgroundFile(context, night, false); // fall back to portrait image for historic reasons
         if (!image.isFile()) return null;
+        final String key = image.getPath();
+        synchronized (sCachedBackgroundImages) {
+            final Drawable cached = sCachedBackgroundImages.get(key);
+            if (cached != null) return cached;
+        }
         try {
             final Bitmap bitmap = PictureFraming.Companion.decode(image, 4096);
             if (bitmap == null) return null;
-            sCachedBackgroundImages[index] = new FramedPicture(bitmap, PictureFraming.Companion.read(image), Color.TRANSPARENT);
-            return sCachedBackgroundImages[index];
+            final Drawable picture = new FramedPicture(bitmap, PictureFraming.Companion.read(image), Color.TRANSPARENT);
+            synchronized (sCachedBackgroundImages) { sCachedBackgroundImages.put(key, picture); }
+            return picture;
         } catch (Exception e) {
             return null;
         }
@@ -592,7 +595,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     }
 
     public static void clearCachedBackgroundImages() {
-        Arrays.fill(sCachedBackgroundImages, null);
+        synchronized (sCachedBackgroundImages) { sCachedBackgroundImages.clear(); }
     }
 
     public static Context getDayNightContext(final Context context, final boolean wantNight) {

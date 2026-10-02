@@ -396,6 +396,7 @@ private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: Restore
     // the files behind the settings: custom layouts (a keyboard's layout must exist for it), font and background
     fun isSettingsFile(path: String) = path.startsWith("layouts${File.separator}") || path.startsWith("custom_")
         || path.startsWith("fonts${File.separator}") // the loaded fonts (FontLibrary)
+        || path.startsWith("pictures${File.separator}") // the loaded pictures (PictureLibrary)
     val restoredDb = ctx.getDatabasePath(Database.NAME + "_restored")
     ZipInputStream(FileInputStream(pending.file)).use { zip ->
         var entry: ZipEntry? = zip.nextEntry
@@ -484,12 +485,40 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
         editor.apply()
     }
 
+    // with their settings: the pictures they had, and the loaded fonts and pictures their settings may name (added to
+    // the phone's lists, nothing there replaced)
+    val pictureFiles = HashMap<String, ByteArray>()
+    if (withSettings) {
+        val deviceProtectedFilesDir = DeviceProtectedUtils.getFilesDir(ctx)
+        ZipInputStream(FileInputStream(pending.file)).use { zip ->
+            var entry: ZipEntry? = zip.nextEntry
+            while (entry != null) {
+                val name = entry.name.substringAfter("unprotected${File.separator}", "")
+                when {
+                    name.startsWith("custom_background_image") -> pictureFiles[name] = zip.readBytes()
+                    name.startsWith("fonts${File.separator}") || name.startsWith("pictures${File.separator}") -> {
+                        val target = File(deviceProtectedFilesDir, name)
+                        if (!target.exists()) FileUtils.copyStreamToNewFile(zip, target)
+                    }
+                }
+                zip.closeEntry()
+                entry = zip.nextEntry
+            }
+        }
+    }
+
     for (keyboard in chosen) {
         SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, keyboard, ctx) // registers it unless it equals a built-in one
         if (SubtypeSettings.getEnabledSubtypes().none { it.toSettingsSubtype() == keyboard })
             SubtypeSettings.addEnabledSubtype(prefs, keyboard.toAdditionalSubtype())
-        if (withSettings) KeyboardProfiles.write(real, KeyboardProfiles.idFor(real, keyboard), settings.getValue(keyboard))
+        if (withSettings) {
+            val id = KeyboardProfiles.idFor(real, keyboard)
+            KeyboardProfiles.write(real, id, settings.getValue(keyboard))
+            // its own pictures in the backup, or the backup's shared ones when it had no set of its own
+            KeyboardProfiles.restoreFiles(pictureFiles, KeyboardProfiles.idIn(backup, keyboard) ?: KeyboardProfiles.SHARED, id)
+        }
     }
+    if (withSettings) { Settings.clearCachedBackgroundImages(); helium314.keyboard.keyboard.KeyboardTypeface.clearCache() }
 }
 
 /** Reads the preferences entry of a backup, the keyboards listed in it and the names of all its entries. */
