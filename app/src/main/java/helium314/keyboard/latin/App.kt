@@ -24,6 +24,7 @@ class App : Application() {
         DebugFlags.init(this)
         FoldableUtils.init(this)
         Settings.init(this)
+        helium314.keyboard.latin.utils.SettingsEventLog.init(this) // first: the crash recoveries below are what it watches
         // the process died with Appearance open (a crash): its changes that weren't kept are undone
         helium314.keyboard.settings.AppearanceDraft.recoverAfterCrash(this)
         helium314.keyboard.settings.LayoutDraft.recoverAfterCrash(this)

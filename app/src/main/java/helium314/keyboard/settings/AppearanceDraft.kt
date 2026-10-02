@@ -44,6 +44,7 @@ class AppearanceDraft private constructor(
 
     /** Back to the snapshot; the live keyboard reloads. */
     fun reject(ctx: Context) {
+        helium314.keyboard.latin.utils.SettingsEventLog.log("Appearance draft put back")
         for ((live, saved) in files) {
             if (saved == null) live.delete()
             else { saved.copy.copyTo(live, overwrite = true); live.setLastModified(saved.modified) }

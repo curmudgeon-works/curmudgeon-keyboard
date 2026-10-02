@@ -54,6 +54,7 @@ object SubtypeSettings {
     }
 
     fun addEnabledSubtype(prefs: SharedPreferences, newSubtype: InputMethodSubtype) {
+        helium314.keyboard.latin.utils.SettingsEventLog.log("keyboard added: ${newSubtype.toSettingsSubtype().toPref()}")
         val subtype = newSubtype.toSettingsSubtype()
         val subtypes = createSettingsSubtypes(prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!) + subtype
         val newString = createPrefSubtypes(subtypes)
@@ -68,6 +69,7 @@ object SubtypeSettings {
 
     /** @return whether subtype was actually removed */
     fun removeEnabledSubtype(context: Context, subtype: InputMethodSubtype): Boolean {
+        helium314.keyboard.latin.utils.SettingsEventLog.log("keyboard removed: ${subtype.toSettingsSubtype().toPref()}")
         val prefs = context.prefs()
         if (!removeEnabledSubtype(prefs, subtype.toSettingsSubtype())) {
             if (SubtypeUtilsAdditional.isAdditionalSubtype(subtype))

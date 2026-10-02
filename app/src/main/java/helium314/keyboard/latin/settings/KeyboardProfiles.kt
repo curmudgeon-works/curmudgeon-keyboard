@@ -167,6 +167,7 @@ object KeyboardProfiles {
      */
     @Synchronized
     fun enable(real: SharedPreferences, keyboards: List<SettingsSubtype>, keepExisting: Boolean) {
+        helium314.keyboard.latin.utils.SettingsEventLog.log("separate settings ON for ${keyboards.map { it.toPref() }} (keepExisting $keepExisting)")
         for (keyboard in keyboards) {
             if (keepExisting && hasOwnSettings(real, keyboard)) continue
             copy(real, SHARED, idFor(real, keyboard))
@@ -177,6 +178,7 @@ object KeyboardProfiles {
     /** Turn separate settings off; [sharedFrom] = the keyboard whose set becomes the shared one, null keeps the previous shared set. */
     @Synchronized
     fun disable(real: SharedPreferences, sharedFrom: SettingsSubtype?) {
+        helium314.keyboard.latin.utils.SettingsEventLog.log("separate settings OFF, shared from ${sharedFrom?.toPref()}")
         if (sharedFrom != null) copy(real, idFor(real, sharedFrom), SHARED)
         real.edit().putBoolean(PREF_SEPARATE, false).apply()
     }
