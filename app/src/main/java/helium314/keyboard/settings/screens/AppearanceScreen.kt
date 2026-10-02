@@ -724,7 +724,18 @@ internal class PreviewKeyboard( // (also the Preferences screen's, for the key s
     }
 
     override fun dialogOpened(emoji: Boolean, people: Boolean) { dialogs++; lastEmoji = emoji; lastPeople = people; show(emoji, people) }
-    override fun restore() { if (dialogs > 0) show(lastEmoji, lastPeople) }
+    // after the number field's window is gone: its own keyboard-hide arrives late and would undo an earlier show
+    override fun restore() {
+        scope.launch {
+            delay(250) // the number field's window is gone by then
+            if (dialogs == 0) return@launch
+            // the dialog has the focus back and wants no keyboard, so a request from the screen below goes nowhere:
+            // it steps aside while the preview comes up, then takes the focus back (the keyboard stays, as on opening)
+            helium314.keyboard.settings.dialogs.KeepKeyboardWindows.stepAside(1200)
+            focused = false // the try-it field lost its focus to the number field
+            show(lastEmoji, lastPeople)
+        }
+    }
     override fun dialogClosed() {
         dialogs = (dialogs - 1).coerceAtLeast(0)
         if (dialogs == 0) hideIfOurs()

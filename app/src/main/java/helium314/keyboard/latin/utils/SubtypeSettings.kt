@@ -214,6 +214,7 @@ object SubtypeSettings {
 
         loadResourceSubtypes(context.resources)
         loadAdditionalSubtypes(context.prefs())
+        enabledSubtypes.clear() // loading twice must not list a keyboard twice
         loadEnabledSubtypes(context)
     }
 

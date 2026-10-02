@@ -25,10 +25,14 @@ class App : Application() {
         FoldableUtils.init(this)
         Settings.init(this)
         helium314.keyboard.latin.utils.SettingsEventLog.init(this) // first: the crash recoveries below are what it watches
+        // the keyboard list first: the Layout & Typing recovery below reloads it, and the other way round the list
+        // was loaded twice and showed every keyboard twice until the next start (the "second keyboard", 2026-10-01)
+        SubtypeSettings.init(this)
         // the process died with Appearance open (a crash): its changes that weren't kept are undone
         helium314.keyboard.settings.AppearanceDraft.recoverAfterCrash(this)
         helium314.keyboard.settings.LayoutDraft.recoverAfterCrash(this)
-        SubtypeSettings.init(this)
+        helium314.keyboard.latin.utils.SettingsEventLog.log("keyboards in the list at start: " +
+            SubtypeSettings.getEnabledSubtypes().joinToString { it.locale }, withCaller = false)
         GestureCorpusRecorder.init(this)
         helium314.keyboard.latin.gesture.SwipeMetrics.init(this)
 

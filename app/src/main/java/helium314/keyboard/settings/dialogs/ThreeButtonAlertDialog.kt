@@ -74,6 +74,21 @@ interface PreviewKeyboardHooks {
     fun restore() { }
 }
 
+/**
+ * The windows of the keep-keyboard dialogs open now, newest last. Such a window keeps the focus without wanting the
+ * keyboard, so nothing below it can call the keyboard up while it has focus; [PreviewKeyboardHooks.restore] steps it
+ * aside for a moment (see PreviewKeyboard).
+ */
+object KeepKeyboardWindows {
+    val open = mutableListOf<android.view.Window>()
+    /** Lets the screen below take the focus for [ms] (its keyboard request goes through), then the dialog takes it back. */
+    fun stepAside(ms: Long) {
+        val w = open.lastOrNull() ?: return
+        w.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
+        w.decorView.postDelayed({ w.clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) }, ms)
+    }
+}
+
 /** True around settings about emojis: their dialogs preview on the emoji panel instead of the letters. */
 val LocalPreviewEmoji = compositionLocalOf { false }
 
@@ -132,10 +147,14 @@ fun ThreeButtonAlertDialog(
             val activity = LocalContext.current.getActivity() as? SettingsActivity
             DisposableEffect(window, activity) {
                 window?.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL)
+                window?.let { KeepKeyboardWindows.open.add(it) }
                 val previous = activity?.outsideTapHandler
                 val handler: () -> Unit = { currentDismiss() }
                 activity?.outsideTapHandler = handler
-                onDispose { if (activity?.outsideTapHandler === handler) activity.outsideTapHandler = previous }
+                onDispose {
+                    window?.let { KeepKeyboardWindows.open.remove(it) }
+                    if (activity?.outsideTapHandler === handler) activity.outsideTapHandler = previous
+                }
             }
             // placed right above the keyboard (and the toolbar); on a small screen it may overlap the keyboard, but
             // its top stays below the screen's header. Re-placed whenever the keyboard or the dialog changes size.
