@@ -402,3 +402,47 @@ class TapRevealer {
     internal var reveal: ((Int) -> Unit)? = null
     fun revealAbove(lineY: Int) = reveal?.invoke(lineY)
 }
+
+/**
+ * For screens with their own scrolling list and a preview keyboard (Layout & Typing, Swiping): remembers where the
+ * list was last tapped and, when a setting brings the preview up, scrolls that spot above where the keyboard will
+ * end. [list] goes on the list (before its verticalScroll), [bar] on the try-it bar's box; pass [reveal] to
+ * PreviewKeyboard. (Appearance does the same through SearchSettingsScreen's rows.)
+ */
+class ListTapReveal(private val scroll: androidx.compose.foundation.ScrollState, private val scope: kotlinx.coroutines.CoroutineScope,
+                    private val ctx: android.content.Context, private val view: android.view.View) {
+    private var tapY = -1
+    private var listTop = 0f
+    private var hiddenBarTop = -1
+    private var shownBarTop = -1
+
+    private fun keyboardLine(): Int {
+        if (shownBarTop > 0) return shownBarTop
+        if (hiddenBarTop <= 0) return Int.MAX_VALUE
+        val strip = ctx.resources.getDimensionPixelSize(helium314.keyboard.latin.R.dimen.config_suggestions_strip_height)
+        return hiddenBarTop - helium314.keyboard.latin.utils.ResourceUtils.getKeyboardHeight(ctx.resources,
+            helium314.keyboard.latin.settings.Settings.getValues()) - strip
+    }
+
+    fun reveal() {
+        val clearance = (40 * ctx.resources.displayMetrics.density).roundToInt() // the rest of the row below the finger
+        val line = keyboardLine()
+        if (tapY > 0 && tapY + clearance > line) {
+            val by = tapY + clearance - line
+            tapY -= by
+            scope.launch { scroll.animateScrollBy(by.toFloat()) }
+        }
+    }
+
+    val list: Modifier = Modifier
+        .pointerInput(Unit) { awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            tapY = (down.position.y + listTop).roundToInt()
+        } }
+        .onGloballyPositioned { listTop = it.positionInWindow().y }
+
+    fun onBarPlaced(barTop: Int) {
+        val imeUp = androidx.core.view.ViewCompat.getRootWindowInsets(view)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
+        if (imeUp) shownBarTop = barTop else hiddenBarTop = barTop
+    }
+}
