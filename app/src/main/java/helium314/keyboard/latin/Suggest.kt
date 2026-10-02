@@ -158,7 +158,8 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
             if (context != null) {
                 val frequent = FrequentLongWords.matching(context, mDictionaryFacilitator.locales, wordComposer.typedWord)
                 var slot = min(2, suggestionsList.size)
-                for (info in frequent) {
+                // (words removed with long-press stay out, like the dictionaries' do; typing one again un-removes it)
+                for (info in frequent.filterNot { mDictionaryFacilitator.isRemovedWord(it.mWord) }) {
                     suggestionsList.removeAll { it.mWord == info.mWord } // already there further down: move it up
                     suggestionsList.add(min(slot, suggestionsList.size), info)
                     slot++
@@ -171,7 +172,7 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
                 val hotSource = suggestionsList.firstOrNull { it.mSourceDict != Dictionary.DICTIONARY_USER_TYPED }?.mSourceDict
                     ?: Dictionary.DICTIONARY_APPLICATION_DEFINED
                 var hotSlot = min(1, suggestionsList.size)
-                for (info in HotWords.matching(wordComposer.typedWord, hotSource)) {
+                for (info in HotWords.matching(wordComposer.typedWord, hotSource).filterNot { mDictionaryFacilitator.isRemovedWord(it.mWord) }) {
                     suggestionsList.removeAll { it.mWord == info.mWord }
                     suggestionsList.add(min(hotSlot, suggestionsList.size), info)
                     hotSlot++
@@ -188,6 +189,7 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
                     for (locale in mDictionaryFacilitator.locales) {
                         for (word in GestureDecoderVocabulary.contractionsFor(typedWordString, locale)) {
                             val shown = capitalize(word, allUpperCase, firstCharCapitalized, locale)
+                            if (mDictionaryFacilitator.isRemovedWord(shown)) continue
                             if (suggestionsList.take(contractionSlot).any { it.mWord == shown }) continue
                             suggestionsList.removeAll { it.mWord == shown }
                             suggestionsList.add(min(contractionSlot, suggestionsList.size),
