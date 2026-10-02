@@ -72,6 +72,8 @@ interface PreviewKeyboardHooks {
     fun dialogClosed()
     /** A text field inside a previewing dialog took the keyboard and gave it back: bring the preview up again. */
     fun restore() { }
+    /** A number box in the dialog has the keyboard (its number pad): the try-it bar shows its 123 tab meanwhile. */
+    fun numberBoxOpened() { }
 }
 
 /**
@@ -83,6 +85,10 @@ object KeepKeyboardWindows {
     val open = mutableListOf<android.view.Window>()
     /** Dialog windows with a number box open (SliderValueText): they take keyboard input until it closes. */
     val typing = mutableSetOf<android.view.Window>()
+    /** Where (screen y of its top) a dialog was when its number box opened: it is held there while the box is open. */
+    val heldTop = mutableMapOf<android.view.Window, Int>()
+    /** The open number box's bottom edge on screen: the dialog moves up only if the keyboard would cover it. */
+    @Volatile var boxBottom = 0
     /** Closes the open number box (set while one is open). */
     var endTyping: (() -> Unit)? = null
     /** Lets the screen below take the focus for [ms] (its keyboard request goes through), then the dialog takes it back. */
@@ -170,6 +176,24 @@ fun ThreeButtonAlertDialog(
                 val dialogDecor = window?.decorView
                 fun place() {
                     if (window == null || activityDecor == null || dialogDecor == null) return
+                    // a number box has the keyboard: the dialog stays where it was when the box opened, whatever the
+                    // system does when the dialog takes the keyboard; it moves up only as far as needed for the box to
+                    // stay above the keyboard
+                    if (window in KeepKeyboardWindows.typing) {
+                        val held = KeepKeyboardWindows.heldTop[window] ?: return
+                        val loc = IntArray(2).also { dialogDecor.getLocationOnScreen(it) }
+                        val imeTop = activityDecor.height - (ViewCompat.getRootWindowInsets(dialogDecor)
+                            ?.getInsets(WindowInsetsCompat.Type.ime())?.bottom ?: 0)
+                        val margin = (8 * dialogDecor.resources.displayMetrics.density).toInt()
+                        val boxBelowKeyboard = (KeepKeyboardWindows.boxBottom - (loc[1] - held) + margin - imeTop).coerceAtLeast(0)
+                        val target = held - boxBelowKeyboard
+                        if (kotlin.math.abs(loc[1] - target) > 1) {
+                            val params = window.attributes
+                            params.y += loc[1] - target // gravity BOTTOM: a bigger y lifts the dialog
+                            window.attributes = params
+                        }
+                        return
+                    }
                     val insets = ViewCompat.getRootWindowInsets(activityDecor) ?: return
                     val ime = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
                     val headerBottom = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top + headerHeight
