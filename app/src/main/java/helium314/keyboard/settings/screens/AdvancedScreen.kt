@@ -79,6 +79,7 @@ fun AdvancedSettingsScreen(
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) Settings.PREF_SHOW_SETUP_WIZARD_ICON else null,
         // (switching back to letters after…: one row with a dialog on Layout & Typing's Typing group)
         // (the physical keyboard's emoji key and the timestamp format: on Others)
+        Settings.PREF_AUTO_PREVIEW_KEYBOARD, // settings screens bring up the preview keyboard by themselves
         SettingsWithoutKey.BACKUP_RESTORE,
         SettingsWithoutKey.FACTORY_RESET, // advanced only (not in the simple set below): tinted
         if (BuildConfig.DEBUG || prefs.getBoolean(DebugSettings.PREF_SHOW_DEBUG_SETTINGS, Defaults.PREF_SHOW_DEBUG_SETTINGS))
@@ -302,6 +303,9 @@ fun createAdvancedSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_RECORD_GESTURE_CORPUS, R.string.record_gesture_corpus, R.string.record_gesture_corpus_summary) {
         SwitchPreference(it, Defaults.PREF_RECORD_GESTURE_CORPUS)
+    },
+    Setting(context, Settings.PREF_AUTO_PREVIEW_KEYBOARD, R.string.auto_preview_keyboard, R.string.auto_preview_keyboard_summary) {
+        SwitchPreference(it, Defaults.PREF_AUTO_PREVIEW_KEYBOARD)
     },
     Setting(context, Settings.PREF_SWIPE_METRICS, R.string.swipe_metrics, R.string.swipe_metrics_summary) { def ->
         val ctx = LocalContext.current

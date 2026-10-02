@@ -202,6 +202,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_ADVANCED_SETTINGS = "advanced_settings";
     public static final String PREF_RECORD_GESTURE_CORPUS = "record_gesture_corpus";
     public static final String PREF_SWIPE_METRICS = "swipe_metrics";
+    public static final String PREF_AUTO_PREVIEW_KEYBOARD = "auto_preview_keyboard";
 
     public static final String PREF_SPACE_TO_CHANGE_LANG = "prefs_long_press_keyboard_to_change_lang";
     public static final String PREF_LANGUAGE_SWIPE_DISTANCE = "language_swipe_distance";

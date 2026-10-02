@@ -691,6 +691,12 @@ internal class PreviewKeyboard( // (also the Preferences screen's, for the key s
 
     private fun show(emoji: Boolean = false, people: Boolean = false) {
         hideJob?.cancel()
+        // "Bring up preview keyboard automatically" off: only the user's tap on the try-it box brings it up; a keyboard
+        // already up (they tapped) still follows, e.g. to the emoji panel
+        val auto = helium314.keyboard.latin.settings.Settings.getCurrentContext()?.prefs()
+            ?.getBoolean(helium314.keyboard.latin.settings.Settings.PREF_AUTO_PREVIEW_KEYBOARD,
+                helium314.keyboard.latin.settings.Defaults.PREF_AUTO_PREVIEW_KEYBOARD) ?: true
+        if (!auto && !focused) return
         reveal() // the tapped row moves above where the keyboard will end, together with it
         if (emoji) {
             // straight to the emoji panel (the people page for the skin tone), like the 😀 tab
