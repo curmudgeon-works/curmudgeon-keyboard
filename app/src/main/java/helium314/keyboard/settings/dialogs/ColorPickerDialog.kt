@@ -170,7 +170,7 @@ fun ColorPickerDialog(
 @Composable
 private fun Preview() {
     Theme(previewDark) {
-        ColorPickerDialog({}, -0x0f4488aa, "color name", true, {}, {})
+        ColorPickerDialog({}, -0x0f4488aa, "color name", true, {}, onConfirmed = {})
     }
 }
 
@@ -179,6 +179,6 @@ private fun Preview() {
 @Composable
 private fun WidePreview() {
     Theme(previewDark) {
-        ColorPickerDialog({}, -0x0f4488aa, "color name", true, {}, {})
+        ColorPickerDialog({}, -0x0f4488aa, "color name", true, {}, onConfirmed = {})
     }
 }
