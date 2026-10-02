@@ -163,10 +163,12 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
                     suggestionsList.add(min(slot, suggestionsList.size), info)
                     slot++
                 }
-                // words typed several times just now: right after the typed word, ahead of everything the dictionaries say
+                // words typed several times just now: right after the typed word, ahead of everything the dictionaries say.
+                // With an incoming auto-correction that slot is what space commits: your own recent word (it starts with
+                // what was typed) is the correction then, the dictionaries' one right after it (Rahul, 2026-10-02: the
+                // correction should include my word; the review of 2026-10-02 had moved it behind)
                 val hotSource = suggestionsList.firstOrNull()?.mSourceDict ?: typedWordInfo.mSourceDict
-                // (after an incoming auto-correction, which is what space commits: before, a hot word took its place)
-                var hotSlot = min(if (hasAutoCorrection) 2 else 1, suggestionsList.size)
+                var hotSlot = min(1, suggestionsList.size)
                 for (info in HotWords.matching(wordComposer.typedWord, hotSource)) {
                     suggestionsList.removeAll { it.mWord == info.mWord }
                     suggestionsList.add(min(hotSlot, suggestionsList.size), info)
