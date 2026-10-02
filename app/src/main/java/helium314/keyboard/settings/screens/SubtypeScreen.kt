@@ -339,7 +339,7 @@ fun SubtypeScreen(
                 // ---- the layout, with the toolbar (then typing with backspace, popups, clipboard history): main layout (advanced), shape, emoji key, split, send key, other layouts, bottom row
                 WithBigTitle(stringResource(R.string.keyboard_layout_set)) {
                     // the main layout (QWERTY, QWERTZ, AZERTY, …) on top, advanced
-                    if (advanced) AdvancedBlock { Pending(layoutChanged(LayoutType.MAIN)) { MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) } } }
+                    AdvancedBlock(advanced) { Pending(layoutChanged(LayoutType.MAIN)) { MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) } } }
                     // the keyboard's shape first (moved from Appearance): height, numbers row;
                     // their dialogs keep the preview keyboard up
                     CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
@@ -374,7 +374,7 @@ fun SubtypeScreen(
                     // the send/enter key on the rows under the emoji and clipboard panels: one switch for both
                     val withAction = (currentSubtype.layoutName(LayoutType.EMOJI_BOTTOM) ?: Settings.readDefaultLayoutName(LayoutType.EMOJI_BOTTOM, prefs)) == "emoji_bottom_row_with_action"
                     // advanced: the send key on the emoji and clipboard panels, long-press space to change input method
-                    if (advanced) AdvancedBlock {
+                    AdvancedBlock(advanced) {
                         Pending(keyChanged(Settings.PREF_SPACE_TO_CHANGE_LANG)) {
                             CompositionLocalProvider(LocalCompactPreferences provides true) {
                                 SettingsActivity.settingsContainer[Settings.PREF_SPACE_TO_CHANGE_LANG]?.Preference() } }
@@ -403,14 +403,12 @@ fun SubtypeScreen(
                             preview.changed(emoji = false)
                             setCurrentSubtype(if (on) currentSubtype.withLayout(LayoutType.FUNCTIONAL, "functional_keys_tablet") else currentSubtype.withoutLayout(LayoutType.FUNCTIONAL))
                         }
-                        if (Settings.getInstance().isTablet || advanced) {
-                            val row = @Composable { Pending(layoutChanged(LayoutType.FUNCTIONAL)) {
-                                SwitchRow(stringResource(R.string.bottom_row_tablet), tablet, onChange = onTablet) } }
-                            if (Settings.getInstance().isTablet) row() else AdvancedBlock { row() }
-                        }
+                        val row = @Composable { Pending(layoutChanged(LayoutType.FUNCTIONAL)) {
+                            SwitchRow(stringResource(R.string.bottom_row_tablet), tablet, onChange = onTablet) } }
+                        if (Settings.getInstance().isTablet) row() else AdvancedBlock(advanced) { row() }
                     }
                     // advanced: bottom row size (with its padding) and side padding, moved from Appearance
-                    if (advanced) AdvancedBlock {
+                    AdvancedBlock(advanced) {
                         CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
                             LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
                         Pending(prefixChanged(Settings.PREF_BOTTOM_ROW_SCALE_PREFIX) || prefixChanged(Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX)) {
@@ -425,7 +423,7 @@ fun SubtypeScreen(
                         Pending(keyChanged(Settings.PREF_TOOLBAR_VISIBILITY)) {
                             SettingsActivity.settingsContainer[Settings.PREF_TOOLBAR_VISIBILITY]?.Preference() }
                     }
-                    if (advanced) AdvancedBlock {
+                    AdvancedBlock(advanced) {
                         CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
                             LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
                             toolbarItems(prefs).filterNotNull().filter { it != Settings.PREF_TOOLBAR_VISIBILITY }.forEach {
@@ -478,7 +476,7 @@ fun SubtypeScreen(
                             SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_SPEED_UP]?.Preference() }
                     }
                     // (the symbol switches — hide on the number row / other keys, long-press dots — are on Appearance)
-                    if (advanced) AdvancedBlock {
+                    AdvancedBlock(advanced) {
                         CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
                             LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
                             // backspace, advanced: swiping left, undoing an autocorrection (a tap after a swipe: on Swiping)
@@ -495,7 +493,7 @@ fun SubtypeScreen(
                     }
                 }
                 // ---- popups: what holding a key offers (every row is advanced, so the group is too)
-                if (advanced) AdvancedBlock { WithBigTitle(stringResource(R.string.key_popups_group)) {
+                AdvancedBlock(advanced) { WithBigTitle(stringResource(R.string.key_popups_group)) {
                     // preset popup layouts, customize popups, customize keys and popups with JSON (all advanced);
                     // italic as a whole when any of it changed
                     Pending(keyChanged("key_popups", "key_popup_set_selected", "key_popup_sets", Settings.PREF_SYMBOL_POPUP_MAP)
@@ -511,7 +509,7 @@ fun SubtypeScreen(
                     }
                 } }
                 // (its own tinted block: the screen's gap between blocks shows as a thin line, like above Backspace)
-                if (advanced) AdvancedBlock {
+                AdvancedBlock(advanced) {
                     WithBigTitle(stringResource(R.string.settings_category_clipboard_history)) {
                         CompositionLocalProvider(LocalCompactPreferences provides true) {
                             clipboardHistoryItems(prefs).filterIsInstance<String>().forEach {
@@ -728,8 +726,8 @@ private val advancedInputItems = listOf(Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NU
 /** Advanced items on a slightly different background, so toggling the mode shows what it adds (last in the Input
  *  group, in place elsewhere). */
 @Composable
-fun AdvancedBlock(content: @Composable () -> Unit) {
-    // edge to edge: widened by the screen's side margin, the rows inside keep their place
+fun AdvancedBlock(visible: Boolean = true, content: @Composable () -> Unit) = helium314.keyboard.settings.AdvancedReveal(visible) {
+    // edge to edge: widened by the screen's side margin, the rows inside keep their place; unfolds with the mode switch
     Column(Modifier
         .layout { measurable, constraints ->
             val margin = SCREEN_MARGIN.roundToPx()

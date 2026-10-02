@@ -322,7 +322,6 @@ fun createAppearanceSettings(context: Context) = listOf(
             items,
             Defaults.PREF_ICON_STYLE,
             live = true,
-            previewKeyboard = false, // the rows show the icons
             itemTrailing = { (_, style) ->
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(end = 8.dp)) {
