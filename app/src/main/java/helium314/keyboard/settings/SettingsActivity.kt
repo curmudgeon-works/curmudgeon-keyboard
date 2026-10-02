@@ -77,6 +77,7 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
     private var passingGesture = false
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) lastTouchDown = android.os.SystemClock.uptimeMillis()
         val handler = outsideTapHandler ?: return super.dispatchTouchEvent(ev)
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) passingGesture = ev.y >= touchPassFromY
         if (passingGesture) return super.dispatchTouchEvent(ev)
@@ -251,6 +252,8 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
     }
 
     companion object {
+        /** When the screen (not a dialog) was last touched, uptime ms: the preview keyboard stays quiet until then. */
+        @Volatile var lastTouchDown = 0L
         // public write so compose previews can show the screens
         // having it in a companion object is not ideal as it will stay in memory even after settings are closed
         // but it's small enough to not care

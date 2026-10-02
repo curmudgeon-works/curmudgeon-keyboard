@@ -70,6 +70,9 @@ val LocalPreviewKeyboard = compositionLocalOf<PreviewKeyboardHooks?> { null }
 interface PreviewKeyboardHooks {
     fun dialogOpened(emoji: Boolean, people: Boolean)
     fun dialogClosed()
+    /** A Save / Discard question: the keyboard goes down and stays down (whatever the answer changes) until the
+     *  screen is touched again. */
+    fun quiet() {}
 }
 
 /** True around settings about emojis: their dialogs preview on the emoji panel instead of the letters. */
