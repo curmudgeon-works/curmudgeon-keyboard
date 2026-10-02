@@ -154,21 +154,22 @@ fun AppearanceScreen(
             Settings.PREF_THEME_DAY_NIGHT else null,
         Settings.PREF_THEME_COLORS,
         if (dayNightMode) Settings.PREF_THEME_COLORS_NIGHT else null,
+        SettingsWithoutKey.FONTS, // keys, symbols, suggestions: one dialog
+        Settings.PREF_THEME_STYLE,
+        Settings.PREF_ICON_STYLE,
+        Settings.PREF_CUSTOM_ICON_NAMES,
+        // (part of themes too since 2026-10-02; the per-area symbol rows are on Others)
+        SettingsWithoutKey.HIDE_ALL_SYMBOLS,
+        Settings.PREF_THEME_KEY_BORDERS,
+        Settings.PREF_KEY_HORIZONTAL_GAP,
+        Settings.PREF_KEY_VERTICAL_GAP,
+        Settings.PREF_SPACE_BAR_TEXT,
+        // the background picture last
         SettingsWithoutKey.BACKGROUND_IMAGE,
         SettingsWithoutKey.BACKGROUND_IMAGE_LANDSCAPE,
         // only with a picture set: keys painted or clear on it
         if (listOf(false, true).any { night -> listOf(false, true).any { land -> Settings.getCustomBackgroundFile(ctx, night, land).exists() } })
             Settings.PREF_BACKGROUND_WHOLE_PICTURE else null,
-        Settings.PREF_THEME_KEY_BORDERS,
-        Settings.PREF_KEY_HORIZONTAL_GAP,
-        Settings.PREF_KEY_VERTICAL_GAP,
-        Settings.PREF_THEME_STYLE,
-        Settings.PREF_ICON_STYLE,
-        Settings.PREF_CUSTOM_ICON_NAMES,
-        SettingsWithoutKey.FONTS, // keys, symbols, suggestions: one dialog
-        // (part of themes too since 2026-10-02; the per-area symbol rows are on Others)
-        SettingsWithoutKey.HIDE_ALL_SYMBOLS,
-        Settings.PREF_SPACE_BAR_TEXT,
         // ---- then the emoji preferences (not part of themes)
         R.string.appearance_group_emoji,
         Settings.PREF_EMOJI_FONT_SCALE,
