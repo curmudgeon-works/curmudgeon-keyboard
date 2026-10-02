@@ -177,6 +177,7 @@ object Defaults {
     const val PREF_SYMBOL_POPUP_MAP = "q~` w× e÷ r{ t} y[ u] i| o_ p- a@ s+ d—– f… g: h; j' k\" l/ z= x\\ c< v> b, n! m?"
     const val PREF_RECORD_GESTURE_CORPUS = false
     const val PREF_SWIPE_METRICS = false
+    const val PREF_AUTO_PREVIEW_KEYBOARD = true // settings bring the preview keyboard up by themselves
     const val PREF_MORE_POPUP_KEYS = "all" // matches the Standard popup preset (upstream: "main")
     const val PREF_SPACE_TO_CHANGE_LANG = true
     const val PREF_LANGUAGE_SWIPE_DISTANCE = 5
