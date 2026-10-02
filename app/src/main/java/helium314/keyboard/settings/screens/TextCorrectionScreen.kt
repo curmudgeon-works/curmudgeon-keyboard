@@ -8,6 +8,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,8 +53,9 @@ import helium314.keyboard.settings.preferences.TextInputPreference
 fun TextCorrectionScreen(
     onClickBack: () -> Unit,
 ) {
-    val prefs = LocalContext.current.prefs()
-    val b = (LocalContext.current.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
+    val ctx = LocalContext.current
+    val prefs = ctx.prefs()
+    val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
     if ((b?.value ?: 0) < 0)
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
     val autocorrectEnabled = prefs.getBoolean(Settings.PREF_AUTO_CORRECTION, Defaults.PREF_AUTO_CORRECTION)
@@ -97,10 +101,51 @@ fun TextCorrectionScreen(
         if (prefs.getBoolean(Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Defaults.PREF_KEY_USE_PERSONALIZED_DICTS))
             Settings.PREF_ADD_TO_PERSONAL_DICTIONARY else null
     )
+    // every change applies at once and can be tried in the box at the bottom (the keyboard comes up for a moment, as on
+    // Appearance); the top bar's tick keeps the changes since the screen opened, the cross undoes them
+    val draft = helium314.keyboard.settings.rememberPrefsDraft("correction", correctionKeys, onClickBack)
+    val tryIt = remember { TryItState() }
+    val keyboard = helium314.keyboard.latin.utils.SubtypeSettings.getSelectedSubtype(prefs).toSettingsSubtype()
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    val softKeyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val view = androidx.compose.ui.platform.LocalView.current
+    val revealer = remember { helium314.keyboard.settings.TapRevealer() }
+    var hiddenBarTop by remember { androidx.compose.runtime.mutableIntStateOf(-1) }
+    var shownBarTop by remember { androidx.compose.runtime.mutableIntStateOf(-1) }
+    fun keyboardLine(): Int {
+        if (shownBarTop > 0) return shownBarTop
+        if (hiddenBarTop <= 0) return Int.MAX_VALUE
+        val strip = ctx.resources.getDimensionPixelSize(R.dimen.config_suggestions_strip_height)
+        return hiddenBarTop - helium314.keyboard.latin.utils.ResourceUtils.getKeyboardHeight(ctx.resources, Settings.getValues()) - strip
+    }
+    val preview = remember { PreviewKeyboard(tryIt, scope, showIme = { softKeyboard?.show() }, reveal = { revealer.revealAbove(keyboardLine()) }) {
+        focusManager.clearFocus(); softKeyboard?.hide() } }
+    fun shape() = correctionKeys.map { prefs.all[it] }
+    var lastShape by remember { mutableStateOf(shape()) }
+    androidx.compose.runtime.LaunchedEffect(b?.value) {
+        val now = shape()
+        if (now != lastShape) { lastShape = now; preview.changed(emoji = false) }
+    }
+    var bottomBarTop by remember { androidx.compose.runtime.mutableIntStateOf(-1) }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { (ctx.getActivity() as? SettingsActivity)?.touchPassFromY = Int.MAX_VALUE } }
+    androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.dialogs.LocalKeepKeyboard provides true,
+        helium314.keyboard.settings.dialogs.LocalPreviewKeyboard provides preview,
+        helium314.keyboard.settings.dialogs.LocalBottomBarTop provides bottomBarTop) {
     SearchSettingsScreen(
-        onClickBack = onClickBack,
+        onClickBack = draft.leave,
         title = stringResource(R.string.settings_screen_correction),
         settings = items,
+        topActions = draft.topActions,
+        bottomBar = { androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.onGloballyPositioned {
+            bottomBarTop = it.positionInWindow().y.toInt()
+            // the try-it bar stays usable while a dialog is open
+            (ctx.getActivity() as? SettingsActivity)?.touchPassFromY = bottomBarTop
+            val imeUp = androidx.core.view.ViewCompat.getRootWindowInsets(view)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
+            if (imeUp) shownBarTop = bottomBarTop else hiddenBarTop = bottomBarTop
+        }) { TryItBar(keyboard, tryIt, onFocus = preview::onFocus, onUsed = preview::onUsed) } },
+        revealer = revealer,
+        isPending = { it in draft.pending },
         simpleModeKeys = setOf(
             SettingsWithoutKey.EDIT_PERSONAL_DICTIONARY, Settings.PREF_AUTO_CORRECTION, Settings.PREF_AUTO_CAP,
             Settings.PREF_KEY_USE_DOUBLE_SPACE_PERIOD, Settings.PREF_AUTOSPACE_AFTER_SUGGESTION,
@@ -108,7 +153,22 @@ fun TextCorrectionScreen(
             Settings.PREF_ADD_TO_PERSONAL_DICTIONARY,
         ),
     )
+    draft.dialogs()
+    }
 }
+
+/** Every preference on the Text correction screen (shown or not), for its tick / cross and its preview. */
+private val correctionKeys = listOf(
+    Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE, Settings.PREF_AUTO_CORRECTION, Settings.PREF_MORE_AUTO_CORRECTION,
+    Settings.PREF_AUTOCORRECT_SHORTCUTS, Settings.PREF_AUTOCORRECT_WITH_DIGITS, Settings.PREF_AUTO_CORRECT_THRESHOLD,
+    Settings.PREF_AUTO_CAP, Settings.PREF_KEY_USE_DOUBLE_SPACE_PERIOD, Settings.PREF_AUTOSPACE_AFTER_PUNCTUATION,
+    Settings.PREF_AUTOSPACE_AFTER_SUGGESTION, Settings.PREF_AUTOSPACE_BEFORE_GESTURE_TYPING, Settings.PREF_AUTOSPACE_AFTER_GESTURE_TYPING,
+    Settings.PREF_SHIFT_REMOVES_AUTOSPACE, Settings.PREF_SHOW_SUGGESTIONS, Settings.PREF_ALWAYS_SHOW_SUGGESTIONS,
+    Settings.PREF_ALWAYS_SHOW_SUGGESTIONS_EXCEPT_WEB_TEXT, Settings.PREF_CENTER_SUGGESTION_TEXT_TO_ENTER, Settings.PREF_SUGGEST_EMOJIS,
+    Settings.PREF_INLINE_EMOJI_SEARCH, Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Settings.PREF_ALWAYS_INCOGNITO_MODE,
+    Settings.PREF_BIGRAM_PREDICTIONS, Settings.PREF_SUGGEST_PUNCTUATION, Settings.PREF_PUNCTUATION_SUGGESTIONS,
+    Settings.PREF_SUGGEST_CLIPBOARD_CONTENT, Settings.PREF_USE_CONTACTS, Settings.PREF_USE_APPS, Settings.PREF_ADD_TO_PERSONAL_DICTIONARY,
+)
 
 fun createCorrectionSettings(context: Context) = listOf(
     Setting(context, SettingsWithoutKey.EDIT_PERSONAL_DICTIONARY, R.string.edit_personal_dictionary) {

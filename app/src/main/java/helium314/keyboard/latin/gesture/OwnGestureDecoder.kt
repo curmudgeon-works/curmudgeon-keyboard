@@ -48,9 +48,13 @@ object OwnGestureDecoder {
     private const val MAX_RESULTS = 10 // at least; more when the user asks for more suggestions (up to 40)
 
     /** The user's inflection weights and scorer blend, read from the (per keyboard) preferences on every swipe. */
-    class Tuning(val turn: Float, val slowdown: Float, val kushler: Float, val historyBoost: Int) {
-        /** One decimal each; the label the statistics are kept under. */
-        val key: String = String.format(Locale.ROOT, "T%.1f S%.1f K%.1f H%d", turn, slowdown, kushler, historyBoost)
+    class Tuning(val turn: Float, val slowdown: Float, val kushler: Float, val historyBoost: Int,
+                 val fastCommon: Float = Defaults.PREF_GESTURE_FAST_COMMON_WORDS, val cornerMiss: Float = Defaults.PREF_GESTURE_CORNER_MISS) {
+        /** One decimal each (two for the fast-swipe pair); the label the statistics are kept under. The fast-swipe pair
+         *  is only in it when not at its default, so the results counted before it existed stay under their label. */
+        val key: String = String.format(Locale.ROOT, "T%.1f S%.1f K%.1f H%d", turn, slowdown, kushler, historyBoost) +
+            (if (round2(fastCommon) != Defaults.PREF_GESTURE_FAST_COMMON_WORDS) String.format(Locale.ROOT, " F%.2f", fastCommon) else "") +
+            (if (round2(cornerMiss) != Defaults.PREF_GESTURE_CORNER_MISS) String.format(Locale.ROOT, " C%.2f", cornerMiss) else "")
         override fun equals(other: Any?) = other is Tuning && other.key == key
         override fun hashCode() = key.hashCode()
 
@@ -63,13 +67,17 @@ object OwnGestureDecoder {
                 prefs.getFloat(Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Defaults.PREF_GESTURE_SLOWDOWN_WEIGHT),
                 prefs.getFloat(Settings.PREF_GESTURE_KUSHLER_WEIGHT, Defaults.PREF_GESTURE_KUSHLER_WEIGHT),
                 prefs.getInt(Settings.PREF_GESTURE_HISTORY_BOOST, Defaults.PREF_GESTURE_HISTORY_BOOST),
+                prefs.getFloat(Settings.PREF_GESTURE_FAST_COMMON_WORDS, Defaults.PREF_GESTURE_FAST_COMMON_WORDS),
+                prefs.getFloat(Settings.PREF_GESTURE_CORNER_MISS, Defaults.PREF_GESTURE_CORNER_MISS),
             )
 
             /** The tuning a [key] stands for, or null if it isn't one; keys from before pauses were dropped carry a P, ignored. */
             fun parse(key: String): Tuning? {
-                val m = Regex("T([\\d.]+)(?: P[\\d.]+)? S([\\d.]+) K([\\d.]+) H(\\d+)").matchEntire(key) ?: return null
-                val v = m.groupValues.drop(1).map { it.toFloatOrNull() ?: return null }
-                return Tuning(v[0], v[1], v[2], v[3].toInt())
+                val m = Regex("T([\\d.]+)(?: P[\\d.]+)? S([\\d.]+) K([\\d.]+) H(\\d+)(?: F([\\d.]+))?(?: C([\\d.]+))?").matchEntire(key) ?: return null
+                val v = m.groupValues.drop(1).take(4).map { it.toFloatOrNull() ?: return null }
+                val f = m.groupValues[5].toFloatOrNull() ?: Defaults.PREF_GESTURE_FAST_COMMON_WORDS
+                val c = m.groupValues[6].toFloatOrNull() ?: Defaults.PREF_GESTURE_CORNER_MISS
+                return Tuning(v[0], v[1], v[2], v[3].toInt(), f, c)
             }
 
             fun write(prefs: SharedPreferences, tuning: Tuning) = prefs.edit()
@@ -77,9 +85,13 @@ object OwnGestureDecoder {
                 .putFloat(Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, tuning.slowdown)
                 .putFloat(Settings.PREF_GESTURE_KUSHLER_WEIGHT, tuning.kushler)
                 .putInt(Settings.PREF_GESTURE_HISTORY_BOOST, tuning.historyBoost)
+                .putFloat(Settings.PREF_GESTURE_FAST_COMMON_WORDS, tuning.fastCommon)
+                .putFloat(Settings.PREF_GESTURE_CORNER_MISS, tuning.cornerMiss)
                 .apply()
         }
     }
+
+    private fun round2(v: Float) = Math.round(v * 100) / 100f
 
     /** The tuning the last swipe was decoded with (the statistics are kept under its key). */
     @Volatile var currentTuning: Tuning = Tuning.DEFAULT
@@ -101,11 +113,11 @@ object OwnGestureDecoder {
     @Synchronized
     private fun decoderFor(capsHeight: Float, capsSwipe: Boolean, tuning: Tuning): GestureDecoder {
         if (capsHeight != decoderCapsHeight || capsSwipe != decoderCapsSwipe || tuning != decoderTuning) {
-            val kushler = KushlerScorer(KushlerConfig(slowEmphasis = tuning.slowdown))
+            val kushler = KushlerScorer(KushlerConfig(slowEmphasis = tuning.slowdown, matchRelaxPerKeyPerSecond = tuning.cornerMiss))
             val location = LocationScorer()
             val hybrid = HybridScorer(kushler, location, kushlerWeight = tuning.kushler, locationWeight = 1f - tuning.kushler)
             scorers = listOf(hybrid, kushler, location)
-            decoder = GestureDecoder(hybrid, DecoderConfig(capsExcursions = capsSwipe),
+            decoder = GestureDecoder(hybrid, DecoderConfig(capsExcursions = capsSwipe, frequencyEmphasisPerKeyPerSecond = tuning.fastCommon),
                 preprocessor = GesturePreprocessor(PreprocessorConfig(excursionMinHeightKeyHeights = capsHeight,
                     turnConfidenceScale = tuning.turn, stopDtFactor = 2.5f)))
             decoderCapsHeight = capsHeight

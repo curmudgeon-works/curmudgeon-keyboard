@@ -42,11 +42,12 @@ fun gestureTypingItems(prefs: SharedPreferences): List<String?> {
 }
 
 val gestureTypingSimpleModeKeys = setOf(
-    Settings.PREF_GESTURE_INPUT, Settings.PREF_GESTURE_PREVIEW_TRAIL, Settings.PREF_GESTURE_SPACE_AWARE,
+    Settings.PREF_GESTURE_INPUT, Settings.PREF_GESTURE_PREVIEW_TRAIL, Settings.PREF_GESTURE_TRAIL_FADEOUT_DURATION,
+    Settings.PREF_GESTURE_SPACE_AWARE,
 )
 
 fun createGestureTypingSettings(context: Context) = listOf(
-    Setting(context, Settings.PREF_GESTURE_INPUT, R.string.gesture_input, R.string.gesture_input_summary) {
+    Setting(context, Settings.PREF_GESTURE_INPUT, R.string.gesture_input) {
         SwitchPreference(it, Defaults.PREF_GESTURE_INPUT)
     },
     Setting(context, Settings.PREF_GESTURE_PREVIEW_TRAIL, R.string.gesture_preview_trail) {
@@ -55,11 +56,10 @@ fun createGestureTypingSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_GESTURE_SPACE_AWARE, R.string.gesture_space_aware, R.string.gesture_space_aware_summary) {
         SwitchPreference(it, Defaults.PREF_GESTURE_SPACE_AWARE)
     },
-    Setting(context, Settings.PREF_GESTURE_CAPS_SWIPE, R.string.gesture_caps_swipe, R.string.gesture_caps_swipe_summary) {
+    Setting(context, Settings.PREF_GESTURE_CAPS_SWIPE, R.string.gesture_caps_swipe) {
         SwitchPreference(it, Defaults.PREF_GESTURE_CAPS_SWIPE)
     },
-    Setting(context, Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD, R.string.gesture_apostrophe_via_period,
-        R.string.gesture_apostrophe_via_period_summary) {
+    Setting(context, Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD, R.string.gesture_apostrophe_via_period) {
         SwitchPreference(it, Defaults.PREF_GESTURE_APOSTROPHE_VIA_PERIOD)
     },
     Setting(context, Settings.PREF_GESTURE_CAPS_HEIGHT, R.string.gesture_caps_height, R.string.gesture_caps_height_summary) { def ->
