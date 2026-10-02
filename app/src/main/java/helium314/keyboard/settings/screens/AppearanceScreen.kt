@@ -207,7 +207,7 @@ fun AppearanceScreen(
         return hiddenBarTop - ResourceUtils.getKeyboardHeight(ctx.resources, sv) - strip
     }
     val preview = remember { PreviewKeyboard(tryIt, scope, showIme = { softKeyboard?.show() }, reveal = { revealer.revealAbove(keyboardLine()) }) {
-        focusManager.clearFocus(); softKeyboard?.hide() } }
+        focusManager.clearFocus(force = true); softKeyboard?.hide() } }
     // a changed appearance value (a switch, say) brings the keyboard up for a moment; dialogs report themselves
     var lastValues by remember { mutableStateOf(AppearanceLooks.current(prefs)) }
     LaunchedEffect(b?.value) {
@@ -682,6 +682,9 @@ internal class PreviewKeyboard( // (also the Preferences screen's, for the key s
     private var hideJob: Job? = null
 
     fun onFocus(isFocused: Boolean) {
+        // the try-it box got the focus back by itself (the Save / Discard question closing hands the window, and with it
+        // the box's focus and keyboard, back): not wanted until the screen is touched again
+        if (isFocused && isQuiet()) { scope.launch { hide() }; return }
         focused = isFocused
         if (!isFocused) byUs = false
     }
@@ -729,9 +732,12 @@ internal class PreviewKeyboard( // (also the Preferences screen's, for the key s
     override fun quiet() {
         hideJob?.cancel()
         backToLetters()
-        // down now, the try-it box without focus (else the keyboard comes back with the focus when the question goes)
-        if (byUs || focused) { byUs = false; hide() }
+        // down now, the try-it box without focus (else the keyboard comes back with the focus when the question goes),
+        // whoever brought it up
+        byUs = false
+        focused = false
         quietSince = android.os.SystemClock.uptimeMillis()
+        hide()
     }
 
     override fun dialogOpened(emoji: Boolean, people: Boolean) { dialogs++; if (!isQuiet()) show(emoji, people) }

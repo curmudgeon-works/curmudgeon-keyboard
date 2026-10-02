@@ -243,7 +243,7 @@ fun SubtypeScreen(
     // the row tapped last is moved above where the preview keyboard will end when a setting brings it up
     val tapReveal = remember { helium314.keyboard.settings.ListTapReveal(scrollState, scope, ctx, view) }
     val preview = remember { PreviewKeyboard(tryIt, scope, showIme = { softKeyboard?.show() }, reveal = tapReveal::reveal) {
-        focusManager.clearFocus(); softKeyboard?.hide() } }
+        focusManager.clearFocus(force = true); softKeyboard?.hide() } }
     var bottomBarTop by remember { mutableIntStateOf(-1) }
     // a switch whose effect shows on the keyboard brings it up for a moment, as on Appearance (dialogs report themselves):
     // the keyboard's shape, what a key press does (popup, vibration, sound), the emoji key, backspace, popups

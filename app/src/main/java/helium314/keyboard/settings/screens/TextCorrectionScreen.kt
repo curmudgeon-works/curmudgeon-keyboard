@@ -120,7 +120,7 @@ fun TextCorrectionScreen(
         return hiddenBarTop - helium314.keyboard.latin.utils.ResourceUtils.getKeyboardHeight(ctx.resources, Settings.getValues()) - strip
     }
     val preview = remember { PreviewKeyboard(tryIt, scope, showIme = { softKeyboard?.show() }, reveal = { revealer.revealAbove(keyboardLine()) }) {
-        focusManager.clearFocus(); softKeyboard?.hide() } }
+        focusManager.clearFocus(force = true); softKeyboard?.hide() } }
     fun shape() = correctionKeys.map { prefs.all[it] }
     var lastShape by remember { mutableStateOf(shape()) }
     androidx.compose.runtime.LaunchedEffect(b?.value) {
