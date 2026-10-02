@@ -124,13 +124,13 @@
     <!-- Name of the main dictionary, as opposed to auxiliary dictionaries (medical/entertainment/sports...) -->
     <string name="main_dictionary">Main dictionary</string>
     <!-- Option to enable showing suggestions -->
-    <string name="prefs_show_suggestions">Show correction suggestions</string>
+    <string name="prefs_show_suggestions">Show suggestions</string>
     <!-- Description for show suggestions -->
     <string name="prefs_show_suggestions_summary">Display suggested words while typing</string>
     <!-- Option to override app flag to not show suggestions -->
-    <string name="prefs_always_show_suggestions">Always show suggestions</string>
+    <string name="prefs_always_show_suggestions">Ignore other apps’ request to disable suggestions</string>
     <!-- Description for override app flag to not show suggestions -->
-    <string name="prefs_always_show_suggestions_summary">Ignore other apps’ request to disable suggestions (may cause issues)</string>
+    <string name="prefs_always_show_suggestions_summary">(May cause issues)</string>
     <!-- Option to not override the above flags for InputType.WEB_EDIT_TEXT -->
     <string name="prefs_always_show_suggestions_except_web_text">Don’t always show suggestions for web edit fields</string>
     <!-- Description for prefs_always_show_suggestions_except_web_text -->
@@ -164,7 +164,7 @@
     <!-- Option to suggest auto correction suggestions very aggressively. Auto-corrects to a word which has even large edit distance from typed word. -->
     <string name="auto_correction_threshold_mode_very_aggressive">Very aggressive</string>
     <!-- Option to show the text to be entered as the middle middle suggestion -->
-    <string name="center_suggestion_text_to_enter">Always use middle suggestion</string>
+    <string name="center_suggestion_text_to_enter">Space or punctuation enters first suggestion</string>
     <!-- Description for the center text to enter setting -->
     <string name="center_suggestion_text_to_enter_summary">On pressing space or punctuation, the middle suggestion will be entered</string>
     <!-- Option to enable using next word suggestions. After the user types a space, with this option on, the keyboard will try to predict the next word. -->

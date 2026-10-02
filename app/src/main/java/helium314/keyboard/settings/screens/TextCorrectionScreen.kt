@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.dp
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -244,7 +245,7 @@ fun createCorrectionSettings(context: Context) = listOf(
         SwitchPreference(it, Defaults.PREF_SHIFT_REMOVES_AUTOSPACE)
     },
     Setting(context, Settings.PREF_SHOW_SUGGESTIONS,
-        R.string.prefs_show_suggestions, R.string.prefs_show_suggestions_summary
+        R.string.prefs_show_suggestions
     ) {
         SwitchPreference(it, Defaults.PREF_SHOW_SUGGESTIONS) {
             // the row above the keys changes with it (and, toolbar opening from a key, the top-left key's popup)
@@ -255,12 +256,14 @@ fun createCorrectionSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_ALWAYS_SHOW_SUGGESTIONS,
         R.string.prefs_always_show_suggestions, R.string.prefs_always_show_suggestions_summary
     ) {
-        SwitchPreference(it, Defaults.PREF_ALWAYS_SHOW_SUGGESTIONS)
+        // depends on Show suggestions (shown only with it on): indented under it
+        Indented { SwitchPreference(it, Defaults.PREF_ALWAYS_SHOW_SUGGESTIONS) }
     },
     Setting(context, Settings.PREF_ALWAYS_SHOW_SUGGESTIONS_EXCEPT_WEB_TEXT,
         R.string.prefs_always_show_suggestions_except_web_text, R.string.prefs_always_show_suggestions_except_web_text_summary
     ) {
-        SwitchPreference(it, Defaults.PREF_ALWAYS_SHOW_SUGGESTIONS_EXCEPT_WEB_TEXT)
+        // depends on the one above: one step further in
+        Indented(2) { SwitchPreference(it, Defaults.PREF_ALWAYS_SHOW_SUGGESTIONS_EXCEPT_WEB_TEXT) }
     },
     Setting(context, Settings.PREF_KEY_USE_PERSONALIZED_DICTS,
         R.string.use_personalized_dicts, R.string.use_personalized_dicts_summary
@@ -299,7 +302,7 @@ fun createCorrectionSettings(context: Context) = listOf(
         TextInputPreference(setting, defaultSpecs ?: "")
     },
     Setting(context, Settings.PREF_CENTER_SUGGESTION_TEXT_TO_ENTER,
-        R.string.center_suggestion_text_to_enter, R.string.center_suggestion_text_to_enter_summary
+        R.string.center_suggestion_text_to_enter // (the old summary spoke of a middle suggestion: the strip has none)
     ) {
         SwitchPreference(it, Defaults.PREF_CENTER_SUGGESTION_TEXT_TO_ENTER)
     },
@@ -358,3 +361,9 @@ private fun PreferencePreview() {
         }
     }
 }
+
+/** A row that depends on the one above it: [steps] × 16 dp further in than the screen's rows. */
+@Composable
+private fun Indented(steps: Int = 1, content: @Composable () -> Unit) =
+    androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.preferences.LocalRowStart provides
+        helium314.keyboard.settings.preferences.LocalRowStart.current + (16 * steps).dp, content = content)
