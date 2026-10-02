@@ -22,6 +22,8 @@ object GestureStats {
         var pickedLater: Int = 0, var deleted: Int = 0,
         /** decode time on this phone: how many swipes were timed, their total ms and the slowest */
         var timed: Int = 0, var timeMs: Long = 0, var slowestMs: Int = 0,
+        /** when the first and the latest swipe were counted (ms since 1970); 0: before the dates were kept */
+        var first: Long = 0, var last: Long = 0,
     ) {
         val averageMs: Int get() = if (timed == 0) 0 else (timeMs / timed).toInt()
         /** Ranking score: a kept swipe counts fully, a second choice half, a third a quarter, the rest nothing. */
@@ -29,11 +31,11 @@ object GestureStats {
 
         fun toJson(): JSONObject = JSONObject().put("n", swipes).put("kept", kept).put("p2", pickedSecond)
             .put("p3", pickedThird).put("pl", pickedLater).put("del", deleted)
-            .put("t", timed).put("ms", timeMs).put("max", slowestMs)
+            .put("t", timed).put("ms", timeMs).put("max", slowestMs).put("from", first).put("to", last)
 
         companion object {
             fun fromJson(o: JSONObject) = Row(o.optInt("n"), o.optInt("kept"), o.optInt("p2"), o.optInt("p3"), o.optInt("pl"), o.optInt("del"),
-                o.optInt("t"), o.optLong("ms"), o.optInt("max"))
+                o.optInt("t"), o.optLong("ms"), o.optInt("max"), o.optLong("from"), o.optLong("to"))
         }
     }
 
@@ -76,11 +78,35 @@ object GestureStats {
         return o.keys().asSequence().associateWith { Row.fromJson(o.getJSONObject(it)) }
     }
 
+    /** Deletes [tuningKey]'s results for good: it counts from zero again. */
     fun clear(prefs: SharedPreferences, tuningKey: String) {
         val o = readJson(prefs)
         o.remove(tuningKey)
         prefs.edit().putString(PREF_KEY, o.toString()).apply()
     }
+
+    /** A tuning's results put aside ("save and start afresh"), with the time they cover. */
+    class Saved(val tuningKey: String, val row: Row)
+
+    /** [tuningKey]'s results move to the saved ones (shown after the others, oldest first); it counts from zero again. */
+    fun saveAndClear(prefs: SharedPreferences, tuningKey: String) {
+        val o = readJson(prefs)
+        val row = o.optJSONObject(tuningKey) ?: return
+        val saved = readSavedJson(prefs).put(JSONObject().put("key", tuningKey).put("row", row))
+        o.remove(tuningKey)
+        prefs.edit().putString(PREF_KEY, o.toString()).putString(PREF_SAVED_KEY, saved.toString()).apply()
+    }
+
+    fun readSaved(prefs: SharedPreferences): List<Saved> {
+        val a = readSavedJson(prefs)
+        return (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let { o ->
+            o.optJSONObject("row")?.let { Saved(o.optString("key"), Row.fromJson(it)) } } }
+    }
+
+    private const val PREF_SAVED_KEY = "gesture_stats_saved"
+
+    private fun readSavedJson(prefs: SharedPreferences): org.json.JSONArray =
+        try { org.json.JSONArray(prefs.getString(PREF_SAVED_KEY, "[]")!!) } catch (e: Exception) { org.json.JSONArray() }
 
     /** The tuning with the best score among those tried on enough swipes, or null. */
     fun recommended(rows: Map<String, Row>): String? =
@@ -93,8 +119,9 @@ object GestureStats {
         val prefs = Settings.getCurrentContext()?.realPrefs() ?: return
         try {
             val o = readJson(prefs)
-            val row = o.optJSONObject(key)?.let { Row.fromJson(it) } ?: Row()
+            val row = o.optJSONObject(key)?.let { Row.fromJson(it) } ?: Row(first = System.currentTimeMillis())
             change(row)
+            row.last = System.currentTimeMillis()
             o.put(key, row.toJson())
             prefs.edit().putString(PREF_KEY, o.toString()).apply()
         } catch (e: Exception) {
