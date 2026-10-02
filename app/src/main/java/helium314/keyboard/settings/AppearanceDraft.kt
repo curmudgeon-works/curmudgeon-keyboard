@@ -67,9 +67,8 @@ class AppearanceDraft private constructor(
         private fun liveFiles(ctx: Context) = listOf(
             Settings.getCustomBackgroundFile(ctx, false, false), Settings.getCustomBackgroundFile(ctx, false, true),
             Settings.getCustomBackgroundFile(ctx, true, false), Settings.getCustomBackgroundFile(ctx, true, true),
-        ).flatMap { listOf(it, PictureFraming.fileFor(it)) } + listOf( // each picture with its framing
-            Settings.getCustomEmojiFontFile(ctx), // (the text fonts are a list of files kept by name: only the choices change)
-        )
+        ).flatMap { listOf(it, PictureFraming.fileFor(it)) } // each picture with its framing (the fonts, emoji too, are
+        // a list of files kept by name: only the choices change, preferences)
 
         private fun dir(ctx: Context) = File(ctx.filesDir, "appearance_draft")
         private const val PREFS_FILE = "draft_prefs.json" // written last: its presence means a complete snapshot

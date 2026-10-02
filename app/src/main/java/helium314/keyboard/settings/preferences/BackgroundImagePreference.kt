@@ -2,6 +2,9 @@
 package helium314.keyboard.settings.preferences
 
 import android.app.Activity
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.combinedClickable
+import helium314.keyboard.latin.common.PictureLibrary
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -100,9 +103,12 @@ fun BackgroundImagePref(setting: Setting, isLandscape: Boolean) {
     val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
         .addCategory(Intent.CATEGORY_OPENABLE)
         .setType("image/*")
+    // a picture already loaded (on any keyboard) or a new one from the gallery; straight to the gallery while there are none
+    var showPicker by rememberSaveable { mutableStateOf(false) }
+    fun pickPicture() { if (PictureLibrary.list(ctx).isEmpty()) launcher.launch(intent) else showPicker = true }
     fun open() {
         if (getFile().exists()) showFramingDialog = true
-        else launcher.launch(intent)
+        else pickPicture()
     }
     Preference(
         name = setting.title,
@@ -135,7 +141,7 @@ fun BackgroundImagePref(setting: Setting, isLandscape: Boolean) {
             isLandscape = isLandscape,
             title = title,
             onDismiss = { showFramingDialog = false },
-            onOtherPicture = { showFramingDialog = false; launcher.launch(intent) },
+            onOtherPicture = { showFramingDialog = false; pickPicture() },
             onRemove = {
                 getFile().delete()
                 PictureFraming.fileFor(getFile()).delete()
@@ -146,6 +152,76 @@ fun BackgroundImagePref(setting: Setting, isLandscape: Boolean) {
     }
     if (showErrorDialog) {
         InfoDialog(stringResource(R.string.file_read_error)) { showErrorDialog = false }
+    }
+    if (showPicker) {
+        PicturePickerDialog(
+            onDismiss = { showPicker = false },
+            onGallery = { showPicker = false; launcher.launch(intent) },
+            onPicked = { picture ->
+                showPicker = false
+                // this keyboard's own copy, placed afresh (framed independently of the other keyboards)
+                scope.launch(Dispatchers.IO) {
+                    val ok = runCatching {
+                        val live = getFile()
+                        picture.copyTo(live, overwrite = true)
+                        PictureFraming.fileFor(live).delete()
+                        picture.setLastModified(System.currentTimeMillis())
+                        Settings.clearCachedBackgroundImages()
+                    }.isSuccess
+                    withContext(Dispatchers.Main) {
+                        AppearanceLooks.reload(ctx)
+                        if (ok) showFramingDialog = true else showErrorDialog = true
+                    }
+                }
+            },
+        )
+    }
+}
+
+/** The pictures loaded so far (shared by all keyboards) to choose from, or a new one from the gallery; a long press
+ *  removes one from the list. */
+@Composable
+private fun PicturePickerDialog(onDismiss: () -> Unit, onGallery: () -> Unit, onPicked: (File) -> Unit) {
+    val ctx = LocalContext.current
+    var generation by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    val pictures = remember(generation) { PictureLibrary.list(ctx) }
+    var toForget by remember { mutableStateOf<File?>(null) }
+    ThreeButtonAlertDialog(
+        onDismissRequest = onDismiss,
+        onConfirmed = onGallery,
+        confirmButtonText = stringResource(R.string.background_picture_gallery),
+        title = { Text(stringResource(R.string.background_picture_choose)) },
+        content = {
+            androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(3),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.heightIn(max = 320.dp),
+            ) {
+                items(pictures.size, key = { pictures[it].name }) { i ->
+                    val picture = pictures[i]
+                    val thumb by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, picture) {
+                        value = withContext(Dispatchers.IO) {
+                            runCatching<androidx.compose.ui.graphics.ImageBitmap?> { PictureFraming.decode(picture, 300)?.asImageBitmap() }.getOrNull()
+                        }
+                    }
+                    Box(Modifier.aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                        .combinedClickable(onClick = { onPicked(picture) }, onLongClick = { toForget = picture })) {
+                        thumb?.let {
+                            androidx.compose.foundation.Image(it, null, contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                modifier = Modifier.matchParentSize().clip(RoundedCornerShape(8.dp)))
+                        }
+                    }
+                }
+            }
+        },
+    )
+    toForget?.let { picture ->
+        ConfirmationDialog(
+            onDismissRequest = { toForget = null },
+            onConfirmed = { PictureLibrary.remove(picture); toForget = null; generation++ },
+            content = { Text(stringResource(R.string.background_picture_forget)) },
+        )
     }
 }
 
@@ -283,6 +359,7 @@ private fun setBackgroundImage(ctx: Context, uri: Uri, isNight: Boolean, isLands
         imageFile.delete()
         return false
     }
+    PictureLibrary.add(ctx, imageFile) // offered to every keyboard from now on
     Settings.clearCachedBackgroundImages()
     return true
 }
