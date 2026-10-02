@@ -210,6 +210,7 @@
     <string name="gesture_caps_height_value">%s key heights</string>
     <!-- Title of the setting to adjust the fast-typing gesture cooldown-->
     <string name="gesture_fast_typing_cooldown">Rapid typing cooldown</string>
+    <string name="gesture_fast_typing_cooldown_summary">Raise if quick taps turn into swiped words; lower if swipes come out as taps</string>
     <!-- The text that represents no cooldown-->
     <string name="gesture_fast_typing_cooldown_instant">Always start instantly</string>
     <!-- Title of the setting to adjust the gesture trail fadeout duration-->

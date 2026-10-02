@@ -80,7 +80,10 @@ fun createGestureTypingSettings(context: Context) = listOf(
             description = {
                 if (it <= 0) stringResource(R.string.gesture_fast_typing_cooldown_instant)
                 else stringResource(R.string.abbreviation_unit_milliseconds, it.toString())
-            }
+            },
+            // the value at the right, what to do with it underneath
+            valueOnRight = true,
+            summary = stringResource(R.string.gesture_fast_typing_cooldown_summary),
         )
     },
     Setting(context, Settings.PREF_GESTURE_TRAIL_THICKNESS, R.string.gesture_trail_thickness) { def ->
