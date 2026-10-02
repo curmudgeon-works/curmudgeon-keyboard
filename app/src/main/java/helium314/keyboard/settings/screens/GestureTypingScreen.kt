@@ -42,8 +42,7 @@ fun gestureTypingItems(prefs: SharedPreferences): List<String?> {
 }
 
 val gestureTypingSimpleModeKeys = setOf(
-    Settings.PREF_GESTURE_INPUT, Settings.PREF_GESTURE_PREVIEW_TRAIL, Settings.PREF_GESTURE_TRAIL_FADEOUT_DURATION,
-    Settings.PREF_GESTURE_SPACE_AWARE,
+    Settings.PREF_GESTURE_INPUT, Settings.PREF_GESTURE_PREVIEW_TRAIL, Settings.PREF_GESTURE_SPACE_AWARE,
 )
 
 fun createGestureTypingSettings(context: Context) = listOf(
