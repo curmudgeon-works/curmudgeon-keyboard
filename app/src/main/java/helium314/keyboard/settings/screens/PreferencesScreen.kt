@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.screens
 
+import androidx.compose.runtime.remember
 import helium314.keyboard.settings.SettingsWithoutKey
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.latin.settings.KeyboardProfiles
@@ -238,9 +239,12 @@ fun createPreferencesSettings(context: Context) = listOf(
             blocked = { ctx -> SystemFeedback.soundBlocker(ctx)?.let { r -> ctx.getString(r) } },
             open = SystemFeedback::openSoundSettings,
         ) { onSwitched, blockedNow ->
-            // Android keeps key sounds off: the switch stays as set, greyed (its sound and volume rows are hidden)
-            val on = LocalContext.current.prefs().getBoolean(Settings.PREF_SOUND_ON, Defaults.PREF_SOUND_ON)
-            SwitchPreference(it, Defaults.PREF_SOUND_ON, dimmed = on && blockedNow) { on -> onSwitched(on) }
+            // Android keeps key sounds off: the switch stays as set, greyed (its sound and volume rows are hidden).
+            // Its own state, updated by the flip itself: read from the saved value only, the first flip on wasn't
+            // greyed (nothing redrew the row until a later flip)
+            val prefs = LocalContext.current.prefs()
+            var on by remember { mutableStateOf(prefs.getBoolean(Settings.PREF_SOUND_ON, Defaults.PREF_SOUND_ON)) }
+            SwitchPreference(it, Defaults.PREF_SOUND_ON, dimmed = on && blockedNow) { now -> on = now; onSwitched(now) }
         }
     },
     Setting(context, Settings.PREF_SHOW_EMOJI_DESCRIPTIONS, R.string.show_emoji_descriptions) {
