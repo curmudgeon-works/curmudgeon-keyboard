@@ -425,7 +425,7 @@
     <!-- Preferences item for disabling word learning -->
     <string name="incognito">Force incognito mode</string>
     <!-- Description for "prefs_force_incognito_mode" option. -->
-    <string name="prefs_force_incognito_mode_summary">Disable learning of new words</string>
+    <string name="prefs_force_incognito_mode_summary">Disable learning of new words (incognito)</string>
     <!-- Content description for "popup keys" suggestions view -->
     <string name="more_keys_strip_description">More keys</string>
     <!-- Title for input language & layout selection screen -->
