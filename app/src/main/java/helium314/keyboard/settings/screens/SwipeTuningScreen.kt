@@ -92,7 +92,7 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
         bottomBar = { androidx.compose.foundation.layout.Box(Modifier.onGloballyPositioned {
             bottomBarTop = it.positionInWindow().y.toInt()
             (ctx.getActivity() as? SettingsActivity)?.touchPassFromY = bottomBarTop
-        }) { TryItBar(keyboard, tryIt, onFocus = preview::onFocus) } },
+        }) { TryItBar(keyboard, tryIt, onFocus = preview::onFocus, onUsed = preview::onUsed) } },
     ) {
         // the content is taller than a screen now that the gesture typing items are here
         Column(Modifier.verticalScroll(rememberScrollState()).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))) {

@@ -3,13 +3,14 @@
     android:shape="rectangle">
     <solid
         android:color="#F6F8FA" />
+    <!-- the width is the popup's minimum width AND KeyPreviewView's room for the letter (minus the side padding):
+         wide enough that a single letter isn't squeezed, flatter on top (the font padding is off in KeyPreviewView) -->
     <size
         android:height="5dp"
-        android:width="35dp"/>
-    <!-- wider at the sides, flatter on top (the letter's font padding is off in KeyPreviewView) -->
-    <padding android:left="12dp"
-        android:top="2dp"
-        android:right="12dp"
+        android:width="52dp"/>
+    <padding android:left="8dp"
+        android:top="3dp"
+        android:right="8dp"
         android:bottom="60dp" />
     <corners android:radius="5dp" />
 </shape>

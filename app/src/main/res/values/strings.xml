@@ -694,6 +694,8 @@
     <string name="font_follows_key_text">Use same font for symbols and suggestions</string>
     <!-- the one tile for the symbols' and the suggestions' text -->
     <string name="symbols_suggestions_fonts">Symbols &amp; suggestions fonts</string>
+    <string name="fonts_title">Fonts</string>
+    <string name="text_style_keys">Keys</string>
     <string name="fonts_same_as_keys">Use the same font as the keys</string>
     <string name="text_style_symbols">Symbols</string>
     <string name="text_style_suggestions">Suggestions</string>
