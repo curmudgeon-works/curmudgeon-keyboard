@@ -78,6 +78,7 @@ object SubtypeUtilsAdditional {
     // updates additional subtypes, enabled subtypes, and selected subtype
     @SuppressLint("UseKtx") // easier to understand
     fun changeAdditionalSubtype(from: SettingsSubtype, to: SettingsSubtype, context: Context) {
+        helium314.keyboard.latin.utils.SettingsEventLog.log("keyboard changed: ${from.toPref()} -> ${to.toPref()}")
         val prefs = context.prefs()
         KeyboardProfiles.onKeyboardChanged(context.realPrefs(), from, to)
         // read now because there may be an intermediate state where the subtype is invalid and thus removed

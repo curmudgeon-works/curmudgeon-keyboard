@@ -48,6 +48,7 @@ class LayoutDraft private constructor(
 
     /** Back to the snapshot: preferences, layout files, the keyboards and the live keyboard. */
     fun reject(ctx: Context) {
+        helium314.keyboard.latin.utils.SettingsEventLog.log("Layout & Typing draft put back (snapshot of $subtype)")
         val real = ctx.realPrefs()
         val now = scoped(ctx)
         real.edit {
@@ -142,6 +143,7 @@ class LayoutDraft private constructor(
         fun rejectOpen(ctx: Context) { active?.reject(ctx) }
 
         private fun start(ctx: Context, subtype: String): LayoutDraft {
+            helium314.keyboard.latin.utils.SettingsEventLog.log("Layout & Typing snapshot taken for $subtype")
             val dir = dir(ctx).apply { deleteRecursively(); mkdirs() }
             val live = layoutsDir(ctx)
             val copy = if (live.isDirectory) File(dir, "layouts").also { live.copyRecursively(it, overwrite = true) } else null
@@ -157,6 +159,7 @@ class LayoutDraft private constructor(
         /** A snapshot left on disk by a process that died with Layout & Typing open: put it back. Called at app start. */
         fun recoverAfterCrash(ctx: Context) {
             if (active != null) return
+            if (File(dir(ctx), PREFS_FILE).exists()) helium314.keyboard.latin.utils.SettingsEventLog.log("Layout & Typing snapshot found at app start: recovering")
             val dir = dir(ctx)
             val json = runCatching { JSONObject(File(dir, PREFS_FILE).readText()) }.getOrNull()
             if (json == null) { dir.deleteRecursively(); return }
