@@ -42,7 +42,7 @@
     <!-- Option to control whether or not to show a popup with a larger font on each key press. -->
     <string name="popup_on_keypress">Popup on keypress</string>
     <!-- Option whether the keyboard can be hidden by swiping down on the toolbar -->
-    <string name="toolbar_swipe_down_to_hide">Hide keyboard by swipe</string>
+    <string name="toolbar_swipe_down_to_hide">Hide keyboard by swiping down from suggestion strip</string>
     <!-- Description for toolbar_swipe_down_to_hide -->
     <string name="toolbar_swipe_down_to_hide_summary">Swipe down on the suggestion strip or the toolbar to close the keyboard</string>
     <!-- Settings screen title for preferences-->
@@ -218,6 +218,8 @@
     <string name="gesture_trail_off">Off</string>
     <string name="gesture_trail_whole">Show the whole swipe trail</string>
     <string name="gesture_trail_whole_linger">Trail vanishes at next touch or after</string>
+    <string name="gesture_trail_never_vanish">Never vanish until next touch</string>
+    <string name="gesture_trail_until_touch">Until next touch</string>
     <string name="gesture_trail_fadeout_duration">Swipe trail lifespan</string>
     <!-- Preferences item for enabling clipboard history -->
     <string name="enable_clipboard_history">Enable clipboard history</string>
@@ -311,14 +313,16 @@
     <string name="swipe_tuning_turns">Turns</string>
     <string name="swipe_tuning_slowdowns">Slowdowns</string>
     <string name="swipe_tuning_blend">Inflections vs. whole path</string>
-    <string name="swipe_tuning_blend_summary">1 = only the inflection points count, 0 = only where the whole path runs</string>
+    <string name="swipe_tuning_turns_summary">How much the points where your finger turns count (0 to 1.5)</string>
+    <string name="swipe_tuning_slowdowns_summary">How much slowing over a key favours its letter (0 to 1)</string>
+    <string name="swipe_tuning_blend_summary">0 to 1: 1 = only the turns and slowdowns count, 0 = only where the whole path runs</string>
     <string name="swipe_other">Other swipes</string>
     <string name="swipe_tuning_fast_common">Fast swipes overweight common words</string>
-    <string name="swipe_tuning_fast_common_summary">For every key width per second faster than 12, how much more a word\'s commonness counts</string>
+    <string name="swipe_tuning_fast_common_summary">For every key width per second faster than 12, how much more a word\'s commonness counts (0 to 0.2)</string>
     <string name="swipe_tuning_corner_miss">Corner miss allowance</string>
-    <string name="swipe_tuning_corner_miss_summary">For every key width per second faster than 12, how much more a corner may miss its key</string>
+    <string name="swipe_tuning_corner_miss_summary">For every key width per second faster than 12, how much more a corner may miss its key (0 to 0.2)</string>
     <string name="swipe_tuning_history_boost">Learned-word boost</string>
-    <string name="swipe_tuning_history_boost_summary">How much a word you have typed before is favoured over dictionary words of the same shape (0–255 frequency scale)</string>
+    <string name="swipe_tuning_history_boost_summary">How much a word you have typed before is favoured over dictionary words of the same shape (0 to 128, added to a word frequency of 0 to 255)</string>
     <string name="swipe_tuning_stats">Results per setting</string>
     <string name="swipe_tuning_no_stats">No swipes counted yet</string>
     <!-- %1$d swipes, then percentages -->

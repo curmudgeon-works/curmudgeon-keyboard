@@ -202,10 +202,12 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
             // ---- how the decoder weighs a swipe (only while swiping is on), and how each weighting did
             helium314.keyboard.settings.AdvancedReveal(gestureOn) { Column {
                 GroupTitle(R.string.swipe_tuning)
-                Text(stringResource(R.string.swipe_tuning_summary), Modifier.padding(start = 22.dp, end = 12.dp, top = 2.dp, bottom = 4.dp),
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                WeightSlider(draft.pending, Settings.PREF_GESTURE_TURN_WEIGHT, Defaults.PREF_GESTURE_TURN_WEIGHT, R.string.swipe_tuning_turns, 0f..1.5f)
-                WeightSlider(draft.pending, Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Defaults.PREF_GESTURE_SLOWDOWN_WEIGHT, R.string.swipe_tuning_slowdowns, 0f..1f)
+                // (the group's explanation, R.string.swipe_tuning_summary, is kept but not shown: each slider says what it
+                // does and its scale instead)
+                WeightSlider(draft.pending, Settings.PREF_GESTURE_TURN_WEIGHT, Defaults.PREF_GESTURE_TURN_WEIGHT, R.string.swipe_tuning_turns, 0f..1.5f,
+                    R.string.swipe_tuning_turns_summary)
+                WeightSlider(draft.pending, Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Defaults.PREF_GESTURE_SLOWDOWN_WEIGHT, R.string.swipe_tuning_slowdowns, 0f..1f,
+                    R.string.swipe_tuning_slowdowns_summary)
                 WeightSlider(draft.pending, Settings.PREF_GESTURE_KUSHLER_WEIGHT, Defaults.PREF_GESTURE_KUSHLER_WEIGHT, R.string.swipe_tuning_blend, 0f..1f,
                     R.string.swipe_tuning_blend_summary)
                 BoostSlider(draft.pending)

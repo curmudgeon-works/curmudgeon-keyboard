@@ -33,6 +33,8 @@ fun <T: Number> SliderPreference(
     applyOnRelease: Boolean = false, // with [live]: written when the slider is let go
     valueOnRight: Boolean = false, // the value at the row's right end in the name's font, instead of under the name
     summary: String? = null, // with [valueOnRight]: the line under the name
+    offLabel: String? = null, // a checkbox in the dialog that sets [offValue] (outside the range) and greys the slider out
+    offValue: T? = null,
     onConfirmed: (T) -> Unit = { },
 ) {
     helium314.keyboard.settings.KnownDefaults.note(key, default)
@@ -86,6 +88,8 @@ fun <T: Number> SliderPreference(
             showDefault = true,
             live = live,
             applyOnRelease = applyOnRelease,
+            offLabel = offLabel,
+            offValue = offValue?.toFloat() ?: -1f,
             onDefault = { prefs.edit { remove(key) }; onConfirmed(default) },
             defaultValue = default.toFloat(),
             intermediateSteps = stepSize?.let {
