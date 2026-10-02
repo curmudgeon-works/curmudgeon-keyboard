@@ -40,8 +40,8 @@ fun reloadSymbolHints() {
 }
 
 /**
- * "Hide symbols on keys": on when all three are hidden, off when all are shown, and in between (the thumb grey in the
- * middle) when they differ. A tap sets all three: from in between, it hides them all.
+ * "Hide symbols on keys": a plain switch, on when all three are hidden (the per-area rows on Others can hide some: then
+ * it's off, and turning it on hides them all). Off shows them all.
  */
 @Composable
 fun HideAllSymbolsPreference(setting: Setting) {
@@ -49,29 +49,12 @@ fun HideAllSymbolsPreference(setting: Setting) {
     val prefs = ctx.prefs()
     val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
     if ((b?.value ?: 0) < 0) Log.v("irrelevant", "recompose on preference change")
-    val hidden = symbolHintPrefs.map { (key, default) -> !prefs.getBoolean(key, default) }
-    val state = when { hidden.all { it } -> true; hidden.none { it } -> false; else -> null }
+    val allHidden = symbolHintPrefs.all { (key, default) -> !prefs.getBoolean(key, default) }
     fun set(hide: Boolean) {
         prefs.edit { symbolHintPrefs.forEach { (key, _) -> putBoolean(key, !hide) } }
         reloadSymbolHints()
     }
-    Preference(name = setting.title, description = setting.description, onClick = { set(state != true) }) {
-        if (state != null) Switch(checked = state, onCheckedChange = { set(it) })
-        else MixedSwitch { set(true) }
-    }
-}
-
-/** A switch with its thumb grey in the middle: some of what it stands for is on, some off. */
-@Composable
-private fun MixedSwitch(onClick: () -> Unit) {
-    // the size of a Material 3 switch, so the rows line up
-    Box(
-        Modifier.size(width = 52.dp, height = 32.dp)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape)
-            .border(2.dp, MaterialTheme.colorScheme.outline, CircleShape)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(Modifier.size(20.dp).background(MaterialTheme.colorScheme.outline, CircleShape))
+    Preference(name = setting.title, description = setting.description, onClick = { set(!allHidden) }) {
+        Switch(checked = allHidden, onCheckedChange = { set(it) })
     }
 }
