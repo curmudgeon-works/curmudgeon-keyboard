@@ -1,3 +1,4 @@
+@file:OptIn(kotlinx.coroutines.FlowPreview::class)
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.dialogs
 
@@ -12,6 +13,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.drop
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,6 +53,9 @@ fun ColorPickerDialog(
     title: String,
     showDefault: Boolean,
     onDefault: () -> Unit,
+    // set: the colour shows on the preview keyboard as it's picked (a moment after the finger stops), the keyboard stays
+    // up and the dialog stays clear of it (smaller wheel, no hex box: it would need the keyboard)
+    onPreview: ((Int) -> Unit)? = null,
     onConfirmed: (Int) -> Unit,
 ) {
     val controller = rememberColorPickerController()
@@ -79,10 +87,13 @@ fun ColorPickerDialog(
             ) { }
         }
     }
+    if (onPreview != null) LaunchedEffect(Unit) {
+        snapshotFlow { currentColor }.drop(1).debounce(250).collect { onPreview(it.toArgb()) }
+    }
     @Composable fun picker() {
         HsvColorPicker(
             modifier = Modifier
-                .size(300.dp)
+                .size(if (onPreview != null) 220.dp else 300.dp)
                 .padding(10.dp),
             controller = controller,
             onColorChanged = {
@@ -112,7 +123,7 @@ fun ColorPickerDialog(
             initialColor = Color(initialColor),
             wheelPaint = wheelPaint
         )
-        TextField(
+        if (onPreview == null) TextField(
             value = textValue,
             keyboardOptions = KeyboardOptions(
                 autoCorrectEnabled = false,
@@ -129,7 +140,7 @@ fun ColorPickerDialog(
         )
     }
     ThreeButtonAlertDialog(
-        keepKeyboard = false, // has a text field, needs the focus
+        keepKeyboard = onPreview != null, // the hex box needs the focus (no hex box while previewing)
         onDismissRequest = onDismissRequest,
         onConfirmed = { onConfirmed(controller.selectedColor.value.toArgb()) },
         title = { Text(title) },
