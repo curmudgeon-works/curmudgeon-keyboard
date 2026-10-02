@@ -102,7 +102,7 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     val view = androidx.compose.ui.platform.LocalView.current
     val tapReveal = remember { helium314.keyboard.settings.ListTapReveal(listScroll, scope, ctx, view) }
     val preview = remember { PreviewKeyboard(tryIt, scope, showIme = { softKeyboard?.show() }, reveal = tapReveal::reveal) {
-        focusManager.clearFocus(); softKeyboard?.hide() } }
+        focusManager.clearFocus(force = true); softKeyboard?.hide() } }
     var bottomBarTop by remember { mutableIntStateOf(-1) }
     // a swipe setting changed (a switch; the dialogs bring the keyboard up themselves) brings it up for a moment to
     // swipe on, as on Layout & Typing; the decoder weights below don't
