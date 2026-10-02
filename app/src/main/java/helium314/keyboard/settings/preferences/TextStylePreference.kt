@@ -473,12 +473,22 @@ fun SuggestionColorRow(reload: () -> Unit) {
         androidx.compose.foundation.layout.Box(Modifier.size(28.dp).background(androidx.compose.ui.graphics.Color(color),
             androidx.compose.foundation.shape.CircleShape))
     }
-    if (showPicker) helium314.keyboard.settings.dialogs.ColorPickerDialog(
-        onDismissRequest = { showPicker = false },
-        initialColor = color,
-        title = stringResource(R.string.suggestion_text_color),
-        showDefault = true,
-        onDefault = { prefs.edit { remove(Settings.PREF_SUGGESTION_TEXT_COLOR) }; reload() },
-        onConfirmed = { prefs.edit { putInt(Settings.PREF_SUGGESTION_TEXT_COLOR, it) }; reload() },
-    )
+    if (showPicker) {
+        // previewed live on the keyboard while picking; Cancel puts back what was set
+        val before = remember { prefs.all[Settings.PREF_SUGGESTION_TEXT_COLOR] as? Int }
+        var confirmed by remember { mutableStateOf(false) }
+        helium314.keyboard.settings.dialogs.ColorPickerDialog(
+            onDismissRequest = {
+                if (!confirmed) prefs.edit { if (before == null) remove(Settings.PREF_SUGGESTION_TEXT_COLOR) else putInt(Settings.PREF_SUGGESTION_TEXT_COLOR, before) }
+                reload()
+                showPicker = false
+            },
+            initialColor = color,
+            title = stringResource(R.string.suggestion_text_color),
+            showDefault = true,
+            onDefault = { confirmed = true; prefs.edit { remove(Settings.PREF_SUGGESTION_TEXT_COLOR) }; reload() },
+            onConfirmed = { confirmed = true; prefs.edit { putInt(Settings.PREF_SUGGESTION_TEXT_COLOR, it) }; reload() },
+            onPreview = { prefs.edit { putInt(Settings.PREF_SUGGESTION_TEXT_COLOR, it) }; reload() },
+        )
+    }
 }
