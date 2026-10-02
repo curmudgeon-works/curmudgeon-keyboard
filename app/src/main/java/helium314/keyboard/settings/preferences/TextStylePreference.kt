@@ -244,26 +244,23 @@ private fun fontName(font: String): String = when {
     })
 }
 
+
 /**
- * One tile for the symbols' and the suggestions' text (was two tiles and a switch): first "Use the same font as the
- * keys"; while it is on the rest is greyed but still works, and touching any of it turns the switch off (both keep
- * the key font as their own choice, so nothing jumps). Then the two side by side (font, B I U), then the two sizes.
+ * One tile, one dialog for the three texts on the keyboard: the keys, the symbols on them, the suggestions. Per text a
+ * row with its font and B I U, and its size slider below (applied when let go). Each keeps its own font (the old
+ * "same font as the keys" switch is gone; AppUpgrade gave symbols and suggestions the key font where it was on).
  * Every change shows on the live keyboard; OK keeps, Cancel puts back what was set when it opened.
  */
 @Composable
-fun SymbolsSuggestionsFontsPreference(setting: Setting, symbols: TextStyleKeys, suggestions: TextStyleKeys) {
+fun FontsPreference(setting: Setting, texts: List<Pair<Int, TextStyleKeys>>) {
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
     var showDialog by rememberSaveable { mutableStateOf(false) }
     var generation by remember { mutableIntStateOf(0) }
     @Suppress("UNUSED_EXPRESSION") generation
-    val follows = prefs.getBoolean(Settings.PREF_FONT_FOLLOWS_KEY_TEXT, Defaults.PREF_FONT_FOLLOWS_KEY_TEXT)
-    val keyFont = prefs.getString(Settings.PREF_KEY_FONT, TextFonts.AUTO)!!
-    fun fontOf(k: TextStyleKeys) = if (follows) TextFonts.shown(ctx, keyFont, FontLibrary.SLOT_KEY)
-        else TextFonts.shown(ctx, prefs.getString(k.font, TextFonts.AUTO)!!, k.slot)
-    val summary = if (follows) stringResource(R.string.fonts_same_as_keys)
-        else "${fontName(fontOf(symbols))} · ${fontName(fontOf(suggestions))}"
-    Preference(name = setting.title, description = summary, onClick = { showDialog = true }) { }
+    fun fontOf(k: TextStyleKeys) = TextFonts.shown(ctx, prefs.getString(k.font, TextFonts.AUTO)!!, k.slot)
+    Preference(name = setting.title, description = texts.map { fontName(fontOf(it.second)) }.distinct().joinToString(" · "),
+        onClick = { showDialog = true }) { }
     if (!showDialog) return
 
     fun reload() {
@@ -271,30 +268,20 @@ fun SymbolsSuggestionsFontsPreference(setting: Setting, symbols: TextStyleKeys, 
         KeyboardSwitcher.getInstance().setThemeNeedsReload()
         generation++
     }
-    for (k in listOf(symbols, suggestions)) {
+    for ((_, k) in texts) {
         helium314.keyboard.settings.KnownDefaults.note(k.font, TextFonts.AUTO)
         helium314.keyboard.settings.KnownDefaults.note(k.size, if (k.sizeIsInt) k.sizeDefault.toInt() else k.sizeDefault)
         helium314.keyboard.settings.KnownDefaults.note(k.bold, k.boldDefault(prefs))
         helium314.keyboard.settings.KnownDefaults.note(k.italic, false)
         helium314.keyboard.settings.KnownDefaults.note(k.underline, false)
     }
-    val allKeys = listOf(symbols, suggestions).flatMap { listOf(it.font, it.size, it.bold, it.italic, it.underline) + it.extraKeys } +
-        Settings.PREF_FONT_FOLLOWS_KEY_TEXT
-    val snapshot = rememberPrefSnapshot(prefs, allKeys)
+    val snapshot = rememberPrefSnapshot(prefs, texts.flatMap { (_, k) -> listOf(k.font, k.size, k.bold, k.italic, k.underline) + k.extraKeys })
     var confirmed by remember { mutableStateOf(false) }
     var showError by remember { mutableStateOf(false) }
-    /** Any change below the switch: the switch goes off first, both keeping the key font so nothing else changes. */
     fun change(block: SharedPreferences.Editor.() -> Unit) {
-        prefs.edit {
-            if (prefs.getBoolean(Settings.PREF_FONT_FOLLOWS_KEY_TEXT, Defaults.PREF_FONT_FOLLOWS_KEY_TEXT)) {
-                putBoolean(Settings.PREF_FONT_FOLLOWS_KEY_TEXT, false)
-                putString(symbols.font, keyFont)
-                putString(suggestions.font, keyFont)
-            }
-            block()
-        }
-        // a font file loaded but not chosen any more is dropped (only one side can hold the new one)
-        if (listOf(symbols, suggestions).none { FontLibrary.isPending(prefs.getString(it.font, "")!!) }) FontLibrary.discardPending(ctx)
+        prefs.edit { block() }
+        // a font file loaded but not chosen any more is dropped
+        if (texts.none { (_, k) -> FontLibrary.isPending(prefs.getString(k.font, "")!!) }) FontLibrary.discardPending(ctx)
         reload()
     }
     var loadingFor by remember { mutableStateOf<TextStyleKeys?>(null) }
@@ -325,7 +312,7 @@ fun SymbolsSuggestionsFontsPreference(setting: Setting, symbols: TextStyleKeys, 
         },
         onConfirmed = {
             confirmed = true
-            for (k in listOf(symbols, suggestions)) {
+            for ((_, k) in texts) {
                 val chosen = prefs.getString(k.font, TextFonts.AUTO)!!
                 if (FontLibrary.isPending(chosen)) prefs.edit { putString(k.font, FontLibrary.commit(ctx, chosen)) }
             }
@@ -333,23 +320,18 @@ fun SymbolsSuggestionsFontsPreference(setting: Setting, symbols: TextStyleKeys, 
         },
         title = { Text(setting.title) },
         content = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.fonts_same_as_keys), Modifier.weight(1f))
-                    androidx.compose.material3.Switch(checked = follows, onCheckedChange = { on ->
-                        if (on) { prefs.edit { putBoolean(Settings.PREF_FONT_FOLLOWS_KEY_TEXT, true) }; reload() }
-                        else change { }
-                    })
-                }
-                // greyed while following the keys, still adjustable (which stops the following)
-                val dim = if (follows) Modifier.alpha(0.45f) else Modifier
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth().then(dim)) {
-                    for ((k, label) in listOf(symbols to R.string.text_style_symbols, suggestions to R.string.text_style_suggestions)) {
-                        val font = fontOf(k)
-                        val choices = TextFonts.system + FontLibrary.names(ctx).map { FontLibrary.PREFIX + it } +
-                            listOfNotNull(font.takeIf { FontLibrary.isPending(it) }) + TextFonts.LOAD
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(stringResource(label), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                for ((label, k) in texts) {
+                    val font = fontOf(k)
+                    val choices = TextFonts.system + FontLibrary.names(ctx).map { FontLibrary.PREFIX + it } +
+                        listOfNotNull(font.takeIf { FontLibrary.isPending(it) }) + TextFonts.LOAD
+                    val stored = if (k.sizeIsInt) prefs.getInt(k.size, k.sizeDefault.toInt()).toFloat() else prefs.getFloat(k.size, k.sizeDefault)
+                    var position by remember(k.size) { mutableFloatStateOf(stored) }
+                    Text("${stringResource(label)} · ${k.sizeText(position)}", style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 6.dp))
+                    // font and B I U on one row
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
                             DropDownField(
                                 items = choices,
                                 selectedItem = font,
@@ -364,35 +346,26 @@ fun SymbolsSuggestionsFontsPreference(setting: Setting, symbols: TextStyleKeys, 
                                         DeleteButton { FontLibrary.delete(ctx, FontLibrary.displayName(choice)); reload() }
                                 },
                             ) { Text(fontName(it), maxLines = 1) }
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                val bold = prefs.getBoolean(k.bold, k.boldDefault(prefs))
-                                val italic = prefs.getBoolean(k.italic, false)
-                                val underline = prefs.getBoolean(k.underline, false)
-                                FilledIconToggleButton(checked = bold, onCheckedChange = { change { putBoolean(k.bold, it) } }) {
-                                    Text("B", fontWeight = FontWeight.Bold) }
-                                FilledIconToggleButton(checked = italic, onCheckedChange = { change { putBoolean(k.italic, it) } }) {
-                                    Text("I", fontStyle = FontStyle.Italic) }
-                                FilledIconToggleButton(checked = underline, onCheckedChange = { change { putBoolean(k.underline, it) } }) {
-                                    Text("U", textDecoration = TextDecoration.Underline) }
-                            }
                         }
+                        val bold = prefs.getBoolean(k.bold, k.boldDefault(prefs))
+                        val italic = prefs.getBoolean(k.italic, false)
+                        val underline = prefs.getBoolean(k.underline, false)
+                        FilledIconToggleButton(checked = bold, onCheckedChange = { change { putBoolean(k.bold, it) } }) {
+                            Text("B", fontWeight = FontWeight.Bold) }
+                        FilledIconToggleButton(checked = italic, onCheckedChange = { change { putBoolean(k.italic, it) } }) {
+                            Text("I", fontStyle = FontStyle.Italic) }
+                        FilledIconToggleButton(checked = underline, onCheckedChange = { change { putBoolean(k.underline, it) } }) {
+                            Text("U", textDecoration = TextDecoration.Underline) }
                     }
-                }
-                // the two sizes, one below the other (applied when the slider is let go)
-                for ((k, label) in listOf(symbols to R.string.text_style_symbols_size, suggestions to R.string.text_style_suggestions_size)) {
-                    val stored = if (k.sizeIsInt) prefs.getInt(k.size, k.sizeDefault.toInt()).toFloat() else prefs.getFloat(k.size, k.sizeDefault)
-                    var position by remember(k.size) { mutableFloatStateOf(stored) }
-                    Column(dim) {
-                        Text(stringResource(label, k.sizeText(position)), style = MaterialTheme.typography.bodyMedium)
-                        Slider(
-                            value = position,
-                            onValueChange = { position = it },
-                            onValueChangeFinished = {
-                                change { if (k.sizeIsInt) putInt(k.size, position.roundToInt()) else putFloat(k.size, position) }
-                            },
-                            valueRange = k.sizeRange,
-                        )
-                    }
+                    // the size below
+                    Slider(
+                        value = position,
+                        onValueChange = { position = it },
+                        onValueChangeFinished = {
+                            change { if (k.sizeIsInt) putInt(k.size, position.roundToInt()) else putFloat(k.size, position) }
+                        },
+                        valueRange = k.sizeRange,
+                    )
                 }
             }
         },

@@ -72,7 +72,7 @@ object Defaults {
     const val PREF_TOOLBAR_IN_STRIP_ROW = false // the expanded toolbar opens in a row of its own above the suggestions
     const val PREF_DELETE_SWIPE_SPEED = 1f // characters per finger step of swiping left from backspace, times this
     const val PREF_BACKGROUND_WHOLE_PICTURE = true // keys clear on the background picture (the switch, shown inverted, reads off)
-    const val PREF_FONT_FOLLOWS_KEY_TEXT = true // symbols and suggestions use the key text font
+    const val PREF_FONT_FOLLOWS_KEY_TEXT = false // (no switch since 2026-10-01: each text has its own font; see AppUpgrade)
     const val PREF_KEY_TEXT_ITALIC = false
     const val PREF_KEY_TEXT_UNDERLINE = false
     const val PREF_HINT_FONT_SCALE = 1.0f // the symbols on the keys, relative to their usual size

@@ -304,7 +304,7 @@ fun SubtypeScreen(
                     // the try-it bar stays usable while a key sound dialog is open
                     (ctx.getActivity() as? SettingsActivity)?.touchPassFromY = bottomBarTop
                 }) {
-                    TryItBar(currentSubtype, tryIt, onFocus = preview::onFocus)
+                    TryItBar(currentSubtype, tryIt, onFocus = preview::onFocus, onUsed = preview::onUsed)
                 }
             }
         ) { innerPadding ->

@@ -384,7 +384,7 @@ class TryItState {
 }
 
 @Composable
-fun TryItBar(keyboard: SettingsSubtype, state: TryItState, onFocus: (Boolean) -> Unit = {}) {
+fun TryItBar(keyboard: SettingsSubtype, state: TryItState, onFocus: (Boolean) -> Unit = {}, onUsed: () -> Unit = {}) {
     // the emoji tab: a text field whose keyboard is switched to the emoji panel once it is up; leaving the tab
     // switches back to the letters
     var wasEmoji by remember { mutableStateOf(false) }
@@ -408,7 +408,7 @@ fun TryItBar(keyboard: SettingsSubtype, state: TryItState, onFocus: (Boolean) ->
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
         ) {
             OutlinedTextField(
-                value = tryText, onValueChange = { tryText = it },
+                value = tryText, onValueChange = { tryText = it; onUsed() }, // typing in it: the preview is in use
                 label = { Text(stringResource(R.string.key_popups_try), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = when (state.mode) {

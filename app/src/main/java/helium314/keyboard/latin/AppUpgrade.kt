@@ -60,6 +60,21 @@ fun checkVersionUpgrade(context: Context) {
 /** Our own settings changes: each checks its own state, so running them on every start is cheap and safe
  *  (MIGRATION_VERSION stays at upstream's, so onUpgrade doesn't run for them). */
 private fun curmudgeonUpgrades(prefs: SharedPreferences, freshInstall: Boolean) {
+    // 0.3.001: the "same font as the keys" switch is gone (one Fonts dialog, each text its own font): where it was on
+    // (its old default), symbols and suggestions take the key font as their own, so nothing changes on screen
+    if (!prefs.getBoolean("fonts_follow_migrated", false)) {
+        prefs.edit {
+            if (!freshInstall && prefs.getBoolean(Settings.PREF_FONT_FOLLOWS_KEY_TEXT, true)) {
+                val keyFont = prefs.getString(Settings.PREF_KEY_FONT, null)
+                if (keyFont != null) {
+                    putString(Settings.PREF_HINT_FONT, keyFont)
+                    putString(Settings.PREF_SUGGESTION_FONT, keyFont)
+                }
+            }
+            putBoolean(Settings.PREF_FONT_FOLLOWS_KEY_TEXT, false)
+            putBoolean("fonts_follow_migrated", true)
+        }
+    }
     // 0.1.004: toolbar mode → Toolbar visibility + Show suggestions (the only suggestions switch)
     if (!prefs.contains(Settings.PREF_TOOLBAR_VISIBILITY) && prefs.contains(Settings.PREF_TOOLBAR_MODE)) {
         val old = prefs.getString(Settings.PREF_TOOLBAR_MODE, null)
