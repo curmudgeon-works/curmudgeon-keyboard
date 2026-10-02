@@ -240,6 +240,8 @@ fun AppearanceScreen(
             SettingsWithoutKey.APPEARANCE_LOOKS, Settings.PREF_THEME_STYLE, Settings.PREF_THEME_COLORS, Settings.PREF_THEME_KEY_BORDERS, Settings.PREF_THEME_DAY_NIGHT,
             Settings.PREF_THEME_COLORS_NIGHT, SettingsWithoutKey.FONTS,
             SettingsWithoutKey.HIDE_ALL_SYMBOLS,
+            // the emoji size (with its fit), skin tone and font
+            Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT, Settings.PREF_EMOJI_SKIN_TONE, SettingsWithoutKey.CUSTOM_EMOJI_FONT,
         ),
         // cross and tick: reject or accept everything changed since the screen opened, each asks first
         topActions = {
@@ -640,7 +642,7 @@ private fun SavedLooksPreference(setting: Setting) {
             checkTextValid = { name -> name.isNotBlank() && looks.none { it.name == name } },
             onConfirmed = { name ->
                 store(looks + AppearanceLooks.Look(name,
-                    AppearanceLooks.current(prefs) + (AppearanceLooks.PICTURES to AppearanceLooks.savePictures(ctx))))
+                    AppearanceLooks.snapshot(prefs) + (AppearanceLooks.PICTURES to AppearanceLooks.savePictures(ctx))))
                 prefs.edit { putString(AppearanceLooks.PREF_SELECTED, name) } // what's on the keyboard now is this theme
             },
         )

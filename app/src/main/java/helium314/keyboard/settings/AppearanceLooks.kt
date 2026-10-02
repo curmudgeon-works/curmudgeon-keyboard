@@ -159,10 +159,18 @@ object AppearanceLooks {
         prefs.edit {
             for (key in now.keys) if (key !in values) remove(key)
             // only what themes cover: themes saved before hold keys that moved out (keyboard height, split, numbers row)
-            for ((key, value) in values) if (inScope(key) && now[key] != value) KeyboardProfiles.put(this, key, value)
+            // (null: the theme has it at its default, so it's unset again)
+            for ((key, value) in values) if (inScope(key) && now[key] != value) {
+                if (value == null) remove(key) else KeyboardProfiles.put(this, key, value)
+            }
         }
         reload(ctx)
     }
+
+    /** What a theme saves: the values set now, and every theme setting left at its default as null, so applying the
+     *  theme puts those back to their default too (before 2026-10-02 a theme had only the values set, and one left at
+     *  its default kept whatever was there when the theme was applied). */
+    fun snapshot(prefs: SharedPreferences): Map<String, Any?> = keys.associateWith { null } + current(prefs)
 
     /** Everything that draws the keyboard reads the preferences again. */
     fun reload(ctx: Context) {
@@ -190,7 +198,9 @@ object AppearanceLooks {
         val arr = JSONArray()
         for (look in looks) arr.put(JSONObject().apply {
             put("name", look.name)
-            put("values", JSONObject().also { v -> look.values.forEach { (key, value) -> toJson(value)?.let { v.put(key, it) } } })
+            // a value at its default is saved as {"d":true} (read back as null, see snapshot)
+            put("values", JSONObject().also { v -> look.values.forEach { (key, value) ->
+                (if (value == null) JSONObject().put("d", true) else toJson(value))?.let { v.put(key, it) } } })
         })
         prefs.edit { putString(PREF, arr.toString()) }
     }
