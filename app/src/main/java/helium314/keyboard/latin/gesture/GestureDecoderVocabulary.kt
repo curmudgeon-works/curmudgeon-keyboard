@@ -43,9 +43,14 @@ object GestureDecoderVocabulary {
         set(value) {
             if (value == field) return
             field = value
-            // learned words are merged into every cached vocabulary with the boost baked in: rebuild from the disk caches
-            cache.clear()
-            merged.clear()
+            // learned words are merged into every cached vocabulary with the boost baked in: rebuild them in the
+            // background while the current ones keep serving swipes (clearing them emptied every swipe until the rebuild,
+            // e.g. right after switching to a keyboard with its own boost)
+            val context = Settings.getCurrentContext() ?: run { cache.clear(); merged.clear(); return }
+            val entries = mainEntries.toMap()
+            Thread({
+                for ((key, list) in entries) runCatching { publishNow(key, key.constructLocale(), context, list) }
+            }, "GestureVocabBoost").start()
         }
     private const val CACHE_DIR = "own_gesture_vocab"
     private const val CACHE_VERSION = 1

@@ -26,6 +26,9 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -366,6 +369,7 @@ fun FontsPreference(setting: Setting, texts: List<Pair<Int, TextStyleKeys>>) {
                         },
                         valueRange = k.sizeRange,
                     )
+                    k.extra?.invoke(::reload) // e.g. the suggestions' colour
                 }
             }
         },
@@ -453,4 +457,28 @@ fun EmojiFontPreference(setting: Setting) {
     )
     if (showError)
         InfoDialog(stringResource(R.string.file_read_error)) { showError = false }
+}
+
+/** The suggestion strip words' colour (a theme setting; orange unless chosen): a swatch opening the colour picker. */
+@Composable
+fun SuggestionColorRow(reload: () -> Unit) {
+    val ctx = LocalContext.current
+    val prefs = ctx.prefs()
+    helium314.keyboard.settings.KnownDefaults.note(Settings.PREF_SUGGESTION_TEXT_COLOR, Defaults.PREF_SUGGESTION_TEXT_COLOR)
+    var showPicker by remember { mutableStateOf(false) }
+    val color = prefs.getInt(Settings.PREF_SUGGESTION_TEXT_COLOR, Defaults.PREF_SUGGESTION_TEXT_COLOR)
+    Row(verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().clickable { showPicker = true }.padding(vertical = 6.dp)) {
+        Text(stringResource(R.string.suggestion_text_color), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        androidx.compose.foundation.layout.Box(Modifier.size(28.dp).background(androidx.compose.ui.graphics.Color(color),
+            androidx.compose.foundation.shape.CircleShape))
+    }
+    if (showPicker) helium314.keyboard.settings.dialogs.ColorPickerDialog(
+        onDismissRequest = { showPicker = false },
+        initialColor = color,
+        title = stringResource(R.string.suggestion_text_color),
+        showDefault = true,
+        onDefault = { prefs.edit { remove(Settings.PREF_SUGGESTION_TEXT_COLOR) }; reload() },
+        onConfirmed = { prefs.edit { putInt(Settings.PREF_SUGGESTION_TEXT_COLOR, it) }; reload() },
+    )
 }
