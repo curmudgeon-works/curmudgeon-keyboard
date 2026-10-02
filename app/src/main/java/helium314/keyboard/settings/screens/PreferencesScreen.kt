@@ -101,7 +101,7 @@ fun preferencesInputItems(prefs: SharedPreferences, ctx: Context): List<Any?> {
         Settings.PREF_SOUND_ON,
         if (soundRows) Settings.PREF_KEYPRESS_SOUND else null,
         if (soundRows) Settings.PREF_KEYPRESS_SOUND_VOLUME else null,
-        Settings.PREF_SAVE_SUBTYPE_PER_APP,
+        // (keyboard per app: on Advanced, with the other settings shared by all keyboards)
     )
 }
 
@@ -176,14 +176,12 @@ fun createPreferencesSettings(context: Context) = listOf(
         SwitchPreference(it, Defaults.PREF_BACKSPACE_DELETES_SWIPED_WORD)
     },
     Setting(context, Settings.PREF_SAVE_SUBTYPE_PER_APP, R.string.save_subtype_per_app) {
-        // with separate settings per keyboard, say this one isn't (with shared settings everything is shared anyway)
-        val separate = KeyboardProfiles.isSeparate(LocalContext.current.realPrefs())
-        SwitchPreference(it.title, key = it.key, default = Defaults.PREF_SAVE_SUBTYPE_PER_APP,
-            description = if (separate) stringResource(R.string.setting_shared_by_keyboards) else null)
+        // on Advanced, among the settings shared by all keyboards
+        SwitchPreference(it, Defaults.PREF_SAVE_SUBTYPE_PER_APP)
     },
-    // the three under Appearance's "Hide symbols on keys", a little in
+    // the symbols area by area (on Others; Appearance's "Hide symbols on keys" sets all three)
     Setting(context, Settings.PREF_SHOW_HINTS, R.string.hints_other_keys) {
-        Box(Modifier.padding(start = 16.dp)) { SwitchPreference(it, Defaults.PREF_SHOW_HINTS, inverted = true) { reloadSymbolHints() } }
+        SwitchPreference(it, Defaults.PREF_SHOW_HINTS, inverted = true) { reloadSymbolHints() }
     },
     Setting(context, Settings.PREF_REMOVE_REDUNDANT_POPUPS, R.string.remove_redundant_popups) {
         SwitchPreference(it, Defaults.PREF_REMOVE_REDUNDANT_POPUPS) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
@@ -220,7 +218,7 @@ fun createPreferencesSettings(context: Context) = listOf(
         }
     },
     Setting(context, Settings.PREF_SHOW_POPUP_HINTS, R.string.show_popup_hints) {
-        Box(Modifier.padding(start = 16.dp)) { SwitchPreference(it, Defaults.PREF_SHOW_POPUP_HINTS, inverted = true) { reloadSymbolHints() } }
+        SwitchPreference(it, Defaults.PREF_SHOW_POPUP_HINTS, inverted = true) { reloadSymbolHints() }
     },
     Setting(context, Settings.PREF_POPUP_ON, R.string.popup_on_keypress) {
         SwitchPreference(it, Defaults.PREF_POPUP_ON) { KeyboardSwitcher.getInstance().reloadKeyboard() }
@@ -263,7 +261,7 @@ fun createPreferencesSettings(context: Context) = listOf(
         }
     },
     Setting(context, Settings.PREF_SHOW_NUMBER_ROW_HINTS, R.string.number_row_hints) {
-        Box(Modifier.padding(start = 16.dp)) { SwitchPreference(it, Defaults.PREF_SHOW_NUMBER_ROW_HINTS, inverted = true) { reloadSymbolHints() } }
+        SwitchPreference(it, Defaults.PREF_SHOW_NUMBER_ROW_HINTS, inverted = true) { reloadSymbolHints() }
     },
     Setting(context, Settings.PREF_SHOW_LANGUAGE_SWITCH_KEY, R.string.show_language_switch_key) {
         SwitchPreference(it, Defaults.PREF_SHOW_LANGUAGE_SWITCH_KEY) { KeyboardSwitcher.getInstance().reloadKeyboard() }
