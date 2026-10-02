@@ -126,13 +126,13 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
         icon = R.drawable.ic_settings_correction
     ) { NextScreenIcon() }
     // (no Dictionaries: tapping a language in the keyboard's Languages list manages its dictionaries)
-    Preference(
-        name = stringResource(R.string.settings_screen_advanced),
-        onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Advanced) },
-        icon = R.drawable.ic_settings_advanced
-    ) { NextScreenIcon() }
-    // the settings few need (advanced only)
+    // the settings few need (advanced only): Advanced (backup and restore first) and Others
     AdvancedTint(advanced) {
+        Preference(
+            name = stringResource(R.string.settings_screen_advanced),
+            onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Advanced) },
+            icon = R.drawable.ic_settings_advanced
+        ) { NextScreenIcon() }
         Preference(
             name = stringResource(R.string.settings_screen_others),
             onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Others) },
