@@ -178,10 +178,14 @@ private val correctionKeys = listOf(
 
 fun createCorrectionSettings(context: Context) = listOf(
     Setting(context, SettingsWithoutKey.EDIT_PERSONAL_DICTIONARY, R.string.edit_personal_dictionary) {
-        Preference(
-            name = stringResource(R.string.edit_personal_dictionary),
-            onClick = { SettingsDestination.navigateTo(SettingsDestination.PersonalDictionaries) },
-        ) { NextScreenIcon() }
+        // a line above it too, like under the headings
+        androidx.compose.foundation.layout.Column {
+            androidx.compose.material3.HorizontalDivider()
+            Preference(
+                name = stringResource(R.string.edit_personal_dictionary),
+                onClick = { SettingsDestination.navigateTo(SettingsDestination.PersonalDictionaries) },
+            ) { NextScreenIcon() }
+        }
     },
     Setting(context, Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE,
         R.string.prefs_block_potentially_offensive_title, R.string.prefs_block_potentially_offensive_summary
