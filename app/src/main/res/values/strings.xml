@@ -302,10 +302,9 @@
     <string name="layout_files_invalid">This layout has an error</string>
     <string name="space_swipe_move_cursor">Swipe spacebar to move cursor</string>
     <string name="space_swipe_move_cursor_summary">Slide left or right along the spacebar to move the cursor</string>
-    <string name="swipe_tuning_inflections">Inflection weights</string>
     <string name="swipe_tuning_summary">How much the decoder trusts the points where your finger turns, stops or slows down, and how much of a word\'s score comes from those points rather than from the overall shape. Try a setting for a while: the results below show how each one did for you.</string>
     <string name="swipe_tuning_turns">Turns</string>
-    <string name="swipe_tuning_slowdowns">Slowdowns (slowing over a key favours its letter)</string>
+    <string name="swipe_tuning_slowdowns">Slowdowns</string>
     <string name="swipe_tuning_blend">Inflections vs. whole path</string>
     <string name="swipe_tuning_blend_summary">1 = only the inflection points count, 0 = only where the whole path runs</string>
     <string name="swipe_tuning_history_boost">Learned-word boost</string>

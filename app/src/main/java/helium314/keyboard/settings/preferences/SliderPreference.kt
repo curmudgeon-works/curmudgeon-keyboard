@@ -31,6 +31,8 @@ fun <T: Number> SliderPreference(
     onValueChanged: (Float?) -> Unit = { },
     live: Boolean = false, // the value is written while dragging (the live keyboard shows it); Cancel puts the old one back
     applyOnRelease: Boolean = false, // with [live]: written when the slider is let go
+    valueOnRight: Boolean = false, // the value at the row's right end in the name's font, instead of under the name
+    summary: String? = null, // with [valueOnRight]: the line under the name
     onConfirmed: (T) -> Unit = { },
 ) {
     helium314.keyboard.settings.KnownDefaults.note(key, default)
@@ -56,7 +58,11 @@ fun <T: Number> SliderPreference(
         name = name,
         onClick = { showDialog = true },
         modifier = modifier,
-        description = description(initialValue)
+        description = if (valueOnRight) summary else description(initialValue),
+        value = if (!valueOnRight) null else { {
+            androidx.compose.material3.Text(description(initialValue), style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface)
+        } },
     )
     if (showDialog)
         SliderDialog(

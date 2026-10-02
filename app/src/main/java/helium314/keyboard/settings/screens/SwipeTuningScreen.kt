@@ -164,9 +164,8 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
 
             // ---- how the decoder weighs a swipe, and how each weighting did
             GroupTitle(R.string.swipe_tuning)
-            PreferenceCategory(stringResource(R.string.swipe_tuning_inflections))
-            Text(stringResource(R.string.swipe_tuning_summary), Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.swipe_tuning_summary), Modifier.padding(start = 22.dp, end = 12.dp, top = 2.dp, bottom = 4.dp),
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             WeightSlider(Settings.PREF_GESTURE_TURN_WEIGHT, Defaults.PREF_GESTURE_TURN_WEIGHT, R.string.swipe_tuning_turns, 0f..1.5f)
             WeightSlider(Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Defaults.PREF_GESTURE_SLOWDOWN_WEIGHT, R.string.swipe_tuning_slowdowns, 0f..1f)
             WeightSlider(Settings.PREF_GESTURE_KUSHLER_WEIGHT, Defaults.PREF_GESTURE_KUSHLER_WEIGHT, R.string.swipe_tuning_blend, 0f..1f,
@@ -216,10 +215,12 @@ private fun BoostSlider() {
     SliderPreference(
         name = stringResource(R.string.swipe_tuning_history_boost),
         key = Settings.PREF_GESTURE_HISTORY_BOOST,
-        description = { value: Int -> "$value  ·  " + stringResource(R.string.swipe_tuning_history_boost_summary) },
+        description = { value: Int -> "$value" },
         default = Defaults.PREF_GESTURE_HISTORY_BOOST,
         range = 0f..128f,
         stepSize = 8,
+        valueOnRight = true,
+        summary = stringResource(R.string.swipe_tuning_history_boost_summary),
     )
 }
 
@@ -230,9 +231,11 @@ private fun WeightSlider(key: String, default: Float, title: Int, range: ClosedF
     SliderPreference(
         name = stringResource(title),
         key = key,
-        description = { value: Float -> String.format(java.util.Locale.ROOT, "%.1f", value) + (summary?.let { "  ·  " + stringResource(it) } ?: "") },
+        description = { value: Float -> String.format(java.util.Locale.ROOT, "%.1f", value) },
         default = default,
         range = range,
         onConfirmed = { value: Float -> prefs.edit { putFloat(key, (value * 10).roundToInt() / 10f) } },
+        valueOnRight = true,
+        summary = summary?.let { stringResource(it) },
     )
 }
