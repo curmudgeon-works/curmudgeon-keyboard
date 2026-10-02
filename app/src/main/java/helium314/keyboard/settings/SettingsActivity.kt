@@ -79,10 +79,6 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         val handler = outsideTapHandler ?: return super.dispatchTouchEvent(ev)
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) passingGesture = ev.y >= touchPassFromY
-        // a tap on the try-it bar while a dialog's number box has the keyboard: the box closes (keeping what was
-        // typed) and the keyboard goes back to the try-it field
-        if (passingGesture && ev.actionMasked == MotionEvent.ACTION_DOWN)
-            helium314.keyboard.settings.dialogs.KeepKeyboardWindows.endTyping?.invoke()
         if (passingGesture) return super.dispatchTouchEvent(ev)
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) handler()
         return true

@@ -79,10 +79,7 @@ fun SliderDialog(
                             valueRange = range,
                             steps = intermediateSteps
                         )
-                    // tap the value to type it
-                    SliderValueText(sliderPosition, range, positionString) { v ->
-                        sliderPosition = v; touched = true; atDefault = false; onValueChanged(v)
-                    }
+                    Text(positionString(sliderPosition))
                 }
             }
         },
