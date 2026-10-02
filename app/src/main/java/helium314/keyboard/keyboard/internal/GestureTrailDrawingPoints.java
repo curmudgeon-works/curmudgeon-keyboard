@@ -43,6 +43,7 @@ final class GestureTrailDrawingPoints {
     private int mLastInterpolatedDrawIndex;
     // with the trail not fading: when the finger was lifted (in the time of {@link #mEventTimes}), -1 while swiping
     private int mLiftTime = -1;
+    private long mLiftUptime;
 
     // Use this value as imaginary zero because x-coordinates may be zero.
     private static final int DOWN_EVENT_MARKER = -128;
@@ -89,7 +90,7 @@ final class GestureTrailDrawingPoints {
         if (strokeId != mCurrentStrokeId) {
             // a trail that doesn't fade: the previous word's trail goes as the next one starts (it would show again,
             // its points being as old as the new lift)
-            if (!helium314.keyboard.latin.settings.Settings.getValues().mGestureTrailFades) mTrailStartIndex = trailSize;
+            if (helium314.keyboard.latin.settings.Settings.getValues().mGestureTrailWhole) mTrailStartIndex = trailSize;
             final int elapsedTime = (int)(downTime - mCurrentTimeBase);
             for (int i = mTrailStartIndex; i < trailSize; i++) {
                 // Decay the previous strokes' event times.
@@ -175,7 +176,12 @@ final class GestureTrailDrawingPoints {
         final int wholeTrailAge;
         if (params.mFades) wholeTrailAge = -1;
         else if (helium314.keyboard.keyboard.PointerTracker.isInGesture()) { mLiftTime = -1; wholeTrailAge = 0; }
-        else { if (mLiftTime < 0) mLiftTime = sinceDown; wholeTrailAge = sinceDown - mLiftTime; }
+        else {
+            if (mLiftTime < 0) { mLiftTime = sinceDown; mLiftUptime = SystemClock.uptimeMillis(); }
+            // the next touch (a tap, or the next swipe) takes it away at once
+            wholeTrailAge = helium314.keyboard.keyboard.PointerTracker.getLastDownTime() > mLiftUptime
+                    ? params.mTrailLingerDuration : sinceDown - mLiftTime;
+        }
         int startIndex;
         for (startIndex = mTrailStartIndex; startIndex < trailSize; startIndex++) {
             final int elapsedTime = wholeTrailAge >= 0 ? wholeTrailAge : sinceDown - eventTimes[startIndex];
@@ -193,12 +199,13 @@ final class GestureTrailDrawingPoints {
             int p1x = getXCoordValue(xCoords[startIndex]);
             int p1y = yCoords[startIndex];
             final int lastTime = wholeTrailAge >= 0 ? wholeTrailAge : sinceDown - eventTimes[startIndex];
-            float r1 = getWidth(lastTime, params) / 2.0f;
+            // (the whole trail keeps its full width while it waits; it only fades)
+            float r1 = getWidth(wholeTrailAge >= 0 ? 0 : lastTime, params) / 2.0f;
             for (int i = startIndex + 1; i < trailSize; i++) {
                 final int elapsedTime = wholeTrailAge >= 0 ? wholeTrailAge : sinceDown - eventTimes[i];
                 final int p2x = getXCoordValue(xCoords[i]);
                 final int p2y = yCoords[i];
-                final float r2 = getWidth(elapsedTime, params) / 2.0f;
+                final float r2 = getWidth(wholeTrailAge >= 0 ? 0 : elapsedTime, params) / 2.0f;
                 // Draw trail line only when the current point isn't a down point.
                 if (!isDownEventXCoord(xCoords[i])) {
                     final float body1 = r1 * params.mTrailBodyRatio;

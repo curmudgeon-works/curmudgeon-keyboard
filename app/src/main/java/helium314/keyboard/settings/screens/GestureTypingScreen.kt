@@ -94,8 +94,19 @@ fun createGestureTypingSettings(context: Context) = listOf(
             live = true, applyOnRelease = true, // try it on the preview keyboard with the dialog open
         )
     },
-    Setting(context, Settings.PREF_GESTURE_TRAIL_FADES, R.string.gesture_trail_fades) {
-        SwitchPreference(it, Defaults.PREF_GESTURE_TRAIL_FADES)
+    Setting(context, Settings.PREF_GESTURE_TRAIL_WHOLE, R.string.gesture_trail_whole) {
+        SwitchPreference(it, Defaults.PREF_GESTURE_TRAIL_WHOLE)
+    },
+    Setting(context, Settings.PREF_GESTURE_TRAIL_WHOLE_LINGER, R.string.gesture_trail_whole_linger) { def ->
+        SliderPreference(
+            name = def.title,
+            key = def.key,
+            default = Defaults.PREF_GESTURE_TRAIL_WHOLE_LINGER,
+            range = 0f..3000f,
+            stepSize = 100,
+            description = { stringResource(R.string.abbreviation_unit_milliseconds, it.toString()) },
+            live = true, applyOnRelease = true, // try it on the preview keyboard with the dialog open
+        )
     },
     Setting(context, Settings.PREF_GESTURE_TRAIL_FADEOUT_DURATION, R.string.gesture_trail_fadeout_duration) { def ->
         SliderPreference(

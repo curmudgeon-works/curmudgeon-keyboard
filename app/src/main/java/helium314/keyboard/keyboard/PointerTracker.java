@@ -124,6 +124,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
 
     private boolean mIsDetectingGesture = false; // per PointerTracker.
     private static boolean sInGesture = false;
+    private static long sLastDownTime; // of any finger, for the swipe trail that vanishes at the next touch
     private static TypingTimeRecorder sTypingTimeRecorder;
 
     // The position and time at which first down event occurred.
@@ -223,6 +224,11 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         }
 
         return trackers.get(id);
+    }
+
+    /** When a finger last touched the keyboard (uptime ms). */
+    public static long getLastDownTime() {
+        return sLastDownTime;
     }
 
     /** A swipe (gesture typing) is going on: a finger is down and drawing a word. */
@@ -647,6 +653,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
 
     private void onDownEvent(final int x, final int y, final long eventTime,
             final KeyDetector keyDetector) {
+        sLastDownTime = eventTime;
         setKeyDetectorInner(keyDetector);
         if (DEBUG_EVENT) {
             printTouchEvent("onDownEvent:", x, y, eventTime);

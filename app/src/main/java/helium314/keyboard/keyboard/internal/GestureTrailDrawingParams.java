@@ -32,13 +32,14 @@ final class GestureTrailDrawingParams {
     public final float mTrailBodyRatio;
     public final boolean mTrailShadowEnabled;
     public final float mTrailShadowRatio;
-    public final int mFadeoutStartDelay;
+    public int mFadeoutStartDelay;
+    private final int mThemeFadeoutStartDelay;
     public int mFadeoutDuration;
     public final int mUpdateInterval;
 
     public int mTrailLingerDuration;
-    // the whole trail (fading off) fades this fast once the finger is lifted
-    private static final int FULL_TRAIL_FADEOUT_DURATION = 250; // millisecond
+    // the whole trail (not fading on the way) fades this fast once its time after the lift is up
+    private static final int WHOLE_TRAIL_FADEOUT_DURATION = 150; // millisecond
 
     public GestureTrailDrawingParams(final TypedArray mainKeyboardViewAttr) {
         mTrailColor = Settings.getValues().mColors.get(ColorType.GESTURE_TRAIL);
@@ -54,13 +55,14 @@ final class GestureTrailDrawingParams {
                 R.styleable.MainKeyboardView_gestureTrailShadowRatio, 0);
         mTrailShadowEnabled = (trailShadowRatioInt > 0);
         mTrailShadowRatio = (float)trailShadowRatioInt / (float)PERCENTAGE_INT;
-        mFadeoutStartDelay = GestureTrailDrawingPoints.DEBUG_SHOW_POINTS
+        mThemeFadeoutStartDelay = GestureTrailDrawingPoints.DEBUG_SHOW_POINTS
                 ? FADEOUT_START_DELAY_FOR_DEBUG
                 : mainKeyboardViewAttr.getInt(
                         R.styleable.MainKeyboardView_gestureTrailFadeoutStartDelay, 0);
         mFadeoutDuration = GestureTrailDrawingPoints.DEBUG_SHOW_POINTS
                 ? FADEOUT_DURATION_FOR_DEBUG
                 : Settings.getValues().mGestureTrailFadeoutDuration;
+        mFadeoutStartDelay = mThemeFadeoutStartDelay;
         mTrailLingerDuration = mFadeoutStartDelay + mFadeoutDuration;
         mUpdateInterval = mainKeyboardViewAttr.getInt(
                 R.styleable.MainKeyboardView_gestureTrailUpdateInterval, 0);
@@ -74,9 +76,12 @@ final class GestureTrailDrawingParams {
         final float scale = sv.mGestureTrailThickness / 100f;
         mTrailStartWidth = mThemeStartWidth * scale;
         mTrailEndWidth = mThemeEndWidth * scale;
-        mFades = sv.mGestureTrailFades;
-        if (!GestureTrailDrawingPoints.DEBUG_SHOW_POINTS)
-            mFadeoutDuration = mFades ? sv.mGestureTrailFadeoutDuration : FULL_TRAIL_FADEOUT_DURATION;
+        mFades = !sv.mGestureTrailWhole;
+        if (!GestureTrailDrawingPoints.DEBUG_SHOW_POINTS) {
+            // fading: each point after the theme's delay, over the lifespan; whole: all of it, the set time after the lift
+            mFadeoutStartDelay = mFades ? mThemeFadeoutStartDelay : sv.mGestureTrailWholeLinger;
+            mFadeoutDuration = mFades ? sv.mGestureTrailFadeoutDuration : WHOLE_TRAIL_FADEOUT_DURATION;
+        }
         mTrailLingerDuration = mFadeoutStartDelay + mFadeoutDuration;
     }
 }
