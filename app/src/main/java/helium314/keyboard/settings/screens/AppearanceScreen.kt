@@ -722,7 +722,19 @@ internal class PreviewKeyboard( // (also the Preferences screen's, for the key s
         hide()
     }
 
-    override fun dialogOpened(emoji: Boolean, people: Boolean) { dialogs++; show(emoji, people) }
+    private var quietSince = 0L
+    // quiet() was called and the screen hasn't been touched since
+    private fun isQuiet() = quietSince > 0 && SettingsActivity.lastTouchDown < quietSince
+
+    override fun quiet() {
+        hideJob?.cancel()
+        backToLetters()
+        // down now, the try-it box without focus (else the keyboard comes back with the focus when the question goes)
+        if (byUs || focused) { byUs = false; hide() }
+        quietSince = android.os.SystemClock.uptimeMillis()
+    }
+
+    override fun dialogOpened(emoji: Boolean, people: Boolean) { dialogs++; if (!isQuiet()) show(emoji, people) }
     override fun dialogClosed() {
         dialogs = (dialogs - 1).coerceAtLeast(0)
         if (dialogs == 0) hideIfOurs()
@@ -735,7 +747,7 @@ internal class PreviewKeyboard( // (also the Preferences screen's, for the key s
     }
 
     fun changed(emoji: Boolean) {
-        if (dialogs > 0) return
+        if (dialogs > 0 || isQuiet()) return
         show(emoji)
         hideJob = scope.launch { delay(3000); hideIfOurs() }
     }
