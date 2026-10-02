@@ -725,6 +725,7 @@ internal class PreviewKeyboard( // (also the Preferences screen's, for the key s
 
     override fun dialogOpened(emoji: Boolean, people: Boolean) { dialogs++; lastEmoji = emoji; lastPeople = people; show(emoji, people) }
     // after the number field's window is gone: its own keyboard-hide arrives late and would undo an earlier show
+    override fun numberBoxOpened() { tryIt.mode = TryItMode.NUMBER } // only the tab: the box has the focus
     override fun restore() {
         scope.launch {
             delay(250) // the number field's window is gone by then

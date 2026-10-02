@@ -26,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
@@ -79,13 +81,21 @@ fun SliderValueText(
     // the dialog takes keyboard input while the box is open; when it closes the preview goes back to the try-it box
     val latestApply = androidx.compose.runtime.rememberUpdatedState(::apply)
     DisposableEffect(window) {
-        window?.let { KeepKeyboardWindows.typing.add(it) }
+        window?.let { w ->
+            KeepKeyboardWindows.heldTop[w] = IntArray(2).also { w.decorView.getLocationOnScreen(it) }[1]
+            KeepKeyboardWindows.typing.add(w)
+        }
+        preview?.numberBoxOpened() // the try-it bar's tab follows: 123 now, back with restore() below
+        // nor does the system move the dialog to show the box above the keyboard: it is above it already
+        val previousSoftInput = window?.attributes?.softInputMode
+        window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
         val end: () -> Unit = { editing = false }
         KeepKeyboardWindows.endTyping = end
         window?.clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
         onDispose {
             latestApply.value() // OK pressed (or the box left) without Done: what was typed still counts
-            window?.let { KeepKeyboardWindows.typing.remove(it) }
+            window?.let { KeepKeyboardWindows.typing.remove(it); KeepKeyboardWindows.heldTop.remove(it) }
+            previousSoftInput?.let { window?.setSoftInputMode(it) }
             if (KeepKeyboardWindows.endTyping === end) KeepKeyboardWindows.endTyping = null
             window?.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
             preview?.restore()
@@ -107,6 +117,10 @@ fun SliderValueText(
             keyboardActions = KeyboardActions(onDone = { apply(); editing = false }),
             modifier = Modifier
                 .focusRequester(focus)
+                .onGloballyPositioned { // where the box is on screen, so the dialog can keep it above the keyboard
+                    KeepKeyboardWindows.boxBottom = it.boundsInWindow().bottom.toInt() +
+                        IntArray(2).also { l -> window?.decorView?.getLocationOnScreen(l) }[1]
+                }
                 .onFocusChanged { if (!it.isFocused) apply() } // left for the try-it box: take what was typed so far
                 .widthIn(min = 40.dp)
                 .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))
