@@ -99,11 +99,19 @@ private fun factoryReset(ctx: Context, keyboards: Boolean, learnedWords: Boolean
     Settings.getInstance().stopListener()
     prefs.edit { prefs.all.keys.filterNot(::keep).forEach { remove(it) } }
     KeyboardProfiles.editingId = KeyboardProfiles.SHARED
+    // the background pictures belong to the settings (every keyboard's: the set ids start again after a reset, and a
+    // new keyboard mustn't find an old one's picture)
+    KeyboardProfiles.deleteAllFiles()
+    Settings.clearCachedBackgroundImages()
     if (learnedWords) PersonalizationHelper.removeAllUserHistoryDictionaries(ctx)
     if (clipboard) ClipboardDao.getInstance(ctx)?.clear()
     if (custom) {
         val filesDir = DeviceProtectedUtils.getFilesDir(ctx)
         for (type in LayoutType.entries) File(filesDir, type.folder).deleteRecursively()
+        // the loaded fonts and pictures, offered to every keyboard
+        helium314.keyboard.keyboard.FontLibrary.dir(ctx).deleteRecursively()
+        helium314.keyboard.latin.common.PictureLibrary.dir(ctx).deleteRecursively()
+        helium314.keyboard.keyboard.KeyboardTypeface.clearCache()
         // dictionaries the user added (the built-in ones are in the app itself)
         DictionaryInfoUtils.getCacheDirectories(ctx).forEach { dir ->
             dir.listFiles()?.filter { it.name.endsWith(DictionaryInfoUtils.USER_DICTIONARY_SUFFIX) }?.forEach { it.delete() }

@@ -62,8 +62,7 @@ object AppearanceLooks {
     fun screenValues(prefs: SharedPreferences): Map<String, Any?> = prefs.all.filterKeys { onScreen(it) }
 
     /** Back to [values] for everything on the Appearance screen (the draft's Discard). */
-    fun applyScreen(ctx: Context, values: Map<String, Any?>) {
-        val prefs = ctx.prefs()
+    fun applyScreen(ctx: Context, values: Map<String, Any?>, prefs: SharedPreferences = ctx.prefs()) {
         val now = screenValues(prefs)
         prefs.edit {
             for (key in now.keys) if (key !in values) remove(key)
