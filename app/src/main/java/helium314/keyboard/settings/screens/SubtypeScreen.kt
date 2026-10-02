@@ -251,7 +251,15 @@ fun SubtypeScreen(
     var lastShape by remember { mutableStateOf(shape()) }
     LaunchedEffect(b?.value) {
         val now = shape()
-        if (now != lastShape) { lastShape = now; preview.changed(emoji = false) }
+        if (now != lastShape) {
+            val changed = previewedSwitches.filterIndexed { i, _ -> now[i] != lastShape[i] }
+            lastShape = now
+            // the sound switch while Android keeps key sounds off (silent, DND…): it is greyed and there is nothing
+            // to hear, so no preview; with sound possible it previews like the rest
+            val soundOnlyAndBlocked = changed == listOf(Settings.PREF_SOUND_ON) &&
+                helium314.keyboard.settings.preferences.SystemFeedback.soundBlocker(ctx) != null
+            if (!soundOnlyAndBlocked) preview.changed(emoji = false)
+        }
     }
     DisposableEffect(Unit) { onDispose { (ctx.getActivity() as? SettingsActivity)?.touchPassFromY = Int.MAX_VALUE } }
     val customMainLayouts = LayoutUtilsCustom.getLayoutFiles(LayoutType.MAIN, ctx, currentSubtype.locale).map { it.name }
