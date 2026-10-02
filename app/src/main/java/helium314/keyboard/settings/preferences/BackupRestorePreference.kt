@@ -428,6 +428,14 @@ private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: Restore
         }
     }
     if (choice.clipboard) Database.copyFromDb(restoredDb, ctx)
+    if (allSettings) {
+        // a backup from before the pictures were per keyboard (or the picture list existed): what app start does once
+        val real = ctx.realPrefs()
+        KeyboardProfiles.migrateFiles(real)
+        helium314.keyboard.latin.common.PictureLibrary.migrate(ctx, real.getBoolean("picture_library_migrated", false)) {
+            real.edit().putBoolean("picture_library_migrated", true).apply() }
+        Settings.clearCachedBackgroundImages()
+    }
     LayoutUtilsCustom.onLayoutFileChanged()
 }
 
@@ -501,9 +509,12 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
                 val name = entry.name.substringAfter("unprotected${File.separator}", "")
                 when {
                     name in wantedPictures -> pictureFiles[name] = zip.readBytes()
-                    name.startsWith("fonts${File.separator}") || name.startsWith("pictures${File.separator}") -> {
+                    (name.startsWith("fonts${File.separator}") || name.startsWith("pictures${File.separator}"))
+                        && backupFilePatterns.any { name.matches(it) } -> {
                         val target = File(deviceProtectedFilesDir, name)
-                        if (!target.exists()) FileUtils.copyStreamToNewFile(zip, target)
+                        // (and never outside the app's folder, whatever the zip says)
+                        val inside = target.canonicalPath.startsWith(deviceProtectedFilesDir.canonicalPath + File.separator)
+                        if (inside && !target.exists()) FileUtils.copyStreamToNewFile(zip, target)
                     }
                 }
                 zip.closeEntry()
@@ -520,7 +531,8 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
             val id = KeyboardProfiles.idFor(real, keyboard)
             KeyboardProfiles.write(real, id, settings.getValue(keyboard))
             // its own pictures in the backup, or the backup's shared ones when it had no set of its own
-            KeyboardProfiles.restoreFiles(pictureFiles, KeyboardProfiles.idIn(backup, keyboard) ?: KeyboardProfiles.SHARED, id)
+            KeyboardProfiles.restoreFiles(pictureFiles, KeyboardProfiles.idIn(backup, keyboard) ?: KeyboardProfiles.SHARED, id,
+                perKeyboardBackup = backup["profile_files_migrated"] == true)
         }
     }
     if (withSettings) { Settings.clearCachedBackgroundImages(); helium314.keyboard.keyboard.KeyboardTypeface.clearCache() }

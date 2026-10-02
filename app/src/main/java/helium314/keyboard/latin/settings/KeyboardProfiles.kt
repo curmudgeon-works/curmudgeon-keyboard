@@ -278,11 +278,13 @@ object KeyboardProfiles {
 
     /** Backup restore of one keyboard: its pictures from the backup's files (named for the backup's id [fromId]),
      *  given as name -> bytes, become set [toId]'s. */
-    fun restoreFiles(files: Map<String, ByteArray>, fromId: Int, toId: Int) {
+    fun restoreFiles(files: Map<String, ByteArray>, fromId: Int, toId: Int, perKeyboardBackup: Boolean) {
         val dir = filesDir ?: return
-        // a backup from before the pictures were per keyboard has only the plain ones (what every keyboard showed)
-        val source = if (fromId != SHARED && profileFileNames.none { files.containsKey(it + suffix(fromId)) }) SHARED else fromId
-        if (profileFileNames.none { files.containsKey(it + suffix(source)) }) return // no pictures in the backup: keep the phone's
+        // a backup made since the pictures are per keyboard ([perKeyboardBackup]: it has "profile_files_migrated") says
+        // exactly what the keyboard had, a missing file = no picture; an older one has only the plain pictures (what every
+        // keyboard showed then), and without any the phone's are kept
+        val source = if (perKeyboardBackup) fromId else SHARED
+        if (!perKeyboardBackup && profileFileNames.none { files.containsKey(it + suffix(source)) }) return
         for (name in profileFileNames) for (ext in listOf("", ".framing")) {
             val to = java.io.File(dir, name + suffix(toId) + ext)
             val bytes = files[name + suffix(source) + ext]

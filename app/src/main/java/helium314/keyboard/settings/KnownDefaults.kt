@@ -13,6 +13,9 @@ object KnownDefaults {
 
     fun note(key: String, default: Any?) { if (default != null) defaults[key] = default }
 
+    /** The default noted for [key], or null. */
+    fun of(key: String): Any? = defaults[key]
+
     /** Whether two stored values of [key] mean the same (null = not stored = the default). */
     fun same(key: String, a: Any?, b: Any?): Boolean {
         if (a == b) return true

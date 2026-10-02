@@ -32,7 +32,8 @@ object HotWords {
     private fun spelled(forms: List<String>, typed: String): String {
         val natural = forms.firstOrNull { it == it.lowercase() } ?: forms.last()
         return when {
-            typed.length >= 2 && typed == typed.uppercase() && typed != typed.lowercase() -> natural.uppercase()
+            // (2+ letters: "I'" or "U." is one capital, not caps lock)
+            typed.count { it.isLetter() } >= 2 && typed.none { it.isLowerCase() } -> natural.uppercase()
             typed.first().isUpperCase() -> natural.replaceFirstChar { it.uppercaseChar() }
             else -> natural
         }
