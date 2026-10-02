@@ -621,9 +621,10 @@ private val backupFilePatterns by lazy { listOf(
     "dicts${File.separator}.*${File.separator}.*user\\.dict".toRegex(),
     "UserHistoryDictionary.*${File.separator}UserHistoryDictionary.*\\.(body|header)".toRegex(),
     "custom_background_image.*".toRegex(),
+    "pictures${File.separator}[^${File.separator}]+".toRegex(), // the picture list shared by all keyboards
     "custom_font".toRegex(), // the text style fonts of before; restored ones move into the list (FontLibrary)
     "fonts${File.separator}[^${File.separator}]+".toRegex(),
-    "custom_emoji_font".toRegex(),
+    "custom_emoji_font.*".toRegex(), // (one per keyboard with separate settings: custom_emoji_font_p<id>)
     "custom_hint_font".toRegex(),
     "custom_suggestion_font".toRegex(),
 ) }

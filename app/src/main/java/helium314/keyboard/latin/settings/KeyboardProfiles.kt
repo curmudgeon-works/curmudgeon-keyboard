@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.latin.settings
 
+import helium314.keyboard.latin.utils.getActivity
 import android.content.SharedPreferences
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.latin.utils.LanguagePriority
@@ -120,6 +121,7 @@ object KeyboardProfiles {
             put(editor, prefixedKey(toId, plain), value)
         }
         editor.apply()
+        copyFiles(fromId, toId)
         Log.i("KeyboardProfiles", "copied settings $fromId -> $toId")
     }
 
@@ -190,7 +192,59 @@ object KeyboardProfiles {
     @Volatile var editingId: Int = SHARED
 
     fun refreshImeId(real: SharedPreferences) {
+        val old = imeId
         imeId = if (isSeparate(real)) idFor(real, selectedKeyboard(real)) else SHARED
+        // another keyboard's background picture and emoji font (see profileFile)
+        if (imeId != old) {
+            Settings.clearCachedBackgroundImages()
+            runCatching { helium314.keyboard.keyboard.KeyboardTypeface.clearCache() }
+        }
+    }
+
+    // ---- files that belong to a keyboard's settings ----
+    // The background pictures (with their framing) are files, not preferences: with separate
+    // settings each keyboard has its own copy, named with "_p<id>" (the shared set keeps the plain name). Copying a
+    // set copies them too. Before 2026-10-02 every keyboard used the plain files.
+
+    /** The app's files dir, set at start (App) so [copy] can reach the files without a context. */
+    @Volatile var filesDir: java.io.File? = null
+
+    private val profileFileNames = listOf("custom_background_image", "custom_background_image_night",
+        "custom_background_image_landscape", "custom_background_image_landscape_night")
+
+    /** [name] for the set in use where [context] is: the settings screens' keyboard, or the keyboard on screen. */
+    @JvmStatic
+    fun profileFile(context: android.content.Context, name: String): java.io.File {
+        val dir = helium314.keyboard.latin.utils.DeviceProtectedUtils.getFilesDir(context)
+        val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(context)
+        val id = if (!isSeparate(real)) SHARED
+            else if (context.getActivity() != null) editingId else imeId
+        return java.io.File(dir, name + suffix(id))
+    }
+
+    private fun suffix(id: Int) = if (id == SHARED) "" else "_p$id"
+
+    /** The files of set [fromId] over those of [toId] (one missing in [fromId] is removed in [toId]). */
+    private fun copyFiles(fromId: Int, toId: Int) {
+        val dir = filesDir ?: return
+        for (name in profileFileNames) for (ext in listOf("", ".framing")) {
+            val from = java.io.File(dir, name + suffix(fromId) + ext)
+            val to = java.io.File(dir, name + suffix(toId) + ext)
+            runCatching { if (from.exists()) from.copyTo(to, overwrite = true) else to.delete() }
+        }
+    }
+
+    /** Once: keyboards that got their own set before the files were per keyboard get a copy of the plain ones. */
+    fun migrateFiles(real: SharedPreferences) {
+        if (real.getBoolean("profile_files_migrated", false)) return
+        val map = ids(real)
+        for (key in map.keys()) {
+            val id = map.optInt(key, SHARED)
+            if (id == SHARED) continue
+            val dir = filesDir ?: return
+            if (profileFileNames.none { java.io.File(dir, it + suffix(id)).exists() }) copyFiles(SHARED, id)
+        }
+        real.edit().putBoolean("profile_files_migrated", true).apply()
     }
 
     /** The keyboard whose settings the screens edit (separate settings on), or null (shared settings). */

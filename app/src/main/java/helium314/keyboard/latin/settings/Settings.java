@@ -93,6 +93,8 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_KEY_TEXT_UNDERLINE = "key_text_underline";
     public static final String PREF_HINT_FONT_SCALE = "hint_font_scale";
     public static final String PREF_KEY_FONT = "key_font";
+    // the emoji font: "font:<name>" from the font list (FontLibrary), "default" for the system's, "auto" = the file of before
+    public static final String PREF_EMOJI_FONT = "emoji_font";
     public static final String PREF_HINT_FONT = "hint_font";
     public static final String PREF_SUGGESTION_FONT = "suggestion_font";
     public static final String PREF_FONT_FOLLOWS_KEY_TEXT = "font_follows_key_text";
@@ -585,7 +587,8 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     }
 
     public static File getCustomBackgroundFile(final Context context, final boolean night, final boolean landscape) {
-        return new File(DeviceProtectedUtils.getFilesDir(context), "custom_background_image" + (landscape ? "_landscape" : "") + (night ? "_night" : ""));
+        // one per keyboard with separate settings (KeyboardProfiles.profileFile)
+        return KeyboardProfiles.profileFile(context, "custom_background_image" + (landscape ? "_landscape" : "") + (night ? "_night" : ""));
     }
 
     public static void clearCachedBackgroundImages() {
@@ -635,6 +638,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     }
 
     public static File getCustomEmojiFontFile(final Context context) {
+        // the file of before: FontLibrary moves it into the font list ("Emoji font"), PREF_EMOJI_FONT picks per keyboard
         return new File(DeviceProtectedUtils.getFilesDir(context), "custom_emoji_font");
     }
 

@@ -506,7 +506,8 @@ fun createAppearanceSettings(context: Context) = listOf(
     },
     Setting(context, SettingsWithoutKey.CUSTOM_EMOJI_FONT, R.string.custom_emoji_font) {
         CompositionLocalProvider(LocalPreviewEmoji provides true) {
-        CustomFontPreference(it, Settings.getCustomEmojiFontFile(LocalContext.current), R.string.custom_emoji_font)
+        // a choice from the font list shared by all keyboards (the file of before moved into it)
+        helium314.keyboard.settings.preferences.EmojiFontPreference(it)
         }
     },
     Setting(context, Settings.PREF_EMOJI_FONT_SCALE, R.string.prefs_emoji_font_scale) { setting ->
@@ -783,7 +784,7 @@ private fun tileChanged(tile: String, keys: Set<String>, files: Set<String>): Bo
             Settings.PREF_HINT_FONT, Settings.PREF_HINT_FONT_SCALE, Settings.PREF_HINT_TEXT_BOLD, Settings.PREF_HINT_TEXT_ITALIC,
             Settings.PREF_HINT_TEXT_UNDERLINE, Settings.PREF_SUGGESTION_FONT, Settings.PREF_SUGGESTION_TEXT_SIZE,
             Settings.PREF_SUGGESTION_BOLD, Settings.PREF_SUGGESTION_ITALIC, Settings.PREF_SUGGESTION_UNDERLINE)
-        SettingsWithoutKey.CUSTOM_EMOJI_FONT -> "custom_emoji_font" in files
+        SettingsWithoutKey.CUSTOM_EMOJI_FONT -> Settings.PREF_EMOJI_FONT in keys
         SettingsWithoutKey.BACKGROUND_IMAGE -> files.any { it.startsWith("custom_background_image") && !it.contains("landscape") }
         SettingsWithoutKey.BACKGROUND_IMAGE_LANDSCAPE -> files.any { it.startsWith("custom_background_image_landscape") }
         Settings.PREF_ENABLE_SPLIT_KEYBOARD -> any(Settings.PREF_ENABLE_SPLIT_KEYBOARD, Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE,

@@ -11,7 +11,7 @@ import java.io.File
 
 /**
  * The font files the user has loaded, kept by name in one folder and offered in every text style dialog
- * (key text, symbols, suggestion strip). A dialog's choice is stored as "font:<name>".
+ * (key text, symbols, suggestion strip) and the emoji font's: shared by all keyboards, each keyboard's settings pick. A dialog's choice is stored as "font:<name>".
  * A file loaded in a dialog waits in the pending folder until OK; Cancel throws it away.
  */
 object FontLibrary {
@@ -22,10 +22,12 @@ object FontLibrary {
     const val SLOT_KEY = "custom_font"
     const val SLOT_HINT = "custom_hint_font"
     const val SLOT_SUGGESTION = "custom_suggestion_font"
+    const val SLOT_EMOJI = "custom_emoji_font" // the emoji font of before (one file for every keyboard)
     private val slots = listOf(
         Triple(SLOT_KEY, Settings.PREF_KEY_FONT, "Key text font"),
         Triple(SLOT_HINT, Settings.PREF_HINT_FONT, "Symbols font"),
         Triple(SLOT_SUGGESTION, Settings.PREF_SUGGESTION_FONT, "Suggestion strip font"),
+        Triple(SLOT_EMOJI, Settings.PREF_EMOJI_FONT, "Emoji font"),
     )
     private val fontPrefs = slots.map { it.second }
 

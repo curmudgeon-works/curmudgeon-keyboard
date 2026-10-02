@@ -899,6 +899,9 @@ language, hence "No language". -->
     <string name="background_picture_stretched_hint">The whole picture, squeezed to the keyboard\'s shape.</string>
     <string name="background_picture_stretch">Stretch to fit</string>
     <string name="background_picture_other">Other picture</string>
+    <string name="background_picture_choose">Choose a picture</string>
+    <string name="background_picture_gallery">From gallery</string>
+    <string name="background_picture_forget">Remove this picture from the list? Keyboards that use it keep it.</string>
     <string name="background_picture_remove">Remove</string>
     <!-- Title for customizing background image in landscape mode -->
     <string name="customize_background_image_landscape">Set background image (landscape)</string>

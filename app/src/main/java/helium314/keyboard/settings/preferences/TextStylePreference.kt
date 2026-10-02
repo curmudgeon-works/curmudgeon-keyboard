@@ -373,3 +373,84 @@ fun FontsPreference(setting: Setting, texts: List<Pair<Int, TextStyleKeys>>) {
     if (showError)
         InfoDialog(stringResource(R.string.file_read_error)) { showError = false }
 }
+
+/**
+ * The emoji font: the system's, or one from the font list. The list is shared by all keyboards (a font loaded here
+ * is offered in the text style dialogs and on every keyboard too); each keyboard's settings keep their own choice.
+ * Every change shows on the live keyboard; OK keeps, Cancel puts back what was set when it opened.
+ */
+@Composable
+fun EmojiFontPreference(setting: Setting) {
+    val ctx = LocalContext.current
+    val prefs = ctx.prefs()
+    var showDialog by rememberSaveable { mutableStateOf(false) }
+    var showError by rememberSaveable { mutableStateOf(false) }
+    var generation by remember { mutableIntStateOf(0) }
+    @Suppress("UNUSED_EXPRESSION") generation
+    helium314.keyboard.settings.KnownDefaults.note(Settings.PREF_EMOJI_FONT, TextFonts.AUTO)
+    val font = TextFonts.shown(ctx, prefs.getString(Settings.PREF_EMOJI_FONT, TextFonts.AUTO)!!, FontLibrary.SLOT_EMOJI)
+    Preference(name = setting.title, description = fontName(font), onClick = { showDialog = true }) { }
+    if (!showDialog) return
+
+    fun reload() {
+        KeyboardTypeface.clearCache()
+        KeyboardSwitcher.getInstance().setThemeNeedsReload()
+        generation++
+    }
+    val snapshot = helium314.keyboard.settings.rememberPrefSnapshot(prefs, listOf(Settings.PREF_EMOJI_FONT))
+    var confirmed by remember { mutableStateOf(false) }
+    fun choose(choice: String) {
+        prefs.edit { putString(Settings.PREF_EMOJI_FONT, choice) }
+        if (!FontLibrary.isPending(choice)) FontLibrary.discardPending(ctx)
+        reload()
+    }
+    // a loaded file previews at once but joins the font list only on OK
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        if (it.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
+        val uri = it.data?.data ?: return@rememberLauncherForActivityResult
+        val tempFile = File(DeviceProtectedUtils.getFilesDir(ctx), "temp_file")
+        FileUtils.copyContentUriToNewFile(uri, ctx, tempFile)
+        try {
+            Typeface.createFromFile(tempFile)
+            val name = ctx.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                ?.use { c -> if (c.moveToFirst()) c.getString(0) else null } ?: "font"
+            choose(FontLibrary.addPending(ctx, tempFile, name))
+        } catch (_: Exception) {
+            showError = true
+        } finally {
+            tempFile.delete()
+        }
+    }
+    // the system's emoji, or a font file (the serif / sans / mono families have no emoji of their own)
+    val choices = listOf(TextFonts.DEFAULT) + FontLibrary.names(ctx).map { FontLibrary.PREFIX + it } +
+        listOfNotNull(font.takeIf { FontLibrary.isPending(it) }) + TextFonts.LOAD
+    ThreeButtonAlertDialog(
+        onDismissRequest = {
+            if (!confirmed && snapshot.restore()) reload()
+            FontLibrary.discardPending(ctx)
+            showDialog = false
+        },
+        onConfirmed = {
+            confirmed = true
+            val chosen = prefs.getString(Settings.PREF_EMOJI_FONT, TextFonts.AUTO)!!
+            if (FontLibrary.isPending(chosen)) { prefs.edit { putString(Settings.PREF_EMOJI_FONT, FontLibrary.commit(ctx, chosen)) }; reload() }
+        },
+        title = { Text(setting.title) },
+        content = {
+            DropDownField(
+                items = choices,
+                selectedItem = font,
+                onSelected = { choice ->
+                    if (choice == TextFonts.LOAD) launcher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*"))
+                    else choose(choice)
+                },
+                itemTrailing = { choice ->
+                    if (choice.startsWith(FontLibrary.PREFIX) && !FontLibrary.isPending(choice))
+                        DeleteButton { FontLibrary.delete(ctx, FontLibrary.displayName(choice)); reload() }
+                },
+            ) { Text(fontName(it)) }
+        },
+    )
+    if (showError)
+        InfoDialog(stringResource(R.string.file_read_error)) { showError = false }
+}

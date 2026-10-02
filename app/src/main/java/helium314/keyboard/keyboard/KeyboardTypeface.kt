@@ -56,7 +56,9 @@ object KeyboardTypeface {
 
     private fun loadCustomEmojiTypeface(context: Context): Typeface? {
         return runCatching {
-            Typeface.createFromFile(Settings.getCustomEmojiFontFile(context))
+            // this keyboard's choice from the font list ("auto": the emoji font of before, if there was one)
+            val choice = context.prefs().getString(Settings.PREF_EMOJI_FONT, "auto")!!
+            Typeface.createFromFile(FontLibrary.fileFor(context, choice, FontLibrary.SLOT_EMOJI)!!)
         }.getOrNull()
     }
 

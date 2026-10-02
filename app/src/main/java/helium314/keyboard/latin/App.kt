@@ -28,6 +28,15 @@ class App : Application() {
         // the keyboard list first: the Layout & Typing recovery below reloads it, and the other way round the list
         // was loaded twice and showed every keyboard twice until the next start (the "second keyboard", 2026-10-01)
         SubtypeSettings.init(this)
+        // the background pictures and emoji font are per keyboard with separate settings: where they are, and a copy for
+        // the keyboards that had their own set before that
+        helium314.keyboard.latin.settings.KeyboardProfiles.filesDir = helium314.keyboard.latin.utils.DeviceProtectedUtils.getFilesDir(this)
+        helium314.keyboard.latin.settings.KeyboardProfiles.migrateFiles(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
+        // every picture loaded so far joins the picture list all keyboards choose from
+        helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this).let { real ->
+            helium314.keyboard.latin.common.PictureLibrary.migrate(this, real.getBoolean("picture_library_migrated", false)) {
+                real.edit().putBoolean("picture_library_migrated", true).apply() }
+        }
         // the process died with Appearance open (a crash): its changes that weren't kept are undone
         helium314.keyboard.settings.AppearanceDraft.recoverAfterCrash(this)
         helium314.keyboard.settings.LayoutDraft.recoverAfterCrash(this)
