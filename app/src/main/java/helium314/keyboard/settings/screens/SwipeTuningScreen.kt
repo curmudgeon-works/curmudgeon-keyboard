@@ -276,6 +276,12 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
                         Text(stringResource(R.string.swipe_tuning_time, row.averageMs, row.slowestMs), style = MaterialTheme.typography.bodySmall)
                 }
             }
+            // ---- the swipe logs (diagnostics, moved from Advanced): only while swiping is on
+            helium314.keyboard.settings.AdvancedReveal(gestureOn) { Column {
+                GroupTitle(R.string.swipe_logging)
+                SettingsActivity.settingsContainer[Settings.PREF_RECORD_GESTURE_CORPUS]?.Preference()
+                SettingsActivity.settingsContainer[Settings.PREF_SWIPE_METRICS]?.Preference()
+            } }
         }
       }
         }

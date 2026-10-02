@@ -317,6 +317,7 @@
     <string name="swipe_tuning_slowdowns_summary">How much slowing over a key favours its letter (0 to 1)</string>
     <string name="swipe_tuning_blend_summary">0 to 1: 1 = only the turns and slowdowns count, 0 = only where the whole path runs</string>
     <string name="swipe_other">Other swipes</string>
+    <string name="swipe_logging">Swipe logging</string>
     <string name="swipe_tuning_fast_common">Fast swipes overweight common words</string>
     <string name="swipe_tuning_fast_common_summary">For every key width per second faster than 12, how much more a word\'s commonness counts (0 to 0.2)</string>
     <string name="swipe_tuning_corner_miss">Corner miss allowance</string>
@@ -421,7 +422,7 @@
     <!-- Preferences item for enabling URL detection -->
     <string name="url_detection_title">URL detection</string>
     <!-- Description for "url_detection_title" option. -->
-    <string name="url_detection_summary">Try to detect URLs and similar as a single word</string>
+    <string name="url_detection_summary">Treat web and email addresses as a single word</string>
     <!-- Preferences item for disabling word learning -->
     <string name="incognito">Force incognito mode</string>
     <!-- Description for "prefs_force_incognito_mode" option. -->

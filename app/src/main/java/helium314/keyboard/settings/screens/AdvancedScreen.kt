@@ -86,11 +86,10 @@ fun AdvancedSettingsScreen(
         SettingsWithoutKey.FACTORY_RESET,
         if (BuildConfig.DEBUG || prefs.getBoolean(DebugSettings.PREF_SHOW_DEBUG_SETTINGS, Defaults.PREF_SHOW_DEBUG_SETTINGS))
             SettingsWithoutKey.DEBUG_SETTINGS else null,
-        R.string.settings_category_experimental,
+        // (once under Experimental; now with the rest)
         Settings.PREF_EMOJI_MAX_SDK,
         Settings.PREF_URL_DETECTION,
-        Settings.PREF_RECORD_GESTURE_CORPUS,
-        Settings.PREF_SWIPE_METRICS,
+        // (recording the swipe corpus and logging swipe results: on the Swipe screen, Swipe logging)
     )
     SearchSettingsScreen(
         onClickBack = onClickBack,
