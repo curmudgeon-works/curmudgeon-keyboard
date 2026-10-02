@@ -93,7 +93,8 @@ fun TextCorrectionScreen(
         if (prefs.getBoolean(Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Defaults.PREF_KEY_USE_PERSONALIZED_DICTS))
             Settings.PREF_ADD_TO_PERSONAL_DICTIONARY else null,
         Settings.PREF_ALWAYS_INCOGNITO_MODE, // (from Advanced; advanced here too) never learn, like incognito fields
-        if (suggestionsEnabled) Settings.PREF_CENTER_SUGGESTION_TEXT_TO_ENTER else null,
+        // (PREF_CENTER_SUGGESTION_TEXT_TO_ENTER, "show the word space will type as the middle suggestion", is no longer
+        // shown: the strip has no middle and shows the typed word first anyway; its Setting stays, off, see SettingsValues)
         if (suggestionsEnabled || autocorrectEnabled) Settings.PREF_SUGGEST_EMOJIS else null,
         if (suggestionsEnabled || autocorrectEnabled) Settings.PREF_INLINE_EMOJI_SEARCH else null,
         Settings.PREF_SUGGEST_PUNCTUATION,
