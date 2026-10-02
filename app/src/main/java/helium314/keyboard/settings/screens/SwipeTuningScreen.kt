@@ -78,7 +78,11 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     val softKeyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val preview = remember { PreviewKeyboard(tryIt, scope, showIme = { softKeyboard?.show() }, reveal = { }) {
+    // the row tapped last moves above where the preview keyboard will end (as on Layout & Typing and Appearance)
+    val listScroll = rememberScrollState()
+    val view = androidx.compose.ui.platform.LocalView.current
+    val tapReveal = remember { helium314.keyboard.settings.ListTapReveal(listScroll, scope, ctx, view) }
+    val preview = remember { PreviewKeyboard(tryIt, scope, showIme = { softKeyboard?.show() }, reveal = tapReveal::reveal) {
         focusManager.clearFocus(); softKeyboard?.hide() } }
     var bottomBarTop by remember { mutableIntStateOf(-1) }
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { (ctx.getActivity() as? SettingsActivity)?.touchPassFromY = Int.MAX_VALUE } }
@@ -91,11 +95,12 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
         settings = emptyList(),
         bottomBar = { androidx.compose.foundation.layout.Box(Modifier.onGloballyPositioned {
             bottomBarTop = it.positionInWindow().y.toInt()
+            tapReveal.onBarPlaced(bottomBarTop)
             (ctx.getActivity() as? SettingsActivity)?.touchPassFromY = bottomBarTop
         }) { TryItBar(keyboard, tryIt, onFocus = preview::onFocus, onUsed = preview::onUsed) } },
     ) {
         // the content is taller than a screen now that the gesture typing items are here
-        Column(Modifier.verticalScroll(rememberScrollState()).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))) {
+        Column(tapReveal.list.verticalScroll(listScroll).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))) {
           androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.preferences.LocalRowStart provides 22.dp) {
             // ---- what a swipe can do: gesture typing itself (its own screen without the own decoder), then the extras
             GroupTitle(R.string.swipe_settings)

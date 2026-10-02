@@ -88,6 +88,19 @@ public class KeyPreviewView extends TextView {
         setTextScaleX(maxWidth / width);
     }
 
+    /** The label at its own size, made smaller (never narrower) if it would not fit [width] x [height]. */
+    public void fitTextTo(final int width, final int height) {
+        final CharSequence text = getText();
+        if (TextUtils.isEmpty(text)) return;
+        setTextScaleX(1.0f);
+        final float textWidth = getTextWidth(text.toString(), getPaint());
+        final float roomW = width * 0.88f;
+        final float roomH = height * 0.9f;
+        final float lineH = getPaint().getFontMetrics(null);
+        final float factor = Math.min(textWidth > roomW ? roomW / textWidth : 1f, lineH > roomH ? roomH / lineH : 1f);
+        if (factor < 1f) setTextSize(TypedValue.COMPLEX_UNIT_PX, getTextSize() * factor);
+    }
+
     public static void clearTextCache() {
         sNoScaleXTextSet.clear();
     }

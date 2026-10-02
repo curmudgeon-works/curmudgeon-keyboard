@@ -86,16 +86,14 @@ public final class KeyPreviewChoreographer {
             final KeyboardIconsSet iconsSet, final KeyDrawParams drawParams,
             final int fullKeyboardViewWidth, final int[] originCoords) {
         keyPreviewView.setPreviewVisual(key, iconsSet, drawParams);
-        keyPreviewView.measure(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        mParams.setGeometry(keyPreviewView);
-        final int previewWidth = keyPreviewView.getMeasuredWidth();
-        final int previewHeight = keyPreviewView.getMeasuredHeight();
-        final int keyDrawWidth = key.getDrawWidth();
-        // The key preview is horizontally aligned with the center of the visible part of the
-        // parent key. If it doesn't fit in this {@link KeyboardView}, it is moved inward to fit and
-        // the left/right background is used if such background is specified.
+        // the bubble is the key's own size, standing on the row above it (like Gboard / the stock keyboard), with a
+        // small gap: every key gets the same bubble, and a wide letter is never squeezed into a narrow one
+        final int previewWidth = key.getDrawWidth();
+        final int previewHeight = key.getHeight();
+        final int gap = Math.max(mParams.mPreviewOffset,
+                Math.round(4 * keyPreviewView.getResources().getDisplayMetrics().density));
         final int keyPreviewPosition;
-        int previewX = key.getDrawX() - (previewWidth - keyDrawWidth) / 2 + CoordinateUtils.x(originCoords);
+        int previewX = key.getDrawX() + CoordinateUtils.x(originCoords);
         if (previewX < 0) {
             previewX = 0;
             keyPreviewPosition = KeyPreviewView.POSITION_LEFT;
@@ -109,11 +107,14 @@ public final class KeyPreviewChoreographer {
         keyPreviewView.setPreviewBackground(hasPopupKeys, keyPreviewPosition);
         final Colors colors = Settings.getValues().mColors;
         colors.setBackground(keyPreviewView, ColorType.KEY_PREVIEW_BACKGROUND);
+        // the background's own padding (made for the old balloon reaching down over the key) is not used
+        keyPreviewView.setPadding(0, 0, 0, 0);
+        keyPreviewView.fitTextTo(previewWidth, previewHeight);
+        keyPreviewView.measure(View.MeasureSpec.makeMeasureSpec(previewWidth, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(previewHeight, View.MeasureSpec.EXACTLY));
+        mParams.setGeometry(keyPreviewView);
 
-        // The key preview is placed vertically above the top edge of the parent key with an
-        // arbitrary offset.
-        final int previewY = key.getY() - previewHeight + key.getHeight() - mParams.mPreviewOffset
-                + CoordinateUtils.y(originCoords);
+        final int previewY = key.getY() - previewHeight - gap + CoordinateUtils.y(originCoords);
 
         ViewLayoutUtils.placeViewAt(keyPreviewView, previewX, previewY, previewWidth, previewHeight);
         keyPreviewView.setPivotX(previewWidth / 2.0f);
