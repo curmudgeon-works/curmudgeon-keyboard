@@ -415,7 +415,10 @@ fun TryItBar(keyboard: SettingsSubtype, state: TryItState, onFocus: (Boolean) ->
                     TryItMode.NUMBER -> KeyboardType.Number
                     TryItMode.PHONE -> KeyboardType.Phone
                     else -> KeyboardType.Text
-                }),
+                }, imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+                // Enter is part of trying the keyboard (e.g. "back to ABC after enter"): it must not close it, which a
+                // one-line field does by default
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { }),
                 modifier = Modifier
                     .weight(1f)
                     .focusRequester(state.focusRequester)
