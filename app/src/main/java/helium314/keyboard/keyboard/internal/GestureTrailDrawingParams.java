@@ -40,6 +40,7 @@ final class GestureTrailDrawingParams {
     public int mTrailLingerDuration;
     // the whole trail (not fading on the way) fades this fast once its time after the lift is up
     private static final int WHOLE_TRAIL_FADEOUT_DURATION = 150; // millisecond
+    private static final int UNTIL_NEXT_TOUCH = 1_000_000_000; // millisecond, ~11 days
 
     public GestureTrailDrawingParams(final TypedArray mainKeyboardViewAttr) {
         mTrailColor = Settings.getValues().mColors.get(ColorType.GESTURE_TRAIL);
@@ -79,7 +80,9 @@ final class GestureTrailDrawingParams {
         mFades = !sv.mGestureTrailWhole;
         if (!GestureTrailDrawingPoints.DEBUG_SHOW_POINTS) {
             // fading: each point after the theme's delay, over the lifespan; whole: all of it, the set time after the lift
-            mFadeoutStartDelay = mFades ? mThemeFadeoutStartDelay : sv.mGestureTrailWholeLinger;
+            // (a negative time: until the next touch only, practically forever)
+            mFadeoutStartDelay = mFades ? mThemeFadeoutStartDelay
+                    : sv.mGestureTrailWholeLinger < 0 ? UNTIL_NEXT_TOUCH : sv.mGestureTrailWholeLinger;
             mFadeoutDuration = mFades ? sv.mGestureTrailFadeoutDuration : WHOLE_TRAIL_FADEOUT_DURATION;
         }
         mTrailLingerDuration = mFadeoutStartDelay + mFadeoutDuration;

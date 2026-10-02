@@ -107,8 +107,10 @@ fun createGestureTypingSettings(context: Context) = listOf(
             default = Defaults.PREF_GESTURE_TRAIL_WHOLE_LINGER,
             range = 0f..3000f,
             stepSize = 100,
-            description = { stringResource(R.string.abbreviation_unit_milliseconds, it.toString()) },
+            description = { if (it < 0) stringResource(R.string.gesture_trail_until_touch)
+                else stringResource(R.string.abbreviation_unit_milliseconds, it.toString()) },
             live = true, applyOnRelease = true, // try it on the preview keyboard with the dialog open
+            offLabel = stringResource(R.string.gesture_trail_never_vanish), offValue = -1, // -1: only the next touch
         )
     },
     Setting(context, Settings.PREF_GESTURE_TRAIL_FADEOUT_DURATION, R.string.gesture_trail_fadeout_duration) { def ->

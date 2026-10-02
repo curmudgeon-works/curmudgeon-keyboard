@@ -119,7 +119,7 @@ fun createToolbarSettings(context: Context) = listOf(
             KeyboardSwitcher.getInstance().setThemeNeedsReload()
         }
     },
-    Setting(context, Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE, R.string.toolbar_swipe_down_to_hide, R.string.toolbar_swipe_down_to_hide_summary) {
+    Setting(context, Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE, R.string.toolbar_swipe_down_to_hide) {
         SwitchPreference(it, Defaults.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE)
     },
     Setting(context, SettingsWithoutKey.TOOLBAR_KEYS_ALL, R.string.toolbar_keys) {
