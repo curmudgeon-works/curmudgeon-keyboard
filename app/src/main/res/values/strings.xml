@@ -186,7 +186,7 @@
     <!-- Description for "gesture_input" option. The user can input a word by tracing the letters of a word without releasing the finger from the screen.-->
     <string name="gesture_input_summary">Type a word by swiping through its letters</string>
     <!-- Option to enable gesture trail preview. The user can see a trail of the gesture during gesture input.-->
-    <string name="gesture_preview_trail">Show swipe trail</string>
+    <string name="gesture_preview_trail">Show full swipe trail</string>
     <!-- Option to enable gesture floating text preview. The user can see a suggested word floating above the keyboard during a gesture input.-->
     <string name="gesture_floating_preview_static">Suggested word follows your finger while swiping</string>
     <!-- Description for "gesture_floating_preview_static" option. The user can see a suggested word floating above the keyboard during a gesture input.-->
@@ -307,6 +307,7 @@
     <string name="swipe_tuning_slowdowns">Slowdowns</string>
     <string name="swipe_tuning_blend">Inflections vs. whole path</string>
     <string name="swipe_tuning_blend_summary">1 = only the inflection points count, 0 = only where the whole path runs</string>
+    <string name="swipe_other">Other swipes</string>
     <string name="swipe_tuning_fast_common">Fast swipes overweight common words</string>
     <string name="swipe_tuning_fast_common_summary">For every key width per second faster than 12, how much more a word\'s commonness counts</string>
     <string name="swipe_tuning_corner_miss">Corner miss allowance</string>

@@ -120,32 +120,45 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
         title = stringResource(R.string.swipe_screen),
         topActions = draft.topActions,
         settings = emptyList(),
-        bottomBar = { androidx.compose.foundation.layout.Box(Modifier.onGloballyPositioned {
-            bottomBarTop = it.positionInWindow().y.toInt()
-            tapReveal.onBarPlaced(bottomBarTop)
-            (ctx.getActivity() as? SettingsActivity)?.touchPassFromY = bottomBarTop
-        }) { TryItBar(keyboard, tryIt, onFocus = preview::onFocus, onUsed = preview::onUsed) } },
     ) {
+        // (a screen with its own content draws its own try-it bar: SearchSettingsScreen's bottomBar is for its list)
+        androidx.compose.material3.Scaffold(contentWindowInsets = WindowInsets(0), bottomBar = {
+            androidx.compose.foundation.layout.Box(Modifier.onGloballyPositioned {
+                bottomBarTop = it.positionInWindow().y.toInt()
+                tapReveal.onBarPlaced(bottomBarTop)
+                (ctx.getActivity() as? SettingsActivity)?.touchPassFromY = bottomBarTop
+            }) { TryItBar(keyboard, tryIt, onFocus = preview::onFocus, onUsed = preview::onUsed) }
+        }) { innerPadding ->
         // the content is taller than a screen now that the gesture typing items are here
-        Column(tapReveal.list.verticalScroll(listScroll).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))) {
+        Column(Modifier.padding(innerPadding).then(tapReveal.list).verticalScroll(listScroll)) {
           androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.preferences.LocalRowStart provides 22.dp) {
-            // ---- what a swipe can do: gesture typing itself (its own screen without the own decoder), then the extras
-            GroupTitle(R.string.swipe_settings)
             val advanced by SettingsMode.state(ctx)
             val gestureOn = prefs.getBoolean(Settings.PREF_GESTURE_INPUT, Defaults.PREF_GESTURE_INPUT)
-            val trailOn = prefs.getBoolean(Settings.PREF_GESTURE_PREVIEW_TRAIL, Defaults.PREF_GESTURE_PREVIEW_TRAIL)
             val capsOn = prefs.getBoolean(Settings.PREF_GESTURE_CAPS_SWIPE, Defaults.PREF_GESTURE_CAPS_SWIPE)
             // a row in italics while it has a change not yet kept with the tick
             @Composable fun Pref(key: String) = androidx.compose.runtime.CompositionLocalProvider(
                 helium314.keyboard.settings.preferences.LocalPendingChange provides (key in draft.pending)) {
                 SettingsActivity.settingsContainer[key]?.Preference()
             }
-            Pref(Settings.PREF_GESTURE_INPUT)
-            if (gestureOn) Pref(Settings.PREF_GESTURE_PREVIEW_TRAIL)
-            if (gestureOn && trailOn) Pref(Settings.PREF_GESTURE_TRAIL_FADEOUT_DURATION)
-            Pref(Settings.PREF_GESTURE_CAPS_SWIPE)
-            // a backspace tap right after a swipe takes the whole swiped word (moved from Layout & Typing)
-            Pref(Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD)
+            // ---- the main switch: off folds away everything about swiped words (settings and tuning); the other
+            // swipes (spacebar, suggestion strip) work when tapping too, and the results stay as history
+            androidx.compose.foundation.layout.Box(Modifier.padding(top = 8.dp)) { Pref(Settings.PREF_GESTURE_INPUT) }
+            helium314.keyboard.settings.AdvancedReveal(gestureOn) { Column {
+                GroupTitle(R.string.swipe_settings)
+                Pref(Settings.PREF_GESTURE_PREVIEW_TRAIL) // (its lifespan: on Others)
+                Pref(Settings.PREF_GESTURE_CAPS_SWIPE)
+                // a backspace tap right after a swipe takes the whole swiped word (moved from Layout & Typing)
+                Pref(Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD)
+                // advanced, last in the group
+                AdvancedTint(advanced) {
+                    Pref(Settings.PREF_GESTURE_FAST_TYPING_COOLDOWN)
+                    if (capsOn) Pref(Settings.PREF_GESTURE_CAPS_HEIGHT)
+                    Pref(Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD)
+                }
+            } }
+
+            // ---- swipes that aren't word-swiping
+            GroupTitle(R.string.swipe_other)
             // on = move cursor, off = nothing; the other spacebar swipe actions are below (advanced)
             val moveCursor = Settings.readHorizontalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.MOVE_CURSOR
             val moveCursorPending = Settings.PREF_SPACE_HORIZONTAL_SWIPE in draft.pending
@@ -158,13 +171,9 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
                         (if (on) KeyboardActionListener.SwipeAction.MOVE_CURSOR else KeyboardActionListener.SwipeAction.NONE).name) }
                 })
             }
-            // advanced, last in the group: the finer points, then every space bar swipe (moved from Advanced) with the
-            // distance / sensitivity their actions use
+            // advanced: swiping down on the suggestion strip (or the toolbar) hides the keyboard (moved from the toolbar
+            // settings), then every space bar swipe (moved from Advanced) with the distance / sensitivity their actions use
             AdvancedTint(advanced) {
-                if (gestureOn) Pref(Settings.PREF_GESTURE_FAST_TYPING_COOLDOWN)
-                if (capsOn) Pref(Settings.PREF_GESTURE_CAPS_HEIGHT)
-                Pref(Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD)
-                // swiping down on the suggestion strip (or the toolbar) hides the keyboard; moved from the toolbar settings
                 Pref(Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE)
                 listOfNotNull(Settings.PREF_SPACE_HORIZONTAL_SWIPE, Settings.PREF_SPACE_VERTICAL_SWIPE,
                     if (Settings.readHorizontalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.SWITCH_LANGUAGE
@@ -175,19 +184,21 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
                 ).forEach { Pref(it) }
             }
 
-            // ---- how the decoder weighs a swipe, and how each weighting did
-            GroupTitle(R.string.swipe_tuning)
-            Text(stringResource(R.string.swipe_tuning_summary), Modifier.padding(start = 22.dp, end = 12.dp, top = 2.dp, bottom = 4.dp),
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            WeightSlider(draft.pending, Settings.PREF_GESTURE_TURN_WEIGHT, Defaults.PREF_GESTURE_TURN_WEIGHT, R.string.swipe_tuning_turns, 0f..1.5f)
-            WeightSlider(draft.pending, Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Defaults.PREF_GESTURE_SLOWDOWN_WEIGHT, R.string.swipe_tuning_slowdowns, 0f..1f)
-            WeightSlider(draft.pending, Settings.PREF_GESTURE_KUSHLER_WEIGHT, Defaults.PREF_GESTURE_KUSHLER_WEIGHT, R.string.swipe_tuning_blend, 0f..1f,
-                R.string.swipe_tuning_blend_summary)
-            BoostSlider(draft.pending)
-            WeightSlider(draft.pending, Settings.PREF_GESTURE_FAST_COMMON_WORDS, Defaults.PREF_GESTURE_FAST_COMMON_WORDS, R.string.swipe_tuning_fast_common,
-                0f..0.2f, R.string.swipe_tuning_fast_common_summary, decimals = 2)
-            WeightSlider(draft.pending, Settings.PREF_GESTURE_CORNER_MISS, Defaults.PREF_GESTURE_CORNER_MISS, R.string.swipe_tuning_corner_miss,
-                0f..0.2f, R.string.swipe_tuning_corner_miss_summary, decimals = 2)
+            // ---- how the decoder weighs a swipe (only while swiping is on), and how each weighting did
+            helium314.keyboard.settings.AdvancedReveal(gestureOn) { Column {
+                GroupTitle(R.string.swipe_tuning)
+                Text(stringResource(R.string.swipe_tuning_summary), Modifier.padding(start = 22.dp, end = 12.dp, top = 2.dp, bottom = 4.dp),
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                WeightSlider(draft.pending, Settings.PREF_GESTURE_TURN_WEIGHT, Defaults.PREF_GESTURE_TURN_WEIGHT, R.string.swipe_tuning_turns, 0f..1.5f)
+                WeightSlider(draft.pending, Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Defaults.PREF_GESTURE_SLOWDOWN_WEIGHT, R.string.swipe_tuning_slowdowns, 0f..1f)
+                WeightSlider(draft.pending, Settings.PREF_GESTURE_KUSHLER_WEIGHT, Defaults.PREF_GESTURE_KUSHLER_WEIGHT, R.string.swipe_tuning_blend, 0f..1f,
+                    R.string.swipe_tuning_blend_summary)
+                BoostSlider(draft.pending)
+                WeightSlider(draft.pending, Settings.PREF_GESTURE_FAST_COMMON_WORDS, Defaults.PREF_GESTURE_FAST_COMMON_WORDS, R.string.swipe_tuning_fast_common,
+                    0f..0.2f, R.string.swipe_tuning_fast_common_summary, decimals = 2)
+                WeightSlider(draft.pending, Settings.PREF_GESTURE_CORNER_MISS, Defaults.PREF_GESTURE_CORNER_MISS, R.string.swipe_tuning_corner_miss,
+                    0f..0.2f, R.string.swipe_tuning_corner_miss_summary, decimals = 2)
+            } }
 
             PreferenceCategory(stringResource(R.string.swipe_tuning_stats))
             if (rows.isEmpty())
@@ -204,7 +215,8 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
                         if (key == recommended) {
                             Text(stringResource(R.string.swipe_tuning_recommended), Modifier.padding(start = 8.dp),
                                 color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
-                            if (!isCurrent) TextButton(onClick = {
+                            // (choosing a tuning means nothing while swiping is off: the results are history then)
+                            if (!isCurrent) TextButton(enabled = gestureOn, onClick = {
                                 OwnGestureDecoder.Tuning.parse(key)?.let { OwnGestureDecoder.Tuning.write(prefs, it) }
                                 (ctx.getActivity() as? SettingsActivity)?.prefChanged()
                             }) { Text(stringResource(R.string.swipe_tuning_use)) }
@@ -223,7 +235,9 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
         }
       }
         }
+        }
     }
+    draft.dialogs()
 }
 
 /** The learned-word boost: whole numbers, shown as the summary explains. */
