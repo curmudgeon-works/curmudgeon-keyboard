@@ -527,54 +527,75 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         return true
     }
 
-    /** Keyboard-themed card floating above the strip: the word, a bin icon and Remove / Cancel. */
+    /**
+     * A keyboard-themed card in the middle of the keyboard, clear of the strip: "Remove “word”?", what removing means,
+     * Cancel / Remove. It doesn't take the focus: a focused window without a text field made Android hide the keyboard,
+     * which hid the card, gave the focus back and showed the keyboard again, in a loop (seen in the settings' preview).
+     */
     private fun showRemoveSuggestionCard(wordView: TextView, word: String) {
         val colors = Settings.getValues().mColors
         val density = resources.displayMetrics.density
         fun dp(v: Int) = (v * density).toInt()
         val card = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(16), dp(10), dp(8), dp(10))
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(20), dp(16), dp(12))
             background = GradientDrawable().apply {
-                cornerRadius = dp(14).toFloat()
+                cornerRadius = dp(20).toFloat()
                 setColor(colors.get(ColorType.MORE_SUGGESTIONS_BACKGROUND))
             }
-            elevation = dp(6).toFloat()
+            elevation = dp(8).toFloat()
+        }
+        val titleRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
         }
         val icon = ImageView(context).apply {
             setImageDrawable(KeyboardIconsSet.instance.getNewDrawable(KeyboardIconsSet.NAME_BIN, context))
             colors.setColor(this, ColorType.REMOVE_SUGGESTION_ICON)
-            layoutParams = LinearLayout.LayoutParams(dp(22), dp(22)).apply { marginEnd = dp(10) }
+            layoutParams = LinearLayout.LayoutParams(dp(24), dp(24)).apply { marginEnd = dp(12) }
         }
-        val label = TextView(context).apply {
+        val title = TextView(context).apply {
             text = context.getString(R.string.remove_suggestion, word)
             setTextColor(colors.get(ColorType.KEY_TEXT))
-            textSize = 15f
-            maxWidth = dp(220)
+            textSize = 19f
+        }
+        titleRow.addView(icon)
+        titleRow.addView(title)
+        // what removing means: it comes back when typed, and what it had learned is gone
+        val message = TextView(context).apply {
+            text = context.getString(R.string.remove_suggestion_message)
+            setTextColor(colors.get(ColorType.KEY_TEXT))
+            alpha = 0.75f
+            textSize = 14f
+            setPadding(0, dp(10), dp(8), dp(4))
         }
         fun button(textId: Int, accent: Boolean, onClick: () -> Unit) = TextView(context).apply {
             text = context.getString(textId).uppercase()
             setTextColor(colors.get(if (accent) ColorType.SUGGESTION_AUTO_CORRECT else ColorType.KEY_TEXT))
-            textSize = 14f
+            textSize = 15f
             typeface = Typeface.DEFAULT_BOLD
-            setPadding(dp(12), dp(8), dp(12), dp(8))
+            setPadding(dp(16), dp(12), dp(16), dp(12))
             setOnClickListener { onClick() }
         }
-        val popup = PopupWindow(card, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, true)
-        card.addView(icon)
-        card.addView(label)
-        card.addView(button(android.R.string.cancel, false) { popup.dismiss() })
-        // the word the card shows: the strip can have changed under it since the long press
-        card.addView(button(R.string.remove, true) { removeSuggestion(word); popup.dismiss() })
-        popup.isOutsideTouchable = true
+        val popup = PopupWindow(card, (width * 0.85f).toInt().coerceAtMost(dp(420)), ViewGroup.LayoutParams.WRAP_CONTENT, false)
+        val buttons = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END
+            // Cancel left, the action right
+            addView(button(android.R.string.cancel, false) { popup.dismiss() })
+            addView(button(R.string.remove, true) { removeSuggestion(word); popup.dismiss() })
+        }
+        card.addView(titleRow)
+        card.addView(message)
+        card.addView(buttons)
+        popup.isOutsideTouchable = true // a tap elsewhere closes it (it gets told without having the focus)
         popup.setOnDismissListener { wordView.isPressed = false }
-        card.measure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.AT_MOST), MeasureSpec.UNSPECIFIED)
-        // centred over the word, just above the strip; clamped to the keyboard's width
-        val location = IntArray(2).also { wordView.getLocationInWindow(it) }
+        // in the middle of the keyboard below the strip
+        card.measure(MeasureSpec.makeMeasureSpec(popup.width, MeasureSpec.EXACTLY), MeasureSpec.UNSPECIFIED)
         val stripLocation = IntArray(2).also { getLocationInWindow(it) }
-        val x = (location[0] + wordView.width / 2 - card.measuredWidth / 2).coerceIn(stripLocation[0], stripLocation[0] + width - card.measuredWidth)
-        val y = stripLocation[1] - card.measuredHeight - dp(6)
+        val keyboardHeight = KeyboardSwitcher.getInstance().mainKeyboardView?.height ?: 0
+        val x = stripLocation[0] + (width - popup.width) / 2
+        val y = stripLocation[1] + height + ((keyboardHeight - card.measuredHeight) / 2).coerceAtLeast(dp(8))
         popup.showAtLocation(this, Gravity.NO_GRAVITY, x, y)
     }
 
