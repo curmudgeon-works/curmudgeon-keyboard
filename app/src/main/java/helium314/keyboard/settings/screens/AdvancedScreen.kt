@@ -106,7 +106,7 @@ fun AdvancedSettingsScreen(
 @SuppressLint("ApplySharedPref")
 fun createAdvancedSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_ALWAYS_INCOGNITO_MODE,
-        R.string.incognito, R.string.prefs_force_incognito_mode_summary)
+        R.string.prefs_force_incognito_mode_summary) // "Disable learning of new words" as the title, no subtext
     {
         SwitchPreference(it, Defaults.PREF_ALWAYS_INCOGNITO_MODE) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
