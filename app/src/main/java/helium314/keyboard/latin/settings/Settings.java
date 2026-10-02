@@ -327,6 +327,17 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
         } finally {
             mSettingsValuesLock.unlock();
         }
+        // swiping on / off and its trail: the keyboard takes them when it starts, so the one already up (the settings
+        // preview) went on swiping (or not) until it was closed and opened again
+        if (PREF_GESTURE_INPUT.equals(key) || PREF_GESTURE_PREVIEW_TRAIL.equals(key)) {
+            final SettingsValues sv = mSettingsValues;
+            final helium314.keyboard.keyboard.MainKeyboardView view = helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().getMainKeyboardView();
+            if (view != null) view.post(() -> view.setGestureHandlingEnabledByUser(sv.mGestureInputEnabled,
+                    sv.mGestureTrailEnabled, sv.mGestureFloatingPreviewTextEnabled));
+            // the swipe vocabulary is otherwise only warmed when the keyboard opens
+            if (sv.mGestureInputEnabled && sv.mLocale != null)
+                helium314.keyboard.latin.gesture.GestureDecoderVocabulary.INSTANCE.getOrBuildAsync(sv.mLocale);
+        }
         if (PREF_ADDITIONAL_SUBTYPES.equals(key)) {
             SubtypeSettings.INSTANCE.reloadEnabledSubtypes(mContext);
         }
