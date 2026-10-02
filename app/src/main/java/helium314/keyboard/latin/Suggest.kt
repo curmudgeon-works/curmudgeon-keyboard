@@ -266,6 +266,7 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
             //  i guess then not mAutoCorrectionEnabledPerUserSettings should be read, but rather some isAutocorrectEnabled()
             // If the word does not allow to be auto-corrected, then we don't auto-correct.
             || !allowsToBeAutoCorrected // If we are doing prediction, then we never auto-correct of course
+            || wordComposer.isManuallyCapitalizedOnly() // a capital the user typed (not the sentence start's): keep the word
             || !wordComposer.isComposingWord // If we don't have suggestion results, we can't evaluate the first suggestion
             // for auto-correction
             || suggestionResults.isEmpty() // If the word has digits, we never auto-correct because it's likely the word
