@@ -180,7 +180,8 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_GESTURE_FAST_TYPING_COOLDOWN = "gesture_fast_typing_cooldown";
     public static final String PREF_GESTURE_TRAIL_FADEOUT_DURATION = "gesture_trail_fadeout_duration";
     public static final String PREF_GESTURE_TRAIL_THICKNESS = "gesture_trail_thickness"; // percent of the theme's width, 0: no trail
-    public static final String PREF_GESTURE_TRAIL_FADES = "gesture_trail_fades"; // off: the whole trail stays until the finger lifts
+    public static final String PREF_GESTURE_TRAIL_WHOLE = "gesture_trail_whole"; // the whole trail stays until the finger lifts (no fading on the way)
+    public static final String PREF_GESTURE_TRAIL_WHOLE_LINGER = "gesture_trail_whole_linger"; // ms it stays after the lift (or until the next touch)
     public static final String PREF_SHOW_SETUP_WIZARD_ICON = "show_setup_wizard_icon";
     public static final String PREF_USE_CONTACTS = "use_contacts";
     public static final String PREF_USE_APPS = "use_apps";
