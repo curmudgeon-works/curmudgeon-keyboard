@@ -53,7 +53,8 @@ import kotlin.math.roundToInt
 
 /** The "Swipe settings" group's preferences (not the decoder weights of "Swipe tuning"). */
 private val swipeSettingKeys = listOf(
-    Settings.PREF_GESTURE_INPUT, Settings.PREF_GESTURE_PREVIEW_TRAIL, Settings.PREF_GESTURE_FAST_TYPING_COOLDOWN,
+    Settings.PREF_GESTURE_INPUT, Settings.PREF_GESTURE_PREVIEW_TRAIL, Settings.PREF_GESTURE_TRAIL_THICKNESS,
+    Settings.PREF_GESTURE_TRAIL_FADES, Settings.PREF_DELETE_SWIPE, Settings.PREF_DELETE_SWIPE_SPEED, Settings.PREF_GESTURE_FAST_TYPING_COOLDOWN,
     Settings.PREF_GESTURE_TRAIL_FADEOUT_DURATION, Settings.PREF_GESTURE_SPACE_AWARE, Settings.PREF_GESTURE_CAPS_SWIPE,
     Settings.PREF_GESTURE_CAPS_HEIGHT, Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD, Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE,
     Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD, Settings.PREF_SPACE_HORIZONTAL_SWIPE, Settings.PREF_SPACE_VERTICAL_SWIPE,
@@ -140,25 +141,24 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
                 helium314.keyboard.settings.preferences.LocalPendingChange provides (key in draft.pending)) {
                 SettingsActivity.settingsContainer[key]?.Preference()
             }
-            // ---- the main switch: off folds away everything about swiped words (settings and tuning); the other
-            // swipes (spacebar, suggestion strip) work when tapping too, and the results stay as history
+            // ---- the main switch: off folds away everything about swiped words (here and the tuning); the other
+            // swipes (spacebar, backspace, suggestion strip) work when tapping too and stay, and the results stay as history
+            val trailFades = prefs.getBoolean(Settings.PREF_GESTURE_TRAIL_FADES, Defaults.PREF_GESTURE_TRAIL_FADES)
             androidx.compose.foundation.layout.Box(Modifier.padding(top = 8.dp)) { Pref(Settings.PREF_GESTURE_INPUT) }
+            GroupTitle(R.string.swipe_settings)
             helium314.keyboard.settings.AdvancedReveal(gestureOn) { Column {
-                GroupTitle(R.string.swipe_settings)
-                Pref(Settings.PREF_GESTURE_PREVIEW_TRAIL) // (its lifespan: on Others)
+                Pref(Settings.PREF_GESTURE_TRAIL_THICKNESS)
+                Pref(Settings.PREF_GESTURE_TRAIL_FADES)
+                // how long a point of the trail stays: under its switch, indented
+                helium314.keyboard.settings.AdvancedReveal(trailFades) {
+                    androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.preferences.LocalRowStart provides 38.dp) {
+                        Pref(Settings.PREF_GESTURE_TRAIL_FADEOUT_DURATION)
+                    }
+                }
                 Pref(Settings.PREF_GESTURE_CAPS_SWIPE)
                 // a backspace tap right after a swipe takes the whole swiped word (moved from Layout & Typing)
                 Pref(Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD)
-                // advanced, last in the group
-                AdvancedTint(advanced) {
-                    Pref(Settings.PREF_GESTURE_FAST_TYPING_COOLDOWN)
-                    if (capsOn) Pref(Settings.PREF_GESTURE_CAPS_HEIGHT)
-                    Pref(Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD)
-                }
             } }
-
-            // ---- swipes that aren't word-swiping
-            GroupTitle(R.string.swipe_other)
             // on = move cursor, off = nothing; the other spacebar swipe actions are below (advanced)
             val moveCursor = Settings.readHorizontalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.MOVE_CURSOR
             val moveCursorPending = Settings.PREF_SPACE_HORIZONTAL_SWIPE in draft.pending
@@ -171,9 +171,17 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
                         (if (on) KeyboardActionListener.SwipeAction.MOVE_CURSOR else KeyboardActionListener.SwipeAction.NONE).name) }
                 })
             }
-            // advanced: swiping down on the suggestion strip (or the toolbar) hides the keyboard (moved from the toolbar
-            // settings), then every space bar swipe (moved from Advanced) with the distance / sensitivity their actions use
+            // advanced, last in the group: the swiped-word details (only while swiping is on), then the swipes that work
+            // when tapping too: from backspace (the same setting as on Layout & Typing), down on the suggestion strip
+            // (moved from the toolbar settings), and every space bar swipe (moved from Advanced) with the distance /
+            // sensitivity their actions use
             AdvancedTint(advanced) {
+                helium314.keyboard.settings.AdvancedReveal(gestureOn) { Column {
+                    Pref(Settings.PREF_GESTURE_FAST_TYPING_COOLDOWN)
+                    if (capsOn) Pref(Settings.PREF_GESTURE_CAPS_HEIGHT)
+                    Pref(Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD)
+                } }
+                Pref(Settings.PREF_DELETE_SWIPE)
                 Pref(Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE)
                 listOfNotNull(Settings.PREF_SPACE_HORIZONTAL_SWIPE, Settings.PREF_SPACE_VERTICAL_SWIPE,
                     if (Settings.readHorizontalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.SWITCH_LANGUAGE

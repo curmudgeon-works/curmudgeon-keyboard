@@ -93,6 +93,7 @@ public final class GestureTrailsDrawingPreview extends AbstractDrawingPreview im
         }
         dirtyRect.setEmpty();
         boolean needsUpdatingGestureTrail = false;
+        mDrawingParams.update();
         // Draw gesture trails to offscreen buffer.
         synchronized (mGestureTrails) {
             // Trails count == fingers count that have ever been active.
