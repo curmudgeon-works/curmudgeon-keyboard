@@ -87,20 +87,21 @@ fun TextCorrectionScreen(
         if (suggestionsEnabled) Settings.PREF_ALWAYS_SHOW_SUGGESTIONS else null,
         if (suggestionsEnabled && prefs.getBoolean(Settings.PREF_ALWAYS_SHOW_SUGGESTIONS, Defaults.PREF_ALWAYS_SHOW_SUGGESTIONS))
             Settings.PREF_ALWAYS_SHOW_SUGGESTIONS_EXCEPT_WEB_TEXT else null,
+        // (right after Show suggestions and the rows indented under it)
+        Settings.PREF_BIGRAM_PREDICTIONS,
+        Settings.PREF_KEY_USE_PERSONALIZED_DICTS,
+        if (prefs.getBoolean(Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Defaults.PREF_KEY_USE_PERSONALIZED_DICTS))
+            Settings.PREF_ADD_TO_PERSONAL_DICTIONARY else null,
+        Settings.PREF_ALWAYS_INCOGNITO_MODE, // (from Advanced; advanced here too) never learn, like incognito fields
         if (suggestionsEnabled) Settings.PREF_CENTER_SUGGESTION_TEXT_TO_ENTER else null,
         if (suggestionsEnabled || autocorrectEnabled) Settings.PREF_SUGGEST_EMOJIS else null,
         if (suggestionsEnabled || autocorrectEnabled) Settings.PREF_INLINE_EMOJI_SEARCH else null,
-        Settings.PREF_KEY_USE_PERSONALIZED_DICTS,
-        Settings.PREF_ALWAYS_INCOGNITO_MODE, // (from Advanced; advanced here too) never learn, like incognito fields
-        Settings.PREF_BIGRAM_PREDICTIONS,
         Settings.PREF_SUGGEST_PUNCTUATION,
         if (prefs.getBoolean(Settings.PREF_SUGGEST_PUNCTUATION, Defaults.PREF_SUGGEST_PUNCTUATION))
             Settings.PREF_PUNCTUATION_SUGGESTIONS else null,
         Settings.PREF_SUGGEST_CLIPBOARD_CONTENT,
         Settings.PREF_USE_CONTACTS,
         Settings.PREF_USE_APPS,
-        if (prefs.getBoolean(Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Defaults.PREF_KEY_USE_PERSONALIZED_DICTS))
-            Settings.PREF_ADD_TO_PERSONAL_DICTIONARY else null
     )
     // every change applies at once and can be tried in the box at the bottom (the keyboard comes up for a moment, as on
     // Appearance); the top bar's tick keeps the changes since the screen opened, the cross undoes them
@@ -152,7 +153,8 @@ fun TextCorrectionScreen(
             Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE,
             Settings.PREF_KEY_USE_DOUBLE_SPACE_PERIOD, Settings.PREF_AUTOSPACE_AFTER_SUGGESTION,
             Settings.PREF_AUTOSPACE_AFTER_GESTURE_TYPING, Settings.PREF_AUTOSPACE_AFTER_PUNCTUATION,
-            Settings.PREF_SHOW_SUGGESTIONS, Settings.PREF_SUGGEST_EMOJIS, Settings.PREF_USE_CONTACTS,
+            Settings.PREF_SHOW_SUGGESTIONS, Settings.PREF_BIGRAM_PREDICTIONS, Settings.PREF_KEY_USE_PERSONALIZED_DICTS,
+            Settings.PREF_SUGGEST_EMOJIS, Settings.PREF_USE_CONTACTS,
             Settings.PREF_ADD_TO_PERSONAL_DICTIONARY,
         ),
     )
@@ -256,14 +258,14 @@ fun createCorrectionSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_ALWAYS_SHOW_SUGGESTIONS,
         R.string.prefs_always_show_suggestions, R.string.prefs_always_show_suggestions_summary
     ) {
-        // depends on Show suggestions (shown only with it on): indented under it
-        Indented { SwitchPreference(it, Defaults.PREF_ALWAYS_SHOW_SUGGESTIONS) }
+        // (shown only with Show suggestions on, right after it)
+        SwitchPreference(it, Defaults.PREF_ALWAYS_SHOW_SUGGESTIONS)
     },
     Setting(context, Settings.PREF_ALWAYS_SHOW_SUGGESTIONS_EXCEPT_WEB_TEXT,
         R.string.prefs_always_show_suggestions_except_web_text, R.string.prefs_always_show_suggestions_except_web_text_summary
     ) {
-        // depends on the one above: one step further in
-        Indented(2) { SwitchPreference(it, Defaults.PREF_ALWAYS_SHOW_SUGGESTIONS_EXCEPT_WEB_TEXT) }
+        // depends on the one above: indented under it
+        Indented { SwitchPreference(it, Defaults.PREF_ALWAYS_SHOW_SUGGESTIONS_EXCEPT_WEB_TEXT) }
     },
     Setting(context, Settings.PREF_KEY_USE_PERSONALIZED_DICTS,
         R.string.use_personalized_dicts, R.string.use_personalized_dicts_summary
