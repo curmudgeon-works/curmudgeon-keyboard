@@ -258,7 +258,8 @@ public class SettingsValues {
         mAutoCorrectEnabled = mAutoCorrectionEnabledPerUserSettings
                 && (mInputAttributes.mInputTypeShouldAutoCorrect || prefs.getBoolean(Settings.PREF_MORE_AUTO_CORRECTION, Defaults.PREF_MORE_AUTO_CORRECTION))
                 && (mUrlDetectionEnabled || !InputTypeUtils.isUriOrEmailType(mInputAttributes.mInputType));
-        mCenterSuggestionTextToEnter = prefs.getBoolean(Settings.PREF_CENTER_SUGGESTION_TEXT_TO_ENTER, Defaults.PREF_CENTER_SUGGESTION_TEXT_TO_ENTER);
+        // the setting is no longer offered (the strip has no middle slot): off, whatever was saved
+        mCenterSuggestionTextToEnter = false;
         mAutoCorrectionThreshold = mAutoCorrectEnabled
                 ? prefs.getFloat(Settings.PREF_AUTO_CORRECT_THRESHOLD, Defaults.PREF_AUTO_CORRECT_THRESHOLD)
                 : Float.MAX_VALUE;
