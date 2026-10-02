@@ -21,9 +21,9 @@ import org.json.JSONObject
 /**
  * A "look" (theme) is the keyboard's styling saved under a name: colours, background pictures, key borders and gaps,
  * key and icon style, icons, fonts. Saved looks are one JSON list in the preferences, shared by all keyboards; a
- * look's background pictures are copies in their own folder (see [PICTURES]). Not in looks: space bar text, the
- * hide-symbols switches and the emoji settings (typing preferences, on Appearance but kept by its Save / Discard
- * only, see [onScreen]).
+ * look's background pictures are copies in their own folder (see [PICTURES]); also the symbols on the keys (the
+ * hide-symbols switches) and the space bar text (since 2026-10-02: a theme saved before keeps the current ones). Not in
+ * looks: the emoji settings (on Appearance but kept by its Save / Discard only, see [onScreen]).
  */
 object AppearanceLooks {
     const val PREF = "appearance_looks"
@@ -41,6 +41,7 @@ object AppearanceLooks {
         Settings.PREF_KEY_HORIZONTAL_GAP, Settings.PREF_KEY_VERTICAL_GAP,
         Settings.PREF_KEY_TEXT_BOLD, Settings.PREF_KEY_TEXT_ITALIC, Settings.PREF_KEY_TEXT_UNDERLINE, Settings.PREF_HINT_FONT_SCALE,
         Settings.PREF_KEY_FONT, Settings.PREF_HINT_FONT, Settings.PREF_SUGGESTION_FONT, Settings.PREF_FONT_FOLLOWS_KEY_TEXT, Settings.PREF_HINT_TEXT_BOLD, Settings.PREF_HINT_TEXT_ITALIC, Settings.PREF_HINT_TEXT_UNDERLINE,
+        Settings.PREF_SPACE_BAR_TEXT, Settings.PREF_SHOW_NUMBER_ROW_HINTS, Settings.PREF_SHOW_HINTS, Settings.PREF_SHOW_POPUP_HINTS,
     )
     // the scales have a key per orientation / fold state, the custom colors one per theme
     private val prefixes = listOf(
@@ -52,7 +53,6 @@ object AppearanceLooks {
 
     // on the Appearance screen but not in looks: its Save / Discard (AppearanceDraft) keeps them too
     private val screenOnlyKeys = setOf(
-        Settings.PREF_SPACE_BAR_TEXT, Settings.PREF_SHOW_NUMBER_ROW_HINTS, Settings.PREF_SHOW_HINTS, Settings.PREF_SHOW_POPUP_HINTS,
         Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT, Settings.PREF_EMOJI_SKIN_TONE, Settings.PREF_SHOW_EMOJI_DESCRIPTIONS,
         PREF_SELECTED, // Discard puts the chosen theme back too
     )
