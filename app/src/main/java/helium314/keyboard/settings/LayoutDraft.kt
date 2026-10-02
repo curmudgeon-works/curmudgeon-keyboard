@@ -115,7 +115,9 @@ class LayoutDraft private constructor(
         fun plain(key: String) = key.replace(profileKey, "")
         fun inScope(plainKey: String) = plainKey in keys || prefixes.any { plainKey.startsWith(it) }
 
-        private fun scoped(ctx: Context): Map<String, Any?> = ctx.realPrefs().all.filterKeys { inScope(plain(it)) }
+        // (with the "at its default" marks of a keyboard's own set, so Discard puts those back too)
+        private fun scoped(ctx: Context): Map<String, Any?> =
+            ctx.realPrefs().all.filterKeys { inScope(plain(it).removePrefix(helium314.keyboard.latin.settings.KeyboardProfiles.TOMBSTONE)) }
 
         private fun layoutsDir(ctx: Context) = File(DeviceProtectedUtils.getFilesDir(ctx), "layouts")
         /** relative path -> size and time, enough to tell a change without reading */

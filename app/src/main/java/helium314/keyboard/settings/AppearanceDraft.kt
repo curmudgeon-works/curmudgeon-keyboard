@@ -36,7 +36,8 @@ class AppearanceDraft private constructor(
 
     /** The preferences whose value differs from the snapshot. */
     fun changedKeys(ctx: Context): Set<String> {
-        val now = currentPrefs(ctx)
+        val now = AppearanceLooks.screenValues(
+            ProfilePreferences(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)) { setId })
         return (now.keys + prefs.keys).filterTo(HashSet()) { !KnownDefaults.same(it, now[it], prefs[it]) }
     }
 
