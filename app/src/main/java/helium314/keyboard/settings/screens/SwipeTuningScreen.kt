@@ -5,6 +5,7 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import helium314.keyboard.settings.AdvancedTint
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
@@ -145,7 +146,17 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
             // ---- the main switch: off folds away everything about swiped words (here and the tuning); the other
             // swipes (spacebar, backspace, suggestion strip) work when tapping too and stay, and the results stay as history
             val wholeTrail = prefs.getBoolean(Settings.PREF_GESTURE_TRAIL_WHOLE, Defaults.PREF_GESTURE_TRAIL_WHOLE)
-            androidx.compose.foundation.layout.Box(Modifier.padding(top = 8.dp)) { Pref(Settings.PREF_GESTURE_INPUT) }
+            // the main switch as a heading of its own (a line above it, the headings' text), its switch at the right
+            androidx.compose.material3.HorizontalDivider(Modifier.padding(top = 8.dp))
+            val setGesture = { on: Boolean -> prefs.edit { putBoolean(Settings.PREF_GESTURE_INPUT, on) } }
+            Row(verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().clickable { setGesture(!gestureOn) }
+                    .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 4.dp)) {
+                Text(stringResource(R.string.gesture_input), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium.let {
+                    if (Settings.PREF_GESTURE_INPUT in draft.pending) it.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic) else it },
+                    color = MaterialTheme.colorScheme.secondary)
+                Switch(checked = gestureOn, onCheckedChange = { setGesture(it) })
+            }
             GroupTitle(R.string.swipe_settings)
             helium314.keyboard.settings.AdvancedReveal(gestureOn) { Column {
                 Pref(Settings.PREF_GESTURE_TRAIL_THICKNESS)
