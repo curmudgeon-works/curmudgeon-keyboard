@@ -166,10 +166,10 @@ fun AppearanceScreen(
         Settings.PREF_ICON_STYLE,
         Settings.PREF_CUSTOM_ICON_NAMES,
         SettingsWithoutKey.FONTS, // keys, symbols, suggestions: one dialog
-        // ---- then the typing preferences (not part of themes)
-        R.string.appearance_group_keys,
-        SettingsWithoutKey.HIDE_ALL_SYMBOLS, // (the per-area rows — number row, other keys, ellipsis — are in the backlog)
+        // (part of themes too since 2026-10-02; the per-area symbol rows are on Others)
+        SettingsWithoutKey.HIDE_ALL_SYMBOLS,
         Settings.PREF_SPACE_BAR_TEXT,
+        // ---- then the emoji preferences (not part of themes)
         R.string.appearance_group_emoji,
         Settings.PREF_EMOJI_FONT_SCALE,
         if (prefs.getFloat(Settings.PREF_EMOJI_FONT_SCALE, Defaults.PREF_EMOJI_FONT_SCALE) != 1f)
