@@ -155,10 +155,11 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
                     helium314.keyboard.settings.AdvancedReveal(!wholeTrail) { Pref(Settings.PREF_GESTURE_TRAIL_FADEOUT_DURATION) }
                     helium314.keyboard.settings.AdvancedReveal(wholeTrail) { Pref(Settings.PREF_GESTURE_TRAIL_WHOLE_LINGER) }
                 }
-                Pref(Settings.PREF_GESTURE_CAPS_SWIPE)
                 // a backspace tap right after a swipe takes the whole swiped word (moved from Layout & Typing)
                 Pref(Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD)
             } }
+            // from backspace: the same setting as on Layout & Typing (one preference, so both always agree)
+            Pref(Settings.PREF_DELETE_SWIPE)
             // on = move cursor, off = nothing; the other spacebar swipe actions are below (advanced)
             val moveCursor = Settings.readHorizontalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.MOVE_CURSOR
             val moveCursorPending = Settings.PREF_SPACE_HORIZONTAL_SWIPE in draft.pending
@@ -171,17 +172,20 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
                         (if (on) KeyboardActionListener.SwipeAction.MOVE_CURSOR else KeyboardActionListener.SwipeAction.NONE).name) }
                 })
             }
-            // from backspace: the same setting as on Layout & Typing (one preference, so both always agree)
-            Pref(Settings.PREF_DELETE_SWIPE)
-            // advanced, last in the group: the swiped-word details (only while swiping is on), then the swipes that work
-            // when tapping too: down on the suggestion strip
+            // advanced, last in the group: the swiped-word details (only while swiping is on; the capitalizing height
+            // under its switch, indented), then the swipes that work when tapping too: down on the suggestion strip
             // (moved from the toolbar settings), and every space bar swipe (moved from Advanced) with the distance /
             // sensitivity their actions use
             AdvancedTint(advanced) {
                 helium314.keyboard.settings.AdvancedReveal(gestureOn) { Column {
-                    Pref(Settings.PREF_GESTURE_FAST_TYPING_COOLDOWN)
-                    if (capsOn) Pref(Settings.PREF_GESTURE_CAPS_HEIGHT)
                     Pref(Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD)
+                    Pref(Settings.PREF_GESTURE_FAST_TYPING_COOLDOWN)
+                    Pref(Settings.PREF_GESTURE_CAPS_SWIPE)
+                    helium314.keyboard.settings.AdvancedReveal(capsOn) {
+                        androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.preferences.LocalRowStart provides 38.dp) {
+                            Pref(Settings.PREF_GESTURE_CAPS_HEIGHT)
+                        }
+                    }
                 } }
                 Pref(Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE)
                 listOfNotNull(Settings.PREF_SPACE_HORIZONTAL_SWIPE, Settings.PREF_SPACE_VERTICAL_SWIPE,
