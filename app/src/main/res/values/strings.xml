@@ -437,6 +437,7 @@
     <string name="keyboards_title">All keyboards</string>
     <!-- Long-press menu on a suggestion, %s is the word -->
     <string name="remove_suggestion">Remove \"%s\" from suggestions?</string>
+    <string name="remove_suggestion_message">It comes back if you type it again. If the keyboard had learned it from your typing, that learning starts over.</string>
     <string name="no_dictionary_short">No dictionary</string>
     <string name="keyboard_languages">Languages</string>
     <string name="key_popups_title">Long-press popups</string>
