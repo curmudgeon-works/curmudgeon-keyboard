@@ -54,7 +54,7 @@ import kotlin.math.roundToInt
 /** The "Swipe settings" group's preferences (not the decoder weights of "Swipe tuning"). */
 private val swipeSettingKeys = listOf(
     Settings.PREF_GESTURE_INPUT, Settings.PREF_GESTURE_PREVIEW_TRAIL, Settings.PREF_GESTURE_TRAIL_THICKNESS,
-    Settings.PREF_GESTURE_TRAIL_WHOLE, Settings.PREF_GESTURE_TRAIL_WHOLE_LINGER, Settings.PREF_DELETE_SWIPE, Settings.PREF_DELETE_SWIPE_SPEED, Settings.PREF_GESTURE_FAST_TYPING_COOLDOWN,
+    Settings.PREF_GESTURE_TRAIL_WHOLE, Settings.PREF_GESTURE_TRAIL_WHOLE_LINGER, Settings.PREF_DELETE_SWIPE, Settings.PREF_DELETE_SWIPE_SPEED, Settings.PREF_AUTOSPACE_AFTER_GESTURE_TYPING, Settings.PREF_GESTURE_FAST_TYPING_COOLDOWN,
     Settings.PREF_GESTURE_TRAIL_FADEOUT_DURATION, Settings.PREF_GESTURE_SPACE_AWARE, Settings.PREF_GESTURE_CAPS_SWIPE,
     Settings.PREF_GESTURE_CAPS_HEIGHT, Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD, Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE,
     Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD, Settings.PREF_SPACE_HORIZONTAL_SWIPE, Settings.PREF_SPACE_VERTICAL_SWIPE,
@@ -157,6 +157,8 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
                 }
                 // a backspace tap right after a swipe takes the whole swiped word (moved from Layout & Typing)
                 Pref(Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD)
+                // the same setting as on Text correction (one preference, so both always agree)
+                Pref(Settings.PREF_AUTOSPACE_AFTER_GESTURE_TYPING)
             } }
             // from backspace: the same setting as on Layout & Typing (one preference, so both always agree)
             Pref(Settings.PREF_DELETE_SWIPE)
