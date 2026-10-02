@@ -79,7 +79,9 @@ fun AdvancedSettingsScreen(
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) Settings.PREF_SHOW_SETUP_WIZARD_ICON else null,
         // (switching back to letters after…: one row with a dialog on Layout & Typing's Typing group)
         // (the physical keyboard's emoji key and the timestamp format: on Others)
+        // settings shared by all keyboards
         Settings.PREF_AUTO_PREVIEW_KEYBOARD, // settings screens bring up the preview keyboard by themselves
+        Settings.PREF_SAVE_SUBTYPE_PER_APP, // which keyboard comes up in an app (moved from Layout & Typing)
         SettingsWithoutKey.BACKUP_RESTORE,
         SettingsWithoutKey.FACTORY_RESET, // advanced only (not in the simple set below): tinted
         if (BuildConfig.DEBUG || prefs.getBoolean(DebugSettings.PREF_SHOW_DEBUG_SETTINGS, Defaults.PREF_SHOW_DEBUG_SETTINGS))

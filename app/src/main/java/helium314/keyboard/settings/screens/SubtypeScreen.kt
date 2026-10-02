@@ -723,7 +723,7 @@ private val previewedSwitches = listOf(
     Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, Settings.PREF_REMOVE_REDUNDANT_POPUPS,
 )
 
-private val advancedInputItems = listOf(Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, SettingsWithoutKey.ABC_AFTER, Settings.PREF_SAVE_SUBTYPE_PER_APP) // (emoji descriptions: Appearance, Emoji group)
+private val advancedInputItems = listOf(Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, SettingsWithoutKey.ABC_AFTER) // (emoji descriptions: Appearance, Emoji group)
 
 /** Advanced items on a slightly different background, so toggling the mode shows what it adds (last in the Input
  *  group, in place elsewhere). */
