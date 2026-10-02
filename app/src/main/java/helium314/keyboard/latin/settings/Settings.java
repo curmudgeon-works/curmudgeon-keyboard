@@ -179,6 +179,8 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_GESTURE_CORNER_MISS = "gesture_corner_miss";
     public static final String PREF_GESTURE_FAST_TYPING_COOLDOWN = "gesture_fast_typing_cooldown";
     public static final String PREF_GESTURE_TRAIL_FADEOUT_DURATION = "gesture_trail_fadeout_duration";
+    public static final String PREF_GESTURE_TRAIL_THICKNESS = "gesture_trail_thickness"; // percent of the theme's width, 0: no trail
+    public static final String PREF_GESTURE_TRAIL_FADES = "gesture_trail_fades"; // off: the whole trail stays until the finger lifts
     public static final String PREF_SHOW_SETUP_WIZARD_ICON = "show_setup_wizard_icon";
     public static final String PREF_USE_CONTACTS = "use_contacts";
     public static final String PREF_USE_APPS = "use_apps";
@@ -329,7 +331,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
         }
         // swiping on / off and its trail: the keyboard takes them when it starts, so the one already up (the settings
         // preview) went on swiping (or not) until it was closed and opened again
-        if (PREF_GESTURE_INPUT.equals(key) || PREF_GESTURE_PREVIEW_TRAIL.equals(key)) {
+        if (PREF_GESTURE_INPUT.equals(key) || PREF_GESTURE_PREVIEW_TRAIL.equals(key) || PREF_GESTURE_TRAIL_THICKNESS.equals(key)) {
             final SettingsValues sv = mSettingsValues;
             final helium314.keyboard.keyboard.MainKeyboardView view = helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().getMainKeyboardView();
             if (view != null) view.post(() -> view.setGestureHandlingEnabledByUser(sv.mGestureInputEnabled,

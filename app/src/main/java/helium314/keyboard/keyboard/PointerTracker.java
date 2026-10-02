@@ -225,6 +225,11 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         return trackers.get(id);
     }
 
+    /** A swipe (gesture typing) is going on: a finger is down and drawing a word. */
+    public static boolean isInGesture() {
+        return sInGesture;
+    }
+
     public static boolean isAnyInDraggingFinger() {
         return sPointerTrackerQueue.isAnyInDraggingFinger();
     }

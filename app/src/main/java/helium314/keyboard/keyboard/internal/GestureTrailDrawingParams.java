@@ -24,22 +24,27 @@ final class GestureTrailDrawingParams {
     private static final int FADEOUT_DURATION_FOR_DEBUG = 200; // millisecond
 
     public final int mTrailColor;
-    public final float mTrailStartWidth;
-    public final float mTrailEndWidth;
+    public float mTrailStartWidth; // the theme's widths times the thickness setting, see update()
+    public float mTrailEndWidth;
+    private final float mThemeStartWidth;
+    private final float mThemeEndWidth;
+    public boolean mFades = true;
     public final float mTrailBodyRatio;
     public final boolean mTrailShadowEnabled;
     public final float mTrailShadowRatio;
     public final int mFadeoutStartDelay;
-    public final int mFadeoutDuration;
+    public int mFadeoutDuration;
     public final int mUpdateInterval;
 
-    public final int mTrailLingerDuration;
+    public int mTrailLingerDuration;
+    // the whole trail (fading off) fades this fast once the finger is lifted
+    private static final int FULL_TRAIL_FADEOUT_DURATION = 250; // millisecond
 
     public GestureTrailDrawingParams(final TypedArray mainKeyboardViewAttr) {
         mTrailColor = Settings.getValues().mColors.get(ColorType.GESTURE_TRAIL);
-        mTrailStartWidth = mainKeyboardViewAttr.getDimension(
+        mThemeStartWidth = mainKeyboardViewAttr.getDimension(
                 R.styleable.MainKeyboardView_gestureTrailStartWidth, 0.0f);
-        mTrailEndWidth = mainKeyboardViewAttr.getDimension(
+        mThemeEndWidth = mainKeyboardViewAttr.getDimension(
                 R.styleable.MainKeyboardView_gestureTrailEndWidth, 0.0f);
         final int PERCENTAGE_INT = 100;
         mTrailBodyRatio = (float)mainKeyboardViewAttr.getInt(
@@ -59,5 +64,19 @@ final class GestureTrailDrawingParams {
         mTrailLingerDuration = mFadeoutStartDelay + mFadeoutDuration;
         mUpdateInterval = mainKeyboardViewAttr.getInt(
                 R.styleable.MainKeyboardView_gestureTrailUpdateInterval, 0);
+        update();
+    }
+
+    /** The trail settings (thickness, fading, lifespan) as they are now: read before every frame, so a change in the
+     *  settings shows on the keyboard already up. */
+    public void update() {
+        final helium314.keyboard.latin.settings.SettingsValues sv = Settings.getValues();
+        final float scale = sv.mGestureTrailThickness / 100f;
+        mTrailStartWidth = mThemeStartWidth * scale;
+        mTrailEndWidth = mThemeEndWidth * scale;
+        mFades = sv.mGestureTrailFades;
+        if (!GestureTrailDrawingPoints.DEBUG_SHOW_POINTS)
+            mFadeoutDuration = mFades ? sv.mGestureTrailFadeoutDuration : FULL_TRAIL_FADEOUT_DURATION;
+        mTrailLingerDuration = mFadeoutStartDelay + mFadeoutDuration;
     }
 }

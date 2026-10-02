@@ -116,6 +116,8 @@ public class SettingsValues {
     public final float mGestureCapsHeight; // in key heights, see Defaults.PREF_GESTURE_CAPS_HEIGHT
     public final String mGestureDecoderScorer; // scorer of the in-tree gesture decoder: hybrid | kushler | location
     public final boolean mGestureTrailEnabled;
+    public final int mGestureTrailThickness; // percent
+    public final boolean mGestureTrailFades;
     public final boolean mGestureFloatingPreviewTextEnabled;
     public final boolean mGestureFloatingPreviewDynamicEnabled;
     public final int mGestureFastTypingCooldown;
@@ -306,7 +308,11 @@ public class SettingsValues {
         mGestureInputEnabled = prefs.getBoolean(Settings.PREF_GESTURE_INPUT, Defaults.PREF_GESTURE_INPUT);
         mGestureDecoderScorer = prefs.getString(DebugSettings.PREF_GESTURE_DECODER_SCORER, Defaults.PREF_GESTURE_DECODER_SCORER);
         mGestureCapsHeight = prefs.getInt(Settings.PREF_GESTURE_CAPS_HEIGHT, Defaults.PREF_GESTURE_CAPS_HEIGHT) / 100f;
-        mGestureTrailEnabled = prefs.getBoolean(Settings.PREF_GESTURE_PREVIEW_TRAIL, Defaults.PREF_GESTURE_PREVIEW_TRAIL);
+        mGestureTrailThickness = prefs.getInt(Settings.PREF_GESTURE_TRAIL_THICKNESS, Defaults.PREF_GESTURE_TRAIL_THICKNESS);
+        // (the old "Show swipe trail" switch is thickness 0 now; see AppUpgrade)
+        mGestureTrailEnabled = prefs.getBoolean(Settings.PREF_GESTURE_PREVIEW_TRAIL, Defaults.PREF_GESTURE_PREVIEW_TRAIL)
+                && mGestureTrailThickness > 0;
+        mGestureTrailFades = prefs.getBoolean(Settings.PREF_GESTURE_TRAIL_FADES, Defaults.PREF_GESTURE_TRAIL_FADES);
         // swiped words show in the suggestion strip only, never floating over the keyboard
         mGestureFloatingPreviewTextEnabled = false;
         mGestureFloatingPreviewDynamicEnabled = false;

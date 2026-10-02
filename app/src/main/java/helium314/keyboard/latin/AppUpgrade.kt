@@ -75,6 +75,14 @@ private fun curmudgeonUpgrades(prefs: SharedPreferences, freshInstall: Boolean) 
             putBoolean("fonts_follow_migrated", true)
         }
     }
+    // 0.3.001: "Show swipe trail" off became trail thickness 0 (the thickness slider's Off); the switch stays on
+    if (!prefs.getBoolean("trail_thickness_migrated", false)) {
+        prefs.edit {
+            if (!prefs.getBoolean(Settings.PREF_GESTURE_PREVIEW_TRAIL, true)) putInt(Settings.PREF_GESTURE_TRAIL_THICKNESS, 0)
+            putBoolean(Settings.PREF_GESTURE_PREVIEW_TRAIL, true)
+            putBoolean("trail_thickness_migrated", true)
+        }
+    }
     // 0.1.004: toolbar mode → Toolbar visibility + Show suggestions (the only suggestions switch)
     if (!prefs.contains(Settings.PREF_TOOLBAR_VISIBILITY) && prefs.contains(Settings.PREF_TOOLBAR_MODE)) {
         val old = prefs.getString(Settings.PREF_TOOLBAR_MODE, null)

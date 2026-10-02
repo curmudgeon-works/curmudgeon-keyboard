@@ -213,6 +213,9 @@
     <!-- The text that represents no cooldown-->
     <string name="gesture_fast_typing_cooldown_instant">Always start instantly</string>
     <!-- Title of the setting to adjust the gesture trail fadeout duration-->
+    <string name="gesture_trail_thickness">Swipe trail thickness</string>
+    <string name="gesture_trail_off">Off</string>
+    <string name="gesture_trail_fades">Swipe trail fades away</string>
     <string name="gesture_trail_fadeout_duration">Swipe trail lifespan</string>
     <!-- Preferences item for enabling clipboard history -->
     <string name="enable_clipboard_history">Enable clipboard history</string>

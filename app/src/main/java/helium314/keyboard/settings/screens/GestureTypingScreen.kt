@@ -83,6 +83,20 @@ fun createGestureTypingSettings(context: Context) = listOf(
             }
         )
     },
+    Setting(context, Settings.PREF_GESTURE_TRAIL_THICKNESS, R.string.gesture_trail_thickness) { def ->
+        SliderPreference(
+            name = def.title,
+            key = def.key,
+            default = Defaults.PREF_GESTURE_TRAIL_THICKNESS,
+            range = 0f..300f,
+            stepSize = 10,
+            description = { if (it <= 0) stringResource(R.string.gesture_trail_off) else "$it%" },
+            live = true, applyOnRelease = true, // try it on the preview keyboard with the dialog open
+        )
+    },
+    Setting(context, Settings.PREF_GESTURE_TRAIL_FADES, R.string.gesture_trail_fades) {
+        SwitchPreference(it, Defaults.PREF_GESTURE_TRAIL_FADES)
+    },
     Setting(context, Settings.PREF_GESTURE_TRAIL_FADEOUT_DURATION, R.string.gesture_trail_fadeout_duration) { def ->
         SliderPreference(
             name = def.title,
@@ -91,6 +105,7 @@ fun createGestureTypingSettings(context: Context) = listOf(
             range = 100f..1900f,
             description = { stringResource(R.string.abbreviation_unit_milliseconds, (it + 100).toString()) },
             stepSize = 10,
+            live = true, applyOnRelease = true,
         ) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
 )
