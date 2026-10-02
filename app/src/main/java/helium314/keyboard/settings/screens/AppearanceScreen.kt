@@ -676,6 +676,14 @@ private fun SavedLooksPreference(setting: Setting) {
 internal class PreviewKeyboard( // (also the Preferences screen's, for the key sound settings)
     private val tryIt: TryItState, private val scope: CoroutineScope, private val showIme: () -> Unit,
     private val reveal: () -> Unit, private val hide: () -> Unit) : PreviewKeyboardHooks {
+    init { latest = java.lang.ref.WeakReference(this) }
+
+    companion object {
+        /** The preview keyboard of the screen opened last: the Save / Discard questions reach it even when composed
+         *  outside the screen's LocalPreviewKeyboard. */
+        var latest: java.lang.ref.WeakReference<PreviewKeyboard>? = null
+    }
+
     private var focused = false
     private var byUs = false // we brought it up, so we take it down
     private var dialogs = 0

@@ -54,7 +54,7 @@ fun UnsavedChangesDialog(onKeepWorking: () -> Unit, onDiscardAndExit: () -> Unit
 private fun NoPreview(content: @Composable () -> Unit) {
     // the preview keyboard goes down with the question and doesn't come back after it (Save: the try-it box got the
     // focus back and the keyboard with it; Discard: the settings put back counted as changes) until a next touch
-    val preview = LocalPreviewKeyboard.current
+    val preview = LocalPreviewKeyboard.current ?: helium314.keyboard.settings.screens.PreviewKeyboard.latest?.get()
     androidx.compose.runtime.DisposableEffect(Unit) { preview?.quiet(); onDispose { preview?.quiet() } }
     CompositionLocalProvider(LocalKeepKeyboard provides false, content = content)
 }
