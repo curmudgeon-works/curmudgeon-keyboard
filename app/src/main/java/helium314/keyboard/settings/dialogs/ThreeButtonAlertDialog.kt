@@ -81,6 +81,10 @@ interface PreviewKeyboardHooks {
  */
 object KeepKeyboardWindows {
     val open = mutableListOf<android.view.Window>()
+    /** Dialog windows with a number box open (SliderValueText): they take keyboard input until it closes. */
+    val typing = mutableSetOf<android.view.Window>()
+    /** Closes the open number box (set while one is open). */
+    var endTyping: (() -> Unit)? = null
     /** Lets the screen below take the focus for [ms] (its keyboard request goes through), then the dialog takes it back. */
     fun stepAside(ms: Long) {
         val w = open.lastOrNull() ?: return
@@ -138,7 +142,8 @@ fun ThreeButtonAlertDialog(
             SideEffect {
                 // the dialog stays focusable (back and outside taps work as usual) but tells the system it has no use
                 // for the keyboard, so the one below stays up; no dim, the keyboard is the preview
-                window?.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
+                if (window != null && window !in KeepKeyboardWindows.typing)
+                    window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
                 window?.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
             }
             // touches outside the dialog go to the window under them: the keyboard gets its taps (typing, emoji tabs);
