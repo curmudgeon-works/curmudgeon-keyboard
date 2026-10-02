@@ -80,8 +80,8 @@ fun TextCorrectionScreen(
         if (gestureEnabled) Settings.PREF_AUTOSPACE_AFTER_GESTURE_TYPING else null, // (also on the Swipe screen)
         if (gestureEnabled) Settings.PREF_AUTOSPACE_BEFORE_GESTURE_TYPING else null,
         Settings.PREF_AUTOSPACE_AFTER_PUNCTUATION,
-        Settings.PREF_KEY_USE_DOUBLE_SPACE_PERIOD,
         Settings.PREF_SHIFT_REMOVES_AUTOSPACE,
+        Settings.PREF_KEY_USE_DOUBLE_SPACE_PERIOD,
         R.string.settings_category_suggestions,
         if (suggestionsVisible) Settings.PREF_SHOW_SUGGESTIONS else null,
         if (suggestionsEnabled) Settings.PREF_ALWAYS_SHOW_SUGGESTIONS else null,
@@ -155,7 +155,7 @@ fun TextCorrectionScreen(
             Settings.PREF_KEY_USE_DOUBLE_SPACE_PERIOD, Settings.PREF_AUTOSPACE_AFTER_SUGGESTION,
             Settings.PREF_AUTOSPACE_AFTER_GESTURE_TYPING, Settings.PREF_AUTOSPACE_AFTER_PUNCTUATION,
             Settings.PREF_SHOW_SUGGESTIONS, Settings.PREF_BIGRAM_PREDICTIONS, Settings.PREF_KEY_USE_PERSONALIZED_DICTS,
-            Settings.PREF_SUGGEST_EMOJIS, Settings.PREF_USE_CONTACTS,
+            // (suggest emojis and contact names: advanced)
             Settings.PREF_ADD_TO_PERSONAL_DICTIONARY,
         ),
     )
@@ -344,7 +344,7 @@ fun createCorrectionSettings(context: Context) = listOf(
         SwitchPreferenceWithEmojiDictWarning(it, Defaults.PREF_SUGGEST_EMOJIS)
     },
     Setting(
-        context, Settings.PREF_INLINE_EMOJI_SEARCH, R.string.inline_emoji_search, R.string.inline_emoji_search_summary) {
+        context, Settings.PREF_INLINE_EMOJI_SEARCH, R.string.inline_emoji_search) {
         SwitchPreferenceWithEmojiDictWarning(it, Defaults.PREF_INLINE_EMOJI_SEARCH)
     },
     Setting(context, Settings.PREF_ADD_TO_PERSONAL_DICTIONARY,
