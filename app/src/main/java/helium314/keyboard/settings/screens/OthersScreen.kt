@@ -40,6 +40,10 @@ fun OthersScreen(onClickBack: () -> Unit) {
         Settings.PREF_UNDO_UNIT,
         Settings.PREF_REDO_UNIT,
         Settings.PREF_CUSTOM_CURRENCY_KEY, // the symbols pages' currency key and its popup
+        // the symbols on the keys area by area (Appearance has the one "Hide symbols on keys" switch for all of them)
+        Settings.PREF_SHOW_NUMBER_ROW_HINTS,
+        Settings.PREF_SHOW_HINTS,
+        Settings.PREF_SHOW_POPUP_HINTS,
     )
     SearchSettingsScreen(
         onClickBack = onClickBack,

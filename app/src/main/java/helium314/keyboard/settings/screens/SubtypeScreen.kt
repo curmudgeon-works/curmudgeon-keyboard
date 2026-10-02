@@ -37,6 +37,13 @@ import helium314.keyboard.settings.dialogs.LocalBottomBarTop
 import helium314.keyboard.settings.dialogs.LocalPreviewKeyboard
 import helium314.keyboard.settings.dialogs.LocalKeepKeyboard
 import kotlin.math.roundToInt
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.runtime.mutableFloatStateOf
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -232,7 +239,28 @@ fun SubtypeScreen(
     val focusManager = LocalFocusManager.current
     val softKeyboard = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
-    val preview = remember { PreviewKeyboard(tryIt, scope, showIme = { softKeyboard?.show() }, reveal = { }) {
+    // the row tapped last is moved above where the preview keyboard will end when a setting brings it up (as on
+    // Appearance): the try-it bar's top as seen with the keyboard up, else computed from the keyboard's own height
+    val view = androidx.compose.ui.platform.LocalView.current
+    var hiddenBarTop by remember { mutableIntStateOf(-1) }
+    var shownBarTop by remember { mutableIntStateOf(-1) }
+    var tapY by remember { mutableIntStateOf(-1) } // window y of the last tap on the list
+    var listTop by remember { mutableFloatStateOf(0f) }
+    fun keyboardLine(): Int {
+        if (shownBarTop > 0) return shownBarTop
+        if (hiddenBarTop <= 0) return Int.MAX_VALUE
+        val strip = ctx.resources.getDimensionPixelSize(R.dimen.config_suggestions_strip_height)
+        return hiddenBarTop - helium314.keyboard.latin.utils.ResourceUtils.getKeyboardHeight(ctx.resources, Settings.getValues()) - strip
+    }
+    val rowClearance = with(LocalDensity.current) { 40.dp.roundToPx() } // the rest of the tapped row below the finger
+    val preview = remember { PreviewKeyboard(tryIt, scope, showIme = { softKeyboard?.show() }, reveal = {
+        val line = keyboardLine()
+        if (tapY > 0 && tapY + rowClearance > line) {
+            val by = (tapY + rowClearance - line).toFloat()
+            tapY -= by.toInt()
+            scope.launch { scrollState.animateScrollBy(by) }
+        }
+    }) {
         focusManager.clearFocus(); softKeyboard?.hide() } }
     var bottomBarTop by remember { mutableIntStateOf(-1) }
     // a switch whose effect shows on the keyboard brings it up for a moment, as on Appearance (dialogs report themselves):
@@ -301,6 +329,8 @@ fun SubtypeScreen(
             bottomBar = {
                 Box(Modifier.onSizeChanged { if (it.height > previewHeight) previewHeight = it.height }.onGloballyPositioned {
                     bottomBarTop = it.positionInWindow().y.roundToInt()
+                    val imeUp = androidx.core.view.ViewCompat.getRootWindowInsets(view)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
+                    if (imeUp) shownBarTop = bottomBarTop else hiddenBarTop = bottomBarTop
                     // the try-it bar stays usable while a key sound dialog is open
                     (ctx.getActivity() as? SettingsActivity)?.touchPassFromY = bottomBarTop
                 }) {
@@ -309,7 +339,14 @@ fun SubtypeScreen(
             }
         ) { innerPadding ->
             Column(
-                modifier = Modifier.verticalScroll(scrollState).padding(horizontal = SCREEN_MARGIN)
+                modifier = Modifier
+                    // where a row was tapped (watched before the row handles it): the reveal above moves it clear
+                    .pointerInput(Unit) { awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        tapY = (down.position.y + listTop).roundToInt()
+                    } }
+                    .onGloballyPositioned { listTop = it.positionInWindow().y }
+                    .verticalScroll(scrollState).padding(horizontal = SCREEN_MARGIN)
                     .then(Modifier.padding(innerPadding))
                     .padding(bottom = with(LocalDensity.current) { reservedBottom.toDp() }),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
