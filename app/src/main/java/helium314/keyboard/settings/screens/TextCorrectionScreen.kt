@@ -295,7 +295,7 @@ fun createCorrectionSettings(context: Context) = listOf(
 
     },
     Setting(context, Settings.PREF_BIGRAM_PREDICTIONS,
-        R.string.bigram_prediction, R.string.bigram_prediction_summary
+        R.string.bigram_prediction
     ) {
         SwitchPreference(it, Defaults.PREF_BIGRAM_PREDICTIONS) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
