@@ -89,6 +89,7 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     // every change applies at once; the top bar's tick keeps the changes since the screen opened, the cross undoes them
     val draft = helium314.keyboard.settings.rememberPrefsDraft("swipe", swipeSettingKeys + swipeTuningKeys, onClickBack)
     var statsGeneration by remember { mutableIntStateOf(0) }
+    var askReset by remember { mutableStateOf<String?>(null) } // the tuning whose results the reset question is about
     val rows = remember(statsGeneration, b?.value) { GestureStats.read(ctx.realPrefs()) }
     val current = OwnGestureDecoder.Tuning.read(prefs)
     val recommended = GestureStats.recommended(rows)
@@ -244,9 +245,24 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
                         pct(row.pickedThird + row.pickedLater), pct(row.deleted)), style = MaterialTheme.typography.bodySmall)
                     if (row.timed > 0)
                         Text(stringResource(R.string.swipe_tuning_time, row.averageMs, row.slowestMs), style = MaterialTheme.typography.bodySmall)
-                    if (isCurrent) TextButton(onClick = { GestureStats.clear(ctx.realPrefs(), key); statsGeneration++ }) {
+                    if (isCurrent) TextButton(onClick = { askReset = key }) {
                         Text(stringResource(R.string.swipe_tuning_reset))
                     }
+                }
+            }
+            // results put aside with "save and start afresh", oldest first, with the days they cover
+            for (saved in remember(statsGeneration) { GestureStats.readSaved(ctx.realPrefs()) }) {
+                val row = saved.row
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(saved.tuningKey, Modifier.weight(1f))
+                        Text(statsDates(row), style = MaterialTheme.typography.labelMedium)
+                    }
+                    fun pct(n: Int) = if (row.swipes == 0) 0 else (100f * n / row.swipes).roundToInt()
+                    Text(stringResource(R.string.swipe_tuning_row, row.swipes, pct(row.kept), pct(row.pickedSecond),
+                        pct(row.pickedThird + row.pickedLater), pct(row.deleted)), style = MaterialTheme.typography.bodySmall)
+                    if (row.timed > 0)
+                        Text(stringResource(R.string.swipe_tuning_time, row.averageMs, row.slowestMs), style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -255,6 +271,29 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
         }
     }
     draft.dialogs()
+    // resetting the current tuning's results: gone for good, or kept as a dated row at the end; either way it counts
+    // from zero again
+    askReset?.let { key ->
+        helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog(
+            onDismissRequest = { askReset = null },
+            title = { Text(stringResource(R.string.swipe_tuning_reset_title)) },
+            content = { Text(stringResource(R.string.swipe_tuning_reset_message)) },
+            neutralButtonText = stringResource(R.string.swipe_tuning_reset_delete),
+            onNeutral = { GestureStats.clear(ctx.realPrefs(), key); statsGeneration++; askReset = null },
+            confirmButtonText = stringResource(R.string.swipe_tuning_reset_save),
+            onConfirmed = { GestureStats.saveAndClear(ctx.realPrefs(), key); statsGeneration++ },
+            keepKeyboard = false,
+        )
+    }
+}
+
+/** The days a row of results covers, e.g. "Sep 28 – Oct 2" ("… – Oct 2" for results counted before dates were kept). */
+@Composable
+private fun statsDates(row: GestureStats.Row): String {
+    val format = java.text.SimpleDateFormat("MMM d", java.util.Locale.getDefault())
+    val to = if (row.last > 0) format.format(java.util.Date(row.last)) else "…"
+    val from = if (row.first > 0) format.format(java.util.Date(row.first)) else "…"
+    return if (from == to) from else "$from – $to"
 }
 
 /** The learned-word boost: whole numbers, shown as the summary explains. */

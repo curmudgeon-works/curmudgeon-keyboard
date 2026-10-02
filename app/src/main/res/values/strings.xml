@@ -332,6 +332,10 @@
     <string name="swipe_tuning_time">Decode time: %1$d ms on average, %2$d ms at most</string>
     <string name="swipe_tuning_use">Use</string>
     <string name="swipe_tuning_reset">Reset these results</string>
+    <string name="swipe_tuning_reset_title">Reset these results?</string>
+    <string name="swipe_tuning_reset_message">Counting starts again from zero. Saving keeps these results as a row at the end of the list, with the dates they cover.</string>
+    <string name="swipe_tuning_reset_delete">Delete permanently</string>
+    <string name="swipe_tuning_reset_save">Save and start afresh</string>
     <string name="swipe_tuning_current">Current setting</string>
     <!-- Preferences item for format for timestamp keycode -->
     <string name="timestamp_format_title">Format for timestamp key</string>
