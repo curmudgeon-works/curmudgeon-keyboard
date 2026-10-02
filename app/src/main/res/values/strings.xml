@@ -112,7 +112,7 @@
     <!-- Description for option to add learned words to system-wide user dictionary -->
     <string name="add_to_personal_dictionary_summary">Use device personal dictionary to store learned words</string>
     <!-- Option name for enabling or disabling the double-space period feature that lets double tap on spacebar insert a period followed by a space -->
-    <string name="use_double_space_period">Double-space period</string>
+    <string name="use_double_space_period">Double-space inserts period &amp; space</string>
     <!-- Description for option enabling or disabling the double-space period feature that lets double tap on spacebar insert a period followed by a space -->
     <string name="use_double_space_period_summary">Double tap on spacebar inserts a period followed by a space</string>
     <!-- Option to enable auto capitalization of sentences -->
@@ -405,7 +405,7 @@
     <!-- Preferences item for inserting space after entering a word using gesture typing -->
     <string name="autospace_after_gesture_typing">Autospace after swiping a word</string>
     <!-- Preferences item for avoiding automatic space insertion by pressing shift -->
-    <string name="shift_removes_autospace">No autospace when pressing shift</string>
+    <string name="shift_removes_autospace">Shift removes pending autospace</string>
     <!-- Description for "autospace_after_punctuation" setting -->
     <string name="shift_removes_autospace_summary">Shift removes pending autospace</string>
     <!-- Preferences item for showing popup keys in long-press popup -->

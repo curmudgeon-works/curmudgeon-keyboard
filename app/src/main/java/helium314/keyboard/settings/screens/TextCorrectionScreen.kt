@@ -188,27 +188,27 @@ fun createCorrectionSettings(context: Context) = listOf(
         }
     },
     Setting(context, Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE,
-        R.string.prefs_block_potentially_offensive_title, R.string.prefs_block_potentially_offensive_summary
+        R.string.prefs_block_potentially_offensive_title
     ) {
         SwitchPreference(it, Defaults.PREF_BLOCK_POTENTIALLY_OFFENSIVE)
     },
     Setting(context, Settings.PREF_AUTO_CORRECTION,
-        R.string.autocorrect, R.string.auto_correction_summary
+        R.string.autocorrect
     ) {
         SwitchPreference(it, Defaults.PREF_AUTO_CORRECTION)
     },
     Setting(context, Settings.PREF_MORE_AUTO_CORRECTION,
-        R.string.more_autocorrect, R.string.more_autocorrect_summary
+        R.string.more_autocorrect
     ) {
         SwitchPreference(it, Defaults.PREF_MORE_AUTO_CORRECTION)
     },
     Setting(context, Settings.PREF_AUTOCORRECT_SHORTCUTS,
-        R.string.auto_correct_shortcuts, R.string.auto_correct_shortcuts_summary
+        R.string.auto_correct_shortcuts
     ) {
         SwitchPreference(it, Defaults.PREF_AUTOCORRECT_SHORTCUTS)
     },
     Setting(context, Settings.PREF_AUTOCORRECT_WITH_DIGITS,
-        R.string.autocorrect_with_digits, R.string.autocorrect_with_digits_summary
+        R.string.autocorrect_with_digits
     ) {
         SwitchPreference(it, Defaults.PREF_AUTOCORRECT_WITH_DIGITS)
     },
@@ -225,17 +225,17 @@ fun createCorrectionSettings(context: Context) = listOf(
         SwitchPreference(it, Defaults.PREF_BACKSPACE_REVERTS_AUTOCORRECT)
     },
     Setting(context, Settings.PREF_AUTO_CAP,
-        R.string.auto_cap, R.string.auto_cap_summary
+        R.string.auto_cap
     ) {
         SwitchPreference(it, Defaults.PREF_AUTO_CAP)
     },
     Setting(context, Settings.PREF_KEY_USE_DOUBLE_SPACE_PERIOD,
-        R.string.use_double_space_period, R.string.use_double_space_period_summary
+        R.string.use_double_space_period
     ) {
         SwitchPreference(it, Defaults.PREF_KEY_USE_DOUBLE_SPACE_PERIOD)
     },
     Setting(context, Settings.PREF_AUTOSPACE_AFTER_PUNCTUATION,
-        R.string.autospace_after_punctuation, R.string.autospace_after_punctuation_summary
+        R.string.autospace_after_punctuation
     ) {
         SwitchPreference(it, Defaults.PREF_AUTOSPACE_AFTER_PUNCTUATION)
     },
@@ -248,7 +248,7 @@ fun createCorrectionSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_AUTOSPACE_BEFORE_GESTURE_TYPING, R.string.autospace_before_gesture_typing) {
         SwitchPreference(it, Defaults.PREF_AUTOSPACE_BEFORE_GESTURE_TYPING)
     },
-    Setting(context, Settings.PREF_SHIFT_REMOVES_AUTOSPACE, R.string.shift_removes_autospace, R.string.shift_removes_autospace_summary) {
+    Setting(context, Settings.PREF_SHIFT_REMOVES_AUTOSPACE, R.string.shift_removes_autospace) {
         SwitchPreference(it, Defaults.PREF_SHIFT_REMOVES_AUTOSPACE)
     },
     Setting(context, Settings.PREF_SHOW_SUGGESTIONS,
