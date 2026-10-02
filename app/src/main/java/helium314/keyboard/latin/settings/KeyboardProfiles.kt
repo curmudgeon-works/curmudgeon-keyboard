@@ -122,10 +122,13 @@ object KeyboardProfiles {
             if (key.startsWith(PREFIX) && key.contains(SEPARATOR)) continue // another set's
             if (!isGlobal(key)) values[key] = value
         }
-        if (fromId != SHARED) for ((key, value) in real.all) {
-            val plain = unprefixedKey(fromId, key)?.takeIf { it != key } ?: continue
-            if (plain.startsWith(TOMBSTONE)) values.remove(plain.removePrefix(TOMBSTONE)) // at its default in the source
-            if (!isGlobal(plain)) values[plain] = value
+        if (fromId != SHARED) {
+            val own = real.all.mapNotNull { (key, value) -> unprefixedKey(fromId, key)?.takeIf { it != key }?.let { it to value } }
+            // first what's at its default in the source (no shared value then), then its own values: a value of its own
+            // wins over a mark left behind (before, the file's order decided)
+            for ((plain, _) in own) if (plain.startsWith(TOMBSTONE)) values.remove(plain.removePrefix(TOMBSTONE))
+            for ((plain, value) in own) if (!isGlobal(plain) && !(plain.startsWith(TOMBSTONE) && own.any { it.first == plain.removePrefix(TOMBSTONE) }))
+                values[plain] = value
         }
         for ((plain, value) in values) {
             // a "default" mark only means something in a keyboard's own set
@@ -269,13 +272,20 @@ object KeyboardProfiles {
         dir.listFiles { f -> profileFileNames.any { f.name.startsWith(it) } }?.forEach { it.delete() }
     }
 
+    /** The backup file names [restoreFiles] can use for set [fromId] (its own, and the plain ones). */
+    fun restoreFileNames(fromId: Int): Set<String> =
+        profileFileNames.flatMap { n -> listOf("", ".framing").flatMap { e -> listOf(n + suffix(fromId) + e, n + e) } }.toSet()
+
     /** Backup restore of one keyboard: its pictures from the backup's files (named for the backup's id [fromId]),
      *  given as name -> bytes, become set [toId]'s. */
     fun restoreFiles(files: Map<String, ByteArray>, fromId: Int, toId: Int) {
         val dir = filesDir ?: return
+        // a backup from before the pictures were per keyboard has only the plain ones (what every keyboard showed)
+        val source = if (fromId != SHARED && profileFileNames.none { files.containsKey(it + suffix(fromId)) }) SHARED else fromId
+        if (profileFileNames.none { files.containsKey(it + suffix(source)) }) return // no pictures in the backup: keep the phone's
         for (name in profileFileNames) for (ext in listOf("", ".framing")) {
             val to = java.io.File(dir, name + suffix(toId) + ext)
-            val bytes = files[name + suffix(fromId) + ext]
+            val bytes = files[name + suffix(source) + ext]
             runCatching { if (bytes != null) to.writeBytes(bytes) else to.delete() }
         }
     }
@@ -320,16 +330,24 @@ class ProfilePreferences(private val real: SharedPreferences, private val active
         && real.contains(KeyboardProfiles.prefixedKey(id(), KeyboardProfiles.TOMBSTONE + key))
 
     override fun getAll(): MutableMap<String, *> {
+        // what the reads give: in a keyboard's own set its values, else the shared ones (not where it's marked "at its
+        // default"); before, the shared fallbacks were missing, and a draft's Discard set those keys to their default
         val id = id()
         val result = HashMap<String, Any?>()
+        val marked = HashSet<String>()
         for ((key, value) in real.all) {
-            val plain = KeyboardProfiles.unprefixedKey(KeyboardProfiles.SHARED, key) ?: continue
-            if (id == KeyboardProfiles.SHARED || KeyboardProfiles.isGlobal(plain)) { if (!(key.startsWith("p") && key.contains("/"))) result[key] = value }
+            if (key.startsWith(KeyboardProfiles.TOMBSTONE)) continue
+            if (key.startsWith("p") && key.contains("/")) continue // a set's own key, below
+            result[key] = value
         }
         if (id != KeyboardProfiles.SHARED) {
-            for ((key, value) in real.all) { KeyboardProfiles.unprefixedKey(id, key)?.let { if (it != key) result[it] = value } }
-            // at their default here: neither the mark nor the shared value
-            result.keys.filter { it.startsWith(KeyboardProfiles.TOMBSTONE) }.forEach { result.remove(it); result.remove(it.removePrefix(KeyboardProfiles.TOMBSTONE)) }
+            val own = HashMap<String, Any?>()
+            for ((key, value) in real.all) {
+                val plain = KeyboardProfiles.unprefixedKey(id, key)?.takeIf { it != key } ?: continue
+                if (plain.startsWith(KeyboardProfiles.TOMBSTONE)) marked.add(plain.removePrefix(KeyboardProfiles.TOMBSTONE)) else own[plain] = value
+            }
+            for (key in marked) if (!KeyboardProfiles.isGlobal(key)) result.remove(key)
+            result.putAll(own) // a value of its own wins over a mark left behind
         }
         return result
     }

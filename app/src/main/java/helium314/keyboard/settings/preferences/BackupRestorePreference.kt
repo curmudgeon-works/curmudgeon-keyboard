@@ -434,6 +434,9 @@ private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: Restore
 /** The backup's preferences replace the phone's, every keyboard's set included. */
 private fun restoreAllSettings(ctx: Context, pending: PendingRestore) {
     Settings.getInstance().stopListener()
+    // the backup's set ids replace the phone's: pictures of the phone's sets would turn up on the backup's keyboards
+    KeyboardProfiles.deleteAllFiles()
+    Settings.clearCachedBackgroundImages()
     ctx.realPrefs().edit {
         clear()
         for ((key, value) in pending.prefs) KeyboardProfiles.put(this, key, value)
@@ -488,6 +491,8 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
     // with their settings: the pictures they had, and the loaded fonts and pictures their settings may name (added to
     // the phone's lists, nothing there replaced)
     val pictureFiles = HashMap<String, ByteArray>()
+    // only the chosen keyboards' pictures are read (each can be a few MB)
+    val wantedPictures = chosen.flatMap { KeyboardProfiles.restoreFileNames(KeyboardProfiles.idIn(backup, it) ?: KeyboardProfiles.SHARED) }.toSet()
     if (withSettings) {
         val deviceProtectedFilesDir = DeviceProtectedUtils.getFilesDir(ctx)
         ZipInputStream(FileInputStream(pending.file)).use { zip ->
@@ -495,7 +500,7 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
             while (entry != null) {
                 val name = entry.name.substringAfter("unprotected${File.separator}", "")
                 when {
-                    name.startsWith("custom_background_image") -> pictureFiles[name] = zip.readBytes()
+                    name in wantedPictures -> pictureFiles[name] = zip.readBytes()
                     name.startsWith("fonts${File.separator}") || name.startsWith("pictures${File.separator}") -> {
                         val target = File(deviceProtectedFilesDir, name)
                         if (!target.exists()) FileUtils.copyStreamToNewFile(zip, target)

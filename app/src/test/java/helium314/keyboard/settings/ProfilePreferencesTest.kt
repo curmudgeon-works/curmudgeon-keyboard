@@ -53,4 +53,32 @@ class ProfilePreferencesTest {
         assertEquals(0, shared.getInt("c", 0))
         assertFalse(real.all.keys.any { it.startsWith(KeyboardProfiles.TOMBSTONE) }) // no mark in the shared set
     }
+
+    @Test fun ownSetListsSharedFallbacksAndOwnValueBeatsStaleMark() {
+        real.edit().putInt("x", 4).putInt("y", 9).commit()
+        val own = set(1)
+        assertEquals(4, own.all["x"]) // read through to the shared value, so a draft's snapshot has it
+        own.edit().remove("y").commit()
+        assertFalse(own.all.containsKey("y"))
+        // a value written straight into the file (Layout & Typing's Discard does) next to a mark left behind
+        real.edit().putInt("p1/y", 6).commit()
+        assertEquals(6, own.getInt("y", 0))
+        assertEquals(6, own.all["y"])
+        KeyboardProfiles.copy(real, 1, 3)
+        assertEquals(6, set(3).getInt("y", 0))
+    }
+
+    @Test fun hotWordKeepsCapitals() {
+        val hw = helium314.keyboard.latin.utils.HotWords
+        val dict = helium314.keyboard.latin.dictionary.Dictionary.DICTIONARY_USER_TYPED
+        hw.clear()
+        repeat(3) { hw.onWordCommitted("hello") }
+        assertEquals("Hello", hw.matching("Hel", dict).first().mWord) // sentence start
+        assertEquals("hello", hw.matching("hel", dict).first().mWord)
+        assertEquals("HELLO", hw.matching("HEL", dict).first().mWord)
+        hw.clear()
+        repeat(3) { hw.onWordCommitted("Curmudgeon") }
+        assertEquals("Curmudgeon", hw.matching("cur", dict).first().mWord) // a name keeps its capital
+        hw.clear()
+    }
 }

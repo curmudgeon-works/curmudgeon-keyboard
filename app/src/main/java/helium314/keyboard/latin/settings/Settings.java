@@ -265,7 +265,10 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
 
     // static cache for background images to avoid potentially slow reload on every settings reload
     // by picture file: the keyboard being edited (settings) and the one on screen can each have their own
-    private final static java.util.HashMap<String, Drawable> sCachedBackgroundImages = new java.util.HashMap<>();
+    // (the last 4 used: a day and a night picture of the keyboard on screen and of the one being edited)
+    private final static java.util.LinkedHashMap<String, Drawable> sCachedBackgroundImages = new java.util.LinkedHashMap<>(8, 0.75f, true) {
+        @Override protected boolean removeEldestEntry(final java.util.Map.Entry<String, Drawable> eldest) { return size() > 4; }
+    };
 
     private static final Settings sInstance = new Settings();
 
