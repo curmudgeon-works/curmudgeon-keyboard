@@ -175,6 +175,8 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_GESTURE_SLOWDOWN_WEIGHT = "gesture_slowdown_weight";
     public static final String PREF_GESTURE_KUSHLER_WEIGHT = "gesture_kushler_weight";
     public static final String PREF_GESTURE_HISTORY_BOOST = "gesture_history_boost";
+    public static final String PREF_GESTURE_FAST_COMMON_WORDS = "gesture_fast_common_words";
+    public static final String PREF_GESTURE_CORNER_MISS = "gesture_corner_miss";
     public static final String PREF_GESTURE_FAST_TYPING_COOLDOWN = "gesture_fast_typing_cooldown";
     public static final String PREF_GESTURE_TRAIL_FADEOUT_DURATION = "gesture_trail_fadeout_duration";
     public static final String PREF_SHOW_SETUP_WIZARD_ICON = "show_setup_wizard_icon";

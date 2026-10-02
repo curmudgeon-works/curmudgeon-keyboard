@@ -31,6 +31,7 @@ class App : Application() {
         // the process died with Appearance open (a crash): its changes that weren't kept are undone
         helium314.keyboard.settings.AppearanceDraft.recoverAfterCrash(this)
         helium314.keyboard.settings.LayoutDraft.recoverAfterCrash(this)
+        helium314.keyboard.settings.PrefsDraft.recoverAfterCrash(this) // Swipe, Text correction
         helium314.keyboard.latin.utils.SettingsEventLog.log("keyboards in the list at start: " +
             SubtypeSettings.getEnabledSubtypes().joinToString { it.locale }, withCaller = false)
         GestureCorpusRecorder.init(this)

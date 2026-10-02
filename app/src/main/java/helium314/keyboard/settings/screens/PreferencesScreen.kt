@@ -172,7 +172,7 @@ fun createPreferencesSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_BACKSPACE_SPEED_UP, R.string.backspace_speed_up) {
         BackspaceSpeedUpPreference(it)
     },
-    Setting(context, Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD, R.string.backspace_deletes_swiped_word, R.string.backspace_deletes_swiped_word_summary) {
+    Setting(context, Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD, R.string.backspace_deletes_swiped_word) {
         SwitchPreference(it, Defaults.PREF_BACKSPACE_DELETES_SWIPED_WORD)
     },
     Setting(context, Settings.PREF_SAVE_SUBTYPE_PER_APP, R.string.save_subtype_per_app) {
