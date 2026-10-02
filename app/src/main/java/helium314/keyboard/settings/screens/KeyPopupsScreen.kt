@@ -240,7 +240,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
             )
         // the deep customization, advanced only: every key's popups (a tab per key group), the keys and popups as JSON
         val advanced by SettingsMode.state(ctx)
-        if (advanced) AdvancedBlock {
+        AdvancedBlock(advanced) {
             // the preset layouts first (with saving the current one), then the full customization under them
             Row(verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth().clickable { showAccentsDialog = true }.heightIn(min = ROW_HEIGHT).padding(vertical = 4.dp).padding(start = 10.dp)) {

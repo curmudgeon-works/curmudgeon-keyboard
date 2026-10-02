@@ -132,7 +132,7 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
         icon = R.drawable.ic_settings_advanced
     ) { NextScreenIcon() }
     // the settings few need (advanced only)
-    if (advanced) AdvancedTint {
+    AdvancedTint(advanced) {
         Preference(
             name = stringResource(R.string.settings_screen_others),
             onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Others) },

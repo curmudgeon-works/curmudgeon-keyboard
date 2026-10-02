@@ -158,20 +158,25 @@ fun SearchSettingsScreen(
                     ) {
                         // advanced-only items (and headings whose items all are) on the advanced tint; not on screens
                         // that are advanced as a whole (empty simple set), whose entry carries the tint instead
-                        val tinting = advanced && !simpleModeKeys.isNullOrEmpty()
+                        // (the tint stays while an item folds away, so not tied to the mode itself)
+                        val tinting = !simpleModeKeys.isNullOrEmpty()
                         fun isAdvanced(item: Any?) = tinting && item is String && item !in simpleModeKeys!!
+                        // every item is composed, the ones the mode hides folded away: the advanced switch unfolds and
+                        // folds them (AdvancedReveal) instead of the list jumping
+                        val shown = shownSettings.toSet()
                         // rows indented under the flush headings (Preference reads it), like Layout & Typing
                         androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.preferences.LocalRowStart provides 22.dp) {
-                        shownSettings.forEachIndexed { index, it ->
+                        settings.forEachIndexed { index, it ->
                             if (it is Int) {
-                                val categoryItems = shownSettings.drop(index + 1).takeWhile { next -> next !is Int }.filterIsInstance<String>()
-                                if (categoryItems.isNotEmpty() && categoryItems.all { item -> isAdvanced(item) })
-                                    AdvancedTint { PreferenceCategory(stringResource(it)) }
-                                else PreferenceCategory(stringResource(it))
+                                val categoryItems = settings.drop(index + 1).takeWhile { next -> next !is Int }.filterIsInstance<String>()
+                                AdvancedReveal(it in shown) {
+                                    if (categoryItems.isNotEmpty() && categoryItems.all { item -> isAdvanced(item) })
+                                        AdvancedTint { PreferenceCategory(stringResource(it)) }
+                                    else PreferenceCategory(stringResource(it))
+                                }
                             } else {
-                                // this only animates appearing prefs
-                                // a solution would be using a list(visible to key)
-                                AnimatedVisibility(visible = it != null) {
+                                // a pref that comes with another's setting appears with the same animation
+                                AdvancedReveal(it != null && it in shown) {
                                     if (it != null) {
                                         val row = remember { TappedRow(BringIntoViewRequester()) }
                                         Box(Modifier.bringIntoViewRequester(row.requester).onGloballyPositioned { row.coords = it }.pointerInput(Unit) {

@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -100,7 +101,8 @@ fun CustomizeIconsDialog(
         onNeutral = { showDeletePrefConfirmDialog = true },
         title = { Text(stringResource(R.string.customize_icons)) },
         content = {
-            LazyColumn(state = state) {
+            // short enough that the preview keyboard stays in view below
+            LazyColumn(state = state, modifier = Modifier.heightIn(max = 220.dp)) {
                 items(iconsAndNames, key = { it.second }) { (iconName, displayName) ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -151,7 +153,8 @@ fun CustomizeIconsDialog(
             content = {
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 64.dp),
-                    state = gridState
+                    state = gridState,
+                    modifier = Modifier.heightIn(max = 220.dp)
                 ) {
                     items(icons, key = { it }) { resId ->
                         val color = if (resId == selectedIcon) MaterialTheme.colorScheme.primary

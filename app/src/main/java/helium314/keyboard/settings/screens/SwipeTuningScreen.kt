@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -49,6 +50,15 @@ import helium314.keyboard.settings.preferences.PreferenceCategory
 import helium314.keyboard.settings.preferences.SliderPreference
 import androidx.core.content.edit
 import kotlin.math.roundToInt
+
+/** The "Swipe settings" group's preferences (not the decoder weights of "Swipe tuning"). */
+private val swipeSettingKeys = listOf(
+    Settings.PREF_GESTURE_INPUT, Settings.PREF_GESTURE_PREVIEW_TRAIL, Settings.PREF_GESTURE_FAST_TYPING_COOLDOWN,
+    Settings.PREF_GESTURE_TRAIL_FADEOUT_DURATION, Settings.PREF_GESTURE_SPACE_AWARE, Settings.PREF_GESTURE_CAPS_SWIPE,
+    Settings.PREF_GESTURE_CAPS_HEIGHT, Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD, Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE,
+    Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD, Settings.PREF_SPACE_HORIZONTAL_SWIPE, Settings.PREF_SPACE_VERTICAL_SWIPE,
+    Settings.PREF_LANGUAGE_SWIPE_DISTANCE, Settings.PREF_TOUCHPAD_SENSITIVITY,
+)
 
 @Composable
 private fun GroupTitle(titleId: Int) = Column {
@@ -85,6 +95,14 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     val preview = remember { PreviewKeyboard(tryIt, scope, showIme = { softKeyboard?.show() }, reveal = tapReveal::reveal) {
         focusManager.clearFocus(); softKeyboard?.hide() } }
     var bottomBarTop by remember { mutableIntStateOf(-1) }
+    // a swipe setting changed (a switch; the dialogs bring the keyboard up themselves) brings it up for a moment to
+    // swipe on, as on Layout & Typing; the decoder weights below don't
+    fun swipeShape() = swipeSettingKeys.map { prefs.all[it] }
+    var lastSwipeShape by remember { mutableStateOf(swipeShape()) }
+    androidx.compose.runtime.LaunchedEffect(b?.value) {
+        val now = swipeShape()
+        if (now != lastSwipeShape) { lastSwipeShape = now; preview.changed(emoji = false) }
+    }
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { (ctx.getActivity() as? SettingsActivity)?.touchPassFromY = Int.MAX_VALUE } }
     androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.dialogs.LocalKeepKeyboard provides true,
         helium314.keyboard.settings.dialogs.LocalPreviewKeyboard provides preview,
@@ -105,20 +123,20 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
             // ---- what a swipe can do: gesture typing itself (its own screen without the own decoder), then the extras
             GroupTitle(R.string.swipe_settings)
             val advanced by SettingsMode.state(ctx)
-            SettingsMode.filter(gestureTypingItems(prefs), gestureTypingSimpleModeKeys, advanced).forEach {
-                if (it !is String) return@forEach
+            gestureTypingItems(prefs).forEach {
+                if (it == null) return@forEach
                 if (it in gestureTypingSimpleModeKeys) SettingsActivity.settingsContainer[it]?.Preference()
-                else AdvancedTint { SettingsActivity.settingsContainer[it]?.Preference() }
+                else AdvancedTint(advanced) { SettingsActivity.settingsContainer[it]?.Preference() }
             }
             SettingsActivity.settingsContainer[Settings.PREF_GESTURE_CAPS_SWIPE]?.Preference()
             if (prefs.getBoolean(Settings.PREF_GESTURE_CAPS_SWIPE, Defaults.PREF_GESTURE_CAPS_SWIPE))
                 SettingsActivity.settingsContainer[Settings.PREF_GESTURE_CAPS_HEIGHT]?.Preference()
             SettingsActivity.settingsContainer[Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD]?.Preference()
             // swiping down on the toolbar / suggestions hides the keyboard (moved from the toolbar settings; advanced)
-            if (advanced && Settings.readToolbarMode(prefs) != helium314.keyboard.latin.utils.ToolbarMode.HIDDEN)
-                AdvancedTint { SettingsActivity.settingsContainer[Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE]?.Preference() }
+            if (Settings.readToolbarMode(prefs) != helium314.keyboard.latin.utils.ToolbarMode.HIDDEN)
+                AdvancedTint(advanced) { SettingsActivity.settingsContainer[Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE]?.Preference() }
             // a backspace tap right after a swipe takes the whole swiped word (moved from Layout & Typing; advanced)
-            if (advanced) AdvancedTint { SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD]?.Preference() }
+            AdvancedTint(advanced) { SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD]?.Preference() }
             // on = move cursor, off = nothing; the other spacebar swipe actions stay in Advanced (shown off here)
             val moveCursor = Settings.readHorizontalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.MOVE_CURSOR
             Row(verticalAlignment = Alignment.CenterVertically,
@@ -134,7 +152,7 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
                 })
             }
             // advanced: every space bar swipe (moved from Advanced), with the distance / sensitivity their actions use
-            if (advanced) AdvancedTint {
+            AdvancedTint(advanced) {
                 listOfNotNull(Settings.PREF_SPACE_HORIZONTAL_SWIPE, Settings.PREF_SPACE_VERTICAL_SWIPE,
                     if (Settings.readHorizontalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.SWITCH_LANGUAGE
                         || Settings.readVerticalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.SWITCH_LANGUAGE)

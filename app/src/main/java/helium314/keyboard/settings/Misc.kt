@@ -183,8 +183,25 @@ val contentTextDirectionStyle = TextStyle(textDirection = TextDirection.Content)
 @Composable
 fun advancedTint() = MaterialTheme.colorScheme.surfaceContainerHigh
 
-/** An advanced-only item (or run of items) on the advanced tint, edge to edge of its parent. */
+/** An advanced-only item (or run of items) on the advanced tint, edge to edge of its parent. With [visible] (the
+ *  advanced mode) it unfolds and folds away with the mode switch instead of popping in and out. */
 @Composable
-fun AdvancedTint(content: @Composable () -> Unit) {
-    Column(Modifier.fillMaxWidth().background(advancedTint())) { content() }
+fun AdvancedTint(visible: Boolean? = null, content: @Composable () -> Unit) {
+    if (visible == null) Column(Modifier.fillMaxWidth().background(advancedTint())) { content() }
+    else AdvancedReveal(visible) { Column(Modifier.fillMaxWidth().background(advancedTint())) { content() } }
 }
+
+/** Rows that come and go with the advanced mode: they unfold downwards (and fade in) when it's turned on, and fold
+ *  up (fading out) when it's turned off, so the rows below slide rather than jump. */
+@Composable
+fun AdvancedReveal(visible: Boolean, content: @Composable () -> Unit) {
+    androidx.compose.animation.AnimatedVisibility(
+        visible = visible,
+        enter = androidx.compose.animation.expandVertically(androidx.compose.animation.core.tween(ADVANCED_ANIM_MS),
+            expandFrom = Alignment.Top) + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(ADVANCED_ANIM_MS)),
+        exit = androidx.compose.animation.shrinkVertically(androidx.compose.animation.core.tween(ADVANCED_ANIM_MS),
+            shrinkTowards = Alignment.Top) + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(ADVANCED_ANIM_MS)),
+    ) { content() }
+}
+
+private const val ADVANCED_ANIM_MS = 280
