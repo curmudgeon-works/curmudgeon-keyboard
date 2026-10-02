@@ -3,7 +3,6 @@ package helium314.keyboard.settings.dialogs
 
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.LocalTextStyle
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -13,7 +12,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextDecoration
 
 /**
  * A slider's value text that can be tapped to type the number instead of dragging. The number is typed in the units
@@ -32,16 +30,17 @@ fun SliderValueText(
     onTyped: (Float) -> Unit,
 ) {
     var editing by remember { mutableStateOf(false) }
+    val preview = LocalPreviewKeyboard.current // the number field takes the keyboard; the preview comes back after
     val text = display(value)
     // two points of the shown scale (the ends, else the middle: an end may read as words, e.g. "Always start instantly")
     val samples = listOf(range.start, (range.start + range.endInclusive) / 2, range.endInclusive)
         .map { it to numberIn(display(it)) }.filter { it.second != null }
-    Text(text, modifier.clickable { editing = true },
-        style = style.copy(textDecoration = TextDecoration.Underline), color = MaterialTheme.colorScheme.primary)
+    // looks like plain text: typing the number is a quiet extra for whoever taps it
+    Text(text, modifier.clickable { editing = true }, style = style)
     if (!editing) return
     val (a, b) = if (samples.size >= 2) samples.first() to samples.last() else null to null
     TextInputDialog(
-        onDismissRequest = { editing = false },
+        onDismissRequest = { editing = false; preview?.restore() },
         onConfirmed = { typed ->
             val n = numberIn(typed) ?: return@TextInputDialog
             val v = if (a != null && b != null && b.second != a.second)

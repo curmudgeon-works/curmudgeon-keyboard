@@ -70,6 +70,8 @@ val LocalPreviewKeyboard = compositionLocalOf<PreviewKeyboardHooks?> { null }
 interface PreviewKeyboardHooks {
     fun dialogOpened(emoji: Boolean, people: Boolean)
     fun dialogClosed()
+    /** A text field inside a previewing dialog took the keyboard and gave it back: bring the preview up again. */
+    fun restore() { }
 }
 
 /** True around settings about emojis: their dialogs preview on the emoji panel instead of the letters. */

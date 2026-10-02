@@ -693,6 +693,7 @@ internal class PreviewKeyboard( // (also the Preferences screen's, for the key s
     }
 
     private var emojiByUs = false // we switched the preview to the emoji panel, so we switch it back
+    private var lastEmoji = false; private var lastPeople = false // what the open dialogs asked to preview
 
     private fun show(emoji: Boolean = false, people: Boolean = false) {
         hideJob?.cancel()
@@ -722,7 +723,8 @@ internal class PreviewKeyboard( // (also the Preferences screen's, for the key s
         hide()
     }
 
-    override fun dialogOpened(emoji: Boolean, people: Boolean) { dialogs++; show(emoji, people) }
+    override fun dialogOpened(emoji: Boolean, people: Boolean) { dialogs++; lastEmoji = emoji; lastPeople = people; show(emoji, people) }
+    override fun restore() { if (dialogs > 0) show(lastEmoji, lastPeople) }
     override fun dialogClosed() {
         dialogs = (dialogs - 1).coerceAtLeast(0)
         if (dialogs == 0) hideIfOurs()
