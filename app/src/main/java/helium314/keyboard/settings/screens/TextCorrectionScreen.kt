@@ -295,7 +295,7 @@ fun createCorrectionSettings(context: Context) = listOf(
     ) {
         SwitchPreference(it, Defaults.PREF_BIGRAM_PREDICTIONS) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
-    Setting(context, Settings.PREF_SUGGEST_PUNCTUATION, R.string.suggest_punctuation, R.string.suggest_punctuation_summary
+    Setting(context, Settings.PREF_SUGGEST_PUNCTUATION, R.string.suggest_punctuation
     ) {
         SwitchPreference(it, Defaults.PREF_SUGGEST_PUNCTUATION) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
@@ -310,12 +310,12 @@ fun createCorrectionSettings(context: Context) = listOf(
         SwitchPreference(it, Defaults.PREF_CENTER_SUGGESTION_TEXT_TO_ENTER)
     },
     Setting(context, Settings.PREF_SUGGEST_CLIPBOARD_CONTENT,
-        R.string.suggest_clipboard_content, R.string.suggest_clipboard_content_summary
+        R.string.suggest_clipboard_content
     ) {
         SwitchPreference(it, Defaults.PREF_SUGGEST_CLIPBOARD_CONTENT)
     },
     Setting(context, Settings.PREF_USE_CONTACTS,
-        R.string.use_contacts_dict, R.string.use_contacts_dict_summary
+        R.string.use_contacts_dict
     ) { setting ->
         val activity = LocalContext.current.getActivity() ?: return@Setting
         var granted by remember { mutableStateOf(PermissionsUtil.checkAllPermissionsGranted(activity, Manifest.permission.READ_CONTACTS)) }
@@ -334,12 +334,12 @@ fun createCorrectionSettings(context: Context) = listOf(
         )
     },
     Setting(context, Settings.PREF_USE_APPS,
-        R.string.use_apps_dict, R.string.use_apps_dict_summary
+        R.string.use_apps_dict
     ) { setting ->
         SwitchPreference(setting, Defaults.PREF_USE_APPS)
     },
     Setting(
-        context, Settings.PREF_SUGGEST_EMOJIS, R.string.suggest_emojis, R.string.suggest_emojis_summary
+        context, Settings.PREF_SUGGEST_EMOJIS, R.string.suggest_emojis
     ) {
         SwitchPreferenceWithEmojiDictWarning(it, Defaults.PREF_SUGGEST_EMOJIS)
     },
