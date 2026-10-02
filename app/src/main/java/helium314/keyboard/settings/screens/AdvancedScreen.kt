@@ -73,6 +73,7 @@ fun AdvancedSettingsScreen(
     if ((b?.value ?: 0) < 0)
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
     val items = listOf(
+        SettingsWithoutKey.BACKUP_RESTORE, // first
         // (force incognito: on Text correction, next to learning from what you type)
         // (on Layout & Typing: long-press delay and symbols-key numpad (Typing), space key changes input method
         //  (Layout), delete swipe (Backspace); space bar swipes on Swiping; "more diacritics" is the popup presets)
@@ -82,8 +83,7 @@ fun AdvancedSettingsScreen(
         // settings shared by all keyboards
         Settings.PREF_AUTO_PREVIEW_KEYBOARD, // settings screens bring up the preview keyboard by themselves
         Settings.PREF_SAVE_SUBTYPE_PER_APP, // which keyboard comes up in an app (moved from Layout & Typing)
-        SettingsWithoutKey.BACKUP_RESTORE,
-        SettingsWithoutKey.FACTORY_RESET, // advanced only (not in the simple set below): tinted
+        SettingsWithoutKey.FACTORY_RESET,
         if (BuildConfig.DEBUG || prefs.getBoolean(DebugSettings.PREF_SHOW_DEBUG_SETTINGS, Defaults.PREF_SHOW_DEBUG_SETTINGS))
             SettingsWithoutKey.DEBUG_SETTINGS else null,
         R.string.settings_category_experimental,
@@ -96,10 +96,8 @@ fun AdvancedSettingsScreen(
         onClickBack = onClickBack,
         title = stringResource(R.string.settings_screen_advanced),
         settings = items,
-        simpleModeKeys = setOf(
-            SettingsWithoutKey.BACKUP_RESTORE,
-            DebugSettings.PREF_SHOW_DEBUG_SETTINGS, SettingsWithoutKey.DEBUG_SETTINGS,
-        ),
+        // (no simple set: the screen as a whole is advanced, its entry on the main screen shows only in advanced mode;
+        // everything in it shows, untinted)
     )
 }
 
