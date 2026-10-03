@@ -125,7 +125,6 @@ public class SettingsValues {
     public final int mGestureTrailFadeoutDuration;
     public final boolean mSlidingKeyInputPreviewEnabled;
     public final int mKeyLongpressTimeout;
-    public final boolean mEnableEmojiAltPhysicalKey;
     public final boolean mIsSplitKeyboardEnabled;
     public final float mSplitKeyboardSpacerRelativeWidth;
     public final int mScreenMetrics;
@@ -302,7 +301,6 @@ public class SettingsValues {
         mKeypressVibrationDuration = prefs.getInt(Settings.PREF_VIBRATION_DURATION_SETTINGS, Defaults.PREF_VIBRATION_DURATION_SETTINGS);
         mKeypressSoundVolume = prefs.getFloat(Settings.PREF_KEYPRESS_SOUND_VOLUME, Defaults.PREF_KEYPRESS_SOUND_VOLUME);
         mKeypressSound = prefs.getString(Settings.PREF_KEYPRESS_SOUND, Defaults.PREF_KEYPRESS_SOUND);
-        mEnableEmojiAltPhysicalKey = prefs.getBoolean(Settings.PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY, Defaults.PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY);
         mGestureInputEnabled = prefs.getBoolean(Settings.PREF_GESTURE_INPUT, Defaults.PREF_GESTURE_INPUT);
         mGestureDecoderScorer = prefs.getString(DebugSettings.PREF_GESTURE_DECODER_SCORER, Defaults.PREF_GESTURE_DECODER_SCORER);
         mGestureCapsHeight = prefs.getInt(Settings.PREF_GESTURE_CAPS_HEIGHT, Defaults.PREF_GESTURE_CAPS_HEIGHT) / 100f;

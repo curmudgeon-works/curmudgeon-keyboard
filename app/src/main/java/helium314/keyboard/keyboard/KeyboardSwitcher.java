@@ -207,20 +207,11 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         }
     }
 
-    /** The settings' currency dialog: the keyboard (up now, or once it starts within a second) shows the symbols page. */
-    public void openSymbolsOnStart() {
-        sPendingPanel = 4;
-        sPendingPanelTime = android.os.SystemClock.uptimeMillis();
-        if (getKeyboardSwitchState() != KeyboardSwitchState.HIDDEN && getKeyboardSwitchState() != KeyboardSwitchState.SYMBOLS_SHIFTED)
-            setSymbolsKeyboard();
-    }
-
     private void applyPendingPanel() {
         final int panel = sPendingPanel;
         sPendingPanel = 0;
         if (panel == 0 || android.os.SystemClock.uptimeMillis() - sPendingPanelTime > 1000) return;
-        if (panel == 4) setSymbolsKeyboard();
-        else if (panel == 2) setClipboardKeyboard();
+        if (panel == 2) setClipboardKeyboard();
         else { setEmojiKeyboard(); if (panel == 3) mEmojiPalettesView.showPeopleCategory(); }
     }
 

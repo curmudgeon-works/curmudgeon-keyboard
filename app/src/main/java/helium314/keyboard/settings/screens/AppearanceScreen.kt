@@ -771,14 +771,6 @@ internal class PreviewKeyboard( // (also the Preferences screen's, for the key s
         byUs = false
     }
 
-    override fun symbolsChanged() {
-        if (dialogs > 0 || isQuiet()) return
-        runCatching { KeyboardSwitcher.getInstance().openSymbolsOnStart() }
-        emojiByUs = true // (switched back to the letters when it goes, like the emoji panel)
-        show()
-        hideJob = scope.launch { delay(3000); hideIfOurs() }
-    }
-
     fun changed(emoji: Boolean) {
         if (dialogs > 0 || isQuiet()) return
         show(emoji)

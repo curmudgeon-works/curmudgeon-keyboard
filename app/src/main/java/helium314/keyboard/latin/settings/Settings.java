@@ -68,7 +68,6 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_USER_MORE_COLORS_PREFIX = "user_more_colors_";
 
     public static final String PREF_CUSTOM_ICON_NAMES = "custom_icon_names";
-    public static final String PREF_TOOLBAR_CUSTOM_KEY_CODES = "toolbar_custom_key_codes";
     public static final String PREF_LAYOUT_PREFIX = "layout_";
 
     public static final String PREF_AUTO_CAP = "auto_cap";
@@ -166,7 +165,6 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_KEYPRESS_SOUND_VOLUME = "keypress_sound_volume";
     public static final String PREF_KEYPRESS_SOUND = "keypress_sound";
     public static final String PREF_KEY_LONGPRESS_TIMEOUT = "key_longpress_timeout";
-    public static final String PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY = "enable_emoji_alt_physical_key";
     public static final String PREF_GESTURE_PREVIEW_TRAIL = "gesture_preview_trail";
     public static final String PREF_GESTURE_SPACE_AWARE = "gesture_space_aware";
     public static final String PREF_GESTURE_CAPS_HEIGHT = "gesture_caps_height";
@@ -196,7 +194,6 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_SHOW_NUMBER_ROW_IN_SYMBOLS = "show_number_row_in_symbols";
     public static final String PREF_LOCALIZED_NUMBER_ROW = "localized_number_row";
     public static final String PREF_SHOW_NUMBER_ROW_HINTS = "show_number_row_hints";
-    public static final String PREF_CUSTOM_CURRENCY_KEY = "custom_currency_key";
 
     public static final String PREF_SHOW_HINTS = "show_hints";
     public static final String PREF_POPUP_KEYS_ORDER = "popup_keys_order";
@@ -235,7 +232,6 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_ABC_AFTER_NUMPAD_SPACE = "abc_after_numpad_space";
     public static final String PREF_REMOVE_REDUNDANT_POPUPS = "remove_redundant_popups";
     public static final String PREF_SPACE_BAR_TEXT = "space_bar_text";
-    public static final String PREF_TIMESTAMP_FORMAT = "timestamp_format";
     public static final String PREF_UNDO_HISTORY_LENGTH = "undo_history_length";
     public static final String PREF_UNDO_UNIT = "undo_unit";
     public static final String PREF_REDO_UNIT = "redo_unit";
@@ -326,7 +322,6 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
                 Log.w(TAG, "onSharedPreferenceChanged called before loadSettings.");
                 return;
             }
-            ToolbarUtilsKt.clearCustomToolbarKeyCodes();
             loadSettings(mContext, mSettingsValues.mLocale, mSettingsValues.mInputAttributes);
             // key-press vibration and sound keep their own copy: without this the keyboard already up (e.g. the
             // settings preview) went on with the old values until it restarted
@@ -625,18 +620,6 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
 
     public String getInLocale(@StringRes final int resId, final Locale locale) {
         return RunInLocaleKt.runInLocale(mContext, locale, (ctx) -> ctx.getString(resId));
-    }
-
-    public String readCustomCurrencyKey() {
-        return mPrefs.getString(PREF_CUSTOM_CURRENCY_KEY, Defaults.PREF_CUSTOM_CURRENCY_KEY);
-    }
-
-    public Integer getCustomToolbarKeyCode(ToolbarKey key) {
-        return ToolbarUtilsKt.getCustomKeyCode(key, mPrefs);
-    }
-
-    public Integer getCustomToolbarLongpressCode(ToolbarKey key) {
-        return ToolbarUtilsKt.getCustomLongpressKeyCode(key, mPrefs);
     }
 
     public static File getCustomFontFile(final Context context) {
