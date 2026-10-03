@@ -88,6 +88,9 @@
     <!-- Option to show shortcut key to emoji palettes -->
     <!-- Keyboards: press and hold a keyboard > Rename (empty: its languages' name again) -->
     <string name="rename_keyboard">Rename</string>
+    <!-- Keyboards > Add keyboard (separate settings): where the new keyboard's settings come from -->
+    <string name="new_keyboard_copy_settings">Settings for %s: copy from</string>
+    <string name="new_keyboard_default_settings">Default settings</string>
     <string name="show_emoji_key">Emoji key</string>
     <!-- Layout & Typing: a microphone key right of the space bar -->
     <string name="show_voice_key">Voice input key</string>
