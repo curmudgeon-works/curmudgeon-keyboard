@@ -15,7 +15,7 @@ import helium314.keyboard.settings.SearchSettingsScreen
 import helium314.keyboard.settings.SettingsActivity
 
 /**
- * Settings few people need, kept out of the way (advanced only): pinning a toolbar key by long-press (only for a toolbar that opens with the arrow), custom toolbar key codes, the
+ * Settings few people need, kept out of the way (advanced only): custom toolbar key codes, the
  * toolbar reversed for right-to-left languages, the emoji key of a physical keyboard, the timestamp key's format, the
  * currencies on the symbols pages' currency key.
  */
@@ -24,9 +24,8 @@ fun OthersScreen(onClickBack: () -> Unit) {
     val prefs = LocalContext.current.prefs()
     val b = (LocalContext.current.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
     if ((b?.value ?: 0) < 0) Log.v("irrelevant", "recompose on preference change")
-    val expandable = Settings.readToolbarMode(prefs) == ToolbarMode.EXPANDABLE
     val items = listOf(
-        if (expandable) Settings.PREF_QUICK_PIN_TOOLBAR_KEYS else null,
+        // (pin toolbar key on long press: a checkbox in Select toolbar keys)
         Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES, // what a toolbar key sends on tap / long-press
         if (Settings.readToolbarMode(prefs) != ToolbarMode.HIDDEN) Settings.PREF_VARIABLE_TOOLBAR_DIRECTION else null,
         Settings.PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY,
