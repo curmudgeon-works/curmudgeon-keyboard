@@ -15,6 +15,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
+import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
+import helium314.keyboard.latin.utils.realPrefs
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.LocalContentColor
@@ -127,92 +131,112 @@ fun ColorsScreen(
         val uri = result.data?.data ?: return@rememberLauncherForActivityResult
         ctx.getActivity()?.contentResolver?.openOutputStream(uri)?.writer()?.use { it.write(getColorString(prefs, newThemeName.text)) }
     }
-    SearchScreen(
-        title = {
-            var nameValid by rememberSaveable { mutableStateOf(true) }
-            var nameField by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(newThemeName) }
-            TextField(
-                value = nameField,
-                onValueChange = {
-                    nameValid = KeyboardTheme.renameUserColors(newThemeName.text, it.text, prefs)
-                    if (nameValid) {
-                        newThemeName = it
-                        SettingsActivity.forceTheme = newThemeName.text
-                    }
-                    nameField = it
-                },
-                isError = !nameValid,
-//                supportingText = { if (!nameValid) Text(stringResource(R.string.name_invalid)) } // todo: this is cutting off bottom half of the actual text...
-                trailingIcon = { if (!nameValid) CloseIcon(R.string.name_invalid) },
-                singleLine = true,
-                textStyle = contentTextDirectionStyle,
-            )
-        },
-        menu = listOf(
-            stringResource(R.string.main_colors) to { KeyboardTheme.writeUserMoreColors(prefs, newThemeName.text, 0) },
-            stringResource(R.string.more_colors) to { KeyboardTheme.writeUserMoreColors(prefs, newThemeName.text, 1) },
-            stringResource(R.string.all_colors) to { KeyboardTheme.writeUserMoreColors(prefs, newThemeName.text, 2) },
-            stringResource(R.string.button_save_file) to {
-                val intent = Intent(Intent.ACTION_CREATE_DOCUMENT)
-                    .addCategory(Intent.CATEGORY_OPENABLE)
-                    .putExtra(Intent.EXTRA_TITLE,"${newThemeName.text}.json")
-                    .setType("application/json")
-                saveLauncher.launch(intent)
-            },
-            stringResource(R.string.copy_to_clipboard) to {
-                val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                cm.setPrimaryClip(ClipData.newPlainText("Curmudgeon theme", getColorString(prefs, newThemeName.text)))
-            },
-        ),
-        onClickBack = onClickBack,
-        filteredItems = { search ->
-            val result = shownColors.filter { color ->
-                color.displayName.split(" ", "_").any { it.startsWith(search, true) }
-            }
-            if (moreColors == 2) result.toMutableList<ColorSetting?>().apply { add(0, null) }
-            else result
-        },
-        itemContent = { colorSetting ->
-            if (colorSetting == null)
-                Text( // not a colorSetting, but still best done as part of the list
-                    stringResource(R.string.all_colors_warning),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            else
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .clickable { chosenColorString = Json.encodeToString(colorSetting) }
-                ) {
-                    Spacer(
-                        modifier = Modifier
-                            .background(Color(colorSetting.displayColor()), shape = CircleShape)
-                            .size(50.dp)
-                    )
-                    Column(Modifier
-                        .weight(1f)
-                        .padding(horizontal = 16.dp)) {
-                        Text(colorSetting.displayName)
-                        if (colorSetting.auto == true)
-                            CompositionLocalProvider(
-                                LocalTextStyle provides MaterialTheme.typography.bodyMedium,
-                                LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant
-                            ) {
-                                Text(stringResource(R.string.auto_user_color))
+    // a try-it box at the bottom, like Appearance's: the keyboard shows the colours being edited (forced while this
+    // screen is open) and comes up for a moment after each change
+    val tryIt = remember { TryItState() }
+    val scope = rememberCoroutineScope()
+    val softKeyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    val preview = remember { PreviewKeyboard(tryIt, scope, showIme = { softKeyboard?.show() }, reveal = { }) {
+        focusManager.clearFocus(force = true); softKeyboard?.hide() } }
+    val previewKeyboard = helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(ctx.realPrefs())
+        ?: helium314.keyboard.latin.utils.SubtypeSettings.getSelectedSubtype(prefs).toSettingsSubtype()
+    androidx.compose.material3.Scaffold(
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0),
+        bottomBar = { TryItBar(previewKeyboard, tryIt, onFocus = preview::onFocus, onUsed = preview::onUsed) },
+    ) { inner ->
+    androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.padding(inner)) {
+    CompositionLocalProvider(helium314.keyboard.settings.dialogs.LocalPreviewKeyboard provides preview) {
+            SearchScreen(
+                title = {
+                    var nameValid by rememberSaveable { mutableStateOf(true) }
+                    var nameField by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(newThemeName) }
+                    TextField(
+                        value = nameField,
+                        onValueChange = {
+                            nameValid = KeyboardTheme.renameUserColors(newThemeName.text, it.text, prefs)
+                            if (nameValid) {
+                                newThemeName = it
+                                SettingsActivity.forceTheme = newThemeName.text
                             }
+                            nameField = it
+                        },
+                        isError = !nameValid,
+        //                supportingText = { if (!nameValid) Text(stringResource(R.string.name_invalid)) } // todo: this is cutting off bottom half of the actual text...
+                        trailingIcon = { if (!nameValid) CloseIcon(R.string.name_invalid) },
+                        singleLine = true,
+                        textStyle = contentTextDirectionStyle,
+                    )
+                },
+                menu = listOf(
+                    stringResource(R.string.main_colors) to { KeyboardTheme.writeUserMoreColors(prefs, newThemeName.text, 0) },
+                    stringResource(R.string.more_colors) to { KeyboardTheme.writeUserMoreColors(prefs, newThemeName.text, 1) },
+                    stringResource(R.string.all_colors) to { KeyboardTheme.writeUserMoreColors(prefs, newThemeName.text, 2) },
+                    stringResource(R.string.button_save_file) to {
+                        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT)
+                            .addCategory(Intent.CATEGORY_OPENABLE)
+                            .putExtra(Intent.EXTRA_TITLE,"${newThemeName.text}.json")
+                            .setType("application/json")
+                        saveLauncher.launch(intent)
+                    },
+                    stringResource(R.string.copy_to_clipboard) to {
+                        val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        cm.setPrimaryClip(ClipData.newPlainText("Curmudgeon theme", getColorString(prefs, newThemeName.text)))
+                    },
+                ),
+                onClickBack = onClickBack,
+                filteredItems = { search ->
+                    val result = shownColors.filter { color ->
+                        color.displayName.split(" ", "_").any { it.startsWith(search, true) }
                     }
-                    if (colorSetting.auto != null)
-                        Switch(colorSetting.auto, onCheckedChange = { checked ->
-                            val oldUserColors = KeyboardTheme.readUserColors(prefs, newThemeName.text)
-                            val newUserColors = (oldUserColors + ColorSetting(colorSetting.name, checked, colorSetting.color))
-                                .reversed().distinctBy { it.displayName }
-                            KeyboardTheme.writeUserColors(prefs, newThemeName.text, newUserColors)
-                        })
+                    if (moreColors == 2) result.toMutableList<ColorSetting?>().apply { add(0, null) }
+                    else result
+                },
+                itemContent = { colorSetting ->
+                    if (colorSetting == null)
+                        Text( // not a colorSetting, but still best done as part of the list
+                            stringResource(R.string.all_colors_warning),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    else
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .clickable { chosenColorString = Json.encodeToString(colorSetting) }
+                        ) {
+                            Spacer(
+                                modifier = Modifier
+                                    .background(Color(colorSetting.displayColor()), shape = CircleShape)
+                                    .size(50.dp)
+                            )
+                            Column(Modifier
+                                .weight(1f)
+                                .padding(horizontal = 16.dp)) {
+                                Text(colorSetting.displayName)
+                                if (colorSetting.auto == true)
+                                    CompositionLocalProvider(
+                                        LocalTextStyle provides MaterialTheme.typography.bodyMedium,
+                                        LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant
+                                    ) {
+                                        Text(stringResource(R.string.auto_user_color))
+                                    }
+                            }
+                            if (colorSetting.auto != null)
+                                Switch(colorSetting.auto, onCheckedChange = { checked ->
+                                    val oldUserColors = KeyboardTheme.readUserColors(prefs, newThemeName.text)
+                                    val newUserColors = (oldUserColors + ColorSetting(colorSetting.name, checked, colorSetting.color))
+                                        .reversed().distinctBy { it.displayName }
+                                    KeyboardTheme.writeUserColors(prefs, newThemeName.text, newUserColors)
+                                    preview.changed(emoji = false)
+                                })
+                        }
                 }
-        }
-    )
+            )
+    }
+    }
+    }
     if (chosenColor != null) {
         val oldAllColors = KeyboardTheme.readUserAllColors(prefs, newThemeName.text, null)
         ColorPickerDialog(
@@ -224,6 +248,7 @@ fun ColorsScreen(
                 // clear the color
                 oldAllColors.remove(ColorType.valueOf(chosenColor.name))
                 KeyboardTheme.writeUserAllColors(prefs, newThemeName.text, oldAllColors)
+                preview.changed(emoji = false)
             }
         ) { color ->
             if (moreColors == 2) {
@@ -235,6 +260,7 @@ fun ColorsScreen(
                     .reversed().distinctBy { it.displayName }
                 KeyboardTheme.writeUserColors(prefs, newThemeName.text, newUserColors)
             }
+            preview.changed(emoji = false) // the new colour on the keyboard for a moment
         }
     }
 }
