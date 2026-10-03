@@ -89,8 +89,10 @@ fun KeyboardsScreen(
     var askEnable by remember { mutableStateOf(false) } // some keyboards have an older set: keep or reset?
     var askDisable by remember { mutableStateOf(false) } // which set becomes the shared one?
     val expanded = remember { mutableStateListOf<SettingsSubtype>() } // several keyboards can be unfolded at once
-    // the settings screens edit the shared set unless a keyboard's own section was entered
-    KeyboardProfiles.editingId = KeyboardProfiles.SHARED
+    // the settings screens edit the shared set unless a keyboard's own section was entered; with separate settings
+    // this screen's search edits the keyboard in use (the shared set is read by no keyboard then)
+    KeyboardProfiles.editingId = if (KeyboardProfiles.isSeparate(real))
+        KeyboardProfiles.idFor(real, SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype()) else KeyboardProfiles.SHARED
     var generation by remember { mutableIntStateOf(0) } // re-read the keyboards after a delete
     SearchSettingsScreen(
         onClickBack = onClickBack,
@@ -279,6 +281,13 @@ fun KeyboardsScreen(
                     }
                     val locale = item as Locale
                     val settingsSubtype = SubtypeUtilsAdditional.createDefaultSubtype(locale).toSettingsSubtype()
+                    // that keyboard is in the list already: nothing added, and its settings stay its own
+                    if (enabledNow.contains(settingsSubtype)) {
+                        android.widget.Toast.makeText(ctx, ctx.getString(R.string.keyboard_already_added, keyboardName(settingsSubtype, ctx)),
+                            android.widget.Toast.LENGTH_SHORT).show()
+                        showAddKeyboard = false
+                        return@ListPickerDialog
+                    }
                     SubtypeUtilsAdditional.changeAdditionalSubtype(settingsSubtype, settingsSubtype, ctx) // registers it unless it equals a built-in one
                     SubtypeSettings.addEnabledSubtype(ctx.prefs(), settingsSubtype.toAdditionalSubtype())
                     if (separate) // a new keyboard starts as a copy of the one in use

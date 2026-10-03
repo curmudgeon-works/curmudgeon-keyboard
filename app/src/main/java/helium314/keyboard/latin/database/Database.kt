@@ -46,17 +46,7 @@ class Database private constructor(context: Context, name: String = NAME) : SQLi
                             clipDao.addClip(it.getLong(0), it.getInt(1) != 0, it.getString(2))
                     }
             }
-            val db = getInstance(context)
-            db.writableDatabase.execSQL("DELETE FROM GESTURE_DATA")
-            otherDb.readableDatabase.rawQuery("SELECT TIMESTAMP, WORD, EXPORTED, SOURCE_ACTIVE, DATA FROM GESTURE_DATA", null)
-                .use { c ->
-                    db.writableDatabase.transaction {
-                        while (c.moveToNext()) {
-                            execSQL("INSERT INTO GESTURE_DATA (TIMESTAMP, WORD, EXPORTED, SOURCE_ACTIVE, DATA) " +
-                                "VALUES (${c.getLong(0)},?,${c.getInt(2)},${c.getInt(3)},?)", arrayOf(c.getString(1), c.getString(4)))
-                        }
-                    }
-                }
+            // (upstream also copied its gesture-data table here: not in this app, and fresh installs don't have it)
             otherDb.close()
             file.delete()
         }
