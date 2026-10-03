@@ -159,7 +159,12 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
                 val frequent = FrequentLongWords.matching(context, mDictionaryFacilitator.locales, wordComposer.typedWord)
                 var slot = min(2, suggestionsList.size)
                 // (words removed with long-press stay out, like the dictionaries' do; typing one again un-removes it)
-                for (info in frequent.filterNot { mDictionaryFacilitator.isRemovedWord(it.mWord) }) {
+                // and with the typed word's capitals, like every other suggestion (a capital you typed stays)
+                val frequentAllCaps = wordComposer.isAllUpperCase && wordComposer.size() > 1
+                val frequentFirstCap = wordComposer.isOrWillBeOnlyFirstCharCapitalized
+                for (info in frequent.filterNot { mDictionaryFacilitator.isRemovedWord(it.mWord) }.map {
+                    if (frequentAllCaps || frequentFirstCap) getTransformedSuggestedWordInfo(it, mDictionaryFacilitator.mainLocale,
+                        frequentAllCaps, frequentFirstCap, 0) else it }) {
                     suggestionsList.removeAll { it.mWord == info.mWord } // already there further down: move it up
                     suggestionsList.add(min(slot, suggestionsList.size), info)
                     slot++
@@ -266,7 +271,6 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
             //  i guess then not mAutoCorrectionEnabledPerUserSettings should be read, but rather some isAutocorrectEnabled()
             // If the word does not allow to be auto-corrected, then we don't auto-correct.
             || !allowsToBeAutoCorrected // If we are doing prediction, then we never auto-correct of course
-            || wordComposer.isManuallyCapitalizedOnly() // a capital the user typed (not the sentence start's): keep the word
             || !wordComposer.isComposingWord // If we don't have suggestion results, we can't evaluate the first suggestion
             // for auto-correction
             || suggestionResults.isEmpty() // If the word has digits, we never auto-correct because it's likely the word

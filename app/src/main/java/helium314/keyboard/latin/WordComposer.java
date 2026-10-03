@@ -338,16 +338,6 @@ public final class WordComposer {
         return mCapsCount == size();
     }
 
-    /**
-     * The user capitalised this word's first letter themselves (shift, not the sentence start's automatic capital, not
-     * caps lock) and typed the rest in lower case: a name or a word meant that way, which auto-correct leaves alone
-     * (Rahul, 2026-10-02: overwriting capitals the user typed needs a high confidence). Capitals further in ("MULti")
-     * don't count: such a word can still be corrected.
-     */
-    public boolean isManuallyCapitalizedOnly() {
-        return mCapitalizedMode == CAPS_MODE_MANUAL_SHIFTED && isComposingWord() && mIsOnlyFirstCharCapitalized && size() > 1;
-    }
-
     public boolean wasShiftedNoLock() {
         return mCapitalizedMode == CAPS_MODE_AUTO_SHIFTED
                 || mCapitalizedMode == CAPS_MODE_MANUAL_SHIFTED;
