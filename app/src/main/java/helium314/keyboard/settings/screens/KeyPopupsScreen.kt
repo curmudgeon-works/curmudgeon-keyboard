@@ -346,9 +346,41 @@ fun CustomizePopupsScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
         else pendingChange = overrideKey to labels
     }
     val tryIt = remember { TryItState() }
+    // Keep / Discard like the other screens: every change shows at once (the preview), the cross puts back what was
+    // there when the screen opened (the arrangement, the chosen set, the saved sets), the tick keeps it
+    val real = ctx.realPrefs()
+    fun now() = arrayListOf(prefs.getString(KeyPopupOverrides.PREF, null), prefs.getString(KeyPopupOverrides.PREF_SELECTED_SET, null),
+        real.getString(KeyPopupOverrides.PREF_SETS, null))
+    var opened by rememberSaveable { mutableStateOf(now()) }
+    val changed = remember(generation) { now() } != opened
+    fun putBack() {
+        prefs.edit().apply {
+            if (opened[0] == null) remove(KeyPopupOverrides.PREF) else putString(KeyPopupOverrides.PREF, opened[0])
+            if (opened[1] == null) remove(KeyPopupOverrides.PREF_SELECTED_SET) else putString(KeyPopupOverrides.PREF_SELECTED_SET, opened[1])
+        }.apply()
+        real.edit().apply { if (opened[2] == null) remove(KeyPopupOverrides.PREF_SETS) else putString(KeyPopupOverrides.PREF_SETS, opened[2]) }.apply()
+        generation++
+        reloadPreview()
+    }
+    var askReject by rememberSaveable { mutableStateOf(false) }
+    var askAccept by rememberSaveable { mutableStateOf(false) }
+    var askLeave by rememberSaveable { mutableStateOf(false) }
+    fun leave() { if (changed) askLeave = true else onClickBack() }
+    androidx.activity.compose.BackHandler(enabled = changed) { leave() }
+    if (askReject) helium314.keyboard.settings.dialogs.DiscardChangesDialog({ askReject = false }) { putBack() }
+    if (askAccept) helium314.keyboard.settings.dialogs.SaveChangesDialog({ askAccept = false }) { opened = now() }
+    if (askLeave) helium314.keyboard.settings.dialogs.UnsavedChangesDialog(
+        onKeepWorking = { askLeave = false },
+        onDiscardAndExit = { askLeave = false; putBack(); onClickBack() },
+        onSaveAndExit = { askLeave = false; onClickBack() },
+    )
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.key_popups_full)) }, navigationIcon = { BackButton(onClickBack) }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.key_popups_full)) }, navigationIcon = { BackButton(::leave) },
+            actions = { if (changed) {
+                IconButton({ askReject = true }) { Icon(painterResource(R.drawable.ic_close), stringResource(R.string.appearance_reject)) }
+                IconButton({ askAccept = true }) { Icon(painterResource(R.drawable.ic_check), stringResource(R.string.appearance_accept)) }
+            } }) },
         bottomBar = { TryItBar(keyboard, tryIt) },
     ) { innerPadding ->
         Column(Modifier.fillMaxSize().padding(innerPadding)) {
