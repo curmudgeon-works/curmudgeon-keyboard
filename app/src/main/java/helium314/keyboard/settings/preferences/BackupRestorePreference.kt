@@ -388,8 +388,11 @@ private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: Restore
     val tags = choice.keyboards.flatMap { listOf(it.locale) + getSecondaryLocales(it.extraValues) }.map { it.toLanguageTag() }.toSet()
     val filesDir = ctx.filesDir ?: return
     val deviceProtectedFilesDir = DeviceProtectedUtils.getFilesDir(ctx)
-    // a language's learned words are replaced as a whole, never mixed with the phone's
-    if (choice.learnedWords) for (tag in tags) File(filesDir, "${UserHistoryDictionary.NAME}.$tag.dict").deleteRecursively()
+    // a language's learned words are replaced as a whole, never mixed with the phone's; only where the backup has
+    // learned words for it (else the phone's would be deleted with nothing to replace them)
+    val tagsInBackup = tags.filter { tag -> pending.entries.any {
+        it.substringAfter("unprotected${File.separator}").startsWith("${UserHistoryDictionary.NAME}.$tag.") } }
+    if (choice.learnedWords) for (tag in tagsInBackup) File(filesDir, "${UserHistoryDictionary.NAME}.$tag.dict").deleteRecursively()
     fun isLearnedWords(path: String) = tags.any { path.startsWith("${UserHistoryDictionary.NAME}.$it.") || path == "blacklists${File.separator}$it.txt" }
     fun isDictionary(path: String) = path.endsWith(DictionaryInfoUtils.USER_DICTIONARY_SUFFIX)
         && tags.any { path.startsWith("dicts${File.separator}$it${File.separator}") }
@@ -463,7 +466,8 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
     val prefs = ctx.prefs()
     val backup = pending.prefs
     // its own set when the backup kept one, else the backup's shared set was what it used
-    val settings = chosen.associateWith { KeyboardProfiles.ownSettingsIn(backup, it) ?: KeyboardProfiles.sharedSettingsIn(backup) }
+    // (the backup's shared set with the keyboard's own on top: what it read on the old phone)
+    val settings = chosen.associateWith { KeyboardProfiles.effectiveSettingsIn(backup, it) }
     if (withSettings && !KeyboardProfiles.isSeparate(real))
         KeyboardProfiles.enable(real, SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }, keepExisting = true)
 
@@ -529,7 +533,9 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
             SubtypeSettings.addEnabledSubtype(prefs, keyboard.toAdditionalSubtype())
         if (withSettings) {
             val id = KeyboardProfiles.idFor(real, keyboard)
-            KeyboardProfiles.write(real, id, settings.getValue(keyboard))
+            // exactly that set: a setting the backup leaves at its default gets a default mark, so it doesn't read
+            // the phone's shared value instead
+            KeyboardProfiles.write(real, id, settings.getValue(keyboard), markDefaults = true)
             // its own pictures in the backup, or the backup's shared ones when it had no set of its own
             KeyboardProfiles.restoreFiles(pictureFiles, KeyboardProfiles.idIn(backup, keyboard) ?: KeyboardProfiles.SHARED, id,
                 perKeyboardBackup = backup["profile_files_migrated"] == true)

@@ -86,6 +86,8 @@
     <!-- Option for setting whether language switch key should switch internal layouts only, or also to other keyboards -->
     <string name="language_switch_key_behavior">Language switch key behavior</string>
     <!-- Option to show shortcut key to emoji palettes -->
+    <!-- Keyboards > Add keyboard: that language's keyboard is in the list already -->
+    <string name="keyboard_already_added">%s is already in your keyboards</string>
     <string name="show_emoji_key">Emoji key</string>
     <!-- Layout & Typing: a microphone key right of the space bar -->
     <string name="show_voice_key">Voice input key</string>

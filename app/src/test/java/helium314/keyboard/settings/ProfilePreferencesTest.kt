@@ -39,6 +39,17 @@ class ProfilePreferencesTest {
         assertEquals(5, set(KeyboardProfiles.SHARED).getInt("some_size", 1)) // the shared set untouched
     }
 
+    @Test fun restoredSetReadsBackupDefaultsNotPhoneShared() {
+        // the phone's shared set has auto-correct off; the backup's keyboard left it at its default (not stored)
+        real.edit().putBoolean("auto_correction", false).putInt("theme_size", 3).putBoolean("fonts_follow_migrated", true).commit()
+        KeyboardProfiles.write(real, 1, mapOf("theme_size" to 5), markDefaults = true)
+        val own = set(1)
+        assertEquals(true, own.getBoolean("auto_correction", true)) // the default, not the phone's shared false
+        assertEquals(5, own.getInt("theme_size", 0)) // the backup's value
+        assertEquals(true, own.getBoolean("fonts_follow_migrated", false)) // an upgrade flag is never marked
+        assertEquals(false, set(KeyboardProfiles.SHARED).getBoolean("auto_correction", true)) // the shared set untouched
+    }
+
     @Test fun copyTakesOwnValuesOverShared() {
         real.edit().putInt("a", 1).putInt("b", 2).putInt("c", 3).commit()
         set(1).edit().putInt("a", 10).remove("c").commit()

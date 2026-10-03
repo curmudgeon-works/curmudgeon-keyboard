@@ -80,8 +80,11 @@ object KeyboardProfiles {
         if (!map.has(fromPref)) return
         val id = map.getInt(fromPref)
         map.remove(fromPref)
-        map.put(to.toPref(), id)
-        real.edit().putString(PREF_IDS, map.toString()).apply()
+        val editor = real.edit()
+        // it became a keyboard that already has a set (e.g. its layout deleted): that one stays, this one's set goes
+        if (map.has(to.toPref())) real.all.keys.filter { it.startsWith("$PREFIX$id$SEPARATOR") }.forEach { editor.remove(it) }
+        else map.put(to.toPref(), id)
+        editor.putString(PREF_IDS, map.toString()).apply()
     }
 
     /** A keyboard was deleted: its set goes with it. */
@@ -140,12 +143,20 @@ object KeyboardProfiles {
         Log.i("KeyboardProfiles", "copied settings $fromId -> $toId")
     }
 
-    /** Write [settings] (plain keys) as the own set of profile [id], replacing what was there. */
+    // one-time upgrade flags ("fonts_follow_migrated", "defaults_feedback_on_done"): bookkeeping, never marked
+    private val upgradeFlag = Regex(".*(_migrated|_done)")
+
+    /** Write [settings] (plain keys) as the own set of profile [id], replacing what was there; [markDefaults]: every
+     *  shared setting not in [settings] reads its default in that set (a mark), not the shared value. */
     @Synchronized
-    fun write(real: SharedPreferences, id: Int, settings: Map<String, Any?>) {
+    fun write(real: SharedPreferences, id: Int, settings: Map<String, Any?>, markDefaults: Boolean = false) {
         val editor = real.edit()
         real.all.keys.filter { it.startsWith("$PREFIX$id$SEPARATOR") }.forEach { editor.remove(it) }
         for ((key, value) in settings) put(editor, prefixedKey(id, key), value)
+        if (markDefaults && id != SHARED)
+            for (key in real.all.keys)
+                if (!isGlobal(key) && !key.startsWith(TOMBSTONE) && key !in settings && !upgradeFlag.matches(key))
+                    editor.putBoolean(prefixedKey(id, TOMBSTONE + key), true)
         editor.apply()
     }
 
@@ -179,6 +190,16 @@ object KeyboardProfiles {
         if (backup[PREF_SEPARATE] != true) return null
         val map = try { JSONObject(backup[PREF_IDS] as? String ?: "{}") } catch (e: Exception) { JSONObject() }
         return keyboard.toPref().takeIf { map.has(it) }?.let { map.getInt(it) }
+    }
+
+    /** What [keyboard] read in a backed-up preference map: the backup's shared set with its own set on top (a default
+     *  mark of its own takes the shared value out), plain keys, no marks. */
+    fun effectiveSettingsIn(backup: Map<String, Any?>, keyboard: SettingsSubtype): Map<String, Any?> {
+        val values = HashMap(sharedSettingsIn(backup))
+        val own = ownSettingsIn(backup, keyboard) ?: return values
+        for (key in own.keys) if (key.startsWith(TOMBSTONE)) values.remove(key.removePrefix(TOMBSTONE))
+        for ((key, value) in own) if (!key.startsWith(TOMBSTONE)) values[key] = value
+        return values
     }
 
     /** The shared set of a backed-up preference map: plain, non-global keys. */

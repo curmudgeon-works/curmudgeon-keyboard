@@ -111,7 +111,9 @@ fun TextCorrectionScreen(
     // Appearance); the top bar's tick keeps the changes since the screen opened, the cross undoes them
     val draft = helium314.keyboard.settings.rememberPrefsDraft("correction", correctionKeys, onClickBack)
     val tryIt = remember { TryItState() }
-    val keyboard = helium314.keyboard.latin.utils.SubtypeSettings.getSelectedSubtype(prefs).toSettingsSubtype()
+    // the keyboard being edited (its own settings), else the one in use: the preview switches to it
+    val keyboard = helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(LocalContext.current))
+        ?: helium314.keyboard.latin.utils.SubtypeSettings.getSelectedSubtype(prefs).toSettingsSubtype()
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     val softKeyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
