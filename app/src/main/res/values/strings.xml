@@ -91,6 +91,9 @@
     <!-- Keyboards > Add keyboard (separate settings): where the new keyboard's settings come from -->
     <string name="new_keyboard_copy_settings">Settings for %s: copy from</string>
     <string name="new_keyboard_default_settings">Default settings</string>
+    <!-- Settings: a bar on top while another keyboard is selected in Android -->
+    <string name="not_current_keyboard">Curmudgeon isn\'t your current keyboard</string>
+    <string name="switch_to_this_keyboard">Switch</string>
     <string name="show_emoji_key">Emoji key</string>
     <!-- Layout & Typing: a microphone key right of the space bar -->
     <string name="show_voice_key">Voice input key</string>
