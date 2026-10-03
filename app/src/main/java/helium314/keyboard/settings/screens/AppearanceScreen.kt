@@ -279,6 +279,9 @@ fun AppearanceScreen(
     )
 }
 
+/** Which of Midnight / Daylight the light-dark pairing came from (see the light / dark switch), for turning it off. */
+private const val PAIRED_FROM = "day_night_paired_from"
+
 /** Settings whose change is best seen on the emoji panel. */
 private val emojiKeys = setOf(Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT, Settings.PREF_EMOJI_SKIN_TONE,
     Settings.PREF_EMOJI_MAX_SDK, Settings.PREF_EMOJI_FONT)
@@ -413,13 +416,17 @@ fun createAppearanceSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_THEME_DAY_NIGHT, R.string.day_night_mode) { setting ->
         val prefs = LocalContext.current.prefs()
         SwitchPreference(setting, Defaults.PREF_THEME_DAY_NIGHT) { on ->
-            // Midnight (black) with light / dark turned on: Daylight by day, Midnight by night; off again: Midnight
-            // (the two themes differ only in their colours)
+            // Midnight (black) or Daylight (light) with light / dark turned on: the pair, Daylight in light mode and
+            // Midnight in dark mode (the two themes differ only in their colours); off again: the one it came from
             val day = prefs.getString(Settings.PREF_THEME_COLORS, Defaults.PREF_THEME_COLORS)
             val night = prefs.getString(Settings.PREF_THEME_COLORS_NIGHT, Defaults.PREF_THEME_COLORS_NIGHT)
-            if (night == KeyboardTheme.THEME_BLACK) {
-                if (on && day == KeyboardTheme.THEME_BLACK) prefs.edit { putString(Settings.PREF_THEME_COLORS, KeyboardTheme.THEME_LIGHT) }
-                else if (!on && day == KeyboardTheme.THEME_LIGHT) prefs.edit { putString(Settings.PREF_THEME_COLORS, KeyboardTheme.THEME_BLACK) }
+            val black = KeyboardTheme.THEME_BLACK; val light = KeyboardTheme.THEME_LIGHT
+            if (on && day == night && (day == black || day == light)) prefs.edit {
+                putString(Settings.PREF_THEME_COLORS, light); putString(Settings.PREF_THEME_COLORS_NIGHT, black)
+                putString(PAIRED_FROM, day)
+            } else if (!on && day == light && night == black) {
+                val from = prefs.getString(PAIRED_FROM, black)!!
+                prefs.edit { putString(Settings.PREF_THEME_COLORS, from); putString(Settings.PREF_THEME_COLORS_NIGHT, from); remove(PAIRED_FROM) }
             }
             KeyboardSwitcher.getInstance().setThemeNeedsReload()
         }

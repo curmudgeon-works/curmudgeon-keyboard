@@ -63,6 +63,7 @@ object AppearanceLooks {
     private val screenOnlyKeys = setOf(
         Settings.PREF_EMOJI_MAX_SDK,
         PREF_SELECTED, // Discard puts the chosen theme back too
+        "day_night_paired_from", // (which of Midnight / Daylight the light / dark switch paired from)
     )
     fun onScreen(key: String) = inScope(key) || key in screenOnlyKeys
 
