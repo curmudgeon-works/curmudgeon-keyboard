@@ -60,7 +60,13 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
     Preference(name = stringResource(R.string.layout_presets), description = summary, onClick = { showList = true }) { NextScreenIcon() }
     // while the list is open nothing of the keyboard's is cleaned up (its unsaved layout must survive a preview
     // for Cancel); afterwards what no keyboard uses goes
-    if (showList) androidx.compose.runtime.DisposableEffect(Unit) {
+    // OK would drop the keyboard's unsaved layout: asked first (the preset, and what was there for a "no")
+    var askLoss: Triple<LayoutPresets.Preset, Map<String, Any?>, SettingsSubtype>? by remember { mutableStateOf(null) }
+    fun keep(preset: LayoutPresets.Preset, from: SettingsSubtype) {
+        LayoutPresets.restorePopupSet(ctx, from, preset) // its popup set, if deleted since
+        prefs.edit { putString(LayoutPresets.PREF_SELECTED, preset.name) }
+    }
+    if (showList || askLoss != null) androidx.compose.runtime.DisposableEffect(Unit) {
         helium314.keyboard.latin.utils.LayoutUtilsCustom.cleanupHeld++
         onDispose {
             helium314.keyboard.latin.utils.LayoutUtilsCustom.cleanupHeld--
@@ -87,8 +93,9 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
             },
             onItemSelected = {
                 confirmed = true
-                LayoutPresets.restorePopupSet(ctx, initialKeyboard, it) // its popup set, if deleted since
-                prefs.edit { putString(LayoutPresets.PREF_SELECTED, it.name) }
+                if (helium314.keyboard.latin.utils.LayoutUtilsCustom.dropsUnsaved(initialKeyboard, keyboard))
+                    askLoss = Triple(it, initial, initialKeyboard)
+                else keep(it, initialKeyboard)
             },
             trailing = { preset ->
                 IconButton({ confirmed = true; showList = false; toRename = preset }) { Icon(painterResource(R.drawable.ic_edit), stringResource(R.string.layout_preset_rename)) }
@@ -124,6 +131,18 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
                 store(presets.map { if (it === preset) LayoutPresets.Preset(name, it.values) else it })
                 if (prefs.getString(LayoutPresets.PREF_SELECTED, null) == preset.name) prefs.edit { putString(LayoutPresets.PREF_SELECTED, name) }
             },
+        )
+    }
+    askLoss?.let { (preset, before, beforeKeyboard) ->
+        ConfirmationDialog(
+            onDismissRequest = { // no: everything as it was when the list opened
+                LayoutPresets.applySettings(ctx, before)
+                if (keyboard != beforeKeyboard) setKeyboard(beforeKeyboard)
+                askLoss = null
+            },
+            title = { Text(stringResource(R.string.layout_presets)) },
+            content = { Text(stringResource(R.string.unsaved_layout_will_be_lost)) },
+            onConfirmed = { keep(preset, beforeKeyboard); askLoss = null },
         )
     }
     toDelete?.let { preset ->
