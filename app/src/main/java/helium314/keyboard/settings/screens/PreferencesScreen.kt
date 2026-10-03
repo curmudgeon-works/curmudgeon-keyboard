@@ -120,7 +120,7 @@ fun clipboardHistoryItems(prefs: SharedPreferences): List<Any?> {
 }
 
 val preferencesSimpleModeKeys = setOf(
-    Settings.PREF_SHOW_HINTS, Settings.PREF_SYMBOL_POPUP_MAP, Settings.PREF_POPUP_ON,
+    Settings.PREF_SYMBOL_POPUP_MAP, Settings.PREF_POPUP_ON,
     Settings.PREF_VIBRATE_ON, Settings.PREF_SOUND_ON, Settings.PREF_SHOW_NUMBER_ROW,
     Settings.PREF_SHOW_EMOJI_KEY, Settings.PREF_ENABLE_CLIPBOARD_HISTORY,
 )
@@ -179,10 +179,6 @@ fun createPreferencesSettings(context: Context) = listOf(
         // on Advanced, among the settings shared by all keyboards
         SwitchPreference(it, Defaults.PREF_SAVE_SUBTYPE_PER_APP)
     },
-    // the symbols area by area (on Others; Appearance's "Hide symbols on keys" sets all three)
-    Setting(context, Settings.PREF_SHOW_HINTS, R.string.hints_other_keys) {
-        SwitchPreference(it, Defaults.PREF_SHOW_HINTS, inverted = true) { reloadSymbolHints() }
-    },
     Setting(context, Settings.PREF_REMOVE_REDUNDANT_POPUPS, R.string.remove_redundant_popups) {
         SwitchPreference(it, Defaults.PREF_REMOVE_REDUNDANT_POPUPS) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
@@ -216,9 +212,6 @@ fun createPreferencesSettings(context: Context) = listOf(
                 checkTextValid = { KeyboardParser.isValidSymbolPopupMap(it) }
             )
         }
-    },
-    Setting(context, Settings.PREF_SHOW_POPUP_HINTS, R.string.show_popup_hints) {
-        SwitchPreference(it, Defaults.PREF_SHOW_POPUP_HINTS, inverted = true) { reloadSymbolHints() }
     },
     Setting(context, Settings.PREF_POPUP_ON, R.string.popup_on_keypress) {
         SwitchPreference(it, Defaults.PREF_POPUP_ON) { KeyboardSwitcher.getInstance().reloadKeyboard() }
@@ -259,9 +252,6 @@ fun createPreferencesSettings(context: Context) = listOf(
             KeyboardLayoutSet.onSystemLocaleChanged()
             KeyboardSwitcher.getInstance().reloadKeyboard()
         }
-    },
-    Setting(context, Settings.PREF_SHOW_NUMBER_ROW_HINTS, R.string.number_row_hints) {
-        SwitchPreference(it, Defaults.PREF_SHOW_NUMBER_ROW_HINTS, inverted = true) { reloadSymbolHints() }
     },
     Setting(context, Settings.PREF_SHOW_LANGUAGE_SWITCH_KEY, R.string.show_language_switch_key) {
         SwitchPreference(it, Defaults.PREF_SHOW_LANGUAGE_SWITCH_KEY) { KeyboardSwitcher.getInstance().reloadKeyboard() }

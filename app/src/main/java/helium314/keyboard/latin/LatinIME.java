@@ -978,13 +978,10 @@ public class LatinIME extends InputMethodService implements
             // Space state must be updated before calling updateShiftState
             switcher.requestUpdatingShiftState(getCurrentAutoCapsState(), getCurrentRecapitalizeState());
         }
-        // Set neutral suggestions and show the toolbar if the "Auto show toolbar" setting is enabled.
+        // Set neutral suggestions.
         if (!mHandler.hasPendingResumeSuggestions()) {
             mHandler.cancelUpdateSuggestionStrip();
             setNeutralSuggestionStrip();
-            if (hasSuggestionStripView() && currentSettingsValues.mAutoShowToolbar && !tryShowClipboardSuggestion()) {
-                mSuggestionStripView.setToolbarVisibility(true);
-            }
         }
 
         mainKeyboardView.setMainDictionaryAvailability(mDictionaryFacilitator.hasAtLeastOneInitializedMainDictionary());
@@ -1501,10 +1498,6 @@ public class LatinIME extends InputMethodService implements
                 || noSuggestionsFromDictionaries) {
             mSuggestionStripView.setSuggestions(suggestedWords,
                     mRichImm.getCurrentSubtype().isRtlSubtype());
-            // Auto hide the toolbar if dictionary suggestions are available
-            if (currentSettingsValues.mAutoHideToolbar && !noSuggestionsFromDictionaries) {
-                mSuggestionStripView.setToolbarVisibility(false);
-            }
         }
     }
 
@@ -1556,32 +1549,16 @@ public class LatinIME extends InputMethodService implements
         return false;
     }
 
-    // This will first try showing a clipboard suggestion. On success, the toolbar will be hidden
-    // if the "Auto hide toolbar" is enabled. Otherwise, an empty suggestion strip (if prediction
+    // This will first try showing a clipboard suggestion. Otherwise, an empty suggestion strip (if prediction
     // is enabled) or punctuation suggestions (if it's disabled) will be set.
-    // Then, the toolbar will be shown automatically if the relevant setting is enabled
-    // and there is a selection of text or it's the start of a line.
     @Override
     public void setNeutralSuggestionStrip() {
         final SettingsValues currentSettings = mSettings.getCurrent();
-        if (tryShowClipboardSuggestion()) {
-            // clipboard suggestion has been set
-            if (hasSuggestionStripView() && currentSettings.mAutoHideToolbar)
-                mSuggestionStripView.setToolbarVisibility(false);
-            return;
-        }
+        if (tryShowClipboardSuggestion()) return; // clipboard suggestion has been set
         final SuggestedWords neutralSuggestions = currentSettings.mSuggestPunctuation
                 ? currentSettings.mPunctuationSuggestions
                 : SuggestedWords.getEmptyInstance();
         setSuggestedWords(neutralSuggestions);
-        if (hasSuggestionStripView() && currentSettings.mAutoShowToolbar) {
-            final int codePointBeforeCursor = mInputLogic.mConnection.getCodePointBeforeCursor();
-            if (mInputLogic.mConnection.hasSelection()
-                    || codePointBeforeCursor == Constants.NOT_A_CODE
-                    || codePointBeforeCursor == Constants.CODE_ENTER) {
-                mSuggestionStripView.setToolbarVisibility(true);
-            }
-        }
     }
 
     @Override

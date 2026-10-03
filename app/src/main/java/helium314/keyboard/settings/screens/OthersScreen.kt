@@ -34,8 +34,7 @@ fun OthersScreen(onClickBack: () -> Unit) {
         // (Customize suggestions: Text correction's Suggestions group; their spacing: Appearance, a theme setting;
         //  undo / redo: their own group on Layout & Typing)
         Settings.PREF_CUSTOM_CURRENCY_KEY, // the symbols pages' currency key and its popup
-        // (no rows any more, found by search only: the toolbar opening / closing by itself, and the symbols on the
-        //  keys area by area, which Appearance's one "Hide symbols on keys" switch sets together)
+        // (the symbols on the keys area by area are gone as settings: Appearance's "Hide symbols on keys" sets all three)
     )
     SearchSettingsScreen(
         onClickBack = onClickBack,
