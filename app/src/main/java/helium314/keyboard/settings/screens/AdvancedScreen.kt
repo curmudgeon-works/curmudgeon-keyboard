@@ -88,8 +88,8 @@ fun AdvancedSettingsScreen(
         SettingsWithoutKey.FACTORY_RESET,
         if (BuildConfig.DEBUG || prefs.getBoolean(DebugSettings.PREF_SHOW_DEBUG_SETTINGS, Defaults.PREF_SHOW_DEBUG_SETTINGS))
             SettingsWithoutKey.DEBUG_SETTINGS else null,
-        // (once under Experimental; the emoji version is on Appearance's Emoji group, next to the emoji font)
-        Settings.PREF_URL_DETECTION,
+        // (once under Experimental; the emoji version is on Appearance's Emoji group, next to the emoji font, URL
+        //  detection on Text correction's Correction group)
         // (recording the swipe corpus and logging swipe results: on the Swipe screen, Swipe logging)
     )
     SearchSettingsScreen(
