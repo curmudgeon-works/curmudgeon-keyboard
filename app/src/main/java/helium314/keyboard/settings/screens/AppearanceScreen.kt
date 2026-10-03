@@ -147,8 +147,12 @@ fun AppearanceScreen(
     val items = listOf(
         // ---- the theme first: the saved themes, then everything a theme sets
         // (keyboard height, numbers row, split keyboard, bottom row and side padding are on Layout & Typing)
-        R.string.appearance_group_theme,
+        // the saved themes on top, on their own between two lines: a theme covers the whole screen (but the emoji
+        // version), not just the Theme group (2026-10-03)
+        SettingsWithoutKey.DIVIDER,
         SettingsWithoutKey.APPEARANCE_LOOKS,
+        SettingsWithoutKey.DIVIDER,
+        R.string.appearance_group_theme,
         // light / dark following the system first; when on, the light and the dark colours sit under it
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
             Settings.PREF_THEME_DAY_NIGHT else null,
@@ -171,7 +175,7 @@ fun AppearanceScreen(
         // only with a picture set: keys painted or clear on it
         if (listOf(false, true).any { night -> listOf(false, true).any { land -> Settings.getCustomBackgroundFile(ctx, night, land).exists() } })
             Settings.PREF_BACKGROUND_WHOLE_PICTURE else null,
-        // ---- then the emoji preferences (not part of themes)
+        // ---- then the emoji preferences (in themes, but the version, last here)
         R.string.appearance_group_emoji,
         Settings.PREF_EMOJI_FONT_SCALE,
         if (prefs.getFloat(Settings.PREF_EMOJI_FONT_SCALE, Defaults.PREF_EMOJI_FONT_SCALE) != 1f)
@@ -179,9 +183,9 @@ fun AppearanceScreen(
         if (prefs.getInt(Settings.PREF_EMOJI_MAX_SDK, helium314.keyboard.keyboard.emoji.SupportedEmojis.DEFAULT) >= 24)
             Settings.PREF_EMOJI_SKIN_TONE else null,
         SettingsWithoutKey.CUSTOM_EMOJI_FONT,
-        // which emojis show: what the emoji font can draw, overridable (e.g. for a newer font); advanced
-        Settings.PREF_EMOJI_MAX_SDK,
         Settings.PREF_SHOW_EMOJI_DESCRIPTIONS,
+        // which emojis show: what the emoji font can draw, overridable (e.g. for a newer font); advanced, not in themes
+        Settings.PREF_EMOJI_MAX_SDK,
     )
     // every change shows on the live keyboard at once; the draft remembers how things were when the screen opened
     // after Accept or Reject the current state is the new starting point: a fresh snapshot
@@ -242,7 +246,7 @@ fun AppearanceScreen(
         title = stringResource(R.string.settings_screen_appearance),
         settings = items,
         simpleModeKeys = setOf(
-            SettingsWithoutKey.APPEARANCE_LOOKS, Settings.PREF_THEME_STYLE, Settings.PREF_THEME_COLORS, Settings.PREF_THEME_KEY_BORDERS, Settings.PREF_THEME_DAY_NIGHT,
+            SettingsWithoutKey.DIVIDER, SettingsWithoutKey.APPEARANCE_LOOKS, Settings.PREF_THEME_STYLE, Settings.PREF_THEME_COLORS, Settings.PREF_THEME_KEY_BORDERS, Settings.PREF_THEME_DAY_NIGHT,
             Settings.PREF_THEME_COLORS_NIGHT, SettingsWithoutKey.FONTS,
             SettingsWithoutKey.HIDE_ALL_SYMBOLS,
             // the emoji size (with its fit) and skin tone (the emoji font from a file: advanced)

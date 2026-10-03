@@ -43,7 +43,14 @@ object AppearanceLooks {
         Settings.PREF_KEY_FONT, Settings.PREF_HINT_FONT, Settings.PREF_SUGGESTION_FONT, Settings.PREF_FONT_FOLLOWS_KEY_TEXT, Settings.PREF_HINT_TEXT_BOLD, Settings.PREF_HINT_TEXT_ITALIC, Settings.PREF_HINT_TEXT_UNDERLINE,
         Settings.PREF_SPACE_BAR_TEXT, Settings.PREF_SHOW_NUMBER_ROW_HINTS, Settings.PREF_SHOW_HINTS, Settings.PREF_SHOW_POPUP_HINTS,
         Settings.PREF_SUGGESTION_TEXT_COLOR,
+        // the emoji look (since 2026-10-03; a theme saved before leaves them as they are): not the emoji version, which
+        // is about what the phone's font can draw
+        Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT, Settings.PREF_EMOJI_FONT, Settings.PREF_EMOJI_SKIN_TONE,
+        Settings.PREF_SHOW_EMOJI_DESCRIPTIONS,
     )
+    /** The emoji settings at their defaults: the built-in themes put them back (a theme sets the whole look). */
+    private val emojiDefaults: Map<String, Any?> = listOf(Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT,
+        Settings.PREF_EMOJI_FONT, Settings.PREF_EMOJI_SKIN_TONE, Settings.PREF_SHOW_EMOJI_DESCRIPTIONS).associateWith { null }
     // the scales have a key per orientation / fold state, the custom colors one per theme
     private val prefixes = listOf(
         // (keyboard height, split, numbers row, bottom row size and side padding are Layout & Typing's: not in themes)
@@ -54,7 +61,7 @@ object AppearanceLooks {
 
     // on the Appearance screen but not in looks: its Save / Discard (AppearanceDraft) keeps them too
     private val screenOnlyKeys = setOf(
-        Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT, Settings.PREF_EMOJI_FONT, Settings.PREF_EMOJI_MAX_SDK, Settings.PREF_EMOJI_SKIN_TONE, Settings.PREF_SHOW_EMOJI_DESCRIPTIONS,
+        Settings.PREF_EMOJI_MAX_SDK,
         PREF_SELECTED, // Discard puts the chosen theme back too
     )
     fun onScreen(key: String) = inScope(key) || key in screenOnlyKeys
@@ -123,25 +130,25 @@ object AppearanceLooks {
     /** The themes that ship with the app: Midnight and Daylight one colour set each, the others a light and a dark one
      *  following the system. */
     fun builtIn(ctx: Context): List<Look> = listOf(
-        Look(ctx.getString(R.string.theme_preset_midnight), mapOf(PICTURES to NO_PICTURES,
+        Look(ctx.getString(R.string.theme_preset_midnight), emojiDefaults + mapOf(PICTURES to NO_PICTURES,
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
             // one colour set, always (the light / dark switch off)
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_BLACK, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_BLACK,
             Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to false)),
-        Look(ctx.getString(R.string.theme_preset_daylight), mapOf(PICTURES to NO_PICTURES,
+        Look(ctx.getString(R.string.theme_preset_daylight), emojiDefaults + mapOf(PICTURES to NO_PICTURES,
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
             // one colour set, always (the light / dark switch off)
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_LIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_LIGHT,
             Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to false)),
-        Look(ctx.getString(R.string.theme_preset_holo), mapOf(PICTURES to NO_PICTURES,
+        Look(ctx.getString(R.string.theme_preset_holo), emojiDefaults + mapOf(PICTURES to NO_PICTURES,
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_HOLO, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_HOLO,
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_HOLO_LIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_HOLO_WHITE,
             Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to true)),
-        Look(ctx.getString(R.string.theme_preset_paper), mapOf(PICTURES to NO_PICTURES,
+        Look(ctx.getString(R.string.theme_preset_paper), emojiDefaults + mapOf(PICTURES to NO_PICTURES,
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_LIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_DARK,
             Settings.PREF_THEME_KEY_BORDERS to false, Settings.PREF_THEME_DAY_NIGHT to true)),
-        Look(ctx.getString(R.string.theme_preset_ocean), mapOf(PICTURES to NO_PICTURES,
+        Look(ctx.getString(R.string.theme_preset_ocean), emojiDefaults + mapOf(PICTURES to NO_PICTURES,
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_ROUNDED, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_ROUNDED,
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_OCEAN_LIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_OCEAN,
             Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_KEY_HORIZONTAL_GAP to 1.0f, Settings.PREF_KEY_VERTICAL_GAP to 1.5f,

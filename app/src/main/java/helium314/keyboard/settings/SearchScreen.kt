@@ -175,8 +175,10 @@ fun SearchSettingsScreen(
                                     else PreferenceCategory(stringResource(it))
                                 }
                             } else {
+                                // a line across the list
+                                if (it == SettingsWithoutKey.DIVIDER) AdvancedReveal(it in shown) { androidx.compose.material3.HorizontalDivider() }
                                 // a pref that comes with another's setting appears with the same animation
-                                AdvancedReveal(it != null && it in shown) {
+                                else AdvancedReveal(it != null && it in shown) {
                                     if (it != null) {
                                         val row = remember { TappedRow(BringIntoViewRequester()) }
                                         Box(Modifier.bringIntoViewRequester(row.requester).onGloballyPositioned { row.coords = it }.pointerInput(Unit) {
