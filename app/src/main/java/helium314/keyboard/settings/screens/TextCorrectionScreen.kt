@@ -72,10 +72,10 @@ fun TextCorrectionScreen(
         if (autocorrectEnabled) Settings.PREF_AUTOCORRECT_SHORTCUTS else null,
         if (autocorrectEnabled) Settings.PREF_AUTOCORRECT_WITH_DIGITS else null,
         if (autocorrectEnabled) Settings.PREF_AUTO_CORRECT_THRESHOLD else null,
-        Settings.PREF_URL_DETECTION, // (from Advanced; advanced here too) web and email addresses as one word
         // (backspace reverts autocorrect: in the Backspace group of the Preferences screen)
         Settings.PREF_AUTO_CAP,
         Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE,
+        Settings.PREF_URL_DETECTION, // (from Advanced; advanced here too) web and email addresses as one word
         R.string.settings_category_space,
         Settings.PREF_AUTOSPACE_AFTER_SUGGESTION,
         if (gestureEnabled) Settings.PREF_AUTOSPACE_AFTER_GESTURE_TYPING else null, // (also on the Swipe screen)
