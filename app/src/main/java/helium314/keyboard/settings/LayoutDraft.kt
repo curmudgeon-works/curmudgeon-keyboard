@@ -7,6 +7,7 @@ import helium314.keyboard.keyboard.KeyboardLayoutSet
 import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.LayoutUtilsCustom
 import helium314.keyboard.latin.utils.SubtypeSettings
@@ -35,7 +36,7 @@ class LayoutDraft private constructor(
         val now = scoped(ctx)
         // the rows: every key of either snapshot, a "~" mark standing for its key
         val keys = (now.keys + prefs.keys).mapTo(HashSet()) { base(it) }
-        return keys.filterTo(HashSet()) { !KnownDefaults.same(plain(it), reads(now, it), reads(prefs, it)) }.mapTo(HashSet()) { plain(it) }
+        return keys.filterTo(HashSet()) { !switchState(it) && !KnownDefaults.same(plain(it), reads(now, it), reads(prefs, it)) }.mapTo(HashSet()) { plain(it) }
     }
 
     /** What [key] (full) reads as in [stored]: its value; a keyboard's key "at its default" (its "~" mark, see
@@ -63,11 +64,17 @@ class LayoutDraft private constructor(
         val real = ctx.realPrefs()
         val now = scoped(ctx)
         real.edit {
-            for (key in now.keys) if (key !in prefs) remove(key)
-            for ((key, value) in prefs) if (now[key] != value) {
+            for (key in now.keys) if (key !in prefs && !switchState(key)) remove(key)
+            for ((key, value) in prefs) if (now[key] != value && !switchState(key)) {
                 if (value == null) remove(key) else KeyboardProfiles.put(this, key, value)
             }
         }
+        // the keyboard in use stays as it is (the preview switched it, not a setting), unless the undo took its
+        // definition away: then the one it had when the screen opened
+        val selected = real.getString(Settings.PREF_SELECTED_SUBTYPE, null)?.toSettingsSubtype()
+        val enabled = SubtypeSettings.createSettingsSubtypes(real.getString(Settings.PREF_ENABLED_SUBTYPES, "") ?: "")
+        if (selected != null && selected !in enabled) (prefs[Settings.PREF_SELECTED_SUBTYPE] as? String)?.let {
+            real.edit { putString(Settings.PREF_SELECTED_SUBTYPE, it) } }
         val live = layoutsDir(ctx)
         live.deleteRecursively()
         layoutsCopy?.copyRecursively(live, overwrite = true)
@@ -124,6 +131,9 @@ class LayoutDraft private constructor(
             Settings.PREF_SAVED_APP_SUBTYPE_PREFIX,
         )
         private val profileKey = Regex("^p\\d+/")
+        /** Which keyboard is in use, and each app's remembered one: switching keyboards (the preview does when the try-it
+         *  box is tapped) is no change of this screen's settings, and Discard doesn't switch back. */
+        private fun switchState(key: String) = plain(key) == Settings.PREF_SELECTED_SUBTYPE || plain(key).startsWith(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX)
         fun plain(key: String) = key.replace(profileKey, "")
         private val AT_DEFAULT = Any() // a mark whose default isn't known: equal only to itself
         private val TOMB = KeyboardProfiles.TOMBSTONE
