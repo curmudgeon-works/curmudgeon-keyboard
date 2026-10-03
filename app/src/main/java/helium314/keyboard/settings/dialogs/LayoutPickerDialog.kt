@@ -51,8 +51,6 @@ import helium314.keyboard.settings.Setting
 import helium314.keyboard.settings.SettingsActivity
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.settings.contentTextDirectionStyle
-import helium314.keyboard.settings.layoutFilePicker
-import helium314.keyboard.settings.layoutIntent
 import helium314.keyboard.latin.utils.previewDark
 
 @Composable
@@ -79,17 +77,12 @@ fun LayoutPickerDialog(
     }
     var errorDialog by rememberSaveable { mutableStateOf(false) }
     var newLayoutDialog: Pair<String, String?>? by rememberSaveable { mutableStateOf(null) }
-    val picker = layoutFilePicker { content, name ->
-        newLayoutDialog = (name ?: layoutType.default) to content
-    }
     ThreeButtonAlertDialog(
         keepKeyboard = false, // has a text field, needs the focus
         onDismissRequest = onDismissRequest,
         cancelButtonText = stringResource(R.string.dialog_close),
         onConfirmed = { },
         confirmButtonText = null,
-        neutralButtonText = stringResource(R.string.button_load_custom),
-        onNeutral = { picker.launch(layoutIntent) },
         title = { Text(setting.title) },
         content = {
             CompositionLocalProvider(

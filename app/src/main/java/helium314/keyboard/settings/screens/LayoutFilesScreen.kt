@@ -104,26 +104,7 @@ fun LayoutFilesScreen(onClickBack: () -> Unit) {
         (ctx.getActivity() as? SettingsActivity)?.prefChanged()
     }
 
-    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-        uri ?: return@rememberLauncherForActivityResult
-        val layouts = JSONObject()
-        LAYOUT_FILE_TYPES.forEach { layouts.put(it.name.lowercase(), texts[it]) }
-        val json = JSONObject().put("format", FILE_FORMAT).put("version", 1).put("layouts", layouts)
-        ctx.contentResolver.openOutputStream(uri)?.use { it.writer().apply { write(json.toString(2)); flush() } }
-    }
-    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri ?: return@rememberLauncherForActivityResult
-        val loaded = runCatching {
-            val json = JSONObject(ctx.contentResolver.openInputStream(uri)!!.use { it.reader().readText() })
-            val layouts = json.getJSONObject("layouts")
-            LAYOUT_FILE_TYPES.mapNotNull { t -> layouts.optString(t.name.lowercase(), "").takeIf { it.isNotBlank() }?.let { t to it } }
-        }.getOrNull()
-        if (loaded.isNullOrEmpty()) Toast.makeText(ctx, R.string.layout_files_load_error, Toast.LENGTH_LONG).show()
-        else {
-            loaded.forEach { (t, text) -> texts[t] = text }
-            Toast.makeText(ctx, R.string.layout_files_loaded, Toast.LENGTH_LONG).show()
-        }
-    }
+    // (no files: layouts go in and out by copy and paste; the one file the app writes is the backup)
 
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
@@ -153,8 +134,6 @@ fun LayoutFilesScreen(onClickBack: () -> Unit) {
             )
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
                 TextButton(onClick = { texts[type] = builtIn(type) }) { Text(stringResource(R.string.layout_files_builtin)) }
-                TextButton(onClick = { importLauncher.launch(arrayOf("application/json", "text/*", "*/*")) }) { Text(stringResource(R.string.layout_files_load)) }
-                TextButton(onClick = { exportLauncher.launch("curmudgeon_layouts.json") }) { Text(stringResource(R.string.layout_files_export)) }
             }
         }
     }

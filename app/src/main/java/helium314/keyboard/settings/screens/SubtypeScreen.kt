@@ -146,8 +146,6 @@ import helium314.keyboard.settings.dialogs.ListPickerDialog
 import helium314.keyboard.settings.dialogs.MultiListPickerDialog
 import helium314.keyboard.settings.dialogs.ReorderDialog
 import helium314.keyboard.settings.initPreview
-import helium314.keyboard.settings.layoutFilePicker
-import helium314.keyboard.settings.layoutIntent
 import helium314.keyboard.settings.GetIconOrEmpty
 import java.util.Locale
 
@@ -582,9 +580,6 @@ private fun MainLayoutRow(
                 onConfirmed = { pickKeys(layout); keysToConfirm = null },
             )
         }
-        val layoutPicker = layoutFilePicker { content, name ->
-            showLayoutEditDialog = (name ?: "new layout") to content
-        }
         DropDownField(
             items = appLayouts + customLayouts,
             selectedItem = currentSubtype.mainLayoutName() ?: SubtypeLocaleUtils.QWERTY,
@@ -668,12 +663,8 @@ private fun MainLayoutRow(
                 onDismissRequest = { showAddLayoutDialog = false },
                 title = { Text(stringResource(R.string.button_title_add_custom_layout)) },
                 content = { Text(annotated) },
+                // an empty editor: a layout comes in by pasting it there (no files)
                 onConfirmed = { showLayoutEditDialog = "new layout" to "" },
-                neutralButtonText = stringResource(R.string.button_load_custom),
-                onNeutral = {
-                    showAddLayoutDialog = false
-                    layoutPicker.launch(layoutIntent)
-                }
             )
         }
     }

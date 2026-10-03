@@ -861,7 +861,7 @@ language, hence "No language". -->
     <!-- Button text and title for adding a custom layout -->
     <string name="button_title_add_custom_layout">Add custom layout</string>
     <!-- Message text for adding a custom layout -->
-    <string name="message_add_custom_layout">Select a file in a compatible format. Information about the formats is available %s.</string>
+    <string name="message_add_custom_layout">Paste a layout in a compatible format into the editor that opens. Information about the formats is available %s.</string>
     <!-- Button text for loading a custom layout, image or theme file. Preferably 10 characters or less. -->
     <string name="button_load_custom">Load file</string>
     <!-- Button text for saving a theme file. Preferably 10 characters or less. -->
