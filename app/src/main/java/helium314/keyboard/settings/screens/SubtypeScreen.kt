@@ -352,9 +352,15 @@ fun SubtypeScreen(
                             Pending(keyChanged(Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS)) { Box(Modifier.padding(start = 16.dp)) {
                                 SettingsActivity.settingsContainer[Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS]?.Preference() } }
                     }
-                    // then the emoji key switch
+                    // then the emoji key switch, and the voice key's (right of the space bar)
                     Pending(keyChanged(Settings.PREF_SHOW_EMOJI_KEY)) {
                         PrefSwitchRow(Settings.PREF_SHOW_EMOJI_KEY, Defaults.PREF_SHOW_EMOJI_KEY, R.string.show_emoji_key) {
+                            holdPreview()
+                            KeyboardSwitcher.getInstance().reloadKeyboard()
+                        }
+                    }
+                    Pending(keyChanged(Settings.PREF_SHOW_VOICE_KEY)) {
+                        PrefSwitchRow(Settings.PREF_SHOW_VOICE_KEY, Defaults.PREF_SHOW_VOICE_KEY, R.string.show_voice_key) {
                             holdPreview()
                             KeyboardSwitcher.getInstance().reloadKeyboard()
                         }
@@ -722,7 +728,7 @@ private val previewDialogItems = setOf(Settings.PREF_KEYPRESS_SOUND, Settings.PR
 private val previewedSwitches = listOf(
     Settings.PREF_SHOW_NUMBER_ROW, Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS, Settings.PREF_ENABLE_SPLIT_KEYBOARD,
     Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE,
-    Settings.PREF_SHOW_EMOJI_KEY,
+    Settings.PREF_SHOW_EMOJI_KEY, Settings.PREF_SHOW_VOICE_KEY,
     Settings.PREF_POPUP_ON, Settings.PREF_VIBRATE_ON, Settings.PREF_SOUND_ON,
     Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS, Settings.PREF_BACKSPACE_SPEED_UP, Settings.PREF_DELETE_SWIPE,
     Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, Settings.PREF_REMOVE_REDUNDANT_POPUPS,

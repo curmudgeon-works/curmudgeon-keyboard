@@ -78,6 +78,7 @@ public class SettingsValues {
     public final boolean mSwipeMetrics; // opt-in local log of how each swipe ended (first choice / strip / never offered) and the decode time
     public final boolean mSpaceForLangChange;
     public final boolean mShowsEmojiKey;
+    public final boolean mShowsVoiceKey;
     public final boolean mVarToolbarDirection;
     public final boolean mUsePersonalizedDicts;
     public final boolean mUseDoubleSpacePeriod;
@@ -244,6 +245,9 @@ public class SettingsValues {
         mSwipeMetrics = prefs.getBoolean(Settings.PREF_SWIPE_METRICS, Defaults.PREF_SWIPE_METRICS);
         mSpaceForLangChange = prefs.getBoolean(Settings.PREF_SPACE_TO_CHANGE_LANG, Defaults.PREF_SPACE_TO_CHANGE_LANG);
         mShowsEmojiKey = prefs.getBoolean(Settings.PREF_SHOW_EMOJI_KEY, Defaults.PREF_SHOW_EMOJI_KEY);
+        // the voice key right of the space bar: only where voice input is offered (not in passwords or email addresses,
+        // and only with a voice input method on the phone, e.g. Google voice typing)
+        mShowsVoiceKey = mShowsVoiceInputKey && prefs.getBoolean(Settings.PREF_SHOW_VOICE_KEY, Defaults.PREF_SHOW_VOICE_KEY);
         mVarToolbarDirection = mToolbarMode != ToolbarMode.HIDDEN; // the toolbar follows the language's direction (no setting since 0.3.002)
         mUsePersonalizedDicts = prefs.getBoolean(Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Defaults.PREF_KEY_USE_PERSONALIZED_DICTS);
         mUseDoubleSpacePeriod = prefs.getBoolean(Settings.PREF_KEY_USE_DOUBLE_SPACE_PERIOD, Defaults.PREF_KEY_USE_DOUBLE_SPACE_PERIOD)
