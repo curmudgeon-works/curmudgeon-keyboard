@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -181,7 +182,8 @@ private fun AddColorRow(onDismissRequest: () -> Unit, userColors: Collection<Str
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().clickable { askName = true }.padding(start = 10.dp, top = 12.dp, bottom = 12.dp)
     ) {
-        Icon(painterResource(R.drawable.ic_plus), stringResource(R.string.add))
+        // (18 dp, like the Keys row's plus: the full 24 looked too big next to the text)
+        Icon(painterResource(R.drawable.ic_plus), stringResource(R.string.add), Modifier.size(18.dp))
         Text(stringResource(R.string.add_color_theme, defaultName), Modifier.padding(start = 8.dp))
     }
     if (askName)
