@@ -388,11 +388,9 @@ private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: Restore
     val tags = choice.keyboards.flatMap { listOf(it.locale) + getSecondaryLocales(it.extraValues) }.map { it.toLanguageTag() }.toSet()
     val filesDir = ctx.filesDir ?: return
     val deviceProtectedFilesDir = DeviceProtectedUtils.getFilesDir(ctx)
-    // a language's learned words are replaced as a whole, never mixed with the phone's; only where the backup has
-    // learned words for it (else the phone's would be deleted with nothing to replace them)
-    val tagsInBackup = tags.filter { tag -> pending.entries.any {
-        it.substringAfter("unprotected${File.separator}").startsWith("${UserHistoryDictionary.NAME}.$tag.") } }
-    if (choice.learnedWords) for (tag in tagsInBackup) File(filesDir, "${UserHistoryDictionary.NAME}.$tag.dict").deleteRecursively()
+    // learned words are added to the phone's, never replacing them: the backup's store is unpacked aside, then each
+    // word (and word pair) is replayed into the phone's store; the removed-word lists are combined
+    val learnedDir = File(ctx.cacheDir, "restore_learned").apply { deleteRecursively() }
     fun isLearnedWords(path: String) = tags.any { path.startsWith("${UserHistoryDictionary.NAME}.$it.") || path == "blacklists${File.separator}$it.txt" }
     fun isDictionary(path: String) = path.endsWith(DictionaryInfoUtils.USER_DICTIONARY_SUFFIX)
         && tags.any { path.startsWith("dicts${File.separator}$it${File.separator}") }
@@ -422,7 +420,10 @@ private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: Restore
                         Log.w("AdvancedScreen", "error restoring personal dictionary", t)
                     }
                 }
-                choice.learnedWords && isLearnedWords(path) -> FileUtils.copyStreamToNewFile(zip, target)
+                choice.learnedWords && isLearnedWords(path) -> {
+                    val aside = File(learnedDir, path)
+                    if (aside.canonicalPath.startsWith(learnedDir.canonicalPath + File.separator)) FileUtils.copyStreamToNewFile(zip, aside)
+                }
                 choice.dictionaries && isDictionary(path) -> FileUtils.copyStreamToNewFile(zip, target)
                 allSettings && isSettingsFile(path) -> FileUtils.copyStreamToNewFile(zip, target)
             }
@@ -431,6 +432,19 @@ private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: Restore
         }
     }
     if (choice.clipboard) Database.copyFromDb(restoredDb, ctx)
+    if (choice.learnedWords) {
+        val locales = choice.keyboards.flatMap { listOf(it.locale) + getSecondaryLocales(it.extraValues) }.associateBy { it.toLanguageTag() }
+        for ((tag, locale) in locales) {
+            File(learnedDir, "${UserHistoryDictionary.NAME}.$tag.dict").takeIf { it.exists() }?.let { mergeLearnedWords(ctx, it, locale) }
+            File(learnedDir, "blacklists${File.separator}$tag.txt").takeIf { it.isFile }?.let { backupList ->
+                val phoneList = File(filesDir, "blacklists${File.separator}$tag.txt")
+                val have = if (phoneList.isFile) phoneList.readLines().toSet() else emptySet()
+                val add = backupList.readLines().filter { it.isNotBlank() && it !in have }
+                if (add.isNotEmpty()) { phoneList.parentFile?.mkdirs(); phoneList.appendText(add.joinToString("\n", postfix = "\n")) }
+            }
+        }
+        learnedDir.deleteRecursively()
+    }
     if (allSettings) {
         // a backup from before the pictures were per keyboard (or the picture list existed): what app start does once
         val real = ctx.realPrefs()
@@ -680,3 +694,42 @@ private val backupFilePatterns by lazy { listOf(
     "custom_hint_font".toRegex(),
     "custom_suggestion_font".toRegex(),
 ) }
+
+/**
+ * Adds the learned words of a backed-up store ([dictDir], unpacked) to the phone's for [locale]: each word pair and word
+ * is replayed as often as its level says (one use raises a level), with its last use's time, so a word comes out about
+ * as strong as it was; words the phone already knows get stronger.
+ */
+private fun mergeLearnedWords(ctx: Context, dictDir: File, locale: Locale) {
+    val backupDict = com.android.inputmethod.latin.BinaryDictionary(dictDir.absolutePath, 0, dictDir.length(), true, locale,
+        helium314.keyboard.latin.dictionary.Dictionary.TYPE_USER_HISTORY, false)
+    if (!backupDict.isValidDictionary) { backupDict.close(); return }
+    val phone = helium314.keyboard.latin.personalization.PersonalizationHelper.getUserHistoryDictionary(ctx, locale)
+    val words = ArrayList<helium314.keyboard.latin.makedict.WordProperty>()
+    var token = 0
+    do {
+        val result = backupDict.getNextWordProperty(token)
+        val wp = result.mWordProperty ?: break
+        words.add(wp)
+        token = result.mNextToken
+    } while (token != 0)
+    backupDict.close()
+    val isWord = words.associate { it.mWord to !it.mIsNotAWord }
+    val viaPairs = HashMap<String, Int>() // a pair's replay counts its word too
+    for (wp in words) for (ngram in wp.mNgrams.orEmpty()) {
+        val target = ngram.mTargetWord.mWord
+        val info = ngram.mTargetWord.mProbabilityInfo
+        repeat(info.mLevel.coerceIn(1, 15)) {
+            phone.updateEntriesForWord(ngram.mNgramContext, target, isWord[target] ?: true, 1, info.mTimestamp)
+        }
+        viaPairs[target] = (viaPairs[target] ?: 0) + info.mLevel.coerceIn(1, 15)
+    }
+    for (wp in words) {
+        if (wp.mIsBeginningOfSentence) continue
+        val level = wp.mProbabilityInfo.mLevel.coerceIn(1, 15)
+        repeat((level - (viaPairs[wp.mWord] ?: 0)).coerceAtLeast(if (viaPairs.containsKey(wp.mWord)) 0 else 1)) {
+            phone.updateEntriesForWord(helium314.keyboard.latin.NgramContext.EMPTY_PREV_WORDS_INFO, wp.mWord, !wp.mIsNotAWord, 1, wp.mProbabilityInfo.mTimestamp)
+        }
+    }
+    phone.onFinishInput() // saved
+}

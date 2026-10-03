@@ -280,14 +280,10 @@ fun KeyboardsScreen(
                         return@ListPickerDialog
                     }
                     val locale = item as Locale
-                    val settingsSubtype = SubtypeUtilsAdditional.createDefaultSubtype(locale).toSettingsSubtype()
-                    // that keyboard is in the list already: nothing added, and its settings stay its own
-                    if (enabledNow.contains(settingsSubtype)) {
-                        android.widget.Toast.makeText(ctx, ctx.getString(R.string.keyboard_already_added, keyboardName(settingsSubtype, ctx)),
-                            android.widget.Toast.LENGTH_SHORT).show()
-                        showAddKeyboard = false
-                        return@ListPickerDialog
-                    }
+                    val plain = SubtypeUtilsAdditional.createDefaultSubtype(locale).toSettingsSubtype()
+                    // that language's keyboard is in the list already: another one, numbered ("English 2"), so the
+                    // listed one keeps its settings
+                    val settingsSubtype = if (!enabledNow.contains(plain)) plain else nextNumbered(plain)
                     SubtypeUtilsAdditional.changeAdditionalSubtype(settingsSubtype, settingsSubtype, ctx) // registers it unless it equals a built-in one
                     SubtypeSettings.addEnabledSubtype(ctx.prefs(), settingsSubtype.toAdditionalSubtype())
                     if (separate) // a new keyboard starts as a copy of the one in use
@@ -324,14 +320,19 @@ private class CopyOf(val keyboard: SettingsSubtype)
  * Adds a copy of [source]: the same languages and layout, told apart by a number; with [withOwnSettings] it takes
  * [source]'s own settings (separate settings), otherwise it starts from the common ones.
  */
-private fun copyKeyboard(ctx: Context, source: SettingsSubtype, withOwnSettings: Boolean) {
-    val real = ctx.realPrefs()
+/** [source] with the lowest copy number ("English 2", 3, ...) no listed keyboard has. */
+private fun nextNumbered(source: SettingsSubtype): SettingsSubtype {
     val base = source.without(ExtraValue.KEYBOARD_COPY)
     val taken = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }
         .filter { it.without(ExtraValue.KEYBOARD_COPY) == base }
         .mapNotNull { it.getExtraValueOf(ExtraValue.KEYBOARD_COPY)?.toIntOrNull() }
     val number = generateSequence(2) { it + 1 }.first { it !in taken }
-    val copy = base.with(ExtraValue.KEYBOARD_COPY, number.toString())
+    return base.with(ExtraValue.KEYBOARD_COPY, number.toString())
+}
+
+private fun copyKeyboard(ctx: Context, source: SettingsSubtype, withOwnSettings: Boolean) {
+    val real = ctx.realPrefs()
+    val copy = nextNumbered(source)
     SubtypeUtilsAdditional.changeAdditionalSubtype(copy, copy, ctx) // registers it
     SubtypeSettings.addEnabledSubtype(ctx.prefs(), copy.toAdditionalSubtype())
     KeyboardProfiles.copy(real, if (withOwnSettings) KeyboardProfiles.idFor(real, source) else KeyboardProfiles.SHARED,
