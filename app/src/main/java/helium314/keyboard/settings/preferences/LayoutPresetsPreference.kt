@@ -58,6 +58,15 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
     val summary = chosen?.let { if (tweaked) it.name + " (" + stringResource(R.string.theme_tweaked) + ")" else it.name }
         ?: stringResource(R.string.layout_presets_summary)
     Preference(name = stringResource(R.string.layout_presets), description = summary, onClick = { showList = true }) { NextScreenIcon() }
+    // while the list is open nothing of the keyboard's is cleaned up (its unsaved layout must survive a preview
+    // for Cancel); afterwards what no keyboard uses goes
+    if (showList) androidx.compose.runtime.DisposableEffect(Unit) {
+        helium314.keyboard.latin.utils.LayoutUtilsCustom.cleanupHeld++
+        onDispose {
+            helium314.keyboard.latin.utils.LayoutUtilsCustom.cleanupHeld--
+            helium314.keyboard.latin.utils.LayoutUtilsCustom.removeUnusedPrivateLayouts(ctx)
+        }
+    }
     if (showList)
         ListPickerDialog(
             onDismissRequest = {
