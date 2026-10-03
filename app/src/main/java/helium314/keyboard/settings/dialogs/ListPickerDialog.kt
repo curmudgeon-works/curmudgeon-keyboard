@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.dialogs
 
-import helium314.keyboard.settings.scrollbar
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -68,7 +67,7 @@ fun <T: Any> ListPickerDialog(
             CompositionLocalProvider(
                 LocalTextStyle provides MaterialTheme.typography.bodyLarge
             ) {
-                LazyColumn(state = state, modifier = Modifier.scrollbar(state)) {
+                LazyColumn(state = state) {
                     items(items) { item ->
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
