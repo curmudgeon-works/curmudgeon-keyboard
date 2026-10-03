@@ -16,7 +16,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MultiChoiceSegmentedButtonRow
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.foundation.clickable
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -99,17 +98,6 @@ fun ToolbarKeysPreference(setting: Setting) {
     }
     // what the three prefs held when the dialog opened (null = unset), for Cancel
     val opened = remember { toolbars.map { prefs.getString(it, null) } }
-    // "Pin toolbar key on long press" (its own setting once, on Others): a checkbox under the list, only for a toolbar
-    // that opens with the arrow; written at once like the keys, put back on Cancel
-    val expandable = Settings.readToolbarMode(prefs) == helium314.keyboard.latin.utils.ToolbarMode.EXPANDABLE
-    val openedQuickPin = remember { prefs.all[Settings.PREF_QUICK_PIN_TOOLBAR_KEYS] as? Boolean }
-    var quickPin by remember { mutableStateOf(prefs.getBoolean(Settings.PREF_QUICK_PIN_TOOLBAR_KEYS, Defaults.PREF_QUICK_PIN_TOOLBAR_KEYS)) }
-    fun setQuickPin(pin: Boolean) {
-        quickPin = pin
-        prefs.edit { putBoolean(Settings.PREF_QUICK_PIN_TOOLBAR_KEYS, pin) }
-        KeyboardSwitcher.getInstance().setThemeNeedsReload()
-        helium314.keyboard.latin.suggestions.SuggestionStripView.showToolbarForPreview(true) // (a reload closes it)
-    }
     var confirmed by remember { mutableStateOf(false) }
     fun write() {
         prefs.edit {
@@ -129,19 +117,14 @@ fun ToolbarKeysPreference(setting: Setting) {
     ThreeButtonAlertDialog(
         onDismissRequest = {
             if (!confirmed) { // Cancel / back / outside: the lists as they were
-                prefs.edit {
-                    toolbars.forEachIndexed { t, key -> if (opened[t] == null) remove(key) else putString(key, opened[t]) }
-                    if (openedQuickPin == null) remove(Settings.PREF_QUICK_PIN_TOOLBAR_KEYS)
-                    else putBoolean(Settings.PREF_QUICK_PIN_TOOLBAR_KEYS, openedQuickPin)
-                }
+                prefs.edit { toolbars.forEachIndexed { t, key -> if (opened[t] == null) remove(key) else putString(key, opened[t]) } }
                 KeyboardSwitcher.getInstance().setThemeNeedsReload()
             }
             showDialog = false
         },
         title = { Text(setting.title) },
         neutralButtonText = stringResource(R.string.button_default),
-        onNeutral = { confirmed = true; prefs.edit { toolbars.forEach { remove(it) }; remove(Settings.PREF_QUICK_PIN_TOOLBAR_KEYS) }
-            KeyboardSwitcher.getInstance().setThemeNeedsReload() },
+        onNeutral = { confirmed = true; prefs.edit { toolbars.forEach { remove(it) } }; KeyboardSwitcher.getInstance().setThemeNeedsReload() },
         onConfirmed = { confirmed = true; write() },
         content = {
             Column {
@@ -180,17 +163,6 @@ fun ToolbarKeysPreference(setting: Setting) {
                                 }
                             }
                         }
-                    }
-                }
-                if (expandable) Row(
-                    Modifier.padding(top = 8.dp).clickable { setQuickPin(!quickPin) },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    androidx.compose.material3.Checkbox(checked = quickPin, onCheckedChange = { setQuickPin(it) })
-                    Column {
-                        Text(stringResource(R.string.quick_pin_toolbar_keys), style = MaterialTheme.typography.bodyMedium)
-                        Text(stringResource(R.string.quick_pin_toolbar_keys_summary), style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
