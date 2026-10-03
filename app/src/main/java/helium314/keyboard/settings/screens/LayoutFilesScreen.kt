@@ -106,11 +106,29 @@ fun LayoutFilesScreen(onClickBack: () -> Unit) {
 
     // (no files: layouts go in and out by copy and paste; the one file the app writes is the backup)
 
+    // Built-in over a tab's own text asks first; leaving with unsaved tabs asks Save / Discard
+    var askBuiltIn by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    var askLeave by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    fun leave() { if (changed.isNotEmpty()) askLeave = true else onClickBack() }
+    androidx.activity.compose.BackHandler(enabled = changed.isNotEmpty()) { leave() }
+    if (askBuiltIn) helium314.keyboard.settings.dialogs.ConfirmationDialog(
+        onDismissRequest = { askBuiltIn = false },
+        title = { Text(stringResource(R.string.layout_files_builtin)) },
+        content = { Text(stringResource(R.string.layout_files_builtin_confirm)) },
+        onConfirmed = { texts[type] = builtIn(type) },
+    )
+    if (askLeave) helium314.keyboard.settings.dialogs.UnsavedChangesDialog(
+        onKeepWorking = { askLeave = false },
+        onDiscardAndExit = { askLeave = false; onClickBack() },
+        // a broken tab (!) can't be saved: back to the editor, where the tabs show it
+        onSaveAndExit = { askLeave = false; if (invalid.isEmpty()) { save(); onClickBack() } },
+    )
+
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
         topBar = { TopAppBar(
             title = { Text(stringResource(R.string.layout_files)) },
-            navigationIcon = { BackButton(onClickBack) },
+            navigationIcon = { BackButton(::leave) },
             actions = { Button(onClick = ::save, enabled = changed.isNotEmpty() && invalid.isEmpty(),
                 modifier = Modifier.padding(end = 8.dp)) { Text(stringResource(R.string.save)) } },
         ) },
@@ -133,7 +151,8 @@ fun LayoutFilesScreen(onClickBack: () -> Unit) {
                 supportingText = { if (type in invalid) Text(stringResource(R.string.layout_files_invalid)) },
             )
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
-                TextButton(onClick = { texts[type] = builtIn(type) }) { Text(stringResource(R.string.layout_files_builtin)) }
+                // (only asks when the tab's text would be lost: already the built-in one, nothing to do)
+                TextButton(onClick = { if (texts[type] != builtIn(type)) askBuiltIn = true }) { Text(stringResource(R.string.layout_files_builtin)) }
             }
         }
     }
