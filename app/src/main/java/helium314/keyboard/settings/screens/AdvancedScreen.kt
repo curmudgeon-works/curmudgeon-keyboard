@@ -86,8 +86,7 @@ fun AdvancedSettingsScreen(
         SettingsWithoutKey.FACTORY_RESET,
         if (BuildConfig.DEBUG || prefs.getBoolean(DebugSettings.PREF_SHOW_DEBUG_SETTINGS, Defaults.PREF_SHOW_DEBUG_SETTINGS))
             SettingsWithoutKey.DEBUG_SETTINGS else null,
-        // (once under Experimental; now with the rest)
-        Settings.PREF_EMOJI_MAX_SDK,
+        // (once under Experimental; the emoji version is on Appearance's Emoji group, next to the emoji font)
         Settings.PREF_URL_DETECTION,
         // (recording the swipe corpus and logging swipe results: on the Swipe screen, Swipe logging)
     )

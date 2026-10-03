@@ -178,6 +178,8 @@ fun AppearanceScreen(
         if (prefs.getInt(Settings.PREF_EMOJI_MAX_SDK, 0) >= 24)
             Settings.PREF_EMOJI_SKIN_TONE else null,
         SettingsWithoutKey.CUSTOM_EMOJI_FONT,
+        // which emojis show: what the emoji font can draw, overridable (e.g. for a newer font); advanced
+        Settings.PREF_EMOJI_MAX_SDK,
         Settings.PREF_SHOW_EMOJI_DESCRIPTIONS,
     )
     // every change shows on the live keyboard at once; the draft remembers how things were when the screen opened
@@ -272,7 +274,8 @@ fun AppearanceScreen(
 }
 
 /** Settings whose change is best seen on the emoji panel. */
-private val emojiKeys = setOf(Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT, Settings.PREF_EMOJI_SKIN_TONE)
+private val emojiKeys = setOf(Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT, Settings.PREF_EMOJI_SKIN_TONE,
+    Settings.PREF_EMOJI_MAX_SDK, Settings.PREF_EMOJI_FONT)
 
 fun createAppearanceSettings(context: Context) = listOf(
     Setting(context, SettingsWithoutKey.FONTS, R.string.fonts_title) {
