@@ -396,8 +396,6 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         } else {
             suggestionsStrip.addView(view)
         }
-
-        if (Settings.getValues().mAutoHideToolbar) setToolbarVisibility(false)
     }
 
     fun setMoreSuggestionsHeight(remainingHeight: Int) {
@@ -645,10 +643,6 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         setSuggestions(newSuggestedWords, direction != 1)
         suggestionsStrip.isVisible = true
 
-        // Show the toolbar if no suggestions are left and the "Auto show toolbar" setting is enabled
-        if (this.suggestedWords.isEmpty && Settings.getValues().mAutoShowToolbar) {
-            setToolbarVisibility(true)
-        }
     }
 
     private fun clear() {
