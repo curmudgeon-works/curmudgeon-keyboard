@@ -180,7 +180,9 @@ private fun backupLauncher(onError: (String) -> Unit): ManagedActivityResultLaun
                         zipStream.closeEntry()
                     }
                     zipStream.putNextEntry(ZipEntry(PREFS_FILE_NAME))
-                    settingsToJsonStream(ctx.realPrefs().all, zipStream) // every keyboard's set, not just the edited one
+                    // every keyboard's set, not just the edited one; settings at their default written out too, so a phone or
+                    // version with other defaults restores what this one did
+                    settingsToJsonStream(helium314.keyboard.settings.SettingDefaults.explicit(ctx.realPrefs().all).mapKeys { it.key as String? }, zipStream)
                     zipStream.closeEntry()
                     zipStream.putNextEntry(ZipEntry(PROTECTED_PREFS_FILE_NAME))
                     settingsToJsonStream(ctx.protectedPrefs().all, zipStream)

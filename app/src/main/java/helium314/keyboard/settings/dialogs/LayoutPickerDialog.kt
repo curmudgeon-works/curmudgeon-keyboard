@@ -69,7 +69,7 @@ fun LayoutPickerDialog(
 
     val currentLayout = Settings.readDefaultLayoutName(layoutType, prefs)
     val internalLayouts = LayoutUtils.getAvailableLayouts(layoutType, ctx)
-    val customLayouts = LayoutUtilsCustom.getLayoutFiles(layoutType, ctx).map { it.name }.sorted()
+    val customLayouts = LayoutUtilsCustom.listedLayoutNames(layoutType, ctx).sorted() // (keyboards' unnamed copies are theirs)
     val layouts = internalLayouts + customLayouts + ""
 
     val state = rememberLazyListState()

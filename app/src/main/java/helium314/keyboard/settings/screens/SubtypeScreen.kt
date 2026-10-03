@@ -262,7 +262,8 @@ fun SubtypeScreen(
         }
     }
     DisposableEffect(Unit) { onDispose { (ctx.getActivity() as? SettingsActivity)?.touchPassFromY = Int.MAX_VALUE } }
-    val customMainLayouts = LayoutUtilsCustom.getLayoutFiles(LayoutType.MAIN, ctx, currentSubtype.locale).map { it.name }
+    // (the named ones, and this keyboard's own unnamed copy of a deleted one)
+    val customMainLayouts = LayoutUtilsCustom.listedLayoutNames(LayoutType.MAIN, ctx, currentSubtype.locale, currentSubtype.mainLayoutName())
     // checked when leaving (the top bar's arrow may hold an older copy of this function)
     fun leave() { if (draft.hasChanges(ctx)) askOnLeave = true else { LayoutDraft.close(); onClickBack() } }
     fun discardChanges() {
@@ -588,26 +589,22 @@ private fun MainLayoutRow(
                 Text(SubtypeLocaleUtils.getLayoutDisplayNameInSystemLocale(it, currentSubtype.locale))
                 Row (verticalAlignment = Alignment.CenterVertically) {
                     IconButton({ showLayoutEditDialog = it to null }) { Icon(painterResource(R.drawable.ic_edit), stringResource(R.string.edit_layout)) }
-                    if (it in customLayouts)
+                    if (it in customLayouts && !LayoutUtilsCustom.isPrivateLayout(it))
                         IconButton({ showLayoutDeleteDialog = true }) { Icon(painterResource(R.drawable.ic_bin), stringResource(R.string.delete)) }
                 }
             }
             if (showLayoutDeleteDialog) {
                 val others = SubtypeSettings.getAdditionalSubtypes().filter { st -> st.mainLayoutName() == it }
-                    .any { st -> st.toSettingsSubtype() != currentSubtype }
+                    .any() // (this one included: every keyboard using it keeps the keys)
                 ConfirmationDialog(
                     onDismissRequest = { showLayoutDeleteDialog = false },
                     confirmButtonText = stringResource(R.string.delete),
                     title = { Text(stringResource(R.string.delete_layout, LayoutUtilsCustom.getDisplayName(it))) },
                     content = { if (others) Text(stringResource(R.string.layout_in_use)) },
                     onConfirmed = {
-                        if (it == currentSubtype.mainLayoutName()) {
-                            // similar to what is done in SubtypeSettings.onRenameLayout
-                            val defaultLayout = SubtypeSettings.getResourceSubtypesForLocale(currentSubtype.locale).firstOrNull()?.mainLayoutName()
-                            val newSubtype = if (defaultLayout == null) currentSubtype.withoutLayout(LayoutType.MAIN)
-                                else currentSubtype.withLayout(LayoutType.MAIN, defaultLayout)
-                            setCurrentSubtype(newSubtype)
-                        }
+                        // this keyboard keeps the keys as its own unnamed copy (the others too, in deleteLayout)
+                        if (it == currentSubtype.mainLayoutName())
+                            setCurrentSubtype(currentSubtype.withLayout(LayoutType.MAIN, LayoutUtilsCustom.makePrivateCopy(it, LayoutType.MAIN, ctx)))
                         LayoutUtilsCustom.deleteLayout(it, LayoutType.MAIN, ctx)
                         (ctx.getActivity() as? SettingsActivity)?.prefChanged()
                     }
@@ -684,7 +681,7 @@ private fun SecondaryLayoutRow(
         val explicitLayout = currentSubtype.layoutName(type)
         val layout = explicitLayout ?: Settings.readDefaultLayoutName(type, prefs)
         val defaultLayouts = builtIns(LayoutUtils.getAvailableLayouts(type, ctx).toList())
-        val customLayouts = LayoutUtilsCustom.getLayoutFiles(type, ctx).map { it.name }
+        val customLayouts = LayoutUtilsCustom.listedLayoutNames(type, ctx, current = explicitLayout)
         DropDownField(
             items = defaultLayouts + customLayouts,
             selectedItem = layout,

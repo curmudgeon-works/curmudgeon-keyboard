@@ -116,7 +116,18 @@ object LayoutUtilsCustom {
         customLayoutMap.clear()
     }
 
+    /**
+     * Deleting a layout takes its name off the list, not its keys from the keyboards using it: each of them gets a copy
+     * of its own, unnamed ("Unsaved layout", offered to no other keyboard), which goes when that keyboard does or picks
+     * another layout. Keyboards that only used it as the default for its type go back to the built-in one.
+     */
     fun deleteLayout(layoutName: String, layoutType: LayoutType, context: Context) {
+        val prefs = context.prefs()
+        val users = (SubtypeSettings.createSettingsSubtypes(prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!)
+            + SubtypeSettings.createSettingsSubtypes(prefs.getString(Settings.PREF_ADDITIONAL_SUBTYPES, Defaults.PREF_ADDITIONAL_SUBTYPES)!!))
+            .distinct().filter { it.layoutName(layoutType) == layoutName }
+        for (keyboard in users)
+            SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, keyboard.withLayout(layoutType, makePrivateCopy(layoutName, layoutType, context)), context)
         getLayoutFile(layoutName, layoutType, context).delete()
         onLayoutFileChanged()
         SubtypeSettings.onRenameLayout(layoutType, layoutName, null, context)
@@ -124,7 +135,9 @@ object LayoutUtilsCustom {
     }
 
     fun getDisplayName(layoutName: String) =
-        try {
+        if (isPrivateLayout(layoutName))
+            Settings.getCurrentContext()?.getString(helium314.keyboard.latin.R.string.unsaved_layout) ?: "Unsaved layout"
+        else try {
             if (layoutName.count { it == '.' } == 3) // main layout: "custom.<locale or script>.<name>.", other: custom.<name>.
                 decodeBase36(layoutName.substringAfter(CUSTOM_LAYOUT_PREFIX).substringAfter(".").substringBeforeLast("."))
             else decodeBase36(layoutName.substringAfter(CUSTOM_LAYOUT_PREFIX).substringBeforeLast("."))
@@ -143,6 +156,39 @@ object LayoutUtilsCustom {
     }
 
     fun isCustomLayout(layoutName: String) = layoutName.startsWith(CUSTOM_LAYOUT_PREFIX)
+
+    /** A keyboard's own copy of a deleted layout: "custom.<scope>.~<n>." (main) or "custom.~<n>." */
+    fun isPrivateLayout(layoutName: String) = isCustomLayout(layoutName) && layoutName.contains(".$PRIVATE_MARK")
+
+    /** The layouts a picker offers: the named ones, plus [current] when it's the keyboard's own unnamed copy. */
+    fun listedLayoutNames(layoutType: LayoutType, context: Context, locale: Locale? = null, current: String? = null): List<String> =
+        getLayoutFiles(layoutType, context, locale).map { it.name }.filterNot { isPrivateLayout(it) } +
+            listOfNotNull(current?.takeIf { isPrivateLayout(it) })
+
+    /** A private copy of [layoutName] (same keys), for one keyboard; returns its name. */
+    fun makePrivateCopy(layoutName: String, layoutType: LayoutType, context: Context): String {
+        val scope = if (layoutType == LayoutType.MAIN) layoutName.removePrefix(CUSTOM_LAYOUT_PREFIX).substringBefore(".") + "." else ""
+        var number = System.currentTimeMillis()
+        var name: String
+        do { name = CUSTOM_LAYOUT_PREFIX + scope + PRIVATE_MARK + number++.toString(36) + "." } while (getLayoutFile(name, layoutType, context).exists())
+        getLayoutFile(name, layoutType, context).writeText(getLayoutFile(layoutName, layoutType, context).readText())
+        onLayoutFileChanged()
+        return name
+    }
+
+    /** Deletes the private layouts no keyboard uses any more (its keyboard deleted, or switched to another layout). */
+    fun removeUnusedPrivateLayouts(context: Context) {
+        val prefs = context.prefs()
+        val used = (SubtypeSettings.createSettingsSubtypes(prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!)
+            + SubtypeSettings.createSettingsSubtypes(prefs.getString(Settings.PREF_ADDITIONAL_SUBTYPES, Defaults.PREF_ADDITIONAL_SUBTYPES)!!)
+            + prefs.getString(Settings.PREF_SELECTED_SUBTYPE, Defaults.PREF_SELECTED_SUBTYPE)!!.toSettingsSubtype())
+            .flatMap { kb -> LayoutType.entries.mapNotNull { kb.layoutName(it) } }.toSet()
+        var removed = false
+        for (type in LayoutType.entries)
+            for (file in getLayoutFiles(type, context))
+                if (isPrivateLayout(file.name) && file.name !in used) { file.delete(); removed = true }
+        if (removed) onLayoutFileChanged()
+    }
 
     fun getLayoutFile(layoutName: String, layoutType: LayoutType, context: Context): File {
         val file = File(DeviceProtectedUtils.getFilesDir(context), layoutType.folder + File.separator + layoutName)
@@ -183,6 +229,7 @@ object LayoutUtilsCustom {
 
     // this goes into prefs and file names, so do not change!
     const val CUSTOM_LAYOUT_PREFIX = "custom."
+    private const val PRIVATE_MARK = "~"
     private const val TAG = "LayoutUtilsCustom"
     private val customLayoutMap = EnumMap<LayoutType, List<File>>(LayoutType::class.java)
 }
