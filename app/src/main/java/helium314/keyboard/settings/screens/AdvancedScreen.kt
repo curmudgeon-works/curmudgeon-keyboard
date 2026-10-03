@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -208,8 +211,7 @@ fun createAdvancedSettings(context: Context) = listOf(
         )
     },
     Setting(context, Settings.PREF_UNDO_UNIT, R.string.undo_unit) {
-        ListPreference(it, listOf(stringResource(R.string.undo_unit_word) to "word",
-            stringResource(R.string.undo_unit_character) to "character"), Defaults.PREF_UNDO_UNIT)
+        UnitChoiceRow(it, Defaults.PREF_UNDO_UNIT)
     },
     // how many suggestions the strip shows, and rules for the 2nd one on (SuggestionRules)
     Setting(context, Settings.PREF_SUGGESTION_RULES, R.string.customize_suggestions) {
@@ -228,8 +230,7 @@ fun createAdvancedSettings(context: Context) = listOf(
         )
     },
     Setting(context, Settings.PREF_REDO_UNIT, R.string.redo_unit) {
-        ListPreference(it, listOf(stringResource(R.string.undo_unit_word) to "word",
-            stringResource(R.string.undo_unit_character) to "character"), Defaults.PREF_REDO_UNIT)
+        UnitChoiceRow(it, Defaults.PREF_REDO_UNIT)
     },
     Setting(context, SettingsWithoutKey.DEBUG_SETTINGS, R.string.debug_settings_title) {
         Preference(
@@ -315,6 +316,26 @@ private fun Preview() {
     Theme(previewDark) {
         Surface {
             AdvancedSettingsScreen { }
+        }
+    }
+}
+
+/** A character or a whole word per press (undo / redo): two buttons in the row, like a language's L / M / H. */
+@Composable
+private fun UnitChoiceRow(setting: Setting, default: String) {
+    val prefs = LocalContext.current.prefs()
+    var value by remember { mutableStateOf(prefs.getString(setting.key, default) ?: default) }
+    val options = listOf("character" to stringResource(R.string.undo_unit_char_short), "word" to stringResource(R.string.undo_unit_word_short))
+    Preference(name = setting.title, onClick = { }) {
+        SingleChoiceSegmentedButtonRow {
+            options.forEachIndexed { index, (v, label) ->
+                SegmentedButton(
+                    selected = value == v,
+                    onClick = { value = v; prefs.edit { putString(setting.key, v) } },
+                    shape = SegmentedButtonDefaults.itemShape(index, options.size),
+                    label = { Text(label) },
+                )
+            }
         }
     }
 }

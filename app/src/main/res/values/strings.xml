@@ -361,6 +361,9 @@
     <string name="redo_unit">Redo restores</string>
     <string name="undo_unit_word">A whole word</string>
     <string name="undo_unit_character">One character</string>
+    <!-- the two buttons in the undo and redo rows -->
+    <string name="undo_unit_char_short">Char</string>
+    <string name="undo_unit_word_short">Word</string>
     <!-- Customize suggestions (Others): how many suggestions, and a rule per position from the 2nd on -->
     <string name="customize_suggestions">Customize suggestions</string>
     <string name="suggestion_count_title">Number of suggestions: %s</string>
