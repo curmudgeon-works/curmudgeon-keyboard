@@ -205,39 +205,63 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                 initialText = if (current.userName != null) "" else stringResource(R.string.key_popups_my_set),
                 checkTextValid = { it.isNotBlank() },
             )
+        // a tap shows the preset on the preview and the list stays (like Themes); OK keeps it, Cancel puts back what
+        // was there when the list opened (the keyboard's accents and symbols page, the arrangement, the set, the map)
+        val opened = remember(showAccentsDialog) { keyboard to listOf(prefs.getString(KeyPopupOverrides.PREF, null),
+            prefs.getString(KeyPopupOverrides.PREF_SELECTED_SET, null), prefs.getString(Settings.PREF_SYMBOL_POPUP_MAP, null)) }
+        var confirmed by remember(showAccentsDialog) { mutableStateOf(false) }
+        fun putBack() {
+            val (kb, values) = opened
+            prefs.edit().apply {
+                listOf(KeyPopupOverrides.PREF, KeyPopupOverrides.PREF_SELECTED_SET, Settings.PREF_SYMBOL_POPUP_MAP).zip(values)
+                    .forEach { (key, value) -> if (value == null) remove(key) else putString(key, value) }
+            }.apply()
+            if (keyboard != kb) onKeyboardChanged(kb)
+            generation++
+            reloadPreview()
+        }
+        /** [preset] on the keyboard: its accents level and symbols page, its arrangement (a built-in has none), the set's
+         *  name, the letter-to-symbol map. */
+        fun applyPreset(preset: Preset) {
+            var changed = keyboard.with(ExtraValue.MORE_POPUPS, preset.morePopups)
+            changed = if (preset.symbolsLayout == null) changed.withoutLayout(LayoutType.SYMBOLS)
+                else changed.withLayout(LayoutType.SYMBOLS, preset.symbolsLayout)
+            KeyPopupOverrides.save(prefs, preset.overrides ?: emptyMap())
+            prefs.edit().apply {
+                if (preset.userName != null) putString(KeyPopupOverrides.PREF_SELECTED_SET, preset.userName) else remove(KeyPopupOverrides.PREF_SELECTED_SET)
+                if (preset.symbolMap != null) putString(Settings.PREF_SYMBOL_POPUP_MAP, preset.symbolMap)
+            }.apply()
+            onKeyboardChanged(changed)
+            generation++
+            reloadPreview()
+        }
         if (showAccentsDialog)
             ListPickerDialog(
-                onDismissRequest = { showAccentsDialog = false },
+                onDismissRequest = { if (!confirmed) putBack(); showAccentsDialog = false },
                 title = { Text(stringResource(R.string.key_popups_presets)) },
                 items = presets,
                 getItemName = { presetName(it) },
                 selectedItem = current,
+                confirmImmediately = false,
+                onItemHighlighted = { applyPreset(it) },
+                // (rename / delete: what was only previewed is put back first)
                 trailing = { p -> p.userName?.let { name ->
-                    IconButton({ showAccentsDialog = false; setToRename = name }) { Icon(painterResource(R.drawable.ic_edit), stringResource(R.string.key_popups_rename_set)) }
-                    DeleteButton { showAccentsDialog = false; setToDelete = name }
+                    IconButton({ if (!confirmed) putBack(); confirmed = true; showAccentsDialog = false; setToRename = name }) { Icon(painterResource(R.drawable.ic_edit), stringResource(R.string.key_popups_rename_set)) }
+                    DeleteButton { if (!confirmed) putBack(); confirmed = true; showAccentsDialog = false; setToDelete = name }
                 } },
                 // the current arrangement (built-in or own, with any changes) as a new set of the user's own
                 footer = {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        modifier = Modifier.fillMaxWidth().clickable { showAccentsDialog = false; pendingChange = null; showSaveAsDialog = true }
+                        // (saving keeps what's on the keyboard now, a previewed preset included: that's what gets saved)
+                        modifier = Modifier.fillMaxWidth().clickable { confirmed = true; showAccentsDialog = false; pendingChange = null; showSaveAsDialog = true }
                             .padding(horizontal = 8.dp).heightIn(min = 48.dp)) {
                         Icon(painterResource(R.drawable.ic_plus), null, Modifier.padding(horizontal = 12.dp))
                         Text(stringResource(R.string.key_popups_save_as_new), color = MaterialTheme.colorScheme.primary)
                     }
                 },
                 onItemSelected = { preset ->
-                    var changed = keyboard.with(ExtraValue.MORE_POPUPS, preset.morePopups)
-                    changed = if (preset.symbolsLayout == null) changed.withoutLayout(LayoutType.SYMBOLS)
-                        else changed.withLayout(LayoutType.SYMBOLS, preset.symbolsLayout)
-                    // a saved set brings its arrangement; a built-in has none
-                    KeyPopupOverrides.save(prefs, preset.overrides ?: emptyMap())
-                    prefs.edit().apply {
-                        if (preset.userName != null) putString(KeyPopupOverrides.PREF_SELECTED_SET, preset.userName) else remove(KeyPopupOverrides.PREF_SELECTED_SET)
-                        if (preset.symbolMap != null) putString(Settings.PREF_SYMBOL_POPUP_MAP, preset.symbolMap)
-                    }.apply()
-                    onKeyboardChanged(changed)
-                    generation++
-                    reloadPreview()
+                    confirmed = true
+                    applyPreset(preset)
                     preview?.keepAfterClose() // the picked popups stay on the preview a while
                 }
             )
