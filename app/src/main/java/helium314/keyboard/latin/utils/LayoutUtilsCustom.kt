@@ -187,6 +187,12 @@ object LayoutUtilsCustom {
         return name
     }
 
+    /** Whether going from [before] to [after] leaves one of [before]'s private (unsaved) layouts unused. */
+    fun dropsUnsaved(before: helium314.keyboard.latin.settings.SettingsSubtype, after: helium314.keyboard.latin.settings.SettingsSubtype): Boolean {
+        val kept = LayoutType.entries.mapNotNull { after.layoutName(it) }.toSet()
+        return LayoutType.entries.mapNotNull { before.layoutName(it) }.any { isPrivateLayout(it) && it !in kept }
+    }
+
     /** Deletes the private layouts no keyboard uses any more (its keyboard deleted, or switched to another layout). */
     fun removeUnusedPrivateLayouts(context: Context) {
         if (cleanupHeld > 0) return // a preview is open: Cancel may need them again (it calls this when it closes)

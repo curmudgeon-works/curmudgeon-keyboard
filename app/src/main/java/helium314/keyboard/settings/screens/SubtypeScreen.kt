@@ -566,6 +566,22 @@ private fun MainLayoutRow(
         val appLayouts = LayoutUtils.getAvailableLayouts(LayoutType.MAIN, ctx, currentSubtype.locale)
         var showAddLayoutDialog by remember { mutableStateOf(false) }
         var showLayoutEditDialog: Pair<String, String?>? by remember { mutableStateOf(null) }
+        var keysToConfirm: String? by remember { mutableStateOf(null) } // replacing an unsaved layout: asked first
+        fun pickKeys(layout: String) {
+            // if the locale defaults to qwerty, use it as implicit default to avoid creating unnecessary additional subtypes
+            if (layout == SubtypeLocaleUtils.QWERTY
+                && SubtypeSettings.getResourceSubtypesForLocale(currentSubtype.locale).any { it.mainLayoutName() == null })
+                setCurrentSubtype(currentSubtype.withoutLayout(LayoutType.MAIN))
+            else setCurrentSubtype(currentSubtype.withLayout(LayoutType.MAIN, layout))
+        }
+        keysToConfirm?.let { layout ->
+            ConfirmationDialog(
+                onDismissRequest = { keysToConfirm = null },
+                title = { Text(stringResource(R.string.layout_keys)) },
+                content = { Text(stringResource(R.string.unsaved_layout_will_be_lost)) },
+                onConfirmed = { pickKeys(layout); keysToConfirm = null },
+            )
+        }
         val layoutPicker = layoutFilePicker { content, name ->
             showLayoutEditDialog = (name ?: "new layout") to content
         }
@@ -579,11 +595,10 @@ private fun MainLayoutRow(
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } },
             onSelected = { layout ->
-                // if the locale defaults to qwerty, use it as implicit default to avoid creating unnecessary additional subtypes
-                if (layout == SubtypeLocaleUtils.QWERTY
-                    && SubtypeSettings.getResourceSubtypesForLocale(currentSubtype.locale).any { it.mainLayoutName() == null })
-                    setCurrentSubtype(currentSubtype.withoutLayout(LayoutType.MAIN))
-                else setCurrentSubtype(currentSubtype.withLayout(LayoutType.MAIN, layout))
+                // other keys than the keyboard's unsaved layout: that one is lost, asked first
+                if (currentSubtype.mainLayoutName()?.let { LayoutUtilsCustom.isPrivateLayout(it) } == true && layout != currentSubtype.mainLayoutName())
+                    keysToConfirm = layout
+                else pickKeys(layout)
             },
             extraButton = {
                 IconButton({ showAddLayoutDialog = true }) // (a smaller plus: the row's text is small next to it)

@@ -876,6 +876,7 @@ language, hence "No language". -->
     <string name="layout_in_use">Keyboards using it keep its keys, as an unsaved layout of their own.</string>
     <!-- a keyboard's own copy of a deleted custom layout (no name; edit it to save it under a name) -->
     <string name="unsaved_layout">Unsaved layout</string>
+    <string name="unsaved_layout_will_be_lost">This keyboard\'s unsaved layout will be lost. To keep it, cancel, then give it a name: Keys, its pencil, a name, Save.</string>
     <!-- Message on layout error -->
     <string name="layout_error">Layout error: %s</string>
     <!-- Text hint for editing layout -->
