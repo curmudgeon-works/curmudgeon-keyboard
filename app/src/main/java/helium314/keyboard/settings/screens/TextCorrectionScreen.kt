@@ -299,6 +299,7 @@ fun createCorrectionSettings(context: Context) = listOf(
                 onConfirmed = {
                     prefs.edit { putBoolean(setting.key, false) }
                 },
+                title = { Text(setting.title) },
                 content = { Text(stringResource(R.string.disable_personalized_dicts_message)) }
             )
         }

@@ -442,6 +442,7 @@ fun createAppearanceSettings(context: Context) = listOf(
             ThreeButtonAlertDialog(
                 onDismissRequest = { show = false },
                 onConfirmed = {},
+                title = { Text(stringResource(R.string.enable_split_keyboard)) },
                 confirmButtonText = null,
                 cancelButtonText = stringResource(R.string.dialog_close),
                 content = {
