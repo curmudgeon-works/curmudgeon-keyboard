@@ -227,6 +227,8 @@ fun SubtypeScreen(
     val tryIt = remember { TryItState() }
     // back from Android's settings (sound / vibration switched there): the input rows are worked out again
     var resumed by remember { mutableIntStateOf(0) }
+    // and when the phone is silenced or unsilenced with the screen open (volume keys, quick settings)
+    val feedbackChanges = helium314.keyboard.settings.preferences.SystemFeedback.rememberChanges()
     val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
@@ -449,7 +451,7 @@ fun SubtypeScreen(
                 // ---- typing: key-press popup, vibration, sound, per-app keyboard, localized number row
                 WithBigTitle(stringResource(R.string.settings_category_input)) {
                     CompositionLocalProvider(LocalCompactPreferences provides true) {
-                        (if (resumed >= 0) preferencesInputItems(prefs, ctx) else emptyList()).filter { it !in advancedInputItems }.forEach {
+                        (if (resumed >= 0 && feedbackChanges >= 0) preferencesInputItems(prefs, ctx) else emptyList()).filter { it !in advancedInputItems }.forEach {
                             if (it !is String) return@forEach
                             CompositionLocalProvider(LocalPendingChange provides keyChanged(it)) {
                             // the rows that appear under Vibrate / Sound when they're on sit a little in; the dialogs

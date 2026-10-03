@@ -66,6 +66,39 @@ object SystemFeedback {
         return null
     }
 
+    /**
+     * Counts Android's changes that can block or unblock our key sounds and vibration while a screen is open (ringer
+     * mode, a volume, Do Not Disturb, tap & click sounds, vibration switches): silencing the phone from the volume
+     * keys or the quick settings doesn't leave the screen, so a check on returning alone would miss it. Read it to
+     * work out what's blocked again on every change.
+     */
+    @Composable
+    fun rememberChanges(): Int {
+        val ctx = LocalContext.current
+        var changes by remember { mutableIntStateOf(0) }
+        DisposableEffect(Unit) {
+            val receiver = object : android.content.BroadcastReceiver() {
+                override fun onReceive(c: Context?, i: Intent?) { changes++ }
+            }
+            val filter = android.content.IntentFilter().apply {
+                addAction(AudioManager.RINGER_MODE_CHANGED_ACTION)
+                addAction("android.media.VOLUME_CHANGED_ACTION") // (not public, sent by Android on every volume change)
+                addAction(android.app.NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED)
+            }
+            androidx.core.content.ContextCompat.registerReceiver(ctx, receiver, filter, androidx.core.content.ContextCompat.RECEIVER_EXPORTED)
+            val observer = object : android.database.ContentObserver(android.os.Handler(android.os.Looper.getMainLooper())) {
+                override fun onChange(selfChange: Boolean) { changes++ }
+            }
+            for (key in listOf(Settings.System.SOUND_EFFECTS_ENABLED, "vibrate_on", Settings.System.HAPTIC_FEEDBACK_ENABLED))
+                ctx.contentResolver.registerContentObserver(Settings.System.getUriFor(key), false, observer)
+            onDispose {
+                runCatching { ctx.unregisterReceiver(receiver) }
+                ctx.contentResolver.unregisterContentObserver(observer)
+            }
+        }
+        return changes
+    }
+
     fun openVibrationSettings(ctx: Context) {
         // Pixel and AOSP have a "Vibration & haptics" page without a public action; elsewhere the sound page holds it
         val page = Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$VibrationSettingsActivity"))
@@ -95,8 +128,10 @@ fun SystemFeedbackNote(blocked: (Context) -> String?, open: (Context) -> Unit,
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
     Column {
-        // cheap reads, done on every recomposition; reading `resumed` recomposes when the screen comes back from Android's settings
-        val reason = if (resumed >= 0) blocked(ctx) else null
+        // cheap reads, done on every recomposition; reading `resumed` recomposes when the screen comes back from Android's
+        // settings, reading the changes when the phone is silenced (or unsilenced) with the screen open
+        val changes = SystemFeedback.rememberChanges()
+        val reason = if (resumed >= 0 && changes >= 0) blocked(ctx) else null
         switch({ switchedOn = it }, reason != null)
         val text = if (switchedOn) reason else null
         if (text != null)
