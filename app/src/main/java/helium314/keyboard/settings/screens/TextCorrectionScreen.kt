@@ -11,6 +11,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -409,19 +412,32 @@ private fun TrustWordsRow(setting: Setting) {
     val on = prefs.getBoolean(setting.key, Defaults.PREF_AUTOCORRECT_FREQUENT_WORDS)
     val count = prefs.getInt(Settings.PREF_TRUST_TYPED_COUNT, Defaults.PREF_TRUST_TYPED_COUNT).coerceIn(1, MAX_TRUST_COUNT)
     fun setCount(n: Int) = prefs.edit { putInt(Settings.PREF_TRUST_TYPED_COUNT, n) }
-    Preference(name = setting.title, onClick = { prefs.edit { putBoolean(setting.key, !on) } }) {
-        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+    // (like a Preference row, but the count follows the title instead of sitting at the end with the switch)
+    val compact = helium314.keyboard.settings.preferences.LocalCompactPreferences.current
+    androidx.compose.foundation.layout.Row(
+        androidx.compose.ui.Modifier.fillMaxWidth().clickable { prefs.edit { putBoolean(setting.key, !on) } }
+            .then(if (compact) androidx.compose.ui.Modifier.heightIn(min = 56.dp).padding(vertical = 4.dp).padding(start = 10.dp)
+                else androidx.compose.ui.Modifier.heightIn(min = 44.dp).padding(vertical = 10.dp)
+                    .padding(start = helium314.keyboard.settings.preferences.LocalRowStart.current, end = 12.dp)),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+    ) {
+        androidx.compose.foundation.layout.Row(androidx.compose.ui.Modifier.weight(1f),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Text(setting.title, androidx.compose.ui.Modifier.weight(1f, fill = false),
+                style = androidx.compose.material3.MaterialTheme.typography.bodyLarge.let {
+                    if (helium314.keyboard.settings.preferences.LocalPendingChange.current)
+                        it.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic) else it })
             // (dimmed while off; still settable)
-            val dim = if (on) androidx.compose.ui.Modifier else androidx.compose.ui.Modifier.alpha(0.5f)
-            androidx.compose.foundation.layout.Row(dim, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            androidx.compose.foundation.layout.Row(if (on) androidx.compose.ui.Modifier else androidx.compose.ui.Modifier.alpha(0.5f),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 StepButton("\u2212", stringResource(R.string.trust_typed_fewer), count > 1) { setCount(count - 1) }
                 Text("$count", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
                 StepButton("+", stringResource(R.string.trust_typed_more), count < MAX_TRUST_COUNT) { setCount(count + 1) }
-                Text(stringResource(R.string.trust_typed_times))
+                Text(stringResource(R.string.trust_typed_times), style = androidx.compose.material3.MaterialTheme.typography.bodyLarge)
             }
-            androidx.compose.material3.Switch(checked = on, onCheckedChange = { prefs.edit { putBoolean(setting.key, it) } },
-                modifier = androidx.compose.ui.Modifier.padding(start = 12.dp))
         }
+        androidx.compose.material3.Switch(checked = on, onCheckedChange = { prefs.edit { putBoolean(setting.key, it) } },
+            modifier = androidx.compose.ui.Modifier.padding(start = 12.dp))
     }
 }
 
