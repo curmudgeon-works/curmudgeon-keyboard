@@ -341,9 +341,7 @@ fun SubtypeScreen(
                 WithBigTitle(stringResource(R.string.keyboard_layout_set)) {
                     // the saved Layouts first (everything on this screen but the popups, as a theme is for Appearance)
                     helium314.keyboard.settings.preferences.LayoutPresetsPreference(currentSubtype) { setCurrentSubtype(it) }
-                    // then the keys (QWERTY, QWERTZ, AZERTY, …, or your own), advanced
-                    AdvancedBlock(advanced) { Pending(layoutChanged(LayoutType.MAIN)) { WithSmallTitle(stringResource(R.string.layout_keys)) {
-                        MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) } } } }
+                    // (the keys, QWERTY, AZERTY, …: first row of Keys & Popups)
                     // the keyboard's shape first (moved from Appearance): height, numbers row;
                     // their dialogs keep the preview keyboard up
                     CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
@@ -502,6 +500,24 @@ fun SubtypeScreen(
                         }
                     }
                 }
+                // ---- keys & popups: the keys (QWERTY, AZERTY, …, or your own) and what holding them offers (every row is
+                // advanced, so the group is too)
+                AdvancedBlock(advanced) { WithBigTitle(stringResource(R.string.key_popups_group)) {
+                    Pending(layoutChanged(LayoutType.MAIN)) { MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) } }
+                    // preset popup layouts, customize popups, customize keys and popups with JSON (all advanced);
+                    // italic as a whole when any of it changed
+                    Pending(keyChanged("key_popups", "key_popup_set_selected", "key_popup_sets", Settings.PREF_SYMBOL_POPUP_MAP)
+                            || currentSubtype.getExtraValueOf(ExtraValue.MORE_POPUPS) != openedSubtype.getExtraValueOf(ExtraValue.MORE_POPUPS)
+                            || layoutChanged(LayoutType.SYMBOLS) || changedFolders.any { it != "main" } || prefixChanged(Settings.PREF_LAYOUT_PREFIX)) {
+                        CompositionLocalProvider(LocalKeepKeyboard provides true, LocalPreviewKeyboard provides preview,
+                            LocalBottomBarTop provides bottomBarTop) { KeyPopupsSection(currentSubtype) { setCurrentSubtype(it) } } }
+                    run {
+                        Pending(keyChanged(Settings.PREF_SHOW_TLD_POPUP_KEYS)) {
+                            PrefSwitchRow(Settings.PREF_SHOW_TLD_POPUP_KEYS, Defaults.PREF_SHOW_TLD_POPUP_KEYS, R.string.show_tld_popup_keys) { holdPreview(); reloadPreview() } }
+                        Pending(keyChanged(Settings.PREF_REMOVE_REDUNDANT_POPUPS)) {
+                            PrefSwitchRow(Settings.PREF_REMOVE_REDUNDANT_POPUPS, Defaults.PREF_REMOVE_REDUNDANT_POPUPS, R.string.remove_redundant_popups) { holdPreview(); reloadPreview() } }
+                    }
+                } }
                 // ---- the keyboard's own undo / redo (from Others): how far back, and a word or a character per press
                 AdvancedBlock(advanced) { WithBigTitle(stringResource(R.string.undo_redo_group)) {
                     CompositionLocalProvider(LocalCompactPreferences provides true) {
@@ -518,22 +534,6 @@ fun SubtypeScreen(
                         }
                     }
                 }
-                // ---- popups: what holding a key offers (every row is advanced, so the group is too)
-                AdvancedBlock(advanced) { WithBigTitle(stringResource(R.string.key_popups_group)) {
-                    // preset popup layouts, customize popups, customize keys and popups with JSON (all advanced);
-                    // italic as a whole when any of it changed
-                    Pending(keyChanged("key_popups", "key_popup_set_selected", "key_popup_sets", Settings.PREF_SYMBOL_POPUP_MAP)
-                            || currentSubtype.getExtraValueOf(ExtraValue.MORE_POPUPS) != openedSubtype.getExtraValueOf(ExtraValue.MORE_POPUPS)
-                            || layoutChanged(LayoutType.SYMBOLS) || changedFolders.any { it != "main" } || prefixChanged(Settings.PREF_LAYOUT_PREFIX)) {
-                        CompositionLocalProvider(LocalKeepKeyboard provides true, LocalPreviewKeyboard provides preview,
-                            LocalBottomBarTop provides bottomBarTop) { KeyPopupsSection(currentSubtype) { setCurrentSubtype(it) } } }
-                    run {
-                        Pending(keyChanged(Settings.PREF_SHOW_TLD_POPUP_KEYS)) {
-                            PrefSwitchRow(Settings.PREF_SHOW_TLD_POPUP_KEYS, Defaults.PREF_SHOW_TLD_POPUP_KEYS, R.string.show_tld_popup_keys) { holdPreview(); reloadPreview() } }
-                        Pending(keyChanged(Settings.PREF_REMOVE_REDUNDANT_POPUPS)) {
-                            PrefSwitchRow(Settings.PREF_REMOVE_REDUNDANT_POPUPS, Defaults.PREF_REMOVE_REDUNDANT_POPUPS, R.string.remove_redundant_popups) { holdPreview(); reloadPreview() } }
-                    }
-                } }
             }
             }
         }
@@ -571,6 +571,12 @@ private fun MainLayoutRow(
         DropDownField(
             items = appLayouts + customLayouts,
             selectedItem = currentSubtype.mainLayoutName() ?: SubtypeLocaleUtils.QWERTY,
+            fieldContent = { selected -> Column {
+                Text(stringResource(R.string.layout_keys), style = MaterialTheme.typography.bodyLarge,
+                    fontStyle = if (helium314.keyboard.settings.preferences.LocalPendingChange.current) androidx.compose.ui.text.font.FontStyle.Italic else null)
+                Text(SubtypeLocaleUtils.getLayoutDisplayNameInSystemLocale(selected, currentSubtype.locale),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } },
             onSelected = { layout ->
                 // if the locale defaults to qwerty, use it as implicit default to avoid creating unnecessary additional subtypes
                 if (layout == SubtypeLocaleUtils.QWERTY

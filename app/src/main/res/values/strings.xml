@@ -280,7 +280,7 @@
     <string name="swipe_screen">Swiping</string>
     <string name="swipe_settings">Swipe settings</string>
     <!-- On the Layout screen: the files of every secondary layout (add, load, edit, delete) -->
-    <string name="layout_files">Customize keys and popups with JSON</string>
+    <string name="layout_files">Full customization with JSON</string>
     <!-- Group on the Preferences screen: the backspace key\'s settings -->
     <string name="factory_reset">Factory reset</string>
     <string name="factory_reset_summary">Settings back to how they were at install</string>
@@ -456,7 +456,7 @@
     <string name="no_dictionary_short">No dictionary</string>
     <string name="keyboard_languages">Languages</string>
     <string name="key_popups_title">Long-press popups</string>
-    <string name="key_popups_group">Popups</string>
+    <string name="key_popups_group">Keys &amp; Popups</string>
     <string name="key_popups_summary">What holding a key offers. Switch popups off or drag them into the order you want; the first one is shown as the key\'s hint.</string>
     <string name="key_popups_letters">Letters and numbers</string>
     <string name="key_popups_contextual">Keys that change with the text field</string>
@@ -476,8 +476,8 @@
     <string name="hide_all_symbols">Hide symbols on keys</string>
     <string name="key_popups_symbols">Symbols page</string>
     <string name="key_popups_more_symbols">More symbols page</string>
-    <string name="key_popups_presets">Preset popup layouts</string>
-    <string name="key_popups_full">Customize popups</string>
+    <string name="key_popups_presets">Popup sets</string>
+    <string name="key_popups_full">Customize popup for each key</string>
     <string name="key_popups_full_summary">Every key\'s long-press popups, a tab per group of keys</string>
     <string name="key_popups_save_as_new">Save current popup layout</string>
     <string name="key_popups_save_change_title">Save this change to a set of your own</string>

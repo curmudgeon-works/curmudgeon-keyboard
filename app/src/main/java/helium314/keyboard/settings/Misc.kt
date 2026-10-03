@@ -136,6 +136,8 @@ fun <T>DropDownField(
     onSelected: (T) -> Unit,
     extraButton: @Composable (() -> Unit)? = null,
     itemTrailing: @Composable ((T) -> Unit)? = null, // e.g. a delete button, in the menu only
+    // a row's look for the closed field (a title with the choice under it, like the rows next to it); null: the item
+    fieldContent: @Composable ((T) -> Unit)? = null,
     itemContent: @Composable (T) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -144,10 +146,10 @@ fun <T>DropDownField(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)
+            modifier = if (fieldContent != null) Modifier.padding(start = 10.dp) else Modifier.padding(start = 8.dp, bottom = 4.dp)
         ) {
             Box(Modifier.weight(1f)) {
-                itemContent(selectedItem)
+                (fieldContent ?: itemContent)(selectedItem)
             }
             ExpandButton(items.size > 1) { expanded = !expanded }
             if (extraButton != null)
