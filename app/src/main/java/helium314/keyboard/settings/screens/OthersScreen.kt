@@ -15,8 +15,7 @@ import helium314.keyboard.settings.SearchSettingsScreen
 import helium314.keyboard.settings.SettingsActivity
 
 /**
- * Settings few people need, kept out of the way (advanced only): custom toolbar key codes, the emoji key of a physical keyboard, the timestamp key's format, the
- * currencies on the symbols pages' currency key.
+ * Settings few people need, kept out of the way (advanced only): custom toolbar key codes, the emoji key of a physical keyboard, the timestamp key's format.
  */
 @Composable
 fun OthersScreen(onClickBack: () -> Unit) {
@@ -29,7 +28,6 @@ fun OthersScreen(onClickBack: () -> Unit) {
         Settings.PREF_TIMESTAMP_FORMAT,
         // (Customize suggestions: Text correction's Suggestions group; their spacing: Appearance, a theme setting;
         //  undo / redo: their own group on Layout & Typing)
-        Settings.PREF_CUSTOM_CURRENCY_KEY, // the symbols pages' currency key and its popup
         // (the symbols on the keys area by area are gone as settings: Appearance's "Hide symbols on keys" sets all three)
     )
     SearchSettingsScreen(

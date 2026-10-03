@@ -193,20 +193,24 @@ fun createAdvancedSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_CUSTOM_CURRENCY_KEY, R.string.customize_currencies) { setting ->
         var showDialog by rememberSaveable { mutableStateOf(false) }
+        val preview = helium314.keyboard.settings.dialogs.LocalPreviewKeyboard.current
         Preference(
             name = setting.title,
             onClick = { showDialog = true }
         )
         if (showDialog) {
             val prefs = LocalContext.current.prefs()
+            // the keyboard typing in the dialog opens on the symbols page, where the currency key is
+            androidx.compose.runtime.LaunchedEffect(Unit) { runCatching { KeyboardSwitcher.getInstance().openSymbolsOnStart() } }
             TextInputDialog(
                 onDismissRequest = { showDialog = false },
                 textInputLabel = { Text(stringResource(R.string.customize_currencies_detail)) },
                 initialText = prefs.getString(setting.key, Defaults.PREF_CUSTOM_CURRENCY_KEY)!!,
-                onConfirmed = { prefs.edit { putString(setting.key, it) }; KeyboardLayoutSet.onSystemLocaleChanged() },
+                // after OK / Default the preview keyboard shows the symbols page with the new currencies for a moment
+                onConfirmed = { prefs.edit { putString(setting.key, it) }; KeyboardLayoutSet.onSystemLocaleChanged(); preview?.symbolsChanged() },
                 title = { Text(stringResource(R.string.customize_currencies)) },
                 neutralButtonText = if (prefs.contains(setting.key)) stringResource(R.string.button_default) else null,
-                onNeutral = { prefs.edit { remove(setting.key)}; KeyboardLayoutSet.onSystemLocaleChanged() },
+                onNeutral = { prefs.edit { remove(setting.key)}; KeyboardLayoutSet.onSystemLocaleChanged(); preview?.symbolsChanged() },
                 checkTextValid = { text -> text.splitOnWhitespace().none { it.length > 8 } }
             )
         }
