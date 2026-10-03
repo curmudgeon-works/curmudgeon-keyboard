@@ -489,9 +489,6 @@ fun SubtypeScreen(
                                 val pending = if (it == SettingsWithoutKey.ABC_AFTER) abcAfterKeys.any { k -> keyChanged(k.first) } else keyChanged(it)
                                 Pending(pending) { SettingsActivity.settingsContainer[it]?.Preference() }
                             }
-                            // the symbols pages' currencies, last (from Others): its dialog types on the symbols page
-                            Pending(keyChanged(Settings.PREF_CUSTOM_CURRENCY_KEY)) {
-                                SettingsActivity.settingsContainer[Settings.PREF_CUSTOM_CURRENCY_KEY]?.Preference() }
                         }
                     }
                 }

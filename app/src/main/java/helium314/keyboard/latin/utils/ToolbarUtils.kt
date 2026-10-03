@@ -58,7 +58,7 @@ private fun setToolbarButtonActivatedState(button: ImageButton) {
     }
 }
 
-fun getCodeForToolbarKey(key: ToolbarKey) = Settings.getInstance().getCustomToolbarKeyCode(key) ?: when (key) {
+fun getCodeForToolbarKey(key: ToolbarKey) = when (key) {
     VOICE -> KeyCode.VOICE_INPUT
     CLIPBOARD -> KeyCode.CLIPBOARD
     NUMPAD -> KeyCode.NUMPAD
@@ -91,7 +91,7 @@ fun getCodeForToolbarKey(key: ToolbarKey) = Settings.getInstance().getCustomTool
     SPLIT -> KeyCode.SPLIT_LAYOUT
 }
 
-fun getCodeForToolbarKeyLongClick(key: ToolbarKey) = Settings.getInstance().getCustomToolbarLongpressCode(key) ?: when (key) {
+fun getCodeForToolbarKeyLongClick(key: ToolbarKey) = when (key) {
     CLIPBOARD -> KeyCode.CLIPBOARD_PASTE
     UNDO -> KeyCode.REDO
     REDO -> KeyCode.UNDO
@@ -229,37 +229,3 @@ private fun getEnabledToolbarKeys(prefs: SharedPreferences, pref: String, defaul
     }
 }
 
-fun writeCustomKeyCodes(prefs: SharedPreferences, codes: EnumMap<ToolbarKey, Pair<Int?, Int?>>) {
-    val string = codes.mapNotNull { entry -> entry.value?.let { "${entry.key.name},${it.first},${it.second}" } }.joinToString(";")
-    prefs.edit { putString(Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES, string) }
-}
-
-fun readCustomKeyCodes(prefs: SharedPreferences): EnumMap<ToolbarKey, Pair<Int?, Int?>> {
-    val map = EnumMap<ToolbarKey, Pair<Int?, Int?>>(ToolbarKey::class.java)
-    prefs.getString(Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES, Defaults.PREF_TOOLBAR_CUSTOM_KEY_CODES)!!
-        .split(";").forEach {
-            runCatching {
-                val s = it.split(",")
-                map[ToolbarKey.valueOf(s[0])] = s[1].toIntOrNull() to s[2].toIntOrNull()
-            }
-        }
-    return map
-}
-
-fun getCustomKeyCode(key: ToolbarKey, prefs: SharedPreferences): Int? {
-    if (customToolbarKeyCodes == null)
-        customToolbarKeyCodes = readCustomKeyCodes(prefs)
-    return customToolbarKeyCodes!![key]?.first
-}
-
-fun getCustomLongpressKeyCode(key: ToolbarKey, prefs: SharedPreferences): Int? {
-    if (customToolbarKeyCodes == null)
-        customToolbarKeyCodes = readCustomKeyCodes(prefs)
-    return customToolbarKeyCodes!![key]?.second
-}
-
-fun clearCustomToolbarKeyCodes() {
-    customToolbarKeyCodes = null
-}
-
-private var customToolbarKeyCodes: EnumMap<ToolbarKey, Pair<Int?, Int?>>? = null

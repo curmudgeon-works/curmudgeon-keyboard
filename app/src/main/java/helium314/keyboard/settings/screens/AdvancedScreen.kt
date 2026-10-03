@@ -42,7 +42,6 @@ import helium314.keyboard.latin.common.splitOnWhitespace
 import helium314.keyboard.latin.settings.DebugSettings
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
-import helium314.keyboard.latin.utils.checkTimestampFormat
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.NextScreenIcon
 import helium314.keyboard.settings.SettingsContainer
@@ -166,11 +165,6 @@ fun createAdvancedSettings(context: Context) = listOf(
     Setting(context, Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, R.string.prefs_long_press_symbol_for_numpad) {
         SwitchPreference(it, Defaults.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD)
     },
-    Setting(context, Settings.PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY, R.string.prefs_enable_emoji_alt_physical_key,
-        R.string.prefs_enable_emoji_alt_physical_key_summary)
-    {
-        SwitchPreference(it, Defaults.PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY)
-    },
     Setting(context, Settings.PREF_SHOW_SETUP_WIZARD_ICON, R.string.show_setup_wizard_icon, R.string.show_setup_wizard_icon_summary) {
         val ctx = LocalContext.current
         SwitchPreference(it, Defaults.PREF_SHOW_SETUP_WIZARD_ICON) { SystemBroadcastReceiver.toggleAppIcon(ctx) }
@@ -191,30 +185,6 @@ fun createAdvancedSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_ABC_AFTER_CLIP, R.string.switch_keyboard_after, R.string.after_clip) {
         SwitchPreference(it, Defaults.PREF_ABC_AFTER_CLIP)
     },
-    Setting(context, Settings.PREF_CUSTOM_CURRENCY_KEY, R.string.customize_currencies) { setting ->
-        var showDialog by rememberSaveable { mutableStateOf(false) }
-        val preview = helium314.keyboard.settings.dialogs.LocalPreviewKeyboard.current
-        Preference(
-            name = setting.title,
-            onClick = { showDialog = true }
-        )
-        if (showDialog) {
-            val prefs = LocalContext.current.prefs()
-            // the keyboard typing in the dialog opens on the symbols page, where the currency key is
-            androidx.compose.runtime.LaunchedEffect(Unit) { runCatching { KeyboardSwitcher.getInstance().openSymbolsOnStart() } }
-            TextInputDialog(
-                onDismissRequest = { showDialog = false },
-                textInputLabel = { Text(stringResource(R.string.customize_currencies_detail)) },
-                initialText = prefs.getString(setting.key, Defaults.PREF_CUSTOM_CURRENCY_KEY)!!,
-                // after OK / Default the preview keyboard shows the symbols page with the new currencies for a moment
-                onConfirmed = { prefs.edit { putString(setting.key, it) }; KeyboardLayoutSet.onSystemLocaleChanged(); preview?.symbolsChanged() },
-                title = { Text(stringResource(R.string.customize_currencies)) },
-                neutralButtonText = if (prefs.contains(setting.key)) stringResource(R.string.button_default) else null,
-                onNeutral = { prefs.edit { remove(setting.key)}; KeyboardLayoutSet.onSystemLocaleChanged(); preview?.symbolsChanged() },
-                checkTextValid = { text -> text.splitOnWhitespace().none { it.length > 8 } }
-            )
-        }
-    },
     Setting(context, Settings.PREF_MORE_POPUP_KEYS, R.string.show_popup_keys_title) {
         val items = listOf(POPUP_KEYS_NORMAL, POPUP_KEYS_MAIN, POPUP_KEYS_MORE, POPUP_KEYS_ALL).map { setting ->
             stringResource(morePopupKeysResId(setting)) to setting
@@ -226,9 +196,6 @@ fun createAdvancedSettings(context: Context) = listOf(
     },
     Setting(context, SettingsWithoutKey.FACTORY_RESET, R.string.factory_reset, R.string.factory_reset_summary) {
         FactoryResetPreference(it)
-    },
-    Setting(context, Settings.PREF_TIMESTAMP_FORMAT, R.string.timestamp_format_title) { setting ->
-        TextInputPreference(setting, Defaults.PREF_TIMESTAMP_FORMAT, stringResource(R.string.timestamp_description)) { checkTimestampFormat(it) }
     },
     // the keyboard's own undo / redo (EditHistory): how many steps back, and a whole step or one character per press
     Setting(context, Settings.PREF_UNDO_HISTORY_LENGTH, R.string.undo_history_length) { setting ->

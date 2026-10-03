@@ -101,11 +101,11 @@ class LayoutDraft private constructor(
             Settings.PREF_KEY_LONGPRESS_TIMEOUT, Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, Settings.PREF_SPACE_TO_CHANGE_LANG,
             Settings.PREF_ABC_AFTER_SYMBOL_SPACE, Settings.PREF_ABC_AFTER_NUMPAD_SPACE,
             Settings.PREF_ABC_AFTER_EMOJI, Settings.PREF_ABC_AFTER_CLIP,
-            Settings.PREF_UNDO_HISTORY_LENGTH, Settings.PREF_UNDO_UNIT, Settings.PREF_REDO_UNIT, Settings.PREF_CUSTOM_CURRENCY_KEY,
+            Settings.PREF_UNDO_HISTORY_LENGTH, Settings.PREF_UNDO_UNIT, Settings.PREF_REDO_UNIT,
             // the toolbar group
             Settings.PREF_TOOLBAR_MODE, Settings.PREF_TOOLBAR_HIDING_GLOBAL, Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE,
             Settings.PREF_TOOLBAR_KEYS, Settings.PREF_PINNED_TOOLBAR_KEYS, Settings.PREF_CLIPBOARD_TOOLBAR_KEYS,
-            Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES, Settings.PREF_TOOLBAR_EXPAND_ICON,
+            Settings.PREF_TOOLBAR_EXPAND_ICON,
             Settings.PREF_TOOLBAR_IN_STRIP_ROW, Settings.PREF_TOOLBAR_VISIBILITY,
             // layout
             Settings.PREF_SHOW_NUMBER_ROW, Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS,

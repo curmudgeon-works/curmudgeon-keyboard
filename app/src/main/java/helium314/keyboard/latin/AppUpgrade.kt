@@ -41,7 +41,6 @@ import helium314.keyboard.latin.utils.protectedPrefs
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.latin.utils.upgradeToolbarPrefs
-import helium314.keyboard.latin.utils.writeCustomKeyCodes
 import helium314.keyboard.settings.screens.colorPrefsAndResIds
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -327,27 +326,8 @@ private object AppUpgrade {
             if (prefs.getString(Settings.PREF_THEME_COLORS_NIGHT, Defaults.PREF_THEME_COLORS_NIGHT) == "user_night")
                 prefs.edit { putString(Settings.PREF_THEME_COLORS_NIGHT, themeNameNight) }
         }
-        if (oldVersion <= 2302) {
-            fun readCustomKeyCodes(setting: String) =
-                prefs.getString(setting, "")!!
-                    .split(";").filter { it.isNotEmpty()}.associate {
-                        val code = runCatching { it.substringAfter(",").toIntOrNull()?.checkAndConvertCode() }.getOrNull()
-                        it.substringBefore(",") to code
-                    }
-            val customCodes = readCustomKeyCodes("toolbar_custom_key_codes")
-            val customLongpressCodes = readCustomKeyCodes("toolbar_custom_longpress_codes")
+        if (oldVersion <= 2302) // (custom toolbar key codes: no setting since 0.3.002, the old ones just go)
             prefs.edit { remove("toolbar_custom_longpress_codes").remove("toolbar_custom_key_codes") }
-            val combined = EnumMap<ToolbarKey, Pair<Int?, Int?>>(ToolbarKey::class.java)
-            customCodes.forEach { runCatching {
-                val key = ToolbarKey.valueOf(it.key)
-                combined[key] = (combined[key] ?: (null to null)).copy(first = it.value)
-            } }
-            customLongpressCodes.forEach { runCatching {
-                val key = ToolbarKey.valueOf(it.key)
-                combined[key] = (combined[key] ?: (null to null)).copy(second = it.value)
-            } }
-            writeCustomKeyCodes(prefs, combined)
-        }
         if (oldVersion <= 2303) {
             File(DeviceProtectedUtils.getFilesDir(context), "layouts").listFiles()?.forEach { file ->
                 val folder = DeviceProtectedUtils.getFilesDir(context)

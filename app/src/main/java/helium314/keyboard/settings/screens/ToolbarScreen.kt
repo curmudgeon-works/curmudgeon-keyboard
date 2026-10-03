@@ -30,7 +30,6 @@ import helium314.keyboard.settings.SearchSettingsScreen
 import helium314.keyboard.settings.Setting
 import helium314.keyboard.settings.SettingsActivity
 import helium314.keyboard.latin.utils.Theme
-import helium314.keyboard.settings.dialogs.ToolbarKeysCustomizer
 import helium314.keyboard.settings.initPreview
 import helium314.keyboard.settings.preferences.ListPreference
 import helium314.keyboard.settings.preferences.Preference
@@ -76,7 +75,7 @@ fun toolbarItems(prefs: SharedPreferences): List<String?> {
 val toolbarKeys = listOf(
     Settings.PREF_TOOLBAR_MODE, Settings.PREF_TOOLBAR_HIDING_GLOBAL, Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE,
     Settings.PREF_TOOLBAR_KEYS, Settings.PREF_PINNED_TOOLBAR_KEYS, Settings.PREF_CLIPBOARD_TOOLBAR_KEYS,
-    Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES, Settings.PREF_TOOLBAR_EXPAND_ICON,
+    Settings.PREF_TOOLBAR_EXPAND_ICON,
     Settings.PREF_TOOLBAR_VISIBILITY, Settings.PREF_TOOLBAR_OPENED_BY_KEY,
 )
 
@@ -133,18 +132,6 @@ fun createToolbarSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_CLIPBOARD_TOOLBAR_KEYS, R.string.clipboard_toolbar_keys) {
         ReorderSwitchPreference(it, Defaults.PREF_CLIPBOARD_TOOLBAR_KEYS)
-    },
-    Setting(context, Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES, R.string.customize_toolbar_key_codes) {
-        var showDialog by rememberSaveable { mutableStateOf(false) }
-        Preference(
-            name = it.title,
-            onClick = { showDialog = true },
-        )
-        if (showDialog)
-            ToolbarKeysCustomizer(
-                key = it.key,
-                onDismissRequest = { showDialog = false }
-            )
     },
 )
 

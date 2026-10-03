@@ -49,7 +49,6 @@ object Defaults {
     @JvmField
     val PREF_THEME_DAY_NIGHT = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
     const val PREF_CUSTOM_ICON_NAMES = ""
-    const val PREF_TOOLBAR_CUSTOM_KEY_CODES = ""
     const val PREF_AUTO_CAP = true
     const val PREF_VIBRATE_ON = true // fresh installs; older installs keep "off" (curmudgeonUpgrades)
     const val PREF_VIBRATE_IN_DND_MODE = false
@@ -140,7 +139,6 @@ object Defaults {
     const val PREF_KEYPRESS_SOUND_VOLUME = -0.01f
     const val PREF_KEYPRESS_SOUND = "android" // KeypressSounds
     const val PREF_KEY_LONGPRESS_TIMEOUT = 300
-    const val PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY = true
     const val PREF_GESTURE_PREVIEW_TRAIL = true
     const val PREF_GESTURE_SPACE_AWARE = false
     const val PREF_GESTURE_CAPS_SWIPE = true // swiping up above the keyboard capitalizes the letter left from (own gesture decoder)
@@ -173,7 +171,6 @@ object Defaults {
     const val PREF_SHOW_NUMBER_ROW_IN_SYMBOLS = true
     const val PREF_LOCALIZED_NUMBER_ROW = true
     const val PREF_SHOW_NUMBER_ROW_HINTS = true
-    const val PREF_CUSTOM_CURRENCY_KEY = ""
     const val PREF_SHOW_HINTS = true
     const val PREF_POPUP_KEYS_ORDER = POPUP_KEYS_ORDER_DEFAULT
     const val PREF_POPUP_KEYS_LABELS_ORDER = POPUP_KEYS_LABEL_DEFAULT
@@ -213,7 +210,6 @@ object Defaults {
     const val PREF_ABC_AFTER_NUMPAD_SPACE = false
     const val PREF_REMOVE_REDUNDANT_POPUPS = false
     const val PREF_SPACE_BAR_TEXT = ""
-    const val PREF_TIMESTAMP_FORMAT = "yyyy-MM-dd HH:mm:ss"
     const val PREF_UNDO_HISTORY_LENGTH = 20 // steps the keyboard's own undo reaches back (see EditHistory)
     const val PREF_UNDO_UNIT = "word" // undo takes back a whole step ("word") or one "character" per press
     const val PREF_REDO_UNIT = "word" // the same for redo

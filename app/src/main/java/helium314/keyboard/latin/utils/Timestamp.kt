@@ -7,7 +7,10 @@ import helium314.keyboard.latin.settings.Settings
 import java.text.SimpleDateFormat
 import java.util.Calendar
 
-fun getTimestamp(context: Context): String = getTimestampFormatter(context).format(Calendar.getInstance().time)
+/** The timestamp key's tap (its long-press offers the date or the time alone). */
+fun getTimestamp(context: Context): String = SimpleDateFormat(TIMESTAMP_FORMAT, Settings.getValues().mLocale).format(Calendar.getInstance().time)
+
+private const val TIMESTAMP_FORMAT = "yyyy-MM-dd HH:mm:ss"
 
 /** A popup key's output text starting with this types the time in the format after it, e.g. "Date|!timestamp/yyyy-MM-dd". */
 const val TIMESTAMP_TEXT_PREFIX = "!timestamp/"
@@ -18,11 +21,3 @@ fun resolveTimestampText(text: String): String {
     val format = text.substring(TIMESTAMP_TEXT_PREFIX.length)
     return runCatching { SimpleDateFormat(format, Settings.getValues().mLocale).format(Calendar.getInstance().time) }.getOrDefault(text)
 }
-
-fun getTimestampFormatter(context: Context): SimpleDateFormat {
-    val format = context.prefs().getString(Settings.PREF_TIMESTAMP_FORMAT, Defaults.PREF_TIMESTAMP_FORMAT)
-    return runCatching<SimpleDateFormat> { SimpleDateFormat(format, Settings.getValues().mLocale) }.getOrNull()
-        ?: SimpleDateFormat(Defaults.PREF_TIMESTAMP_FORMAT, Settings.getValues().mLocale)
-}
-
-fun checkTimestampFormat(format: String) = runCatching { SimpleDateFormat(format, Settings.getValues().mLocale) }.isSuccess

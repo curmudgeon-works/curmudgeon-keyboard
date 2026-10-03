@@ -73,8 +73,6 @@ interface PreviewKeyboardHooks {
     /** A Save / Discard question: the keyboard goes down and stays down (whatever the answer changes) until the
      *  screen is touched again. */
     fun quiet() {}
-    /** A setting seen on the symbols page changed (the currencies): the keyboard comes up on it for a moment. */
-    fun symbolsChanged() {}
 }
 
 /** True around settings about emojis: their dialogs preview on the emoji panel instead of the letters. */
