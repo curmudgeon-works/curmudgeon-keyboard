@@ -207,6 +207,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
         if (showAccentsDialog)
             ListPickerDialog(
                 onDismissRequest = { showAccentsDialog = false },
+                title = { Text(stringResource(R.string.key_popups_presets)) },
                 items = presets,
                 getItemName = { presetName(it) },
                 selectedItem = current,

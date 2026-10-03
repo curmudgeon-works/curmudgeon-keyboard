@@ -72,6 +72,7 @@ fun <T: Number> SliderPreference(
     if (showDialog)
         SliderDialog(
             onDismissRequest = { showDialog = false },
+            title = { androidx.compose.material3.Text(name) }, // the row's name, like every dialog a row opens
             onDone = {
                 if (default is Int) {
                     prefs.edit { putInt(key, it.toInt()) }
