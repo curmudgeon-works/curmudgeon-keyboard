@@ -34,6 +34,10 @@ public interface DictionaryFacilitator {
     /** A word the user removed (long-press Remove): kept out of the suggestions, swiped ones too. */
     default boolean isRemovedWord(final String word) { return false; }
 
+    /** A word the user typed often enough to trust ("Trust words you've typed N+ times"): auto-correct leaves it
+     *  alone and the spell checker counts it as spelled right. */
+    default boolean isTrustedWord(final String word) { return false; }
+
     String[] ALL_DICTIONARY_TYPES = new String[] {
             Dictionary.TYPE_MAIN,
             Dictionary.TYPE_CONTACTS,

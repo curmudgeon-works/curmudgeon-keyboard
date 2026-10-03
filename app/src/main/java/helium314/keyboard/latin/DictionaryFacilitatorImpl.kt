@@ -583,10 +583,25 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
     // meaning that it always has default mConfidence. So we cannot choose to only check preferred
     // locale, and instead simply return true if word is in any of the available dictionaries
     override fun isValidSpellingWord(word: String): Boolean {
-        mValidSpellingWordReadCache?.get(word)?.let { return it }
-        val result = dictionaryGroups.any { isValidWord(word, DictionaryFacilitator.ALL_DICTIONARY_TYPES, it) }
-        mValidSpellingWordReadCache?.put(word, result)
-        return result
+        val valid = mValidSpellingWordReadCache?.get(word)
+            ?: dictionaryGroups.any { isValidWord(word, DictionaryFacilitator.ALL_DICTIONARY_TYPES, it) }
+                .also { mValidSpellingWordReadCache?.put(word, it) }
+        // (not cached: it changes as the word is typed, and with the setting)
+        return valid || isTrustedWord(word)
+    }
+
+    // typed N times: a word that isn't a dictionary word is stored at count 0 by its first use, so count N - 1 (and a
+    // removed word is learned like one); written with or without the sentence-start capital
+    override fun isTrustedWord(word: String): Boolean {
+        if (word.isEmpty()) return false
+        val values = Settings.getValues() ?: return false
+        if (!values.mAutocorrectFrequentWords) return false
+        val needed = values.mTrustTypedCount - 1
+        val lower = word.lowercase()
+        return dictionaryGroups.any { group ->
+            val history = group.getSubDict(Dictionary.TYPE_USER_HISTORY) ?: return@any false
+            history.getLearnedCount(word) >= needed || (lower != word && history.getLearnedCount(lower) >= needed)
+        }
     }
 
     override fun getMainDictionaryFrequency(word: String, locale: Locale): Int {

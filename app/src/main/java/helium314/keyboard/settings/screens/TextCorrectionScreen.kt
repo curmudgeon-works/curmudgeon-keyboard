@@ -9,6 +9,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -75,7 +80,8 @@ fun TextCorrectionScreen(
         // (backspace reverts autocorrect: in the Backspace group of the Preferences screen)
         Settings.PREF_AUTO_CAP,
         Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE,
-        if (autocorrectEnabled) Settings.PREF_AUTOCORRECT_FREQUENT_WORDS else null, // (advanced) your frequent long words as the correction
+        // your own words win over corrections and spell checks (also with auto-correct off: the underlines)
+        Settings.PREF_AUTOCORRECT_FREQUENT_WORDS,
         Settings.PREF_URL_DETECTION, // (from Advanced; advanced here too) web and email addresses as one word
         R.string.settings_category_space,
         Settings.PREF_AUTOSPACE_AFTER_SUGGESTION,
@@ -154,10 +160,11 @@ fun TextCorrectionScreen(
         }) { TryItBar(keyboard, tryIt, onFocus = preview::onFocus, onUsed = preview::onUsed) } },
         revealer = revealer,
         // (Customize suggestions writes the count too)
-        isPending = { it in draft.pending || (it == Settings.PREF_SUGGESTION_RULES && Settings.PREF_SUGGESTION_COUNT in draft.pending) },
+        isPending = { it in draft.pending || (it == Settings.PREF_SUGGESTION_RULES && Settings.PREF_SUGGESTION_COUNT in draft.pending)
+            || (it == Settings.PREF_AUTOCORRECT_FREQUENT_WORDS && Settings.PREF_TRUST_TYPED_COUNT in draft.pending) },
         simpleModeKeys = setOf(
             SettingsWithoutKey.EDIT_PERSONAL_DICTIONARY, Settings.PREF_AUTO_CORRECTION, Settings.PREF_AUTO_CAP,
-            Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE,
+            Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE, Settings.PREF_AUTOCORRECT_FREQUENT_WORDS,
             Settings.PREF_KEY_USE_DOUBLE_SPACE_PERIOD, Settings.PREF_AUTOSPACE_AFTER_SUGGESTION,
             Settings.PREF_AUTOSPACE_AFTER_GESTURE_TYPING, Settings.PREF_AUTOSPACE_AFTER_PUNCTUATION,
             Settings.PREF_SHOW_SUGGESTIONS, Settings.PREF_BIGRAM_PREDICTIONS, Settings.PREF_KEY_USE_PERSONALIZED_DICTS,
@@ -180,7 +187,8 @@ private val correctionKeys = listOf(
     Settings.PREF_INLINE_EMOJI_SEARCH, Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Settings.PREF_ALWAYS_INCOGNITO_MODE,
     Settings.PREF_BIGRAM_PREDICTIONS, Settings.PREF_SUGGEST_PUNCTUATION, Settings.PREF_PUNCTUATION_SUGGESTIONS,
     Settings.PREF_SUGGEST_CLIPBOARD_CONTENT, Settings.PREF_USE_CONTACTS, Settings.PREF_USE_APPS, Settings.PREF_ADD_TO_PERSONAL_DICTIONARY,
-    Settings.PREF_URL_DETECTION, Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, Settings.PREF_SUGGESTION_COUNT, Settings.PREF_SUGGESTION_RULES,
+    Settings.PREF_URL_DETECTION, Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, Settings.PREF_TRUST_TYPED_COUNT,
+    Settings.PREF_SUGGESTION_COUNT, Settings.PREF_SUGGESTION_RULES,
 )
 
 fun createCorrectionSettings(context: Context) = listOf(
@@ -195,7 +203,7 @@ fun createCorrectionSettings(context: Context) = listOf(
         }
     },
     Setting(context, Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, R.string.autocorrect_frequent_words) {
-        SwitchPreference(it, Defaults.PREF_AUTOCORRECT_FREQUENT_WORDS)
+        TrustWordsRow(it)
     },
     Setting(context, Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE,
         R.string.prefs_block_potentially_offensive_title
@@ -385,3 +393,44 @@ private fun PreferencePreview() {
 private fun Indented(steps: Int = 1, content: @Composable () -> Unit) =
     androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.preferences.LocalRowStart provides
         helium314.keyboard.settings.preferences.LocalRowStart.current + (16 * steps).dp, content = content)
+
+private const val MAX_TRUST_COUNT = 20
+
+/** "Trust words you've typed − 3 + times" and its switch: the count is set right in the row (1 at least). */
+@Composable
+private fun TrustWordsRow(setting: Setting) {
+    val ctx = LocalContext.current
+    val prefs = ctx.prefs()
+    helium314.keyboard.settings.KnownDefaults.note(setting.key, Defaults.PREF_AUTOCORRECT_FREQUENT_WORDS)
+    helium314.keyboard.settings.KnownDefaults.note(Settings.PREF_TRUST_TYPED_COUNT, Defaults.PREF_TRUST_TYPED_COUNT)
+    val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
+    if ((b?.value ?: 0) < 0)
+        Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
+    val on = prefs.getBoolean(setting.key, Defaults.PREF_AUTOCORRECT_FREQUENT_WORDS)
+    val count = prefs.getInt(Settings.PREF_TRUST_TYPED_COUNT, Defaults.PREF_TRUST_TYPED_COUNT).coerceIn(1, MAX_TRUST_COUNT)
+    fun setCount(n: Int) = prefs.edit { putInt(Settings.PREF_TRUST_TYPED_COUNT, n) }
+    Preference(name = setting.title, onClick = { prefs.edit { putBoolean(setting.key, !on) } }) {
+        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            // (dimmed while off; still settable)
+            val dim = if (on) androidx.compose.ui.Modifier else androidx.compose.ui.Modifier.alpha(0.5f)
+            androidx.compose.foundation.layout.Row(dim, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                StepButton("\u2212", stringResource(R.string.trust_typed_fewer), count > 1) { setCount(count - 1) }
+                Text("$count", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+                StepButton("+", stringResource(R.string.trust_typed_more), count < MAX_TRUST_COUNT) { setCount(count + 1) }
+                Text(stringResource(R.string.trust_typed_times))
+            }
+            androidx.compose.material3.Switch(checked = on, onCheckedChange = { prefs.edit { putBoolean(setting.key, it) } },
+                modifier = androidx.compose.ui.Modifier.padding(start = 12.dp))
+        }
+    }
+}
+
+@Composable
+private fun StepButton(label: String, description: String, enabled: Boolean, onClick: () -> Unit) {
+    androidx.compose.material3.IconButton(onClick, enabled = enabled,
+        modifier = androidx.compose.ui.Modifier.size(36.dp).semantics { contentDescription = description }) {
+        Text(label, style = androidx.compose.material3.MaterialTheme.typography.titleLarge,
+            color = if (enabled) androidx.compose.material3.MaterialTheme.colorScheme.primary
+                else androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f))
+    }
+}

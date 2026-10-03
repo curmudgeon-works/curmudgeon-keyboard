@@ -406,6 +406,30 @@ abstract public class ExpandableBinaryDictionary extends Dictionary {
         return false;
     }
 
+    /** How often [word] was learned: its count in a store with historical info (a word not in the dictionaries is
+     *  stored at 0 the first time and counted from its second use on), or -1 when it isn't stored. */
+    public int getLearnedCount(final String word) {
+        reloadDictionaryIfRequired();
+        boolean lockAcquired = false;
+        try {
+            lockAcquired = mLock.readLock().tryLock(
+                    TIMEOUT_FOR_READ_OPS_IN_MILLISECONDS, TimeUnit.MILLISECONDS);
+            if (lockAcquired && mBinaryDictionary != null) {
+                final WordProperty property = mBinaryDictionary.getWordProperty(word, false);
+                // (a word not stored comes back without a timestamp)
+                if (property == null || property.mProbabilityInfo.mTimestamp <= 0) return -1;
+                return property.mProbabilityInfo.mCount;
+            }
+        } catch (final InterruptedException e) {
+            Log.e(TAG, "Interrupted tryLock() in getLearnedCount().", e);
+        } finally {
+            if (lockAcquired) {
+                mLock.readLock().unlock();
+            }
+        }
+        return -1;
+    }
+
     protected boolean isInDictionaryLocked(final String word) {
         if (mBinaryDictionary == null) return false;
         return mBinaryDictionary.isInDictionary(word);

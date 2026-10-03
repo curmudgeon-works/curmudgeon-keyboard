@@ -198,7 +198,8 @@ object Defaults {
     const val PREF_NARROW_KEY_GAPS = true
     const val PREF_ENABLED_SUBTYPES = ""
     const val PREF_SELECTED_SUBTYPE = ""
-    const val PREF_AUTOCORRECT_FREQUENT_WORDS = true // your often-typed long words can be what space commits
+    const val PREF_AUTOCORRECT_FREQUENT_WORDS = true // "Trust words you've typed N+ times": your words win over corrections
+    const val PREF_TRUST_TYPED_COUNT = 3 // the N (1 at least)
     const val PREF_URL_DETECTION = true // fork: default on so email addresses compose and get learned as single words
     const val PREF_DONT_SHOW_MISSING_DICTIONARY_DIALOG = false
     const val PREF_TOOLBAR_MODE = "EXPANDABLE"

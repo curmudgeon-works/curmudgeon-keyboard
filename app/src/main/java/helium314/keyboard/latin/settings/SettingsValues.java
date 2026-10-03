@@ -138,6 +138,7 @@ public class SettingsValues {
     public final float mBottomRowScale;
     public final boolean mUrlDetectionEnabled;
     public final boolean mAutocorrectFrequentWords;
+    public final int mTrustTypedCount;
     public final float mBottomPaddingScale;
     public final float mSidePaddingScale;
     public final ToolbarMode mToolbarMode;
@@ -258,6 +259,7 @@ public class SettingsValues {
         mBlockPotentiallyOffensive = prefs.getBoolean(Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE, Defaults.PREF_BLOCK_POTENTIALLY_OFFENSIVE);
         mUrlDetectionEnabled = prefs.getBoolean(Settings.PREF_URL_DETECTION, Defaults.PREF_URL_DETECTION);
         mAutocorrectFrequentWords = prefs.getBoolean(Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, Defaults.PREF_AUTOCORRECT_FREQUENT_WORDS);
+        mTrustTypedCount = Math.max(1, prefs.getInt(Settings.PREF_TRUST_TYPED_COUNT, Defaults.PREF_TRUST_TYPED_COUNT));
         mAutoCorrectionEnabledPerUserSettings = prefs.getBoolean(Settings.PREF_AUTO_CORRECTION, Defaults.PREF_AUTO_CORRECTION);
         mAutoCorrectEnabled = mAutoCorrectionEnabledPerUserSettings
                 && (mInputAttributes.mInputTypeShouldAutoCorrect || prefs.getBoolean(Settings.PREF_MORE_AUTO_CORRECTION, Defaults.PREF_MORE_AUTO_CORRECTION))

@@ -157,7 +157,7 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
             val context = Settings.getCurrentContext()
             if (context != null) {
                 val frequent = FrequentLongWords.matching(context, mDictionaryFacilitator.locales, wordComposer.typedWord)
-                // "Auto-correct learns your frequent words" on: the first goes in the auto-correction's slot (space commits
+                // "Trust words you've typed N+ times" on: the first goes in the auto-correction's slot (space commits
                 // it when a correction is coming); off: right after it, and the correction stays what it was
                 val frequentCorrects = Settings.getValues().mAutocorrectFrequentWords
                 var slot = min(if (frequentCorrects) 1 else 2, suggestionsList.size)
@@ -181,7 +181,8 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
                 // (a dictionary's source, not the typed word's: long-press Remove refuses the typed word's)
                 val hotSource = suggestionsList.firstOrNull { it.mSourceDict != Dictionary.DICTIONARY_USER_TYPED }?.mSourceDict
                     ?: Dictionary.DICTIONARY_APPLICATION_DEFINED
-                var hotSlot = min(1, suggestionsList.size)
+                // ("Trust words you've typed N+ times" off: right after the correction, which stays what space types)
+                var hotSlot = min(if (frequentCorrects || !hasAutoCorrection) 1 else 2, suggestionsList.size)
                 for (info in HotWords.matching(wordComposer.typedWord, hotSource).filterNot { mDictionaryFacilitator.isRemovedWord(it.mWord) }) {
                     suggestionsList.removeAll { it.mWord == info.mWord }
                     suggestionsList.add(min(hotSlot, suggestionsList.size), info)
@@ -244,7 +245,9 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
         // We allow auto-correction if whitelisting is not required or the word is whitelisted,
         // or if the word had more than one char and was not suggested.
         val allowsToBeAutoCorrected: Boolean
-        if (SHOULD_AUTO_CORRECT_USING_NON_WHITE_LISTED_SUGGESTION
+        if (mDictionaryFacilitator.isTrustedWord(consideredWord)) {
+            allowsToBeAutoCorrected = false // typed often enough to be yours ("Trust words you've typed N+ times")
+        } else if (SHOULD_AUTO_CORRECT_USING_NON_WHITE_LISTED_SUGGESTION
                 || firstSuggestionInContainer?.isKindOf(SuggestedWordInfo.KIND_WHITELIST) == true
                 || (consideredWord.length > 1
                     && typedWordInfo?.mSourceDict == null // more than 1 letter and not in dictionary
