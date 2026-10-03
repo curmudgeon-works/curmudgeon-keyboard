@@ -105,8 +105,7 @@ class LayoutDraft private constructor(
             // the toolbar group
             Settings.PREF_TOOLBAR_MODE, Settings.PREF_TOOLBAR_HIDING_GLOBAL, Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE,
             Settings.PREF_TOOLBAR_KEYS, Settings.PREF_PINNED_TOOLBAR_KEYS, Settings.PREF_CLIPBOARD_TOOLBAR_KEYS,
-            Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES, Settings.PREF_QUICK_PIN_TOOLBAR_KEYS,
-            Settings.PREF_VARIABLE_TOOLBAR_DIRECTION, Settings.PREF_TOOLBAR_EXPAND_ICON,
+            Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES, Settings.PREF_TOOLBAR_EXPAND_ICON,
             Settings.PREF_TOOLBAR_IN_STRIP_ROW, Settings.PREF_TOOLBAR_VISIBILITY,
             // layout
             Settings.PREF_SHOW_NUMBER_ROW, Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS,

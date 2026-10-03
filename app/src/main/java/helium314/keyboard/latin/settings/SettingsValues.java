@@ -128,7 +128,6 @@ public class SettingsValues {
     public final boolean mEnableEmojiAltPhysicalKey;
     public final boolean mIsSplitKeyboardEnabled;
     public final float mSplitKeyboardSpacerRelativeWidth;
-    public final boolean mQuickPinToolbarKeys;
     public final int mScreenMetrics;
     public final boolean mAddToPersonalDictionary;
     public final boolean mUseContactsDictionary;
@@ -246,7 +245,7 @@ public class SettingsValues {
         mSwipeMetrics = prefs.getBoolean(Settings.PREF_SWIPE_METRICS, Defaults.PREF_SWIPE_METRICS);
         mSpaceForLangChange = prefs.getBoolean(Settings.PREF_SPACE_TO_CHANGE_LANG, Defaults.PREF_SPACE_TO_CHANGE_LANG);
         mShowsEmojiKey = prefs.getBoolean(Settings.PREF_SHOW_EMOJI_KEY, Defaults.PREF_SHOW_EMOJI_KEY);
-        mVarToolbarDirection = mToolbarMode != ToolbarMode.HIDDEN && prefs.getBoolean(Settings.PREF_VARIABLE_TOOLBAR_DIRECTION, Defaults.PREF_VARIABLE_TOOLBAR_DIRECTION);
+        mVarToolbarDirection = mToolbarMode != ToolbarMode.HIDDEN; // the toolbar follows the language's direction (no setting since 0.3.002)
         mUsePersonalizedDicts = prefs.getBoolean(Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Defaults.PREF_KEY_USE_PERSONALIZED_DICTS);
         mUseDoubleSpacePeriod = prefs.getBoolean(Settings.PREF_KEY_USE_DOUBLE_SPACE_PERIOD, Defaults.PREF_KEY_USE_DOUBLE_SPACE_PERIOD)
                 && inputAttributes.mIsGeneralTextInput;
@@ -296,7 +295,6 @@ public class SettingsValues {
         mSplitKeyboardSpacerRelativeWidth = mIsSplitKeyboardEnabled
                 ? Math.min(Math.max((displayWidthDp - 600) / 600f + 0.15f, 0.15f), 0.35f) * Settings.readSplitSpacerScale(prefs, isLandscape, isFolded)
                 : 0f;
-        mQuickPinToolbarKeys = mToolbarMode == ToolbarMode.EXPANDABLE && prefs.getBoolean(Settings.PREF_QUICK_PIN_TOOLBAR_KEYS, Defaults.PREF_QUICK_PIN_TOOLBAR_KEYS);
         mScreenMetrics = Settings.readScreenMetrics(res);
 
         // Compute other readable settings

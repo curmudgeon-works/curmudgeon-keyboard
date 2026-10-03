@@ -76,8 +76,7 @@ fun toolbarItems(prefs: SharedPreferences): List<String?> {
 val toolbarKeys = listOf(
     Settings.PREF_TOOLBAR_MODE, Settings.PREF_TOOLBAR_HIDING_GLOBAL, Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE,
     Settings.PREF_TOOLBAR_KEYS, Settings.PREF_PINNED_TOOLBAR_KEYS, Settings.PREF_CLIPBOARD_TOOLBAR_KEYS,
-    Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES, Settings.PREF_QUICK_PIN_TOOLBAR_KEYS,
-    Settings.PREF_VARIABLE_TOOLBAR_DIRECTION, Settings.PREF_TOOLBAR_EXPAND_ICON,
+    Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES, Settings.PREF_TOOLBAR_EXPAND_ICON,
     Settings.PREF_TOOLBAR_VISIBILITY, Settings.PREF_TOOLBAR_OPENED_BY_KEY,
 )
 
@@ -147,16 +146,6 @@ fun createToolbarSettings(context: Context) = listOf(
                 onDismissRequest = { showDialog = false }
             )
     },
-    Setting(context, Settings.PREF_QUICK_PIN_TOOLBAR_KEYS,
-        R.string.quick_pin_toolbar_keys, R.string.quick_pin_toolbar_keys_summary)
-    {
-        SwitchPreference(it, Defaults.PREF_QUICK_PIN_TOOLBAR_KEYS) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
-    },
-    Setting(context, Settings.PREF_VARIABLE_TOOLBAR_DIRECTION,
-        R.string.var_toolbar_direction, R.string.var_toolbar_direction_summary)
-    {
-        SwitchPreference(it, Defaults.PREF_VARIABLE_TOOLBAR_DIRECTION)
-    }
 )
 
 @Preview
