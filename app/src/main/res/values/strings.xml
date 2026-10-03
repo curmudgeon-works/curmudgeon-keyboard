@@ -86,8 +86,6 @@
     <!-- Option for setting whether language switch key should switch internal layouts only, or also to other keyboards -->
     <string name="language_switch_key_behavior">Language switch key behavior</string>
     <!-- Option to show shortcut key to emoji palettes -->
-    <!-- Keyboards > Add keyboard: that language's keyboard is in the list already -->
-    <string name="keyboard_already_added">%s is already in your keyboards</string>
     <string name="show_emoji_key">Emoji key</string>
     <!-- Layout & Typing: a microphone key right of the space bar -->
     <string name="show_voice_key">Voice input key</string>
@@ -267,7 +265,7 @@
     <string name="restore_also">Also restore</string>
     <string name="restore_custom_words">Custom words</string>
     <string name="restore_clipboard">Clipboard history</string>
-    <string name="restore_replaces_note">What\'s chosen replaces what the phone has now.</string>
+    <string name="restore_replaces_note">What\'s chosen replaces what the phone has now; learned words are added to the phone\'s.</string>
     <!-- Swipe tuning screen (own gesture decoder): inflection weights and per-setting statistics -->
     <string name="swipe_tuning">Swipe tuning</string>
     <!-- The per-keyboard screen with the swipe settings and the swipe tuning -->
