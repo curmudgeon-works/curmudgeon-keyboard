@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.preferences
 
+import helium314.keyboard.settings.scrollbar
 import helium314.keyboard.settings.rememberPrefSnapshot
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -139,7 +140,7 @@ private fun KeyboardScaleDialog(
                 LocalTextStyle provides MaterialTheme.typography.bodyLarge
             ) {
                 val state = rememberScrollState()
-                Column(Modifier.verticalScroll(state)) {
+                Column(Modifier.scrollbar(state).verticalScroll(state)) {
                     if (dimensions.size > 1) {
                         dimensions.forEachIndexed { i, dimension ->
                             // hide "folded" box for non-foldables, and no box for a dimension that is always shown

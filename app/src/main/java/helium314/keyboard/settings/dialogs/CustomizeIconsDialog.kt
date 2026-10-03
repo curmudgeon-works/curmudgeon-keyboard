@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.dialogs
 
+import helium314.keyboard.settings.scrollbar
 import helium314.keyboard.settings.rememberPrefSnapshot
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -102,7 +103,7 @@ fun CustomizeIconsDialog(
         title = { Text(stringResource(R.string.customize_icons)) },
         content = {
             // short enough that the preview keyboard stays in view below
-            LazyColumn(state = state, modifier = Modifier.heightIn(max = 220.dp)) {
+            LazyColumn(state = state, modifier = Modifier.heightIn(max = 220.dp).scrollbar(state)) {
                 items(iconsAndNames, key = { it.second }) { (iconName, displayName) ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,

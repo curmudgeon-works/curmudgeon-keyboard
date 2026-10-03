@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.preferences
 
+import helium314.keyboard.settings.scrollbar
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -132,7 +133,7 @@ fun ToolbarKeysPreference(setting: Setting) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))
                 // a short list that scrolls inside: the dialog stays small so the preview keyboard's toolbar shows above it
                 LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.heightIn(max = 220.dp)) {
+                    modifier = Modifier.heightIn(max = 220.dp).scrollbar(listState)) {
                     items(order.toList(), key = { it }) { key ->
                         ReorderableItem(state = dragState, key = key) { dragging ->
                             val elevation by animateDpAsState(if (dragging) 4.dp else 0.dp)

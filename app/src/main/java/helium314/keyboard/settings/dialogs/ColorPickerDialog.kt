@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.dialogs
 
+import helium314.keyboard.settings.scrollbar
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Row
@@ -154,12 +155,14 @@ fun ColorPickerDialog(
                         slidersAndTextField()
                     }
                 }
-            else
-                Column(if (onPreview != null) Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()) else Modifier) {
+            else {
+                val scroll = androidx.compose.foundation.rememberScrollState()
+                Column(if (onPreview != null) Modifier.scrollbar(scroll).verticalScroll(scroll) else Modifier) {
                     topBar()
                     picker()
                     slidersAndTextField()
                 }
+            }
         },
         neutralButtonText = if (showDefault) stringResource(R.string.button_default) else null,
         onNeutral = onDefault,

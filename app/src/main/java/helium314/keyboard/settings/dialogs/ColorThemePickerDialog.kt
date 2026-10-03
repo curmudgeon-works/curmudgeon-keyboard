@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.dialogs
 
+import helium314.keyboard.settings.scrollbar
 import helium314.keyboard.settings.rememberPrefSnapshot
 import android.content.ClipboardManager
 import android.content.Context
@@ -123,7 +124,7 @@ fun ColorThemePickerDialog(
                 LocalTextStyle provides MaterialTheme.typography.bodyLarge
             ) {
                 // a short list that scrolls inside, so the dialog stays clear of the keyboard
-                LazyColumn(state = state, modifier = androidx.compose.ui.Modifier.heightIn(max = 300.dp)) {
+                LazyColumn(state = state, modifier = androidx.compose.ui.Modifier.heightIn(max = 300.dp).scrollbar(state)) {
                     items(colors) { item ->
                         if (item == "") {
                             AddColorRow(close, userColors, targetScreen, setting.key)

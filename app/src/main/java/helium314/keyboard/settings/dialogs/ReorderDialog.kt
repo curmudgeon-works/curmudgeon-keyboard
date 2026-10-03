@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.dialogs
 
+import helium314.keyboard.settings.scrollbar
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -62,6 +63,7 @@ fun <T: Any> ReorderDialog(
             LazyColumn(
                 state = listState,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.scrollbar(listState),
             ) {
                 items(reorderableItems, key = getKey) { item ->
                     ReorderableItem(

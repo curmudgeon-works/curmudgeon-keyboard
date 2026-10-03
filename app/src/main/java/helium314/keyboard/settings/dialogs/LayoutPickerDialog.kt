@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.dialogs
 
+import helium314.keyboard.settings.scrollbar
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -88,7 +89,7 @@ fun LayoutPickerDialog(
             CompositionLocalProvider(
                 LocalTextStyle provides MaterialTheme.typography.bodyLarge
             ) {
-                LazyColumn(state = state) {
+                LazyColumn(state = state, modifier = Modifier.scrollbar(state)) {
                     items(layouts) { item ->
                         if (item == "") {
                             AddLayoutRow({ newLayoutDialog = it to "" }, layoutType, customLayouts)

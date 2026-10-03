@@ -5,6 +5,7 @@
  */
 package helium314.keyboard.settings.dialogs
 
+import helium314.keyboard.settings.scrollbar
 import helium314.keyboard.settings.SettingsActivity
 
 import androidx.compose.runtime.getValue
@@ -203,6 +204,7 @@ fun ThreeButtonAlertDialog(
                                 Box(Modifier
                                     .weight(weight = 1f, fill = false)
                                     .padding(bottom = if (reducePadding) 2.dp else 8.dp)
+                                    .scrollbar(scrollState)
                                     .verticalScroll(scrollState)
                                 ) {
                                     content()

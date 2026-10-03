@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
@@ -207,3 +208,44 @@ fun AdvancedReveal(visible: Boolean, content: @Composable () -> Unit) {
 }
 
 private const val ADVANCED_ANIM_MS = 280
+
+/**
+ * A thin scroll bar at the right edge of a list in a dialog, shown while there's more to scroll (2026-10-03:
+ * without one, a short list that scrolls inside looks complete). Length = the share shown, position = where it is.
+ * Put it on the list (the viewport), before any scrolling modifier.
+ */
+@Composable
+fun Modifier.scrollbar(state: androidx.compose.foundation.lazy.LazyListState): Modifier {
+    val color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+    return this.drawWithContent {
+        drawContent()
+        val info = state.layoutInfo
+        val visible = info.visibleItemsInfo
+        if (visible.isEmpty() || info.totalItemsCount == 0 || (!state.canScrollForward && !state.canScrollBackward)) return@drawWithContent
+        val itemHeight = visible.sumOf { it.size }.toFloat() / visible.size
+        val content = itemHeight * info.totalItemsCount
+        val scrolled = state.firstVisibleItemIndex * itemHeight + state.firstVisibleItemScrollOffset
+        drawScrollbar(color, scrolled, content)
+    }
+}
+
+/** [scrollbar] for a scrolling column ([state] of its verticalScroll). */
+@Composable
+fun Modifier.scrollbar(state: androidx.compose.foundation.ScrollState): Modifier {
+    val color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+    return this.drawWithContent {
+        drawContent()
+        if (state.maxValue <= 0 || state.maxValue == Int.MAX_VALUE) return@drawWithContent
+        drawScrollbar(color, state.value.toFloat(), size.height + state.maxValue)
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScrollbar(color: androidx.compose.ui.graphics.Color, scrolled: Float, content: Float) {
+    val view = size.height
+    if (content <= view) return
+    val thumb = (view * view / content).coerceIn(24.dp.toPx().coerceAtMost(view), view)
+    val top = (scrolled / (content - view)).coerceIn(0f, 1f) * (view - thumb)
+    val width = 3.dp.toPx()
+    drawRoundRect(color, topLeft = androidx.compose.ui.geometry.Offset(size.width - width - 1.dp.toPx(), top),
+        size = androidx.compose.ui.geometry.Size(width, thumb), cornerRadius = androidx.compose.ui.geometry.CornerRadius(width / 2))
+}

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.preferences
 
+import helium314.keyboard.settings.scrollbar
 import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -85,7 +86,8 @@ fun CustomizeSuggestionsPreference(setting: Setting) {
         },
         title = { Text(setting.title) },
         content = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
+            val scroll = rememberScrollState()
+            Column(Modifier.scrollbar(scroll).verticalScroll(scroll)) {
                 Text(stringResource(R.string.suggestion_count_title, countLabel(newCount)))
                 Slider(
                     value = newCount.toFloat(),
