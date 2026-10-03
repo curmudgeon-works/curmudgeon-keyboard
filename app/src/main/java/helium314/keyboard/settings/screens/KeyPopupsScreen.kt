@@ -474,7 +474,7 @@ fun TryItBar(keyboard: SettingsSubtype, state: TryItState, onFocus: (Boolean) ->
 }
 
 /** A built-in set ([name] resource) or one the user saved ([userName], with its per-key arrangement). */
-private class Preset(val name: Int, val morePopups: String, val symbolsLayout: String?,
+private data class Preset(val name: Int, val morePopups: String, val symbolsLayout: String?, // (data: equal by content, the list rebuilds them on every change)
                      val userName: String? = null, val overrides: Map<String, List<String>>? = null,
                      val symbolMap: String? = null) // the letter -> symbols map; null = the Curmudgeon one, "" = none (HeliBoard)
 
