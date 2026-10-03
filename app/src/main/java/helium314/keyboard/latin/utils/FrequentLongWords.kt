@@ -54,6 +54,11 @@ object FrequentLongWords {
 
     fun clear() = caches.clear()
 
+    /** The word was removed (long-press; its learned uses are gone too): out of the lists until it's frequent again. */
+    fun forget(word: String) {
+        for ((key, cache) in caches) caches[key] = Cache(cache.entries.filterNot { it.lower == word.lowercase() }, cache.time)
+    }
+
     private fun refreshAsync(context: Context, locale: Locale, key: String) {
         if (!refreshing.add(key)) return
         Thread({

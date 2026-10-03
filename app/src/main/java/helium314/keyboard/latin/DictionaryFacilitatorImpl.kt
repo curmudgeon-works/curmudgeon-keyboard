@@ -336,11 +336,8 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
                 wasCurrentWordAutoCapitalized, timeStampInSeconds.toInt(), blockPotentiallyOffensive, extraUses
             )
             ngramContextForCurrentWord = ngramContextForCurrentWord.getNextNgramContext(WordInfo(currentWord))
-
-            // remove manually entered blacklisted words from blacklist for likely matching languages
-            dictionaryGroups.filter { it.confidence == preferredGroup.confidence }.forEach {
-                it.removeFromBlacklist(currentWord)
-            }
+            // (a removed word typed again stays removed from the dictionaries: it comes back as a learned word only,
+            // starting from the bottom like any new word; Rahul 2026-10-03)
         }
     }
 
@@ -397,7 +394,8 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         }
         // We demote unrecognized words (frequency <= 0) by specifying them as "invalid".
         // We don't add words with 0-frequency (assuming they would be profanity etc.).
-        val isValid = mainFreq > 0
+        // A dictionary word removed with long-press is learned like a new word too.
+        val isValid = mainFreq > 0 && !dictionaryGroup.isBlacklisted(wordToUse)
         UserHistoryDictionary.addToDictionary(userHistoryDictionary, ngramContext, wordToUse, isValid, timeStampInSeconds)
         // each further use raises the word's level once more (the word alone: the word pair was counted above)
         repeat(extraUses) {
@@ -557,7 +555,10 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
 
             for (info in dictionarySuggestions) {
                 val word = info.word
-                if (isBlacklisted(word) || SupportedEmojis.isUnsupported(word)) // don't add blacklisted words and unsupported emojis
+                // don't add blacklisted words and unsupported emojis; a removed word you have typed again since comes
+                // from your learned words (or your personal dictionary) only
+                val ownWord = info.mSourceDict.mDictType == Dictionary.TYPE_USER_HISTORY || info.mSourceDict.mDictType == Dictionary.TYPE_USER
+                if ((isBlacklisted(word) && !ownWord) || SupportedEmojis.isUnsupported(word))
                     continue
                 if (checkForGarbage
                     // consider the user might use custom main dictionary containing shortcuts
@@ -608,7 +609,9 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
 
     private fun isBlacklisted(word: String): Boolean = dictionaryGroups.any { it.isBlacklisted(word) }
 
-    override fun isRemovedWord(word: String): Boolean = isBlacklisted(word) || isBlacklisted(word.lowercase())
+    // removed with long-press and not typed again since (typed again, it's a learned word like any other)
+    override fun isRemovedWord(word: String): Boolean = (isBlacklisted(word) || isBlacklisted(word.lowercase()))
+        && dictionaryGroups.none { it.getSubDict(Dictionary.TYPE_USER_HISTORY)?.isInDictionary(word) == true }
 
     override fun removeWord(word: String) {
         for (dictionaryGroup in dictionaryGroups) {

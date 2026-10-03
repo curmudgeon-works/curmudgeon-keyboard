@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -44,12 +45,13 @@ fun SliderDialog(
     offLabel: String? = null, // a checkbox under the slider: ticked, the value is [offValue] and the slider is greyed out
     offValue: Float = -1f,
 ) {
-    var off by remember { mutableStateOf(offLabel != null && initialValue == offValue) }
+    // (saveable: a rotation or dark-mode switch keeps the dialog's state, so Cancel still puts back the opening value)
+    var off by rememberSaveable { mutableStateOf(offLabel != null && initialValue == offValue) }
     // (ticked: the slider waits where it would start, the default if there is one)
-    var sliderPosition by remember { mutableFloatStateOf(if (off) (defaultValue ?: range.start).coerceIn(range) else initialValue) }
-    var touched by remember { mutableStateOf(false) }
-    var confirmed by remember { mutableStateOf(false) }
-    var atDefault by remember { mutableStateOf(false) } // Default was pressed and the slider not moved since
+    var sliderPosition by rememberSaveable { mutableFloatStateOf(if (off) (defaultValue ?: range.start).coerceIn(range) else initialValue) }
+    var touched by rememberSaveable { mutableStateOf(false) }
+    var confirmed by rememberSaveable { mutableStateOf(false) }
+    var atDefault by rememberSaveable { mutableStateOf(false) } // Default was pressed and the slider not moved since
     // (live sliders apply when the finger leaves the slider, not during the drag: each step would rebuild the preview)
     val dismiss = { if (live && touched && !confirmed) onValueChanged(initialValue); onDismissRequest() }
 

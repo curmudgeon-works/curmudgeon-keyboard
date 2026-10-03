@@ -65,4 +65,8 @@ object HotWords {
 
     @Synchronized
     fun clear() = recent.clear()
+
+    /** The word was removed (long-press): its recent uses no longer count; typed again, it starts over. */
+    @Synchronized
+    fun forget(word: String) { recent.removeAll { it.equals(word, ignoreCase = true) } }
 }

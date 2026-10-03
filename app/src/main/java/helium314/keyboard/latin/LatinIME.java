@@ -1565,8 +1565,13 @@ public class LatinIME extends InputMethodService implements
     }
 
     @Override
-    public void removeSuggestion(final String word) {
+    public void removeSuggestion(final String word, final SuggestedWords remaining) {
         mDictionaryFacilitator.removeWord(word);
+        // its recent and frequent uses go too: typed again, it starts from the bottom like a new word
+        helium314.keyboard.latin.utils.HotWords.INSTANCE.forget(word);
+        helium314.keyboard.latin.utils.FrequentLongWords.INSTANCE.forget(word);
+        // the strip and the pending auto-correction both lose the word
+        setSuggestedWords(remaining);
     }
 
     @Override

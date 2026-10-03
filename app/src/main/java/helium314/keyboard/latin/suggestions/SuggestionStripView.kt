@@ -85,7 +85,8 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     interface Listener {
         fun pickSuggestionManually(word: SuggestedWordInfo?)
         fun onCodeInput(primaryCode: Int, x: Int, y: Int, isKeyRepeat: Boolean)
-        fun removeSuggestion(word: String?)
+        /** [word] was removed (long-press card): [remaining] are the suggestions without it, also for what space commits. */
+        fun removeSuggestion(word: String?, remaining: SuggestedWords)
         fun removeExternalSuggestions()
         fun onSwipeDownOnToolbar()
     }
@@ -610,23 +611,25 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     }
 
     private fun removeSuggestion(word: String) {
-        listener.removeSuggestion(word)
         moreSuggestionsView.dismissPopupKeysPanel()
-        // show suggestions, but without the removed word
+        // the suggestions without the removed word
         val suggestedWordInfos = ArrayList<SuggestedWordInfo>()
+        var removedIndex = -1
         for (i in 0..<suggestedWords.size()) {
             val info = suggestedWords.getInfo(i)
-            if (info.word != word) suggestedWordInfos.add(info)
+            if (info.word != word) suggestedWordInfos.add(info) else if (removedIndex < 0) removedIndex = i
         }
         suggestedWords.mRawSuggestions?.removeFirst { it.word == word }
-
+        // the removed word was the incoming auto-correction (or came before it, moving another word into its slot):
+        // nothing is auto-corrected now, so space doesn't commit it
+        val willAutoCorrect = suggestedWords.mWillAutoCorrect && (removedIndex < 0 || removedIndex > SuggestedWords.INDEX_OF_AUTO_CORRECTION)
         val newSuggestedWords = SuggestedWords(
             suggestedWordInfos, suggestedWords.mRawSuggestions, suggestedWords.typedWordInfo, suggestedWords.mTypedWordValid,
-            suggestedWords.mWillAutoCorrect, suggestedWords.mIsObsoleteSuggestions, suggestedWords.mInputStyle, suggestedWords.mSequenceNumber
+            willAutoCorrect, suggestedWords.mIsObsoleteSuggestions, suggestedWords.mInputStyle, suggestedWords.mSequenceNumber
         )
-        setSuggestions(newSuggestedWords, direction != 1)
+        // the keyboard takes them (what space commits) and shows them
+        listener.removeSuggestion(word, newSuggestedWords)
         suggestionsStrip.isVisible = true
-
     }
 
     private fun clear() {

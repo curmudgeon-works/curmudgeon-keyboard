@@ -864,8 +864,10 @@ public final class InputLogic {
                 final SettingsValues sv = inputTransaction.getSettingsValues();
                 if (mWordComposer.isComposingWord()) {
                     // Suggestions may have resumed composing on the word before the cursor; finish it so the edit
-                    // below deletes and types plain text instead of replacing the composition.
-                    commitTyped(sv, LastComposedWord.NOT_A_SEPARATOR);
+                    // below deletes and types plain text instead of replacing the composition. Only finished, not
+                    // committed: committing learns the word, and undoing a typo must not teach it.
+                    mConnection.finishComposingText();
+                    resetComposingState(true);
                 }
                 mEditHistory.setMaxSteps(sv.mUndoHistoryLength);
                 final EditHistory.State live = currentEditState();
