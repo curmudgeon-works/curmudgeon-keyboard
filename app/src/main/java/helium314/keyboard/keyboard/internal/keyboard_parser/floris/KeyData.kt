@@ -195,6 +195,7 @@ data class VariationSelector(
  *
  * @property emojiKeyEnabled The key data to use if [KeyboardId.mEmojiKeyEnabled] is true.
  * @property languageKeyEnabled The key data to use if [KeyboardId.mLanguageSwitchKeyEnabled] is true.
+ * @property voiceKeyEnabled The key data to use if [KeyboardId.mHasShortcutKey] is true (the voice key is on and voice input available).
  * @property symbols The key data to use if [KeyboardId.mElementId] is [KeyboardId.ELEMENT_SYMBOLS].
  * @property moreSymbols The key data to use if [KeyboardId.mElementId] is [KeyboardId.ELEMENT_SYMBOLS_SHIFTED].
  * @property alphabet The key data to use if [KeyboardId.isAlphabetKeyboard] is true.
@@ -206,6 +207,7 @@ data class VariationSelector(
 class KeyboardStateSelector(
     val emojiKeyEnabled: AbstractKeyData? = null,
     val languageKeyEnabled: AbstractKeyData? = null,
+    val voiceKeyEnabled: AbstractKeyData? = null,
     val symbols: AbstractKeyData? = null,
     val moreSymbols: AbstractKeyData? = null,
     val alphabet: AbstractKeyData? = null,
@@ -217,6 +219,8 @@ class KeyboardStateSelector(
             emojiKeyEnabled?.compute(params)?.let { return it }
         if (params.mId.mLanguageSwitchKeyEnabled)
             languageKeyEnabled?.compute(params)?.let { return it }
+        if (params.mId.mHasShortcutKey)
+            voiceKeyEnabled?.compute(params)?.let { return it }
         if (params.mId.mElementId == KeyboardId.ELEMENT_SYMBOLS)
             symbols?.compute(params)?.let { return it }
         if (params.mId.mElementId == KeyboardId.ELEMENT_SYMBOLS_SHIFTED)

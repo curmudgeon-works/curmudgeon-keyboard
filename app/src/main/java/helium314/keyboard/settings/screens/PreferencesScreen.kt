@@ -122,7 +122,7 @@ fun clipboardHistoryItems(prefs: SharedPreferences): List<Any?> {
 val preferencesSimpleModeKeys = setOf(
     Settings.PREF_SYMBOL_POPUP_MAP, Settings.PREF_POPUP_ON,
     Settings.PREF_VIBRATE_ON, Settings.PREF_SOUND_ON, Settings.PREF_SHOW_NUMBER_ROW,
-    Settings.PREF_SHOW_EMOJI_KEY, Settings.PREF_ENABLE_CLIPBOARD_HISTORY,
+    Settings.PREF_SHOW_EMOJI_KEY, Settings.PREF_SHOW_VOICE_KEY, Settings.PREF_ENABLE_CLIPBOARD_HISTORY,
 )
 
 /** The four "back to letters after…" switches: one row, a dialog with the four. */
@@ -269,6 +269,9 @@ fun createPreferencesSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_SHOW_EMOJI_KEY, R.string.show_emoji_key) {
         SwitchPreference(it, Defaults.PREF_SHOW_EMOJI_KEY) { KeyboardSwitcher.getInstance().reloadKeyboard() }
+    },
+    Setting(context, Settings.PREF_SHOW_VOICE_KEY, R.string.show_voice_key, R.string.show_voice_key_summary) {
+        SwitchPreference(it, Defaults.PREF_SHOW_VOICE_KEY) { KeyboardSwitcher.getInstance().reloadKeyboard() }
     },
     Setting(context, Settings.PREF_ENABLE_CLIPBOARD_HISTORY,
         R.string.enable_clipboard_history, R.string.enable_clipboard_history_summary)

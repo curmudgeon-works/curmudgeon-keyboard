@@ -87,6 +87,9 @@
     <string name="language_switch_key_behavior">Language switch key behavior</string>
     <!-- Option to show shortcut key to emoji palettes -->
     <string name="show_emoji_key">Emoji key</string>
+    <!-- Layout & Typing: a microphone key right of the space bar -->
+    <string name="show_voice_key">Voice input key</string>
+    <string name="show_voice_key_summary">Right of the space bar; opens the phone\'s voice typing</string>
     <!-- Units abbreviation for the duration (milliseconds) -->
     <string name="abbreviation_unit_milliseconds">%s ms</string>
     <!-- Units abbreviation for the duration (minutes) -->

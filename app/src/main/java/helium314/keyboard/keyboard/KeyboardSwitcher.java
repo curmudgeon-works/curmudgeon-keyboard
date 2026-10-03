@@ -154,7 +154,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         final boolean oneHandedModeEnabled = settingsValues.mOneHandedModeEnabled;
         mKeyboardLayoutSet = builder.setKeyboardGeometry(keyboardWidth, keyboardHeight)
                 .setSubtype(mRichImm.getCurrentSubtype())
-                .setVoiceInputKeyEnabled(settingsValues.mShowsVoiceInputKey)
+                .setVoiceInputKeyEnabled(settingsValues.mShowsVoiceKey) // (the layouts' voice key)
                 .setNumberRowEnabled(settingsValues.mShowsNumberRow)
                 .setNumberRowInSymbolsEnabled(settingsValues.mShowsNumberRowInSymbols)
                 .setLanguageSwitchKeyEnabled(settingsValues.isLanguageSwitchKeyEnabled())
@@ -171,7 +171,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                 final InputMethodSubtype defaults = SubtypeUtilsAdditional.INSTANCE.createDefaultSubtype(mRichImm.getCurrentSubtypeLocale());
                 mKeyboardLayoutSet = builder.setKeyboardGeometry(keyboardWidth, keyboardHeight)
                         .setSubtype(RichInputMethodSubtype.Companion.get(defaults))
-                        .setVoiceInputKeyEnabled(settingsValues.mShowsVoiceInputKey)
+                        .setVoiceInputKeyEnabled(settingsValues.mShowsVoiceKey) // (the layouts' voice key)
                         .setNumberRowEnabled(settingsValues.mShowsNumberRow)
                         .setNumberRowInSymbolsEnabled(settingsValues.mShowsNumberRowInSymbols)
                         .setLanguageSwitchKeyEnabled(settingsValues.isLanguageSwitchKeyEnabled())

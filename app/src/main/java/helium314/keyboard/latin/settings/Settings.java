@@ -122,6 +122,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_SHOW_LANGUAGE_SWITCH_KEY = "show_language_switch_key";
     public static final String PREF_LANGUAGE_SWITCH_KEY = "language_switch_key";
     public static final String PREF_SHOW_EMOJI_KEY = "show_emoji_key";
+    public static final String PREF_SHOW_VOICE_KEY = "show_voice_key";
     public static final String PREF_ADDITIONAL_SUBTYPES = "additional_subtypes";
     public static final String PREF_ENABLE_SPLIT_KEYBOARD = "split_keyboard";
     public static final String PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE = "split_keyboard_landscape";
