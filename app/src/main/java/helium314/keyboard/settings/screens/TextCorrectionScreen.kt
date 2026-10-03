@@ -72,6 +72,7 @@ fun TextCorrectionScreen(
         if (autocorrectEnabled) Settings.PREF_AUTOCORRECT_SHORTCUTS else null,
         if (autocorrectEnabled) Settings.PREF_AUTOCORRECT_WITH_DIGITS else null,
         if (autocorrectEnabled) Settings.PREF_AUTO_CORRECT_THRESHOLD else null,
+        Settings.PREF_URL_DETECTION, // (from Advanced; advanced here too) web and email addresses as one word
         // (backspace reverts autocorrect: in the Backspace group of the Preferences screen)
         Settings.PREF_AUTO_CAP,
         Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE,
@@ -174,6 +175,7 @@ private val correctionKeys = listOf(
     Settings.PREF_INLINE_EMOJI_SEARCH, Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Settings.PREF_ALWAYS_INCOGNITO_MODE,
     Settings.PREF_BIGRAM_PREDICTIONS, Settings.PREF_SUGGEST_PUNCTUATION, Settings.PREF_PUNCTUATION_SUGGESTIONS,
     Settings.PREF_SUGGEST_CLIPBOARD_CONTENT, Settings.PREF_USE_CONTACTS, Settings.PREF_USE_APPS, Settings.PREF_ADD_TO_PERSONAL_DICTIONARY,
+    Settings.PREF_URL_DETECTION,
 )
 
 fun createCorrectionSettings(context: Context) = listOf(
