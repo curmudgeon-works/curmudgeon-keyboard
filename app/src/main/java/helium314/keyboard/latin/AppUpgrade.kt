@@ -65,11 +65,6 @@ fun checkVersionUpgrade(context: Context) {
  * set's values and its "done" flags. Each set keeps its own flags.
  */
 private fun ownSetUpgrades(real: SharedPreferences, freshInstall: Boolean) {
-    // 0.3.002: the emoji version is one setting for all keyboards: keyboards' own copies go (the shared one stays)
-    if (!real.getBoolean("emoji_version_global_done", false)) real.edit {
-        real.all.keys.filter { it.startsWith("p") && it.endsWith("/" + Settings.PREF_EMOJI_MAX_SDK) }.forEach { remove(it) }
-        putBoolean("emoji_version_global_done", true)
-    }
     val ids = runCatching { org.json.JSONObject(real.getString("keyboard_profile_ids", "{}")!!) }.getOrNull() ?: return
     for (name in ids.keys()) {
         val id = ids.optInt(name, KeyboardProfiles.SHARED)
