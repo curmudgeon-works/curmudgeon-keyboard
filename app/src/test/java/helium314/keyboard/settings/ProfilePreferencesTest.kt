@@ -65,7 +65,13 @@ class ProfilePreferencesTest {
     @Test fun layoutPresetsKeepTheirValuesAndSkipPopups() {
         assert(LayoutPresets.inScope(helium314.keyboard.latin.settings.Settings.PREF_SHOW_NUMBER_ROW))
         assert(LayoutPresets.inScope(helium314.keyboard.latin.settings.Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX + "_0"))
-        assertFalse(LayoutPresets.inScope(helium314.keyboard.latin.settings.Settings.PREF_SYMBOL_POPUP_MAP)) // popups keep their own sets
+        assert(LayoutPresets.inScope(helium314.keyboard.latin.settings.Settings.PREF_SYMBOL_POPUP_MAP)) // popups are in Layouts too
+        assertFalse(LayoutPresets.inScope("key_popup_sets")) // the saved popup sets stay app-wide
+        // a Layout saved before popups were in Layouts (no script) leaves a keyboard's popups alone
+        val en = helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.US, "")
+        val old = LayoutPresets.Preset("Old", mapOf("key_popups" to "{}", helium314.keyboard.latin.settings.Settings.PREF_SHOW_NUMBER_ROW to true))
+        assertFalse(LayoutPresets.settingsFor(en, old).containsKey("key_popups"))
+        assert(LayoutPresets.settingsFor(en, old).containsKey(helium314.keyboard.latin.settings.Settings.PREF_SHOW_NUMBER_ROW))
         assertFalse(LayoutPresets.inScope(helium314.keyboard.latin.settings.Settings.PREF_ENABLE_CLIPBOARD_HISTORY)) // app-wide
         val preset = LayoutPresets.Preset("Mine", mapOf(helium314.keyboard.latin.settings.Settings.PREF_SHOW_NUMBER_ROW to true, helium314.keyboard.latin.settings.Settings.PREF_VIBRATE_ON to null,
             "layout:MAIN" to "qwertz", "layoutText:SYMBOLS" to "a b\nc"))

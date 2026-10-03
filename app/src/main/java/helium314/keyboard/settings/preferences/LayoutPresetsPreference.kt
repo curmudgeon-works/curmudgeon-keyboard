@@ -73,10 +73,14 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
             confirmImmediately = false,
             // each tap starts from what was there when the list opened, so one previewed Layout never leaks into the next
             onItemHighlighted = {
-                LayoutPresets.applySettings(ctx, initial + it.values.filterKeys { k -> LayoutPresets.inScope(k) })
+                LayoutPresets.applySettings(ctx, initial + LayoutPresets.settingsFor(initialKeyboard, it))
                 setKeyboard(LayoutPresets.keyboardWith(ctx, initialKeyboard, it))
             },
-            onItemSelected = { confirmed = true; prefs.edit { putString(LayoutPresets.PREF_SELECTED, it.name) } },
+            onItemSelected = {
+                confirmed = true
+                LayoutPresets.restorePopupSet(ctx, initialKeyboard, it) // its popup set, if deleted since
+                prefs.edit { putString(LayoutPresets.PREF_SELECTED, it.name) }
+            },
             trailing = { preset ->
                 IconButton({ confirmed = true; showList = false; toRename = preset }) { Icon(painterResource(R.drawable.ic_edit), stringResource(R.string.layout_preset_rename)) }
                 DeleteButton { confirmed = true; showList = false; toDelete = preset }
