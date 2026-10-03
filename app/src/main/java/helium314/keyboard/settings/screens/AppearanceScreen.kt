@@ -154,6 +154,7 @@ fun AppearanceScreen(
             Settings.PREF_THEME_DAY_NIGHT else null,
         Settings.PREF_THEME_COLORS,
         if (dayNightMode) Settings.PREF_THEME_COLORS_NIGHT else null,
+        Settings.PREF_SUGGESTION_WORD_PADDING, // spacing between suggestions (advanced; saved with a theme)
         SettingsWithoutKey.FONTS, // keys, symbols, suggestions: one dialog
         Settings.PREF_THEME_STYLE,
         Settings.PREF_ICON_STYLE,

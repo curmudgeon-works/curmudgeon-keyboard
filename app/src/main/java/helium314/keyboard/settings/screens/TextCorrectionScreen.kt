@@ -93,6 +93,7 @@ fun TextCorrectionScreen(
         Settings.PREF_KEY_USE_PERSONALIZED_DICTS,
         if (prefs.getBoolean(Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Defaults.PREF_KEY_USE_PERSONALIZED_DICTS))
             Settings.PREF_ADD_TO_PERSONAL_DICTIONARY else null,
+        Settings.PREF_SUGGESTION_RULES, // Customize suggestions: how many, rules for the 2nd one on (from Others; advanced)
         Settings.PREF_ALWAYS_INCOGNITO_MODE, // (from Advanced; advanced here too) never learn, like incognito fields
         // (PREF_CENTER_SUGGESTION_TEXT_TO_ENTER, "show the word space will type as the middle suggestion", is no longer
         // shown: the strip has no middle and shows the typed word first anyway; its Setting stays, off, see SettingsValues)
@@ -149,7 +150,8 @@ fun TextCorrectionScreen(
             if (imeUp) shownBarTop = bottomBarTop else hiddenBarTop = bottomBarTop
         }) { TryItBar(keyboard, tryIt, onFocus = preview::onFocus, onUsed = preview::onUsed) } },
         revealer = revealer,
-        isPending = { it in draft.pending },
+        // (Customize suggestions writes the count too)
+        isPending = { it in draft.pending || (it == Settings.PREF_SUGGESTION_RULES && Settings.PREF_SUGGESTION_COUNT in draft.pending) },
         simpleModeKeys = setOf(
             SettingsWithoutKey.EDIT_PERSONAL_DICTIONARY, Settings.PREF_AUTO_CORRECTION, Settings.PREF_AUTO_CAP,
             Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE,
@@ -175,7 +177,7 @@ private val correctionKeys = listOf(
     Settings.PREF_INLINE_EMOJI_SEARCH, Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Settings.PREF_ALWAYS_INCOGNITO_MODE,
     Settings.PREF_BIGRAM_PREDICTIONS, Settings.PREF_SUGGEST_PUNCTUATION, Settings.PREF_PUNCTUATION_SUGGESTIONS,
     Settings.PREF_SUGGEST_CLIPBOARD_CONTENT, Settings.PREF_USE_CONTACTS, Settings.PREF_USE_APPS, Settings.PREF_ADD_TO_PERSONAL_DICTIONARY,
-    Settings.PREF_URL_DETECTION,
+    Settings.PREF_URL_DETECTION, Settings.PREF_SUGGESTION_COUNT, Settings.PREF_SUGGESTION_RULES,
 )
 
 fun createCorrectionSettings(context: Context) = listOf(

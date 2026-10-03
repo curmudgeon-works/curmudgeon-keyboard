@@ -15,8 +15,7 @@ import helium314.keyboard.settings.SearchSettingsScreen
 import helium314.keyboard.settings.SettingsActivity
 
 /**
- * Settings few people need, kept out of the way (advanced only): the toolbar opening and closing by itself and
- * pinning a toolbar key by long-press (only for a toolbar that opens with the arrow), custom toolbar key codes, the
+ * Settings few people need, kept out of the way (advanced only): pinning a toolbar key by long-press (only for a toolbar that opens with the arrow), custom toolbar key codes, the
  * toolbar reversed for right-to-left languages, the emoji key of a physical keyboard, the timestamp key's format, the
  * currencies on the symbols pages' currency key.
  */
@@ -27,23 +26,16 @@ fun OthersScreen(onClickBack: () -> Unit) {
     if ((b?.value ?: 0) < 0) Log.v("irrelevant", "recompose on preference change")
     val expandable = Settings.readToolbarMode(prefs) == ToolbarMode.EXPANDABLE
     val items = listOf(
-        if (expandable) Settings.PREF_AUTO_SHOW_TOOLBAR else null,
-        if (expandable) Settings.PREF_AUTO_HIDE_TOOLBAR else null,
         if (expandable) Settings.PREF_QUICK_PIN_TOOLBAR_KEYS else null,
         Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES, // what a toolbar key sends on tap / long-press
         if (Settings.readToolbarMode(prefs) != ToolbarMode.HIDDEN) Settings.PREF_VARIABLE_TOOLBAR_DIRECTION else null,
         Settings.PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY,
         Settings.PREF_TIMESTAMP_FORMAT,
-        Settings.PREF_SUGGESTION_RULES, // Customize suggestions: how many, and rules for the 2nd one on
-        Settings.PREF_SUGGESTION_WORD_PADDING, // and how far apart they sit (was inside the suggestion font dialog)
-        Settings.PREF_UNDO_HISTORY_LENGTH, // the keyboard's own undo / redo
-        Settings.PREF_UNDO_UNIT,
-        Settings.PREF_REDO_UNIT,
+        // (Customize suggestions: Text correction's Suggestions group; their spacing: Appearance, a theme setting;
+        //  undo / redo: their own group on Layout & Typing)
         Settings.PREF_CUSTOM_CURRENCY_KEY, // the symbols pages' currency key and its popup
-        // the symbols on the keys area by area (Appearance has the one "Hide symbols on keys" switch for all of them)
-        Settings.PREF_SHOW_NUMBER_ROW_HINTS,
-        Settings.PREF_SHOW_HINTS,
-        Settings.PREF_SHOW_POPUP_HINTS,
+        // (no rows any more, found by search only: the toolbar opening / closing by itself, and the symbols on the
+        //  keys area by area, which Appearance's one "Hide symbols on keys" switch sets together)
     )
     SearchSettingsScreen(
         onClickBack = onClickBack,

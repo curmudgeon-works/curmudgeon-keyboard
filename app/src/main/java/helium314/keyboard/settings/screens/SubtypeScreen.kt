@@ -492,6 +492,13 @@ fun SubtypeScreen(
                         }
                     }
                 }
+                // ---- the keyboard's own undo / redo (from Others): how far back, and a word or a character per press
+                AdvancedBlock(advanced) { WithBigTitle(stringResource(R.string.undo_redo_group)) {
+                    CompositionLocalProvider(LocalCompactPreferences provides true) {
+                        listOf(Settings.PREF_UNDO_HISTORY_LENGTH, Settings.PREF_UNDO_UNIT, Settings.PREF_REDO_UNIT).forEach {
+                            Pending(keyChanged(it)) { SettingsActivity.settingsContainer[it]?.Preference() } }
+                    }
+                } }
                 // ---- popups: what holding a key offers (every row is advanced, so the group is too)
                 AdvancedBlock(advanced) { WithBigTitle(stringResource(R.string.key_popups_group)) {
                     // preset popup layouts, customize popups, customize keys and popups with JSON (all advanced);
