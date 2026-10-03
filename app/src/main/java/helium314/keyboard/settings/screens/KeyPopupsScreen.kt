@@ -134,7 +134,9 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
         val presets = listOf(
             // the Curmudgeon default: every variant a key has, plus the symbol map (owner's call 2026-09-26: "a lot richer")
             Preset(R.string.key_popups_preset_standard, POPUP_KEYS_ALL, null, symbolMap = Defaults.PREF_SYMBOL_POPUP_MAP),
-            Preset(R.string.key_popups_preset_heliboard, POPUP_KEYS_MAIN, null, symbolMap = ""), // upstream's real default level
+            // HeliBoard's own: its accents level, no symbol map, and its popup order (as HeliBoard ships it, checked
+            // against upstream 415c45f1 of 2026-09-30); the hint is the first popup entry, as everywhere here
+            Preset(R.string.key_popups_preset_heliboard, POPUP_KEYS_MAIN, null, symbolMap = "", popupOrder = HELIBOARD_POPUP_ORDER),
             Preset(R.string.key_popups_preset_main, POPUP_KEYS_MAIN, null),
             Preset(R.string.key_popups_preset_more, POPUP_KEYS_MORE, null),
             Preset(R.string.key_popups_preset_all, POPUP_KEYS_ALL, null),
@@ -208,12 +210,13 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
         // a tap shows the preset on the preview and the list stays (like Themes); OK keeps it, Cancel puts back what
         // was there when the list opened (the keyboard's accents and symbols page, the arrangement, the set, the map)
         val opened = remember(showAccentsDialog) { keyboard to listOf(prefs.getString(KeyPopupOverrides.PREF, null),
-            prefs.getString(KeyPopupOverrides.PREF_SELECTED_SET, null), prefs.getString(Settings.PREF_SYMBOL_POPUP_MAP, null)) }
+            prefs.getString(KeyPopupOverrides.PREF_SELECTED_SET, null), prefs.getString(Settings.PREF_SYMBOL_POPUP_MAP, null),
+            prefs.getString(Settings.PREF_POPUP_KEYS_ORDER, null)) }
         var confirmed by remember(showAccentsDialog) { mutableStateOf(false) }
         fun putBack() {
             val (kb, values) = opened
             prefs.edit().apply {
-                listOf(KeyPopupOverrides.PREF, KeyPopupOverrides.PREF_SELECTED_SET, Settings.PREF_SYMBOL_POPUP_MAP).zip(values)
+                listOf(KeyPopupOverrides.PREF, KeyPopupOverrides.PREF_SELECTED_SET, Settings.PREF_SYMBOL_POPUP_MAP, Settings.PREF_POPUP_KEYS_ORDER).zip(values)
                     .forEach { (key, value) -> if (value == null) remove(key) else putString(key, value) }
             }.apply()
             if (keyboard != kb) onKeyboardChanged(kb)
@@ -226,10 +229,13 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
             var changed = keyboard.with(ExtraValue.MORE_POPUPS, preset.morePopups)
             changed = if (preset.symbolsLayout == null) changed.withoutLayout(LayoutType.SYMBOLS)
                 else changed.withLayout(LayoutType.SYMBOLS, preset.symbolsLayout)
+            // a preset with its own popup order sets it, and the keyboard's own order (if any) goes
+            if (preset.popupOrder != null) changed = changed.without(ExtraValue.POPUP_ORDER)
             KeyPopupOverrides.save(prefs, preset.overrides ?: emptyMap())
             prefs.edit().apply {
                 if (preset.userName != null) putString(KeyPopupOverrides.PREF_SELECTED_SET, preset.userName) else remove(KeyPopupOverrides.PREF_SELECTED_SET)
                 if (preset.symbolMap != null) putString(Settings.PREF_SYMBOL_POPUP_MAP, preset.symbolMap)
+                if (preset.popupOrder != null) putString(Settings.PREF_POPUP_KEYS_ORDER, preset.popupOrder)
             }.apply()
             onKeyboardChanged(changed)
             generation++
@@ -474,9 +480,14 @@ fun TryItBar(keyboard: SettingsSubtype, state: TryItState, onFocus: (Boolean) ->
 }
 
 /** A built-in set ([name] resource) or one the user saved ([userName], with its per-key arrangement). */
+/** HeliBoard's popup order (language accents, numbers, symbols, layout, other languages, all on), as it ships. */
+private val HELIBOARD_POPUP_ORDER = listOf("language_priority", "number", "symbols", "layout", "language")
+    .joinToString(helium314.keyboard.latin.common.Constants.Separators.ENTRY) { it + helium314.keyboard.latin.common.Constants.Separators.KV + true }
+
 private data class Preset(val name: Int, val morePopups: String, val symbolsLayout: String?, // (data: equal by content, the list rebuilds them on every change)
                      val userName: String? = null, val overrides: Map<String, List<String>>? = null,
-                     val symbolMap: String? = null) // the letter -> symbols map; null = the Curmudgeon one, "" = none (HeliBoard)
+                     val symbolMap: String? = null, // the letter -> symbols map; null = the Curmudgeon one, "" = none (HeliBoard)
+                     val popupOrder: String? = null) // the popup order it sets; null = leaves the order as it is
 
 private class KeyInfo(val label: String, val title: String, val popups: List<String>, val pool: List<String>, val overrideKey: String = label)
 
