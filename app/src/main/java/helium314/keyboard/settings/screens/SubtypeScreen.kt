@@ -489,6 +489,9 @@ fun SubtypeScreen(
                                 val pending = if (it == SettingsWithoutKey.ABC_AFTER) abcAfterKeys.any { k -> keyChanged(k.first) } else keyChanged(it)
                                 Pending(pending) { SettingsActivity.settingsContainer[it]?.Preference() }
                             }
+                            // the symbols pages' currencies, last (from Others): its dialog types on the symbols page
+                            Pending(keyChanged(Settings.PREF_CUSTOM_CURRENCY_KEY)) {
+                                SettingsActivity.settingsContainer[Settings.PREF_CUSTOM_CURRENCY_KEY]?.Preference() }
                         }
                     }
                 }
@@ -499,6 +502,15 @@ fun SubtypeScreen(
                             Pending(keyChanged(it)) { SettingsActivity.settingsContainer[it]?.Preference() } }
                     }
                 } }
+                // (its own tinted block: the screen's gap between blocks shows as a thin line, like above Backspace)
+                AdvancedBlock(advanced) {
+                    WithBigTitle(stringResource(R.string.settings_category_clipboard_history)) {
+                        CompositionLocalProvider(LocalCompactPreferences provides true) {
+                            clipboardHistoryItems(prefs).filterIsInstance<String>().forEach {
+                                Pending(keyChanged(it)) { SettingsActivity.settingsContainer[it]?.Preference() } }
+                        }
+                    }
+                }
                 // ---- popups: what holding a key offers (every row is advanced, so the group is too)
                 AdvancedBlock(advanced) { WithBigTitle(stringResource(R.string.key_popups_group)) {
                     // preset popup layouts, customize popups, customize keys and popups with JSON (all advanced);
@@ -515,15 +527,6 @@ fun SubtypeScreen(
                             PrefSwitchRow(Settings.PREF_REMOVE_REDUNDANT_POPUPS, Defaults.PREF_REMOVE_REDUNDANT_POPUPS, R.string.remove_redundant_popups) { holdPreview(); reloadPreview() } }
                     }
                 } }
-                // (its own tinted block: the screen's gap between blocks shows as a thin line, like above Backspace)
-                AdvancedBlock(advanced) {
-                    WithBigTitle(stringResource(R.string.settings_category_clipboard_history)) {
-                        CompositionLocalProvider(LocalCompactPreferences provides true) {
-                            clipboardHistoryItems(prefs).filterIsInstance<String>().forEach {
-                                Pending(keyChanged(it)) { SettingsActivity.settingsContainer[it]?.Preference() } }
-                        }
-                    }
-                }
             }
             }
         }
