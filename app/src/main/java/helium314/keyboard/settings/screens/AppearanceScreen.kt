@@ -175,7 +175,7 @@ fun AppearanceScreen(
         Settings.PREF_EMOJI_FONT_SCALE,
         if (prefs.getFloat(Settings.PREF_EMOJI_FONT_SCALE, Defaults.PREF_EMOJI_FONT_SCALE) != 1f)
             Settings.PREF_EMOJI_KEY_FIT else null,
-        if (prefs.getInt(Settings.PREF_EMOJI_MAX_SDK, 0) >= 24)
+        if (prefs.getInt(Settings.PREF_EMOJI_MAX_SDK, helium314.keyboard.keyboard.emoji.SupportedEmojis.LATEST) >= 24)
             Settings.PREF_EMOJI_SKIN_TONE else null,
         SettingsWithoutKey.CUSTOM_EMOJI_FONT,
         // which emojis show: what the emoji font can draw, overridable (e.g. for a newer font); advanced
