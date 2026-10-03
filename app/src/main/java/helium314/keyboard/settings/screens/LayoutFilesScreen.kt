@@ -102,6 +102,9 @@ fun LayoutFilesScreen(onClickBack: () -> Unit) {
         LayoutUtilsCustom.onLayoutFileChanged()
         KeyboardSwitcher.getInstance().setThemeNeedsReload()
         (ctx.getActivity() as? SettingsActivity)?.prefChanged()
+        // saved for good: Layout & Typing (this screen's parent) takes it as its new starting point
+        helium314.keyboard.settings.LayoutDraft.rebaseOpen(ctx, setOf(Settings.PREF_LAYOUT_PREFIX + "*"),
+            LAYOUT_FILE_TYPES.map { it.name.lowercase() }.toSet())
     }
 
     // (no files: layouts go in and out by copy and paste; the one file the app writes is the backup)

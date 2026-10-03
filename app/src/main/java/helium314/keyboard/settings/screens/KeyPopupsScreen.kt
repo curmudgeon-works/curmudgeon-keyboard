@@ -368,11 +368,16 @@ fun CustomizePopupsScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     fun leave() { if (changed) askLeave = true else onClickBack() }
     androidx.activity.compose.BackHandler(enabled = changed) { leave() }
     if (askReject) helium314.keyboard.settings.dialogs.DiscardChangesDialog({ askReject = false }) { putBack() }
-    if (askAccept) helium314.keyboard.settings.dialogs.SaveChangesDialog({ askAccept = false }) { opened = now() }
+    // saving here is for good: Layout & Typing (this screen's parent) takes it as its new starting point
+    fun saveForGood() {
+        helium314.keyboard.settings.LayoutDraft.rebaseOpen(ctx, setOf(KeyPopupOverrides.PREF, KeyPopupOverrides.PREF_SELECTED_SET, KeyPopupOverrides.PREF_SETS))
+        opened = now()
+    }
+    if (askAccept) helium314.keyboard.settings.dialogs.SaveChangesDialog({ askAccept = false }) { saveForGood() }
     if (askLeave) helium314.keyboard.settings.dialogs.UnsavedChangesDialog(
         onKeepWorking = { askLeave = false },
         onDiscardAndExit = { askLeave = false; putBack(); onClickBack() },
-        onSaveAndExit = { askLeave = false; onClickBack() },
+        onSaveAndExit = { askLeave = false; saveForGood(); onClickBack() },
     )
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
