@@ -863,9 +863,9 @@ language, hence "No language". -->
     <!-- Message text for adding a custom layout -->
     <string name="message_add_custom_layout">Paste a layout in a compatible format into the editor that opens. Information about the formats is available %s.</string>
     <!-- Button text for loading a custom layout, image or theme file. Preferably 10 characters or less. -->
-    <string name="button_load_custom">Load file</string>
+    <string name="button_load_custom">Load colors from file…</string>
     <!-- Button text for saving a theme file. Preferably 10 characters or less. -->
-    <string name="button_save_file">Save to file</string>
+    <string name="button_save_file">Save colors to file…</string>
     <!-- Button text for copying text to clipboard -->
     <string name="copy_to_clipboard">Copy to Clipboard</string>
     <!-- Error message when file cannot be read -->
@@ -1174,7 +1174,7 @@ New dictionary:
     <!-- Selection: gesture color. -->
     <string name="select_color_gesture">Gesture input</string>
     <!-- Message displayed when clicking "load" button in color theme picker. "%s" will be replaced by discussion_section_link -->
-    <string name="get_colors_message">"You can find and share colors in the %s."</string>
+    <string name="get_colors_message">"Color files made in HeliBoard work here too. You can find and share colors in HeliBoard's %s."</string>
     <!-- Message displayed when clicking add button for layouts. "%s" will be replaced by discussion_section_link -->
     <string name="get_layouts_message">"You can find and share layouts in the %s."</string>
     <!-- Text to be used in get_colors_message and get_layouts_message -->
