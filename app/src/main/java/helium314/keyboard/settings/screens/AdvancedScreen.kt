@@ -194,7 +194,7 @@ fun createAdvancedSettings(context: Context) = listOf(
     Setting(context, SettingsWithoutKey.BACKUP_RESTORE, R.string.backup_restore_title) {
         BackupRestorePreference(it)
     },
-    Setting(context, SettingsWithoutKey.FACTORY_RESET, R.string.factory_reset, R.string.factory_reset_summary) {
+    Setting(context, SettingsWithoutKey.FACTORY_RESET, R.string.factory_reset) {
         FactoryResetPreference(it)
     },
     // the keyboard's own undo / redo (EditHistory): how many steps back, and a whole step or one character per press
@@ -281,7 +281,7 @@ fun createAdvancedSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_RECORD_GESTURE_CORPUS, R.string.record_gesture_corpus, R.string.record_gesture_corpus_summary) {
         SwitchPreference(it, Defaults.PREF_RECORD_GESTURE_CORPUS)
     },
-    Setting(context, Settings.PREF_AUTO_PREVIEW_KEYBOARD, R.string.auto_preview_keyboard, R.string.auto_preview_keyboard_summary) {
+    Setting(context, Settings.PREF_AUTO_PREVIEW_KEYBOARD, R.string.auto_preview_keyboard) {
         SwitchPreference(it, Defaults.PREF_AUTO_PREVIEW_KEYBOARD)
     },
     Setting(context, Settings.PREF_SWIPE_METRICS, R.string.swipe_metrics, R.string.swipe_metrics_summary) { def ->

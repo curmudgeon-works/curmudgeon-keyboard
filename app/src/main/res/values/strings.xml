@@ -380,7 +380,7 @@
     <!-- Title of the setting to record swipes into a local corpus file -->
     <string name="record_gesture_corpus">Record swipe corpus</string>
     <!-- opt-in local log of swipe outcomes; the summary lines under the switch -->
-    <string name="auto_preview_keyboard">Bring up preview keyboard automatically</string>
+    <string name="auto_preview_keyboard">Bring up preview keyboard automatically when changing settings</string>
     <string name="auto_preview_keyboard_summary">Settings you change show their effect on a keyboard right away. Off: it appears only when you tap \"Try it here\"</string>
     <string name="swipe_metrics">Log swipe results</string>
     <string name="swipe_metrics_summary">Keep a local log of how each swipe ends: first choice right, picked from the strip, or never offered (deleted, retyped or edited), with the decode time. Nothing leaves the phone.</string>
