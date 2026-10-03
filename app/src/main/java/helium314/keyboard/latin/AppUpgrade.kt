@@ -134,6 +134,19 @@ private fun curmudgeonUpgrades(prefs: SharedPreferences, freshInstall: Boolean) 
             putBoolean("defaults_feedback_on_done", true)
         }
     }
+    // 0.3.002: new defaults (the Midnight theme, key gaps 1% / 2%): installs from before keep the look they had; a new
+    // install notes that its look is Midnight (the Themes row names it until another theme is chosen)
+    if (!prefs.getBoolean("defaults_look_midnight_done", false)) {
+        prefs.edit {
+            if (!freshInstall) {
+                if (!prefs.contains(Settings.PREF_KEY_HORIZONTAL_GAP)) putFloat(Settings.PREF_KEY_HORIZONTAL_GAP, 0.5f)
+                if (!prefs.contains(Settings.PREF_KEY_VERTICAL_GAP)) putFloat(Settings.PREF_KEY_VERTICAL_GAP, 0.75f)
+                if (!prefs.contains(Settings.PREF_THEME_DAY_NIGHT))
+                    putBoolean(Settings.PREF_THEME_DAY_NIGHT, android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q)
+            } else putBoolean("look_default_midnight", true)
+            putBoolean("defaults_look_midnight_done", true)
+        }
+    }
     // "midnight" was always black's colours under another name: the colour is black now (the Midnight theme stays)
     for (key in listOf(Settings.PREF_THEME_COLORS, Settings.PREF_THEME_COLORS_NIGHT))
         if (prefs.getString(key, null) == "midnight") prefs.edit { putString(key, KeyboardTheme.THEME_BLACK) }

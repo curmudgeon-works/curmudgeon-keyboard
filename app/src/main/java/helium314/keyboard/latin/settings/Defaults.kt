@@ -46,8 +46,9 @@ object Defaults {
     const val PREF_THEME_COLORS = KeyboardTheme.THEME_BLACK
     const val PREF_THEME_COLORS_NIGHT = KeyboardTheme.THEME_BLACK
     const val PREF_THEME_KEY_BORDERS = true
+    // the default look is the Midnight theme: black, one colour set (2026-10-03; before: following the system on Android 10+)
     @JvmField
-    val PREF_THEME_DAY_NIGHT = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+    val PREF_THEME_DAY_NIGHT = false
     const val PREF_CUSTOM_ICON_NAMES = ""
     const val PREF_AUTO_CAP = true
     const val PREF_VIBRATE_ON = true // fresh installs; older installs keep "off" (curmudgeonUpgrades)
@@ -115,8 +116,8 @@ object Defaults {
     const val PREF_SUGGESTION_UNDERLINE = false
     const val PREF_SUGGESTION_WORD_PADDING = 10  // dp
     // Key gap (% of keyboard width/height) — values match the new defaults in config.xml
-    const val PREF_KEY_HORIZONTAL_GAP = 0.5f
-    const val PREF_KEY_VERTICAL_GAP = 0.75f
+    const val PREF_KEY_HORIZONTAL_GAP = 1f // (2026-10-03; was 0.5)
+    const val PREF_KEY_VERTICAL_GAP = 2f // (2026-10-03; was 0.75)
     // Toolbar expand button icon: "arrow" | "incognito" | "settings" | "none"
     const val PREF_TOOLBAR_EXPAND_ICON = "arrow"
     const val PREF_EMOJI_KEY_FIT = true

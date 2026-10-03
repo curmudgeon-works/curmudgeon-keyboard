@@ -406,8 +406,19 @@ fun createAppearanceSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_THEME_KEY_BORDERS, R.string.key_borders) {
         SwitchPreference(it, Defaults.PREF_THEME_KEY_BORDERS) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
-    Setting(context, Settings.PREF_THEME_DAY_NIGHT, R.string.day_night_mode) {
-        SwitchPreference(it, Defaults.PREF_THEME_DAY_NIGHT) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+    Setting(context, Settings.PREF_THEME_DAY_NIGHT, R.string.day_night_mode) { setting ->
+        val prefs = LocalContext.current.prefs()
+        SwitchPreference(setting, Defaults.PREF_THEME_DAY_NIGHT) { on ->
+            // Midnight (black) with light / dark turned on: Daylight by day, Midnight by night; off again: Midnight
+            // (the two themes differ only in their colours)
+            val day = prefs.getString(Settings.PREF_THEME_COLORS, Defaults.PREF_THEME_COLORS)
+            val night = prefs.getString(Settings.PREF_THEME_COLORS_NIGHT, Defaults.PREF_THEME_COLORS_NIGHT)
+            if (night == KeyboardTheme.THEME_BLACK) {
+                if (on && day == KeyboardTheme.THEME_BLACK) prefs.edit { putString(Settings.PREF_THEME_COLORS, KeyboardTheme.THEME_LIGHT) }
+                else if (!on && day == KeyboardTheme.THEME_LIGHT) prefs.edit { putString(Settings.PREF_THEME_COLORS, KeyboardTheme.THEME_BLACK) }
+            }
+            KeyboardSwitcher.getInstance().setThemeNeedsReload()
+        }
     },
     Setting(context, Settings.PREF_BACKGROUND_WHOLE_PICTURE, R.string.background_whole_picture) {
         Box(Modifier.padding(start = 16.dp)) {
@@ -605,7 +616,10 @@ private fun SavedLooksPreference(setting: Setting) {
     fun store(list: List<AppearanceLooks.Look>) { AppearanceLooks.save(prefs, list); generation++ }
     // the chosen theme's name; "tweaked" when a value it sets (or its pictures) differs now, "unsaved" while the
     // theme's part of the screen has changes not saved yet
-    val chosen = prefs.getString(AppearanceLooks.PREF_SELECTED, null)?.let { name -> (builtIn + looks).firstOrNull { it.name == name } }
+    // (a new install's look is Midnight: named so until another theme is chosen)
+    val chosenName = prefs.getString(AppearanceLooks.PREF_SELECTED, null)
+        ?: ctx.getString(R.string.theme_preset_midnight).takeIf { prefs.getBoolean("look_default_midnight", false) }
+    val chosen = chosenName?.let { name -> (builtIn + looks).firstOrNull { it.name == name } }
     val tweaked = chosen != null && AppearanceLooks.isTweaked(ctx, chosen)
     val draft = AppearanceDraft.of(ctx)
     val unsaved = draft.changedKeys(ctx).any { AppearanceLooks.inScope(it) || it == AppearanceLooks.PREF_SELECTED }
