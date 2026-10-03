@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.ScrollState
@@ -585,8 +586,9 @@ private fun MainLayoutRow(
                 else setCurrentSubtype(currentSubtype.withLayout(LayoutType.MAIN, layout))
             },
             extraButton = {
-                IconButton({ showAddLayoutDialog = true })
-                { Icon(painterResource(R.drawable.ic_plus), stringResource(R.string.button_title_add_custom_layout)) }
+                IconButton({ showAddLayoutDialog = true }) // (a smaller plus: the row's text is small next to it)
+                { Icon(painterResource(R.drawable.ic_plus), stringResource(R.string.button_title_add_custom_layout),
+                    Modifier.size(18.dp)) }
             }
         ) {
             var showLayoutDeleteDialog by remember { mutableStateOf(false) }
