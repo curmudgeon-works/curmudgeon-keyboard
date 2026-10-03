@@ -84,6 +84,8 @@ fun KeyboardsScreen(
     var showAddKeyboard by remember { mutableStateOf(false) }
     var keyboardToCopy: SettingsSubtype? by remember { mutableStateOf(null) } // asks: its own settings, or the common ones?
     var keyboardToDelete: SettingsSubtype? by remember { mutableStateOf(null) }
+    var keyboardMenu: SettingsSubtype? by remember { mutableStateOf(null) } // press and hold: Rename, Delete
+    var keyboardToRename: SettingsSubtype? by remember { mutableStateOf(null) }
     val real = ctx.realPrefs()
     var separate by remember { mutableStateOf(KeyboardProfiles.isSeparate(real)) }
     var askEnable by remember { mutableStateOf(false) } // some keyboards have an older set: keep or reset?
@@ -165,7 +167,7 @@ fun KeyboardsScreen(
                             }
                         },
                         icon = R.drawable.ic_settings_layout, // a keyboard (the globe is for its languages)
-                        onLongClick = if (enabled.size > 1) ({ keyboardToDelete = keyboard }) else null,
+                        onLongClick = { keyboardMenu = keyboard },
                     ) {
                         if (order.size > 1)
                             Text("\u2261", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -251,6 +253,39 @@ fun KeyboardsScreen(
                 content = { Text(stringResource(R.string.separate_settings_disable_message, keyboardName(primary, ctx))) },
                 confirmButtonText = stringResource(R.string.separate_settings_use_primary),
                 cancelButtonText = stringResource(R.string.separate_settings_keep_separate), // (Android's order: Cancel, then OK)
+            )
+        }
+        keyboardMenu?.let { keyboard ->
+            val rename = stringResource(R.string.rename_keyboard)
+            val delete = stringResource(R.string.delete)
+            ListPickerDialog(
+                onDismissRequest = { keyboardMenu = null },
+                onItemSelected = { item ->
+                    keyboardMenu = null
+                    if (item == rename) keyboardToRename = keyboard else keyboardToDelete = keyboard
+                },
+                title = { Text(keyboardName(keyboard, ctx)) },
+                items = listOfNotNull(rename, delete.takeIf { enabledNow.size > 1 }), // (the last keyboard can't go)
+                getItemName = { it },
+                showRadioButtons = false,
+            )
+        }
+        keyboardToRename?.let { keyboard ->
+            helium314.keyboard.settings.dialogs.TextInputDialog(
+                onDismissRequest = { keyboardToRename = null },
+                onConfirmed = { name ->
+                    val renamed = withKeyboardName(keyboard, name)
+                    if (renamed != keyboard) {
+                        SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, renamed, ctx) // its settings go with it
+                        if (expanded.remove(keyboard)) expanded.add(renamed)
+                        generation++
+                    }
+                },
+                title = { Text(stringResource(R.string.rename_keyboard)) },
+                initialText = customKeyboardName(keyboard) ?: "",
+                // shows the languages' name, which an empty box gives back
+                textInputLabel = { Text(keyboardName(keyboard.without(helium314.keyboard.latin.common.Constants.Subtype.ExtraValue.KEYBOARD_NAME), ctx)) },
+                checkTextValid = { true },
             )
         }
         keyboardToDelete?.let { keyboard ->

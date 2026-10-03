@@ -73,6 +73,7 @@ object SubtypeUtilsAdditional {
         val newAdditionalSubtypes = oldAdditionalSubtypes.filter { it != settingsSubtype }
         val newAdditionalSubtypesString = SubtypeSettings.createPrefSubtypes(newAdditionalSubtypes)
         prefs.edit { putString(Settings.PREF_ADDITIONAL_SUBTYPES, newAdditionalSubtypesString) }
+        LayoutUtilsCustom.removeUnusedPrivateLayouts(context) // its own copy of a deleted layout goes with it
     }
 
     // updates additional subtypes, enabled subtypes, and selected subtype
@@ -112,6 +113,7 @@ object SubtypeUtilsAdditional {
             .filterValues { it.toString().toSettingsSubtype() == from }.forEach { editor.putString(it.key, to.toPref()) }
         editor.apply()
         SubtypeSettings.reloadEnabledSubtypes(context)
+        LayoutUtilsCustom.removeUnusedPrivateLayouts(context) // switched away from its own copy of a deleted layout
     }
 
     fun createAdditionalSubtypes(prefSubtypes: String): List<InputMethodSubtype> =

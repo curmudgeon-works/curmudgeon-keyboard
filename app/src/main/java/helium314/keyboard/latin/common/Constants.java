@@ -92,6 +92,9 @@ public final class Constants {
             /** The number of a copy of a keyboard (2, 3, ...): tells it apart from the original, which it otherwise equals */
             public static final String KEYBOARD_COPY = "KeyboardCopy";
 
+            /** The name the user gave the keyboard (URL-encoded: it goes into the keyboard's definition string) */
+            public static final String KEYBOARD_NAME = "KeyboardName";
+
             /** Overrides the general "more popups" setting */
             public static final String MORE_POPUPS = "MorePopups";
 

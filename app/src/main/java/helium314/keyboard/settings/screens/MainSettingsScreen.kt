@@ -83,8 +83,19 @@ private fun PreviewScreen() {
 }
 
 /** "English (US) + Hinglish" */
+/** The name the user gave [keyboard] (long-press > Rename), or null. */
+fun customKeyboardName(keyboard: SettingsSubtype): String? =
+    keyboard.getExtraValueOf(helium314.keyboard.latin.common.Constants.Subtype.ExtraValue.KEYBOARD_NAME)
+        ?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }?.takeIf { it.isNotBlank() }
+
+/** [keyboard] named [name] (blank: its own name taken off, back to its languages). */
+fun withKeyboardName(keyboard: SettingsSubtype, name: String): SettingsSubtype {
+    val key = helium314.keyboard.latin.common.Constants.Subtype.ExtraValue.KEYBOARD_NAME
+    return if (name.isBlank()) keyboard.without(key) else keyboard.with(key, java.net.URLEncoder.encode(name.trim(), "UTF-8"))
+}
+
 fun keyboardName(keyboard: SettingsSubtype, ctx: Context): String =
-    (listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)).joinToString(" + ") { it.localizedDisplayName(ctx.resources) } +
+    customKeyboardName(keyboard) ?: (listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)).joinToString(" + ") { it.localizedDisplayName(ctx.resources) } +
         (keyboard.getExtraValueOf(helium314.keyboard.latin.common.Constants.Subtype.ExtraValue.KEYBOARD_COPY)?.let { " ($it)" } ?: "")
 
 /** The sections of one keyboard's settings, as menu entries. Used by the keyboard's own screen and inline under the keyboards list. */

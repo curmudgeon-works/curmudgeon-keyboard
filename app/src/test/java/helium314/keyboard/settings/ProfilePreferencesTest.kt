@@ -50,6 +50,18 @@ class ProfilePreferencesTest {
         assertEquals(false, set(KeyboardProfiles.SHARED).getBoolean("auto_correction", true)) // the shared set untouched
     }
 
+    @Test fun backupWritesDefaultsOut() {
+        val defaults = SettingDefaults.all
+        assert(defaults.size > 100) { "only ${defaults.size} defaults found" }
+        assertEquals(helium314.keyboard.latin.settings.Defaults.PREF_AUTO_CORRECTION, defaults[helium314.keyboard.latin.settings.Settings.PREF_AUTO_CORRECTION])
+        assertFalse(defaults.containsKey(helium314.keyboard.latin.settings.Settings.PREF_KEY_TEXT_BOLD)) // its absence means something
+        val ac = helium314.keyboard.latin.settings.Settings.PREF_AUTO_CORRECTION
+        val out = SettingDefaults.explicit(mapOf("p3/~$ac" to true))
+        assertEquals(defaults[ac], out[ac]) // the shared set's default written out
+        assertEquals(defaults[ac], out["p3/$ac"]) // keyboard 3's mark became its value
+        assertFalse(out.containsKey("p3/~$ac"))
+    }
+
     @Test fun copyTakesOwnValuesOverShared() {
         real.edit().putInt("a", 1).putInt("b", 2).putInt("c", 3).commit()
         set(1).edit().putInt("a", 10).remove("c").commit()
