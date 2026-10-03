@@ -421,20 +421,23 @@ private fun TrustWordsRow(setting: Setting) {
                     .padding(start = helium314.keyboard.settings.preferences.LocalRowStart.current, end = 12.dp)),
         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
     ) {
-        androidx.compose.foundation.layout.Row(androidx.compose.ui.Modifier.weight(1f),
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Text(setting.title, androidx.compose.ui.Modifier.weight(1f, fill = false),
-                style = androidx.compose.material3.MaterialTheme.typography.bodyLarge.let {
-                    if (helium314.keyboard.settings.preferences.LocalPendingChange.current)
-                        it.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic) else it })
+        // the title, the count and "times" wrap like one line of text: what doesn't fit goes below (the count as one piece)
+        val style = androidx.compose.material3.MaterialTheme.typography.bodyLarge.let {
+            if (helium314.keyboard.settings.preferences.LocalPendingChange.current)
+                it.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic) else it }
+        @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+        androidx.compose.foundation.layout.FlowRow(androidx.compose.ui.Modifier.weight(1f),
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp),
+            itemVerticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            setting.title.split(" ").forEach { Text(it, style = style) }
             // (dimmed while off; still settable)
             androidx.compose.foundation.layout.Row(if (on) androidx.compose.ui.Modifier else androidx.compose.ui.Modifier.alpha(0.5f),
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 StepButton("\u2212", stringResource(R.string.trust_typed_fewer), count > 1) { setCount(count - 1) }
                 Text("$count", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
                 StepButton("+", stringResource(R.string.trust_typed_more), count < MAX_TRUST_COUNT) { setCount(count + 1) }
-                Text(stringResource(R.string.trust_typed_times), style = androidx.compose.material3.MaterialTheme.typography.bodyLarge)
             }
+            Text(stringResource(R.string.trust_typed_times), style = style)
         }
         androidx.compose.material3.Switch(checked = on, onCheckedChange = { prefs.edit { putBoolean(setting.key, it) } },
             modifier = androidx.compose.ui.Modifier.padding(start = 12.dp))

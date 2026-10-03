@@ -98,6 +98,14 @@ class LayoutDraft private constructor(
         val enabled = SubtypeSettings.createSettingsSubtypes(real.getString(Settings.PREF_ENABLED_SUBTYPES, "") ?: "")
         if (selected != null && selected !in enabled) (prefs[Settings.PREF_SELECTED_SUBTYPE] as? String)?.let {
             real.edit { putString(Settings.PREF_SELECTED_SUBTYPE, it) } }
+        // same for each app's remembered keyboard (a changed keyboard took the apps with it)
+        real.edit {
+            real.all.filterKeys { it.startsWith(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX) }.forEach { (key, value) ->
+                if (value.toString().toSettingsSubtype() in enabled) return@forEach
+                val before = prefs[key] as? String
+                if (before != null && before.toSettingsSubtype() in enabled) putString(key, before) else remove(key)
+            }
+        }
         val live = layoutsDir(ctx)
         live.deleteRecursively()
         layoutsCopy?.copyRecursively(live, overwrite = true)

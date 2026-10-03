@@ -177,10 +177,11 @@ object AppearanceLooks {
         reload(ctx)
     }
 
-    /** What a theme saves: the values set now, and every theme setting left at its default as null, so applying the
+    /** What a theme saves: the values set now, and every theme setting left at its default with its default value
+     *  written out, like a backup (null where the default isn't fixed or absence means something), so applying the
      *  theme puts those back to their default too (before 2026-10-02 a theme had only the values set, and one left at
      *  its default kept whatever was there when the theme was applied). */
-    fun snapshot(prefs: SharedPreferences): Map<String, Any?> = keys.associateWith { null } + current(prefs)
+    fun snapshot(prefs: SharedPreferences): Map<String, Any?> = keys.associateWith { SettingDefaults.of(it) } + current(prefs)
 
     /** Everything that draws the keyboard reads the preferences again. */
     fun reload(ctx: Context) {

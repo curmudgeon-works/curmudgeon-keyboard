@@ -14,13 +14,13 @@ object KnownDefaults {
     fun note(key: String, default: Any?) { if (default != null) defaults[key] = default }
 
     /** The default noted for [key], or null. */
-    fun of(key: String): Any? = defaults[key]
+    fun of(key: String): Any? = defaults[key] ?: SettingDefaults.of(key)
 
     /** Whether two stored values of [key] mean the same (null = not stored = the default). */
     fun same(key: String, a: Any?, b: Any?): Boolean {
         if (a == b) return true
         if (a != null && b != null) return equalNumbers(a, b)
-        val d = defaults[key] ?: return false
+        val d = of(key) ?: return false
         return equalNumbers(a ?: d, b ?: d)
     }
 

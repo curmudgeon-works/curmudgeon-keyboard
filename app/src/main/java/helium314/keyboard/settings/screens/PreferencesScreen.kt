@@ -120,7 +120,7 @@ fun clipboardHistoryItems(prefs: SharedPreferences): List<Any?> {
 }
 
 val preferencesSimpleModeKeys = setOf(
-    Settings.PREF_SYMBOL_POPUP_MAP, Settings.PREF_POPUP_ON,
+    Settings.PREF_POPUP_ON,
     Settings.PREF_VIBRATE_ON, Settings.PREF_SOUND_ON, Settings.PREF_SHOW_NUMBER_ROW,
     Settings.PREF_SHOW_EMOJI_KEY, Settings.PREF_SHOW_VOICE_KEY, Settings.PREF_ENABLE_CLIPBOARD_HISTORY,
 )
@@ -182,36 +182,11 @@ fun createPreferencesSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_REMOVE_REDUNDANT_POPUPS, R.string.remove_redundant_popups) {
         SwitchPreference(it, Defaults.PREF_REMOVE_REDUNDANT_POPUPS) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
-    Setting(context, Settings.PREF_POPUP_KEYS_ORDER, R.string.popup_order) {
-        ReorderSwitchPreference(it, Defaults.PREF_POPUP_KEYS_ORDER)
-    },
     Setting(
         context, Settings.PREF_SHOW_TLD_POPUP_KEYS, R.string.show_tld_popup_keys,
         R.string.show_tld_popup_keys_summary
     ) {
         SwitchPreference(it, Defaults.PREF_SHOW_TLD_POPUP_KEYS) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
-    },
-    Setting(context, Settings.PREF_SYMBOL_POPUP_MAP, R.string.symbol_popup_map, R.string.symbol_popup_map_summary) { setting ->
-        var showDialog by rememberSaveable { mutableStateOf(false) }
-        Preference(
-            name = setting.title,
-            description = setting.description,
-            onClick = { showDialog = true }
-        )
-        if (showDialog) {
-            val prefs = LocalContext.current.prefs()
-            TextInputDialog(
-                onDismissRequest = { showDialog = false },
-                textInputLabel = { Text(stringResource(R.string.symbol_popup_map_detail)) },
-                initialText = prefs.getString(setting.key, Defaults.PREF_SYMBOL_POPUP_MAP)!!,
-                onConfirmed = { prefs.edit { putString(setting.key, it.trim()) }; KeyboardLayoutSet.onSystemLocaleChanged() },
-                title = { Text(stringResource(R.string.symbol_popup_map)) },
-                neutralButtonText = if (prefs.contains(setting.key)) stringResource(R.string.button_default) else null,
-                onNeutral = { prefs.edit { remove(setting.key) }; KeyboardLayoutSet.onSystemLocaleChanged() },
-                singleLine = false,
-                checkTextValid = { KeyboardParser.isValidSymbolPopupMap(it) }
-            )
-        }
     },
     Setting(context, Settings.PREF_POPUP_ON, R.string.popup_on_keypress) {
         SwitchPreference(it, Defaults.PREF_POPUP_ON) { KeyboardSwitcher.getInstance().reloadKeyboard() }
@@ -252,20 +227,6 @@ fun createPreferencesSettings(context: Context) = listOf(
             KeyboardLayoutSet.onSystemLocaleChanged()
             KeyboardSwitcher.getInstance().reloadKeyboard()
         }
-    },
-    Setting(context, Settings.PREF_SHOW_LANGUAGE_SWITCH_KEY, R.string.show_language_switch_key) {
-        SwitchPreference(it, Defaults.PREF_SHOW_LANGUAGE_SWITCH_KEY) { KeyboardSwitcher.getInstance().reloadKeyboard() }
-    },
-    Setting(context, Settings.PREF_LANGUAGE_SWITCH_KEY, R.string.language_switch_key_behavior) {
-        ListPreference(
-            it,
-            listOf(
-                stringResource(R.string.switch_language) to "internal",
-                stringResource(R.string.language_switch_key_switch_input_method) to "input_method",
-                stringResource(R.string.language_switch_key_switch_both) to "both"
-            ),
-            Defaults.PREF_LANGUAGE_SWITCH_KEY
-        ) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
     Setting(context, Settings.PREF_SHOW_EMOJI_KEY, R.string.show_emoji_key) {
         SwitchPreference(it, Defaults.PREF_SHOW_EMOJI_KEY) { KeyboardSwitcher.getInstance().reloadKeyboard() }

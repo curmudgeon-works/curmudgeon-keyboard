@@ -19,7 +19,7 @@ class LayoutDraftTest {
         val real = ctx.realPrefs()
         real.edit().clear().commit()
         val draft = LayoutDraft.of(ctx, "en-US:")
-        real.edit().putString("key_popups", "{\"e\":[\"é\"]}").putBoolean(Settings.PREF_SHOW_NUMBER_ROW, true).commit()
+        real.edit().putString("key_popups", "{\"e\":[\"é\"]}").putBoolean(Settings.PREF_SHOW_NUMBER_ROW, false).commit() // (on is its default: no change)
         assertTrue(draft.changedKeys(ctx).containsAll(setOf("key_popups", Settings.PREF_SHOW_NUMBER_ROW)))
         LayoutDraft.rebaseOpen(ctx, setOf("key_popups")) // the popup editor's tick
         assertFalse("key_popups" in draft.changedKeys(ctx)) // saved for good

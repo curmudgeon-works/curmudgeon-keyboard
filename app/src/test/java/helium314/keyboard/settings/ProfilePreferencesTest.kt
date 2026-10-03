@@ -55,6 +55,17 @@ class ProfilePreferencesTest {
         assert(defaults.size > 100) { "only ${defaults.size} defaults found" }
         assertEquals(helium314.keyboard.latin.settings.Defaults.PREF_AUTO_CORRECTION, defaults[helium314.keyboard.latin.settings.Settings.PREF_AUTO_CORRECTION])
         assertFalse(defaults.containsKey(helium314.keyboard.latin.settings.Settings.PREF_KEY_TEXT_BOLD)) // its absence means something
+        // the sizes, one key per screen state, are written out too (saved Layouts and themes use the same table)
+        val D = helium314.keyboard.latin.settings.Defaults
+        for (i in 0 until 4) assertEquals(D.PREF_KEYBOARD_HEIGHT_SCALE[i],
+            defaults[helium314.keyboard.latin.settings.createPrefKeyForBooleanSettings(helium314.keyboard.latin.settings.Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, i, 2)])
+        for (i in 0 until 4) assertEquals(D.PREF_BOTTOM_PADDING_SCALE[i],
+            defaults[helium314.keyboard.latin.settings.createPrefKeyForBooleanSettings(helium314.keyboard.latin.settings.Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX, i, 2)])
+        for (i in 0 until 8) assertEquals(D.PREF_SIDE_PADDING_SCALE[i],
+            defaults[helium314.keyboard.latin.settings.createPrefKeyForBooleanSettings(helium314.keyboard.latin.settings.Settings.PREF_SIDE_PADDING_SCALE_PREFIX, i, 3)])
+        // a renamed Layout is still the one tapped in the list
+        val values = mapOf<String, Any?>(helium314.keyboard.latin.settings.Settings.PREF_SHOW_NUMBER_ROW to true)
+        assertEquals(LayoutPresets.Preset("Old", values), LayoutPresets.Preset("New", HashMap(values)))
         val ac = helium314.keyboard.latin.settings.Settings.PREF_AUTO_CORRECTION
         val out = SettingDefaults.explicit(mapOf("p3/~$ac" to true))
         assertEquals(defaults[ac], out[ac]) // the shared set's default written out
@@ -78,7 +89,10 @@ class ProfilePreferencesTest {
         LayoutPresets.save(real, listOf(preset))
         val back = LayoutPresets.load(real).single()
         assertEquals("Mine", back.name)
-        assertEquals(preset.values, back.values) // null (at its default) and the custom keys' text survive
+        assertEquals(preset.values, back.values.filterKeys { it in preset.values }) // null (at its default) and the custom keys' text survive
+        // a Layout without the sizes (saved before the defaults were written out) puts them back to their default
+        assertEquals(helium314.keyboard.latin.settings.Defaults.PREF_KEYBOARD_HEIGHT_SCALE[0],
+            back.values[helium314.keyboard.latin.settings.createPrefKeyForBooleanSettings(helium314.keyboard.latin.settings.Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, 0, 2)])
     }
 
     @Test fun keyboardBecomingAnotherKeepsBothSets() {

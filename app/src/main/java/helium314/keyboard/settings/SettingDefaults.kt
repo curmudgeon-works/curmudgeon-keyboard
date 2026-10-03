@@ -4,6 +4,7 @@ package helium314.keyboard.settings
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.settings.createPrefKeyForBooleanSettings
 
 /**
  * Every setting's default, read from [Defaults] by the setting's name in [Settings] (PREF_X: key and default), so a
@@ -34,8 +35,23 @@ object SettingDefaults {
             }.getOrNull() ?: continue
             if (default is Boolean || default is Int || default is Long || default is Float || default is String) map[key] = default
         }
+        // the sizes, one key per screen state: PREF_X_PREFIX with the Defaults array PREF_X (2^n entries for n conditions,
+        // as Settings reads them)
+        for (field in Settings::class.java.fields) {
+            if (!field.name.startsWith("PREF_") || !field.name.endsWith("_PREFIX")) continue
+            val prefix = runCatching { field.get(null) as? String }.getOrNull() ?: continue
+            val array = runCatching { Defaults::class.java.getField(field.name.removeSuffix("_PREFIX")).get(null) as? Array<*> }
+                .getOrNull() ?: continue
+            val number = Integer.numberOfTrailingZeros(array.size)
+            if (array.isEmpty() || 1 shl number != array.size) continue
+            array.forEachIndexed { i, default -> if (default is Float) map[createPrefKeyForBooleanSettings(prefix, i, number)] = default }
+        }
         map
     }
+
+    /** What a saved Layout or theme stores for [key] at its default: the fixed default, or null (unset again when
+     *  applied) for one whose absence means something or whose default isn't fixed. */
+    fun of(key: String): Any? = all[key]
 
     private val ownMark = Regex("^p(\\d+)/${Regex.escape(KeyboardProfiles.TOMBSTONE)}(.+)$")
 

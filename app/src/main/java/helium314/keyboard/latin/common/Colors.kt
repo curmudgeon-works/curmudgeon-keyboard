@@ -127,7 +127,6 @@ class DynamicColors(context: Context, override val themeStyle: String, override 
                 || keyHintText != getKeyHintText(context)
                 || spaceBarText != getSpaceBarText(context)
 
-    private val navBar: Int
     /** brightened or darkened variant of [background], to be used if exact background color would be
      *  bad contrast, e.g. popup keys popup or no border space bar */
     private val adjustedBackground: Int
@@ -177,11 +176,8 @@ class DynamicColors(context: Context, override val themeStyle: String, override 
 
         if (themeStyle == STYLE_HOLO && keyboardBackground == null) {
             val darkerBackground = adjustLuminosityAndKeepAlpha(background, -0.2f)
-            navBar = darkerBackground
             keyboardBackground = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(background, darkerBackground))
             backgroundSetupDone = true
-        } else {
-            navBar = background
         }
 
         // todo (idea): make better use of the states?
@@ -291,7 +287,6 @@ class DynamicColors(context: Context, override val themeStyle: String, override 
         ACTION_KEY_POPUP_KEYS_BACKGROUND -> if (themeStyle == STYLE_HOLO) adjustedBackground else accent
         STRIP_BACKGROUND -> if (!hasKeyBorders && themeStyle == STYLE_MATERIAL) adjustedBackground else background
         CLIPBOARD_SUGGESTION_BACKGROUND -> doubleAdjustedBackground
-        NAVIGATION_BAR -> navBar
         MORE_SUGGESTIONS_HINT, SUGGESTED_WORD, SUGGESTION_TYPED_WORD, SUGGESTION_VALID_WORD -> adjustedKeyText
         ACTION_KEY_ICON, TOOL_BAR_EXPAND_KEY -> Color.WHITE
     }
@@ -381,7 +376,6 @@ class DefaultColors (
     private val gesture: Int = accent,
     private var keyboardBackground: Drawable? = null,
 ) : Colors {
-    private val navBar: Int
     /** brightened or darkened variant of [background], to be used if exact background color would be
      *  bad contrast, e.g. popup keys popup or no border space bar */
     private val adjustedBackground: Int
@@ -443,11 +437,8 @@ class DefaultColors (
 
         if (themeStyle == STYLE_HOLO && keyboardBackground == null) {
             val darkerBackground = adjustLuminosityAndKeepAlpha(mainBackground, -0.2f)
-            navBar = darkerBackground
             keyboardBackground = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(mainBackground, darkerBackground))
             backgroundSetupDone = true
-        } else {
-            navBar = mainBackground
         }
 
         adjustedBackgroundFilter = colorFilter(adjustedBackground)
@@ -496,7 +487,6 @@ class DefaultColors (
         KEY_BACKGROUND -> keyBackground
         ACTION_KEY_POPUP_KEYS_BACKGROUND -> if (themeStyle == STYLE_HOLO) adjustedBackground else accent
         STRIP_BACKGROUND -> if (!hasKeyBorders && themeStyle == STYLE_MATERIAL) adjustedBackground else background
-        NAVIGATION_BAR -> navBar
         SUGGESTION_AUTO_CORRECT, EMOJI_CATEGORY, TOOL_BAR_KEY, TOOL_BAR_EXPAND_KEY, ONE_HANDED_MODE_BUTTON -> suggestionText
         MORE_SUGGESTIONS_HINT, SUGGESTED_WORD, SUGGESTION_TYPED_WORD, SUGGESTION_VALID_WORD -> adjustedSuggestionText
         ACTION_KEY_ICON -> keyText
@@ -655,7 +645,6 @@ enum class ColorType {
     POPUP_KEYS_BACKGROUND,
     POPUP_KEY_TEXT,
     POPUP_KEY_ICON,
-    NAVIGATION_BAR,
     SHIFT_KEY_ICON,
     SPACE_BAR_BACKGROUND,
     SPACE_BAR_TEXT,

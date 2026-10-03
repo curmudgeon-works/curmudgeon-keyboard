@@ -2,7 +2,6 @@ package helium314.keyboard.latin.settings
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.os.Build
 import android.util.TypedValue
 import android.view.Gravity
 import helium314.keyboard.keyboard.KeyboardActionListener
@@ -193,8 +192,6 @@ object Defaults {
     const val PREF_CLIPBOARD_HISTORY_SIZE = 100 // entries kept, pinned ones not counted; never expires by time
     const val PREF_CLIPBOARD_HISTORY_PINNED_FIRST = true
     const val PREF_ADD_TO_PERSONAL_DICTIONARY = false
-    @JvmField
-    val PREF_NAVBAR_COLOR = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
     const val PREF_NARROW_KEY_GAPS = true
     const val PREF_ENABLED_SUBTYPES = ""
     const val PREF_SELECTED_SUBTYPE = ""

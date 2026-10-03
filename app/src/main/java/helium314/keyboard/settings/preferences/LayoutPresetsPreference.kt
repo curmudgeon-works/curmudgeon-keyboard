@@ -37,6 +37,7 @@ import helium314.keyboard.settings.dialogs.TextInputDialog
 /**
  * The saved Layouts (like the Themes row on Appearance): pick one to put it on this keyboard (shown on the preview at
  * once; OK keeps it, Cancel puts back what was there), save the current one under a name, rename or delete your own.
+ * Saving, renaming and deleting open over the list, which stays (with the preview) until OK or Cancel.
  */
 @Composable
 fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSubtype) -> Unit) {
@@ -49,6 +50,7 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
     val initial = remember(showList) { LayoutPresets.current(prefs) }
     val initialKeyboard = remember(showList) { keyboard }
     var confirmed by remember(showList) { mutableStateOf(false) }
+    var previewed: LayoutPresets.Preset? by remember(showList) { mutableStateOf(null) } // the one tapped, on the keyboard now
     var saveAs by remember { mutableStateOf(false) }
     var toRename: LayoutPresets.Preset? by remember { mutableStateOf(null) }
     var toDelete: LayoutPresets.Preset? by remember { mutableStateOf(null) }
@@ -73,13 +75,15 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
             helium314.keyboard.latin.utils.LayoutUtilsCustom.removeUnusedPrivateLayouts(ctx)
         }
     }
+    // the previewed Layout off again: what was there when the list opened
+    fun putBack() {
+        if (LayoutPresets.current(prefs) != initial) LayoutPresets.applySettings(ctx, initial)
+        if (keyboard != initialKeyboard) setKeyboard(initialKeyboard)
+    }
     if (showList)
         ListPickerDialog(
             onDismissRequest = {
-                if (!confirmed) {
-                    if (LayoutPresets.current(prefs) != initial) LayoutPresets.applySettings(ctx, initial)
-                    if (keyboard != initialKeyboard) setKeyboard(initialKeyboard)
-                }
+                if (!confirmed) putBack()
                 showList = false
             },
             title = { Text(stringResource(R.string.layout_presets)) },
@@ -88,22 +92,25 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
             confirmImmediately = false,
             // each tap starts from what was there when the list opened, so one previewed Layout never leaks into the next
             onItemHighlighted = {
+                previewed = it
                 LayoutPresets.applySettings(ctx, initial + LayoutPresets.settingsFor(initialKeyboard, it))
                 setKeyboard(LayoutPresets.keyboardWith(ctx, initialKeyboard, it))
             },
-            onItemSelected = {
+            onItemSelected = { tapped ->
                 confirmed = true
+                // (the list's own copy: renamed since, it's found again by content; deleted, nothing is on the keyboard)
+                val it = presets.firstOrNull { p -> p == tapped } ?: return@ListPickerDialog
                 if (helium314.keyboard.latin.utils.LayoutUtilsCustom.dropsUnsaved(initialKeyboard, keyboard))
                     askLoss = Triple(it, initial, initialKeyboard)
                 else keep(it, initialKeyboard)
             },
             trailing = { preset ->
-                IconButton({ confirmed = true; showList = false; toRename = preset }) { Icon(painterResource(R.drawable.ic_edit), stringResource(R.string.layout_preset_rename)) }
-                DeleteButton { confirmed = true; showList = false; toDelete = preset }
+                IconButton({ toRename = preset }) { Icon(painterResource(R.drawable.ic_edit), stringResource(R.string.layout_preset_rename)) }
+                DeleteButton { toDelete = preset }
             },
             footer = {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.fillMaxWidth().clickable { confirmed = true; showList = false; saveAs = true }
+                    modifier = Modifier.fillMaxWidth().clickable { saveAs = true }
                         .padding(horizontal = 8.dp).heightIn(min = 48.dp)) {
                     Icon(painterResource(R.drawable.ic_plus), null, Modifier.padding(horizontal = 12.dp))
                     Text(stringResource(R.string.layout_preset_save), color = MaterialTheme.colorScheme.primary)
@@ -117,8 +124,10 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
             initialText = stringResource(R.string.layout_preset_default_name, presets.size + 1),
             checkTextValid = { name -> name.isNotBlank() && presets.none { it.name == name } },
             onConfirmed = { name ->
+                // what is on the keyboard now, a previewed Layout included
                 store(presets + LayoutPresets.Preset(name, LayoutPresets.snapshot(ctx, keyboard)))
-                prefs.edit { putString(LayoutPresets.PREF_SELECTED, name) } // what this keyboard has now is this Layout
+                // what this keyboard has now is this Layout (from the list: only once it's OK'd)
+                if (!showList) prefs.edit { putString(LayoutPresets.PREF_SELECTED, name) }
             },
         )
     toRename?.let { preset ->
@@ -151,6 +160,7 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
             title = { Text(stringResource(R.string.layout_preset_delete, preset.name)) },
             confirmButtonText = stringResource(R.string.delete),
             onConfirmed = {
+                if (preset == previewed) { putBack(); previewed = null } // its preview goes with it
                 store(presets.filter { it !== preset })
                 if (prefs.getString(LayoutPresets.PREF_SELECTED, null) == preset.name) prefs.edit { remove(LayoutPresets.PREF_SELECTED) }
             },

@@ -123,8 +123,6 @@ public class LatinIME extends InputMethodService implements
 
     final Settings mSettings;
     public final KeyboardActionListener mKeyboardActionListener;
-    private int mOriginalNavBarColor = 0;
-    private int mOriginalNavBarFlags = 0;
 
     // UIHandler is needed when creating InputLogic
     public final UIHandler mHandler = new UIHandler(this);
@@ -1006,7 +1004,6 @@ public class LatinIME extends InputMethodService implements
     public void onWindowShown() {
         super.onWindowShown();
         if (isInputViewShown()) {
-            setNavigationBarColor();
             workaroundForHuaweiStatusBarIssue();
         }
     }
@@ -1019,7 +1016,6 @@ public class LatinIME extends InputMethodService implements
         if (mainKeyboardView != null) {
             mainKeyboardView.closing();
         }
-        clearNavigationBarColor();
     }
 
     void onFinishInputInternal() {
@@ -1782,47 +1778,6 @@ public class LatinIME extends InputMethodService implements
         final SettingsValues settingsValues = mSettings.getCurrent();
         p.println(settingsValues.dump());
         p.println(mDictionaryFacilitator.dump(this));
-    }
-
-    // slightly modified from Simple Keyboard: https://github.com/rkkr/simple-keyboard/blob/master/app/src/main/java/rkr/simplekeyboard/inputmethod/latin/LatinIME.java
-    @SuppressWarnings("deprecation")
-    private void setNavigationBarColor() {
-        final SettingsValues settingsValues = mSettings.getCurrent();
-        if (!settingsValues.mCustomNavBarColor)
-            return;
-        final int color = settingsValues.mColors.get(ColorType.NAVIGATION_BAR);
-        final Window window = getWindow().getWindow();
-        if (window == null)
-            return;
-        mOriginalNavBarColor = window.getNavigationBarColor();
-        window.setNavigationBarColor(color);
-
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O)
-            return;
-        final View view = window.getDecorView();
-        mOriginalNavBarFlags = view.getSystemUiVisibility();
-        if (ColorUtilKt.isBrightColor(color)) {
-            view.setSystemUiVisibility(mOriginalNavBarFlags | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
-        } else {
-            view.setSystemUiVisibility(mOriginalNavBarFlags & ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
-        }
-    }
-
-    @SuppressWarnings("deprecation")
-    private void clearNavigationBarColor() {
-        final SettingsValues settingsValues = mSettings.getCurrent();
-        if (!settingsValues.mCustomNavBarColor)
-            return;
-        final Window window = getWindow().getWindow();
-        if (window == null) {
-            return;
-        }
-        window.setNavigationBarColor(mOriginalNavBarColor);
-
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O)
-            return;
-        final View view = window.getDecorView();
-        view.setSystemUiVisibility(mOriginalNavBarFlags);
     }
 
     // On HUAWEI devices with Android 12: a white bar may appear in landscape mode (issue #231)

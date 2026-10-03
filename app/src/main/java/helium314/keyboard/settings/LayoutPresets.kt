@@ -40,7 +40,11 @@ object LayoutPresets {
     private val popupKeys = setOf(Settings.PREF_SHOW_TLD_POPUP_KEYS, Settings.PREF_REMOVE_REDUNDANT_POPUPS,
         Settings.PREF_SYMBOL_POPUP_MAP, KeyPopupOverrides.PREF, KeyPopupOverrides.PREF_SELECTED_SET)
 
-    class Preset(val name: String, val values: Map<String, Any?>)
+    /** Equal by content, not name: the list's tapped one is still found after a rename (or a reload of the list). */
+    class Preset(val name: String, val values: Map<String, Any?>) {
+        override fun equals(other: Any?) = other is Preset && other.values == values
+        override fun hashCode() = values.hashCode()
+    }
 
     // the saved popup sets (app-wide), the keyboard list, and what an entry of its own covers
     private val notInPresets = setOf("key_popup_sets", PREF_SELECTED,
@@ -53,10 +57,12 @@ object LayoutPresets {
     /** The settings part as it is now (plain keys, the edited keyboard's set). */
     fun current(prefs: SharedPreferences): Map<String, Any?> = prefs.all.filterKeys { inScope(it) }
 
-    /** What a Layout saves for [keyboard]: its keys, the settings set now, and every other one as null (its default). */
+    /** What a Layout saves for [keyboard]: its keys, the settings set now, and every other one at its default with the
+     *  default value written out, like a backup (null where the default isn't fixed or absence means something). */
     fun snapshot(ctx: Context, keyboard: SettingsSubtype): Map<String, Any?> {
         val values = HashMap<String, Any?>()
-        LayoutDraft.keys.filter { inScope(it) }.forEach { values[it] = null }
+        LayoutDraft.keys.filter { inScope(it) }.forEach { values[it] = SettingDefaults.of(it) }
+        values.putAll(sizeDefaults)
         values.putAll(current(ctx.prefs()))
         values[SCRIPT] = keyboard.locale.script()
         values[MORE_POPUPS] = keyboard.getExtraValueOf(ExtraValue.MORE_POPUPS)
@@ -135,6 +141,11 @@ object LayoutPresets {
         KeyboardSwitcher.getInstance().setThemeNeedsReload()
     }
 
+    /** A Layout saved before the defaults were written out has a size missing when it was at its default. */
+    private val sizeDefaults by lazy { SettingDefaults.all.filterKeys { key -> sizePrefixes.any { key.startsWith(it) } } }
+    private val sizePrefixes = listOf(Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, Settings.PREF_SPLIT_SPACER_SCALE_PREFIX,
+        Settings.PREF_BOTTOM_ROW_SCALE_PREFIX, Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX, Settings.PREF_SIDE_PADDING_SCALE_PREFIX)
+
     /** Whether what [preset] sets differs from what is set now for [keyboard]. */
     fun isTweaked(ctx: Context, keyboard: SettingsSubtype, preset: Preset): Boolean {
         val now = ctx.prefs().all
@@ -150,7 +161,7 @@ object LayoutPresets {
             (0 until arr.length()).map { i ->
                 val o = arr.getJSONObject(i)
                 val v = o.getJSONObject("values")
-                Preset(o.getString("name"), v.keys().asSequence().associateWith { key ->
+                Preset(o.getString("name"), sizeDefaults + v.keys().asSequence().associateWith { key ->
                     v.getJSONObject(key).let { if (it.has("d")) null else AppearanceLooks.fromJson(it) } })
             }
         }.getOrDefault(emptyList())
