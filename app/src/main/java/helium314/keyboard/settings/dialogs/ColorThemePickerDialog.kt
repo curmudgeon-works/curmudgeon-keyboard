@@ -133,13 +133,7 @@ fun ColorThemePickerDialog(
     )
     var errorDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val loadFilePicker = filePicker { uri ->
-        ctx.getActivity()?.contentResolver?.openInputStream(uri)?.use {
-            val text = it.reader().readText()
-            // theme not added when done without coroutine (maybe prefs listener is not yet registered?)
-            scope.launch { errorDialog = !loadColorString(text, prefs) }
-        }
-    }
+    // (no loading from a file: the one file the app reads settings from is a backup; a colour set comes by paste)
     if (showLoadDialog) {
         ConfirmationDialog(
             onDismissRequest = { showLoadDialog = false },
@@ -150,21 +144,13 @@ fun ColorThemePickerDialog(
                 Text(text.htmlToAnnotated())
             },
             onConfirmed = {
-                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
-                    .addCategory(Intent.CATEGORY_OPENABLE)
-                    .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("text/*", "application/octet-stream", "application/json"))
-                    .setType("*/*")
-                loadFilePicker.launch(intent)
-            },
-            confirmButtonText = stringResource(R.string.button_load_custom),
-            onNeutral = {
-                showLoadDialog = false
                 val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 val clip = cm.primaryClip?.takeIf { it.itemCount > 0 } ?: return@ConfirmationDialog
                 val text = clip.getItemAt(0).text
-                errorDialog = !loadColorString(text.toString(), prefs)
+                // theme not added when done without coroutine (maybe prefs listener is not yet registered?)
+                scope.launch { errorDialog = !loadColorString(text.toString(), prefs) }
             },
-            neutralButtonText = stringResource(R.string.paste)
+            confirmButtonText = stringResource(R.string.paste)
         )
     }
     if (errorDialog)
