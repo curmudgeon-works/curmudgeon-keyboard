@@ -380,9 +380,13 @@ fun createAppearanceSettings(context: Context) = listOf(
                 onClick = { showDialog = true }
             )
         }
+        // back from the colour editor (the list's pencil or Add): the list again
+        var reopen by rememberSaveable { mutableStateOf(false) }
+        androidx.compose.runtime.LaunchedEffect(Unit) { if (reopen) { reopen = false; showDialog = true } }
         if (showDialog)
             ColorThemePickerDialog(
                 onDismissRequest = { showDialog = false },
+                onOpenEditor = { showDialog = false; reopen = true },
                 setting = setting,
                 isNight = false,
                 default = Defaults.PREF_THEME_COLORS
@@ -402,9 +406,13 @@ fun createAppearanceSettings(context: Context) = listOf(
                 onClick = { showDialog = true }
             )
         }
+        // back from the colour editor (the list's pencil or Add): the list again
+        var reopen by rememberSaveable { mutableStateOf(false) }
+        androidx.compose.runtime.LaunchedEffect(Unit) { if (reopen) { reopen = false; showDialog = true } }
         if (showDialog)
             ColorThemePickerDialog(
                 onDismissRequest = { showDialog = false },
+                onOpenEditor = { showDialog = false; reopen = true },
                 setting = setting,
                 isNight = true,
                 default = Defaults.PREF_THEME_COLORS_NIGHT

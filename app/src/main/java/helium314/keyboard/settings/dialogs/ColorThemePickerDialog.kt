@@ -73,7 +73,10 @@ fun ColorThemePickerDialog(
     onDismissRequest: () -> Unit,
     setting: Setting,
     isNight: Boolean,
-    default: String
+    default: String,
+    /** The pencil or Add left for the colour editor: the list is closed (what's chosen kept) and the caller shows it
+     *  again on coming back. */
+    onOpenEditor: () -> Unit = onDismissRequest,
 ) {
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
@@ -107,7 +110,7 @@ fun ColorThemePickerDialog(
     // a tap shows the colors on the live keyboard; OK keeps them, Cancel puts back what was set when the dialog opened
     val snapshot = rememberPrefSnapshot(prefs, listOf(setting.key))
     var confirmed by remember { mutableStateOf(false) }
-    val close = { confirmed = true; onDismissRequest() }
+    val close = { confirmed = true; onOpenEditor() }
     ThreeButtonAlertDialog(
         // the keyboard stays up below the dialog (a tap shows the colours on it), the dialog sits above it
         keepKeyboard = true,
