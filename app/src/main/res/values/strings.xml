@@ -313,6 +313,7 @@
     <!-- Name under which an edited layout is kept as the user's own -->
     <string name="layout_files_own_name">My layout</string>
     <string name="layout_files_builtin">Built-in</string>
+    <string name="layout_files_builtin_confirm">Replace this tab with the built-in layout? Your changes in it will be lost.</string>
     <string name="layout_files_load">Load file</string>
     <string name="layout_files_export">Save to file</string>
     <string name="layout_files_loaded">Layouts loaded. Save to use them.</string>
