@@ -29,7 +29,11 @@ object AppearanceLooks {
     const val PREF = "appearance_looks"
     const val PREF_SELECTED = "appearance_look_selected" // the theme last chosen (its name), for the Themes row
 
-    class Look(val name: String, val values: Map<String, Any?>)
+    /** Equal by content, not name: the list's tapped one is still found after a rename (or a reload of the list). */
+    class Look(val name: String, val values: Map<String, Any?>) {
+        override fun equals(other: Any?) = other is Look && other.values == values
+        override fun hashCode() = values.hashCode()
+    }
 
     private val keys = setOf(
         Settings.PREF_THEME_STYLE, Settings.PREF_ICON_STYLE, Settings.PREF_CUSTOM_ICON_NAMES, Settings.PREF_THEME_COLORS,

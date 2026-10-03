@@ -607,7 +607,8 @@ private fun Preview() {
     }
 }
 
-/** The saved looks: pick one to apply it, save the current look under a name, rename or delete your own. */
+/** The saved looks: pick one to apply it, save the current look under a name, rename or delete your own. Saving,
+ *  renaming and deleting open over the list, which stays (with the preview) until OK or Cancel. */
 @Composable
 private fun SavedLooksPreference(setting: Setting) {
     val ctx = LocalContext.current
@@ -621,6 +622,7 @@ private fun SavedLooksPreference(setting: Setting) {
     // the background pictures when the list opened, to put back on Cancel (a copy, made only while the list is open)
     val initialPictures = remember(showList) { if (showList) AppearanceLooks.currentPictures(ctx) else null }
     var confirmed by remember(showList) { mutableStateOf(false) }
+    var previewed: AppearanceLooks.Look? by remember(showList) { mutableStateOf(null) } // the one tapped, on the keyboard now
     var saveAs by remember { mutableStateOf(false) }
     var toRename: AppearanceLooks.Look? by remember { mutableStateOf(null) }
     var toDelete: AppearanceLooks.Look? by remember { mutableStateOf(null) }
@@ -638,13 +640,15 @@ private fun SavedLooksPreference(setting: Setting) {
     val state = listOfNotNull(stringResource(R.string.theme_tweaked).takeIf { tweaked }, stringResource(R.string.theme_unsaved).takeIf { unsaved })
     val summary = chosen?.let { if (state.isEmpty()) it.name else it.name + " (" + state.joinToString(", ") + ")" }
     Preference(name = setting.title, description = summary, onClick = { showList = true }) { NextScreenIcon() }
+    // the previewed theme off again: what was there when the list opened
+    fun putBack() {
+        if (AppearanceLooks.current(prefs) != initial) AppearanceLooks.apply(ctx, initial)
+        initialPictures?.let { AppearanceLooks.applyPictures(ctx, it) }
+    }
     if (showList)
         ListPickerDialog(
             onDismissRequest = {
-                if (!confirmed) {
-                    if (AppearanceLooks.current(prefs) != initial) AppearanceLooks.apply(ctx, initial)
-                    initialPictures?.let { AppearanceLooks.applyPictures(ctx, it) }
-                }
+                if (!confirmed) putBack()
                 initialPictures?.let { AppearanceLooks.deletePictures(ctx, it) }
                 showList = false
             },
@@ -654,16 +658,21 @@ private fun SavedLooksPreference(setting: Setting) {
             confirmImmediately = false,
             // a theme only changes what it lists: the rest stays as it was when the list opened (height, fonts, switches…);
             // starting from `initial` on every tap also means one previewed theme never leaks into the next
-            onItemHighlighted = { AppearanceLooks.apply(ctx, initial + it.values); AppearanceLooks.applyPictures(ctx, it) },
-            onItemSelected = { confirmed = true; prefs.edit { putString(AppearanceLooks.PREF_SELECTED, it.name) } },
+            onItemHighlighted = { previewed = it; AppearanceLooks.apply(ctx, initial + it.values); AppearanceLooks.applyPictures(ctx, it) },
+            onItemSelected = { tapped ->
+                confirmed = true
+                // (the list's own copy: renamed since, it's found again by content; deleted, nothing is on the keyboard)
+                val it = (builtIn + looks).firstOrNull { l -> l == tapped } ?: return@ListPickerDialog
+                prefs.edit { putString(AppearanceLooks.PREF_SELECTED, it.name) }
+            },
             // the built-in themes come first and can't be changed; the user's own are renamed and deleted here
-            trailing = { look -> if (look !in builtIn) {
-                IconButton({ confirmed = true; showList = false; toRename = look }) { Icon(painterResource(R.drawable.ic_edit), stringResource(R.string.appearance_look_rename)) }
-                DeleteButton { confirmed = true; showList = false; toDelete = look }
+            trailing = { look -> if (builtIn.none { it === look }) { // (by identity: a theme of the same content is still yours)
+                IconButton({ toRename = look }) { Icon(painterResource(R.drawable.ic_edit), stringResource(R.string.appearance_look_rename)) }
+                DeleteButton { toDelete = look }
             } },
             footer = {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.fillMaxWidth().clickable { confirmed = true; showList = false; saveAs = true }
+                    modifier = Modifier.fillMaxWidth().clickable { saveAs = true }
                         .padding(horizontal = 8.dp).heightIn(min = 48.dp)) {
                     Icon(painterResource(R.drawable.ic_plus), null, Modifier.padding(horizontal = 12.dp))
                     Text(stringResource(R.string.appearance_look_save), color = MaterialTheme.colorScheme.primary)
@@ -679,7 +688,8 @@ private fun SavedLooksPreference(setting: Setting) {
             onConfirmed = { name ->
                 store(looks + AppearanceLooks.Look(name,
                     AppearanceLooks.snapshot(prefs) + (AppearanceLooks.PICTURES to AppearanceLooks.savePictures(ctx))))
-                prefs.edit { putString(AppearanceLooks.PREF_SELECTED, name) } // what's on the keyboard now is this theme
+                // what's on the keyboard now (a previewed theme included) is this theme; from the list: only once it's OK'd
+                if (!showList) prefs.edit { putString(AppearanceLooks.PREF_SELECTED, name) }
             },
         )
     toRename?.let { look ->
@@ -700,6 +710,7 @@ private fun SavedLooksPreference(setting: Setting) {
             title = { Text(stringResource(R.string.appearance_look_delete, look.name)) },
             confirmButtonText = stringResource(R.string.delete),
             onConfirmed = {
+                if (look == previewed) { putBack(); previewed = null } // its preview goes with it
                 AppearanceLooks.deletePictures(ctx, look); store(looks.filter { it !== look })
                 if (prefs.getString(AppearanceLooks.PREF_SELECTED, null) == look.name) prefs.edit { remove(AppearanceLooks.PREF_SELECTED) }
             },

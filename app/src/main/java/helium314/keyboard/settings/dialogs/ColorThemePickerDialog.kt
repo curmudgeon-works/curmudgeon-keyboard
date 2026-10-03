@@ -112,7 +112,12 @@ fun ColorThemePickerDialog(
         // the keyboard stays up below the dialog (a tap shows the colours on it), the dialog sits above it
         keepKeyboard = true,
         onDismissRequest = {
-            if (!confirmed && snapshot.restore()) KeyboardSwitcher.getInstance().setThemeNeedsReload()
+            // (a set deleted here isn't put back: the keyboard stays on what it shows now)
+            val before = snapshot[setting.key] as? String
+            val beforeGone = before != null && before !in defaultColors && prefs.all.keys.none { k ->
+                k == Settings.PREF_USER_COLORS_PREFIX + before || k == Settings.PREF_USER_ALL_COLORS_PREFIX + before
+                    || k == Settings.PREF_USER_MORE_COLORS_PREFIX + before }
+            if (!confirmed && !beforeGone && snapshot.restore()) KeyboardSwitcher.getInstance().setThemeNeedsReload()
             onDismissRequest()
         },
         onConfirmed = { confirmed = true },
