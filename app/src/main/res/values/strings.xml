@@ -425,6 +425,8 @@
     <!-- Option for showing letters defined in any locale -->
     <string name="show_popup_keys_all">Add all available variants</string>
     <!-- Preferences item for enabling URL detection -->
+    <!-- Text correction (advanced): words you type often (long ones) can be the auto-correction -->
+    <string name="autocorrect_frequent_words">Auto-correct learns your frequent words</string>
     <string name="url_detection_title">URL detection</string>
     <!-- Description for "url_detection_title" option. -->
     <string name="url_detection_summary">Treat web and email addresses as a single word</string>

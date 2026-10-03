@@ -48,10 +48,10 @@ fun <T: Number> SliderPreference(
     else throw IllegalArgumentException("only float and int are supported")
 
     var showDialog by rememberSaveable { mutableStateOf(false) }
-    val hadValue = remember(showDialog) { prefs.contains(key) }
+    val hadValue = rememberSaveable(showDialog) { prefs.contains(key) }
     // the value when the dialog opened: live drags write the pref and redraw this row, so the current value would
     // make Cancel "restore" the dragged one
-    val openValue = remember(showDialog) { initialValue }
+    val openValue = rememberSaveable(showDialog) { initialValue }
     @Suppress("UNCHECKED_CAST")
     fun write(value: Float) {
         if (live && !hadValue && value == openValue.toFloat()) prefs.edit { remove(key) } // Cancel: unset stays unset

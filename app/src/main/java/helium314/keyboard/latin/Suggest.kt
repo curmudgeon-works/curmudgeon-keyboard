@@ -157,7 +157,10 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
             val context = Settings.getCurrentContext()
             if (context != null) {
                 val frequent = FrequentLongWords.matching(context, mDictionaryFacilitator.locales, wordComposer.typedWord)
-                var slot = min(2, suggestionsList.size)
+                // "Auto-correct learns your frequent words" on: the first goes in the auto-correction's slot (space commits
+                // it when a correction is coming); off: right after it, and the correction stays what it was
+                val frequentCorrects = Settings.getValues().mAutocorrectFrequentWords
+                var slot = min(if (frequentCorrects) 1 else 2, suggestionsList.size)
                 // (words removed with long-press stay out, like the dictionaries' do; typing one again un-removes it)
                 // and with the typed word's capitals, like every other suggestion (a capital you typed stays)
                 val frequentAllCaps = wordComposer.isAllUpperCase && wordComposer.size() > 1
@@ -165,6 +168,8 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
                 for (info in frequent.filterNot { mDictionaryFacilitator.isRemovedWord(it.mWord) }.map {
                     if (frequentAllCaps || frequentFirstCap) getTransformedSuggestedWordInfo(it, mDictionaryFacilitator.mainLocale,
                         frequentAllCaps, frequentFirstCap, 0) else it }) {
+                    val at = suggestionsList.indexOfFirst { it.mWord == info.mWord }
+                    if (at in 0 until slot) continue // already ahead of the slot (the correction itself, say): stays put
                     suggestionsList.removeAll { it.mWord == info.mWord } // already there further down: move it up
                     suggestionsList.add(min(slot, suggestionsList.size), info)
                     slot++

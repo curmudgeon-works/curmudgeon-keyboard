@@ -10,7 +10,7 @@ import java.util.Calendar
 /** The timestamp key's tap (its long-press offers the date or the time alone). */
 fun getTimestamp(context: Context): String = SimpleDateFormat(TIMESTAMP_FORMAT, Settings.getValues().mLocale).format(Calendar.getInstance().time)
 
-private const val TIMESTAMP_FORMAT = "yyyy-MM-dd HH:mm:ss"
+const val TIMESTAMP_FORMAT = "yyyy-MM-dd HH:mm:ss"
 
 /** A popup key's output text starting with this types the time in the format after it, e.g. "Date|!timestamp/yyyy-MM-dd". */
 const val TIMESTAMP_TEXT_PREFIX = "!timestamp/"

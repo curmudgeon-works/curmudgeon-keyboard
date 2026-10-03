@@ -239,7 +239,7 @@ fun createAdvancedSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_EMOJI_MAX_SDK, R.string.prefs_key_emoji_max_sdk) { setting ->
         val ctx = LocalContext.current
-        // the top is this phone's Android or the newest emoji list's, whichever is newer: every emoji shows (the default)
+        // the top is this phone's Android or the newest emoji list's, whichever is newer: every emoji shows
         val top = maxOf(SupportedEmojis.LATEST, Build.VERSION.SDK_INT)
         // opens on the emoji panel, which follows the slider while it's dragged
         CompositionLocalProvider(LocalPreviewEmoji provides true) {
@@ -247,7 +247,7 @@ fun createAdvancedSettings(context: Context) = listOf(
             live = true,
             name = setting.title,
             key = setting.key,
-            default = top,
+            default = SupportedEmojis.DEFAULT, // this phone's Android
             range = 21f..top.toFloat(),
             description = {
                 "Android " + when(it) {

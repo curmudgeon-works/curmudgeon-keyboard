@@ -75,6 +75,7 @@ fun TextCorrectionScreen(
         // (backspace reverts autocorrect: in the Backspace group of the Preferences screen)
         Settings.PREF_AUTO_CAP,
         Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE,
+        if (autocorrectEnabled) Settings.PREF_AUTOCORRECT_FREQUENT_WORDS else null, // (advanced) your frequent long words as the correction
         Settings.PREF_URL_DETECTION, // (from Advanced; advanced here too) web and email addresses as one word
         R.string.settings_category_space,
         Settings.PREF_AUTOSPACE_AFTER_SUGGESTION,
@@ -177,7 +178,7 @@ private val correctionKeys = listOf(
     Settings.PREF_INLINE_EMOJI_SEARCH, Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Settings.PREF_ALWAYS_INCOGNITO_MODE,
     Settings.PREF_BIGRAM_PREDICTIONS, Settings.PREF_SUGGEST_PUNCTUATION, Settings.PREF_PUNCTUATION_SUGGESTIONS,
     Settings.PREF_SUGGEST_CLIPBOARD_CONTENT, Settings.PREF_USE_CONTACTS, Settings.PREF_USE_APPS, Settings.PREF_ADD_TO_PERSONAL_DICTIONARY,
-    Settings.PREF_URL_DETECTION, Settings.PREF_SUGGESTION_COUNT, Settings.PREF_SUGGESTION_RULES,
+    Settings.PREF_URL_DETECTION, Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, Settings.PREF_SUGGESTION_COUNT, Settings.PREF_SUGGESTION_RULES,
 )
 
 fun createCorrectionSettings(context: Context) = listOf(
@@ -190,6 +191,9 @@ fun createCorrectionSettings(context: Context) = listOf(
                 onClick = { SettingsDestination.navigateTo(SettingsDestination.PersonalDictionaries) },
             ) { NextScreenIcon() }
         }
+    },
+    Setting(context, Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, R.string.autocorrect_frequent_words) {
+        SwitchPreference(it, Defaults.PREF_AUTOCORRECT_FREQUENT_WORDS)
     },
     Setting(context, Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE,
         R.string.prefs_block_potentially_offensive_title
