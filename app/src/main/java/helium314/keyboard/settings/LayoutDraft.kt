@@ -89,7 +89,8 @@ class LayoutDraft private constructor(
 
     companion object {
         // the plain keys the screen's rows and sub-screens write (see SubtypeScreen, KeyPopupsScreen, LayoutFilesScreen)
-        private val keys = setOf(
+        internal val keys = setOf(
+            "layout_preset_selected", // the saved Layout last chosen (its name), for the Layouts row
             // typing
             Settings.PREF_POPUP_ON, Settings.PREF_VIBRATE_ON, Settings.PREF_VIBRATION_DURATION_SETTINGS,
             Settings.PREF_VIBRATE_IN_DND_MODE, Settings.PREF_SOUND_ON, Settings.PREF_KEYPRESS_SOUND,
@@ -117,7 +118,7 @@ class LayoutDraft private constructor(
             Settings.PREF_ADDITIONAL_SUBTYPES, Settings.PREF_ENABLED_SUBTYPES, Settings.PREF_SELECTED_SUBTYPE,
             "keyboard_profile_ids",
         )
-        private val prefixes = listOf(
+        internal val prefixes = listOf(
             Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, Settings.PREF_SPLIT_SPACER_SCALE_PREFIX, Settings.PREF_LAYOUT_PREFIX,
             Settings.PREF_BOTTOM_ROW_SCALE_PREFIX, Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX, Settings.PREF_SIDE_PADDING_SCALE_PREFIX,
             Settings.PREF_SAVED_APP_SUBTYPE_PREFIX,

@@ -166,12 +166,23 @@ object LayoutUtilsCustom {
             listOfNotNull(current?.takeIf { isPrivateLayout(it) })
 
     /** A private copy of [layoutName] (same keys), for one keyboard; returns its name. */
-    fun makePrivateCopy(layoutName: String, layoutType: LayoutType, context: Context): String {
-        val scope = if (layoutType == LayoutType.MAIN) layoutName.removePrefix(CUSTOM_LAYOUT_PREFIX).substringBefore(".") + "." else ""
+    fun makePrivateCopy(layoutName: String, layoutType: LayoutType, context: Context): String =
+        makePrivateLayout(getLayoutFile(layoutName, layoutType, context).readText(), layoutType, scopeOf(layoutName, layoutType), context)
+
+    /** For a main layout: what its name is scoped to ("latn" for latin-script languages, else the language tag). */
+    fun scopeOf(layoutName: String, layoutType: LayoutType) =
+        if (layoutType == LayoutType.MAIN) layoutName.removePrefix(CUSTOM_LAYOUT_PREFIX).substringBefore(".") else ""
+
+    /** The scope a main layout for [locale] has (see [scopeOf]). */
+    fun scopeFor(locale: Locale) = scopeOf(getLayoutName("x", LayoutType.MAIN, locale), LayoutType.MAIN)
+
+    /** A private layout (one keyboard's, unnamed) with [text] as its keys; returns its name. */
+    fun makePrivateLayout(text: String, layoutType: LayoutType, scope: String, context: Context): String {
+        val scopePart = if (layoutType == LayoutType.MAIN) "$scope." else ""
         var number = System.currentTimeMillis()
         var name: String
-        do { name = CUSTOM_LAYOUT_PREFIX + scope + PRIVATE_MARK + number++.toString(36) + "." } while (getLayoutFile(name, layoutType, context).exists())
-        getLayoutFile(name, layoutType, context).writeText(getLayoutFile(layoutName, layoutType, context).readText())
+        do { name = CUSTOM_LAYOUT_PREFIX + scopePart + PRIVATE_MARK + number++.toString(36) + "." } while (getLayoutFile(name, layoutType, context).exists())
+        getLayoutFile(name, layoutType, context).writeText(text)
         onLayoutFileChanged()
         return name
     }
