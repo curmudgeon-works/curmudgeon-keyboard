@@ -122,11 +122,7 @@ fun ColorsScreen(
 
     var chosenColorString: String by rememberSaveable { mutableStateOf("") }
     val chosenColor = runCatching { Json.decodeFromString<ColorSetting?>(chosenColorString) }.getOrNull()
-    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
-        val uri = result.data?.data ?: return@rememberLauncherForActivityResult
-        ctx.getActivity()?.contentResolver?.openOutputStream(uri)?.writer()?.use { it.write(getColorString(prefs, newThemeName.text)) }
-    }
+    // (no saving to a file: the one file the app writes is the backup; a colour set is shared by copy and paste)
     SearchScreen(
         title = {
             var nameValid by rememberSaveable { mutableStateOf(true) }
@@ -152,13 +148,6 @@ fun ColorsScreen(
             stringResource(R.string.main_colors) to { KeyboardTheme.writeUserMoreColors(prefs, newThemeName.text, 0) },
             stringResource(R.string.more_colors) to { KeyboardTheme.writeUserMoreColors(prefs, newThemeName.text, 1) },
             stringResource(R.string.all_colors) to { KeyboardTheme.writeUserMoreColors(prefs, newThemeName.text, 2) },
-            stringResource(R.string.button_save_file) to {
-                val intent = Intent(Intent.ACTION_CREATE_DOCUMENT)
-                    .addCategory(Intent.CATEGORY_OPENABLE)
-                    .putExtra(Intent.EXTRA_TITLE,"${newThemeName.text}.json")
-                    .setType("application/json")
-                saveLauncher.launch(intent)
-            },
             stringResource(R.string.copy_to_clipboard) to {
                 val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 cm.setPrimaryClip(ClipData.newPlainText("Curmudgeon theme", getColorString(prefs, newThemeName.text)))
