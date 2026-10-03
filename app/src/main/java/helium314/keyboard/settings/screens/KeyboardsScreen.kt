@@ -86,6 +86,7 @@ fun KeyboardsScreen(
     var keyboardToDelete: SettingsSubtype? by remember { mutableStateOf(null) }
     var keyboardMenu: SettingsSubtype? by remember { mutableStateOf(null) } // press and hold: Rename, Delete
     var keyboardToRename: SettingsSubtype? by remember { mutableStateOf(null) }
+    var newKeyboard: SettingsSubtype? by remember { mutableStateOf(null) } // added, asks where its settings come from
     val real = ctx.realPrefs()
     var separate by remember { mutableStateOf(KeyboardProfiles.isSeparate(real)) }
     var askEnable by remember { mutableStateOf(false) } // some keyboards have an older set: keep or reset?
@@ -303,6 +304,21 @@ fun KeyboardsScreen(
                 confirmButtonText = stringResource(R.string.delete),
             )
         }
+        newKeyboard?.let { added ->
+            val defaults = stringResource(R.string.new_keyboard_default_settings)
+            ListPickerDialog<Any>(
+                onDismissRequest = { newKeyboard = null }, // (nothing added)
+                onItemSelected = { from ->
+                    addNewKeyboard(ctx, added, (from as? SettingsSubtype) ?: SettingsSubtype(Locale.ROOT, DEFAULTS_ONLY))
+                    newKeyboard = null
+                    generation++
+                },
+                title = { Text(stringResource(R.string.new_keyboard_copy_settings, keyboardName(added, ctx))) },
+                items = enabledNow + defaults,
+                getItemName = { if (it is SettingsSubtype) keyboardName(it, ctx) else it as String },
+                showRadioButtons = false,
+            )
+        }
         if (showAddKeyboard)
             ListPickerDialog<Any>(
                 onDismissRequest = { showAddKeyboard = false },
@@ -319,13 +335,10 @@ fun KeyboardsScreen(
                     // that language's keyboard is in the list already: another one, numbered ("English 2"), so the
                     // listed one keeps its settings
                     val settingsSubtype = if (!enabledNow.contains(plain)) plain else nextNumbered(plain)
-                    SubtypeUtilsAdditional.changeAdditionalSubtype(settingsSubtype, settingsSubtype, ctx) // registers it unless it equals a built-in one
-                    SubtypeSettings.addEnabledSubtype(ctx.prefs(), settingsSubtype.toAdditionalSubtype())
-                    if (separate) // a new keyboard starts as a copy of the one in use
-                        KeyboardProfiles.copy(real, KeyboardProfiles.idFor(real, SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype()),
-                            KeyboardProfiles.idFor(real, settingsSubtype))
                     showAddKeyboard = false
-                    generation++ // stays on this screen, the new keyboard appears at the end of the list
+                    // with its own settings, it asks which keyboard's settings to start from; else it has the shared ones
+                    if (separate) newKeyboard = settingsSubtype
+                    else { addNewKeyboard(ctx, settingsSubtype, null); generation++ } // stays here, it appears at the end
                 },
                 title = { Text(stringResource(R.string.add_keyboard)) },
                 // copies of the keyboards first, then a new keyboard for any language
@@ -372,4 +385,26 @@ private fun copyKeyboard(ctx: Context, source: SettingsSubtype, withOwnSettings:
     SubtypeSettings.addEnabledSubtype(ctx.prefs(), copy.toAdditionalSubtype())
     KeyboardProfiles.copy(real, if (withOwnSettings) KeyboardProfiles.idFor(real, source) else KeyboardProfiles.SHARED,
         KeyboardProfiles.idFor(real, copy))
+}
+
+private const val DEFAULTS_ONLY = "defaults only" // (a marker, never a keyboard)
+
+/**
+ * Adds [keyboard] to the list; with separate settings its own set starts as [from]'s (null: the keyboard in use's), or
+ * at every default ([DEFAULTS_ONLY]). A source of another script keeps its popups to itself (they're for its letters):
+ * the new keyboard has the default popups.
+ */
+private fun addNewKeyboard(ctx: Context, keyboard: SettingsSubtype, from: SettingsSubtype?) {
+    val real = ctx.realPrefs()
+    SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, keyboard, ctx) // registers it unless it equals a built-in one
+    SubtypeSettings.addEnabledSubtype(ctx.prefs(), keyboard.toAdditionalSubtype())
+    if (!KeyboardProfiles.isSeparate(real)) return
+    val id = KeyboardProfiles.idFor(real, keyboard)
+    if (from?.extraValues == DEFAULTS_ONLY) { KeyboardProfiles.write(real, id, emptyMap(), markDefaults = true); return }
+    val source = from ?: SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype()
+    KeyboardProfiles.copy(real, KeyboardProfiles.idFor(real, source), id)
+    if (with(helium314.keyboard.latin.utils.ScriptUtils) { source.locale.script() != keyboard.locale.script() }) {
+        val own = helium314.keyboard.latin.settings.ProfilePreferences(real) { id }
+        own.edit().apply { listOf("key_popups", "key_popup_set_selected", Settings.PREF_SYMBOL_POPUP_MAP).forEach { remove(it) } }.apply()
+    }
 }

@@ -810,6 +810,10 @@ public class LatinIME extends InputMethodService implements
             return;
         }
         InputMethodSubtype oldSubtype = mRichImm.getCurrentSubtype().getRawSubtype();
+        // (trace for the 2026-10-03 wrong preview keyboard: logcat -s PreviewKb)
+        final StackTraceElement[] st = new Throwable().getStackTrace();
+        helium314.keyboard.latin.utils.Log.w("PreviewKb", "subtype change " + oldSubtype.getLocale() + " -> " + subtype.getLocale() + " " + subtype.getExtraValue()
+                + " same=" + subtype.equals(oldSubtype) + " from " + (st.length > 2 ? st[1].getMethodName() + "<" + st[2].getMethodName() : "?"));
         if (subtype.equals(oldSubtype)) {
             // onStartInput may be called more than once, resulting in duplicate subtype switches
             return;
@@ -841,6 +845,8 @@ public class LatinIME extends InputMethodService implements
         final List<Locale> hintLocales = EditorInfoCompatUtils.getHintLocales(editorInfo);
         final InputMethodSubtype subtypeForLocales = mSubtypeState.getSubtypeForLocales(mRichImm, hintLocales, subtypeForApp);
         if (subtypeForLocales != null) {
+            helium314.keyboard.latin.utils.Log.w("PreviewKb", "start input in " + (editorInfo == null ? "?" : editorInfo.packageName)
+                    + ": switching to " + subtypeForLocales.getLocale() + " (app memory " + (subtypeForApp != null) + ", hints " + hintLocales + ")");
             // found a better subtype using hint locales and saved-per-app subtype, that we should switch to.
             mHandler.postSwitchLanguage(subtypeForLocales);
         }
