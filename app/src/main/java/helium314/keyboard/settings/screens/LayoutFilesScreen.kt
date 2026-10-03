@@ -109,6 +109,11 @@ fun LayoutFilesScreen(onClickBack: () -> Unit) {
     // Built-in over a tab's own text asks first; leaving with unsaved tabs asks Save / Discard
     var askBuiltIn by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     var askLeave by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    var askReject by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    var askAccept by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    // cross: every tab back to its saved text (the current default for its type); tick: every changed tab saved
+    if (askReject) helium314.keyboard.settings.dialogs.DiscardChangesDialog({ askReject = false }) { saved.forEach { (t, text) -> texts[t] = text } }
+    if (askAccept) helium314.keyboard.settings.dialogs.SaveChangesDialog({ askAccept = false }) { if (invalid.isEmpty()) save() }
     fun leave() { if (changed.isNotEmpty()) askLeave = true else onClickBack() }
     androidx.activity.compose.BackHandler(enabled = changed.isNotEmpty()) { leave() }
     if (askBuiltIn) helium314.keyboard.settings.dialogs.ConfirmationDialog(
@@ -129,8 +134,13 @@ fun LayoutFilesScreen(onClickBack: () -> Unit) {
         topBar = { TopAppBar(
             title = { Text(stringResource(R.string.layout_files)) },
             navigationIcon = { BackButton(::leave) },
-            actions = { Button(onClick = ::save, enabled = changed.isNotEmpty() && invalid.isEmpty(),
-                modifier = Modifier.padding(end = 8.dp)) { Text(stringResource(R.string.save)) } },
+            // cross and tick, like the other screens: only while a tab has changes; the tick waits for broken tabs (!)
+            actions = { if (changed.isNotEmpty()) {
+                androidx.compose.material3.IconButton({ askReject = true }) {
+                    androidx.compose.material3.Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_close), stringResource(R.string.appearance_reject)) }
+                androidx.compose.material3.IconButton({ askAccept = true }, enabled = invalid.isEmpty()) {
+                    androidx.compose.material3.Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_check), stringResource(R.string.appearance_accept)) }
+            } },
         ) },
     ) { innerPadding ->
         Column(Modifier.fillMaxSize().padding(innerPadding)
