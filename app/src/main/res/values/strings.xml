@@ -476,7 +476,7 @@
     <string name="hide_all_symbols">Hide symbols on keys</string>
     <string name="key_popups_symbols">Symbols page</string>
     <string name="key_popups_more_symbols">More symbols page</string>
-    <string name="key_popups_presets">Popup sets</string>
+    <string name="key_popups_presets">Preset popups</string>
     <string name="key_popups_full">Customize popup for each key</string>
     <string name="key_popups_full_summary">Every key\'s long-press popups, a tab per group of keys</string>
     <string name="key_popups_save_as_new">Save current popup layout</string>
