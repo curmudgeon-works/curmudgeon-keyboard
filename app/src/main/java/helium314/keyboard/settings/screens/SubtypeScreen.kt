@@ -341,9 +341,12 @@ fun SubtypeScreen(
                 val advanced by SettingsMode.state(ctx)
                 // two groups, one row style (label 10 dp in, rows 56 dp high): see LocalCompactPreferences, SwitchRow
                 // ---- the layout, with the toolbar (then typing with backspace, popups, clipboard history): main layout (advanced), shape, emoji key, split, send key, other layouts, bottom row
+                // the saved Layouts on top, on their own between two lines: they hold everything on this screen (every
+                // group, popups too), not just the Layout group (2026-10-03)
+                androidx.compose.material3.HorizontalDivider()
+                helium314.keyboard.settings.preferences.LayoutPresetsPreference(currentSubtype) { setCurrentSubtype(it) }
+                androidx.compose.material3.HorizontalDivider()
                 WithBigTitle(stringResource(R.string.keyboard_layout_set)) {
-                    // the saved Layouts first (everything on this screen but the popups, as a theme is for Appearance)
-                    helium314.keyboard.settings.preferences.LayoutPresetsPreference(currentSubtype) { setCurrentSubtype(it) }
                     // (the keys, QWERTY, AZERTY, …: first row of Keys & Popups)
                     // the keyboard's shape first (moved from Appearance): height, numbers row;
                     // their dialogs keep the preview keyboard up
