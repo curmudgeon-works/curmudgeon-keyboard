@@ -81,6 +81,17 @@ class ProfilePreferencesTest {
         assertEquals(preset.values, back.values) // null (at its default) and the custom keys' text survive
     }
 
+    @Test fun keyboardBecomingAnotherKeepsBothSets() {
+        val qwerty = helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.US, "KeyboardLayoutSet=MAIN:qwerty")
+        val colemak = helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.US, "KeyboardLayoutSet=MAIN:colemak")
+        val q = KeyboardProfiles.idFor(real, qwerty); val c = KeyboardProfiles.idFor(real, colemak)
+        set(q).edit().putInt("theme_size", 1).commit(); set(c).edit().putInt("theme_size", 2).commit()
+        KeyboardProfiles.onKeyboardChanged(real, qwerty, colemak) // previewing Colemak on the QWERTY keyboard
+        KeyboardProfiles.onKeyboardChanged(real, colemak, qwerty) // Cancel
+        assertEquals(q, KeyboardProfiles.idFor(real, qwerty)); assertEquals(c, KeyboardProfiles.idFor(real, colemak))
+        assertEquals(1, set(q).getInt("theme_size", 0)); assertEquals(2, set(c).getInt("theme_size", 0)) // both sets kept
+    }
+
     @Test fun copyTakesOwnValuesOverShared() {
         real.edit().putInt("a", 1).putInt("b", 2).putInt("c", 3).commit()
         set(1).edit().putInt("a", 10).remove("c").commit()

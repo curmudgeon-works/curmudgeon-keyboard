@@ -189,6 +189,7 @@ object LayoutUtilsCustom {
 
     /** Deletes the private layouts no keyboard uses any more (its keyboard deleted, or switched to another layout). */
     fun removeUnusedPrivateLayouts(context: Context) {
+        if (cleanupHeld > 0) return // a preview is open: Cancel may need them again (it calls this when it closes)
         val prefs = context.prefs()
         val used = (SubtypeSettings.createSettingsSubtypes(prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!)
             + SubtypeSettings.createSettingsSubtypes(prefs.getString(Settings.PREF_ADDITIONAL_SUBTYPES, Defaults.PREF_ADDITIONAL_SUBTYPES)!!)
@@ -240,6 +241,8 @@ object LayoutUtilsCustom {
 
     // this goes into prefs and file names, so do not change!
     const val CUSTOM_LAYOUT_PREFIX = "custom."
+    /** While above 0 (a list that previews keyboards, e.g. Layouts), private layouts aren't cleaned up. */
+    @Volatile var cleanupHeld = 0
     private const val PRIVATE_MARK = "~"
     private const val TAG = "LayoutUtilsCustom"
     private val customLayoutMap = EnumMap<LayoutType, List<File>>(LayoutType::class.java)

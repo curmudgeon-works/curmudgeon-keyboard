@@ -79,13 +79,13 @@ object KeyboardProfiles {
         val map = ids(real)
         val fromPref = from.toPref()
         if (!map.has(fromPref)) return
+        // it became a keyboard that already has a set (a preview of another keyboard's keys, a layout renamed or
+        // deleted): both sets stay as they are, nothing moves or goes; changed back (Cancel), it finds its own again
+        if (map.has(to.toPref())) return
         val id = map.getInt(fromPref)
         map.remove(fromPref)
-        val editor = real.edit()
-        // it became a keyboard that already has a set (e.g. its layout deleted): that one stays, this one's set goes
-        if (map.has(to.toPref())) real.all.keys.filter { it.startsWith("$PREFIX$id$SEPARATOR") }.forEach { editor.remove(it) }
-        else map.put(to.toPref(), id)
-        editor.putString(PREF_IDS, map.toString()).apply()
+        map.put(to.toPref(), id)
+        real.edit().putString(PREF_IDS, map.toString()).apply()
     }
 
     /** A keyboard was deleted: its set goes with it. */
