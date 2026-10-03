@@ -122,6 +122,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
     val prefs = ctx.prefs()
     var generation by remember { mutableIntStateOf(0) }
     var showAccentsDialog by remember { mutableStateOf(false) }
+    val preview = helium314.keyboard.settings.dialogs.LocalPreviewKeyboard.current
     val overrides = remember(generation) { KeyPopupOverrides.load(prefs) }
     Column {
         // presets: the generated defaults for every key at once (the user's own per-key edits stay on top)
@@ -237,6 +238,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                     onKeyboardChanged(changed)
                     generation++
                     reloadPreview()
+                    preview?.keepAfterClose() // the picked popups stay on the preview a while
                 }
             )
         // the deep customization, advanced only: every key's popups (a tab per key group), the keys and popups as JSON

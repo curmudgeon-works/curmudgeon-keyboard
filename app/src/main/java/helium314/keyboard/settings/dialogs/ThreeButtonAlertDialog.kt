@@ -73,6 +73,9 @@ interface PreviewKeyboardHooks {
     /** A Save / Discard question: the keyboard goes down and stays down (whatever the answer changes) until the
      *  screen is touched again. */
     fun quiet() {}
+    /** A choice in the open dialog changed the keyboard (a preset popup picked): when the dialog closes, the keyboard
+     *  stays up a while to show it, as after a switch is flipped, instead of going down at once. */
+    fun keepAfterClose() {}
 }
 
 /** True around settings about emojis: their dialogs preview on the emoji panel instead of the letters. */

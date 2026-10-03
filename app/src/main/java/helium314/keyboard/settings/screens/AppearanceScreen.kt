@@ -762,9 +762,17 @@ internal class PreviewKeyboard( // (also the Preferences screen's, for the key s
     }
 
     override fun dialogOpened(emoji: Boolean, people: Boolean) { dialogs++; if (!isQuiet()) show(emoji, people) }
+    private var keepAfterClose = false
+    override fun keepAfterClose() { keepAfterClose = true }
+
     override fun dialogClosed() {
         dialogs = (dialogs - 1).coerceAtLeast(0)
-        if (dialogs == 0) hideIfOurs()
+        if (dialogs != 0) return
+        if (keepAfterClose) { // what was picked stays visible a while (typing in the box keeps it up for good)
+            keepAfterClose = false
+            hideJob?.cancel()
+            hideJob = scope.launch { delay(3000); hideIfOurs() }
+        } else hideIfOurs()
     }
 
     /** The user is typing in the try-it box: the keyboard is theirs now, it doesn't go away on a timer. */
