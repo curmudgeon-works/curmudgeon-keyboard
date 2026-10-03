@@ -54,7 +54,7 @@ object AppearanceLooks {
 
     // on the Appearance screen but not in looks: its Save / Discard (AppearanceDraft) keeps them too
     private val screenOnlyKeys = setOf(
-        Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT, Settings.PREF_EMOJI_FONT, Settings.PREF_EMOJI_SKIN_TONE, Settings.PREF_SHOW_EMOJI_DESCRIPTIONS,
+        Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT, Settings.PREF_EMOJI_FONT, Settings.PREF_EMOJI_MAX_SDK, Settings.PREF_EMOJI_SKIN_TONE, Settings.PREF_SHOW_EMOJI_DESCRIPTIONS,
         PREF_SELECTED, // Discard puts the chosen theme back too
     )
     fun onScreen(key: String) = inScope(key) || key in screenOnlyKeys
@@ -174,6 +174,7 @@ object AppearanceLooks {
 
     /** Everything that draws the keyboard reads the preferences again. */
     fun reload(ctx: Context) {
+        helium314.keyboard.keyboard.emoji.SupportedEmojis.load(ctx) // which emojis show (the emoji version)
         Settings.clearCachedBackgroundImages()
         KeyboardIconsSet.needsReload = true
         KeyboardSwitcher.getInstance().setThemeNeedsReload()
