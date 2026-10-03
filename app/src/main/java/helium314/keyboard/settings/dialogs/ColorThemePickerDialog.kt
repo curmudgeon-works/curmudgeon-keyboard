@@ -108,6 +108,8 @@ fun ColorThemePickerDialog(
     var confirmed by remember { mutableStateOf(false) }
     val close = { confirmed = true; onDismissRequest() }
     ThreeButtonAlertDialog(
+        // the keyboard stays up below the dialog (a tap shows the colours on it), the dialog sits above it
+        keepKeyboard = true,
         onDismissRequest = {
             if (!confirmed && snapshot.restore()) KeyboardSwitcher.getInstance().setThemeNeedsReload()
             onDismissRequest()
@@ -120,7 +122,8 @@ fun ColorThemePickerDialog(
             CompositionLocalProvider(
                 LocalTextStyle provides MaterialTheme.typography.bodyLarge
             ) {
-                LazyColumn(state = state) {
+                // a short list that scrolls inside, so the dialog stays clear of the keyboard
+                LazyColumn(state = state, modifier = androidx.compose.ui.Modifier.heightIn(max = 300.dp)) {
                     items(colors) { item ->
                         if (item == "") {
                             AddColorRow(close, userColors, targetScreen, setting.key)
