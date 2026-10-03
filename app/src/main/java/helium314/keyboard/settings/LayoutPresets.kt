@@ -150,7 +150,8 @@ object LayoutPresets {
     fun isTweaked(ctx: Context, keyboard: SettingsSubtype, preset: Preset): Boolean {
         val now = ctx.prefs().all
         if (preset.values.any { (key, value) -> inScope(key) && !KnownDefaults.same(key, now[key], value) }) return true
-        return snapshot(ctx, keyboard).filterKeys { it.startsWith(LAYOUT) && !it.startsWith(LAYOUT_TEXT) } !=
+        // the keys by name only (this runs on every redraw: no layout file is read)
+        return LayoutType.entries.mapNotNull { type -> keyboard.layoutName(type)?.let { LAYOUT + type.name to it } }.toMap() !=
             preset.values.filterKeys { it.startsWith(LAYOUT) && !it.startsWith(LAYOUT_TEXT) }
     }
 

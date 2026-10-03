@@ -697,8 +697,6 @@ private fun PopupEditor(
 private fun showKeyboardForPreview(keyboard: SettingsSubtype) {
     if (!RichInputMethodManager.isInitialized()) return
     val subtype = keyboard.toAdditionalSubtype()
-    // (trace for the 2026-10-03 wrong preview keyboard: logcat -s PreviewKb)
-    helium314.keyboard.latin.utils.Log.w("PreviewKb", "preview wants ${keyboard.toPref()}, IME has ${RichInputMethodManager.getInstance().currentSubtype.rawSubtype.let { it.locale + " " + it.extraValue }}")
     if (RichInputMethodManager.getInstance().currentSubtype.rawSubtype != subtype)
         KeyboardSwitcher.getInstance().switchToSubtype(subtype)
 }
