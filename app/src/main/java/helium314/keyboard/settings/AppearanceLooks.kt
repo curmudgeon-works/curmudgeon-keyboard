@@ -132,11 +132,13 @@ object AppearanceLooks {
      *  following the system. */
     fun builtIn(ctx: Context): List<Look> = listOf(
         Look(ctx.getString(R.string.theme_preset_midnight), emojiDefaults + mapOf(PICTURES to NO_PICTURES,
+            Settings.PREF_KEY_HORIZONTAL_GAP to null, Settings.PREF_KEY_VERTICAL_GAP to null, // the default gaps (1% / 2%)
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
             // one colour set, always (the light / dark switch off)
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_BLACK, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_BLACK,
             Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to false)),
         Look(ctx.getString(R.string.theme_preset_daylight), emojiDefaults + mapOf(PICTURES to NO_PICTURES,
+            Settings.PREF_KEY_HORIZONTAL_GAP to null, Settings.PREF_KEY_VERTICAL_GAP to null, // the default gaps (1% / 2%)
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
             // one colour set, always (the light / dark switch off)
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_LIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_LIGHT,

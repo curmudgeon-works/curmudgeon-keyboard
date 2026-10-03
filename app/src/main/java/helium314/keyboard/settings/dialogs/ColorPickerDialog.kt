@@ -3,6 +3,7 @@
 package helium314.keyboard.settings.dialogs
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -93,7 +94,7 @@ fun ColorPickerDialog(
     @Composable fun picker() {
         HsvColorPicker(
             modifier = Modifier
-                .size(if (onPreview != null) 220.dp else 300.dp)
+                .size(if (onPreview != null) 180.dp else 300.dp)
                 .padding(10.dp),
             controller = controller,
             onColorChanged = {
@@ -154,7 +155,7 @@ fun ColorPickerDialog(
                     }
                 }
             else
-                Column {
+                Column(if (onPreview != null) Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()) else Modifier) {
                     topBar()
                     picker()
                     slidersAndTextField()

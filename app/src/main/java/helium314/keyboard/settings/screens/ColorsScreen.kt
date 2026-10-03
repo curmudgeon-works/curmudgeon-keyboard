@@ -237,29 +237,44 @@ fun ColorsScreen(
     }
     }
     }
-    if (chosenColor != null) {
+    if (chosenColor != null) CompositionLocalProvider(helium314.keyboard.settings.dialogs.LocalPreviewKeyboard provides preview) {
         val oldAllColors = KeyboardTheme.readUserAllColors(prefs, newThemeName.text, null)
-        ColorPickerDialog(
-            onDismissRequest = { chosenColorString = "" },
-            initialColor = chosenColor.displayColor(),
-            title = chosenColor.displayName,
-            showDefault = moreColors == 2 && oldAllColors.contains(ColorType.valueOf(chosenColor.name)),
-            onDefault = {
-                // clear the color
-                oldAllColors.remove(ColorType.valueOf(chosenColor.name))
-                KeyboardTheme.writeUserAllColors(prefs, newThemeName.text, oldAllColors)
-                preview.changed(emoji = false)
-            }
-        ) { color ->
+        // the colour shows on the keyboard while it's picked; Cancel puts back what was there
+        val opened = helium314.keyboard.settings.rememberPrefSnapshot(prefs, listOf(Settings.PREF_USER_COLORS_PREFIX + newThemeName.text,
+            Settings.PREF_USER_ALL_COLORS_PREFIX + newThemeName.text), chosenColorString)
+        var confirmed by remember(chosenColorString) { mutableStateOf(false) }
+        fun write(color: Int) {
             if (moreColors == 2) {
-                oldAllColors[ColorType.valueOf(chosenColor.name)] = color
-                KeyboardTheme.writeUserAllColors(prefs, newThemeName.text, oldAllColors)
+                val all = KeyboardTheme.readUserAllColors(prefs, newThemeName.text, null)
+                all[ColorType.valueOf(chosenColor.name)] = color
+                KeyboardTheme.writeUserAllColors(prefs, newThemeName.text, all)
             } else {
                 val oldUserColors = KeyboardTheme.readUserColors(prefs, newThemeName.text)
                 val newUserColors = (oldUserColors + ColorSetting(chosenColor.name, false, color))
                     .reversed().distinctBy { it.displayName }
                 KeyboardTheme.writeUserColors(prefs, newThemeName.text, newUserColors)
             }
+            helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().setThemeNeedsReload()
+        }
+        ColorPickerDialog(
+            onDismissRequest = {
+                if (!confirmed && opened.restore()) helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().setThemeNeedsReload()
+                chosenColorString = ""
+            },
+            onPreview = { write(it) },
+            initialColor = chosenColor.displayColor(),
+            title = chosenColor.displayName,
+            showDefault = moreColors == 2 && oldAllColors.contains(ColorType.valueOf(chosenColor.name)),
+            onDefault = {
+                // clear the color
+                confirmed = true
+                oldAllColors.remove(ColorType.valueOf(chosenColor.name))
+                KeyboardTheme.writeUserAllColors(prefs, newThemeName.text, oldAllColors)
+                preview.changed(emoji = false)
+            }
+        ) { color ->
+            confirmed = true
+            write(color)
             preview.changed(emoji = false) // the new colour on the keyboard for a moment
         }
     }
