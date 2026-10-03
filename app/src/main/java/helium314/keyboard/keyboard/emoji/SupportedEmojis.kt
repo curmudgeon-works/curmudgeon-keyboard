@@ -10,10 +10,12 @@ import helium314.keyboard.latin.utils.prefs
 
 object SupportedEmojis {
     private val unsupportedEmojis = hashSetOf<String>()
+    /** the newest Android level in emoji/minApi.txt: at or above it every emoji shows */
+    const val LATEST = 36
 
     fun load(context: Context) {
         determineMaxSdk(context)
-        val maxSdk = context.prefs().getInt(Settings.PREF_EMOJI_MAX_SDK, 0)
+        val maxSdk = context.prefs().getInt(Settings.PREF_EMOJI_MAX_SDK, LATEST)
         unsupportedEmojis.clear()
         context.assets.open("emoji/minApi.txt").reader().readLines().forEach {
             val s = it.split(" ")

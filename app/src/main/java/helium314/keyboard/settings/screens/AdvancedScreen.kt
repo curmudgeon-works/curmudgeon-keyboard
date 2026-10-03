@@ -16,6 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import helium314.keyboard.latin.gesture.SwipeMetrics
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import helium314.keyboard.settings.dialogs.LocalPreviewEmoji
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -264,11 +266,16 @@ fun createAdvancedSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_EMOJI_MAX_SDK, R.string.prefs_key_emoji_max_sdk) { setting ->
         val ctx = LocalContext.current
+        // the top is this phone's Android or the newest emoji list's, whichever is newer: every emoji shows (the default)
+        val top = maxOf(SupportedEmojis.LATEST, Build.VERSION.SDK_INT)
+        // opens on the emoji panel, which follows the slider while it's dragged
+        CompositionLocalProvider(LocalPreviewEmoji provides true) {
         SliderPreference(
+            live = true,
             name = setting.title,
             key = setting.key,
-            default = 0,
-            range = 21f..36f,
+            default = top,
+            range = 21f..top.toFloat(),
             description = {
                 "Android " + when(it) {
                     21 -> "5.0"
@@ -283,18 +290,17 @@ fun createAdvancedSettings(context: Context) = listOf(
                     30 -> "11"
                     31 -> "12"
                     32 -> "12L"
-                    33 -> "13"
-                    34 -> "14"
-                    35 -> "15"
-                    36 -> "16"
-                    else -> "version unknown"
+                    in 33..40 -> "${it - 20}"
+                    else -> "(level $it)"
                 }
             },
             onConfirmed = {
                 SupportedEmojis.load(ctx)
+                KeyboardSwitcher.getInstance().clearEmojiCache()
                 KeyboardSwitcher.getInstance().setThemeNeedsReload()
             }
         )
+        }
     },
     Setting(context, Settings.PREF_URL_DETECTION, R.string.url_detection_title, R.string.url_detection_summary) {
         SwitchPreference(it, Defaults.PREF_URL_DETECTION)
