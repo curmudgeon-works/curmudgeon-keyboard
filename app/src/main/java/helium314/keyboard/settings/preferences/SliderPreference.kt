@@ -49,9 +49,12 @@ fun <T: Number> SliderPreference(
 
     var showDialog by rememberSaveable { mutableStateOf(false) }
     val hadValue = remember(showDialog) { prefs.contains(key) }
+    // the value when the dialog opened: live drags write the pref and redraw this row, so the current value would
+    // make Cancel "restore" the dragged one
+    val openValue = remember(showDialog) { initialValue }
     @Suppress("UNCHECKED_CAST")
     fun write(value: Float) {
-        if (live && !hadValue && value == initialValue.toFloat()) prefs.edit { remove(key) } // Cancel: unset stays unset
+        if (live && !hadValue && value == openValue.toFloat()) prefs.edit { remove(key) } // Cancel: unset stays unset
         else if (default is Int) prefs.edit { putInt(key, value.toInt()) }
         else prefs.edit { putFloat(key, value) }
         onConfirmed((if (default is Int) value.toInt() else value) as T)
@@ -78,7 +81,7 @@ fun <T: Number> SliderPreference(
                     onConfirmed(it as T)
                 }
             },
-            initialValue = initialValue.toFloat(),
+            initialValue = openValue.toFloat(),
             range = range,
             positionString = {
                 @Suppress("UNCHECKED_CAST")
