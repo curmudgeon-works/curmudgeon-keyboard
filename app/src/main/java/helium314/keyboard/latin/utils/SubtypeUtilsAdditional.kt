@@ -78,8 +78,19 @@ object SubtypeUtilsAdditional {
 
     // updates additional subtypes, enabled subtypes, and selected subtype
     @SuppressLint("UseKtx") // easier to understand
+    /** Keyboards changed this run (old definition -> new): a screen that still holds the old one follows it here. */
+    val changedTo = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /** [keyboard] (a definition string) as it is now, after the changes made since it was read. */
+    fun current(keyboard: String): String {
+        var k = keyboard
+        repeat(20) { k = changedTo[k] ?: return k } // (a guard against a loop)
+        return k
+    }
+
     fun changeAdditionalSubtype(from: SettingsSubtype, to: SettingsSubtype, context: Context) {
         helium314.keyboard.latin.utils.SettingsEventLog.log("keyboard changed: ${from.toPref()} -> ${to.toPref()}")
+        if (from != to) { changedTo.remove(to.toPref()); changedTo[from.toPref()] = to.toPref() }
         val prefs = context.prefs()
         KeyboardProfiles.onKeyboardChanged(context.realPrefs(), from, to)
         // read now because there may be an intermediate state where the subtype is invalid and thus removed

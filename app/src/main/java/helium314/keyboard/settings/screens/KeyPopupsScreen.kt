@@ -80,6 +80,7 @@ import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.utils.KeyPopupOverrides
+import helium314.keyboard.latin.utils.POPUP_KEYS_ORDER_DEFAULT
 import helium314.keyboard.latin.utils.LayoutType
 import helium314.keyboard.latin.utils.ResourceUtils
 import helium314.keyboard.latin.utils.ScriptUtils
@@ -132,25 +133,30 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
         var pendingChange: Pair<String, List<String>?>? by remember { mutableStateOf(null) }
         var showSaveAsDialog by remember { mutableStateOf(false) }
         val presets = listOf(
+            // each built-in preset is a whole recipe: accents level, symbols page, symbol map, popup order (nothing is
+            // kept from the one before; 2026-10-03)
             // the Curmudgeon default: every variant a key has, plus the symbol map (owner's call 2026-09-26: "a lot richer")
-            Preset(R.string.key_popups_preset_standard, POPUP_KEYS_ALL, null, symbolMap = Defaults.PREF_SYMBOL_POPUP_MAP),
+            Preset(R.string.key_popups_preset_standard, POPUP_KEYS_ALL, null, symbolMap = Defaults.PREF_SYMBOL_POPUP_MAP,
+                popupOrder = POPUP_KEYS_ORDER_DEFAULT),
             // HeliBoard's own: its accents level, no symbol map, and its popup order (as HeliBoard ships it, checked
             // against upstream 415c45f1 of 2026-09-30); the hint is the first popup entry, as everywhere here
             Preset(R.string.key_popups_preset_heliboard, POPUP_KEYS_MAIN, null, symbolMap = "", popupOrder = HELIBOARD_POPUP_ORDER),
-            Preset(R.string.key_popups_preset_main, POPUP_KEYS_MAIN, null),
-            Preset(R.string.key_popups_preset_more, POPUP_KEYS_MORE, null),
-            Preset(R.string.key_popups_preset_all, POPUP_KEYS_ALL, null),
+            // (no "Main accented letters": with no map it's exactly HeliBoard's default)
+            Preset(R.string.key_popups_preset_more, POPUP_KEYS_MORE, null, symbolMap = "", popupOrder = POPUP_KEYS_ORDER_DEFAULT),
+            Preset(R.string.key_popups_preset_all, POPUP_KEYS_ALL, null, symbolMap = "", popupOrder = POPUP_KEYS_ORDER_DEFAULT),
         ).let { builtIn ->
             // the Arabic-script symbols page only makes sense for keyboards of that script
-            if (keyboard.locale.script() == ScriptUtils.SCRIPT_ARABIC) builtIn + Preset(R.string.key_popups_preset_arabic, POPUP_KEYS_NORMAL, "symbols_arabic")
+            if (keyboard.locale.script() == ScriptUtils.SCRIPT_ARABIC) builtIn + Preset(R.string.key_popups_preset_arabic, POPUP_KEYS_NORMAL, "symbols_arabic", symbolMap = "", popupOrder = POPUP_KEYS_ORDER_DEFAULT)
             else builtIn
         } + userSets.map { Preset(0, it.morePopups, it.symbolsLayout, it.name, it.overrides) }
         val accentsValue = keyboard.getExtraValueOf(ExtraValue.MORE_POPUPS)
             ?: prefs.getString(Settings.PREF_MORE_POPUP_KEYS, Defaults.PREF_MORE_POPUP_KEYS)!!
         val symbolsLayout = keyboard.layoutName(LayoutType.SYMBOLS)
         val symbolMap = prefs.getString(Settings.PREF_SYMBOL_POPUP_MAP, Defaults.PREF_SYMBOL_POPUP_MAP)!!
+        val popupOrder = keyboard.getExtraValueOf(ExtraValue.POPUP_ORDER) ?: prefs.getString(Settings.PREF_POPUP_KEYS_ORDER, Defaults.PREF_POPUP_KEYS_ORDER)!!
         val current = presets.firstOrNull { it.userName != null && it.userName == selectedUserSet?.name }
-            ?: presets.firstOrNull { it.userName == null && it.morePopups == accentsValue && it.symbolsLayout == symbolsLayout && (it.symbolMap == null || it.symbolMap == symbolMap) }
+            ?: presets.firstOrNull { it.userName == null && it.morePopups == accentsValue && it.symbolsLayout == symbolsLayout
+                && (it.symbolMap == null || it.symbolMap == symbolMap) && (it.popupOrder == null || it.popupOrder == popupOrder) }
             ?: presets[0]
         // every arrangement belongs to a set of the user's own: into the selected one, or into a new one to be named
         fun storeInSet(name: String, all: Map<String, List<String>>) {
@@ -287,7 +293,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
             NavRow(stringResource(R.string.key_popups_full)) {
                 SettingsDestination.navigateTo(SettingsDestination.CustomizePopups + keyboard.toPref())
             }
-            LayoutFilesRow()
+            LayoutFilesRow(keyboard)
         }
         // own sets are saved (last entry), renamed (pencil) and deleted (trash icon) in the preset list
     }
@@ -704,6 +710,6 @@ private fun reloadPreview() {
 
 /** The row opening the Layout files editor: every secondary layout in one editor (a tab each), one file. */
 @Composable
-fun LayoutFilesRow() = NavRow(stringResource(R.string.layout_files)) {
-    SettingsDestination.navigateTo(SettingsDestination.LayoutFiles)
+fun LayoutFilesRow(keyboard: SettingsSubtype) = NavRow(stringResource(R.string.layout_files)) {
+    SettingsDestination.navigateTo(SettingsDestination.LayoutFiles + keyboard.toPref())
 }

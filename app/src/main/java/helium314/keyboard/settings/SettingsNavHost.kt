@@ -131,8 +131,8 @@ fun SettingsNavHost(
         composable(SettingsDestination.CustomizePopups + "{subtype}") {
             CustomizePopupsScreen(keyboard = it.arguments?.getString("subtype")!!.toSettingsSubtype(), onClickBack = ::goBack)
         }
-        composable(SettingsDestination.LayoutFiles) {
-            LayoutFilesScreen(onClickBack = ::goBack)
+        composable(SettingsDestination.LayoutFiles + "{subtype}") {
+            LayoutFilesScreen(keyboard = it.arguments?.getString("subtype")!!.toSettingsSubtype(), onClickBack = ::goBack)
         }
         composable(SettingsDestination.Colors + "{theme}") {
             ColorsScreen(isNight = false, theme = it.arguments?.getString("theme"), onClickBack = ::goBack)
@@ -170,7 +170,7 @@ object SettingsDestination {
     const val Subtype = "subtype/"
     const val SwipeTuning = "swipe_tuning/"
     const val Layouts = "layouts"
-    const val LayoutFiles = "layout_files"
+    const val LayoutFiles = "layout_files/"
     const val CustomizePopups = "customize_popups/"
     const val Dictionaries = "dictionaries"
     val navTarget = MutableStateFlow(Keyboards)

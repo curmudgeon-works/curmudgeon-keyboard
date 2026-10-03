@@ -187,6 +187,23 @@ object LayoutUtilsCustom {
         return name
     }
 
+    /** The keyboards (but [except]) whose [type] keys are [name]: their own pick, or their default (per keyboard with
+     *  separate settings). */
+    fun keyboardsUsing(context: Context, type: LayoutType, name: String, except: helium314.keyboard.latin.settings.SettingsSubtype?):
+            List<helium314.keyboard.latin.settings.SettingsSubtype> {
+        val real = context.realPrefs()
+        val separate = helium314.keyboard.latin.settings.KeyboardProfiles.isSeparate(real)
+        return SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.distinct().filter { kb ->
+            if (kb == except) return@filter false
+            val own = kb.layoutName(type)
+            if (own != null) return@filter own == name
+            if (type == LayoutType.MAIN) return@filter false // (no own pick: the language's built-in letters)
+            val prefs = if (separate) helium314.keyboard.latin.settings.ProfilePreferences(real) {
+                helium314.keyboard.latin.settings.KeyboardProfiles.idFor(real, kb) } else context.prefs()
+            Settings.readDefaultLayoutName(type, prefs) == name
+        }
+    }
+
     /** Whether going from [before] to [after] leaves one of [before]'s private (unsaved) layouts unused. */
     fun dropsUnsaved(before: helium314.keyboard.latin.settings.SettingsSubtype, after: helium314.keyboard.latin.settings.SettingsSubtype): Boolean {
         val kept = LayoutType.entries.mapNotNull { after.layoutName(it) }.toSet()

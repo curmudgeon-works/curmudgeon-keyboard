@@ -44,6 +44,8 @@ import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.settings.Defaults.default
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.settings.SettingsSubtype
+import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.latin.utils.BackButton
 import helium314.keyboard.latin.utils.LayoutType
 import helium314.keyboard.latin.utils.LayoutType.Companion.displayNameId
@@ -62,19 +64,22 @@ private val LAYOUT_FILE_TYPES = listOf(
 private const val FILE_FORMAT = "curmudgeon-layouts"
 
 /**
- * The secondary layouts in one editor, a tab each, saved to and loaded from one file. Saving writes each changed
- * layout as the user's own (one custom layout per kind) and makes it the default for all keyboards; a layout
- * edited back to the built-in one returns to the built-in.
+ * The secondary layouts of one keyboard in one editor, a tab each: what that keyboard uses (its own pick, else its
+ * default). Saving changes that keyboard only: each changed layout becomes its own unnamed copy, or the built-in one
+ * when edited back to it (2026-10-03: a layout is the keyboard's, like its other settings; no shared file is written).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LayoutFilesScreen(onClickBack: () -> Unit) {
+fun LayoutFilesScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
-    val ownName = stringResource(R.string.layout_files_own_name)
     fun builtIn(type: LayoutType) = LayoutUtils.getContent(type, type.default, ctx)
+    // the keyboard as it is now (a save here changes its definition)
+    fun kb() = helium314.keyboard.latin.utils.SubtypeUtilsAdditional.current(keyboard.toPref()).toSettingsSubtype()
+    // what this keyboard uses for [type]: its own pick (or its own copy), else its default
+    fun usedName(type: LayoutType) = kb().layoutName(type) ?: Settings.readDefaultLayoutName(type, prefs)
     fun inUse(type: LayoutType): String {
-        val name = Settings.readDefaultLayoutName(type, prefs)
+        val name = usedName(type)
         return if (!LayoutUtilsCustom.isCustomLayout(name)) LayoutUtils.getContent(type, name, ctx)
             else LayoutUtilsCustom.getLayoutFile(name, type, ctx).takeIf { it.isFile }?.readText() ?: builtIn(type)
     }
@@ -86,24 +91,29 @@ fun LayoutFilesScreen(onClickBack: () -> Unit) {
     val invalid = LAYOUT_FILE_TYPES.filter { t -> texts[t] != saved[t] && !LayoutUtilsCustom.checkLayout(texts[t]!!, ctx) }.toSet()
     val changed = LAYOUT_FILE_TYPES.filter { texts[it] != saved[it] }
 
+    // saving changes this keyboard only: each changed type becomes its own unnamed copy (or the built-in keys, when
+    // that's what the text is); no shared layout file is written or deleted, so no other keyboard changes
     fun save() {
+        val before = kb()
+        var after = before
         for (t in changed) {
             val text = texts[t]!!
-            val name = LayoutUtilsCustom.getLayoutName(ownName, t)
-            if (text == builtIn(t)) {
-                Settings.writeDefaultLayoutName(null, t, prefs)
-                if (LayoutUtilsCustom.getLayoutFile(name, t, ctx).isFile) LayoutUtilsCustom.deleteLayout(name, t, ctx)
-            } else {
-                LayoutUtilsCustom.getLayoutFile(name, t, ctx).writeText(text)
-                Settings.writeDefaultLayoutName(name, t, prefs)
+            val current = after.layoutName(t)
+            after = when {
+                text == builtIn(t) -> after.withLayout(t, t.default)
+                current != null && LayoutUtilsCustom.isPrivateLayout(current) -> {
+                    LayoutUtilsCustom.getLayoutFile(current, t, ctx).writeText(text); after }
+                else -> after.withLayout(t, LayoutUtilsCustom.makePrivateLayout(text, t, "", ctx))
             }
             saved[t] = text
         }
+        if (after != before) helium314.keyboard.latin.utils.SubtypeUtilsAdditional.changeAdditionalSubtype(before, after, ctx)
         LayoutUtilsCustom.onLayoutFileChanged()
         KeyboardSwitcher.getInstance().setThemeNeedsReload()
         (ctx.getActivity() as? SettingsActivity)?.prefChanged()
         // saved for good: Layout & Typing (this screen's parent) takes it as its new starting point
-        helium314.keyboard.settings.LayoutDraft.rebaseOpen(ctx, setOf(Settings.PREF_LAYOUT_PREFIX + "*"),
+        helium314.keyboard.settings.LayoutDraft.rebaseOpen(ctx, setOf(Settings.PREF_ADDITIONAL_SUBTYPES, Settings.PREF_ENABLED_SUBTYPES,
+            Settings.PREF_SELECTED_SUBTYPE, "keyboard_profile_ids", Settings.PREF_LAYOUT_PREFIX + "*"),
             LAYOUT_FILE_TYPES.map { it.name.lowercase() }.toSet())
     }
 

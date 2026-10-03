@@ -281,6 +281,8 @@ fun SubtypeScreen(
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                 // undone while away (the app was left): edit the keyboard as it was put back
                 LayoutDraft.takeRejectedSubtype()?.let { currentSubtypeString = it }
+                // changed by a screen opened from here (the JSON editor saves this keyboard's own keys): follow it
+                SubtypeUtilsAdditional.current(currentSubtypeString).let { if (it != currentSubtypeString) { currentSubtypeString = it; rebuild++ } }
                 val fresh = LayoutDraft.of(ctx, currentSubtypeString)
                 if (fresh !== draft) { currentSubtypeString = fresh.subtype; draft = fresh; rebuild++ }
             }
@@ -641,6 +643,7 @@ private fun MainLayoutRow(
                 else null
             LayoutEditDialog(
                 onDismissRequest = { showLayoutEditDialog = null },
+                keyboard = currentSubtype,
                 layoutType = LayoutType.MAIN,
                 initialLayoutName = layoutName,
                 startContent = startContent,
@@ -716,7 +719,7 @@ private fun SecondaryLayoutRow(
                     IconButton({ showLayoutEditDialog = true }) { Icon(painterResource(R.drawable.ic_edit), stringResource(R.string.edit_layout)) }
             }
             if (showLayoutEditDialog)
-                LayoutEditDialog(onDismissRequest = { showLayoutEditDialog = false }, layoutType = type, initialLayoutName = it, isNameValid = null)
+                LayoutEditDialog(onDismissRequest = { showLayoutEditDialog = false }, layoutType = type, initialLayoutName = it, keyboard = currentSubtype, isNameValid = null)
         }
     }
 }
