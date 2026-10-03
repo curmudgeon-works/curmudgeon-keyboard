@@ -62,6 +62,19 @@ class ProfilePreferencesTest {
         assertFalse(out.containsKey("p3/~$ac"))
     }
 
+    @Test fun layoutPresetsKeepTheirValuesAndSkipPopups() {
+        assert(LayoutPresets.inScope(helium314.keyboard.latin.settings.Settings.PREF_SHOW_NUMBER_ROW))
+        assert(LayoutPresets.inScope(helium314.keyboard.latin.settings.Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX + "_0"))
+        assertFalse(LayoutPresets.inScope(helium314.keyboard.latin.settings.Settings.PREF_SYMBOL_POPUP_MAP)) // popups keep their own sets
+        assertFalse(LayoutPresets.inScope(helium314.keyboard.latin.settings.Settings.PREF_ENABLE_CLIPBOARD_HISTORY)) // app-wide
+        val preset = LayoutPresets.Preset("Mine", mapOf(helium314.keyboard.latin.settings.Settings.PREF_SHOW_NUMBER_ROW to true, helium314.keyboard.latin.settings.Settings.PREF_VIBRATE_ON to null,
+            "layout:MAIN" to "qwertz", "layoutText:SYMBOLS" to "a b\nc"))
+        LayoutPresets.save(real, listOf(preset))
+        val back = LayoutPresets.load(real).single()
+        assertEquals("Mine", back.name)
+        assertEquals(preset.values, back.values) // null (at its default) and the custom keys' text survive
+    }
+
     @Test fun copyTakesOwnValuesOverShared() {
         real.edit().putInt("a", 1).putInt("b", 2).putInt("c", 3).commit()
         set(1).edit().putInt("a", 10).remove("c").commit()

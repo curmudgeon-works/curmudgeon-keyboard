@@ -339,8 +339,11 @@ fun SubtypeScreen(
                 // two groups, one row style (label 10 dp in, rows 56 dp high): see LocalCompactPreferences, SwitchRow
                 // ---- the layout, with the toolbar (then typing with backspace, popups, clipboard history): main layout (advanced), shape, emoji key, split, send key, other layouts, bottom row
                 WithBigTitle(stringResource(R.string.keyboard_layout_set)) {
-                    // the main layout (QWERTY, QWERTZ, AZERTY, …) on top, advanced
-                    AdvancedBlock(advanced) { Pending(layoutChanged(LayoutType.MAIN)) { MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) } } }
+                    // the saved Layouts first (everything on this screen but the popups, as a theme is for Appearance)
+                    helium314.keyboard.settings.preferences.LayoutPresetsPreference(currentSubtype) { setCurrentSubtype(it) }
+                    // then the keys (QWERTY, QWERTZ, AZERTY, …, or your own), advanced
+                    AdvancedBlock(advanced) { Pending(layoutChanged(LayoutType.MAIN)) { WithSmallTitle(stringResource(R.string.layout_keys)) {
+                        MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) } } } }
                     // the keyboard's shape first (moved from Appearance): height, numbers row;
                     // their dialogs keep the preview keyboard up
                     CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,

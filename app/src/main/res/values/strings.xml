@@ -602,6 +602,15 @@
     <string name="appearance_reject">Discard changes</string>
     <string name="appearance_reject_message">The keyboard goes back to how it looked when you opened Appearance.</string>
     <string name="appearance_looks">Themes</string>
+    <!-- Layout & Typing: saved Layouts (everything on the screen but the popups, saved under a name, like themes) -->
+    <string name="layout_presets">Layouts</string>
+    <string name="layout_presets_summary">Save this screen\'s setup under a name, for any keyboard</string>
+    <string name="layout_preset_save">Save the current layout…</string>
+    <string name="layout_preset_default_name">My layout %d</string>
+    <string name="layout_preset_rename">Rename layout</string>
+    <string name="layout_preset_delete">Delete the layout \"%s\"?</string>
+    <!-- Layout & Typing: the key arrangement (QWERTY, AZERTY, your own) -->
+    <string name="layout_keys">Keys</string>
     <string name="appearance_looks_summary">Built-in themes, and your own: save how the keyboard looks under a name</string>
     <string name="appearance_look_save">Save the current theme…</string>
     <!-- %d: a number, so the suggested name is unused -->
