@@ -12,6 +12,12 @@ import android.view.inputmethod.InputMethodManager
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -67,6 +73,17 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
     private val dictUriFlow = MutableStateFlow<Uri?>(null)
     private val cachedDictionaryFile by lazy { File(this.cacheDir.path + File.separator + "temp_dict") }
     private val crashReportFiles = MutableStateFlow<List<File>>(emptyList())
+    // whether this keyboard is the one selected in Android: checked again whenever the app comes back or regains the
+    // focus (the keyboard picker closing), so the "not your current keyboard" bar follows a switch
+    private val imeSelected = MutableStateFlow(true)
+    private fun refreshImeSelected() {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        imeSelected.value = UncachedInputMethodManagerUtils.isThisImeCurrent(this, imm)
+    }
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) refreshImeSelected()
+    }
     private var paused = true
 
     /** Set while a dialog that keeps the preview keyboard is open: a tap on this screen closes it (and does nothing else). */
@@ -110,10 +127,12 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
                     val dictUri by dictUriFlow.collectAsState()
                     val crashReports by crashReportFiles.collectAsState()
                     val crashFilePicker = filePicker { saveCrashReports(it) }
+                    // the setup only on a real first run (the keyboard not enabled in Android); enabled but another
+                    // keyboard selected: the settings, with a bar to switch (see below)
                     var showWelcomeWizard by rememberSaveable { mutableStateOf(
-                        !UncachedInputMethodManagerUtils.isThisImeCurrent(this, imm)
-                                || !UncachedInputMethodManagerUtils.isThisImeEnabled(this, imm)
+                        !UncachedInputMethodManagerUtils.isThisImeEnabled(this, imm)
                     ) }
+                    val selected by imeSelected.collectAsState()
                     if (spellchecker)
                         Scaffold(contentWindowInsets = WindowInsets.safeDrawing) { innerPadding ->
                             Column(Modifier.padding(innerPadding)) {
@@ -130,7 +149,14 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
                             }
                         }
                     else {
-                        SettingsNavHost(onClickBack = { this.finish() })
+                        androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.fillMaxSize()) {
+                            if (!selected && !showWelcomeWizard) NotSelectedBar { imm.showInputMethodPicker() }
+                            androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.weight(1f)
+                                .then(if (!selected && !showWelcomeWizard) androidx.compose.ui.Modifier.consumeWindowInsets(
+                                    androidx.compose.foundation.layout.WindowInsets.statusBars) else androidx.compose.ui.Modifier)) {
+                                SettingsNavHost(onClickBack = { this@SettingsActivity.finish() })
+                            }
+                        }
                         if (showWelcomeWizard) {
                             WelcomeWizard(close = { showWelcomeWizard = false }, finish = this::finish)
                         } else if (crashReports.isNotEmpty()) {
@@ -207,6 +233,7 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
         super.onResume()
         awaitingResult = false
         paused = false
+        refreshImeSelected()
     }
 
     fun setForceTheme(theme: String?, night: Boolean?) {
@@ -270,3 +297,21 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
 
 // duplicate of SettingsActivity so we can launch it when the app icon is disabled in Android 9 and older
 class SettingsActivity2 : SettingsActivity()
+
+/** On top of every settings screen while another keyboard is selected in Android: says so, Switch opens the picker. */
+@androidx.compose.runtime.Composable
+private fun NotSelectedBar(onSwitch: () -> Unit) {
+    androidx.compose.material3.Surface(color = androidx.compose.material3.MaterialTheme.colorScheme.secondaryContainer) {
+        androidx.compose.foundation.layout.Row(
+            androidx.compose.ui.Modifier.fillMaxWidth()
+                .windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.statusBars)
+                .padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.not_current_keyboard), androidx.compose.ui.Modifier.weight(1f),
+                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onSecondaryContainer)
+            androidx.compose.material3.TextButton(onClick = onSwitch) { Text(stringResource(R.string.switch_to_this_keyboard)) }
+        }
+    }
+}
