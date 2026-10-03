@@ -147,6 +147,11 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     public void loadKeyboard(final EditorInfo editorInfo, final SettingsValues settingsValues,
             final int currentAutoCapsState, @Nullable final RecapitalizeMode currentRecapitalizeState,
             KeyboardLayoutSet.InternalAction internalAction) {
+        // another keyboard (or its setting changed) with another emoji version: the emoji pages are built again
+        if (settingsValues.mEmojiMaxSdk != mLoadedEmojiMaxSdk) {
+            if (mLoadedEmojiMaxSdk != 0) clearEmojiCache();
+            mLoadedEmojiMaxSdk = settingsValues.mEmojiMaxSdk;
+        }
         final KeyboardLayoutSet.Builder builder = new KeyboardLayoutSet.Builder(
                 mThemeContext, editorInfo);
         final int keyboardWidth = ResourceUtils.getKeyboardWidth(mThemeContext, settingsValues);
@@ -591,6 +596,8 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     }
 
     /** Emoji pages are built once and cached: the settings drop them so a changed size or skin tone shows. */
+    private int mLoadedEmojiMaxSdk = 0;
+
     public void clearEmojiCache() {
         if (mEmojiPalettesView != null) mEmojiPalettesView.clearKeyboardCache();
         // the skin tone table is otherwise only reloaded when emoji suggestions are on
