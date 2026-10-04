@@ -100,6 +100,21 @@ class StringUtilsTest {
         checkTextRange("in 2024", "", sp, script, 7, 7)
         checkTextRange("in ", "2024", sp, script, 3, 3)
 
+        // a single digit starting a word (number-row slip, "3stimate") is part of it when at least 3 letters follow
+        checkTextRange("so 3stimate", "", sp, script, 3, 11)
+        checkTextRange("so 3st", "imate now", sp, script, 3, 11)
+        checkTextRange("so 3", "stimate", sp, script, 3, 11)
+        checkTextRange("so ", "3stimate now", sp, script, 3, 11)
+        checkTextRange("(3stimate", "", sp, script, 1, 9)
+        checkTextRange("3stimate", "", sp, script, 0, 8)
+        checkTextRange("so 3st", "", sp, script, 4, 6)
+        checkTextRange("so ", "3st", sp, script, 3, 3)
+        checkTextRange("1st", "", sp, script, 1, 3)
+        checkTextRange("at 5pm", "", sp, script, 4, 6)
+        checkTextRange("at 100mph", "", sp, script, 6, 9)
+        checkTextRange("at 10:3stimate", "", sp, script, 7, 14)
+        checkTextRange("in 2024", "", sp, script, 7, 7)
+
         checkTextRange("mail: blorb@", "florb.com or", sp, script, 12, 17)
         checkTextRange("mail: blorb@", "florb.com or", spUrl, script, 6, 21)
         checkTextRange("mail: blor", "b@florb.com or", sp, script, 6, 11)

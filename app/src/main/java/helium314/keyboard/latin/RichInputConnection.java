@@ -425,6 +425,13 @@ public final class RichInputConnection implements PrivateCommandPerformer {
         return Character.codePointBefore(text, length);
     }
 
+    /** The single digit directly before the composing text if it may start the word, see StringUtilsKt.endsWithLoneDigit */
+    public int getLoneDigitBeforeComposingText() {
+        if (!StringUtilsKt.endsWithLoneDigit(mCommittedTextBeforeComposingText, mCommittedTextBeforeComposingText.length(), Constants.NOT_A_CODE))
+            return Constants.NOT_A_CODE;
+        return Character.codePointBefore(mCommittedTextBeforeComposingText, mCommittedTextBeforeComposingText.length());
+    }
+
     public int getCharBeforeBeforeCursor() {
         if (mComposingText.length() >= 2) return mComposingText.charAt(mComposingText.length() - 2);
         final int length = mCommittedTextBeforeComposingText.length();

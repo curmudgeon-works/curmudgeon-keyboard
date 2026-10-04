@@ -132,6 +132,57 @@ class InputLogicTest {
         assertEquals("Ha0py", composer.typedWord)
     }
 
+    // a single digit mistapped at the start of a word ("3stimate" for estimate) becomes part of the composing word
+    // once 3 letters follow it, so suggestions are for the whole word
+    @Test fun `lone digit before 3 letters is composed with the word`() {
+        reset()
+        chainInput("3st")
+        assertEquals("3st", text)
+        assertEquals("st", composingText)
+        input('i')
+        assertEquals("3sti", text)
+        assertEquals("3sti", composingText)
+        assertEquals("3sti", composer.typedWord)
+        chainInput("mate")
+        assertEquals("3stimate", text)
+        assertEquals("3stimate", composingText)
+        assertEquals("3stimate", composer.typedWord)
+        functionalKeyPress(KeyCode.DELETE)
+        assertEquals("3stimat", composingText)
+    }
+
+    @Test fun `lone digit before 3 letters is composed after a space`() {
+        reset()
+        chainInput("so 3stimate")
+        assertEquals("so 3stimate", text)
+        assertEquals("3stimate", composingText)
+    }
+
+    @Test fun `delete after a word starting with a lone digit resumes the whole word`() {
+        reset()
+        chainInput("so 3stimate ")
+        functionalKeyPress(KeyCode.DELETE)
+        assertEquals("so 3stimate", text)
+        assertEquals("3stimate", composingText)
+        assertEquals("3stimate", composer.typedWord)
+    }
+
+    @Test fun `digit before fewer than 3 letters or more digits stays out of the word`() {
+        reset()
+        chainInput("5pm")
+        assertEquals("pm", composingText)
+        input(' ')
+        assertEquals("5pm ", text)
+        reset()
+        chainInput("100mph")
+        assertEquals("100mph", text)
+        assertEquals("mph", composingText)
+        reset()
+        chainInput("10:3stimate")
+        assertEquals("10:3stimate", text)
+        assertEquals("stimate", composingText)
+    }
+
     @Test fun deleteInsideWord() {
         reset()
         setText("hello you there")

@@ -145,9 +145,12 @@ fun getTouchedWordRange(before: CharSequence, after: CharSequence, script: Strin
     if (endIndexInAfter == -1) {
         endIndexInAfter = 0
         loopOverCodePoints(after) { codePoint, cpLength ->
-            // a digit continues a word that has started with a letter (before the cursor or after it)
+            // a digit continues a word that has started with a letter (before the cursor or after it),
+            // and a single digit right at the cursor may start one ("|3stimate", see endsWithLoneDigit)
             if (!isPartOfCompositionForScript(codePoint, spacingAndPunctuations, script)
-                    && !(Character.isDigit(codePoint) && (startIndexInBefore < before.length || endIndexInAfter > 0))) {
+                    && !(Character.isDigit(codePoint) && (startIndexInBefore < before.length || endIndexInAfter > 0))
+                    && !(endIndexInAfter == 0 && startIndexInBefore == before.length && endsWithLoneDigit(before, before.length, codePoint)
+                        && startsWithLetters(after, cpLength, LETTERS_AFTER_LEADING_DIGIT))) {
                 if (Character.isWhitespace(codePoint) || !spacingAndPunctuations.mCurrentLanguageHasSpaces)
                     return@loopOverCodePoints true
                 // continue to the next whitespace and see whether this contains a sometimesWordConnector
@@ -184,6 +187,11 @@ fun getTouchedWordRange(before: CharSequence, after: CharSequence, script: Strin
         ++startIndexInBefore
     }
 
+    // a single digit right before the word is part of it if at least 3 letters follow ("3stimate", see endsWithLoneDigit)
+    if (startIndexInBefore > 0 && endsWithLoneDigit(before, startIndexInBefore)
+            && startsWithLetters(before.substring(startIndexInBefore) + after.substring(0, endIndexInAfter), 0, LETTERS_AFTER_LEADING_DIGIT))
+        startIndexInBefore -= Character.charCount(before.codePointBefore(startIndexInBefore))
+
     val hasUrlSpans = SpannableStringUtils.hasUrlSpans(before, startIndexInBefore, before.length)
         || SpannableStringUtils.hasUrlSpans(after, 0, endIndexInAfter)
 
@@ -211,6 +219,46 @@ private fun isDigitInsideWord(codePoint: Int, before: CharSequence, digitStart: 
         i -= Character.charCount(cp)
     }
     return false
+}
+
+/** How many letters must follow a single digit at the start of a word for the digit to be part of the word. */
+const val LETTERS_AFTER_LEADING_DIGIT = 3
+
+/**
+ * Whether the text before [end] in [text], followed by [digit] if given, ends with a single digit that may start a word:
+ * a number-row slip at the start of a word ("3stimate" for estimate) is decoded as part of the word, like a digit inside
+ * a word ("Ha0py"). Only a lone digit after whitespace, the start of the text or punctuation like an opening quote:
+ * not "100mph", "2024", "10:3", "v1.2beta". Whether enough letters follow ([LETTERS_AFTER_LEADING_DIGIT], so "5pm",
+ * "1st" or "4th" stay as they are) is up to the caller.
+ */
+fun endsWithLoneDigit(text: CharSequence, end: Int = text.length, digit: Int = Constants.NOT_A_CODE): Boolean {
+    var i = end
+    if (digit == Constants.NOT_A_CODE) {
+        if (i <= 0) return false
+        val cp = text.codePointBefore(i)
+        if (!Character.isDigit(cp)) return false
+        i -= Character.charCount(cp)
+    } else if (!Character.isDigit(digit)) return false
+    // nothing but punctuation back to whitespace or the start
+    while (i > 0) {
+        val cp = text.codePointBefore(i)
+        if (Character.isWhitespace(cp)) return true
+        if (Character.isLetterOrDigit(cp)) return false
+        i -= Character.charCount(cp)
+    }
+    return true
+}
+
+/** Whether [text] has at least [count] letters starting at [start] */
+fun startsWithLetters(text: CharSequence, start: Int, count: Int): Boolean {
+    var i = start
+    repeat(count) {
+        if (i >= text.length) return false
+        val cp = text.codePointAt(i)
+        if (!Character.isLetter(cp)) return false
+        i += Character.charCount(cp)
+    }
+    return true
 }
 
 // actually this should not be in STRING Utils, but only used for getTouchedWordRange

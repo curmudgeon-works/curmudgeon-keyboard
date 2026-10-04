@@ -44,6 +44,7 @@ import helium314.keyboard.latin.SuggestedWords;
 import helium314.keyboard.latin.SuggestedWords.SuggestedWordInfo;
 import helium314.keyboard.latin.WordComposer;
 import helium314.keyboard.latin.common.Constants;
+import helium314.keyboard.latin.common.CoordinateUtils;
 import helium314.keyboard.latin.common.InputPointers;
 import helium314.keyboard.latin.common.StringUtils;
 import helium314.keyboard.latin.common.StringUtilsKt;
@@ -1239,6 +1240,7 @@ public final class InputLogic {
         enterInlineEmojiSearchIfNeeded(codePoint, settingsValues);
 
         if (isComposingWord) {
+            composeLeadingDigitIfNeeded(codePoint);
             mWordComposer.applyProcessedEvent(event);
             // If it's the first letter, make note of auto-caps state
             if (mWordComposer.isSingleLetter()) {
@@ -1261,6 +1263,42 @@ public final class InputLogic {
             }
         }
         inputTransaction.setRequiresUpdateSuggestions();
+    }
+
+    /**
+     * A digit mistapped at the start of a word ("3stimate" for estimate, a slip on the number row) becomes part of the
+     * word when the third letter after it is typed, so the suggestions are for the whole word (like for "Ha0py"), and
+     * resuming the word later picks it up whole too (see StringUtilsKt.getTouchedWordRange). Only a single digit not glued
+     * to other text (see StringUtilsKt.endsWithLoneDigit): "5pm", "1st", "100mph" or "2024" stay as they are.
+     * Typing the digit committed it on its own (it doesn't start a word), so the composing word is extended back over it.
+     * It's never auto-corrected unless the setting for words with digits is on.
+     */
+    private void composeLeadingDigitIfNeeded(final int codePoint) {
+        if (mWordComposer.size() != StringUtilsKt.LETTERS_AFTER_LEADING_DIGIT - 1 || !Character.isLetter(codePoint)
+                || !TextUtils.isEmpty(mWordComposer.getCombiningSpec()) // Hangul and similar combine on the existing events
+                || mWordComposer.isCursorFrontOrMiddleOfComposingWord())
+            return;
+        final int[] letters = StringUtils.toCodePointArray(mWordComposer.getTypedWord());
+        for (final int letter : letters) {
+            if (!Character.isLetter(letter)) return;
+        }
+        final int digit = mConnection.getLoneDigitBeforeComposingText();
+        if (digit == Constants.NOT_A_CODE) return;
+        final int[] codePoints = new int[letters.length + 1];
+        codePoints[0] = digit;
+        System.arraycopy(letters, 0, codePoints, 1, letters.length);
+        // the digit at its key, the letters where they were touched
+        final int[] coordinates = mLatinIME.getCoordinatesForCurrentKeyboard(codePoints);
+        final InputPointers pointers = mWordComposer.getInputPointers();
+        if (pointers.getPointerSize() >= letters.length) {
+            for (int i = 0; i < letters.length; i++) {
+                CoordinateUtils.setXYInArray(coordinates, i + 1, pointers.getXCoordinates()[i], pointers.getYCoordinates()[i]);
+            }
+        }
+        final int composingLength = mWordComposer.getTypedWord().length();
+        mWordComposer.setComposingWord(codePoints, coordinates); // keeps the caps mode noted at the first letter
+        final int composingEnd = mConnection.getExpectedSelectionStart();
+        mConnection.setComposingRegion(composingEnd - composingLength - Character.charCount(digit), composingEnd);
     }
 
     private boolean isCursorAtStartOrAfterSeparator(SettingsValues settingsValues) {
@@ -2354,6 +2392,9 @@ public final class InputLogic {
      */
     private static boolean isResumableWord(final SettingsValues settings, final String word) {
         final int firstCodePoint = word.codePointAt(0);
+        // a single digit only starts a word found at the cursor if letters follow ("3stimate", see getTouchedWordRange)
+        if (Character.isDigit(firstCodePoint))
+            return StringUtilsKt.startsWithLetters(word, Character.charCount(firstCodePoint), StringUtilsKt.LETTERS_AFTER_LEADING_DIGIT);
         return settings.isWordCodePoint(firstCodePoint)
                 && Constants.CODE_SINGLE_QUOTE != firstCodePoint
                 && Constants.CODE_DASH != firstCodePoint;
