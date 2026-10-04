@@ -151,9 +151,12 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
                     else {
                         androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.fillMaxSize()) {
                             if (!selected && !showWelcomeWizard) NotSelectedBar { imm.showInputMethodPicker() }
+                            // (min constraints passed on, as the Surface did before this Box: a screen's own overlay, like
+                            // the personal dictionary's Add a word button, aligns to the screen's corner, not its top start)
                             androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.weight(1f)
                                 .then(if (!selected && !showWelcomeWizard) androidx.compose.ui.Modifier.consumeWindowInsets(
-                                    androidx.compose.foundation.layout.WindowInsets.statusBars) else androidx.compose.ui.Modifier)) {
+                                    androidx.compose.foundation.layout.WindowInsets.statusBars) else androidx.compose.ui.Modifier),
+                                propagateMinConstraints = true) {
                                 SettingsNavHost(onClickBack = { this@SettingsActivity.finish() })
                             }
                         }

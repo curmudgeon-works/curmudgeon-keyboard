@@ -5,11 +5,7 @@ import android.content.Context
 import android.provider.UserDictionary
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,10 +17,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import helium314.keyboard.latin.DictionaryFacilitatorImpl
@@ -122,9 +116,13 @@ fun LearnedWordsScreen(onClickBack: () -> Unit, script: String) {
                 Text(scriptName(script), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
-        filteredItems = { term -> data?.rows(term) ?: listOf(Row.Note(R.string.learned_words_loading)) },
+        // Add a word: the list's first row (as Add keyboard on the keyboards list), not while searching
+        filteredItems = { term -> (if (term.isBlank()) listOf(Row.Add) else emptyList()) +
+            (data?.rows(term) ?: listOf(Row.Note(R.string.learned_words_loading))) },
         itemContent = { row ->
             when (row) {
+                Row.Add -> Preference(name = stringResource(R.string.user_dict_add_word_button), onClick = { adding = true },
+                    icon = R.drawable.ic_plus)
                 is Row.Heading -> PreferenceCategory(stringResource(row.title))
                 is Row.Note -> Text(stringResource(row.text), style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 22.dp, end = 12.dp, top = 4.dp, bottom = 8.dp))
@@ -133,12 +131,6 @@ fun LearnedWordsScreen(onClickBack: () -> Unit, script: String) {
                 }
             }
         },
-    )
-    ExtendedFloatingActionButton(
-        onClick = { adding = true },
-        text = { Text(stringResource(R.string.user_dict_add_word_button)) },
-        icon = { Icon(painter = painterResource(R.drawable.ic_edit), stringResource(R.string.user_dict_add_word_button)) },
-        modifier = Modifier.wrapContentSize(Alignment.BottomEnd).padding(all = 12.dp).then(Modifier.safeDrawingPadding())
     )
 
     selected?.let { item ->
@@ -173,6 +165,7 @@ private class Entry(
 )
 
 private sealed interface Row {
+    object Add : Row
     class Heading(val title: Int) : Row
     class Note(val text: Int) : Row
 }
