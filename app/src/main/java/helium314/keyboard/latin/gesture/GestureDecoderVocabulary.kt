@@ -63,6 +63,55 @@ object GestureDecoderVocabulary {
             for ((key, list) in entries) runCatching { publishNow(key, key.constructLocale(), context, list) }
         }, "GestureVocabBoost").start()
     }
+    /**
+     * Which words must stay out of the vocabularies, so they can't be swiped. Asked once per word while a vocabulary
+     * is built (and for a word learned or removed live), never per swipe: keep it a set lookup.
+     * [learned]: about the word's learned copy (user history) rather than its main-dictionary copy. A word that must
+     * never come back (deleted everywhere) answers true for both; a removed word only for its dictionary copy, as its
+     * learned copy exists only once it's restored (typed again).
+     */
+    fun interface WordExclusion {
+        fun isExcluded(context: Context, locale: Locale, word: String, learned: Boolean): Boolean
+    }
+
+    /**
+     * Words removed with long-press: the dictionary's copy stays out, like in typing's suggestions; the learned copy
+     * comes in once the word is typed again (restored). Further lists plug in by wrapping this (OR), telling the
+     * vocabularies about each new entry with [onWordRemoved].
+     */
+    @Volatile var exclusion: WordExclusion = WordExclusion { context, locale, word, learned ->
+        !learned && isBlacklisted(context, locale, word)
+    }
+
+    // the removed (blacklisted) words per language, as DictionaryFacilitatorImpl keeps them: read from its file once,
+    // then kept up to date by onWordBlacklisted
+    private val blacklists = ConcurrentHashMap<String, Set<String>>()
+
+    private fun blacklist(context: Context, locale: Locale): Set<String> =
+        blacklists.computeIfAbsent(locale.toLanguageTag()) { readBlacklist(context, locale) }
+
+    private fun readBlacklist(context: Context, locale: Locale): Set<String> = try {
+        val file = File(File(context.filesDir, BLACKLIST_DIR), "${locale.toLanguageTag()}.txt")
+        if (file.isFile) file.readLines().filterTo(HashSet()) { it.isNotEmpty() } else emptySet()
+    } catch (t: Throwable) {
+        Log.w(TAG, "could not read the removed words of $locale", t)
+        emptySet()
+    }
+
+    /** Removed with long-press, in this or the lowercase form (as DictionaryFacilitatorImpl.isRemovedWord checks). */
+    private fun isBlacklisted(context: Context, locale: Locale, word: String): Boolean {
+        val set = blacklist(context, locale)
+        return set.isNotEmpty() && (word in set || word.lowercase() in set)
+    }
+
+    private fun isExcluded(context: Context, locale: Locale, word: String, learned: Boolean) =
+        try { exclusion.isExcluded(context, locale, word, learned) } catch (t: Throwable) { false }
+
+    /** [entries] without the words [exclusion] keeps out of [locale]'s vocabulary. */
+    internal fun withoutExcluded(context: Context, locale: Locale, entries: List<Pair<String, Int>>, learned: Boolean) =
+        entries.filterNot { isExcluded(context, locale, it.first, learned) }
+
+    private const val BLACKLIST_DIR = "blacklists" // DictionaryGroup's removed words: <languageTag>.txt, a word per line
     private const val CACHE_DIR = "own_gesture_vocab"
     private const val CACHE_VERSION = 1
     // user-history dict loads asynchronously; on cold start wordPropertiesForSyncing
@@ -112,7 +161,8 @@ object GestureDecoderVocabulary {
             val entries = mainEntries[spec.locale.toLanguageTag()] ?: continue
             val normalized = if (reference == null || entries.map { it.second } == reference) entries
                 else entries.mapIndexed { i, (word, _) -> word to reference[i.coerceAtMost(reference.lastIndex)] }
-            for ((word, freq) in normalized) vocab.add(word, (freq * spec.factor).toInt().coerceAtLeast(MIN_PROBABILITY))
+            for ((word, freq) in withoutExcluded(context, spec.locale, normalized, learned = false))
+                vocab.add(word, (freq * spec.factor).toInt().coerceAtLeast(MIN_PROBABILITY))
             val historyFactor = if (spec.sharesHistory) 1f else spec.factor
             for ((word, freq) in historyEntries(context, spec.locale, retries = 0))
                 vocab.add(word, (freq * historyFactor).toInt().coerceAtLeast(MIN_PROBABILITY))
@@ -200,6 +250,7 @@ object GestureDecoderVocabulary {
         noDictionary.clear()
         merged.clear()
         mergedSpecs.clear()
+        blacklists.clear() // e.g. a backup restore brings other removed words
     }
 
     /**
@@ -210,6 +261,7 @@ object GestureDecoderVocabulary {
         if (!isDecodableWord(word) || !includeLearned) return
         learnExecutor.schedule({
             try {
+                if (isExcluded(context, locale, word, learned = true)) return@schedule
                 val probability = PersonalizationHelper.getUserHistoryDictionary(context, locale).getFrequency(word)
                 if (probability <= 0) return@schedule
                 val freq = (probability + historyBoost).coerceIn(1, 255)
@@ -223,6 +275,34 @@ object GestureDecoderVocabulary {
                 Log.w(TAG, "could not add learned word to the gesture vocabulary", t)
             }
         }, LEARN_DELAY_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
+    }
+
+    /**
+     * [word] was just removed from [locale] (long-press "Remove"): take it out of the vocabularies already built, in
+     * any casing (its learned copies in all casings are gone too). Rebuilds leave it out via [exclusion]; a removed
+     * dictionary word typed again comes back as learned through [onWordLearned].
+     */
+    fun onWordRemoved(locale: Locale, word: String) {
+        if (word.isEmpty()) return
+        learnExecutor.execute {
+            try {
+                val tag = locale.toLanguageTag()
+                cache[tag]?.remove(word)
+                for ((key, vocab) in merged)
+                    if (mergedSpecs[key]?.any { it.locale.toLanguageTag() == tag } == true) vocab.remove(word)
+            } catch (t: Throwable) {
+                Log.w(TAG, "could not remove a word from the gesture vocabulary", t)
+            }
+        }
+    }
+
+    /** [word] was added to [locale]'s removed words (DictionaryGroup.addToBlacklist): keep its dictionary copy out. */
+    fun onWordBlacklisted(locale: Locale, word: String) {
+        val context = Settings.getCurrentContext()
+        blacklists.compute(locale.toLanguageTag()) { _, set ->
+            (set ?: context?.let { readBlacklist(it, locale) } ?: emptySet()) + word
+        }
+        onWordRemoved(locale, word)
     }
 
     private fun loadOrBuild(locale: Locale, key: String) {
@@ -267,7 +347,8 @@ object GestureDecoderVocabulary {
 
     /** Build the trie from the main-dict entries, merge live user history, publish it. Returns merged count. */
     private fun publishNow(key: String, locale: Locale, context: Context, mainEntries: List<Pair<String, Int>>): Int {
-        val vocab = Vocabulary(mainEntries)
+        // removed words' dictionary copies stay out (mainEntries keeps them: the merged vocabularies filter alike)
+        val vocab = Vocabulary(withoutExcluded(context, locale, mainEntries, learned = false))
         val history = historyEntries(context, locale, HISTORY_RETRIES)
         for ((word, freq) in history) vocab.add(word, freq)
         if (vocab.size > 0) {
@@ -312,7 +393,7 @@ object GestureDecoderVocabulary {
             val entries = ArrayList<Pair<String, Int>>(props.size)
             for (wp in props) {
                 val word = wp.mWord ?: continue
-                if (!isDecodableWord(word)) continue
+                if (!isDecodableWord(word) || isExcluded(context, locale, word, learned = true)) continue
                 entries.add(word to (wp.probability + historyBoost).coerceIn(1, 255))
             }
             Log.d(TAG, "read ${entries.size} user-history words for $locale (after $attempts empty reads)")

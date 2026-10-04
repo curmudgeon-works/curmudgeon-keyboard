@@ -787,6 +787,8 @@ private class DictionaryGroup(
             getSubDict(Dictionary.TYPE_USER_HISTORY)?.removeUnigramEntryDynamically(form)
             getSubDict(Dictionary.TYPE_USER)?.removeUnigramEntryDynamically(form)
         }
+        // and from the swipe vocabularies already built (the removed words list below keeps it out of rebuilds)
+        GestureDecoderVocabulary.onWordRemoved(locale, word)
 
         val contactsDict = getSubDict(Dictionary.TYPE_CONTACTS)
         if (contactsDict != null && contactsDict.isInDictionary(word)) {
@@ -880,7 +882,9 @@ private class DictionaryGroup(
     fun isBlacklisted(word: String) = blacklist.contains(word)
 
     fun addToBlacklist(word: String) {
-        if (!blacklist.add(word) || blacklistFile == null) return
+        if (!blacklist.add(word)) return
+        GestureDecoderVocabulary.onWordBlacklisted(locale, word)
+        if (blacklistFile == null) return
         scope.launch {
             synchronized(this) {
                 try {

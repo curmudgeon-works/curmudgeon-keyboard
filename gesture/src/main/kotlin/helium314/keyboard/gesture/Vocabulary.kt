@@ -120,6 +120,24 @@ class Vocabulary(entries: Iterable<Pair<String, Int>>) {
         if (frequency > maxFrequency) maxFrequency = frequency
     }
 
+    /**
+     * Takes a word out (any casing: trie keys are lowercase), e.g. one the user removed. Safe while other threads read
+     * the trie (a decode that already holds the node sees no word and skips it); callers must not change it concurrently.
+     */
+    @Synchronized
+    fun remove(word: String): Boolean {
+        val node = find(word) ?: return false
+        if (node.word == null) return false
+        node.word = null // first: a reader that sees no word skips the node
+        node.frequency = 0
+        size--
+        ends?.let { e ->
+            val k = endsKey(word.first().lowercaseChar(), word.last().lowercaseChar())
+            e.buckets[k]?.let { bucket -> e.buckets[k] = bucket.filter { it !== node }.toTypedArray() }
+        }
+        return true
+    }
+
     fun contains(word: String): Boolean = find(word)?.word != null
 
     fun frequencyOf(word: String): Int = find(word)?.frequency ?: 0

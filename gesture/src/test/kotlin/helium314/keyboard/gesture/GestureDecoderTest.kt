@@ -28,6 +28,24 @@ class GestureDecoderTest {
     }
 
     @Test
+    fun `a removed word is not decoded, and comes back once added again`() {
+        val own = Vocabulary(TestVocabulary.entries)
+        val path = SyntheticPathGenerator.idealPath("hello", geometry)
+        own.firstChars() // build the first/last letter index first, so removing has to keep it up to date
+        val size = own.size
+        assertTrue(own.remove("Hello")) // any casing
+        assertTrue(!own.contains("hello"))
+        assertEquals(size - 1, own.size)
+        assertTrue(!own.remove("hello"))
+        for (scorer in scorers)
+            assertTrue(GestureDecoder(scorer).decode(path, geometry, own, maxResults = 10).none { it.word == "hello" })
+        own.add("hello", 40) // e.g. typed again: only the learned copy's weight
+        assertEquals(40, own.frequencyOf("hello"))
+        for (scorer in scorers)
+            assertEquals(1, GestureDecoder(scorer).decode(path, geometry, own, maxResults = 10).count { it.word == "hello" })
+    }
+
+    @Test
     fun `clean hello decodes to hello with every scorer`() {
         for (scorer in scorers) {
             val results = decode(scorer, "hello")
