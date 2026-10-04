@@ -35,7 +35,10 @@ const char *const HeaderPolicy::NGRAM_COUNT_KEYS[] =
 const char *const HeaderPolicy::MAX_NGRAM_COUNT_KEYS[] =
         {"MAX_UNIGRAM_ENTRY_COUNT", "MAX_BIGRAM_ENTRY_COUNT", "MAX_TRIGRAM_ENTRY_COUNT",
                 "MAX_QUADGRAM_ENTRY_COUNT"};
-const int HeaderPolicy::DEFAULT_MAX_NGRAM_COUNTS[] = {10000, 30000, 30000, 30000};
+// Raised from AOSP's {10000, 30000, 30000, 30000}: a month of daily typing filled the learned words' pairs (2026-10-04:
+// en-US 9,711 words / 29,915 pairs), and per-script stores hold several languages. ~27 bytes an entry keeps the full
+// store near 5 MB, under the 8 MB file limit. (The learned-word files don't set their own caps, so this applies to them.)
+const int HeaderPolicy::DEFAULT_MAX_NGRAM_COUNTS[] = {25000, 80000, 80000, 80000};
 const char *const HeaderPolicy::EXTENDED_REGION_SIZE_KEY = "EXTENDED_REGION_SIZE";
 // Historical info is information that is needed to support decaying such as timestamp, level and
 // count.

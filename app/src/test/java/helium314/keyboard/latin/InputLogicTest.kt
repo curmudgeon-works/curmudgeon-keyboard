@@ -830,13 +830,15 @@ class InputLogicTest {
         assertEquals("hello", lastAddedWord)
     }
 
-    @Test fun `committing a picked up word unchanged takes nothing back`() {
+    @Test fun `committing a picked up word unchanged takes nothing back and adds nothing`() {
         reset()
         chainInput("hello ")
         functionalKeyPress(KeyCode.DELETE)
+        lastAddedWord = ""
         input(' ')
         assertEquals("hello ", text)
         assertEquals(listOf(), unlearnedWords)
+        assertEquals("", lastAddedWord) // and isn't counted again (space, backspace, space: maybe just a pause)
     }
 
     @Test fun `deleting an accepted word takes nothing back`() {

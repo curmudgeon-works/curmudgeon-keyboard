@@ -2845,10 +2845,17 @@ public final class InputLogic {
         final String resumedFrom = mWordComposer.getResumedFrom();
         final String swipedWord = mWordComposer.getSwipedWord();
         final boolean editedAccepted = resumedFrom != null && !resumedFrom.equals(chosenWord);
+        // picked up again and committed unchanged by a space or punctuation (space, backspace, space): not a new
+        // acceptance, maybe just a pause; picked again from the strip it counts (2026-10-04)
+        final boolean reAccepted = resumedFrom != null && resumedFrom.equals(chosenWord)
+                && commitType != LastComposedWord.COMMIT_TYPE_MANUAL_PICK;
         if (learnsHere(settingsValues) && LearningEventLog.isEnabled()) {
             final String event;
             final String before;
-            if (editedAccepted) {
+            if (reAccepted) {
+                event = LearningEventLog.REACCEPTED;
+                before = resumedFrom;
+            } else if (editedAccepted) {
                 event = LearningEventLog.ACCEPTED_EDITED;
                 before = resumedFrom;
             } else if (swipedWord != null && !mWordComposer.isBatchMode() && !swipedWord.equals(chosenWord)) {
@@ -2864,8 +2871,9 @@ public final class InputLogic {
         mEditedInPlaceWord = null;
         if (editedAccepted && learnsHere(settingsValues)) mDictionaryFacilitator.unlearnOneUse(resumedFrom);
         // Add the word to the user history dictionary
-        performAdditionToUserHistoryDictionary(settingsValues, chosenWord, ngramContext,
-                commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK ? PICKED_SUGGESTION_EXTRA_USES : 0);
+        if (!reAccepted)
+            performAdditionToUserHistoryDictionary(settingsValues, chosenWord, ngramContext,
+                    commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK ? PICKED_SUGGESTION_EXTRA_USES : 0);
         if (DebugFlags.DEBUG_ENABLED) {
             long runTimeMillis = SystemClock.elapsedRealtime() - startTimeMillis;
             Log.d(TAG, "commitChosenWord() : " + runTimeMillis + " ms to run "

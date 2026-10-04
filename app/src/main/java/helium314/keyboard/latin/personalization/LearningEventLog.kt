@@ -36,6 +36,8 @@ object LearningEventLog {
     // events
     /** a word committed as it stands (space, a pick from the strip, a swipe kept): +1 */
     const val ACCEPTED = "accepted"
+    /** a word picked up again (e.g. space, backspace) and committed unchanged by a separator: not counted again */
+    const val REACCEPTED = "reaccepted"
     /** backspace right after an auto-correction: the correction -1, the typed word counts when it's committed */
     const val AUTOCORRECT_REVERTED = "autocorrect_reverted"
     /** backspace took a fresh swipe away: it was never counted, nothing changes */
