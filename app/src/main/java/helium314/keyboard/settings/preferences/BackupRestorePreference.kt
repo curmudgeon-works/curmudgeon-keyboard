@@ -499,7 +499,7 @@ private fun restoreAllSettings(ctx: Context, pending: PendingRestore) {
 
 /**
  * Only [chosen] keyboards come out of the backup: each is added (or replaced) with its custom layout files and,
- * [withSettings], its settings and the priority / share switches of its languages. Other keyboards stay as they
+ * [withSettings], its settings and the priorities of its languages. Other keyboards stay as they
  * are. The keyboard's settings need a set of its own, so separate settings per keyboard get switched on if they
  * aren't; the existing keyboards keep the shared set they behave by now.
  */
@@ -534,7 +534,7 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
     }
 
     if (withSettings) {
-        // the languages' priority and share switches are per language, not per keyboard
+        // the languages' priorities are per language, not per keyboard
         val editor = real.edit()
         for (keyboard in chosen)
             for (locale in listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues))

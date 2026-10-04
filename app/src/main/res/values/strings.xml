@@ -553,7 +553,6 @@
     <string name="language_priority_low">L</string>
     <string name="language_priority_medium">M</string>
     <string name="language_priority_high">H</string>
-    <string name="share_user_history">Learned words count for all languages</string>
     <!-- Advanced: one set of learned and blacklisted words for all keyboards (on), or one per keyboard (off) -->
     <string name="share_learned_words">Share learned &amp; blacklisted words across keyboards</string>
     <string name="share_learned_words_off_message">Each keyboard will have its own learned and blacklisted words, starting with a copy of the shared ones.</string>

@@ -11,7 +11,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -122,7 +121,6 @@ private fun LanguageRow(locale: Locale, keyboard: SettingsSubtype, setKeyboard: 
     val prefs = ctx.prefs()
     val own = listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)
     val priority = if (locale in own) LanguagePriority.get(prefs, locale) else OFF
-    var shared by remember(locale) { mutableStateOf(LanguagePriority.sharesUserHistory(prefs, locale)) }
     var showNoDictDialog by remember { mutableStateOf(false) }
     var showDictionaryDialog by remember { mutableStateOf(false) }
     var dictGeneration by remember { mutableIntStateOf(0) }
@@ -179,23 +177,8 @@ private fun LanguageRow(locale: Locale, keyboard: SettingsSubtype, setKeyboard: 
             MissingDictionaryDialog({ showNoDictDialog = false }, locale)
         if (showDictionaryDialog)
             DictionaryDialog({ showDictionaryDialog = false; dictGeneration++ }, locale)
-        if (priority != OFF) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    stringResource(R.string.share_user_history),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f)
-                )
-                Switch(
-                    checked = shared,
-                    onCheckedChange = {
-                        shared = it
-                        LanguagePriority.setSharesUserHistory(prefs, locale, it)
-                    }
-                )
-            }
-        }
+        // (no "learned words count for all languages" switch any more: learned words are per script, shared by the
+        // script's languages; see LearnedStores)
     }
 }
 

@@ -40,6 +40,7 @@ object KeyboardProfiles {
         "appearance_looks", // saved looks too
         "layout_presets", // and saved Layouts
     )
+    // ("share_user_history_": the retired per-language share switch, kept global so old keys stay where they are)
     private val globalPrefixes = listOf(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX, "language_priority_", "share_user_history_", LanguagePriority.PREF_ADDED_PREFIX, "debug_", "gesture_stats")
 
     fun isGlobal(key: String) = key in globalKeys || globalPrefixes.any { key.startsWith(it) } || key.startsWith(PREFIX) && key.contains(SEPARATOR)

@@ -311,7 +311,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
 
     @Override
     public void onSharedPreferenceChanged(final SharedPreferences prefs, final String key) {
-        // a language's priority or share switch (key null: the preferences were cleared)
+        // a language's priority (key null: the preferences were cleared)
         if (key == null || LanguagePriority.INSTANCE.isLanguageKey(key))
             LanguagePriority.INSTANCE.clearCache();
         if (dontReloadOnChanged.contains(key) || (key != null && key.startsWith(PREF_SAVED_APP_SUBTYPE_PREFIX)))
