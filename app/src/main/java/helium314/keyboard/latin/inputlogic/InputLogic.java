@@ -439,8 +439,12 @@ public final class InputLogic {
         // We set this to NONE because after a cursor move, we don't want the space
         // state-related special processing to kick in.
         mSpaceState = SpaceState.NONE;
-        // A genuine cursor move (a tap): the history stays, for the place typing happened (undo goes back there)
-        if (mTypedAt < 0 && !mEditHistory.isEmpty()) mTypedAt = oldSelStart;
+        // A genuine cursor move (a tap): the history stays, for the place typing happened (undo goes back there).
+        // Only when the cursor is somewhere else than the keyboard put it: a letter typed inside the word being typed
+        // also arrives here, and isn't a tap.
+        final int expectedStart = mConnection.getExpectedSelectionStart();
+        if (mTypedAt < 0 && !mEditHistory.isEmpty() && newSelStart != expectedStart)
+            mTypedAt = expectedStart >= 0 ? expectedStart : oldSelStart;
         mLastEditKeyCode = 0;
 
         final boolean selectionChangedOrSafeToReset =
