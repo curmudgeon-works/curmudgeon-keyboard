@@ -7,6 +7,8 @@ package helium314.keyboard.latin.inputlogic
  * neighbouring snapshot. They only ever delete and type at the cursor, so they work in any field, including ones
  * without an undo of their own. When the text no longer lines up with a snapshot (the app changed it, or the cursor
  * went elsewhere) the history is dropped instead of editing the wrong place.
+ * Typing somewhere else after a tap keeps the history: that snapshot is marked as a jump, and undoing past it moves
+ * the cursor back to where the earlier typing ended (redo moves it forward again).
  *
  * A step is undone whole, or one character per press; either way redo walks back the same way.
  */
@@ -16,19 +18,25 @@ class EditHistory(maxSteps: Int = 20) {
         val start get() = cursor - text.length
     }
 
-    /** Delete [delete] chars before the cursor, then type [insert] there. */
-    data class Edit(val delete: Int, val insert: String)
+    /** Move the cursor to [moveTo] first (when not -1; the text before it must then be [expect], or nothing is done),
+     *  then delete [delete] chars before the cursor and type [insert]. */
+    data class Edit(val delete: Int, val insert: String, val moveTo: Int = -1, val expect: State? = null)
 
     /** How many steps back undo reaches. */
     var maxSteps = maxSteps.coerceAtLeast(1)
         set(value) { field = value.coerceAtLeast(1); trim() }
 
     private val states = ArrayList<State>()
+    private val jumps = ArrayList<Boolean>() // per snapshot: it starts at another place than the one before it
     private var current = -1 // the snapshot the text is at, or is moving away from during undo / redo
     private var moving = 0   // -1 after undo, +1 after redo, until any other input; 0 otherwise
 
+    /** Whether there is any history at all. */
+    val isEmpty get() = states.isEmpty()
+
     fun clear() {
         states.clear()
+        jumps.clear()
         current = -1
         moving = 0
     }
@@ -45,7 +53,20 @@ class EditHistory(maxSteps: Int = 20) {
         onOtherInput()
         if (current >= 0 && states[current] == live) return
         truncateAfterCurrent()
-        states.add(live)
+        add(live, false)
+    }
+
+    /** Typing starts at another place ([here]) than where it ended ([there], the text before that place now). */
+    fun onJump(there: State, here: State) {
+        onOtherInput()
+        truncateAfterCurrent()
+        if (current < 0 || states[current] != there) add(there, false) // typed since the last snapshot: keep it reachable
+        add(here, true)
+    }
+
+    private fun add(state: State, jump: Boolean) {
+        states.add(state)
+        jumps.add(jump)
         current = states.lastIndex
         trim()
     }
@@ -59,9 +80,7 @@ class EditHistory(maxSteps: Int = 20) {
             if (moving == 0 && live != states[current]) {
                 // typed since the last snapshot: keep that reachable for redo
                 truncateAfterCurrent()
-                states.add(live)
-                current = states.lastIndex
-                trim()
+                add(live, false)
             }
             if (current == 0) return null
             current - 1
@@ -81,6 +100,15 @@ class EditHistory(maxSteps: Int = 20) {
     }
 
     private fun move(live: State, target: Int, byCharacter: Boolean, direction: Int): Edit? {
+        // across a jump (the text is as it was there): only the cursor moves, to where the other place's text ends
+        // (and the step there in the same press)
+        if (live == states[current] && (if (direction < 0) jumps[current] && target == current - 1 else target == current + 1 && jumps[target])) {
+            moving = direction
+            current = target
+            val there = states[target]
+            val next = if (direction < 0) undo(there, byCharacter) else redo(there, byCharacter)
+            return (next ?: Edit(0, "")).copy(moveTo = there.cursor, expect = there)
+        }
         val full = diff(live, states[target]) ?: run { clear(); return null }
         moving = direction
         if (full.delete == 0 && full.insert.isEmpty()) {
@@ -94,14 +122,16 @@ class EditHistory(maxSteps: Int = 20) {
     }
 
     private fun truncateAfterCurrent() {
-        while (states.size > current + 1) states.removeAt(states.lastIndex)
+        while (states.size > current + 1) { states.removeAt(states.lastIndex); jumps.removeAt(jumps.lastIndex) }
     }
 
     private fun trim() {
         while (states.size > maxSteps + 1) {
             states.removeAt(0)
+            jumps.removeAt(0)
             current--
         }
+        if (jumps.isNotEmpty()) jumps[0] = false // nothing before the first one to jump to
         if (current < 0 && states.isNotEmpty()) current = 0
     }
 

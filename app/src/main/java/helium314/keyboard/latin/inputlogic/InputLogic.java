@@ -112,6 +112,9 @@ public final class InputLogic {
     // swipe, a paste, a run of backspaces). Undo and redo delete and type at the cursor only, so they work even in
     // fields without ctrl+z support; with nothing left, they fall back to the app's ctrl+z / ctrl+shift+z.
     private final EditHistory mEditHistory = new EditHistory(Defaults.PREF_UNDO_HISTORY_LENGTH);
+    // Where the keyboard last typed, while the cursor is somewhere else since (a tap): undo / redo go back there
+    // first; typing at the new place marks a jump in the history. -1: the cursor is where the history left it.
+    private int mTypedAt = -1;
     private int mLastEditKeyCode; // a run of backspaces is one step
     private long mLastKeyTime;
     // todo: this is not used, so either remove it or do something with it
@@ -173,6 +176,7 @@ public final class InputLogic {
         mDeleteCount = 0;
         // New editor: its text has nothing to do with the old history, and deleted text must not leak into it.
         mEditHistory.clear();
+        mTypedAt = -1;
         mSpaceState = SpaceState.NONE;
         mRecapitalizeStatus.disable(); // Do not perform recapitalize until the cursor is moved once
         mCurrentlyPressedHardwareKeys.clear();
@@ -247,10 +251,39 @@ public final class InputLogic {
         return new EditHistory.State(cursor, before.toString());
     }
 
-    // An edit step begins: remember the text as it is now.
+    // The text before [position] as it is now (it may be after the cursor), or null if it can't be read.
+    @Nullable
+    private EditHistory.State editStateAt(final int position) {
+        final EditHistory.State live = currentEditState();
+        if (live == null || position < 0) return null;
+        if (position <= live.getCursor()) {
+            final int keep = live.getText().length() - (live.getCursor() - position);
+            if (keep < 0) return null;
+            return new EditHistory.State(position, live.getText().substring(0, keep));
+        }
+        final int more = position - live.getCursor();
+        final CharSequence after = mConnection.getTextAfterCursor(more, 0);
+        if (after == null || after.length() < more) return null;
+        final String text = live.getText() + after.subSequence(0, more);
+        return new EditHistory.State(position, text.substring(Math.max(0, text.length() - EditHistory.WINDOW)));
+    }
+
+    // An edit step begins: remember the text as it is now (after a tap elsewhere: a jump from where typing ended).
     private void editStepStart() {
         final EditHistory.State state = currentEditState();
+        if (mTypedAt >= 0) {
+            final EditHistory.State there = editStateAt(mTypedAt);
+            mTypedAt = -1;
+            if (there != null && state != null && !mEditHistory.isEmpty()) mEditHistory.onJump(there, state);
+            else mEditHistory.clear();
+        }
         if (state != null) mEditHistory.onStepStart(state);
+    }
+
+    // Input that continues the step being typed; after a tap elsewhere it starts one (a jump).
+    private void editContinues() {
+        if (mTypedAt >= 0) editStepStart();
+        else mEditHistory.onOtherInput();
     }
 
     public InputTransaction onTextInput(final SettingsValues settingsValues, final Event event,
@@ -305,7 +338,7 @@ public final class InputLogic {
     public InputTransaction onPickSuggestionManually(final SettingsValues settingsValues,
             final SuggestedWordInfo suggestionInfo, final int keyboardShiftState,
             final String currentKeyboardScript, final LatinIME.UIHandler handler) {
-        mEditHistory.onOtherInput(); // picking a word replaces the one being typed: same step, but no more redo
+        editContinues(); // picking a word replaces the one being typed: same step, but no more redo
         if (isInlineEmojiSearchAction()) {
             deleteTextReplacedByEmoji();
         }
@@ -406,8 +439,8 @@ public final class InputLogic {
         // We set this to NONE because after a cursor move, we don't want the space
         // state-related special processing to kick in.
         mSpaceState = SpaceState.NONE;
-        // A genuine cursor move: the snapshots no longer describe the text at the cursor.
-        mEditHistory.clear();
+        // A genuine cursor move (a tap): the history stays, for the place typing happened (undo goes back there)
+        if (mTypedAt < 0 && !mEditHistory.isEmpty()) mTypedAt = oldSelStart;
         mLastEditKeyCode = 0;
 
         final boolean selectionChangedOrSafeToReset =
@@ -511,7 +544,7 @@ public final class InputLogic {
             else stepStarts = settingsValues.isWordCodePoint(processedEvent.getCodePoint())
                     && (!mWordComposer.isComposingWord() || mWordComposer.isBatchMode());
             if (stepStarts) editStepStart();
-            else mEditHistory.onOtherInput();
+            else editContinues();
             mLastEditKeyCode = editKeyCode;
         }
         mLastKeyTime = inputTransaction.getTimestamp();
@@ -875,10 +908,31 @@ public final class InputLogic {
                     resetComposingState(true);
                 }
                 mEditHistory.setMaxSteps(sv.mUndoHistoryLength);
-                final EditHistory.State live = currentEditState();
+                // after a tap elsewhere: as if the cursor were still where typing happened (it goes back there)
+                final int back = mTypedAt;
+                final boolean hadHistory = !mEditHistory.isEmpty();
+                if (back >= 0 && mConnection.hasSelection()) {
+                    // text selected since: the cursor goes back to where typing happened first
+                    mConnection.setSelection(back, back);
+                    mTypedAt = -1;
+                }
+                final EditHistory.State live = mTypedAt >= 0 ? editStateAt(mTypedAt) : currentEditState();
                 final EditHistory.Edit edit = live == null ? null
                         : isUndo ? mEditHistory.undo(live, sv.mUndoByCharacter) : mEditHistory.redo(live, sv.mRedoByCharacter);
+                if (edit == null && back >= 0 && hadHistory) {
+                    // the text there no longer lines up (or there's nothing left): nothing changes, the cursor stays
+                    if (mEditHistory.isEmpty()) mTypedAt = -1;
+                    break;
+                }
+                if (edit != null && edit.getMoveTo() >= 0 && !edit.getExpect().equals(editStateAt(edit.getMoveTo()))) {
+                    // the other place's text changed since: nothing is done there
+                    mEditHistory.clear();
+                    mTypedAt = -1;
+                    break;
+                }
                 if (edit != null) {
+                    if (mTypedAt >= 0) { mConnection.setSelection(mTypedAt, mTypedAt); mTypedAt = -1; }
+                    if (edit.getMoveTo() >= 0) mConnection.setSelection(edit.getMoveTo(), edit.getMoveTo());
                     if (edit.getDelete() > 0) mConnection.deleteTextBeforeCursor(edit.getDelete());
                     if (!edit.getInsert().isEmpty()) mConnection.commitText(edit.getInsert(), 1);
                     inputTransaction.setDidAffectContents();

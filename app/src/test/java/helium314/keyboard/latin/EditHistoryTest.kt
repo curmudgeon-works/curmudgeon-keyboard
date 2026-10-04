@@ -102,4 +102,47 @@ class EditHistoryTest {
         undo(); assertEquals("", text)
         redo(); assertEquals("the ", text)
     }
+
+    // ---- a whole field with a cursor anywhere: typing after a tap elsewhere is a jump ----
+
+    private class Field(val history: EditHistory = EditHistory()) {
+        var doc = ""; var cursor = 0
+        fun stateAt(pos: Int) = State(pos, doc.substring(0, pos))
+        fun live() = stateAt(cursor)
+        fun type(s: String) { history.onStepStart(live()); doc = doc.substring(0, cursor) + s + doc.substring(cursor); cursor += s.length }
+        /** Typing after a tap: the history learns where typing ended ([typedAt]). */
+        fun typeAfterTap(typedAt: Int, s: String) {
+            history.onJump(stateAt(typedAt), live())
+            doc = doc.substring(0, cursor) + s + doc.substring(cursor); cursor += s.length
+        }
+        fun apply(e: EditHistory.Edit?): Boolean {
+            if (e == null) return false
+            if (e.moveTo >= 0) { assertEquals(e.expect, stateAt(e.moveTo)); cursor = e.moveTo }
+            doc = doc.substring(0, cursor - e.delete) + e.insert + doc.substring(cursor)
+            cursor += e.insert.length - e.delete
+            return true
+        }
+    }
+
+    @Test fun `typing after a tap elsewhere - undo walks back across the jump in one press each`() {
+        val f = Field()
+        f.type("the "); f.type("keyboard") // cursor at 12
+        f.cursor = 7 // a tap: key|board
+        f.typeAfterTap(12, "x")
+        assertEquals("the keyxboard", f.doc)
+        f.apply(f.history.undo(f.live(), false)); assertEquals("the keyboard", f.doc); assertEquals(7, f.cursor)
+        // back where the typing ended, and that step undone in the same press
+        f.apply(f.history.undo(f.live(), false)); assertEquals("the ", f.doc); assertEquals(4, f.cursor)
+        f.apply(f.history.redo(f.live(), false)); assertEquals("the keyboard", f.doc); assertEquals(12, f.cursor)
+        f.apply(f.history.redo(f.live(), false)); assertEquals("the keyxboard", f.doc); assertEquals(8, f.cursor)
+    }
+
+    @Test fun `undo right after a tap works as if the cursor were still where typing ended`() {
+        val f = Field()
+        f.type("the "); f.type("keyboard")
+        f.cursor = 7 // a tap; undo is given the text before where typing ended, then the cursor goes there
+        val e = f.history.undo(f.stateAt(12), false)!!
+        f.cursor = 12; f.apply(e)
+        assertEquals("the ", f.doc)
+    }
 }
