@@ -62,14 +62,8 @@ private val swipeSettingKeys = listOf(
     Settings.PREF_LANGUAGE_SWIPE_DISTANCE, Settings.PREF_TOUCHPAD_SENSITIVITY,
 )
 
-/** The "Swipe tuning" group's decoder weights. */
-private val swipeTuningKeys = listOf(
-    Settings.PREF_GESTURE_TURN_WEIGHT, Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Settings.PREF_GESTURE_KUSHLER_WEIGHT,
-    Settings.PREF_GESTURE_HISTORY_BOOST, Settings.PREF_GESTURE_FAST_COMMON_WORDS, Settings.PREF_GESTURE_CORNER_MISS,
-)
-
 @Composable
-private fun GroupTitle(titleId: Int) = Column {
+internal fun GroupTitle(titleId: Int) = Column {
     // the same heading as everywhere: a line above, flush at the edge, the rows indented under it
     androidx.compose.material3.HorizontalDivider(Modifier.padding(top = 8.dp))
     Text(stringResource(titleId), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary,
@@ -88,12 +82,7 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     if ((b?.value ?: 0) < 0)
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
     // every change applies at once; the top bar's tick keeps the changes since the screen opened, the cross undoes them
-    val draft = helium314.keyboard.settings.rememberPrefsDraft("swipe", swipeSettingKeys + swipeTuningKeys, onClickBack)
-    var statsGeneration by remember { mutableIntStateOf(0) }
-    var askReset by remember { mutableStateOf<String?>(null) } // the tuning whose results the reset question is about
-    val rows = remember(statsGeneration, b?.value) { GestureStats.read(ctx.realPrefs()) }
-    val current = OwnGestureDecoder.Tuning.read(prefs)
-    val recommended = GestureStats.recommended(rows)
+    val draft = helium314.keyboard.settings.rememberPrefsDraft("swipe", swipeSettingKeys, onClickBack)
     // a try-it bar to swipe in, and the dialogs keep the keyboard up (like Appearance and Layout & Typing)
     val tryIt = remember { TryItState() }
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
@@ -211,140 +200,11 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
                 ).forEach { Pref(it) }
             }
 
-            // ---- how the decoder weighs a swipe (only while swiping is on), and how each weighting did
-            helium314.keyboard.settings.AdvancedReveal(gestureOn) { Column {
-                GroupTitle(R.string.swipe_tuning)
-                // (the group's explanation, R.string.swipe_tuning_summary, is kept but not shown: each slider says what it
-                // does and its scale instead)
-                WeightSlider(draft.pending, Settings.PREF_GESTURE_TURN_WEIGHT, Defaults.PREF_GESTURE_TURN_WEIGHT, R.string.swipe_tuning_turns, 0f..1.5f,
-                    R.string.swipe_tuning_turns_summary)
-                WeightSlider(draft.pending, Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Defaults.PREF_GESTURE_SLOWDOWN_WEIGHT, R.string.swipe_tuning_slowdowns, 0f..1f,
-                    R.string.swipe_tuning_slowdowns_summary)
-                WeightSlider(draft.pending, Settings.PREF_GESTURE_KUSHLER_WEIGHT, Defaults.PREF_GESTURE_KUSHLER_WEIGHT, R.string.swipe_tuning_blend, 0f..1f,
-                    R.string.swipe_tuning_blend_summary)
-                BoostSlider(draft.pending)
-                WeightSlider(draft.pending, Settings.PREF_GESTURE_FAST_COMMON_WORDS, Defaults.PREF_GESTURE_FAST_COMMON_WORDS, R.string.swipe_tuning_fast_common,
-                    0f..0.2f, R.string.swipe_tuning_fast_common_summary, decimals = 2)
-                WeightSlider(draft.pending, Settings.PREF_GESTURE_CORNER_MISS, Defaults.PREF_GESTURE_CORNER_MISS, R.string.swipe_tuning_corner_miss,
-                    0f..0.2f, R.string.swipe_tuning_corner_miss_summary, decimals = 2)
-            } }
-
-            PreferenceCategory(stringResource(R.string.swipe_tuning_stats))
-            if (rows.isEmpty())
-                Text(stringResource(R.string.swipe_tuning_no_stats), Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium)
-            // the current tuning first, then the rest by how well they did
-            val ordered = rows.entries.sortedWith(compareBy({ it.key != current.key }, { -it.value.score }))
-            for ((key, row) in ordered) {
-                val isCurrent = key == current.key
-                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(key, Modifier.weight(1f), fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal)
-                        if (isCurrent)
-                            Text(stringResource(R.string.swipe_tuning_current), style = MaterialTheme.typography.labelMedium)
-                        if (key == recommended) {
-                            Text(stringResource(R.string.swipe_tuning_recommended), Modifier.padding(start = 8.dp),
-                                color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
-                            // (choosing a tuning means nothing while swiping is off: the results are history then)
-                            if (!isCurrent) TextButton(enabled = gestureOn, onClick = {
-                                OwnGestureDecoder.Tuning.parse(key)?.let { OwnGestureDecoder.Tuning.write(prefs, it) }
-                                (ctx.getActivity() as? SettingsActivity)?.prefChanged()
-                            }) { Text(stringResource(R.string.swipe_tuning_use)) }
-                        }
-                    }
-                    fun pct(n: Int) = if (row.swipes == 0) 0 else (100f * n / row.swipes).roundToInt()
-                    Text(stringResource(R.string.swipe_tuning_row, row.swipes, pct(row.kept), pct(row.pickedSecond),
-                        pct(row.pickedThird + row.pickedLater), pct(row.deleted)), style = MaterialTheme.typography.bodySmall)
-                    if (row.timed > 0)
-                        Text(stringResource(R.string.swipe_tuning_time, row.averageMs, row.slowestMs), style = MaterialTheme.typography.bodySmall)
-                    if (isCurrent) TextButton(onClick = { askReset = key }) {
-                        Text(stringResource(R.string.swipe_tuning_reset))
-                    }
-                }
-            }
-            // results put aside with "save and start afresh", oldest first, with the days they cover
-            for (saved in remember(statsGeneration) { GestureStats.readSaved(ctx.realPrefs()) }) {
-                val row = saved.row
-                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(saved.tuningKey, Modifier.weight(1f))
-                        Text(statsDates(row), style = MaterialTheme.typography.labelMedium)
-                    }
-                    fun pct(n: Int) = if (row.swipes == 0) 0 else (100f * n / row.swipes).roundToInt()
-                    Text(stringResource(R.string.swipe_tuning_row, row.swipes, pct(row.kept), pct(row.pickedSecond),
-                        pct(row.pickedThird + row.pickedLater), pct(row.deleted)), style = MaterialTheme.typography.bodySmall)
-                    if (row.timed > 0)
-                        Text(stringResource(R.string.swipe_tuning_time, row.averageMs, row.slowestMs), style = MaterialTheme.typography.bodySmall)
-                }
-            }
-            // ---- the swipe logs (diagnostics, moved from Advanced): only while swiping is on
-            helium314.keyboard.settings.AdvancedReveal(gestureOn) { Column {
-                GroupTitle(R.string.swipe_logging)
-                SettingsActivity.settingsContainer[Settings.PREF_RECORD_GESTURE_CORPUS]?.Preference()
-                SettingsActivity.settingsContainer[Settings.PREF_SWIPE_METRICS]?.Preference()
-                SettingsActivity.settingsContainer[Settings.PREF_LEARNING_LOG]?.Preference()
-            } }
+            // (the decoder's tuning, its statistics and the swipe logs: on "Advanced learning and swiping", 2026-10-04)
         }
       }
         }
         }
     }
     draft.dialogs()
-    // resetting the current tuning's results: gone for good, or kept as a dated row at the end; either way it counts
-    // from zero again
-    askReset?.let { key ->
-        helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog(
-            onDismissRequest = { askReset = null },
-            title = { Text(stringResource(R.string.swipe_tuning_reset_title)) },
-            content = { Text(stringResource(R.string.swipe_tuning_reset_message)) },
-            neutralButtonText = stringResource(R.string.swipe_tuning_reset_delete),
-            onNeutral = { GestureStats.clear(ctx.realPrefs(), key); statsGeneration++; askReset = null },
-            confirmButtonText = stringResource(R.string.swipe_tuning_reset_save),
-            onConfirmed = { GestureStats.saveAndClear(ctx.realPrefs(), key); statsGeneration++ },
-            keepKeyboard = false,
-        )
-    }
-}
-
-/** The days a row of results covers, e.g. "Sep 28 – Oct 2" ("… – Oct 2" for results counted before dates were kept). */
-@Composable
-private fun statsDates(row: GestureStats.Row): String {
-    val format = java.text.SimpleDateFormat("MMM d", java.util.Locale.getDefault())
-    val to = if (row.last > 0) format.format(java.util.Date(row.last)) else "…"
-    val from = if (row.first > 0) format.format(java.util.Date(row.first)) else "…"
-    return if (from == to) from else "$from – $to"
-}
-
-/** The learned-word boost: whole numbers, shown as the summary explains. */
-@Composable
-private fun BoostSlider(pending: Set<String>) = androidx.compose.runtime.CompositionLocalProvider(
-    helium314.keyboard.settings.preferences.LocalPendingChange provides (Settings.PREF_GESTURE_HISTORY_BOOST in pending)) {
-    SliderPreference(
-        name = stringResource(R.string.swipe_tuning_history_boost),
-        key = Settings.PREF_GESTURE_HISTORY_BOOST,
-        description = { value: Int -> "$value" },
-        default = Defaults.PREF_GESTURE_HISTORY_BOOST,
-        range = 0f..128f,
-        stepSize = 8,
-        valueOnRight = true,
-        summary = stringResource(R.string.swipe_tuning_history_boost_summary),
-    )
-}
-
-/** A weight with one decimal (or [decimals]); the stored value is rounded so the statistics key stays readable. */
-@Composable
-private fun WeightSlider(pending: Set<String>, key: String, default: Float, title: Int, range: ClosedFloatingPointRange<Float>,
-                         summary: Int? = null, decimals: Int = 1) = androidx.compose.runtime.CompositionLocalProvider(
-    helium314.keyboard.settings.preferences.LocalPendingChange provides (key in pending)) {
-    val prefs = LocalContext.current.prefs()
-    val scale = if (decimals == 2) 100f else 10f
-    SliderPreference(
-        name = stringResource(title),
-        key = key,
-        description = { value: Float -> String.format(java.util.Locale.ROOT, "%.${decimals}f", value) },
-        default = default,
-        range = range,
-        onConfirmed = { value: Float -> prefs.edit { putFloat(key, (value * scale).roundToInt() / scale) } },
-        valueOnRight = true,
-        summary = summary?.let { stringResource(it) },
-    )
 }

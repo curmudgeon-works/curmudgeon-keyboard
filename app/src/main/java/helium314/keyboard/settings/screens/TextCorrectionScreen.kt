@@ -83,8 +83,7 @@ fun TextCorrectionScreen(
         // (backspace reverts autocorrect: in the Backspace group of the Preferences screen)
         Settings.PREF_AUTO_CAP,
         Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE,
-        // your own words win over corrections and spell checks (also with auto-correct off: the underlines)
-        Settings.PREF_AUTOCORRECT_FREQUENT_WORDS,
+        // (your own words winning over corrections, "Trust words you've typed": on Advanced learning and swiping)
         Settings.PREF_URL_DETECTION, // (from Advanced; advanced here too) web and email addresses as one word
         R.string.settings_category_space,
         Settings.PREF_AUTOSPACE_AFTER_SUGGESTION,
@@ -164,11 +163,10 @@ fun TextCorrectionScreen(
         }) { TryItBar(keyboard, tryIt, onFocus = preview::onFocus, onUsed = preview::onUsed) } },
         revealer = revealer,
         // (Customize suggestions writes the count too)
-        isPending = { it in draft.pending || (it == Settings.PREF_SUGGESTION_RULES && Settings.PREF_SUGGESTION_COUNT in draft.pending)
-            || (it == Settings.PREF_AUTOCORRECT_FREQUENT_WORDS && Settings.PREF_TRUST_TYPED_COUNT in draft.pending) },
+        isPending = { it in draft.pending || (it == Settings.PREF_SUGGESTION_RULES && Settings.PREF_SUGGESTION_COUNT in draft.pending) },
         simpleModeKeys = setOf(
             SettingsWithoutKey.LEARNED_WORDS, Settings.PREF_AUTO_CORRECTION, Settings.PREF_AUTO_CAP,
-            Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE, Settings.PREF_AUTOCORRECT_FREQUENT_WORDS,
+            Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE,
             Settings.PREF_KEY_USE_DOUBLE_SPACE_PERIOD, Settings.PREF_AUTOSPACE_AFTER_SUGGESTION,
             Settings.PREF_AUTOSPACE_AFTER_GESTURE_TYPING, Settings.PREF_AUTOSPACE_AFTER_PUNCTUATION,
             Settings.PREF_SHOW_SUGGESTIONS, Settings.PREF_BIGRAM_PREDICTIONS, Settings.PREF_KEY_USE_PERSONALIZED_DICTS,
@@ -192,7 +190,7 @@ private val correctionKeys = listOf(
     Settings.PREF_INLINE_EMOJI_SEARCH, Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Settings.PREF_ALWAYS_INCOGNITO_MODE,
     Settings.PREF_BIGRAM_PREDICTIONS, Settings.PREF_SUGGEST_PUNCTUATION, Settings.PREF_PUNCTUATION_SUGGESTIONS,
     Settings.PREF_SUGGEST_CLIPBOARD_CONTENT, Settings.PREF_USE_CONTACTS, Settings.PREF_USE_APPS, Settings.PREF_ADD_TO_PERSONAL_DICTIONARY,
-    Settings.PREF_URL_DETECTION, Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, Settings.PREF_TRUST_TYPED_COUNT,
+    Settings.PREF_URL_DETECTION,
     Settings.PREF_SUGGESTION_COUNT, Settings.PREF_SUGGESTION_RULES,
 )
 

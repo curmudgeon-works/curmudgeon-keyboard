@@ -35,6 +35,7 @@ class App : Application() {
         // the keyboards that had their own set before that
         helium314.keyboard.latin.settings.KeyboardProfiles.filesDir = helium314.keyboard.latin.utils.DeviceProtectedUtils.getFilesDir(this)
         helium314.keyboard.latin.settings.KeyboardProfiles.migrateFiles(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
+        helium314.keyboard.latin.settings.KeyboardProfiles.migrateLearningSwiping(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
         // every picture loaded so far joins the picture list all keyboards choose from
         helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this).let { real ->
             helium314.keyboard.latin.common.PictureLibrary.migrate(this, real.getBoolean("picture_library_migrated", false)) {

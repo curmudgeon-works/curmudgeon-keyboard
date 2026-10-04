@@ -99,6 +99,9 @@ fun SettingsNavHost(
         composable(SettingsDestination.Advanced) {
             AdvancedSettingsScreen(onClickBack = ::goBack)
         }
+        composable(SettingsDestination.LearningSwiping) {
+            helium314.keyboard.settings.screens.LearningSwipingScreen(onClickBack = ::goBack)
+        }
         composable(SettingsDestination.Debug) {
             DebugScreen(onClickBack = ::goBack)
         }
@@ -177,6 +180,7 @@ object SettingsDestination {
     const val AllKeyboards = "all_keyboards"
     const val Subtype = "subtype/"
     const val SwipeTuning = "swipe_tuning/"
+    const val LearningSwiping = "learning_swiping"
     const val Layouts = "layouts"
     const val LayoutFiles = "layout_files/"
     const val CustomizePopups = "customize_popups/"

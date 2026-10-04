@@ -52,7 +52,10 @@
     <!-- Settings screen title for text correction options -->
     <string name="settings_screen_correction">Text correction</string>
     <!-- Settings screen title for advanced settings -->
-    <string name="settings_screen_advanced">Advanced</string>
+    <string name="settings_screen_advanced">App settings</string>
+    <!-- the top-level menu with the swipe tuning and how the keyboard learns (2026-10-04) -->
+    <string name="learning_swiping_screen">Advanced learning and swiping</string>
+    <string name="learning_group">Learning</string>
     <!-- Settings screen title for keyboard theme settings -->
     <string name="settings_screen_theme">Theme</string>
     <!-- Settings category title for Preference/Input settings -->

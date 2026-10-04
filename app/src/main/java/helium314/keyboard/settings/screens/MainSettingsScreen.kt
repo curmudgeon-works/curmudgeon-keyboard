@@ -147,10 +147,18 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
     }
 }
 
-/** The Advanced entry (advanced only): the app-wide settings, the same for every keyboard. */
+/** The entries shown only in advanced mode, the same for every keyboard: "Advanced learning and swiping" and the app's
+ *  own settings (App settings, once named Advanced). */
 @Composable
 fun AdvancedEntry(onEnter: () -> Unit = {}) {
     val advanced by SettingsMode.state(LocalContext.current)
+    AdvancedTint(advanced) {
+        Preference(
+            name = stringResource(R.string.learning_swiping_screen),
+            onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.LearningSwiping) },
+            icon = R.drawable.ic_settings_gesture
+        ) { NextScreenIcon() }
+    }
     AdvancedTint(advanced) {
         Preference(
             name = stringResource(R.string.settings_screen_advanced),

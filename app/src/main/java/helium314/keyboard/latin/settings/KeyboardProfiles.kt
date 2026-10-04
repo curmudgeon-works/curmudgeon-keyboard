@@ -39,6 +39,13 @@ object KeyboardProfiles {
         "key_popup_sets", // saved popup sets are meant to be reused across keyboards
         "appearance_looks", // saved looks too
         "layout_presets", // and saved Layouts
+    ) + learningSwipingKeys
+
+    /** "Advanced learning and swiping" (2026-10-04): the same for every keyboard (your hand, your words). */
+    private val learningSwipingKeys: Set<String> get() = setOf(
+        Settings.PREF_GESTURE_TURN_WEIGHT, Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Settings.PREF_GESTURE_KUSHLER_WEIGHT,
+        Settings.PREF_GESTURE_HISTORY_BOOST, Settings.PREF_GESTURE_FAST_COMMON_WORDS, Settings.PREF_GESTURE_CORNER_MISS,
+        Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, Settings.PREF_TRUST_TYPED_COUNT,
     )
     // ("share_user_history_": the retired per-language share switch, kept global so old keys stay where they are)
     private val globalPrefixes = listOf(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX, "language_priority_", "share_user_history_", LanguagePriority.PREF_ADDED_PREFIX, "debug_", "gesture_stats")
@@ -324,6 +331,28 @@ object KeyboardProfiles {
             val bytes = files[name + suffix(source) + ext]
             runCatching { if (bytes != null) to.writeBytes(bytes) else to.delete() }
         }
+    }
+
+    /** Once: the settings that became the same for every keyboard ([learningSwipingKeys]) take the values of the keyboard
+     *  in use (with separate settings), and the keyboards' own copies go. */
+    fun migrateLearningSwiping(real: SharedPreferences) {
+        if (real.getBoolean("learning_swiping_global", false)) return
+        val inUse = if (isSeparate(real)) idFor(real, selectedKeyboard(real)) else SHARED
+        val all = real.all
+        real.edit().apply {
+            for (key in learningSwipingKeys) {
+                if (inUse != SHARED) when (val v = all["$PREFIX$inUse$SEPARATOR$key"]) {
+                    is Boolean -> putBoolean(key, v)
+                    is Int -> putInt(key, v)
+                    is Long -> putLong(key, v)
+                    is Float -> putFloat(key, v)
+                    is String -> putString(key, v)
+                }
+                for (stored in all.keys)
+                    if (stored.startsWith(PREFIX) && stored.endsWith("$SEPARATOR$key")) remove(stored)
+            }
+            putBoolean("learning_swiping_global", true)
+        }.apply()
     }
 
     /** Once: keyboards that got their own set before the files were per keyboard get a copy of the plain ones. */

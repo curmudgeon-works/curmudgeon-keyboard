@@ -24,6 +24,25 @@ class ProfilePreferencesTest {
 
     private fun set(id: Int) = ProfilePreferences(real) { id }
 
+    // "Advanced learning and swiping" is the same for every keyboard: once, the keyboard in use gives its values
+    @Test fun learningSwipingBecomesCommonWithTheKeyboardInUsesValues() {
+        val turn = helium314.keyboard.latin.settings.Settings.PREF_GESTURE_TURN_WEIGHT
+        val trust = helium314.keyboard.latin.settings.Settings.PREF_TRUST_TYPED_COUNT
+        val inUse = KeyboardProfiles.idFor(real, KeyboardProfiles.selectedKeyboard(real))
+        val other = inUse + 1
+        real.edit().putFloat(turn, 0.5f).putFloat("p$inUse/$turn", 1.2f).putFloat("p$other/$turn", 0.1f)
+            .putInt("p$inUse/$trust", 7).commit()
+        KeyboardProfiles.migrateLearningSwiping(real)
+        assertEquals(1.2f, real.getFloat(turn, 0f))
+        assertEquals(7, real.getInt(trust, 0))
+        assertFalse(real.contains("p$inUse/$turn"))
+        assertFalse(real.contains("p$other/$turn"))
+        // from now on every keyboard reads and writes the common value
+        set(other).edit().putFloat(turn, 0.9f).commit()
+        assertEquals(0.9f, set(inUse).getFloat(turn, 0f))
+        assertEquals(0.9f, real.getFloat(turn, 0f))
+    }
+
     @Test fun removedInOwnSetReadsDefaultNotShared() {
         real.edit().putInt("some_size", 5).commit() // the shared set
         val own = set(1)
