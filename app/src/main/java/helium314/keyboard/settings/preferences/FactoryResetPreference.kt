@@ -26,6 +26,9 @@ import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.database.ClipboardDao
 import helium314.keyboard.latin.gesture.GestureDecoderVocabulary
+import helium314.keyboard.latin.personalization.LearnedPools
+import helium314.keyboard.latin.personalization.LearnedStoreIo
+import helium314.keyboard.latin.personalization.LearnedStores
 import helium314.keyboard.latin.personalization.PersonalizationHelper
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
@@ -96,8 +99,12 @@ private fun factoryReset(ctx: Context, keyboards: Boolean, learnedWords: Boolean
             || key == Settings.PREF_SELECTED_SUBTYPE || LanguagePriority.isLanguageKey(key)))
         || (!custom && (key == KeyPopupOverrides.PREF || key == KeyPopupOverrides.PREF_SETS
             || key == KeyPopupOverrides.PREF_SELECTED_SET || key.startsWith(Settings.PREF_LAYOUT_PREFIX)))
+    // keyboards with their own learned words: those go back to one shared set (the setting's default, which the reset
+    // brings back), put together first so nothing is lost on the way (LearnedPools.share)
+    if (!LearnedStores.isShared(prefs)) ctx.filesDir?.let { LearnedPools.share(it, LearnedStoreIo.Native) }
     Settings.getInstance().stopListener()
     prefs.edit { prefs.all.keys.filterNot(::keep).forEach { remove(it) } }
+    LearnedStores.refresh(prefs)
     KeyboardProfiles.editingId = KeyboardProfiles.SHARED
     // the background pictures belong to the settings (every keyboard's: the set ids start again after a reset, and a
     // new keyboard mustn't find an old one's picture)

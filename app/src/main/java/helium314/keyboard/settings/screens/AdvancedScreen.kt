@@ -18,7 +18,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import helium314.keyboard.latin.gesture.SwipeMetrics
+import helium314.keyboard.latin.personalization.LearnedPools
+import helium314.keyboard.latin.personalization.LearnedStores
 import helium314.keyboard.latin.personalization.LearningEventLog
+import helium314.keyboard.latin.utils.realPrefs
+import helium314.keyboard.settings.dialogs.ConfirmationDialog
+import android.widget.Toast
+import androidx.compose.material3.Switch
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import helium314.keyboard.settings.dialogs.LocalPreviewEmoji
@@ -87,6 +97,7 @@ fun AdvancedSettingsScreen(
         // settings shared by all keyboards
         Settings.PREF_AUTO_PREVIEW_KEYBOARD, // settings screens bring up the preview keyboard by themselves
         Settings.PREF_SAVE_SUBTYPE_PER_APP, // which keyboard comes up in an app (moved from Layout & Typing)
+        Settings.PREF_SHARE_LEARNED_WORDS, // one set of learned & blacklisted words for all keyboards, or one each
         SettingsWithoutKey.BACKUP_RESTORE,
         SettingsWithoutKey.FACTORY_RESET,
         if (BuildConfig.DEBUG || prefs.getBoolean(DebugSettings.PREF_SHOW_DEBUG_SETTINGS, Defaults.PREF_SHOW_DEBUG_SETTINGS))
@@ -188,6 +199,9 @@ fun createAdvancedSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_ABC_AFTER_CLIP, R.string.switch_keyboard_after, R.string.after_clip) {
         SwitchPreference(it, Defaults.PREF_ABC_AFTER_CLIP)
+    },
+    Setting(context, Settings.PREF_SHARE_LEARNED_WORDS, R.string.share_learned_words) { setting ->
+        ShareLearnedWordsPreference(setting)
     },
     Setting(context, SettingsWithoutKey.BACKUP_RESTORE, R.string.backup_restore_title) {
         BackupRestorePreference(it)
@@ -341,6 +355,35 @@ private fun Preview() {
 }
 
 /** A character or a whole word per press (undo / redo): two buttons in the row, like a language's L / M / H. */
+/** The switch asks first, saying what happens to the words (see LearnedPools), which are then moved in the background. */
+@Composable
+private fun ShareLearnedWordsPreference(setting: Setting) {
+    val ctx = LocalContext.current
+    val real = ctx.realPrefs()
+    var shared by remember { mutableStateOf(LearnedStores.isShared(real)) }
+    var asking by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    Preference(name = setting.title, onClick = { asking = true }) {
+        Switch(checked = shared, onCheckedChange = { asking = true })
+    }
+    if (asking) ConfirmationDialog(
+        onDismissRequest = { asking = false },
+        onConfirmed = {
+            val to = !shared
+            shared = to
+            scope.launch {
+                val ok = withContext(Dispatchers.IO) { LearnedPools.setShared(ctx, real, to) }
+                if (!ok) {
+                    shared = !to
+                    Toast.makeText(ctx, R.string.share_learned_words_failed, Toast.LENGTH_LONG).show()
+                }
+            }
+        },
+        title = { Text(setting.title) },
+        content = { Text(stringResource(if (shared) R.string.share_learned_words_off_message else R.string.share_learned_words_on_message)) },
+    )
+}
+
 @Composable
 private fun UnitChoiceRow(setting: Setting, default: String) {
     val prefs = LocalContext.current.prefs()

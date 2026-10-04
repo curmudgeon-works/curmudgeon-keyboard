@@ -554,6 +554,11 @@
     <string name="language_priority_medium">M</string>
     <string name="language_priority_high">H</string>
     <string name="share_user_history">Learned words count for all languages</string>
+    <!-- Advanced: one set of learned and blacklisted words for all keyboards (on), or one per keyboard (off) -->
+    <string name="share_learned_words">Share learned &amp; blacklisted words across keyboards</string>
+    <string name="share_learned_words_off_message">Each keyboard will have its own learned and blacklisted words, starting with a copy of the shared ones.</string>
+    <string name="share_learned_words_on_message">All keyboards will share one set of learned and blacklisted words. The keyboards\' own are put together: a word on several keyboards keeps its highest count.</string>
+    <string name="share_learned_words_failed">Couldn\'t move the words. Nothing was changed.</string>
     <!-- Title of the setting to enable number row -->
     <string name="number_row">Number row</string>
     <!-- Description of the settings to enable number row -->

@@ -40,6 +40,7 @@ import helium314.keyboard.latin.gesture.GestureDecoderVocabulary
 import helium314.keyboard.latin.personalization.LearnedEntry
 import helium314.keyboard.latin.personalization.LearnedStoreFiles
 import helium314.keyboard.latin.personalization.LearnedStoreIo
+import helium314.keyboard.latin.personalization.LearnedPools
 import helium314.keyboard.latin.personalization.LearnedStoreMigration
 import helium314.keyboard.latin.personalization.LearnedStores
 import helium314.keyboard.latin.personalization.PersonalizationHelper
@@ -326,6 +327,7 @@ private fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: Int
     wait.await()
     checkVersionUpgrade(ctx)
     transferOldPinnedClips(ctx)
+    LearnedStores.refresh(ctx.realPrefs()) // (the keyboards' own learned words, or the shared ones, as restored)
     Settings.getInstance().startListener()
     SubtypeSettings.reloadEnabledSubtypes(ctx)
     val newDictBroadcast = Intent(DictionaryPackConstants.NEW_DICTIONARY_INTENT_ACTION)
@@ -476,6 +478,11 @@ private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: Restore
 
 /** The backup's preferences replace the phone's, every keyboard's set included. */
 private fun restoreAllSettings(ctx: Context, pending: PendingRestore) {
+    // "Share learned & blacklisted words across keyboards" comes from the backup too: the words move as when it's
+    // switched (LearnedPools), the keyboards' own put together first, then copied to each keyboard if the backup says so
+    // (by the backup's keyboard ids, which replace the phone's)
+    val filesDir = ctx.filesDir
+    if (filesDir != null && !LearnedStores.isShared(ctx.realPrefs())) LearnedPools.share(filesDir, LearnedStoreIo.Native)
     Settings.getInstance().stopListener()
     // the backup's set ids replace the phone's: pictures of the phone's sets would turn up on the backup's keyboards
     KeyboardProfiles.deleteAllFiles()
@@ -485,6 +492,9 @@ private fun restoreAllSettings(ctx: Context, pending: PendingRestore) {
         for ((key, value) in pending.prefs) KeyboardProfiles.put(this, key, value)
     }
     KeyboardProfiles.editingId = KeyboardProfiles.SHARED
+    val real = ctx.realPrefs()
+    if (filesDir != null && !LearnedStores.isShared(real)) LearnedPools.separate(filesDir, LearnedStoreIo.Native, LearnedPools.keyboardPools(real))
+    LearnedStores.refresh(real)
 }
 
 /**
