@@ -109,6 +109,13 @@ class LearnedStoreMigrationTest {
         assertEquals(9 to 1200, FakeLearnedStoreIo.read(store("Latn"))["hai"])
     }
 
+    @Test fun `an unreadable store of the script is set aside, not in the way`() {
+        store("Latn").mkdirs() // (no readable store in it)
+        assertTrue(LearnedStoreMigration.run(dir, io))
+        assertEquals(9 to 1200, FakeLearnedStoreIo.read(store("Latn"))["hai"])
+        assertTrue(File(dir, "${LearnedStoreMigration.PREMERGE_DIR}/UserHistoryDictionary.Latn.dict").exists())
+    }
+
     @Test fun `a store set aside before is kept, under another name`() {
         File(dir, "${LearnedStoreMigration.PREMERGE_DIR}/UserHistoryDictionary.hi.dict").mkdirs()
         LearnedStoreMigration.run(dir, io)

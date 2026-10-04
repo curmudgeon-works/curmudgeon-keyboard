@@ -123,11 +123,11 @@ object LearnedStoreMigration {
         }
         val written = mutableListOf<String>()
         for ((script, parts) in byScript) {
-            val existing = LearnedStoreFiles.read(io, filesDir, script, LearnedStores.SHARED)
-            if (existing == null) {
-                Log.e(TAG, "$script: the existing store can't be read, nothing moved")
-                work.deleteRecursively()
-                return false
+            val existing = LearnedStoreFiles.read(io, filesDir, script, LearnedStores.SHARED) ?: run {
+                // (one the keyboard couldn't read either: it would start it over) kept aside, not in the way
+                Log.w(TAG, "$script: the store there can't be read, set aside")
+                setAside(filesDir, LearnedStores.storeFile(filesDir, script, LearnedStores.SHARED).name)
+                emptyList()
             }
             val merged = mergeAdding(listOf(existing) + parts)
             val target = File(work, LearnedStores.storeFile(filesDir, script, LearnedStores.SHARED).name)
@@ -177,22 +177,25 @@ object LearnedStoreMigration {
         return true
     }
 
+    /** [name] (a path in [filesDir]) moved to [PREMERGE_DIR] as it is, unless it's gone already. */
+    private fun setAside(filesDir: File, name: String) {
+        val file = File(filesDir, name)
+        if (!file.exists()) return
+        val premerge = File(filesDir, PREMERGE_DIR)
+        var target = File(premerge, name)
+        var n = 1
+        while (target.exists()) target = File(premerge, "$name.${n++}") // (set aside before: kept as well)
+        target.parentFile?.mkdirs()
+        if (!file.renameTo(target)) Log.e(TAG, "could not set aside ${file.name}")
+    }
+
     /** The moves the journal lists, each skipped if it's done already; then the journal goes. */
     private fun finish(filesDir: File, io: LearnedStoreIo, journal: File) {
         val work = File(filesDir, LearnedStoreFiles.WORK_DIR)
-        val premerge = File(filesDir, PREMERGE_DIR)
         for (line in journal.readLines()) {
             val (kind, name) = line.split('\t').takeIf { it.size == 2 } ?: continue
             when (kind) {
-                ASIDE -> {
-                    val file = File(filesDir, name)
-                    if (!file.exists()) continue
-                    var target = File(premerge, name)
-                    var n = 1
-                    while (target.exists()) target = File(premerge, "$name.${n++}") // (set aside before: kept as well)
-                    target.parentFile?.mkdirs()
-                    if (!file.renameTo(target)) Log.e(TAG, "could not set aside ${file.name}")
-                }
+                ASIDE -> setAside(filesDir, name)
                 STORE -> {
                     val written = File(work, LearnedStores.storeFile(filesDir, name, LearnedStores.SHARED).name)
                     if (written.exists() && !LearnedStoreFiles.install(io, filesDir, name, LearnedStores.SHARED, written))
