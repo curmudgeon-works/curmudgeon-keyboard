@@ -63,7 +63,9 @@ interface LearnedStoreIo {
                     if (dict.needsToRunGC(true)) dict.flushWithGC()
                     dict.updateEntriesForWordWithNgramContext(ngramContextOf(context), word, true, count, time)
                 }
-                return dict.flushWithGC()
+                // written as it is, not compacted (a compaction can also age old entries: the stores put together keep
+                // what they had); an empty store has nothing to write but its header
+                return if (entries.isEmpty()) dict.flushWithGC() else dict.flush()
             } catch (e: Exception) {
                 Log.e(TAG, "could not write a store of learned words", e)
                 return false
