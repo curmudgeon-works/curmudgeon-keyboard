@@ -115,6 +115,10 @@ public final class InputLogic {
     // Where the keyboard last typed, while the cursor is somewhere else since (a tap): undo / redo go back there
     // first; typing at the new place marks a jump in the history. -1: the cursor is where the history left it.
     private int mTypedAt = -1;
+    // When the keyboard last changed the text: a cursor update right after is that change arriving, not a tap (typing
+    // inside an underlined word moves the cursor where the keyboard's own record doesn't expect it)
+    private long mLastOwnEdit = 0;
+    private static final long OWN_EDIT_ECHO_MS = 300;
     private int mLastEditKeyCode; // a run of backspaces is one step
     private long mLastKeyTime;
     // todo: this is not used, so either remove it or do something with it
@@ -270,6 +274,7 @@ public final class InputLogic {
 
     // An edit step begins: remember the text as it is now (after a tap elsewhere: a jump from where typing ended).
     private void editStepStart() {
+        mLastOwnEdit = android.os.SystemClock.uptimeMillis();
         final EditHistory.State state = currentEditState();
         if (mTypedAt >= 0) {
             final EditHistory.State there = editStateAt(mTypedAt);
@@ -282,6 +287,7 @@ public final class InputLogic {
 
     // Input that continues the step being typed; after a tap elsewhere it starts one (a jump).
     private void editContinues() {
+        mLastOwnEdit = android.os.SystemClock.uptimeMillis();
         if (mTypedAt >= 0) editStepStart();
         else mEditHistory.onOtherInput();
     }
@@ -439,12 +445,12 @@ public final class InputLogic {
         // We set this to NONE because after a cursor move, we don't want the space
         // state-related special processing to kick in.
         mSpaceState = SpaceState.NONE;
-        // A genuine cursor move (a tap): the history stays, for the place typing happened (undo goes back there).
-        // Only when the cursor is somewhere else than the keyboard put it: a letter typed inside the word being typed
-        // also arrives here, and isn't a tap.
+        // A genuine cursor move (a tap): the history stays, for the place typing happened (undo goes back there), as
+        // the phone reports it (the keyboard's own record can lag). Not the echo of the keyboard's own edit.
         final int expectedStart = mConnection.getExpectedSelectionStart();
-        if (mTypedAt < 0 && !mEditHistory.isEmpty() && newSelStart != expectedStart)
-            mTypedAt = expectedStart >= 0 ? expectedStart : oldSelStart;
+        if (mTypedAt < 0 && !mEditHistory.isEmpty()
+                && android.os.SystemClock.uptimeMillis() - mLastOwnEdit > OWN_EDIT_ECHO_MS)
+            mTypedAt = oldSelStart;
         mLastEditKeyCode = 0;
 
         final boolean selectionChangedOrSafeToReset =
@@ -935,6 +941,7 @@ public final class InputLogic {
                     break;
                 }
                 if (edit != null) {
+                    mLastOwnEdit = android.os.SystemClock.uptimeMillis();
                     if (mTypedAt >= 0) { mConnection.setSelection(mTypedAt, mTypedAt); mTypedAt = -1; }
                     if (edit.getMoveTo() >= 0) mConnection.setSelection(edit.getMoveTo(), edit.getMoveTo());
                     if (edit.getDelete() > 0) mConnection.deleteTextBeforeCursor(edit.getDelete());

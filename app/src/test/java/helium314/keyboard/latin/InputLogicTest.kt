@@ -758,6 +758,29 @@ class InputLogicTest {
         assertEquals("/48", InputLogic.getInlineEmojiSearchString("2606:127.0.0.1::/48")) // do we want this?
     }
 
+    @Test fun `undo after a tap and a letter typed there goes back across the tap`() {
+        reset()
+        chainInput("the keyboard")
+        android.os.SystemClock.sleep(500) // a tap comes a while after typing (one right after would be the typing's own echo)
+        setCursorPosition(7) // a tap: key|board
+        chainInput("x")
+        assertEquals("the keyxboard", text)
+        functionalKeyPress(KeyCode.UNDO)
+        assertEquals("the keyboard", text)
+        functionalKeyPress(KeyCode.UNDO)
+        assertEquals("the ", text)
+    }
+
+    @Test fun `undo right after a tap works where typing ended`() {
+        reset()
+        chainInput("the keyboard")
+        android.os.SystemClock.sleep(500)
+        setCursorPosition(7)
+        functionalKeyPress(KeyCode.UNDO)
+        assertEquals("the ", text)
+    }
+
+
     // ------- helper functions ---------
 
     // should be called before every test, so the same state is guaranteed
