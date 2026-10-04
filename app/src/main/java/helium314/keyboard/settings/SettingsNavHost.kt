@@ -121,8 +121,9 @@ fun SettingsNavHost(
         composable(SettingsDestination.LearnedWords) {
             helium314.keyboard.settings.screens.LearnedWordsScriptsScreen(onClickBack = ::goBack)
         }
-        composable(SettingsDestination.LearnedWordsOfScript + "{script}") {
-            helium314.keyboard.settings.screens.LearnedWordsScreen(onClickBack = ::goBack, script = it.arguments?.getString("script") ?: "")
+        composable(SettingsDestination.LearnedWordsOfScript + "{script}/{list}") {
+            helium314.keyboard.settings.screens.LearnedWordsScreen(onClickBack = ::goBack, script = it.arguments?.getString("script") ?: "",
+                blacklisted = it.arguments?.getString("list") == helium314.keyboard.settings.screens.LIST_BLACKLISTED)
         }
         composable(SettingsDestination.AllKeyboards) {
             // the list of all keyboards incl. disabled ones; the keyboards screen shows the enabled ones as entries

@@ -136,7 +136,9 @@
     <string name="learned_words">Learned &amp; blacklisted words</string>
     <!-- Under the Personal dictionary row there: what only that screen has -->
     <string name="learned_words_personal_dictionary_summary">Shortcuts, and words for all languages</string>
-    <string name="learned_words_section_yours">Your words</string>
+    <string name="learned_words_section_yours">Learned words</string>
+    <string name="learned_words_list_learned">Learned</string>
+    <string name="learned_words_list_blacklisted">Blacklisted</string>
     <string name="learned_words_section_blacklisted">Blacklisted words</string>
     <string name="learned_words_none">None</string>
     <string name="learned_words_loading">Reading your words…</string>

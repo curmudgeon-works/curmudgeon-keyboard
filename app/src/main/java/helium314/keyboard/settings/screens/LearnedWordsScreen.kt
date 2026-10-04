@@ -60,18 +60,32 @@ import java.util.Locale
  * first screen, and Add a word here is its add dialog.
  */
 
-/** The scripts of the keyboard's languages, then the personal dictionary's own screens. */
+const val LIST_LEARNED = "learned"
+const val LIST_BLACKLISTED = "blacklisted"
+
+/** The scripts of the keyboard's languages, each with its two lists (2026-10-04): Learned (learned words and the
+ *  personal dictionary together) and Blacklisted. The personal dictionary's own screens (shortcuts, words for all
+ *  languages) stay reachable below, in advanced mode. */
 @Composable
 fun LearnedWordsScriptsScreen(onClickBack: () -> Unit) {
     val ctx = LocalContext.current
+    val advanced by helium314.keyboard.settings.SettingsMode.state(ctx)
     val scripts = remember { scriptLocales().toList() }
+    fun open(script: String, list: String) = SettingsDestination.navigateTo("${SettingsDestination.LearnedWordsOfScript}$script/$list")
     @Composable
     fun ScriptRow(script: Pair<String, List<Locale>>) {
         Preference(
             name = scriptName(script.first),
             description = script.second.joinToString(", ") { it.getLocaleDisplayNameForUserDictSettings(ctx) },
-            onClick = { SettingsDestination.navigateTo(SettingsDestination.LearnedWordsOfScript + script.first) },
-        ) { NextScreenIcon() }
+            onClick = { open(script.first, LIST_LEARNED) },
+        ) {
+            androidx.compose.material3.OutlinedButton({ open(script.first, LIST_LEARNED) },
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp)) {
+                Text(stringResource(R.string.learned_words_list_learned)) }
+            androidx.compose.material3.OutlinedButton({ open(script.first, LIST_BLACKLISTED) },
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp)) {
+                Text(stringResource(R.string.learned_words_list_blacklisted)) }
+        }
     }
     SearchScreen(
         onClickBack = onClickBack,
@@ -81,8 +95,8 @@ fun LearnedWordsScriptsScreen(onClickBack: () -> Unit) {
         itemContent = { ScriptRow(it) },
     ) {
         scripts.forEach { ScriptRow(it) }
-        HorizontalDivider()
-        Preference(
+        if (advanced) HorizontalDivider()
+        if (advanced) Preference(
             name = stringResource(R.string.edit_personal_dictionary),
             description = stringResource(R.string.learned_words_personal_dictionary_summary),
             onClick = { SettingsDestination.navigateTo(SettingsDestination.PersonalDictionaries) },
@@ -91,7 +105,7 @@ fun LearnedWordsScriptsScreen(onClickBack: () -> Unit) {
 }
 
 @Composable
-fun LearnedWordsScreen(onClickBack: () -> Unit, script: String) {
+fun LearnedWordsScreen(onClickBack: () -> Unit, script: String, blacklisted: Boolean) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var data: WordLists? by remember { mutableStateOf(null) }
@@ -112,13 +126,13 @@ fun LearnedWordsScreen(onClickBack: () -> Unit, script: String) {
         onClickBack = onClickBack,
         title = {
             Column {
-                Text(stringResource(R.string.learned_words))
+                Text(stringResource(if (blacklisted) R.string.learned_words_section_blacklisted else R.string.learned_words_section_yours))
                 Text(scriptName(script), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
         // Add a word: the list's first row (as Add keyboard on the keyboards list), not while searching
-        filteredItems = { term -> (if (term.isBlank()) listOf(Row.Add) else emptyList()) +
-            (data?.rows(term) ?: listOf(Row.Note(R.string.learned_words_loading))) },
+        filteredItems = { term -> (if (term.isBlank() && !blacklisted) listOf(Row.Add) else emptyList()) +
+            (data?.rows(term, blacklisted) ?: listOf(Row.Note(R.string.learned_words_loading))) },
         itemContent = { row ->
             when (row) {
                 Row.Add -> Preference(name = stringResource(R.string.user_dict_add_word_button), onClick = { adding = true },
@@ -188,18 +202,14 @@ private class Item(val entry: Entry, val kind: Kind) : Row {
 }
 
 private class WordLists(val yours: List<Entry>, val blacklisted: List<Entry>) {
-    fun rows(term: String): List<Row> {
+    /** One list: the learned words with the personal dictionary's, or the blacklisted words (the page's title says which). */
+    fun rows(term: String, ofBlacklist: Boolean): List<Row> {
         val result = mutableListOf<Row>()
-        fun section(title: Int, summary: Int?, entries: List<Entry>, kind: Kind) {
-            val shown = if (term.isBlank()) entries else entries.filter { e -> e.spellings.any { it.contains(term, true) } }
-            if (term.isNotBlank() && shown.isEmpty()) return
-            result.add(Row.Heading(title))
-            if (summary != null && shown.isNotEmpty()) result.add(Row.Note(summary))
-            if (shown.isEmpty()) result.add(Row.Note(R.string.learned_words_none))
-            shown.mapTo(result) { Item(it, kind) }
-        }
-        section(R.string.learned_words_section_yours, null, yours, Kind.YOURS)
-        section(R.string.learned_words_section_blacklisted, R.string.learned_words_blacklisted_summary, blacklisted, Kind.BLACKLISTED)
+        val entries = if (ofBlacklist) blacklisted else yours
+        val shown = if (term.isBlank()) entries else entries.filter { e -> e.spellings.any { it.contains(term, true) } }
+        if (ofBlacklist && shown.isNotEmpty() && term.isBlank()) result.add(Row.Note(R.string.learned_words_blacklisted_summary))
+        if (shown.isEmpty()) result.add(Row.Note(R.string.learned_words_none))
+        shown.mapTo(result) { Item(it, if (ofBlacklist) Kind.BLACKLISTED else Kind.YOURS) }
         return result
     }
 }

@@ -113,6 +113,7 @@ fun SearchSettingsScreen(
     topActions: @Composable RowScope.() -> Unit = {}, // top bar buttons before the advanced switch
     revealer: TapRevealer? = null, // a screen with a preview keyboard: moves the tapped row above where the keyboard will end
     isPending: ((String) -> Boolean)? = null, // rows with a change not yet accepted, drawn with an italic title
+    showKeyboardName: Boolean = true, // false where the title already is the keyboard's name (its own screen)
     content: @Composable (ColumnScope.() -> Unit)? = null, // overrides settings if not null; LAST: callers pass it as the trailing lambda
 ) {
     val ctx = LocalContext.current
@@ -137,6 +138,7 @@ fun SearchSettingsScreen(
     SearchScreen(
         onClickBack = onClickBack,
         title = { Text(title) },
+        showKeyboardName = showKeyboardName,
         leadingActions = topActions,
         content = {
             if (content != null) content()
@@ -256,6 +258,7 @@ fun <T: Any?> SearchScreen(
     menu: List<Pair<String, () -> Unit>>? = null,
     showAdvancedSwitch: Boolean = true, // the simple / advanced settings switch, on every screen
     leadingActions: @Composable RowScope.() -> Unit = {}, // top bar buttons before the advanced switch
+    showKeyboardName: Boolean = true, // the keyboard being edited under the title (separate settings)
     content: @Composable (ColumnScope.() -> Unit)? = null,
 ) {
     val switchCtx = LocalContext.current
@@ -287,7 +290,7 @@ fun <T: Any?> SearchScreen(
                             val ctx = androidx.compose.ui.platform.LocalContext.current
                             val keyboard = remember { helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(
                                 helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)) }
-                            if (keyboard == null) title()
+                            if (keyboard == null || !showKeyboardName) title()
                             else Column {
                                 title()
                                 Text(helium314.keyboard.settings.screens.keyboardName(keyboard, ctx),

@@ -114,7 +114,6 @@ fun KeyboardsScreen(
                     }
                     Preference(
                         name = stringResource(R.string.separate_settings_per_keyboard),
-                        description = stringResource(R.string.separate_settings_per_keyboard_summary),
                         onClick = { toggle(!separate) },
                         icon = R.drawable.ic_settings_preferences
                     ) { Switch(checked = separate, onCheckedChange = { toggle(it) }) }
@@ -203,7 +202,7 @@ fun KeyboardsScreen(
                         else NextScreenIcon()
                     }
                     if (isExpanded)
-                        KeyboardSettingsEntries(keyboard, Modifier.padding(start = 24.dp),
+                        KeyboardSettingsEntries(keyboard, Modifier.padding(start = 24.dp), showAdvanced = false,
                             onEnter = { KeyboardProfiles.editingId = KeyboardProfiles.idFor(real, keyboard) })
                     }
                 }
@@ -217,7 +216,7 @@ fun KeyboardsScreen(
                 if (!separate)
                     KeyboardSettingsEntries(SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype(), showLanguages = false)
                 else if (enabled.size == 1)
-                    KeyboardSettingsEntries(enabled[0].toSettingsSubtype(), showLanguages = false,
+                    KeyboardSettingsEntries(enabled[0].toSettingsSubtype(), showLanguages = false, showAdvanced = false,
                         onEnter = { KeyboardProfiles.editingId = KeyboardProfiles.idFor(real, enabled[0].toSettingsSubtype()) })
                 else
                     Text(
@@ -226,6 +225,8 @@ fun KeyboardsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                     )
+                // with separate settings: Advanced once, for all keyboards (its settings are app-wide)
+                if (separate) AdvancedEntry()
                 Preference(
                     name = stringResource(R.string.settings_screen_about),
                     onClick = onClickAbout,

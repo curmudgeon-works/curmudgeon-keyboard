@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.screens
 
+import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.AdvancedTint
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -60,12 +61,14 @@ fun MainSettingsScreen(
         onClickBack = onClickBack,
         title = keyboardName(keyboard, ctx),
         settings = emptyList(),
+        showKeyboardName = false, // (the title is its name)
     ) {
         Scaffold(contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)) { innerPadding ->
             Column(
                 Modifier.verticalScroll(rememberScrollState()).then(Modifier.padding(innerPadding))
             ) {
-                KeyboardSettingsEntries(keyboard)
+                KeyboardSettingsEntries(keyboard,
+                    showAdvanced = !helium314.keyboard.latin.settings.KeyboardProfiles.isSeparate(LocalContext.current.realPrefs()))
             }
         }
     }
@@ -100,7 +103,8 @@ fun keyboardName(keyboard: SettingsSubtype, ctx: Context): String =
 
 /** The sections of one keyboard's settings, as menu entries. Used by the keyboard's own screen and inline under the keyboards list. */
 @Composable
-fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modifier, showLanguages: Boolean = true, onEnter: () -> Unit = {}) {
+fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modifier, showLanguages: Boolean = true,
+    showAdvanced: Boolean = true, onEnter: () -> Unit = {}) {
     val ctx = LocalContext.current
     val advanced by SettingsMode.state(ctx)
     Column(modifier) {
@@ -137,13 +141,21 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
         icon = R.drawable.ic_settings_correction
     ) { NextScreenIcon() }
     // (no Dictionaries: tapping a language in the keyboard's Languages list manages its dictionaries)
-    // the settings few need (advanced only): Advanced
+    // the settings few need (advanced only): Advanced; app-wide, so with separate settings it's one entry outside the
+    // keyboards (AdvancedEntry), not one per keyboard
+    if (showAdvanced) AdvancedEntry(onEnter)
+    }
+}
+
+/** The Advanced entry (advanced only): the app-wide settings, the same for every keyboard. */
+@Composable
+fun AdvancedEntry(onEnter: () -> Unit = {}) {
+    val advanced by SettingsMode.state(LocalContext.current)
     AdvancedTint(advanced) {
         Preference(
             name = stringResource(R.string.settings_screen_advanced),
             onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Advanced) },
             icon = R.drawable.ic_settings_advanced
         ) { NextScreenIcon() }
-    }
     }
 }
