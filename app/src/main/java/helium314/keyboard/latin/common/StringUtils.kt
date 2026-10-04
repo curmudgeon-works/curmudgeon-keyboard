@@ -117,7 +117,8 @@ fun getTouchedWordRange(before: CharSequence, after: CharSequence, script: Strin
     var startIndexInBefore = before.length
     var endIndexInAfter = -1 // todo: clarify why might we want to set it when checking before
     loopOverCodePointsBackwards(before) { codePoint, cpLength ->
-        if (!isPartOfCompositionForScript(codePoint, spacingAndPunctuations, script)) {
+        if (!isPartOfCompositionForScript(codePoint, spacingAndPunctuations, script)
+                && !isDigitInsideWord(codePoint, before, startIndexInBefore - cpLength, spacingAndPunctuations, script)) {
             if (Character.isWhitespace(codePoint) || !spacingAndPunctuations.mCurrentLanguageHasSpaces)
                 return@loopOverCodePointsBackwards true
             // continue to the next whitespace and see whether this contains a sometimesWordConnector
@@ -144,7 +145,9 @@ fun getTouchedWordRange(before: CharSequence, after: CharSequence, script: Strin
     if (endIndexInAfter == -1) {
         endIndexInAfter = 0
         loopOverCodePoints(after) { codePoint, cpLength ->
-            if (!isPartOfCompositionForScript(codePoint, spacingAndPunctuations, script)) {
+            // a digit continues a word that has started with a letter (before the cursor or after it)
+            if (!isPartOfCompositionForScript(codePoint, spacingAndPunctuations, script)
+                    && !(Character.isDigit(codePoint) && (startIndexInBefore < before.length || endIndexInAfter > 0))) {
                 if (Character.isWhitespace(codePoint) || !spacingAndPunctuations.mCurrentLanguageHasSpaces)
                     return@loopOverCodePoints true
                 // continue to the next whitespace and see whether this contains a sometimesWordConnector
@@ -192,6 +195,22 @@ fun getTouchedWordRange(before: CharSequence, after: CharSequence, script: Strin
         startIndexInBefore, before.length + endIndexInAfter, before.length,
         hasUrlSpans
     )
+}
+
+// A digit typed inside a word stays part of it ("Ha0py", a mistap on the number row): the word being typed keeps it,
+// so the word found at the cursor (resuming it after space + backspace, or a tap) must too, or only "py" comes back.
+// Only after a letter, like typing: a word never starts with a digit ("5pm" is still "pm", "2024" no word at all).
+private fun isDigitInsideWord(codePoint: Int, before: CharSequence, digitStart: Int,
+                              spacingAndPunctuations: SpacingAndPunctuations, script: String): Boolean {
+    if (!Character.isDigit(codePoint)) return false
+    var i = digitStart
+    while (i > 0) {
+        val cp = Character.codePointBefore(before, i)
+        if (!Character.isDigit(cp))
+            return Character.isLetter(cp) && isPartOfCompositionForScript(cp, spacingAndPunctuations, script)
+        i -= Character.charCount(cp)
+    }
+    return false
 }
 
 // actually this should not be in STRING Utils, but only used for getTouchedWordRange
