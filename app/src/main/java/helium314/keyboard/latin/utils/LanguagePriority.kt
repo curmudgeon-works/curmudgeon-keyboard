@@ -8,7 +8,9 @@ import java.util.Locale
  * Per-language settings for multilingual typing, stored by language tag independent of subtypes:
  * - priority (Low / Medium / High): a fixed factor on that language's suggestion scores, on top of the
  *   automatic confidence of [helium314.keyboard.latin.DictionaryFacilitatorImpl.DictionaryGroup]
- * - share user history: the words learned in that language count for every language, at full weight
+ * (Learned words are per script since 2026-10-04, shared by the script's languages at full weight, see LearnedStores:
+ * the per-language "share learned words" switch of before is gone. Its old keys may still be in the preferences;
+ * nothing reads them.)
  */
 object LanguagePriority {
     const val LOW = 1
@@ -17,15 +19,15 @@ object LanguagePriority {
     const val DEFAULT = HIGH // everything at full weight until the user says otherwise
 
     private const val PREF_PRIORITY_PREFIX = "language_priority_"
+    // (the retired share switch: still a language key, so old preferences are kept and treated like before)
     private const val PREF_SHARE_HISTORY_PREFIX = "share_user_history_"
     const val PREF_ADDED_PREFIX = "language_added_"
 
-    /** The preference keys holding a language's priority, share switch and adding time (global keys, one per language). */
+    /** The preference keys holding a language's priority and adding time (global keys, one per language). */
     fun keys(locale: Locale): List<String> =
-        listOf(PREF_PRIORITY_PREFIX + locale.toLanguageTag(), PREF_SHARE_HISTORY_PREFIX + locale.toLanguageTag(),
-            PREF_ADDED_PREFIX + locale.toLanguageTag())
+        listOf(PREF_PRIORITY_PREFIX + locale.toLanguageTag(), PREF_ADDED_PREFIX + locale.toLanguageTag())
 
-    /** Whether [key] is one of the per-language keys (priority, share switch, adding time). */
+    /** Whether [key] is one of the per-language keys (priority, adding time; the retired share switch). */
     fun isLanguageKey(key: String) =
         key.startsWith(PREF_PRIORITY_PREFIX) || key.startsWith(PREF_SHARE_HISTORY_PREFIX) || key.startsWith(PREF_ADDED_PREFIX)
 
@@ -46,12 +48,6 @@ object LanguagePriority {
 
     fun factor(prefs: SharedPreferences, locale: Locale): Float = factor(get(prefs, locale))
 
-    fun sharesUserHistory(prefs: SharedPreferences, locale: Locale): Boolean =
-        prefs.getBoolean(PREF_SHARE_HISTORY_PREFIX + locale.toLanguageTag(), false)
-
-    fun setSharesUserHistory(prefs: SharedPreferences, locale: Locale, shared: Boolean) =
-        prefs.edit().putBoolean(PREF_SHARE_HISTORY_PREFIX + locale.toLanguageTag(), shared).apply()
-
     /** When the language was last added to a keyboard (0 for languages added before this was recorded). */
     fun added(prefs: SharedPreferences, locale: Locale): Long =
         prefs.getLong(PREF_ADDED_PREFIX + locale.toLanguageTag(), 0L)
@@ -59,15 +55,15 @@ object LanguagePriority {
     fun markAdded(prefs: SharedPreferences, locale: Locale) =
         prefs.edit().putLong(PREF_ADDED_PREFIX + locale.toLanguageTag(), System.currentTimeMillis()).apply()
 
-    // what suggestions need per language (score factor, share switch), read once instead of on every request;
-    // emptied whenever a language key changes (Settings.onSharedPreferenceChanged), so changes apply at once
-    private val cache = java.util.concurrent.ConcurrentHashMap<String, Pair<Float, Boolean>>()
+    // what suggestions need per language (its score factor), read once instead of on every request; emptied whenever
+    // a language key changes (Settings.onSharedPreferenceChanged), so changes apply at once
+    private val cache = java.util.concurrent.ConcurrentHashMap<String, Float>()
 
-    /** The language's score factor and share switch, from the cache ([prefs] is only asked on a miss). */
-    fun forSuggestions(locale: Locale, prefs: () -> SharedPreferences?): Pair<Float, Boolean> =
+    /** The language's score factor, from the cache ([prefs] is only asked on a miss). */
+    fun forSuggestions(locale: Locale, prefs: () -> SharedPreferences?): Float =
         cache[locale.toLanguageTag()] ?: prefs()?.let { p ->
-            (factor(p, locale) to sharesUserHistory(p, locale)).also { cache[locale.toLanguageTag()] = it }
-        } ?: (1f to false)
+            factor(p, locale).also { cache[locale.toLanguageTag()] = it }
+        } ?: 1f
 
     fun clearCache() = cache.clear()
 

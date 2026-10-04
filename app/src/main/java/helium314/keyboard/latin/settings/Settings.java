@@ -207,6 +207,8 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_RECORD_GESTURE_CORPUS = "record_gesture_corpus";
     public static final String PREF_SWIPE_METRICS = "swipe_metrics";
     public static final String PREF_LEARNING_LOG = "learning_log";
+    // one pool of learned & blacklisted words for all keyboards, or one per keyboard (see LearnedStores)
+    public static final String PREF_SHARE_LEARNED_WORDS = "share_learned_words";
     public static final String PREF_AUTO_PREVIEW_KEYBOARD = "auto_preview_keyboard";
 
     public static final String PREF_SPACE_TO_CHANGE_LANG = "prefs_long_press_keyboard_to_change_lang";
@@ -309,7 +311,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
 
     @Override
     public void onSharedPreferenceChanged(final SharedPreferences prefs, final String key) {
-        // a language's priority or share switch (key null: the preferences were cleared)
+        // a language's priority (key null: the preferences were cleared)
         if (key == null || LanguagePriority.INSTANCE.isLanguageKey(key))
             LanguagePriority.INSTANCE.clearCache();
         if (dontReloadOnChanged.contains(key) || (key != null && key.startsWith(PREF_SAVED_APP_SUBTYPE_PREFIX)))

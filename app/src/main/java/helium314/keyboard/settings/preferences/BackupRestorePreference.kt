@@ -37,7 +37,19 @@ import helium314.keyboard.latin.R
 import helium314.keyboard.latin.common.FileUtils
 import helium314.keyboard.latin.database.Database
 import helium314.keyboard.latin.gesture.GestureDecoderVocabulary
+import helium314.keyboard.latin.personalization.LearnedEntry
+import helium314.keyboard.latin.personalization.LearnedStoreFiles
+import helium314.keyboard.latin.personalization.LearnedStoreIo
+import helium314.keyboard.latin.personalization.LearnedPools
+import helium314.keyboard.latin.personalization.LearnedStoreMigration
+import helium314.keyboard.latin.personalization.LearnedStores
+import helium314.keyboard.latin.personalization.PersonalizationHelper
 import helium314.keyboard.latin.personalization.UserHistoryDictionary
+import helium314.keyboard.latin.personalization.byScript
+import helium314.keyboard.latin.personalization.countsOf
+import helium314.keyboard.latin.personalization.mergeAdding
+import helium314.keyboard.latin.utils.ScriptUtils
+import helium314.keyboard.latin.utils.ScriptUtils.script
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
@@ -315,6 +327,7 @@ private fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: Int
     wait.await()
     checkVersionUpgrade(ctx)
     transferOldPinnedClips(ctx)
+    LearnedStores.refresh(ctx.realPrefs()) // (the keyboards' own learned words, or the shared ones, as restored)
     Settings.getInstance().startListener()
     SubtypeSettings.reloadEnabledSubtypes(ctx)
     val newDictBroadcast = Intent(DictionaryPackConstants.NEW_DICTIONARY_INTENT_ACTION)
@@ -373,6 +386,10 @@ private fun restoreEverything(ctx: Context, file: File) {
         }
     }
     Database.copyFromDb(restoredDb, ctx)
+    // the learned words open in the keyboard read the restored files; a backup from before they were per script has
+    // per-language files, merged per script now as at app start
+    PersonalizationHelper.reloadAllFromFiles()
+    LearnedStoreMigration.runNow(ctx)
 }
 
 /**
@@ -391,10 +408,19 @@ private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: Restore
     val tags = choice.keyboards.flatMap { listOf(it.locale) + getSecondaryLocales(it.extraValues) }.map { it.toLanguageTag() }.toSet()
     val filesDir = ctx.filesDir ?: return
     val deviceProtectedFilesDir = DeviceProtectedUtils.getFilesDir(ctx)
-    // learned words are added to the phone's, never replacing them: the backup's store is unpacked aside, then each
-    // word (and word pair) is replayed into the phone's store; the removed-word lists are combined
+    // learned words are added to the phone's, never replacing them: the backup's stores are unpacked aside, then put
+    // together with the phone's (counts added); the removed-word lists are combined. The backup's stores are per
+    // script (shared, or a keyboard's own: UserHistoryDictionary.<script>[.k<id>].dict), or per language in a backup
+    // from before (UserHistoryDictionary.<languageTag>.dict); the chosen keyboards' scripts and languages say which.
     val learnedDir = File(ctx.cacheDir, "restore_learned").apply { deleteRecursively() }
-    fun isLearnedWords(path: String) = tags.any { path.startsWith("${UserHistoryDictionary.NAME}.$it.") || path == "blacklists${File.separator}$it.txt" }
+    val scripts = choice.keyboards.flatMap { listOf(it.locale) + getSecondaryLocales(it.extraValues) }.map { it.script() }.toSet()
+    fun isLearnedWords(path: String): Boolean {
+        val top = path.substringBefore(File.separator)
+        LearnedStores.parseStoreFileName(top)?.let { return it.first in scripts }
+        if (tags.any { path.startsWith("${UserHistoryDictionary.NAME}.$it.") || path == "blacklists${File.separator}$it.txt" }) return true
+        if (!path.startsWith("blacklists${File.separator}") || !path.endsWith(".txt")) return false
+        return path.substringAfterLast(File.separator).removeSuffix(".txt") in scripts
+    }
     fun isDictionary(path: String) = path.endsWith(DictionaryInfoUtils.USER_DICTIONARY_SUFFIX)
         && tags.any { path.startsWith("dicts${File.separator}$it${File.separator}") }
     // the files behind the settings: custom layouts (a keyboard's layout must exist for it), font and background
@@ -436,14 +462,7 @@ private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: Restore
     }
     if (choice.clipboard) Database.copyFromDb(restoredDb, ctx)
     if (choice.learnedWords) {
-        val locales = choice.keyboards.flatMap { listOf(it.locale) + getSecondaryLocales(it.extraValues) }.associateBy { it.toLanguageTag() }
-        for ((tag, locale) in locales) {
-            File(learnedDir, "${UserHistoryDictionary.NAME}.$tag.dict").takeIf { it.exists() }?.let { mergeLearnedWords(ctx, it, locale) }
-            // (through the list object the keyboard holds: a word on both keeps the most strikes)
-            File(learnedDir, "blacklists${File.separator}$tag.txt").takeIf { it.isFile }?.let { backupList ->
-                RemovedWords.blacklist(ctx, locale).combine(backupList.readLines())
-            }
-        }
+        restoreLearnedWords(ctx, pending.prefs, choice.keyboards, learnedDir)
         learnedDir.deleteRecursively()
     }
     if (allSettings) {
@@ -459,6 +478,11 @@ private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: Restore
 
 /** The backup's preferences replace the phone's, every keyboard's set included. */
 private fun restoreAllSettings(ctx: Context, pending: PendingRestore) {
+    // "Share learned & blacklisted words across keyboards" comes from the backup too: the words move as when it's
+    // switched (LearnedPools), the keyboards' own put together first, then copied to each keyboard if the backup says so
+    // (by the backup's keyboard ids, which replace the phone's)
+    val filesDir = ctx.filesDir
+    if (filesDir != null && !LearnedStores.isShared(ctx.realPrefs())) LearnedPools.share(filesDir, LearnedStoreIo.Native)
     Settings.getInstance().stopListener()
     // the backup's set ids replace the phone's: pictures of the phone's sets would turn up on the backup's keyboards
     KeyboardProfiles.deleteAllFiles()
@@ -468,11 +492,14 @@ private fun restoreAllSettings(ctx: Context, pending: PendingRestore) {
         for ((key, value) in pending.prefs) KeyboardProfiles.put(this, key, value)
     }
     KeyboardProfiles.editingId = KeyboardProfiles.SHARED
+    val real = ctx.realPrefs()
+    if (filesDir != null && !LearnedStores.isShared(real)) LearnedPools.separate(filesDir, LearnedStoreIo.Native, LearnedPools.keyboardPools(real))
+    LearnedStores.refresh(real)
 }
 
 /**
  * Only [chosen] keyboards come out of the backup: each is added (or replaced) with its custom layout files and,
- * [withSettings], its settings and the priority / share switches of its languages. Other keyboards stay as they
+ * [withSettings], its settings and the priorities of its languages. Other keyboards stay as they
  * are. The keyboard's settings need a set of its own, so separate settings per keyboard get switched on if they
  * aren't; the existing keyboards keep the shared set they behave by now.
  */
@@ -507,7 +534,7 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
     }
 
     if (withSettings) {
-        // the languages' priority and share switches are per language, not per keyboard
+        // the languages' priorities are per language, not per keyboard
         val editor = real.edit()
         for (keyboard in chosen)
             for (locale in listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues))
@@ -697,89 +724,70 @@ private val backupFilePatterns by lazy { listOf(
 ) }
 
 /**
- * Adds the learned words of a backed-up store ([dictDir], unpacked) to the phone's for [locale]: each word and word pair
- * (and longer) is replayed once with its stored count ([ownCounts]) and the time of its last use (the newer of the
- * backed-up and the phone's), so a word comes out as often typed as it was and keeps fading from where it was
- * (LearnedDecay); the counts of words the phone already knows add up.
+ * Adds the learned words of the backup ([learnedDir]: its stores and blacklists, unpacked) for the chosen [keyboards] to
+ * the phone's, by script: where each keyboard learns on the phone (the shared pool, or its own with "Share learned &
+ * blacklisted words across keyboards" off) gets what it had in the backup (the backup's shared store of each of its
+ * scripts, or its own if the backup had them per keyboard; in a backup from before the per-script stores, those of its
+ * languages, each word into its script's). Counts add up, the latest last use is kept (mergeAdding); blacklists keep the
+ * most strikes. A backup store is put into one phone store once, however many chosen keyboards lead there.
  */
-private fun mergeLearnedWords(ctx: Context, dictDir: File, locale: Locale) {
-    val backupDict = com.android.inputmethod.latin.BinaryDictionary(dictDir.absolutePath, 0, dictDir.length(), true, locale,
-        helium314.keyboard.latin.dictionary.Dictionary.TYPE_USER_HISTORY, false)
-    if (!backupDict.isValidDictionary) { backupDict.close(); return }
-    val phone = helium314.keyboard.latin.personalization.PersonalizationHelper.getUserHistoryDictionary(ctx, locale)
-    val words = ArrayList<helium314.keyboard.latin.makedict.WordProperty>()
-    var token = 0
-    do {
-        val result = backupDict.getNextWordProperty(token)
-        val wp = result.mWordProperty ?: break
-        words.add(wp)
-        token = result.mNextToken
-    } while (token != 0)
-    backupDict.close()
-    val isWord = words.associate { it.mWord to !it.mIsNotAWord }
-    fun contextOf(c: helium314.keyboard.latin.NgramContext) = (1..c.prevWordCount).map { n ->
-        if (c.isNthPrevWordBeginningOfSentence(n)) LearnedEntry.SENTENCE_START else c.getNthPrevWord(n)?.toString() ?: ""
-    }
-    // every entry, with the context to replay it in (a sentence start isn't replayed as a word: the pairs it starts
-    // count it)
-    val entries = ArrayList<LearnedEntry>()
-    val contexts = ArrayList<helium314.keyboard.latin.NgramContext>()
-    val newWords = ArrayList<helium314.keyboard.latin.makedict.WordProperty>()
-    for (wp in words) {
-        // the phone's copy of the word and of the pairs it starts: their last uses, when newer, are kept
-        val onPhone = phone.getLearnedWordProperty(wp.mWord, wp.mIsBeginningOfSentence)
-        if (onPhone == null && !wp.mIsBeginningOfSentence) newWords.add(wp)
-        val phoneTimes = onPhone?.mNgrams.orEmpty().associate {
-            (listOf(it.mTargetWord.mWord) + contextOf(it.mNgramContext)) to it.mTargetWord.mProbabilityInfo.mTimestamp
+private fun restoreLearnedWords(ctx: Context, backup: Map<String, Any?>, keyboards: List<SettingsSubtype>, learnedDir: File) {
+    val filesDir = ctx.filesDir ?: return
+    val real = ctx.realPrefs()
+    val phoneShared = LearnedStores.isShared(real)
+    val backupShared = backup[Settings.PREF_SHARE_LEARNED_WORDS] != false
+    // (phone pool, script) -> the backup's stores and lists that go there
+    val stores = LinkedHashMap<Pair<Int, String>, MutableSet<File>>()
+    val lists = LinkedHashMap<Pair<Int, String>, MutableSet<File>>()
+    for (keyboard in keyboards) {
+        val pool = if (phoneShared) LearnedStores.SHARED else KeyboardProfiles.idFor(real, keyboard)
+        val backupPool = if (backupShared) LearnedStores.SHARED else KeyboardProfiles.anyIdIn(backup, keyboard) ?: LearnedStores.SHARED
+        val locales = listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)
+        for (script in locales.map { it.script() }.distinct()) {
+            stores.getOrPut(pool to script) { LinkedHashSet() }.add(LearnedStores.storeFile(learnedDir, script, backupPool))
+            lists.getOrPut(pool to script) { LinkedHashSet() }.add(LearnedStores.blacklistFile(learnedDir, script, backupPool))
         }
-        if (!wp.mIsBeginningOfSentence) {
-            val info = wp.mProbabilityInfo
-            entries.add(LearnedEntry(wp.mWord, emptyList(), info.mCount,
-                maxOf(info.mTimestamp, onPhone?.mProbabilityInfo?.mTimestamp ?: 0)))
-            contexts.add(helium314.keyboard.latin.NgramContext.EMPTY_PREV_WORDS_INFO)
-        }
-        for (ngram in wp.mNgrams.orEmpty()) {
-            val target = ngram.mTargetWord.mWord
-            val info = ngram.mTargetWord.mProbabilityInfo
-            val context = contextOf(ngram.mNgramContext)
-            entries.add(LearnedEntry(target, context, info.mCount,
-                maxOf(info.mTimestamp, phoneTimes[listOf(target) + context] ?: 0)))
-            contexts.add(ngram.mNgramContext)
+        // a backup from before: per language, words of any script
+        for (locale in locales) {
+            stores.getOrPut(pool to "") { LinkedHashSet() }.add(File(learnedDir, "${UserHistoryDictionary.NAME}.${locale.toLanguageTag()}.dict"))
+            lists.getOrPut(pool to "") { LinkedHashSet() }.add(File(learnedDir, "blacklists${File.separator}${locale.toLanguageTag()}.txt"))
         }
     }
-    // words new to the phone first, at count 0: a pair is only stored when the phone knows the word before it
-    for (wp in newWords) phone.updateEntriesForWord(helium314.keyboard.latin.NgramContext.EMPTY_PREV_WORDS_INFO,
-        wp.mWord, !wp.mIsNotAWord, 0, wp.mProbabilityInfo.mTimestamp)
-    // oldest first: a replay also sets the time of the shorter entries it counts (the word of a pair), whose own last
-    // use is never older, so replayed after it, that one stays
-    val own = ownCounts(entries)
-    for (i in entries.indices.sortedBy { entries[it].time }) {
-        val e = entries[i]
-        phone.updateEntriesForWord(contexts[i], e.word, isWord[e.word] ?: true, own[i], e.time)
+    // the backup's entries for each phone store
+    val io = LearnedStoreIo.Native
+    val toAdd = LinkedHashMap<Pair<Int, String>, MutableList<List<LearnedEntry>>>()
+    for ((target, files) in stores) for (file in files) {
+        if (!file.exists()) continue
+        val (pool, script) = target
+        if (script.isNotEmpty()) {
+            val entries = io.readFile(file, LearnedStores.storeLocale(script)) ?: continue
+            toAdd.getOrPut(target) { mutableListOf() }.add(entries)
+        } else {
+            val locale = Locale.forLanguageTag(file.name.removePrefix("${UserHistoryDictionary.NAME}.").removeSuffix(".dict"))
+            val entries = io.readFile(file, locale) ?: continue
+            for ((wordScript, part) in byScript(entries, locale.script()))
+                toAdd.getOrPut(pool to wordScript) { mutableListOf() }.add(part)
+        }
     }
-    phone.onFinishInput() // saved
-}
-
-/** A learned entry of a backed-up store: [word] after [context] (the words before it, nearest first; empty: the word
- *  itself), with its stored [count] and last use [time] (seconds). */
-internal class LearnedEntry(val word: String, val context: List<String>, val count: Int, val time: Int) {
-    companion object { const val SENTENCE_START = "\u0000" } // (no word contains it)
-}
-
-/**
- * The count each of [entries] replays: one use of a word after some words also counted every shorter entry ending in it
- * (the pair counts the word, 3 words count the pair), so each replays its stored count minus those of the entries one
- * word longer that contain it. A word's stored count already holds its first use (a word of no dictionary is stored at
- * 0 by it), so a word replayed with its count, as a dictionary word, comes out with the same count.
- */
-internal fun ownCounts(entries: List<LearnedEntry>): IntArray {
-    val index = HashMap<List<String>, Int>()
-    entries.forEachIndexed { i, e -> index[listOf(e.word) + e.context] = i }
-    val own = IntArray(entries.size) { entries[it].count }
-    for (e in entries) {
-        if (e.context.isEmpty()) continue
-        val shorter = index[listOf(e.word) + e.context.dropLast(1)] ?: continue
-        own[shorter] -= e.count
+    for ((target, parts) in toAdd) {
+        val (pool, script) = target
+        val phone = LearnedStoreFiles.read(io, filesDir, script, pool) ?: continue
+        val merged = mergeAdding(listOf(phone) + parts)
+        if (!LearnedStoreFiles.write(io, filesDir, script, pool, merged))
+            Log.w("AdvancedScreen", "could not restore the learned words of $script")
+        Log.i("AdvancedScreen", "restored learned words of ${LearnedStores.label(script, pool)}: ${countsOf(phone)} before, ${countsOf(merged)} after")
     }
-    return IntArray(own.size) { own[it].coerceAtLeast(0) }
+    // (through the list objects the keyboard holds: a word on both keeps the most strikes)
+    for ((target, files) in lists) for (file in files) {
+        if (!file.isFile) continue
+        val (pool, script) = target
+        if (script.isNotEmpty()) RemovedWords.blacklist(ctx, script, pool).combine(file.readLines())
+        else {
+            val fallback = Locale.forLanguageTag(file.name.removeSuffix(".txt")).script()
+            RemovedWords.parseAll(file.readLines()).entries.groupBy { ScriptUtils.scriptOfWord(it.key, fallback) }
+                .forEach { (wordScript, entries) ->
+                    RemovedWords.blacklist(ctx, wordScript, pool).combine(entries.map { RemovedWords.format(it.key, it.value) })
+                }
+        }
+    }
 }

@@ -18,7 +18,8 @@ import java.util.concurrent.TimeUnit
  * rules work out. One tab-separated line per event in `learning_events.tsv` in the app's external files dir:
  *
  * time (ms) · event · how the word got there · word before · word after · learned count of the word before (before
- * the change, after it) · learned count of the word after (before, after) · language · app version · for undo and
+ * the change, after it) · learned count of the word after (before, after) · learned words (the script, e.g. "Latn";
+ * "Latn/k3" for a keyboard's own; lines from before 2026-10-04 have the language there) · app version · for undo and
  * redo only: the uses given (+) or taken back (-)
  *
  * A count of -1: the word isn't stored. A word that isn't in the dictionaries is stored at 0 by its first use and
@@ -95,8 +96,8 @@ object LearningEventLog {
     @JvmStatic
     fun isEnabled(): Boolean = file != null && prefs?.getBoolean(Settings.PREF_LEARNING_LOG, Defaults.PREF_LEARNING_LOG) == true
 
-    /** An event in [language]: [before] and [after] are the words (empty if none), [counts] reads their learned counts;
-     *  [change]: the uses given or taken back, if the event says (undo, redo). */
+    /** An event in the learned words [language] names (see the class): [before] and [after] are the words (empty if
+     *  none), [counts] reads their learned counts; [change]: the uses given or taken back, if the event says (undo, redo). */
     @JvmStatic
     @JvmOverloads
     fun log(event: String, origin: String, before: String, after: String, language: String, counts: Counts,
@@ -118,7 +119,7 @@ object LearningEventLog {
     private fun countOf(counts: Counts, word: String): Int =
         if (word.isEmpty()) -1 else try { counts.of(word) } catch (e: Exception) { -1 }
 
-    /** The counts in one language's learned words: the word as written, else lowercase (a sentence-start capital). */
+    /** The counts in one store of learned words: the word as written, else lowercase (a sentence-start capital). */
     @JvmStatic
     fun countsIn(history: ExpandableBinaryDictionary): Counts = Counts { word ->
         val count = history.getLearnedCount(word)

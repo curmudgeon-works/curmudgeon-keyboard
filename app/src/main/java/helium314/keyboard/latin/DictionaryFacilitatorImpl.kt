@@ -29,6 +29,7 @@ import helium314.keyboard.latin.dictionary.DictionaryStats
 import helium314.keyboard.latin.dictionary.ExpandableBinaryDictionary
 import helium314.keyboard.latin.dictionary.UserBinaryDictionary
 import helium314.keyboard.latin.permissions.PermissionsUtil
+import helium314.keyboard.latin.personalization.LearnedStores
 import helium314.keyboard.latin.personalization.LearningEventLog
 import helium314.keyboard.latin.personalization.PersonalizationHelper
 import helium314.keyboard.latin.personalization.UserHistoryDictionary
@@ -39,6 +40,7 @@ import helium314.keyboard.latin.utils.LanguagePriority
 import helium314.keyboard.latin.utils.LearnedDecay
 import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.RemovedWords
+import helium314.keyboard.latin.utils.ScriptUtils.script
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.SuggestionResults
 import helium314.keyboard.latin.utils.getSecondaryLocales
@@ -90,6 +92,12 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
 
     private val scope = CoroutineScope(Dispatchers.Default)
 
+    // Learned words and the blacklist are per script (LearnedStores): the groups of one script hold the same store
+    // object. [learnedPool] is the pool those stores came from when the dictionaries were set up; [filesContext] where
+    // the blacklists are read.
+    @Volatile private var learnedPool = LearnedStores.SHARED
+    @Volatile private var filesContext: Context? = null
+
     override fun setValidSpellingWordReadCache(cache: LruCache<String, Boolean>) {
         mValidSpellingWordReadCache = cache
     }
@@ -107,9 +115,9 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
     }
 
     override fun onFinishInput() {
-        for (dictGroup in dictionaryGroups) {
-            DictionaryFacilitator.ALL_DICTIONARY_TYPES.forEach { dictGroup.getDict(it)?.onFinishInput() }
-        }
+        // (a store of learned words several languages share is saved once)
+        dictionaryGroups.flatMap { g -> DictionaryFacilitator.ALL_DICTIONARY_TYPES.mapNotNull { g.getDict(it) } }
+            .distinctBy { System.identityHashCode(it) }.forEach { it.onFinishInput() }
     }
 
     override fun isActive(): Boolean {
@@ -131,6 +139,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         return contacts == dictGroup.hasDict(Dictionary.TYPE_CONTACTS)
                 && apps == dictGroup.hasDict(Dictionary.TYPE_APPS)
                 && personalization == dictGroup.hasDict(Dictionary.TYPE_USER_HISTORY)
+                && learnedPool == LearnedStores.currentPool // another keyboard's own learned words
                 && locales.size == dictionaryGroups.size
                 && locales.none { findDictionaryGroupWithLocale(dictionaryGroups, it) == null }
     }
@@ -150,6 +159,12 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         Log.i(TAG, "resetDictionaries, force reloading main dictionary: $forceReloadMainDictionary")
 
         val locales = getUsedLocales(newLocale, context)
+        filesContext = context
+        learnedPool = LearnedStores.currentPool
+        blacklists.clear()
+        // the blacklists of the keyboard's scripts read again (e.g. after a restore replaced the files)
+        if (context.filesDir != null)
+            locales.map { it.script() }.distinct().forEach { RemovedWords.blacklist(context, it, learnedPool).reloadAsync() }
 
         val subDictTypesToUse = listOfNotNull(
             Dictionary.TYPE_USER,
@@ -178,6 +193,14 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         existingDictsToCleanup.forEach { (locale, dictTypes) ->
             val dictGroupToCleanup = findDictionaryGroupWithLocale(oldDictionaryGroups, locale) ?: return@forEach
             for (dictType in dictTypes) {
+                if (dictType == Dictionary.TYPE_USER_HISTORY) {
+                    // a store of learned words is per script: one another language still reads stays open; one no
+                    // longer used (another keyboard's own pool) is saved before it's closed
+                    val history = dictGroupToCleanup.getSubDict(dictType)
+                    if (newDictionaryGroups.any { it.getSubDict(dictType) === history }) continue
+                    dictGroupToCleanup.removeSubDict(dictType)?.flushAndClose()
+                    continue
+                }
                 dictGroupToCleanup.closeDict(dictType)
             }
         }
@@ -224,7 +247,12 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
             val subDicts: MutableMap<String, ExpandableBinaryDictionary> = HashMap()
             for (subDictType in newSubDictTypes) {
                 val subDict: ExpandableBinaryDictionary
-                if (forceReload || oldDictGroupForLocale == null
+                if (subDictType == Dictionary.TYPE_USER_HISTORY) {
+                    // always asked for: it's the store of the locale's script in the pool in use, which may have
+                    // changed (the same object comes back if not; cleanup then leaves it open)
+                    subDict = createSubDict(subDictType, context, locale, null, dictNamePrefix) ?: continue
+                    if (oldDictGroupForLocale?.getSubDict(subDictType) === subDict) dictTypesToCleanupForLocale?.remove(subDictType)
+                } else if (forceReload || oldDictGroupForLocale == null
                     || !oldDictGroupForLocale.hasDict(subDictType)
                 ) {
                     // Create a new dictionary.
@@ -236,7 +264,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
                 }
                 subDicts[subDictType] = subDict
             }
-            val newDictGroup = DictionaryGroup(locale, mainDict, subDicts, context)
+            val newDictGroup = DictionaryGroup(locale, mainDict, subDicts)
             newDictionaryGroups.add(newDictGroup)
         }
         return newDictionaryGroups to existingDictsToCleanup
@@ -282,7 +310,9 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         }
         for (dictionaryGroup in dictionaryGroupsToClose) {
             for (dictType in DictionaryFacilitator.ALL_DICTIONARY_TYPES) {
-                dictionaryGroup.closeDict(dictType)
+                // (learned words: saved and closed in one go, a store the languages of a script share once)
+                if (dictType == Dictionary.TYPE_USER_HISTORY) dictionaryGroup.removeSubDict(dictType)?.flushAndClose()
+                else dictionaryGroup.closeDict(dictType)
             }
         }
     }
@@ -337,7 +367,8 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         for (i in words.indices) {
             val currentWord = words[i]
             val wasCurrentWordAutoCapitalized = (i == 0) && wasAutoCapitalized
-            // add to history for preferred dictionary group, to avoid mixing languages in history
+            // into the learned words of the word's own script (not the preferred language's: a guess, which put a
+            // Hinglish word typed after English ones into English's words; 2026-10-04)
             addWordToUserHistory(
                 preferredGroup, ngramContextForCurrentWord, currentWord,
                 wasCurrentWordAutoCapitalized, timeStampInSeconds.toInt(), blockPotentiallyOffensive, extraUses
@@ -349,10 +380,15 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
     }
 
     private fun addWordToUserHistory(
-        dictionaryGroup: DictionaryGroup, ngramContext: NgramContext, word: String, wasAutoCapitalized: Boolean,
+        preferredGroup: DictionaryGroup, ngramContext: NgramContext, word: String, wasAutoCapitalized: Boolean,
         timeStampInSeconds: Int, blockPotentiallyOffensive: Boolean, extraUses: Int = 0
     ) {
-        val userHistoryDictionary = dictionaryGroup.getSubDict(Dictionary.TYPE_USER_HISTORY) ?: return
+        val script = scriptOf(word)
+        val userHistoryDictionary = historyFor(word, create = true) ?: return
+        // the dictionaries of that script's languages say whether it's a word: the preferred language's if it's of that
+        // script, else the first such language's (none: a word of another script than the keyboard's)
+        val groupsOfScript = dictionaryGroups.filter { it.locale.script() == script }
+        val dictionaryGroup = preferredGroup.takeIf { it.locale.script() == script } ?: groupsOfScript.firstOrNull() ?: preferredGroup
 
         val mainFreq = dictionaryGroup.getDict(Dictionary.TYPE_MAIN)?.getFrequency(word) ?: Dictionary.NOT_A_PROBABILITY
         if (mainFreq == 0 && blockPotentiallyOffensive)
@@ -404,20 +440,23 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         // A dictionary word removed with long-press is learned like a new word too until it's back (see isRemovedWord:
         // from then on it's learned as the real word it is). RemovedWords.hasEnoughUses counts on this: stored at 0 by
         // its first use, 1 more per further use.
-        val isValid = mainFreq > 0 && !isRemovedWord(wordToUse)
+        // (a word of any of the script's languages: they share the store)
+        val inAnyDictionary = mainFreq > 0 || groupsOfScript.any { g ->
+            g !== dictionaryGroup && (g.getDict(Dictionary.TYPE_MAIN)?.getFrequency(word) ?: Dictionary.NOT_A_PROBABILITY) > 0 }
+        val isValid = inAnyDictionary && !isRemovedWord(wordToUse)
         UserHistoryDictionary.addToDictionary(userHistoryDictionary, ngramContext, wordToUse, isValid, timeStampInSeconds)
         // each further use raises the word's level once more (the word alone: the word pair was counted above)
         repeat(extraUses) {
             UserHistoryDictionary.addToDictionary(userHistoryDictionary, NgramContext.EMPTY_PREV_WORDS_INFO, wordToUse, isValid, timeStampInSeconds)
         }
-        GestureDecoderVocabulary.onWordLearned(userHistoryDictionary.mContext, dictionaryGroup.locale, wordToUse)
+        GestureDecoderVocabulary.onWordLearned(userHistoryDictionary.mContext, scriptOf(wordToUse), wordToUse)
     }
 
     private fun addToPersonalDictionaryIfInvalidButInHistory(word: String) {
         if (word.length <= 1) return
         val dictionaryGroup = clearlyPreferredDictionaryGroup ?: return
         val userDict = dictionaryGroup.getSubDict(Dictionary.TYPE_USER) ?: return
-        val userHistoryDict = dictionaryGroup.getSubDict(Dictionary.TYPE_USER_HISTORY) ?: return
+        val userHistoryDict = historyFor(word) ?: return
         if (isValidWord(word, DictionaryFacilitator.ALL_DICTIONARY_TYPES, dictionaryGroup))
             return // valid word, no reason to auto-add it to personal dict
         if (isRemovedWord(word))
@@ -508,29 +547,57 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
     }
 
     override fun unlearnOneUse(word: String) {
-        val group = currentlyPreferredDictionaryGroup
         // a word capitalized only by the sentence start was learned lowercase (addWordToUserHistory): that form is
         // tried when the word as written has no count
-        val lower = word.lowercase(group.locale)
-        group.getSubDict(Dictionary.TYPE_USER_HISTORY)?.decrementEntryDynamically(word, if (lower != word) lower else null)
+        val lower = word.lowercase(currentlyPreferredDictionaryGroup.locale)
+        historyFor(word)?.decrementEntryDynamically(word, if (lower != word) lower else null)
         // a word taken back to 0 is no word any more, unless a dictionary has it
         putWordIntoValidSpellingWordCache("unlearnOneUse", word.lowercase(Locale.getDefault()))
     }
 
-    override fun getLearnedCount(word: String): Int = learnedCountIn(currentlyPreferredDictionaryGroup, word)
-
-    override fun getLearnedCountsNow(): LearningEventLog.Counts {
-        val group = currentlyPreferredDictionaryGroup
-        return LearningEventLog.Counts { learnedCountIn(group, it) }
-    }
-
-    private fun learnedCountIn(group: DictionaryGroup, word: String): Int {
-        val history = group.getSubDict(Dictionary.TYPE_USER_HISTORY) ?: return -1
+    override fun getLearnedCount(word: String): Int {
+        val history = historyFor(word) ?: return -1
         val count = history.getLearnedCount(word)
         if (count >= 0) return count
-        val lower = word.lowercase(group.locale)
+        val lower = word.lowercase(currentlyPreferredDictionaryGroup.locale)
         return if (lower != word) history.getLearnedCount(lower) else -1
     }
+
+    // (a word's store is its script's, whichever language is preferred: the counts before and after a change are read
+    // in the same store)
+    override fun getLearnedCountsNow(): LearningEventLog.Counts = LearningEventLog.Counts { getLearnedCount(it) }
+
+    override fun getLearnedWordsLabel(word: String): String = LearnedStores.label(scriptOf(word), learnedPool)
+
+    /** The script whose learned words and blacklist [word] belongs to (from its letters; the main language's without). */
+    private fun scriptOf(word: String): String = LearnedStores.scriptOf(word, dictionaryGroups[0].locale)
+
+    /**
+     * The learned words [word] belongs to: its script's store, as the groups of that script hold it. A word of a script
+     * no language of the keyboard has: the store of that script, read only if it exists unless [create] (learning).
+     */
+    private fun historyFor(word: String, create: Boolean = false): ExpandableBinaryDictionary? {
+        val groups = dictionaryGroups
+        if (!groups[0].hasDict(Dictionary.TYPE_USER_HISTORY)) return null // not set up (yet)
+        val script = scriptOf(word)
+        groups.firstOrNull { it.locale.script() == script }?.getSubDict(Dictionary.TYPE_USER_HISTORY)?.let { return it }
+        val context = filesContext ?: return null
+        PersonalizationHelper.getCachedUserHistoryDictionary(script, learnedPool)?.let { return it }
+        if (!create && !LearnedStores.storeFile(context.filesDir ?: return null, script, learnedPool).exists()) return null
+        return PersonalizationHelper.getUserHistoryDictionary(context, script, learnedPool)
+    }
+
+    /** The blacklist [word] belongs to: its script's. */
+    private fun blacklistFor(word: String): RemovedWords.WordListFile? {
+        val script = scriptOf(word)
+        blacklists[script]?.let { return it }
+        val context = filesContext?.takeIf { it.filesDir != null } ?: return null
+        return RemovedWords.blacklist(context, script, learnedPool).also { blacklists[script] = it }
+    }
+
+    // the lists in use by script (asked for every suggestion: no file name built each time); emptied on every set-up,
+    // when the pool may change
+    private val blacklists = ConcurrentHashMap<String, RemovedWords.WordListFile>()
 
     // TODO: Revise the way to fusion suggestion results.
     override fun getSuggestionResults(
@@ -540,17 +607,24 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         val proximityInfoHandle = keyboard.proximityInfo.nativeProximityInfo
         val weightOfLangModelVsSpatialModel = floatArrayOf(Dictionary.NOT_A_WEIGHT_OF_LANG_MODEL_VS_SPATIAL_MODEL)
 
-        val waitForOtherDicts = if (dictionaryGroups.size == 1) null else CountDownLatch(dictionaryGroups.size - 1)
-        val suggestionsArray = Array<List<SuggestedWordInfo>?>(dictionaryGroups.size) { null }
-        for (i in 1..dictionaryGroups.lastIndex) {
+        val groups = dictionaryGroups
+        // the languages of a script share one store of learned words: it's asked once, by the first of them (asked by
+        // each, every learned word would come up once per language, with that much more weight)
+        val asksHistory = BooleanArray(groups.size) { i ->
+            val history = groups[i].getSubDict(Dictionary.TYPE_USER_HISTORY)
+            history != null && groups.indexOfFirst { it.getSubDict(Dictionary.TYPE_USER_HISTORY) === history } == i
+        }
+        val waitForOtherDicts = if (groups.size == 1) null else CountDownLatch(groups.size - 1)
+        val suggestionsArray = Array<List<SuggestedWordInfo>?>(groups.size) { null }
+        for (i in 1..groups.lastIndex) {
             scope.launch {
                 suggestionsArray[i] = getSuggestions(composedData, ngramContext, settingsValuesForSuggestion, sessionId,
-                    proximityInfoHandle, weightOfLangModelVsSpatialModel, dictionaryGroups[i])
+                    proximityInfoHandle, weightOfLangModelVsSpatialModel, groups[i], groups, asksHistory[i])
                 waitForOtherDicts?.countDown()
             }
         }
         suggestionsArray[0] = getSuggestions(composedData, ngramContext, settingsValuesForSuggestion, sessionId,
-            proximityInfoHandle, weightOfLangModelVsSpatialModel, dictionaryGroups[0])
+            proximityInfoHandle, weightOfLangModelVsSpatialModel, groups[0], groups, asksHistory[0])
         val suggestionResults = SuggestionResults(
             SuggestedWords.MAX_SUGGESTIONS, ngramContext.isBeginningOfSentenceContext, false
         )
@@ -570,19 +644,21 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
     private fun getSuggestions(
         composedData: ComposedData, ngramContext: NgramContext,
         settingsValuesForSuggestion: SettingsValuesForSuggestion, sessionId: Int,
-        proximityInfoHandle: Long, weightOfLangModelVsSpatialModel: FloatArray, dictGroup: DictionaryGroup
+        proximityInfoHandle: Long, weightOfLangModelVsSpatialModel: FloatArray, dictGroup: DictionaryGroup,
+        groups: List<DictionaryGroup>, asksHistory: Boolean
     ): List<SuggestedWordInfo> {
         val suggestions = ArrayList<SuggestedWordInfo>()
         // the user's fixed priority for the language, on top of the automatic confidence (cached, see LanguagePriority)
-        val (priorityFactor, historyShared) = LanguagePriority.forSuggestions(dictGroup.locale) { Settings.getCurrentContext()?.prefs() }
-        val groupWeight = dictGroup.getWeightForLocale(dictionaryGroups, composedData.mIsBatchMode) * priorityFactor
+        val priorityFactor = LanguagePriority.forSuggestions(dictGroup.locale) { Settings.getCurrentContext()?.prefs() }
+        val groupWeight = dictGroup.getWeightForLocale(groups, composedData.mIsBatchMode) * priorityFactor
         // "Suggest learned & personal words" off: what was learned and the personal dictionary aren't offered (still learned)
         val personal = Settings.getValues()?.mUsePersonalizedDicts != false
         for (dictType in DictionaryFacilitator.ALL_DICTIONARY_TYPES) {
             if (!personal && (dictType == Dictionary.TYPE_USER_HISTORY || dictType == Dictionary.TYPE_USER)) continue
+            if (dictType == Dictionary.TYPE_USER_HISTORY && !asksHistory) continue // another language of the script asks it
             val dictionary = dictGroup.getDict(dictType) ?: continue
-            // words learned in a language that shares them count like the highest priority language
-            val weightForLocale = if (historyShared && dictType == Dictionary.TYPE_USER_HISTORY) 1f else groupWeight
+            // learned words belong to the script, not to one language: full weight, whichever language is preferred
+            val weightForLocale = if (dictType == Dictionary.TYPE_USER_HISTORY) 1f else groupWeight
             val dictionarySuggestions = dictionary.getSuggestions(composedData, ngramContext, proximityInfoHandle,
                 settingsValuesForSuggestion, sessionId, weightForLocale, weightOfLangModelVsSpatialModel
             ) ?: continue
@@ -631,20 +707,14 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         return valid || isTrustedWord(word) || isRestoredWord(word)
     }
 
-    // The removed-word entry of [word] (as typed or in lowercase) over the languages: the most strikes count.
-    private fun removedEntry(word: String): RemovedWords.Entry? {
-        var result: RemovedWords.Entry? = null
-        for (group in dictionaryGroups) group.removedEntry(word)?.let { result = it.max(result) }
-        return result
-    }
+    // The removed-word entry of [word] (as typed or in lowercase) in its script's blacklist.
+    private fun removedEntry(word: String): RemovedWords.Entry? = blacklistFor(word)?.entryFor(word)
 
-    // How often [word] was learned (in any capitalization, any language): RemovedWords.hasEnoughUses reads it.
+    // How often [word] was learned (in any capitalization): RemovedWords.hasEnoughUses reads it.
     private fun learnedCount(word: String): Int {
+        val history = historyFor(word) ?: return -1
         val lower = word.lowercase()
-        return dictionaryGroups.maxOfOrNull { group ->
-            val history = group.getSubDict(Dictionary.TYPE_USER_HISTORY) ?: return@maxOfOrNull -1
-            maxOf(history.getLearnedCount(word), if (lower != word) history.getLearnedCount(lower) else -1)
-        } ?: -1
+        return maxOf(history.getLearnedCount(word), if (lower != word) history.getLearnedCount(lower) else -1)
     }
 
     // A removed word typed often enough since (and on its 3rd strike brought back with the strip's "+"): back, see
@@ -666,9 +736,17 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         return RemovedWords.awaitsConfirmation(entry, learnedCount(word))
     }
 
+    /** [word] (or its lowercase entry) brought back with the strip's "+": swiped again too, from its learned copy. */
     override fun confirmRemovedWord(word: String) {
         if (!awaitsConfirmation(word)) return
-        for (group in dictionaryGroups) group.confirmRemoved(word)
+        val list = blacklistFor(word) ?: return
+        val lower = word.lowercase(dictionaryGroups[0].locale)
+        val listed = if (list.contains(word)) word else lower
+        if (!list.confirm(listed)) return
+        val history = historyFor(word) ?: return
+        // the learned copy carries it now (in the vocabularies built so far it was left out)
+        val learned = listOf(word, lower).firstOrNull { history.getLearnedCount(it) >= 0 } ?: return
+        GestureDecoderVocabulary.onWordLearned(history.mContext, scriptOf(word), learned)
     }
 
     // typed N times: a word that isn't a dictionary word is stored at count 0 by its first use, so count N - 1 (and a
@@ -684,10 +762,8 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         val lower = word.lowercase()
         fun trusted(history: ExpandableBinaryDictionary, w: String) = history.getLearnedInfo(w)
             ?.let { LearnedDecay.isTrusted(it.mCount, it.mTimestamp, now, typed) } == true
-        return dictionaryGroups.any { group ->
-            val history = group.getSubDict(Dictionary.TYPE_USER_HISTORY) ?: return@any false
-            trusted(history, word) || (lower != word && trusted(history, lower))
-        }
+        val history = historyFor(word) ?: return false
+        return trusted(history, word) || (lower != word && trusted(history, lower))
     }
 
     override fun getMainDictionaryFrequency(word: String, locale: Locale): Int {
@@ -704,11 +780,11 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
 
     // todo: move into dictionaryGroup?
     private fun isValidWord(word: String, dictionariesToCheck: Array<String>, dictionaryGroup: DictionaryGroup): Boolean {
-        if (word.isEmpty() || dictionaryGroup.isBlacklisted(word)) return false
+        if (word.isEmpty() || isBlacklisted(word)) return false
         return dictionariesToCheck.any { dictionaryGroup.getDict(it)?.isValidWord(word) == true }
     }
 
-    private fun isBlacklisted(word: String): Boolean = dictionaryGroups.any { it.isBlacklisted(word) }
+    private fun isBlacklisted(word: String): Boolean = blacklistFor(word)?.contains(word) == true
 
     // removed with long-press and not back yet (RemovedWords.isRemoved: the strikes say how it comes back)
     override fun isRemovedWord(word: String): Boolean {
@@ -718,9 +794,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
     }
 
     override fun removeWord(word: String) {
-        for (dictionaryGroup in dictionaryGroups) {
-            dictionaryGroup.removeWord(word)
-        }
+        removeWords(listOf(word))
         // and out of Android's personal dictionary for real: the in-memory copy alone came back with its next reload
         val context = dictionaryGroups.firstNotNullOfOrNull { it.getSubDict(Dictionary.TYPE_USER)?.mContext } ?: return
         val locales = locales
@@ -728,10 +802,28 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         scope.launch { runCatching { deleteFromPersonalDictionary(context, word, locales) } }
     }
 
-    override fun clearUserHistoryDictionary(context: Context) {
-        for (dictionaryGroup in dictionaryGroups) {
-            dictionaryGroup.getSubDict(Dictionary.TYPE_USER_HISTORY)?.clear()
+    /**
+     * Removes [words] from the dictionaries (learned words and personal dictionary in every capitalization, contacts,
+     * apps) and gives each one more strike on its script's blacklist. Spellings of one word ("The", "the") are one
+     * Remove: one strike; and one per word, not one per language (the languages of a script share the list).
+     */
+    private fun removeWords(words: Collection<String>) {
+        val struck = LinkedHashSet<String>()
+        for (word in words) {
+            val history = historyFor(word)
+            // each language's dictionaries say how the word is listed: as written if one of them has it so, else lowercase
+            val spellings = dictionaryGroups.map { it.removeEverywhere(word, history) }
+            struck.add(if (word in spellings) word else spellings.firstOrNull() ?: word.lowercase())
         }
+        for (spelling in struck) {
+            blacklistFor(spelling)?.strike(spelling) ?: continue
+            for (group in dictionaryGroups) GestureDecoderVocabulary.onWordBlacklisted(group.locale, spelling)
+        }
+    }
+
+    override fun clearUserHistoryDictionary(context: Context) {
+        dictionaryGroups.mapNotNull { it.getSubDict(Dictionary.TYPE_USER_HISTORY) }.distinctBy { System.identityHashCode(it) }
+            .forEach { it.clear() }
     }
 
     override fun localesAndConfidences(): String? {
@@ -750,7 +842,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
 
     override fun getDictionaryStats(context: Context): List<DictionaryStats> =
         DictionaryFacilitator.DYNAMIC_DICTIONARY_TYPES.flatMap { dictType ->
-            dictionaryGroups.mapNotNull { it.getSubDict(dictType)?.dictionaryStats }
+            dictionaryGroups.mapNotNull { it.getSubDict(dictType) }.distinctBy { System.identityHashCode(it) }.mapNotNull { it.dictionaryStats }
         }
 
     override fun dump(context: Context) = getDictionaryStats(context).joinToString("\n")
@@ -762,24 +854,33 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         private val liveFacilitators = java.util.Collections.newSetFromMap(java.util.WeakHashMap<DictionaryFacilitatorImpl, Boolean>())
 
         /**
-         * Long-press Remove of [words] in [locale], from outside the keyboard (the settings screen "Learned & blacklisted
-         * words"): through the dictionaries of that language a running keyboard has loaded, else through its main
-         * dictionary loaded for this. The learned words are the shared UserHistoryDictionary objects and the blacklist the
+         * Long-press Remove of [words] of [script] in learned-words [pool], from outside the keyboard (the settings screen
+         * "Learned & blacklisted words"; [locales]: the languages of that script): through a running keyboard that has
+         * those dictionaries and that pool loaded, else through the languages' main dictionaries loaded for this (they say
+         * how a word is listed). The learned words are the shared UserHistoryDictionary objects and the blacklist the
          * shared RemovedWords list, so the running keyboard has it at once. Call off the main thread.
          */
         @JvmStatic
-        fun removeWords(context: Context, locale: Locale, words: Collection<String>) {
-            val live = synchronized(liveFacilitators) { liveFacilitators.toList() }
-                .firstNotNullOfOrNull { f -> f.dictionaryGroups.firstOrNull { it.locale == locale && it.hasDict(Dictionary.TYPE_MAIN) } }
+        fun removeWords(context: Context, script: String, pool: Int, locales: Collection<Locale>, words: Collection<String>) {
+            val live = synchronized(liveFacilitators) { liveFacilitators.toList() }.firstOrNull { f ->
+                f.learnedPool == pool && f.dictionaryGroups.any { it.locale in locales && it.hasDict(Dictionary.TYPE_MAIN) } }
             if (live != null) return live.removeWords(words)
-            val mainDict = DictionaryFactory.createMainDictionaryCollection(context, locale, false)
+            val history = PersonalizationHelper.getUserHistoryDictionary(context, script, pool)
+            val groups = locales.map { DictionaryGroup(it, DictionaryFactory.createMainDictionaryCollection(context, it, false)) }
             try {
-                val history = PersonalizationHelper.getUserHistoryDictionary(context, locale)
-                val group = DictionaryGroup(locale, mainDict, mapOf(Dictionary.TYPE_USER_HISTORY to history), context)
-                group.removeWords(words)
+                val struck = LinkedHashSet<String>()
+                for (word in words) {
+                    val spellings = groups.map { it.removeEverywhere(word, history) }
+                    struck.add(if (word in spellings || spellings.isEmpty()) word else spellings.first())
+                }
+                val list = RemovedWords.blacklist(context, script, pool)
+                for (spelling in struck) {
+                    list.strike(spelling)
+                    for (locale in locales) GestureDecoderVocabulary.onWordBlacklisted(locale, spelling)
+                }
                 history.onFinishInput() // written to the file now: the keyboard may not be running
             } finally {
-                mainDict.close()
+                groups.forEach { it.closeDict(Dictionary.TYPE_MAIN) }
             }
         }
 
@@ -896,26 +997,21 @@ private class DictionaryGroup(
     val locale: Locale = Locale(""),
     private var mainDict: Dictionary? = null,
     subDicts: Map<String, ExpandableBinaryDictionary> = emptyMap(),
-    context: Context? = null
 ) {
     private val subDicts: ConcurrentHashMap<String, ExpandableBinaryDictionary> = ConcurrentHashMap(subDicts)
 
-    /** Removes a word from all dictionaries in this group, and gives it one more strike on the blacklist. */
-    fun removeWord(word: String) = removeWords(listOf(word))
-
-    /** [removeWord] for several words; spellings of one word ("The", "the") are one Remove: one strike. */
-    fun removeWords(words: Collection<String>) {
-        words.mapTo(LinkedHashSet()) { removeEverywhere(it) }.forEach { strike(it) }
-    }
-
-    /** Takes [word] out of this group's dictionaries. @return the spelling its blacklist entry has */
-    private fun removeEverywhere(word: String): String {
+    /**
+     * Takes [word] out of this group's dictionaries and out of [history] (the learned words of the word's script, which
+     * the languages of a script share; the blacklist strike is the caller's, once per word).
+     * @return the spelling its blacklist entry has
+     */
+    fun removeEverywhere(word: String, history: ExpandableBinaryDictionary?): String {
         // from the learned words and the personal dictionary in every capitalization ("Hello" at a sentence start was
         // learned as "hello"; "HELLO" with caps lock)
         val lower = word.lowercase(locale)
         val forms = linkedSetOf(word, lower, word.uppercase(locale), lower.replaceFirstChar { it.titlecase(locale) })
         for (form in forms) {
-            getSubDict(Dictionary.TYPE_USER_HISTORY)?.removeUnigramEntryDynamically(form)
+            history?.removeUnigramEntryDynamically(form)
             getSubDict(Dictionary.TYPE_USER)?.removeUnigramEntryDynamically(form)
         }
         // and from the swipe vocabularies already built (the removed words list keeps it out of rebuilds)
@@ -978,35 +1074,7 @@ private class DictionaryGroup(
         return 1f
     }
 
-    // --------------- Blacklist -------------------
-
-    // words cannot be (permanently) removed from some dictionaries, so we use a blacklist for "removing" words; the
-    // lists are shared with the settings screen "Learned & blacklisted words" (same objects, same process), so what's
-    // changed there counts here at once. Re-read when the group is set up (e.g. after a restore replaced the files).
-    private val blacklist = context?.takeIf { it.filesDir != null }?.let { RemovedWords.blacklist(it, locale).apply { reloadAsync() } }
-
-    fun isBlacklisted(word: String) = blacklist?.contains(word) == true
-
-    /** [word]'s entry as typed or in lowercase, see RemovedWords.WordListFile.entryFor. */
-    fun removedEntry(word: String): RemovedWords.Entry? = blacklist?.entryFor(word)
-
-    private fun strike(word: String) {
-        if (blacklist == null) return
-        blacklist.strike(word)
-        GestureDecoderVocabulary.onWordBlacklisted(locale, word)
-    }
-
-    /** [word] (or its lowercase entry) brought back with the strip's "+": swiped again too, from its learned copy. */
-    fun confirmRemoved(word: String) {
-        val list = blacklist ?: return
-        val lower = word.lowercase(locale)
-        val listed = if (list.contains(word)) word else lower
-        if (!list.confirm(listed)) return
-        val history = getSubDict(Dictionary.TYPE_USER_HISTORY) ?: return
-        // the learned copy carries it now (in the vocabularies built so far it was left out)
-        val learned = listOf(word, lower).firstOrNull { history.getLearnedCount(it) >= 0 } ?: return
-        GestureDecoderVocabulary.onWordLearned(history.mContext, locale, learned)
-    }
+    // (the blacklist is per script, not per language: DictionaryFacilitatorImpl.blacklistFor, see RemovedWords)
 
     // --------------- Dictionary handling -------------------
 
@@ -1035,6 +1103,9 @@ private class DictionaryGroup(
         }
         return subDicts.containsKey(dictType)
     }
+
+    /** Takes [dictType] out of the group without closing it. */
+    fun removeSubDict(dictType: String): ExpandableBinaryDictionary? = subDicts.remove(dictType)
 
     fun closeDict(dictType: String) {
         val dict = if (Dictionary.TYPE_MAIN == dictType) {

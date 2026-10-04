@@ -2,6 +2,8 @@
 package helium314.keyboard.latin.utils
 
 import android.content.Context
+import helium314.keyboard.latin.personalization.LearnedStoreMigration
+import helium314.keyboard.latin.personalization.LearnedStores
 import java.io.File
 import java.io.IOException
 import java.util.Locale
@@ -9,7 +11,9 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
 /**
- * The per-language blacklists (long-press Remove: every removed word, with how often it was removed), kept as files.
+ * The blacklists (long-press Remove: every removed word, with how often it was removed), kept as files: one per script,
+ * like the learned words (see LearnedStores: blacklists/<script>.txt, a keyboard's own blacklists/k<id>/<script>.txt), so
+ * a word removed while typing English is removed for Hinglish too; a word goes by its own script.
  * Generic over the file, so a further list of the kind is one more function here.
  *
  * One object per file for the whole process: the keyboard's dictionaries (DictionaryGroup), the spell checker, the swipe
@@ -25,12 +29,19 @@ object RemovedWords {
     // file writes and re-reads, in order
     private val io = Executors.newSingleThreadExecutor { Thread(it, "RemovedWords") }
 
-    private fun dir(context: Context) = File(context.filesDir, "blacklists")
+    /** Long-press Remove: the list of [script] in [pool] (see LearnedStores). */
+    @JvmStatic
+    fun blacklist(context: Context, script: String, pool: Int = LearnedStores.currentPool): WordListFile =
+        forFile(LearnedStores.blacklistFile(context.filesDir, script, pool))
 
-    /** Long-press Remove: filesDir/blacklists/<languageTag>.txt */
-    fun blacklist(context: Context, locale: Locale): WordListFile = forFile(File(dir(context), locale.toLanguageTag() + ".txt"))
+    /** The list [word] belongs to: its own script's (from its letters; [fallback]'s for a word without any). */
+    fun blacklistFor(context: Context, word: String, fallback: Locale, pool: Int = LearnedStores.currentPool): WordListFile =
+        blacklist(context, LearnedStores.scriptOf(word, fallback), pool)
 
-    private fun forFile(file: File): WordListFile = lists.getOrPut(file.absolutePath) { WordListFile(file) }
+    fun forFile(file: File): WordListFile = lists.getOrPut(file.absolutePath) { WordListFile(file) }
+
+    /** The list object for [file] if anything holds it already, else null. */
+    fun cached(file: File): WordListFile? = lists[file.absolutePath]
 
     // ------------------------------- the rule -------------------------------
 
@@ -103,7 +114,18 @@ object RemovedWords {
         return result
     }
 
-    class WordListFile internal constructor(private val file: File) {
+    /** Lists merged into one: every word of each, the most strikes of a word on several (and its confirmation). */
+    fun mergeLists(lists: List<Map<String, Entry>>): Map<String, Entry> {
+        val result = LinkedHashMap<String, Entry>()
+        for (list in lists) for ((word, entry) in list) result[word] = entry.max(result[word])
+        return result
+    }
+
+    /** The lines [WordListFile] writes for [entries]. */
+    fun formatAll(entries: Map<String, Entry>): String =
+        entries.entries.sortedBy { it.key }.joinToString("") { format(it.key, it.value) + "\n" }
+
+    class WordListFile internal constructor(val file: File) {
         private val byWord = ConcurrentHashMap<String, Entry>()
         // changed in memory, not written yet (null: taken off): a re-read meanwhile must not undo them
         private val pending = HashMap<String, Entry?>()
@@ -140,6 +162,8 @@ object RemovedWords {
         fun reloadAsync() = io.execute { read() }
 
         private fun read() = synchronized(lock) {
+            // (while the per-language lists of before are merged into per-script ones, see LearnedStoreMigration)
+            LearnedStoreMigration.awaitDone()
             val read = try {
                 if (file.isDirectory) file.delete() // this apparently was an issue in some versions
                 if (file.isFile) parseAll(file.readLines()) else emptyMap()
@@ -160,7 +184,7 @@ object RemovedWords {
                 try {
                     if (file.isDirectory) file.delete()
                     file.parentFile?.mkdirs()
-                    file.writeText(byWord.entries.sortedBy { it.key }.joinToString("") { format(it.key, it.value) + "\n" })
+                    file.writeText(formatAll(byWord))
                     pending.clear()
                 } catch (e: IOException) {
                     Log.e(TAG, "Exception while trying to write word list ${file.name}", e)
@@ -198,6 +222,18 @@ object RemovedWords {
                 set(word, null)
             }
             return true
+        }
+
+        /** The list replaced by [entries] (the keyboards' lists merged when they share them again). Call off the main thread. */
+        fun replaceAll(entries: Map<String, Entry>) {
+            io.submit {
+                synchronized(lock) {
+                    ensureLoaded()
+                    for (word in byWord.keys.toList()) if (word !in entries) set(word, null)
+                    for ((word, entry) in entries) if (byWord[word] != entry) set(word, entry)
+                }
+            }.get()
+            reload() // after the write it started
         }
 
         /** A backup's list ([lines]) added to this one: its words, and the most strikes of a word on both. Call off the main thread. */

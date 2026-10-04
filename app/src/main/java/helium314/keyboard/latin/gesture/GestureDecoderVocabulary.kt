@@ -7,11 +7,13 @@ import com.android.inputmethod.latin.BinaryDictionary
 import helium314.keyboard.gesture.Vocabulary
 import helium314.keyboard.latin.common.LocaleUtils.constructLocale
 import helium314.keyboard.latin.dictionary.Dictionary
+import helium314.keyboard.latin.personalization.LearnedStores
 import helium314.keyboard.latin.personalization.PersonalizationHelper
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.DictionaryInfoUtils
 import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.RemovedWords
+import helium314.keyboard.latin.utils.ScriptUtils.script
 import java.io.File
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
@@ -54,6 +56,11 @@ object GestureDecoderVocabulary {
             rebuildWithLearned()
         }
 
+    init {
+        // another keyboard's own learned words (or all keyboards' again): the vocabularies carry the old ones
+        LearnedStores.onPoolChanged { rebuildWithLearned() }
+    }
+
     // learned words are merged into every cached vocabulary with the boost baked in: rebuild them in the
     // background while the current ones keep serving swipes (clearing them emptied every swipe until the rebuild,
     // e.g. right after switching to a keyboard with its own boost)
@@ -86,11 +93,13 @@ object GestureDecoderVocabulary {
 
     /** Removed with long-press, in this or the lowercase form, and (for the [learned] copy) not back yet. */
     private fun isRemoved(context: Context, locale: Locale, word: String, learned: Boolean): Boolean {
-        // the same list object the keyboard's dictionaries hold (read here once if they haven't yet: a build thread)
-        val entry = RemovedWords.blacklist(context, locale).apply { ensureLoaded() }.entryFor(word) ?: return false
+        // the same list object the keyboard's dictionaries hold (read here once if they haven't yet: a build thread);
+        // the list of the word's own script, like the learned words
+        val script = LearnedStores.scriptOf(word, locale)
+        val entry = RemovedWords.blacklist(context, script).apply { ensureLoaded() }.entryFor(word) ?: return false
         if (!learned) return true
         // (only for a removed word: the counts aren't read per vocabulary word)
-        val history = PersonalizationHelper.getUserHistoryDictionary(context, locale)
+        val history = PersonalizationHelper.getUserHistoryDictionary(context, script, LearnedStores.currentPool)
         val lower = word.lowercase()
         val count = maxOf(history.getLearnedCount(word), if (lower != word) history.getLearnedCount(lower) else -1)
         return RemovedWords.isRemoved(entry, count)
@@ -125,15 +134,15 @@ object GestureDecoderVocabulary {
     private val learnExecutor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor { Thread(it, "GestureVocabLearn") }
     private const val LEARN_DELAY_MS = 1000L // the user-history write is asynchronous too: read the word's new weight after it
 
-    /** One language of a multilingual keyboard: its score factor from the priority setting, and whether its learned words count for every language. */
-    class LocaleSpec(val locale: Locale, val factor: Float, val sharesHistory: Boolean) {
-        val key get() = "${locale.toLanguageTag()}*$factor*$sharesHistory*$historyBoost"
+    /** One language of a multilingual keyboard: its score factor from the priority setting. */
+    class LocaleSpec(val locale: Locale, val factor: Float) {
+        val key get() = "${locale.toLanguageTag()}*$factor*$historyBoost"
     }
 
     /**
      * Vocabulary for a multilingual keyboard: the per-locale vocabularies merged, each locale's words
-     * scaled by its [LocaleSpec.factor]. Learned words are scaled the same way unless the locale shares
-     * them. Null (and per-locale builds kicked off) until every locale's vocabulary exists.
+     * scaled by its [LocaleSpec.factor]. Learned words are per script and count fully (as in typing's suggestions):
+     * added once per script, unscaled. Null (and per-locale builds kicked off) until every locale's vocabulary exists.
      */
     fun getOrBuildAsync(specs: List<LocaleSpec>): Vocabulary? {
         if (specs.size == 1 && specs[0].factor == 1f) return getOrBuildAsync(specs[0].locale)
@@ -148,15 +157,16 @@ object GestureDecoderVocabulary {
         // all sit at 248+, English's "the" is 222), so every further language is put on the first language's scale
         // by rank before its priority factor applies; otherwise the factor fights the scale instead of expressing priority
         val reference = specs.firstNotNullOfOrNull { mainEntries[it.locale.toLanguageTag()] }?.map { it.second }
+        val scriptsDone = HashSet<String>()
         for (spec in specs) {
             val entries = mainEntries[spec.locale.toLanguageTag()] ?: continue
             val normalized = if (reference == null || entries.map { it.second } == reference) entries
                 else entries.mapIndexed { i, (word, _) -> word to reference[i.coerceAtMost(reference.lastIndex)] }
             for ((word, freq) in withoutExcluded(context, spec.locale, normalized, learned = false))
                 vocab.add(word, (freq * spec.factor).toInt().coerceAtLeast(MIN_PROBABILITY))
-            val historyFactor = if (spec.sharesHistory) 1f else spec.factor
-            for ((word, freq) in historyEntries(context, spec.locale, retries = 0))
-                vocab.add(word, (freq * historyFactor).toInt().coerceAtLeast(MIN_PROBABILITY))
+            // the languages of a script share their learned words: once for all of them
+            if (scriptsDone.add(spec.locale.script()))
+                for ((word, freq) in historyEntries(context, spec.locale, retries = 0)) vocab.add(word, freq)
         }
         if (vocab.size == 0) return null
         Log.d(TAG, "merged vocabulary for $key: ${vocab.size} words")
@@ -244,23 +254,24 @@ object GestureDecoderVocabulary {
     }
 
     /**
-     * A word was just learned into [locale]'s user history: put it into the vocabularies already built (they only read
-     * user history when they are built, so a new word could otherwise not be swiped until the next rebuild).
+     * A word was just learned into [script]'s learned words: put it into the vocabularies already built for the
+     * languages of that script (they only read the learned words when they are built, so a new word could otherwise not
+     * be swiped until the next rebuild).
      */
-    fun onWordLearned(context: Context, locale: Locale, word: String) {
+    fun onWordLearned(context: Context, script: String, word: String) {
         if (!isDecodableWord(word) || !includeLearned) return
+        val pool = LearnedStores.currentPool
         learnExecutor.schedule({
             try {
+                val locale = LearnedStores.storeLocale(script)
                 if (isExcluded(context, locale, word, learned = true)) return@schedule
-                val probability = PersonalizationHelper.getUserHistoryDictionary(context, locale).getFrequency(word)
+                val probability = PersonalizationHelper.getUserHistoryDictionary(context, script, pool).getFrequency(word)
                 if (probability <= 0) return@schedule
                 val freq = (probability + historyBoost).coerceIn(1, 255)
-                val tag = locale.toLanguageTag()
-                cache[tag]?.add(word, freq)
-                for ((key, vocab) in merged) {
-                    val spec = mergedSpecs[key]?.firstOrNull { it.locale.toLanguageTag() == tag } ?: continue
-                    vocab.add(word, (freq * (if (spec.sharesHistory) 1f else spec.factor)).toInt().coerceAtLeast(MIN_PROBABILITY))
-                }
+                for ((tag, vocab) in cache) if (tag.constructLocale().script() == script) vocab.add(word, freq)
+                // (at full weight, as when the vocabulary was built)
+                for ((key, vocab) in merged)
+                    if (mergedSpecs[key]?.any { it.locale.script() == script } == true) vocab.add(word, freq)
             } catch (t: Throwable) {
                 Log.w(TAG, "could not add learned word to the gesture vocabulary", t)
             }
