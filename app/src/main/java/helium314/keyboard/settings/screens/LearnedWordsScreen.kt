@@ -58,7 +58,8 @@ import java.util.Locale
  *   shown in its most typed spelling); a word's script comes from its letters, so a Latin word learned in a Devanagari
  *   language is listed under Latin. Remove: the same as long-press Remove (DictionaryFacilitatorImpl.removeWord), in
  *   every language of the script, plus its rows in the Android personal dictionary
- * - Blacklisted words: the long-press Remove lists (filesDir/blacklists/<tag>.txt, see RemovedWords). Un-blacklist.
+ * - Blacklisted words: the long-press Remove lists (filesDir/blacklists/<tag>.txt, see RemovedWords), with how often
+ *   each was removed (its strikes, which say how it comes back). Un-blacklist: the word and its strikes.
  * A further section (another list of the kind) is one more Kind with its action and one more section() in rows().
  * The personal dictionary's own screens (shortcuts, weights, "for all languages", editing) stay reachable from the
  * first screen, and Add a word here is its add dialog.
@@ -167,6 +168,7 @@ private class Entry(
     val learnedIn: Set<Locale>,
     val personal: List<PersonalEntry>,
     val listedIn: List<Pair<Locale, String>>, // blacklist rows: the language and spelling of each
+    val strikes: Int, // how often removed (the most of its rows), 0: not blacklisted
 )
 
 private sealed interface Row {
@@ -185,7 +187,9 @@ private class Item(val entry: Entry, val kind: Kind) : Row {
             },
             if (entry.personal.isEmpty()) null else stringResource(R.string.learned_words_in_personal_dictionary),
         ).joinToString(" · ").ifEmpty { null }
-        Kind.BLACKLISTED -> null // (what the section means is said once, under its heading)
+        // (what the strikes mean is said once, under the section's heading)
+        Kind.BLACKLISTED -> if (entry.strikes <= 1) stringResource(R.string.learned_words_removed_once)
+            else stringResource(R.string.learned_words_removed_times, entry.strikes)
     }
 }
 
@@ -283,10 +287,11 @@ private class Builder(val lower: String) {
     val learnedIn = mutableSetOf<Locale>()
     val personal = mutableListOf<PersonalEntry>()
     val listedIn = mutableListOf<Pair<Locale, String>>()
+    var strikes = 0
     fun build(): Entry {
         val spellings = counts.keys + personal.map { it.word.word } + listedIn.map { it.second }
         val word = counts.maxByOrNull { it.value }?.key ?: personal.firstOrNull()?.word?.word ?: listedIn.firstOrNull()?.second ?: lower
-        return Entry(word, spellings.toSet(), counts.values.sum(), learnedIn, personal, listedIn)
+        return Entry(word, spellings.toSet(), counts.values.sum(), learnedIn, personal, listedIn, strikes)
     }
 }
 
@@ -303,8 +308,11 @@ private fun readWordLists(context: Context, script: String): WordLists {
         }
         for (p in readPersonal(context, locale))
             if (wordScript(p.word.word, localeScript) == script) yours.of(p.word.word).personal.add(p)
-        for (word in RemovedWords.blacklist(context, locale).apply { reload() }.words())
-            if (wordScript(word, localeScript) == script) blacklisted.of(word).listedIn.add(locale to word)
+        for ((word, removed) in RemovedWords.blacklist(context, locale).apply { reload() }.entries())
+            if (wordScript(word, localeScript) == script) blacklisted.of(word).apply {
+                listedIn.add(locale to word)
+                strikes = maxOf(strikes, removed.strikes) // (each Remove strikes every language of the keyboard)
+            }
     }
     for (p in readPersonal(context, null)) // for all languages
         if (wordScript(p.word.word, ScriptUtils.SCRIPT_LATIN) == script) yours.of(p.word.word).personal.add(p)
@@ -344,7 +352,7 @@ private fun apply(context: Context, scriptLocales: List<Locale>, item: Item) {
             entry.spellings.forEach { HotWords.forget(it); FrequentLongWords.forget(it) }
         }
         Kind.BLACKLISTED -> entry.listedIn.forEach { (locale, word) ->
-            // (and swipeable again)
+            // its strikes go with it (and it's swipeable again)
             if (RemovedWords.blacklist(context, locale).remove(word))
                 helium314.keyboard.latin.gesture.GestureDecoderVocabulary.onWordUnblacklisted(locale, word)
         }

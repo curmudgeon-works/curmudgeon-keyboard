@@ -87,6 +87,10 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         fun onCodeInput(primaryCode: Int, x: Int, y: Int, isKeyRepeat: Boolean)
         /** [word] was removed (long-press card): [remaining] are the suggestions without it, also for what space commits. */
         fun removeSuggestion(word: String?, remaining: SuggestedWords)
+        /** [word] was removed 3 times and typed often enough since: the strip shows a "+" after it ([confirmRemovedWord]). */
+        fun awaitsConfirmation(word: String): Boolean
+        /** The "+" after [word] was tapped: it's back. */
+        fun confirmRemovedWord(word: String)
         fun removeExternalSuggestions()
         fun onSwipeDownOnToolbar()
     }
@@ -364,6 +368,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         startIndexOfMoreSuggestions = layoutHelper.layoutAndReturnStartIndexOfMoreSuggestions(
             context, suggestedWords, suggestionsStrip, this
         )
+        addConfirmMarker()
         isExternalSuggestionVisible = false
         // new words start at the beginning, not wherever the previous list was scrolled to
         val scrollView = suggestionsStrip.parent as? HorizontalScrollView
@@ -580,6 +585,41 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         val x = stripLocation[0] + (width - popup.width) / 2
         val y = stripLocation[1] + height + ((keyboardHeight - card.measuredHeight) / 2).coerceAtLeast(dp(8))
         popup.showAtLocation(this, Gravity.NO_GRAVITY, x, y)
+    }
+
+    // a word removed 3 times comes back only when you say so, once typed often enough again (RemovedWords): a "+" right
+    // after the typed word, in its colour and size, is the say-so (tapping the word itself types it, as always)
+    private var confirmMarker: TextView? = null
+
+    private fun addConfirmMarker() {
+        if (suggestedWords.isPunctuationSuggestions || suggestedWords.size() == 0) return
+        val info = suggestedWords.getInfo(SuggestedWords.INDEX_OF_TYPED_WORD)
+        if (!info.isKindOf(SuggestedWordInfo.KIND_TYPED) || !listener.awaitsConfirmation(info.word)) return
+        val wordView = wordViews.firstOrNull { it.tag == SuggestedWords.INDEX_OF_TYPED_WORD } ?: return
+        val at = suggestionsStrip.indexOfChild(wordView)
+        if (at < 0) return
+        val marker = confirmMarker ?: TextView(context, null, R.attr.suggestionWordStyle).also { confirmMarker = it }
+        marker.text = "+"
+        marker.setTextColor(wordView.currentTextColor)
+        marker.setTextSize(TypedValue.COMPLEX_UNIT_PX, wordView.textSize)
+        marker.typeface = Typeface.DEFAULT_BOLD
+        marker.minWidth = 0
+        marker.minimumWidth = 0
+        marker.gravity = Gravity.CENTER
+        // snug against the word (which has its own spacing), a finger's width to tap
+        val pad = 4.dpToPx(resources)
+        marker.setPadding(pad, 0, 3 * pad, 0)
+        marker.contentDescription = context.getString(R.string.bring_back_removed_word, info.word)
+        Settings.getValues().mColors.setBackground(marker, ColorType.STRIP_BACKGROUND)
+        val word = info.word
+        marker.setOnClickListener {
+            AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, this, HapticEvent.KEY_PRESS)
+            marker.isVisible = false // the suggestions update after this
+            listener.confirmRemovedWord(word)
+        }
+        marker.isVisible = true
+        (marker.parent as? ViewGroup)?.removeView(marker)
+        suggestionsStrip.addView(marker, at + 1, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
     }
 
     private fun showMoreSuggestions(): Boolean {

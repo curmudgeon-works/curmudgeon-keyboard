@@ -164,7 +164,7 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
                 // it when a correction is coming); off: right after it, and the correction stays what it was
                 val frequentCorrects = Settings.getValues().mAutocorrectFrequentWords
                 var slot = min(if (frequentCorrects) 1 else 2, suggestionsList.size)
-                // (words removed with long-press stay out, like the dictionaries' do; typing one again un-removes it)
+                // (words removed with long-press stay out, like the dictionaries' do; typed again often enough, one is back: RemovedWords)
                 // and with the typed word's capitals, like every other suggestion (a capital you typed stays)
                 val frequentAllCaps = wordComposer.isAllUpperCase && wordComposer.size() > 1
                 val frequentFirstCap = wordComposer.isOrWillBeOnlyFirstCharCapitalized

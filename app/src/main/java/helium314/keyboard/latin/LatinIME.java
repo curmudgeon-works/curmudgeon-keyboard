@@ -1569,6 +1569,18 @@ public class LatinIME extends InputMethodService implements
     }
 
     @Override
+    public boolean awaitsConfirmation(final String word) {
+        return mDictionaryFacilitator.awaitsConfirmation(word);
+    }
+
+    @Override
+    public void confirmRemovedWord(final String word) {
+        mDictionaryFacilitator.confirmRemovedWord(word);
+        // the typed word is a real word now: suggestions without the "+", and it's no longer corrected away
+        mHandler.postUpdateSuggestionStrip(SuggestedWords.INPUT_STYLE_TYPING);
+    }
+
+    @Override
     public void removeExternalSuggestions() {
         setNeutralSuggestionStrip();
         mHandler.postResumeSuggestions(false);
