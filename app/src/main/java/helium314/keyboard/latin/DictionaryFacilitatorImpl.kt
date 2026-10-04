@@ -489,15 +489,36 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         return preferred
     }
 
+    // Learning rules (2026-10-04): a correction never wipes a learned word any more (only Remove does). A reverted
+    // auto-correction takes back the one use its commit counted; a deleted fresh swipe was never counted (a swiped word
+    // is learned when it's committed); deleting text takes nothing back.
     override fun unlearnFromUserHistory(word: String, ngramContext: NgramContext, timeStampInSeconds: Long, eventType: Int) {
-        // TODO: Decide whether or not to remove the word on EVENT_BACKSPACE.
-        if (eventType != Constants.EVENT_BACKSPACE) {
-            currentlyPreferredDictionaryGroup.getSubDict(Dictionary.TYPE_USER_HISTORY)?.removeUnigramEntryDynamically(word)
+        if (eventType == Constants.EVENT_REVERT) {
+            unlearnOneUse(word)
+            return
         }
-
         // Update the spelling cache after unlearning. Words that are removed from user history
         // and appear in no other language model are not considered valid.
         putWordIntoValidSpellingWordCache("unlearnFromUserHistory", word.lowercase(Locale.getDefault()))
+    }
+
+    override fun unlearnOneUse(word: String) {
+        val group = currentlyPreferredDictionaryGroup
+        // a word capitalized only by the sentence start was learned lowercase (addWordToUserHistory): that form is
+        // tried when the word as written has no count
+        val lower = word.lowercase(group.locale)
+        group.getSubDict(Dictionary.TYPE_USER_HISTORY)?.decrementEntryDynamically(word, if (lower != word) lower else null)
+        // a word taken back to 0 is no word any more, unless a dictionary has it
+        putWordIntoValidSpellingWordCache("unlearnOneUse", word.lowercase(Locale.getDefault()))
+    }
+
+    override fun getLearnedCount(word: String): Int {
+        val group = currentlyPreferredDictionaryGroup
+        val history = group.getSubDict(Dictionary.TYPE_USER_HISTORY) ?: return -1
+        val count = history.getLearnedCount(word)
+        if (count >= 0) return count
+        val lower = word.lowercase(group.locale)
+        return if (lower != word) history.getLearnedCount(lower) else -1
     }
 
     // TODO: Revise the way to fusion suggestion results.

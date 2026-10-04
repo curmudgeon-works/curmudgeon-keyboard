@@ -151,10 +151,20 @@ public interface DictionaryFacilitator {
     /** a string with all used locales and their current confidences, null if multilingual typing is not used */
     @Nullable String localesAndConfidences();
 
-    /** completely removes the word from user history (currently not if event is a backspace event) */
+    /** A reverted auto-correction takes one use back from the word (see {@link #unlearnOneUse}); deleting words
+     *  (EVENT_BACKSPACE) and a deleted fresh swipe (EVENT_REJECTION, never counted) take nothing. */
     void unlearnFromUserHistory(final String word,
             @NonNull final NgramContext ngramContext, final long timeStampInSeconds,
             final int eventType);
+
+    /** Takes one counted use of [word] back from the learned words (an auto-correction reverted, an accepted word
+     *  edited later): its count goes down by one, never below 0, and the word stays stored. */
+    default void unlearnOneUse(final String word) {}
+
+    /** How often [word] was learned in the language in use (as written, else lowercase), -1 if it isn't stored. */
+    default int getLearnedCount(final String word) {
+        return -1;
+    }
 
     @NonNull SuggestionResults getSuggestionResults(final ComposedData composedData,
             final NgramContext ngramContext, @NonNull final Keyboard keyboard,

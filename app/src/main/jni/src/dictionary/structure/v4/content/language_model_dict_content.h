@@ -201,6 +201,10 @@ class LanguageModelDictContent {
             const HeaderPolicy *const headerPolicy,
             MutableEntryCounters *const entryCountersToUpdate);
 
+    // Curmudgeon: lowers the word's own (unigram) count by [uses], never below 0. The entry stays, with its
+    // flags, its word pairs and the timestamp of its last real use.
+    bool takeBackUses(const int wordId, const int uses);
+
  private:
     DISALLOW_COPY_AND_ASSIGN(LanguageModelDictContent);
 

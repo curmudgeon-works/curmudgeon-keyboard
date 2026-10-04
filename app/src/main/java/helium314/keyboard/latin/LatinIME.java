@@ -1559,6 +1559,11 @@ public class LatinIME extends InputMethodService implements
 
     @Override
     public void removeSuggestion(final String word, final SuggestedWords remaining) {
+        if (!mSettings.getCurrent().mIncognitoModeEnabled) // (nothing typed in incognito goes in the log)
+            helium314.keyboard.latin.personalization.LearningEventLog.log(
+                    helium314.keyboard.latin.personalization.LearningEventLog.REMOVED,
+                    helium314.keyboard.latin.personalization.LearningEventLog.STRIP, word, "",
+                    mDictionaryFacilitator.getCurrentLocale().toLanguageTag(), mDictionaryFacilitator::getLearnedCount);
         mDictionaryFacilitator.removeWord(word);
         // its recent and frequent uses go too: typed again, it starts from the bottom like a new word
         helium314.keyboard.latin.utils.HotWords.INSTANCE.forget(word);

@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import helium314.keyboard.latin.gesture.SwipeMetrics
+import helium314.keyboard.latin.personalization.LearningEventLog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import helium314.keyboard.settings.dialogs.LocalPreviewEmoji
@@ -297,6 +298,31 @@ fun createAdvancedSettings(context: Context) = listOf(
                             style = MaterialTheme.typography.bodySmall)
                     }
                     TextButton(onClick = { SwipeMetrics.clear(); generation++ }) { Text(stringResource(R.string.swipe_metrics_clear)) }
+                }
+            }
+        }
+    },
+    // what corrections do to the learned words, laid out like the swipe results above
+    Setting(context, Settings.PREF_LEARNING_LOG, R.string.learning_log, R.string.learning_log_summary) { def ->
+        val ctx = LocalContext.current
+        var generation by remember { mutableIntStateOf(0) }
+        var on by remember { mutableStateOf(ctx.prefs().getBoolean(def.key, Defaults.PREF_LEARNING_LOG)) }
+        Column {
+            SwitchPreference(def, Defaults.PREF_LEARNING_LOG) { on = it }
+            if (on) {
+                val week = remember(generation) { LearningEventLog.summary(7) }
+                val all = remember(generation) { LearningEventLog.summary(0) }
+                Column(Modifier.padding(start = 22.dp, end = 16.dp, bottom = 8.dp)) {
+                    for ((label, s) in listOf(R.string.swipe_metrics_week to week, R.string.swipe_metrics_all to all)) {
+                        Text(stringResource(label), style = MaterialTheme.typography.labelMedium)
+                        Text(if (s.total == 0) stringResource(R.string.learning_log_none)
+                            else stringResource(R.string.learning_log_line, s.of(LearningEventLog.ACCEPTED),
+                                s.of(LearningEventLog.AUTOCORRECT_REVERTED), s.of(LearningEventLog.SWIPE_DELETED),
+                                s.of(LearningEventLog.ACCEPTED_EDITED), s.of(LearningEventLog.SWIPE_EDITED),
+                                s.of(LearningEventLog.REMOVED), s.of(LearningEventLog.RESTORED)),
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                    TextButton(onClick = { LearningEventLog.clear(); generation++ }) { Text(stringResource(R.string.swipe_metrics_clear)) }
                 }
             }
         }

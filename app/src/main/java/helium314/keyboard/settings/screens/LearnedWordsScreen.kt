@@ -29,6 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import helium314.keyboard.latin.DictionaryFacilitatorImpl
 import helium314.keyboard.latin.R
+import helium314.keyboard.latin.personalization.LearningEventLog
 import helium314.keyboard.latin.personalization.PersonalizationHelper
 import helium314.keyboard.latin.personalization.UserHistoryDictionary
 import helium314.keyboard.latin.utils.FrequentLongWords
@@ -326,6 +327,12 @@ private fun apply(context: Context, scriptLocales: List<Locale>, item: Item) {
             val locales = (scriptLocales + entry.learnedIn + entry.personal.mapNotNull { it.locale }).distinct()
             for (locale in locales) {
                 try {
+                    if (LearningEventLog.isEnabled()) {
+                        val counts = LearningEventLog.countsIn(PersonalizationHelper.getUserHistoryDictionary(context, locale))
+                        for (word in entry.spellings)
+                            LearningEventLog.log(LearningEventLog.REMOVED, LearningEventLog.SETTINGS, word, "",
+                                locale.toLanguageTag(), counts)
+                    }
                     DictionaryFacilitatorImpl.removeWords(context, locale, entry.spellings)
                 } catch (e: Exception) {
                     Log.w("LearnedWordsScreen", "could not remove a word in ${locale.toLanguageTag()}", e)
@@ -345,8 +352,12 @@ private fun apply(context: Context, scriptLocales: List<Locale>, item: Item) {
         }
         Kind.BLACKLISTED -> entry.listedIn.forEach { (locale, word) ->
             // (and swipeable again)
-            if (RemovedWords.blacklist(context, locale).remove(word))
+            if (RemovedWords.blacklist(context, locale).remove(word)) {
                 helium314.keyboard.latin.gesture.GestureDecoderVocabulary.onWordUnblacklisted(locale, word)
+                if (LearningEventLog.isEnabled())
+                    LearningEventLog.log(LearningEventLog.RESTORED, LearningEventLog.SETTINGS, "", word, locale.toLanguageTag(),
+                        LearningEventLog.countsIn(PersonalizationHelper.getUserHistoryDictionary(context, locale)))
+            }
         }
     }
 }

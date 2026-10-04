@@ -258,6 +258,27 @@ bool LanguageModelDictContent::updateAllEntriesOnInputWord(const WordIdArrayView
     return true;
 }
 
+bool LanguageModelDictContent::takeBackUses(const int wordId, const int uses) {
+    if (!mHasHistoricalInfo) {
+        AKLOGE("takeBackUses is called for dictionary without historical info.");
+        return false;
+    }
+    const ProbabilityEntry originalEntry = getProbabilityEntry(wordId);
+    if (!originalEntry.isValid()) {
+        return false; // never counted: nothing to take back
+    }
+    const HistoricalInfo *const originalInfo = originalEntry.getHistoricalInfo();
+    // The timestamp stays: taking a use back is not a use, and it's the age of the last real use that GC and the
+    // eviction order look at. Count 0 makes getWordAttributes treat the word as not a word (like never typed), while
+    // the entry keeps its pairs for when the word is used again.
+    const HistoricalInfo updatedInfo(originalInfo->getTimestamp(), originalInfo->getLevel(),
+            std::max(0, originalInfo->getCount() - uses));
+    const ProbabilityEntry updatedEntry(originalEntry.getFlags(), &updatedInfo);
+    // Not setProbabilityEntry: that adds the whole count to the global total again. The total (the unigram context
+    // count) is left as it is; one use in it is noise, and it is halved with the counters anyway.
+    return setNgramProbabilityEntry(WordIdArrayView(), wordId, &updatedEntry);
+}
+
 const ProbabilityEntry LanguageModelDictContent::createUpdatedEntryFrom(
         const ProbabilityEntry &originalProbabilityEntry, const bool isValid,
         const HistoricalInfo historicalInfo, const HeaderPolicy *const headerPolicy) const {

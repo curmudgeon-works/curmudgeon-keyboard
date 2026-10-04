@@ -45,6 +45,7 @@ class App : Application() {
             SubtypeSettings.getEnabledSubtypes().joinToString { it.locale }, withCaller = false)
         GestureCorpusRecorder.init(this)
         helium314.keyboard.latin.gesture.SwipeMetrics.init(this)
+        helium314.keyboard.latin.personalization.LearningEventLog.init(this)
 
         val scope = CoroutineScope(Dispatchers.Default)
         scope.launch { // do some uncritical work in background for faster startup
