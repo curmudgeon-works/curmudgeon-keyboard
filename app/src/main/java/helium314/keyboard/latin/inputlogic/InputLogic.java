@@ -117,6 +117,9 @@ public final class InputLogic {
     // Where the keyboard last typed, while the cursor is somewhere else since (a tap): undo / redo go back there
     // first; typing at the new place marks a jump in the history. -1: the cursor is where the history left it.
     private int mTypedAt = -1;
+    // the step just begun found a word still being composed (typed or swiped in the step before, not picked up again):
+    // when that word is committed now, its learning belongs to the step that typed it
+    private boolean mLearnInPreviousStep = false;
     // When the keyboard last changed the text: a cursor update right after is that change arriving, not a tap (typing
     // inside an underlined word moves the cursor where the keyboard's own record doesn't expect it)
     private long mLastOwnEdit = 0;
@@ -282,6 +285,7 @@ public final class InputLogic {
     // An edit step begins: remember the text as it is now (after a tap elsewhere: a jump from where typing ended).
     private void editStepStart() {
         mLastOwnEdit = android.os.SystemClock.uptimeMillis();
+        mLearnInPreviousStep = mTypedAt < 0 && mWordComposer.isComposingWord() && mWordComposer.getResumedFrom() == null;
         final EditHistory.State state = currentEditState();
         if (mTypedAt >= 0) {
             final EditHistory.State there = editStateAt(mTypedAt);
@@ -295,6 +299,7 @@ public final class InputLogic {
     // Input that continues the step being typed; after a tap elsewhere it starts one (a jump).
     private void editContinues() {
         mLastOwnEdit = android.os.SystemClock.uptimeMillis();
+        mLearnInPreviousStep = false;
         if (mTypedAt >= 0) editStepStart();
         else mEditHistory.onOtherInput();
     }
@@ -459,6 +464,7 @@ public final class InputLogic {
                 && android.os.SystemClock.uptimeMillis() - mLastOwnEdit > OWN_EDIT_ECHO_MS)
             mTypedAt = oldSelStart;
         mLastEditKeyCode = 0;
+        mLearnInPreviousStep = false; // what a cursor move learns belongs to the step in progress
 
         final boolean selectionChangedOrSafeToReset =
                 oldSelStart != newSelStart || oldSelEnd != newSelEnd // selection changed
@@ -501,7 +507,8 @@ public final class InputLogic {
                 // an accepted word corrected in place (it took back its use) counts like a strip pick; other words
                 // changed in place as before
                 performAdditionToUserHistoryDictionary(settingsValues, mWordBeingCorrectedByCursor,
-                        NgramContext.EMPTY_PREV_WORDS_INFO, mEditedInPlaceWord != null ? PICKED_SUGGESTION_EXTRA_USES : 0);
+                        NgramContext.EMPTY_PREV_WORDS_INFO, mEditedInPlaceWord != null ? PICKED_SUGGESTION_EXTRA_USES : 0,
+                        LearningEventLog.EDIT);
             }
             mEditedInPlaceWord = null; // the cursor left the word: the edit is over
         } else {
@@ -946,15 +953,21 @@ public final class InputLogic {
                 final EditHistory.State live = mTypedAt >= 0 ? editStateAt(mTypedAt) : currentEditState();
                 final EditHistory.Edit edit = live == null ? null
                         : isUndo ? mEditHistory.undo(live, sv.mUndoByCharacter) : mEditHistory.redo(live, sv.mRedoByCharacter);
+                // what the step done or undone changes in the learned words: only if its text really changes here
+                if (edit == null) mEditHistory.cancelLearning(); // (a step that changed nothing, and nothing after it)
+                final java.util.List<EditHistory.Learning> learning = mEditHistory.takeLearning();
+                final boolean finishedStep = mEditHistory.takeFinishedSteps() > 0;
                 if (edit == null && back >= 0 && hadHistory) {
                     // the text there no longer lines up (or there's nothing left): nothing changes, the cursor stays
                     if (mEditHistory.isEmpty()) mTypedAt = -1;
+                    logUndoUntracked(learning, isUndo, sv);
                     break;
                 }
                 if (edit != null && edit.getMoveTo() >= 0 && !edit.getExpect().equals(editStateAt(edit.getMoveTo()))) {
                     // the other place's text changed since: nothing is done there
                     mEditHistory.clear();
                     mTypedAt = -1;
+                    logUndoUntracked(learning, isUndo, sv);
                     break;
                 }
                 if (edit != null) {
@@ -963,12 +976,16 @@ public final class InputLogic {
                     if (edit.getMoveTo() >= 0) mConnection.setSelection(edit.getMoveTo(), edit.getMoveTo());
                     if (edit.getDelete() > 0) mConnection.deleteTextBeforeCursor(edit.getDelete());
                     if (!edit.getInsert().isEmpty()) mConnection.commitText(edit.getInsert(), 1);
+                    if (!learning.isEmpty()) applyUndoLearning(learning, isUndo, sv);
+                    else if (finishedStep && learnsHere(sv)) // a step that learned nothing (e.g. text deleted)
+                        logLearningEvent(isUndo ? LearningEventLog.UNDO : LearningEventLog.REDO, LearningEventLog.NONE, "", "");
                     inputTransaction.setDidAffectContents();
                     inputTransaction.setRequiresUpdateSuggestions();
                 } else {
                     // nothing (left) in the keyboard's history: the app's own undo / redo
                     sendDownUpKeyEventWithMetaState(KeyEvent.KEYCODE_Z,
                             isUndo ? KeyEvent.META_CTRL_ON : KeyEvent.META_CTRL_ON | KeyEvent.META_SHIFT_ON);
+                    logUndoUntracked(learning, isUndo, sv);
                 }
                 break;
             }
@@ -1806,7 +1823,10 @@ public final class InputLogic {
     //  change an accepted word later: the old word -1, the new one +1 (commitChosenWord, unlearnWordEditedInPlace,
     //   learnEditedWordLeftByCursor)
     //  edit a swipe before its commit: the final word +1, as any commit
-    //  deleting text takes nothing back and learns nothing (no fragment left by backspace), nor do undo and redo;
+    //  deleting text takes nothing back and learns nothing (no fragment left by backspace);
+    //  undo takes back exactly what the undone step's learning did (all of it, once the step's text is all undone),
+    //   redo does it again (once its text is all back): each learning below is kept with its step (recordLearning);
+    //   where the history is lost (cleared, or the app's own undo) nothing changes, either way;
     //  a word typed right after a digit ("pm" in "5pm") isn't learned on its own (commitChosenWord).
 
     /** Whether input here changes the learned words at all: as performAdditionToUserHistoryDictionary decides. */
@@ -1821,6 +1841,53 @@ public final class InputLogic {
         if (TextUtils.isEmpty(word) || !learnsHere(settingsValues)) return;
         logLearningEvent(event, origin, word, after); // (reads the counts before the change)
         mDictionaryFacilitator.unlearnOneUse(word);
+        recordLearning(word, -1, origin, false, NgramContext.EMPTY_PREV_WORDS_INFO);
+    }
+
+    /** The step being typed changed the learned words: kept with it in the undo history, for undo to take back and redo
+     *  to do again. */
+    private void recordLearning(final String word, final int uses, final String origin, final boolean autoCapitalized,
+            @NonNull final NgramContext ngramContext) {
+        mEditHistory.onLearned(new EditHistory.Learning(word, uses, origin, autoCapitalized, ngramContext),
+                mLearnInPreviousStep);
+        mLearnInPreviousStep = false;
+    }
+
+    /** An undo ([isUndo]) or redo that lost track of the step (the history is gone, the text no longer lines up, or the
+     *  app's own undo ran): nothing changes in the learned words, logged as such (with the words of the step if known). */
+    private void logUndoUntracked(final java.util.List<EditHistory.Learning> learning, final boolean isUndo,
+            final SettingsValues settingsValues) {
+        if (!learnsHere(settingsValues) || !LearningEventLog.isEnabled()) return;
+        final String event = isUndo ? LearningEventLog.UNDO : LearningEventLog.REDO;
+        if (learning.isEmpty()) logLearningEvent(event, LearningEventLog.UNTRACKED, "", "");
+        for (final EditHistory.Learning l : learning)
+            logLearningEvent(event, LearningEventLog.UNTRACKED, l.getUses() < 0 ? l.getWord() : "",
+                    l.getUses() < 0 ? "" : l.getWord());
+    }
+
+    /** Undo ([isUndo]) or redo finished a step: the uses its learning gave are taken back or given (again), exactly. */
+    private void applyUndoLearning(final java.util.List<EditHistory.Learning> learning, final boolean isUndo,
+            final SettingsValues settingsValues) {
+        if (learning.isEmpty() || !learnsHere(settingsValues)) return;
+        final int timeStampInSeconds = (int) TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis());
+        for (final EditHistory.Learning l : learning) {
+            final String word = l.getWord();
+            final int uses = l.getUses();
+            if (LearningEventLog.isEnabled())
+                LearningEventLog.log(isUndo ? LearningEventLog.UNDO : LearningEventLog.REDO, l.getOrigin(),
+                        uses < 0 ? word : "", uses < 0 ? "" : word,
+                        mDictionaryFacilitator.getCurrentLocale().toLanguageTag(),
+                        mDictionaryFacilitator.getLearnedCountsNow(), (uses > 0 ? "+" : "") + uses);
+            if (uses < 0) {
+                for (int i = 0; i < -uses; i++) mDictionaryFacilitator.unlearnOneUse(word);
+            } else if (uses == 1) {
+                mDictionaryFacilitator.addToUserHistory(word, l.getAutoCapitalized(), l.getContext(),
+                        timeStampInSeconds, settingsValues.mBlockPotentiallyOffensive);
+            } else {
+                mDictionaryFacilitator.addToUserHistory(word, l.getAutoCapitalized(), l.getContext(),
+                        timeStampInSeconds, settingsValues.mBlockPotentiallyOffensive, uses - 1);
+            }
+        }
     }
 
     /**
@@ -1848,9 +1915,10 @@ public final class InputLogic {
         if (resumedFrom == null || resumedFrom.startsWith(word) || !learnsHere(settingsValues)) return;
         logLearningEvent(LearningEventLog.ACCEPTED_EDITED, LearningEventLog.EDIT, resumedFrom, word);
         mDictionaryFacilitator.unlearnOneUse(resumedFrom);
+        recordLearning(resumedFrom, -1, LearningEventLog.EDIT, false, NgramContext.EMPTY_PREV_WORDS_INFO);
         // corrected by hand: as deliberate as a strip pick (2026-10-04)
         performAdditionToUserHistoryDictionary(settingsValues, word, NgramContext.EMPTY_PREV_WORDS_INFO,
-                PICKED_SUGGESTION_EXTRA_USES);
+                PICKED_SUGGESTION_EXTRA_USES, LearningEventLog.EDIT);
     }
 
     /** A line in the corrections log, if it's on: call before the change, the counts before are read now (the counts
@@ -2054,14 +2122,16 @@ public final class InputLogic {
 
     private void performAdditionToUserHistoryDictionary(final SettingsValues settingsValues,
             final String suggestion, @NonNull final NgramContext ngramContext) {
-        performAdditionToUserHistoryDictionary(settingsValues, suggestion, ngramContext, 0);
+        performAdditionToUserHistoryDictionary(settingsValues, suggestion, ngramContext, 0, LearningEventLog.TYPED);
     }
 
     /** A word picked from the suggestions counts as this many more uses: it jumps up the ranking, more with each pick. */
     private static final int PICKED_SUGGESTION_EXTRA_USES = 3;
 
+    /** Learns [suggestion] (1 + [extraUses] uses), kept with the step being typed for undo / redo ([origin]: how it
+     *  got there, for the corrections log). */
     private void performAdditionToUserHistoryDictionary(final SettingsValues settingsValues,
-            final String suggestion, @NonNull final NgramContext ngramContext, final int extraUses) {
+            final String suggestion, @NonNull final NgramContext ngramContext, final int extraUses, final String origin) {
         // If correction is not enabled, we don't add words to the user history dictionary.
         // That's to avoid unintended additions in some sensitive fields, or fields that
         // expect to receive non-words.
@@ -2089,6 +2159,7 @@ public final class InputLogic {
                     timeStampInSeconds, settingsValues.mBlockPotentiallyOffensive);
         else mDictionaryFacilitator.addToUserHistory(word, wasAutoCapitalized, ngramContext,
                 timeStampInSeconds, settingsValues.mBlockPotentiallyOffensive, extraUses);
+        recordLearning(word, 1 + extraUses, origin, wasAutoCapitalized, ngramContext);
     }
 
     // strip word separators from end (may be necessary for urls, e.g. when the user has typed
@@ -2891,6 +2962,7 @@ public final class InputLogic {
         // acceptance, maybe just a pause; picked again from the strip it counts (2026-10-04)
         final boolean reAccepted = resumedFrom != null && resumedFrom.equals(chosenWord)
                 && commitType != LastComposedWord.COMMIT_TYPE_MANUAL_PICK;
+        final String origin = learningOrigin(commitType, chosenWord);
         if (!afterDigit && learnsHere(settingsValues) && LearningEventLog.isEnabled()) {
             final String event;
             final String before;
@@ -2908,15 +2980,19 @@ public final class InputLogic {
                 before = mEditedInPlaceWord != null ? mEditedInPlaceWord
                         : swipedWord != null ? swipedWord : mWordComposer.getTypedWord();
             }
-            logLearningEvent(event, learningOrigin(commitType, chosenWord), before, chosenWord);
+            logLearningEvent(event, origin, before, chosenWord);
         }
         mEditedInPlaceWord = null;
-        if (editedAccepted && !afterDigit && learnsHere(settingsValues)) mDictionaryFacilitator.unlearnOneUse(resumedFrom);
+        if (editedAccepted && !afterDigit && learnsHere(settingsValues)) {
+            mDictionaryFacilitator.unlearnOneUse(resumedFrom);
+            recordLearning(resumedFrom, -1, LearningEventLog.EDIT, false, NgramContext.EMPTY_PREV_WORDS_INFO);
+        }
         // Add the word to the user history dictionary
         if (!reAccepted && !afterDigit)
             performAdditionToUserHistoryDictionary(settingsValues, chosenWord, ngramContext,
                     // a strip pick, or an accepted word corrected by hand: deliberate, extra uses
-                    commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK || editedAccepted ? PICKED_SUGGESTION_EXTRA_USES : 0);
+                    commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK || editedAccepted ? PICKED_SUGGESTION_EXTRA_USES : 0,
+                    origin);
         if (DebugFlags.DEBUG_ENABLED) {
             long runTimeMillis = SystemClock.elapsedRealtime() - startTimeMillis;
             Log.d(TAG, "commitChosenWord() : " + runTimeMillis + " ms to run "

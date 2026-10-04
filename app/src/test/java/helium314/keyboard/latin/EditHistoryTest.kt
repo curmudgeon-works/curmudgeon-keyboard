@@ -26,6 +26,64 @@ class EditHistoryTest {
     private fun undo(byChar: Boolean = false) = apply(history.undo(live(), byChar))
     private fun redo(byChar: Boolean = false) = apply(history.redo(live(), byChar))
 
+    // ---- what each step learned: undo takes it back, redo gives it again, each once ----
+
+    private fun learned(word: String, uses: Int) = history.onLearned(EditHistory.Learning(word, uses, "typed"), false)
+    private fun changes() = history.takeLearning().map { it.word to it.uses }
+
+    @Test fun `a step's learning is taken back when it is all undone, given again when it is all redone`() {
+        type("hello "); learned("hello", 1)
+        type("world "); learned("world", 4)
+        undo(); assertEquals(listOf("world" to -4), changes())
+        undo(); assertEquals(listOf("hello" to -1), changes())
+        redo(); assertEquals(listOf("hello" to 1), changes())
+        redo(); assertEquals(listOf("world" to 4), changes())
+        assertEquals(false, redo()); assertEquals(listOf(), changes())
+    }
+
+    @Test fun `one character at a time, the learning changes once the step is all undone or redone`() {
+        type("hello "); learned("hello", 1)
+        type("ok "); learned("ok", 1)
+        undo(true); undo(true); assertEquals(listOf(), changes())
+        undo(true); assertEquals("hello ", text); assertEquals(listOf("ok" to -1), changes())
+        redo(true); undo(true); assertEquals(listOf(), changes()) // half way back and again: nothing
+        redo(true); redo(true); assertEquals(listOf(), changes())
+        redo(true); assertEquals("hello ok ", text); assertEquals(listOf("ok" to 1), changes())
+        undo(true); redo(true); assertEquals(listOf(), changes())
+    }
+
+    @Test fun `a correction step reverses both its changes`() {
+        type("helo "); learned("helo", 1)
+        backspace(2); text += "lo "; history.onLearned(EditHistory.Learning("helo", -1, "edit"), false)
+        learned("hello", 4)
+        undo(); assertEquals("helo ", text); assertEquals(listOf("hello" to -4, "helo" to 1), changes())
+        redo(); assertEquals(listOf("helo" to -1, "hello" to 4), changes())
+    }
+
+    @Test fun `typing after an undo drops the undone step's learning, the new typing keeps its own`() {
+        type("hello "); learned("hello", 1)
+        type("world "); learned("world", 1)
+        undo(); changes()
+        history.onOtherInput(); type("there "); learned("there", 1)
+        undo(); assertEquals(listOf("there" to -1), changes())
+        undo(); assertEquals(listOf("hello" to -1), changes())
+        redo(); redo(); assertEquals(listOf("hello" to 1, "there" to 1), changes())
+    }
+
+    @Test fun `a word committed after the next step began belongs to the step that typed it`() {
+        type("hello"); type(" world") // the next step began with hello still being composed
+        history.onLearned(EditHistory.Learning("hello", 1, "swiped"), true)
+        undo(); assertEquals(listOf(), changes())
+        undo(); assertEquals(listOf("hello" to -1), changes())
+    }
+
+    @Test fun `a cleared history forgets the learning`() {
+        type("hello "); learned("hello", 1)
+        undo(); changes()
+        history.clear()
+        assertEquals(false, redo()); assertEquals(listOf(), changes())
+    }
+
     @Test fun `undo removes whole steps, newest first`() {
         type("hello "); type("world ")
         undo(); assertEquals("hello ", text)

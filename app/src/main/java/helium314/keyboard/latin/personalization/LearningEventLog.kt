@@ -18,7 +18,8 @@ import java.util.concurrent.TimeUnit
  * rules work out. One tab-separated line per event in `learning_events.tsv` in the app's external files dir:
  *
  * time (ms) · event · how the word got there · word before · word after · learned count of the word before (before
- * the change, after it) · learned count of the word after (before, after) · language · app version
+ * the change, after it) · learned count of the word after (before, after) · language · app version · for undo and
+ * redo only: the uses given (+) or taken back (-)
  *
  * A count of -1: the word isn't stored. A word that isn't in the dictionaries is stored at 0 by its first use and
  * counted from its second on. Nothing leaves the phone, and no word goes to logcat.
@@ -51,7 +52,13 @@ object LearningEventLog {
     const val REMOVED = "removed"
     /** taken off the removed words in the learned words screen */
     const val RESTORED = "restored"
-    val EVENTS = listOf(ACCEPTED, AUTOCORRECT_REVERTED, SWIPE_DELETED, ACCEPTED_EDITED, SWIPE_EDITED, REMOVED, RESTORED)
+    /** the keyboard's undo took a step back: what the step's learning gave is taken back, what it took is given back
+     *  (word before: uses taken back; word after: uses given; the last column says how many) */
+    const val UNDO = "undo"
+    /** the keyboard's redo did the step again: its learning again, exactly as it was (logged as [UNDO]) */
+    const val REDO = "redo"
+    val EVENTS = listOf(ACCEPTED, AUTOCORRECT_REVERTED, SWIPE_DELETED, ACCEPTED_EDITED, SWIPE_EDITED, REMOVED, RESTORED,
+        UNDO, REDO)
 
     // how the word got there
     const val TYPED = "typed"
@@ -63,6 +70,11 @@ object LearningEventLog {
     const val EDIT = "edit"
     /** the learned words screen */
     const val SETTINGS = "settings"
+    /** an undo / redo that lost track of the step (the history was dropped, the text no longer lines up, or nothing was
+     *  left and the app's own undo / redo ran): the learned words don't change */
+    const val UNTRACKED = "untracked"
+    /** an undo / redo of a step that changed no learned word (e.g. deleting text): nothing changes */
+    const val NONE = "none"
 
     /** Reads how often a word was learned, -1 if it isn't stored. */
     fun interface Counts {
@@ -83,9 +95,12 @@ object LearningEventLog {
     @JvmStatic
     fun isEnabled(): Boolean = file != null && prefs?.getBoolean(Settings.PREF_LEARNING_LOG, Defaults.PREF_LEARNING_LOG) == true
 
-    /** An event in [language]: [before] and [after] are the words (empty if none), [counts] reads their learned counts. */
+    /** An event in [language]: [before] and [after] are the words (empty if none), [counts] reads their learned counts;
+     *  [change]: the uses given or taken back, if the event says (undo, redo). */
     @JvmStatic
-    fun log(event: String, origin: String, before: String, after: String, language: String, counts: Counts) {
+    @JvmOverloads
+    fun log(event: String, origin: String, before: String, after: String, language: String, counts: Counts,
+            change: String = "") {
         if (!isEnabled()) return
         val time = System.currentTimeMillis()
         val beforeThen = countOf(counts, before)
@@ -93,7 +108,7 @@ object LearningEventLog {
         executor.schedule({
             try {
                 file?.appendText(line(time, event, origin, before, after, beforeThen, countOf(counts, before),
-                    afterThen, countOf(counts, after), language, BuildConfig.VERSION_NAME) + "\n")
+                    afterThen, countOf(counts, after), language, BuildConfig.VERSION_NAME, change) + "\n")
             } catch (e: Exception) {
                 Log.w(TAG, "could not log a learning event", e)
             }
@@ -111,18 +126,21 @@ object LearningEventLog {
         if (count >= 0 || lower == word) count else history.getLearnedCount(lower)
     }
 
-    /** One line of the log, without the line break. Tabs and line breaks in words would break the columns: spaces. */
+    /** One line of the log, without the line break. Tabs and line breaks in words would break the columns: spaces.
+     *  [change] is a last column only where there is one (undo, redo). */
     fun line(time: Long, event: String, origin: String, before: String, after: String, beforeThen: Int, beforeNow: Int,
-             afterThen: Int, afterNow: Int, language: String, version: String): String =
-        listOf(time, event, origin, clean(before), clean(after), beforeThen, beforeNow, afterThen, afterNow, language, version)
-            .joinToString("\t")
+             afterThen: Int, afterNow: Int, language: String, version: String, change: String = ""): String =
+        (listOf(time, event, origin, clean(before), clean(after), beforeThen, beforeNow, afterThen, afterNow, language, version)
+            + (if (change.isEmpty()) emptyList() else listOf(change))).joinToString("\t")
 
     private fun clean(word: String) = word.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ')
 
-    /** How many events of each kind (see [EVENTS]) were logged in the last [days] days (0 = all). */
-    class Summary(val counts: Map<String, Int>) {
+    /** How many events of each kind (see [EVENTS]) were logged in the last [days] days (0 = all), and how many of them
+     *  lost track ([UNTRACKED]: undo and redo). */
+    class Summary(val counts: Map<String, Int>, val untrackedCounts: Map<String, Int> = emptyMap()) {
         val total get() = counts.values.sum()
         fun of(event: String) = counts[event] ?: 0
+        fun untrackedOf(event: String) = untrackedCounts[event] ?: 0
     }
 
     fun summary(days: Int): Summary {
@@ -138,14 +156,16 @@ object LearningEventLog {
     fun summarize(lines: Sequence<String>, days: Int, now: Long): Summary {
         val since = if (days <= 0) 0L else now - days * 86_400_000L
         val counts = HashMap<String, Int>()
+        val untracked = HashMap<String, Int>()
         for (line in lines) {
             val p = line.split('\t')
             if (p.size < FIELDS) continue
             val time = p[0].toLongOrNull() ?: continue
             if (time < since) continue
             counts[p[1]] = (counts[p[1]] ?: 0) + 1
+            if (p[2] == UNTRACKED) untracked[p[1]] = (untracked[p[1]] ?: 0) + 1
         }
-        return Summary(counts)
+        return Summary(counts, untracked)
     }
 
     /** Deletes the log after the events already queued (they wait [SETTLE_MS]); waits, so a summary read right after it

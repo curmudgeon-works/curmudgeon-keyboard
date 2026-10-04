@@ -40,4 +40,17 @@ class LearningEventLogTest {
         assertEquals(1, week.of(LearningEventLog.ACCEPTED))
         assertEquals(3, week.total)
     }
+
+    @Test fun `undo and redo lines say the uses changed, and the summary tells the untracked ones apart`() {
+        val line = LearningEventLog.line(1, LearningEventLog.UNDO, LearningEventLog.STRIP, "hello", "", 5, 1, -1, -1, "en", "v", "-4")
+        assertEquals("1\tundo\tstrip\thello\t\t5\t1\t-1\t-1\ten\tv\t-4", line)
+        fun l(event: String, origin: String) = LearningEventLog.line(1, event, origin, "", "", -1, -1, -1, -1, "en", "v")
+        val lines = sequenceOf(line, l(LearningEventLog.UNDO, LearningEventLog.UNTRACKED), l(LearningEventLog.UNDO, LearningEventLog.NONE),
+            l(LearningEventLog.REDO, LearningEventLog.UNTRACKED))
+        val s = LearningEventLog.summarize(lines, 0, 2)
+        assertEquals(3, s.of(LearningEventLog.UNDO))
+        assertEquals(1, s.untrackedOf(LearningEventLog.UNDO))
+        assertEquals(1, s.of(LearningEventLog.REDO))
+        assertEquals(1, s.untrackedOf(LearningEventLog.REDO))
+    }
 }

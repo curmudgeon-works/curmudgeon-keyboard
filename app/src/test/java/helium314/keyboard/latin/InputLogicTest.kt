@@ -954,7 +954,7 @@ class InputLogicTest {
     }
 
     // on a Pixel 8 the first undo in "the keyxboard" (cursor after x) logged "keyboard" as learned
-    @Test fun `undo and redo learn nothing, also in a laggy editor`() {
+    @Test fun `undo and redo of a step that learned nothing change nothing, also in a laggy editor`() {
         reset()
         chainInput("the keyboard")
         android.os.SystemClock.sleep(500) // a tap comes a while after typing
@@ -972,6 +972,297 @@ class InputLogicTest {
         setCursorPosition(0)
         assertEquals(listOf(), addedWords)
         assertEquals(listOf(), unlearnedWords)
+    }
+
+    // ---- undo and redo: exactly what the step's learning did, taken back and given again ----
+
+    // uses each word got (+) or lost (-) since the last reset of the facilitator's lists
+    private fun usesOf(word: String) =
+        helium314.keyboard.latin.ShadowFacilitator2.addedUses.filter { it.first == word }.sumOf { it.second } -
+            unlearnedWords.count { it == word }
+
+    private fun clearLearning() {
+        addedWords.clear()
+        unlearnedWords.clear()
+        helium314.keyboard.latin.ShadowFacilitator2.addedUses.clear()
+    }
+
+    @Test fun `undo takes back a typed word's use, redo gives it again, back and forth nets zero`() {
+        reset()
+        chainInput("hello world ")
+        assertEquals(listOf("hello", "world"), addedWords)
+        clearLearning()
+        functionalKeyPress(KeyCode.UNDO)
+        assertEquals("hello ", text)
+        assertEquals(listOf("world"), unlearnedWords)
+        assertEquals(-1, usesOf("world"))
+        functionalKeyPress(KeyCode.REDO)
+        assertEquals("hello world ", text)
+        assertEquals(listOf("world"), addedWords)
+        assertEquals(0, helium314.keyboard.latin.ShadowFacilitator2.lastAddedExtraUses) // plain +1
+        assertEquals(0, usesOf("world"))
+        repeat(3) {
+            functionalKeyPress(KeyCode.UNDO)
+            functionalKeyPress(KeyCode.REDO)
+        }
+        assertEquals("hello world ", text)
+        assertEquals(0, usesOf("world"))
+        assertEquals(0, usesOf("hello"))
+        // two steps back: each word its own use
+        functionalKeyPress(KeyCode.UNDO)
+        functionalKeyPress(KeyCode.UNDO)
+        assertEquals("", text)
+        assertEquals(-1, usesOf("world"))
+        assertEquals(-1, usesOf("hello"))
+        functionalKeyPress(KeyCode.REDO)
+        functionalKeyPress(KeyCode.REDO)
+        assertEquals("hello world ", text)
+        assertEquals(0, usesOf("world"))
+        assertEquals(0, usesOf("hello"))
+        functionalKeyPress(KeyCode.REDO) // nothing left to redo
+        assertEquals(0, usesOf("world"))
+    }
+
+    @Test fun `undo and redo of a typed word in a laggy editor`() {
+        reset()
+        chainInput("hello world ")
+        clearLearning()
+        laggyEditor = true
+        laggyKeyPress(KeyCode.UNDO)
+        assertEquals("hello ", text)
+        laggyKeyPress(KeyCode.REDO)
+        assertEquals("hello world ", text)
+        laggyKeyPress(KeyCode.UNDO)
+        laggyEditor = false
+        assertEquals("hello ", text)
+        assertEquals(-1, usesOf("world"))
+        assertEquals(0, usesOf("hello"))
+    }
+
+    @Test fun `undo takes back all a strip pick gave, redo gives it again`() {
+        reset()
+        chainInput("hel")
+        pickSuggestion("hello")
+        assertEquals("hello", lastAddedWord)
+        assertEquals(3, helium314.keyboard.latin.ShadowFacilitator2.lastAddedExtraUses)
+        clearLearning()
+        functionalKeyPress(KeyCode.UNDO)
+        assertEquals("", text)
+        assertEquals(-4, usesOf("hello"))
+        functionalKeyPress(KeyCode.REDO)
+        assertEquals(0, usesOf("hello"))
+        assertEquals(3, helium314.keyboard.latin.ShadowFacilitator2.lastAddedExtraUses) // +4 in one go
+        functionalKeyPress(KeyCode.UNDO)
+        functionalKeyPress(KeyCode.REDO)
+        assertEquals(0, usesOf("hello"))
+    }
+
+    @Test fun `undo of a word corrected by hand gives the old word its use back and takes the new one's`() {
+        reset()
+        chainInput("helo ")
+        functionalKeyPress(KeyCode.DELETE) // the space: helo is picked up again
+        functionalKeyPress(KeyCode.DELETE)
+        chainInput("lo ")
+        assertEquals("hello ", text)
+        assertEquals(listOf("helo"), unlearnedWords)
+        clearLearning()
+        functionalKeyPress(KeyCode.UNDO)
+        assertEquals("helo ", text)
+        assertEquals(-4, usesOf("hello"))
+        assertEquals(1, usesOf("helo"))
+        functionalKeyPress(KeyCode.UNDO)
+        assertEquals("", text)
+        assertEquals(0, usesOf("helo")) // helo's own +1 taken back too
+        functionalKeyPress(KeyCode.REDO)
+        assertEquals("helo ", text)
+        assertEquals(1, usesOf("helo"))
+        functionalKeyPress(KeyCode.REDO)
+        assertEquals("hello ", text)
+        assertEquals(0, usesOf("hello"))
+        assertEquals(0, usesOf("helo"))
+    }
+
+    @Test fun `undo and redo of a reverted auto-correction reverse and redo both changes`() {
+        reset()
+        setInputType(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_AUTO_CORRECT)
+        chainInput("hullo")
+        getAutocorrectedWithSpaceAfter("hello", "hullo")
+        functionalKeyPress(KeyCode.DELETE) // revert: hello -1
+        input(' ') // hullo +1
+        assertEquals("hullo ", text)
+        clearLearning()
+        functionalKeyPress(KeyCode.UNDO)
+        assertEquals("hello ", text)
+        assertEquals(1, usesOf("hello"))
+        assertEquals(-1, usesOf("hullo"))
+        functionalKeyPress(KeyCode.UNDO)
+        assertEquals("", text)
+        assertEquals(0, usesOf("hello")) // the auto-correction's own +1 taken back
+        functionalKeyPress(KeyCode.REDO)
+        functionalKeyPress(KeyCode.REDO)
+        assertEquals("hullo ", text)
+        assertEquals(0, usesOf("hello"))
+        assertEquals(0, usesOf("hullo"))
+    }
+
+    @Test fun `undoing and redoing a deletion changes nothing`() {
+        reset()
+        chainInput("hello there ")
+        repeat(6) { functionalKeyPress(KeyCode.DELETE) }
+        assertEquals("hello ", text)
+        clearLearning()
+        functionalKeyPress(KeyCode.UNDO)
+        assertEquals("hello there ", text)
+        functionalKeyPress(KeyCode.REDO)
+        assertEquals("hello ", text)
+        functionalKeyPress(KeyCode.UNDO)
+        assertEquals(listOf(), addedWords)
+        assertEquals(listOf(), unlearnedWords)
+        // further back, the typing of there: its use
+        functionalKeyPress(KeyCode.UNDO)
+        assertEquals("hello ", text)
+        assertEquals(-1, usesOf("there"))
+    }
+
+    @Test fun `undo by character takes the word's use back only when its last letter goes`() {
+        reset()
+        latinIME.prefs().edit {
+            putString(Settings.PREF_UNDO_UNIT, "character")
+            putString(Settings.PREF_REDO_UNIT, "character")
+        }
+        chainInput("hello world ")
+        clearLearning()
+        repeat(5) { functionalKeyPress(KeyCode.UNDO) }
+        assertEquals("hello w", text)
+        assertEquals(listOf(), unlearnedWords)
+        functionalKeyPress(KeyCode.UNDO)
+        assertEquals("hello ", text)
+        assertEquals(listOf("world"), unlearnedWords)
+        // back and forth over a letter, or half the word: nothing more
+        functionalKeyPress(KeyCode.REDO)
+        functionalKeyPress(KeyCode.REDO)
+        functionalKeyPress(KeyCode.UNDO)
+        functionalKeyPress(KeyCode.UNDO)
+        assertEquals("hello ", text)
+        assertEquals(-1, usesOf("world"))
+        repeat(5) { functionalKeyPress(KeyCode.REDO) }
+        assertEquals("hello world", text)
+        assertEquals(-1, usesOf("world")) // (the step isn't all back yet: its space)
+        functionalKeyPress(KeyCode.REDO)
+        assertEquals("hello world ", text)
+        assertEquals(0, usesOf("world"))
+        functionalKeyPress(KeyCode.UNDO) // a space: nothing
+        assertEquals(0, usesOf("world"))
+        functionalKeyPress(KeyCode.REDO)
+        assertEquals(0, usesOf("world"))
+    }
+
+    @Test fun `undo and redo across a tap take back and give each step's word`() {
+        reset()
+        chainInput("hello world ")
+        android.os.SystemClock.sleep(500) // a tap comes a while after typing
+        setCursorPosition(5) // hello| world
+        chainInput(" big,")
+        assertEquals("hello big, world ", text)
+        assertEquals("big", lastAddedWord)
+        clearLearning()
+        functionalKeyPress(KeyCode.UNDO)
+        assertEquals("hello  world ", text)
+        assertEquals(-1, usesOf("big"))
+        functionalKeyPress(KeyCode.UNDO)
+        assertEquals("hello world ", text)
+        functionalKeyPress(KeyCode.UNDO) // back where typing ended before the tap
+        assertEquals("hello ", text)
+        assertEquals(-1, usesOf("world"))
+        assertEquals(-1, usesOf("big"))
+        repeat(3) { functionalKeyPress(KeyCode.REDO) }
+        assertEquals("hello big, world ", text)
+        assertEquals(0, usesOf("world"))
+        assertEquals(0, usesOf("big"))
+    }
+
+    @Test fun `a swiped word's use belongs to the swipe that put it there`() {
+        reset()
+        swipe("hello")
+        swipe("world") // commits hello: its use is the first swipe's
+        input(' ')
+        assertEquals("hello world ", text)
+        assertEquals(listOf("hello", "world"), addedWords)
+        clearLearning()
+        functionalKeyPress(KeyCode.UNDO)
+        assertEquals("hello", text)
+        assertEquals(-1, usesOf("world"))
+        assertEquals(0, usesOf("hello"))
+        functionalKeyPress(KeyCode.UNDO)
+        assertEquals("", text)
+        assertEquals(-1, usesOf("hello"))
+        functionalKeyPress(KeyCode.REDO)
+        functionalKeyPress(KeyCode.REDO)
+        assertEquals(0, usesOf("hello"))
+        assertEquals(0, usesOf("world"))
+    }
+
+    @Test fun `undoing a word never committed takes nothing back`() {
+        reset()
+        chainInput("hello wor")
+        clearLearning()
+        functionalKeyPress(KeyCode.UNDO)
+        assertEquals("hello ", text)
+        functionalKeyPress(KeyCode.REDO)
+        assertEquals("hello wor", text)
+        assertEquals(listOf(), unlearnedWords)
+        assertEquals(listOf(), addedWords)
+    }
+
+    @Test fun `where the history is lost, undo and redo change nothing either way`() {
+        reset()
+        chainInput("hello world ")
+        clearLearning()
+        functionalKeyPress(KeyCode.UNDO)
+        assertEquals(-1, usesOf("world"))
+        setText(text) // the editor starts again: the history is dropped
+        functionalKeyPress(KeyCode.REDO) // the app's own redo
+        assertEquals(listOf(), addedWords)
+        reset()
+        chainInput("hello world ")
+        setText(text)
+        clearLearning()
+        functionalKeyPress(KeyCode.UNDO) // the app's own undo
+        functionalKeyPress(KeyCode.REDO)
+        assertEquals(listOf(), unlearnedWords)
+        assertEquals(listOf(), addedWords)
+    }
+
+    @Test fun `the corrections log has a line for each undo and redo, also those that changed nothing`() {
+        reset()
+        helium314.keyboard.latin.personalization.LearningEventLog.init(latinIME)
+        latinIME.prefs().edit { putBoolean(Settings.PREF_LEARNING_LOG, true) }
+        helium314.keyboard.latin.personalization.LearningEventLog.clear()
+        val file = java.io.File(latinIME.getExternalFilesDir(null) ?: latinIME.filesDir, "learning_events.tsv")
+        file.parentFile?.mkdirs()
+        chainInput("hello there ")
+        repeat(6) { functionalKeyPress(KeyCode.DELETE) }
+        functionalKeyPress(KeyCode.UNDO) // the deletion: none
+        functionalKeyPress(KeyCode.UNDO) // there -1
+        functionalKeyPress(KeyCode.REDO) // there +1
+        setText(text)
+        functionalKeyPress(KeyCode.UNDO) // the history is gone: untracked
+        Thread.sleep(1000) // (the log waits a moment for the counts after)
+        val lines = file.readLines().map { it.split('\t') }.filter { it[1] == "undo" || it[1] == "redo" }
+        latinIME.prefs().edit { putBoolean(Settings.PREF_LEARNING_LOG, false) }
+        assertEquals(listOf("undo none", "undo typed there -1", "redo typed there +1", "undo untracked"),
+            lines.map { (listOf(it[1], it[2]) + listOf(it[3] + it[4]).filter { w -> w.isNotEmpty() } + it.drop(11)).joinToString(" ") })
+    }
+
+    @Test fun `undo and redo learn nothing in incognito`() {
+        reset()
+        chainInput("hello world ")
+        latinIME.prefs().edit { putBoolean(Settings.PREF_ALWAYS_INCOGNITO_MODE, true) }
+        clearLearning()
+        functionalKeyPress(KeyCode.UNDO)
+        functionalKeyPress(KeyCode.REDO)
+        assertEquals(listOf(), unlearnedWords)
+        assertEquals(listOf(), addedWords)
     }
 
     @Test fun `a word typed right after a digit is not learned on its own`() {
@@ -1058,6 +1349,7 @@ class InputLogicTest {
         lastAddedWord = ""
         unlearnedWords.clear()
         addedWords.clear()
+        helium314.keyboard.latin.ShadowFacilitator2.addedUses.clear()
         laggyEditor = false
         staleText = null
 
@@ -1213,6 +1505,14 @@ class InputLogicTest {
         latinIME.mInputLogic.setSuggestedWords(sw) // this prepares for autocorrect
         input(' ')
         checkConnectionConsistency()
+    }
+
+    // a swipe as the keyboard gets it: its start, then the word
+    private fun swipe(word: String) {
+        latinIME.mInputLogic.onStartBatchInput(settingsValues, KeyboardSwitcher.getInstance(), latinIME.mHandler)
+        handleMessages()
+        glideTypingInput(word)
+        handleMessages()
     }
 
     private fun glideTypingInput(word: String) {
@@ -1523,6 +1823,7 @@ class ShadowFacilitator2 {
         lastAddedWord = suggestion
         lastAddedExtraUses = 0
         addedWords.add(suggestion)
+        addedUses.add(suggestion to 1)
     }
     // a picked suggestion is learned with extra uses
     @Implementation
@@ -1532,6 +1833,7 @@ class ShadowFacilitator2 {
         lastAddedWord = suggestion
         lastAddedExtraUses = extraUses
         addedWords.add(suggestion)
+        addedUses.add(suggestion to 1 + extraUses)
     }
     @Implementation
     fun unlearnOneUse(word: String) {
@@ -1542,5 +1844,6 @@ class ShadowFacilitator2 {
         var lastAddedExtraUses = 0
         val unlearnedWords = mutableListOf<String>()
         val addedWords = mutableListOf<String>() // every word learned, in order
+        val addedUses = mutableListOf<Pair<String, Int>>() // every word learned, with the uses it got
     }
 }

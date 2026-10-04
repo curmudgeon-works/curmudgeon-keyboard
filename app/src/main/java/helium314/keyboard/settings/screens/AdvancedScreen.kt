@@ -319,7 +319,9 @@ fun createAdvancedSettings(context: Context) = listOf(
                             else stringResource(R.string.learning_log_line, s.of(LearningEventLog.ACCEPTED),
                                 s.of(LearningEventLog.AUTOCORRECT_REVERTED), s.of(LearningEventLog.SWIPE_DELETED),
                                 s.of(LearningEventLog.ACCEPTED_EDITED), s.of(LearningEventLog.SWIPE_EDITED),
-                                s.of(LearningEventLog.REMOVED), s.of(LearningEventLog.RESTORED)),
+                                s.of(LearningEventLog.REMOVED), s.of(LearningEventLog.RESTORED),
+                                s.of(LearningEventLog.UNDO), s.untrackedOf(LearningEventLog.UNDO),
+                                s.of(LearningEventLog.REDO), s.untrackedOf(LearningEventLog.REDO)),
                             style = MaterialTheme.typography.bodySmall)
                     }
                     TextButton(onClick = { LearningEventLog.clear(); generation++ }) { Text(stringResource(R.string.swipe_metrics_clear)) }
