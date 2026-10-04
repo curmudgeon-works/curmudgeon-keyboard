@@ -653,6 +653,11 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         for (dictionaryGroup in dictionaryGroups) {
             dictionaryGroup.removeWord(word)
         }
+        // and out of Android's personal dictionary for real: the in-memory copy alone came back with its next reload
+        val context = dictionaryGroups.firstNotNullOfOrNull { it.getSubDict(Dictionary.TYPE_USER)?.mContext } ?: return
+        val locales = locales
+        // (the provider can be missing or fail on some devices, see addToPersonalDictionaryIfInvalidButInHistory)
+        scope.launch { runCatching { deleteFromPersonalDictionary(context, word, locales) } }
     }
 
     override fun clearUserHistoryDictionary(context: Context) {
@@ -705,6 +710,31 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
                 Log.e(TAG, "Cannot create dictionary: $dictType", e)
             }
             return null
+        }
+
+        /** Deletes [word] in any capitalization from Android's personal dictionary: its rows for all languages and for
+         *  those of [locales]. Blocking. Returns how many rows went. */
+        @JvmStatic
+        fun deleteFromPersonalDictionary(context: Context, word: String, locales: Collection<Locale>): Int {
+            val lower = word.lowercase()
+            val languages = locales.mapTo(HashSet()) { it.language.lowercase() }
+            val ids = mutableListOf<Long>()
+            // (comparing in SQL would ignore the case of ASCII letters only, and a personal dictionary is small)
+            context.contentResolver.query(UserDictionary.Words.CONTENT_URI,
+                arrayOf(UserDictionary.Words._ID, UserDictionary.Words.WORD, UserDictionary.Words.LOCALE), null, null, null
+            )?.use { cursor ->
+                while (cursor.moveToNext()) {
+                    if (cursor.getString(1)?.lowercase() != lower) continue
+                    // "en_US", "en", or none for all languages
+                    val rowLocale = cursor.getString(2)
+                    if (rowLocale.isNullOrEmpty() || rowLocale.split('_', '-').first().lowercase() in languages)
+                        ids.add(cursor.getLong(0))
+                }
+            }
+            var deleted = 0
+            for (id in ids)
+                deleted += context.contentResolver.delete(UserDictionary.Words.CONTENT_URI, "${UserDictionary.Words._ID}=?", arrayOf(id.toString()))
+            return deleted
         }
 
         private fun findDictionaryGroupWithLocale(dictGroups: List<DictionaryGroup>?, locale: Locale): DictionaryGroup? {

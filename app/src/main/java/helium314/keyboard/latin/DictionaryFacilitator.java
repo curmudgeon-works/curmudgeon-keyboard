@@ -117,7 +117,8 @@ public interface DictionaryFacilitator {
             final String dictNamePrefix,
             @Nullable final DictionaryInitializationListener listener);
 
-    /** removes the word from all editable dictionaries, and adds it to a blacklist in case it's in a read-only dictionary */
+    /** removes the word from all editable dictionaries (Android's personal dictionary too, in any capitalization), and adds
+     *  it to a blacklist in case it's in a read-only dictionary */
     void removeWord(String word);
 
     void closeDictionaries();
