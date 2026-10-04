@@ -40,21 +40,42 @@ class DynamicLanguageModelProbabilityUtils {
         return std::min(std::max(probability, NOT_A_PROBABILITY), MAX_PROBABILITY);
     }
 
+    // A learned entry (word or word pair) fades by how long ago it was last used: one halving per
+    // DECAY_STEP_IN_SECONDS unused, at most MAX_DECAY_STEPS (down to 1/8), and an entry used
+    // FREQUENT_ENTRY_MIN_COUNT times or more at most MAX_DECAY_STEPS_FOR_FREQUENT_ENTRY (down to 1/2).
+    // The probability is log-encoded, so a halving is a fixed amount off it. Using the entry again sets
+    // its timestamp to now, which brings it back to full strength. Mirrored in LearnedDecay.kt.
     static int getDecayedProbability(const int probability, const HistoricalInfo historicalInfo) {
-        const int elapsedTime = TimeKeeper::peekCurrentTime() - historicalInfo.getTimestamp();
-        if (elapsedTime < 0) {
-            AKLOGE("The elapsed time is negatime value. Timestamp overflow?");
+        if (probability == NOT_A_PROBABILITY) {
             return NOT_A_PROBABILITY;
         }
-        // TODO: Improve this logic.
-        // We don't modify probability depending on the elapsed time.
-        return probability;
+        const int decay = static_cast<int>(
+                ENCODED_HALVING * static_cast<float>(getDecaySteps(historicalInfo)) + 0.5f);
+        return std::min(std::max(probability - decay, 0), MAX_PROBABILITY);
     }
 
-    static int shouldRemoveEntryDuringGC(const HistoricalInfo historicalInfo) {
-        // TODO: Improve this logic.
-        const int elapsedTime = TimeKeeper::peekCurrentTime() - historicalInfo.getTimestamp();
-        return elapsedTime > DURATION_TO_DISCARD_ENTRY_IN_SECONDS;
+    static int getDecaySteps(const HistoricalInfo historicalInfo) {
+        const int timestamp = historicalInfo.getTimestamp();
+        if (timestamp <= 0) {
+            // No time of last use: nothing to fade from.
+            return 0;
+        }
+        const int elapsedTime = TimeKeeper::peekCurrentTime() - timestamp;
+        if (elapsedTime <= 0) {
+            // Last used "in the future" (the clock was set back since): kept at full strength rather
+            // than hidden, the next use fixes the timestamp.
+            return 0;
+        }
+        const int maxSteps = historicalInfo.getCount() >= FREQUENT_ENTRY_MIN_COUNT
+                ? MAX_DECAY_STEPS_FOR_FREQUENT_ENTRY : MAX_DECAY_STEPS;
+        return std::min(elapsedTime / DECAY_STEP_IN_SECONDS, maxSteps);
+    }
+
+    static int shouldRemoveEntryDuringGC(const HistoricalInfo /* historicalInfo */) {
+        // Learned words are never deleted for age: an old entry only fades (getDecayedProbability).
+        // The entry-count cap (HeaderPolicy::DEFAULT_MAX_NGRAM_COUNTS) still evicts the least
+        // recently used ones when a store outgrows it.
+        return false;
     }
 
     static int getPriorityToPreventFromEviction(const HistoricalInfo historicalInfo) {
@@ -70,7 +91,11 @@ private:
 
     static const int ASSUMED_MIN_COUNTS[];
     static const int ENCODED_BACKOFF_WEIGHTS[];
-    static const int DURATION_TO_DISCARD_ENTRY_IN_SECONDS;
+    static const int DECAY_STEP_IN_SECONDS;
+    static const int MAX_DECAY_STEPS;
+    static const int MAX_DECAY_STEPS_FOR_FREQUENT_ENTRY;
+    static const int FREQUENT_ENTRY_MIN_COUNT;
+    static const float ENCODED_HALVING;
 };
 
 } // namespace latinime

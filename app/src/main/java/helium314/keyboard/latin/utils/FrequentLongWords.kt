@@ -14,13 +14,17 @@ import java.util.concurrent.ConcurrentHashMap
  * charges every completed character, so "someone.long.name@example.com" only wins after several letters no
  * matter how often it was typed. These are matched by prefix instead and get an early slot in the strip.
  *
- * Per locale, read from the user history dictionary (level = how often typed, decays), refreshed in the
+ * Per locale, read from the user history dictionary (probability = how often typed, fades unused), refreshed in the
  * background at most every [REFRESH_MS]; the first lookup after a start returns nothing.
  */
 object FrequentLongWords {
     private const val TAG = "FrequentLongWords"
     private const val MIN_LENGTH = 8
-    private const val MIN_PROBABILITY = 40 // ~ level 3 of the forgetting curve: typed about three times
+    // The learned probability is 255 + 8.59 * log2(count / max(all uses, 8192)) - 32, minus 9 per 3 months unused (at
+    // most 26): a word typed once (count 0) has none, one typed twice is at ~111 in a store of up to 8192 uses. So this
+    // takes any word typed at least twice; only in a store of some 300 000 uses or more does such a word, unused long
+    // enough, drop under it.
+    private const val MIN_PROBABILITY = 40
     private const val REFRESH_MS = 60_000L
     const val MAX_IN_STRIP = 2
     private const val READ_ATTEMPTS = 10

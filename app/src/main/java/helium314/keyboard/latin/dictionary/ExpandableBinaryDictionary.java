@@ -21,6 +21,7 @@ import helium314.keyboard.latin.common.FileUtils;
 import helium314.keyboard.latin.define.DecoderSpecificConstants;
 import helium314.keyboard.latin.makedict.DictionaryHeader;
 import helium314.keyboard.latin.makedict.FormatSpec;
+import helium314.keyboard.latin.makedict.ProbabilityInfo;
 import helium314.keyboard.latin.makedict.UnsupportedFormatException;
 import helium314.keyboard.latin.makedict.WordProperty;
 import helium314.keyboard.latin.settings.SettingsValuesForSuggestion;
@@ -429,22 +430,41 @@ abstract public class ExpandableBinaryDictionary extends Dictionary {
     /** How often [word] was learned: its count in a store with historical info (a word not in the dictionaries is
      *  stored at 0 the first time and counted from its second use on), or -1 when it isn't stored. */
     public int getLearnedCount(final String word) {
+        final ProbabilityInfo info = getLearnedInfo(word);
+        return info == null ? -1 : info.mCount;
+    }
+
+    /** The stored count (as [getLearnedCount]) and last use (mTimestamp, seconds) of [word], or null when it isn't
+     *  stored: what LearnedDecay fades trust by. */
+    @Nullable
+    public ProbabilityInfo getLearnedInfo(final String word) {
+        final WordProperty property = getLearnedWordProperty(word, false);
+        return property == null ? null : property.mProbabilityInfo;
+    }
+
+    /** [word]'s entry in a store with historical info, with the word pairs (and longer) it starts, or null when it
+     *  isn't stored (or the store is busy). */
+    @Nullable
+    public WordProperty getLearnedWordProperty(final String word, final boolean isBeginningOfSentence) {
         reloadDictionaryIfRequired();
         boolean lockAcquired = false;
         try {
             lockAcquired = mLock.readLock().tryLock(
                     TIMEOUT_FOR_READ_OPS_IN_MILLISECONDS, TimeUnit.MILLISECONDS);
             if (lockAcquired && mBinaryDictionary != null) {
-                return learnedCountLocked(word);
+                final WordProperty property = mBinaryDictionary.getWordProperty(word, isBeginningOfSentence);
+                // (a word not stored comes back without a timestamp)
+                if (property == null || property.mProbabilityInfo.mTimestamp <= 0) return null;
+                return property;
             }
         } catch (final InterruptedException e) {
-            Log.e(TAG, "Interrupted tryLock() in getLearnedCount().", e);
+            Log.e(TAG, "Interrupted tryLock() in getLearnedWordProperty().", e);
         } finally {
             if (lockAcquired) {
                 mLock.readLock().unlock();
             }
         }
-        return -1;
+        return null;
     }
 
     private int learnedCountLocked(final String word) {
