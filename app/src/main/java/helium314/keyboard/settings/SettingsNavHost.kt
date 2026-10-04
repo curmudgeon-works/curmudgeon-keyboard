@@ -118,6 +118,12 @@ fun SettingsNavHost(
         composable(SettingsDestination.PersonalDictionaries) {
             PersonalDictionariesScreen(onClickBack = ::goBack)
         }
+        composable(SettingsDestination.LearnedWords) {
+            helium314.keyboard.settings.screens.LearnedWordsScriptsScreen(onClickBack = ::goBack)
+        }
+        composable(SettingsDestination.LearnedWordsOfScript + "{script}") {
+            helium314.keyboard.settings.screens.LearnedWordsScreen(onClickBack = ::goBack, script = it.arguments?.getString("script") ?: "")
+        }
         composable(SettingsDestination.AllKeyboards) {
             // the list of all keyboards incl. disabled ones; the keyboards screen shows the enabled ones as entries
             LanguageScreen(onClickBack = ::goBack)
@@ -165,6 +171,8 @@ object SettingsDestination {
     const val ColorsNight = "colors_night/"
     const val PersonalDictionaries = "personal_dictionaries"
     const val PersonalDictionary = "personal_dictionary/"
+    const val LearnedWords = "learned_words"
+    const val LearnedWordsOfScript = "learned_words/"
     const val Languages = "languages/"
     const val AllKeyboards = "all_keyboards"
     const val Subtype = "subtype/"

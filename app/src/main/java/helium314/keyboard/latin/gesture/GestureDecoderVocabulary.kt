@@ -296,6 +296,13 @@ object GestureDecoderVocabulary {
         }
     }
 
+    /** [word] was taken off [locale]'s removed words (the settings screen "Learned & blacklisted words"): its dictionary
+     *  copy can be swiped again (the vocabularies are rebuilt in the background; rare). */
+    fun onWordUnblacklisted(locale: Locale, word: String) {
+        blacklists.computeIfPresent(locale.toLanguageTag()) { _, set -> set - word }
+        rebuildWithLearned()
+    }
+
     /** [word] was added to [locale]'s removed words (DictionaryGroup.addToBlacklist): keep its dictionary copy out. */
     fun onWordBlacklisted(locale: Locale, word: String) {
         val context = Settings.getCurrentContext()
