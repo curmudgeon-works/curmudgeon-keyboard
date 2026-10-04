@@ -19,16 +19,16 @@ import kotlin.test.assertTrue
 @RunWith(RobolectricTestRunner::class)
 class RemovedWordsTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
-    private val locale = Locale.forLanguageTag("xx-YY")
-    private val file get() = File(ctx.filesDir, "blacklists/xx-YY.txt")
+    private val script = "Zzzz" // (a script code no keyboard has: the file is the test's own)
+    private val file get() = File(ctx.filesDir, "blacklists/Zzzz.txt")
 
     @Test fun `an edit is seen by every holder and lands in the file`() {
         file.delete()
-        val list = RemovedWords.blacklist(ctx, locale)
+        val list = RemovedWords.blacklist(ctx, script, 0)
         list.reload()
-        assertSame(list, RemovedWords.blacklist(ctx, locale))
+        assertSame(list, RemovedWords.blacklist(ctx, script, 0))
         assertEquals(1, list.strike("pyramidar"))
-        assertTrue(RemovedWords.blacklist(ctx, locale).contains("pyramidar"))
+        assertTrue(RemovedWords.blacklist(ctx, script, 0).contains("pyramidar"))
         list.reload() // waits for the write; the word stays
         assertEquals(listOf("pyramidar"), file.readLines())
         assertEquals(1, list.strike("other"))
@@ -45,7 +45,7 @@ class RemovedWordsTest {
 
     @Test fun `strikes count up, are written and read back, and Un-blacklist clears them`() {
         file.delete()
-        val list = RemovedWords.blacklist(ctx, locale)
+        val list = RemovedWords.blacklist(ctx, script, 0)
         list.reload()
         assertEquals(1, list.strike("teh"))
         assertEquals(2, list.strike("teh"))
@@ -83,7 +83,7 @@ class RemovedWordsTest {
 
     @Test fun `a restored backup adds its words and keeps the most strikes`() {
         file.delete()
-        val list = RemovedWords.blacklist(ctx, locale)
+        val list = RemovedWords.blacklist(ctx, script, 0)
         list.reload()
         list.strike("both"); list.strike("both") // 2 on the phone
         list.strike("phone")
@@ -96,7 +96,7 @@ class RemovedWordsTest {
 
     @Test fun `entryFor finds the word as typed or in lowercase`() {
         file.delete()
-        val list = RemovedWords.blacklist(ctx, locale)
+        val list = RemovedWords.blacklist(ctx, script, 0)
         list.reload()
         list.strike("hello")
         assertEquals(Entry(1), list.entryFor("Hello"))
@@ -141,6 +141,35 @@ class RemovedWordsTest {
         assertTrue(RemovedWords.isRemoved(Entry(4), 1000))
         assertTrue(RemovedWords.isRemoved(Entry(5, confirmed = true), 1000))
         assertFalse(RemovedWords.awaitsConfirmation(Entry(4), 1000))
+    }
+
+    @Test fun `lists are per script, a keyboard's own in its folder`() {
+        assertEquals(File(ctx.filesDir, "blacklists/Latn.txt"), RemovedWords.blacklist(ctx, "Latn", 0).file)
+        assertEquals(File(ctx.filesDir, "blacklists/k3/Deva.txt"), RemovedWords.blacklist(ctx, "Deva", 3).file)
+        // a word goes by its own letters: a Hinglish word on a Devanagari keyboard is in the Latin list
+        assertEquals(File(ctx.filesDir, "blacklists/Latn.txt"), RemovedWords.blacklistFor(ctx, "nahi", Locale.forLanguageTag("hi"), 0).file)
+        assertEquals(File(ctx.filesDir, "blacklists/Deva.txt"), RemovedWords.blacklistFor(ctx, "नहीं", Locale.forLanguageTag("en-US"), 0).file)
+        // without letters: the keyboard's
+        assertEquals(File(ctx.filesDir, "blacklists/Deva.txt"), RemovedWords.blacklistFor(ctx, "123", Locale.forLanguageTag("hi"), 0).file)
+    }
+
+    @Test fun `merged lists keep every word with its most strikes and the confirmation`() {
+        val merged = RemovedWords.mergeLists(listOf(
+            mapOf("teh" to Entry(2), "only" to Entry(1), "back" to Entry(3, true)),
+            mapOf("teh" to Entry(1), "other" to Entry(4), "back" to Entry(3)),
+        ))
+        assertEquals(mapOf("teh" to Entry(2), "only" to Entry(1), "back" to Entry(3, true), "other" to Entry(4)), merged)
+        assertEquals("back\t3\tconfirmed\nonly\nother\t4\nteh\t2\n", RemovedWords.formatAll(merged))
+    }
+
+    @Test fun `replaceAll makes the list exactly the given one`() {
+        file.delete()
+        val list = RemovedWords.blacklist(ctx, script, 0)
+        list.reload()
+        list.strike("gone"); list.strike("kept")
+        list.replaceAll(mapOf("kept" to Entry(3), "new" to Entry(1)))
+        assertEquals(mapOf("kept" to Entry(3), "new" to Entry(1)), list.entries())
+        assertEquals(listOf("kept\t3", "new"), file.readLines())
     }
 
     @Test fun `the same word in two lists counts with its most strikes`() {

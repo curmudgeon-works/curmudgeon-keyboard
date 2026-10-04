@@ -1857,7 +1857,8 @@ public final class InputLogic {
      *  after a moment later, in the same language's learned words). */
     private void logLearningEvent(final String event, final String origin, final String before, final String after) {
         if (!LearningEventLog.isEnabled()) return;
-        LearningEventLog.log(event, origin, before, after, mDictionaryFacilitator.getCurrentLocale().toLanguageTag(),
+        LearningEventLog.log(event, origin, before, after,
+                mDictionaryFacilitator.getLearnedWordsLabel(after.isEmpty() ? before : after),
                 mDictionaryFacilitator.getLearnedCountsNow());
     }
 

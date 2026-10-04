@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings
 
-import helium314.keyboard.settings.preferences.LearnedEntry
-import helium314.keyboard.settings.preferences.LearnedEntry.Companion.SENTENCE_START
-import helium314.keyboard.settings.preferences.ownCounts
+import helium314.keyboard.latin.personalization.LearnedEntry
+import helium314.keyboard.latin.personalization.LearnedEntry.Companion.SENTENCE_START
+import helium314.keyboard.latin.personalization.ownCounts
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

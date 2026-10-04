@@ -34,6 +34,7 @@ object KeyboardProfiles {
         Settings.PREF_CLIPBOARD_HISTORY_SIZE, Settings.PREF_CLIPBOARD_HISTORY_PINNED_FIRST,
         Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_SWIPE_METRICS, Settings.PREF_AUTO_PREVIEW_KEYBOARD, // logs of the user's swiping: one file, one switch
         Settings.PREF_LEARNING_LOG, // and of what corrections do to the learned words
+        Settings.PREF_SHARE_LEARNED_WORDS, // it says whether the keyboards have their own learned words: app-wide
         PREF_SEPARATE, PREF_IDS, PREF_NEXT_ID,
         "key_popup_sets", // saved popup sets are meant to be reused across keyboards
         "appearance_looks", // saved looks too
@@ -194,6 +195,13 @@ object KeyboardProfiles {
         return keyboard.toPref().takeIf { map.has(it) }?.let { map.getInt(it) }
     }
 
+    /** [keyboard]'s profile id inside a backed-up preference map, whether or not its settings were separate (the id
+     *  also names a keyboard's own learned words, see LearnedStores); null if the backup has none for it. */
+    fun anyIdIn(backup: Map<String, Any?>, keyboard: SettingsSubtype): Int? {
+        val map = try { JSONObject(backup[PREF_IDS] as? String ?: "{}") } catch (e: Exception) { JSONObject() }
+        return keyboard.toPref().takeIf { map.has(it) }?.let { map.getInt(it) }
+    }
+
     /** What [keyboard] read in a backed-up preference map: the backup's shared set with its own set on top (a default
      *  mark of its own takes the shared value out), plain keys, no marks. */
     fun effectiveSettingsIn(backup: Map<String, Any?>, keyboard: SettingsSubtype): Map<String, Any?> {
@@ -237,6 +245,8 @@ object KeyboardProfiles {
     @Volatile var editingId: Int = SHARED
 
     fun refreshImeId(real: SharedPreferences) {
+        // the learned words of the keyboard in use too, when each keyboard has its own
+        helium314.keyboard.latin.personalization.LearnedStores.refresh(real)
         val old = imeId
         imeId = if (isSeparate(real)) idFor(real, selectedKeyboard(real)) else SHARED
         // another keyboard's background picture and emoji font (see profileFile)

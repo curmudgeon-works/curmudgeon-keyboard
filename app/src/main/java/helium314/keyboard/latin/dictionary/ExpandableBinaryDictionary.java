@@ -587,31 +587,132 @@ abstract public class ExpandableBinaryDictionary extends Dictionary {
         if (!isReloading.compareAndSet(false, true)) {
             return;
         }
-        final File dictFile = mDictFile;
         asyncExecuteTaskWithWriteLock(() -> {
             try {
-                if (!dictFile.exists() || isNeededToRecreate()) {
-                    // If the dictionary file does not exist or contents have been updated,
-                    // generate a new one.
-                    createNewDictionaryLocked();
-                } else if (getBinaryDictionary() == null) {
-                    // Otherwise, load the existing dictionary.
-                    loadBinaryDictionaryLocked();
-                    final BinaryDictionary binaryDictionary = getBinaryDictionary();
-                    if (binaryDictionary != null && !(isValidDictionaryLocked()
-                            // TODO: remove the check below
-                            && matchesExpectedBinaryDictFormatVersionForThisType(binaryDictionary.getFormatVersion()))) {
-                        // Binary dictionary or its format version is not valid. Regenerate
-                        // the dictionary file. createNewDictionaryLocked will remove the
-                        // existing files if appropriate.
-                        createNewDictionaryLocked();
-                    }
-                }
-                clearNeedsToRecreate();
+                ensureLoadedLocked();
             } finally {
                 isReloading.set(false);
             }
         });
+    }
+
+    /** Loads the dictionary from its file (or creates it) unless it's loaded. Under the write lock. */
+    private void ensureLoadedLocked() {
+        if (getBinaryDictionary() != null && !isNeededToRecreate()) return;
+        // (the learned words wait here while their files are being moved into new stores, see UserHistoryDictionary)
+        awaitBeforeLoad();
+        final File dictFile = mDictFile;
+        if (!dictFile.exists() || isNeededToRecreate()) {
+            // If the dictionary file does not exist or contents have been updated,
+            // generate a new one.
+            createNewDictionaryLocked();
+        } else if (getBinaryDictionary() == null) {
+            // Otherwise, load the existing dictionary.
+            loadBinaryDictionaryLocked();
+            final BinaryDictionary binaryDictionary = getBinaryDictionary();
+            if (binaryDictionary != null && !(isValidDictionaryLocked()
+                    // TODO: remove the check below
+                    && matchesExpectedBinaryDictFormatVersionForThisType(binaryDictionary.getFormatVersion()))) {
+                // Binary dictionary or its format version is not valid. Regenerate
+                // the dictionary file. createNewDictionaryLocked will remove the
+                // existing files if appropriate.
+                createNewDictionaryLocked();
+            }
+        }
+        clearNeedsToRecreate();
+    }
+
+    /** Called before the file is first read, under the write lock: a subclass can wait here for its file to be ready. */
+    protected void awaitBeforeLoad() {
+    }
+
+    // ---- whole-store operations (merging learned words: migration, backup restore, sharing across keyboards) ----
+    // Each runs under the write lock on the calling thread, after the tasks holding it: call them off the main thread.
+    // (Not on the dictionary's executor: a restore already runs on it, and with a single thread it would wait for itself.)
+
+    private boolean runLockedAndWait(@NonNull final Runnable task) {
+        mLock.writeLock().lock();
+        try {
+            task.run();
+            return true;
+        } catch (final RuntimeException e) {
+            Log.e(TAG, "Whole-store operation failed: " + mDictName, e);
+            return false;
+        } finally {
+            mLock.writeLock().unlock();
+        }
+    }
+
+    /** Writes what's only in memory to the file, and waits. @return false if it couldn't be done */
+    public boolean flushAndWait() {
+        return runLockedAndWait(() -> {
+            final BinaryDictionary binaryDictionary = getBinaryDictionary();
+            if (binaryDictionary != null) binaryDictionary.flush();
+        });
+    }
+
+    /** Saves what's only in memory, then closes: one task, so the close can't overtake the save (the store is shared and
+     *  can be dropped by one keyboard while its words are still unsaved). The next use reads the file again. */
+    public void flushAndClose() {
+        asyncExecuteTaskWithWriteLock(() -> {
+            final BinaryDictionary binaryDictionary = getBinaryDictionary();
+            if (binaryDictionary != null) binaryDictionary.flush();
+            closeBinaryDictionary();
+        });
+    }
+
+    /** Closes it now, dropping what's only in memory (its file was replaced): the next use reads the file again. */
+    public void closeAndWait() {
+        runLockedAndWait(this::closeBinaryDictionary);
+    }
+
+    /** Every entry, read in one go (loaded from the file first if need be), waiting as long as that takes; unlike
+     *  {@link #getWordPropertiesForSyncing}, which gives up after 100 ms. Null if it couldn't be read. */
+    @Nullable
+    public WordProperty[] getAllWordPropertiesBlocking() {
+        final ArrayList<WordProperty> list = new ArrayList<>();
+        final boolean ok = runLockedAndWait(() -> {
+            ensureLoadedLocked();
+            final BinaryDictionary binaryDictionary = getBinaryDictionary();
+            if (binaryDictionary == null) return;
+            int token = 0;
+            do {
+                final BinaryDictionary.GetNextWordPropertyResult result = binaryDictionary.getNextWordProperty(token);
+                if (result.mWordProperty == null) break;
+                list.add(result.mWordProperty);
+                token = result.mNextToken;
+            } while (token != 0);
+        });
+        return ok ? list.toArray(new WordProperty[0]) : null;
+    }
+
+    /**
+     * Replaces the store's contents by the store in [source] (a dictionary directory written elsewhere; its name must be
+     * this store's file name, the files in it are named after it), and waits. [source] is moved, not copied. Everyone
+     * holding this object sees the new contents at once. @return false if it couldn't be done
+     */
+    public boolean replaceWith(@NonNull final File source) {
+        final AtomicBoolean moved = new AtomicBoolean(false);
+        final boolean ok = runLockedAndWait(() -> {
+            closeBinaryDictionary();
+            if (mDictFile.exists() && !FileUtils.deleteRecursively(mDictFile)) {
+                Log.e(TAG, "Can't remove a file: " + mDictFile.getName());
+                return;
+            }
+            if (!source.renameTo(mDictFile)) {
+                Log.e(TAG, "Can't move a new store in place: " + mDictFile.getName());
+                return;
+            }
+            moved.set(true);
+            ensureLoadedLocked();
+        });
+        return ok && moved.get();
+    }
+
+    /** The file (a directory for this format) the store is kept in. */
+    @NonNull
+    public File getDictFile() {
+        return mDictFile;
     }
 
     /**

@@ -4,7 +4,9 @@ package helium314.keyboard.latin.utils
 import android.content.Context
 import android.os.SystemClock
 import helium314.keyboard.latin.dictionary.Dictionary
+import helium314.keyboard.latin.personalization.LearnedStores
 import helium314.keyboard.latin.personalization.PersonalizationHelper
+import helium314.keyboard.latin.utils.ScriptUtils.script
 import helium314.keyboard.latin.SuggestedWords.SuggestedWordInfo
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
@@ -14,8 +16,8 @@ import java.util.concurrent.ConcurrentHashMap
  * charges every completed character, so "someone.long.name@example.com" only wins after several letters no
  * matter how often it was typed. These are matched by prefix instead and get an early slot in the strip.
  *
- * Per locale, read from the user history dictionary (probability = how often typed, fades unused), refreshed in the
- * background at most every [REFRESH_MS]; the first lookup after a start returns nothing.
+ * Per store of learned words (one per script, see LearnedStores; probability = how often typed, fades unused), refreshed
+ * in the background at most every [REFRESH_MS]; the first lookup after a start returns nothing.
  */
 object FrequentLongWords {
     private const val TAG = "FrequentLongWords"
@@ -40,16 +42,23 @@ object FrequentLongWords {
 
     private fun qualifies(word: String) = word.length >= MIN_LENGTH || word.contains('@') || word.contains('.')
 
+    init {
+        // another keyboard's own learned words (or all keyboards' again)
+        LearnedStores.onPoolChanged { clear() }
+    }
+
     /** Frequent long words of [locales] starting with [typed] (case-insensitive), most often typed first. */
     fun matching(context: Context, locales: List<Locale>, typed: String): List<SuggestedWordInfo> {
         if (typed.isEmpty()) return emptyList()
         val lower = typed.lowercase()
         val now = SystemClock.elapsedRealtime()
         val found = ArrayList<Entry>()
-        for (locale in locales) {
-            val key = locale.toLanguageTag()
+        val pool = LearnedStores.currentPool
+        // (the languages of a script share their learned words: one store each)
+        for (script in locales.map { it.script() }.distinct()) {
+            val key = LearnedStores.storeName(script, pool)
             val cache = caches[key]
-            if (cache == null || now - cache.time > REFRESH_MS) refreshAsync(context, locale, key)
+            if (cache == null || now - cache.time > REFRESH_MS) refreshAsync(context, script, pool, key)
             cache?.entries?.filterTo(found) { it.lower.startsWith(lower) && it.lower != lower }
         }
         return found.sortedByDescending { it.probability }.take(MAX_IN_STRIP).map {
@@ -66,12 +75,12 @@ object FrequentLongWords {
         for ((key, cache) in caches) caches[key] = Cache(cache.entries.filterNot { it.lower == word.lowercase() }, cache.time)
     }
 
-    private fun refreshAsync(context: Context, locale: Locale, key: String) {
+    private fun refreshAsync(context: Context, script: String, pool: Int, key: String) {
         if (!refreshing.add(key)) return
         val started = SystemClock.elapsedRealtime()
         Thread({
             try {
-                val history = PersonalizationHelper.getUserHistoryDictionary(context, locale)
+                val history = PersonalizationHelper.getUserHistoryDictionary(context, script, pool)
                 // the dump gives up after 100 ms and answers with nothing, which a big store misses on the first tries
                 var props = history.wordPropertiesForSyncing
                 var attempts = 0

@@ -169,16 +169,21 @@ public interface DictionaryFacilitator {
      *  edited later): its count goes down by one, never below 0, and the word stays stored. */
     default void unlearnOneUse(final String word) {}
 
-    /** How often [word] was learned in the language in use (as written, else lowercase), -1 if it isn't stored. */
+    /** How often [word] was learned (in the learned words of its script; as written, else lowercase), -1 if it isn't stored. */
     default int getLearnedCount(final String word) {
         return -1;
     }
 
-    /** Reads learned counts as {@link #getLearnedCount}, but always in the learned words of the language in use now,
-     *  also when that switches later (multilingual typing): the corrections log reads a word's count before a change
-     *  and again a moment after it, and with the language read each time those came from two languages' stores. */
+    /** Reads learned counts as {@link #getLearnedCount}, for the corrections log (a word's count before a change and
+     *  again a moment after it: both in its script's store, whichever language is preferred meanwhile). */
     default helium314.keyboard.latin.personalization.LearningEventLog.Counts getLearnedCountsNow() {
         return this::getLearnedCount;
+    }
+
+    /** Which learned words [word] goes into, for the corrections log's language column: its script ("Latn"), and the
+     *  keyboard's own pool when keyboards don't share them ("Latn/k3"). */
+    default String getLearnedWordsLabel(final String word) {
+        return getCurrentLocale().toLanguageTag();
     }
 
     @NonNull SuggestionResults getSuggestionResults(final ComposedData composedData,

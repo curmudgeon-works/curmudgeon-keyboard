@@ -185,6 +185,30 @@ object ScriptUtils {
         }
     }
 
+    // the scripts a word's letters are matched against, most used first (a letter is looked up once per learned word)
+    private val wordScripts = listOf(
+        SCRIPT_LATIN, SCRIPT_CYRILLIC, SCRIPT_GREEK, SCRIPT_ARMENIAN, SCRIPT_ARABIC, SCRIPT_HEBREW, SCRIPT_DEVANAGARI,
+        SCRIPT_BENGALI, SCRIPT_GUJARATI, SCRIPT_TAMIL, SCRIPT_TELUGU, SCRIPT_KANNADA, SCRIPT_MALAYALAM, SCRIPT_SINHALA,
+        SCRIPT_THAI, SCRIPT_LAO, SCRIPT_KHMER, SCRIPT_MYANMAR, SCRIPT_GEORGIAN, SCRIPT_HANGUL,
+    )
+
+    /**
+     * The script of [word]: that of its first letter that belongs to a known script. Learned words and the blacklist are
+     * kept per script, and a word goes by its own letters, not by the language that happened to be preferred when it was
+     * typed (a Hinglish word typed after English ones is Latin either way). [fallback] (the keyboard's script) for a word
+     * without such letters (digits, emoji, symbols).
+     */
+    @JvmStatic
+    fun scriptOfWord(word: CharSequence, fallback: String): String {
+        var i = 0
+        while (i < word.length) {
+            val cp = Character.codePointAt(word, i)
+            if (Character.isLetter(cp)) wordScripts.firstOrNull { isLetterPartOfScript(cp, it) }?.let { return it }
+            i += Character.charCount(cp)
+        }
+        return fallback
+    }
+
     @JvmStatic
     fun isScriptRtl(script: String): Boolean {
         return when (script) {

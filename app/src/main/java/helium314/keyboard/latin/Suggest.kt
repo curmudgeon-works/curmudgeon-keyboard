@@ -29,6 +29,7 @@ import helium314.keyboard.latin.utils.AutoCorrectionUtils
 import helium314.keyboard.latin.utils.FrequentLongWords
 import helium314.keyboard.latin.utils.HotWords
 import helium314.keyboard.latin.utils.Log
+import helium314.keyboard.latin.utils.ScriptUtils.script
 import helium314.keyboard.latin.utils.SuggestionResults
 import java.util.Locale
 import kotlin.math.min
@@ -325,9 +326,10 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
                     // don't allow if suggestion has too low score
                     return true to false
                 }
-                if (firstSuggestion.mSourceDict.mLocale !== typedWordInfo.mSourceDict.mLocale) {
+                val firstLocale = languageOf(firstSuggestion.mSourceDict, dictLocale)
+                if (firstLocale != languageOf(typedWordInfo.mSourceDict, dictLocale)) {
                     // dict locale different -> return the better match
-                    return true to (dictLocale == firstSuggestion.mSourceDict.mLocale)
+                    return true to (dictLocale == firstLocale)
                 }
                 // the score difference may need tuning, but so far it seems alright
                 val firstWordBonusScore =
@@ -381,7 +383,7 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
         fun capitalizeInfo(wordInfo: SuggestedWordInfo) =
             if (shouldMakeSuggestionsOnlyFirstCharCapitalized || shouldMakeSuggestionsAllUpperCase)
                 getTransformedSuggestedWordInfo(
-                    wordInfo, wordInfo.mSourceDict.mLocale ?: locale, shouldMakeSuggestionsAllUpperCase,
+                    wordInfo, languageOf(wordInfo.mSourceDict, locale) ?: locale, shouldMakeSuggestionsAllUpperCase,
                     shouldMakeSuggestionsOnlyFirstCharCapitalized, 0
                 )
             else wordInfo
@@ -568,6 +570,17 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
         // TODO: should we add Finnish here?
         private val sLanguageToMaximumAutoCorrectionWithSpaceLength = hashMapOf(Locale.GERMAN.language to MAXIMUM_AUTO_CORRECT_LENGTH_FOR_GERMAN)
 
+        /**
+         * The language a suggestion's dictionary stands for. Learned words are kept per script, not per language (see
+         * LearnedStores): their store only names a script ("und-Latn"), and a learned word counts as the language in use
+         * ([current]) when it's of that language's script, as it did when each language learned its own words.
+         */
+        private fun languageOf(dict: Dictionary, current: Locale): Locale? {
+            val locale = dict.mLocale ?: return null
+            if (dict.mDictType != Dictionary.TYPE_USER_HISTORY || locale.language.isNotEmpty()) return locale
+            return if (locale.script == current.script()) current else locale
+        }
+
         private fun getTransformedSuggestedWordInfoList(
             wordComposer: WordComposer, results: SuggestionResults,
             trailingSingleQuotesCount: Int, defaultLocale: Locale, keyboard: Keyboard
@@ -582,7 +595,7 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
             if (shouldMakeSuggestionsOnlyFirstCharCapitalized || shouldMakeSuggestionsAllUpperCase || 0 != trailingSingleQuotesCount) {
                 for (i in 0 until suggestionsCount) {
                     val wordInfo = suggestionsContainer[i]
-                    val wordLocale = wordInfo.mSourceDict.mLocale
+                    val wordLocale = languageOf(wordInfo.mSourceDict, defaultLocale)
                     val transformedWordInfo = getTransformedSuggestedWordInfo(
                         wordInfo, wordLocale ?: defaultLocale,
                         shouldMakeSuggestionsAllUpperCase, shouldMakeSuggestionsOnlyFirstCharCapitalized,

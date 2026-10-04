@@ -162,9 +162,7 @@ object OwnGestureDecoder {
         GestureDecoderVocabulary.historyBoost = tuning.historyBoost
         GestureDecoderVocabulary.includeLearned = Settings.getValues()?.mUsePersonalizedDicts != false
         val specs = locales.map {
-            GestureDecoderVocabulary.LocaleSpec(it,
-                prefs?.let { p -> LanguagePriority.factor(p, it) } ?: 1f,
-                prefs?.let { p -> LanguagePriority.sharesUserHistory(p, it) } ?: false)
+            GestureDecoderVocabulary.LocaleSpec(it, prefs?.let { p -> LanguagePriority.factor(p, it) } ?: 1f)
         }
         val vocabulary = GestureDecoderVocabulary.getOrBuildAsync(specs)
         if (vocabulary == null) {
