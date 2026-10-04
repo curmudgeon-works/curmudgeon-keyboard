@@ -17,6 +17,7 @@ import helium314.keyboard.keyboard.MainKeyboardView
 import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode
 import helium314.keyboard.latin.ShadowFacilitator2.Companion.lastAddedWord
 import helium314.keyboard.latin.ShadowFacilitator2.Companion.unlearnedWords
+import helium314.keyboard.latin.ShadowFacilitator2.Companion.addedWords
 import helium314.keyboard.latin.SuggestedWords.SuggestedWordInfo
 import helium314.keyboard.latin.common.Constants
 import helium314.keyboard.latin.common.LocaleUtils.constructLocale
@@ -889,6 +890,95 @@ class InputLogicTest {
         assertEquals(listOf(), unlearnedWords)
     }
 
+    @Test fun `changing an accepted word at its end after a tap takes its use back when the cursor leaves`() {
+        reset()
+        chainInput("hello world ")
+        assertEquals(listOf("hello", "world"), addedWords)
+        setCursorPosition(5) // a tap at the end of hello: picked up again
+        functionalKeyPress(KeyCode.DELETE)
+        input('p')
+        assertEquals("hellp world ", text)
+        setCursorPosition(text.length) // a tap elsewhere: the edit is over
+        assertEquals(listOf("hello"), unlearnedWords)
+        assertEquals(listOf("hello", "world", "hellp"), addedWords)
+        input(' ')
+        assertEquals(listOf("hello"), unlearnedWords)
+        assertEquals(listOf("hello", "world", "hellp"), addedWords)
+        setCursorPosition(11) // the end of world
+        functionalKeyPress(KeyCode.DELETE)
+        input('f')
+        setCursorPosition(0) // the start of the box
+        assertEquals(listOf("hello", "world"), unlearnedWords)
+        assertEquals(listOf("hello", "world", "hellp", "worlf"), addedWords)
+        setCursorPosition(5) // only shortened: text being deleted, nothing changes
+        functionalKeyPress(KeyCode.DELETE)
+        setCursorPosition(0)
+        assertEquals("hell worlf. ", text) // (the second space made a period)
+        assertEquals(listOf("hello", "world"), unlearnedWords)
+        assertEquals(listOf("hello", "world", "hellp", "worlf"), addedWords)
+    }
+
+    // Some editors answer reads with their text from before the keyboard's last edit (see RichInputConnection
+    // getTextBeforeCursorAndDetectLaggyConnection); the keyboard then reloads a cursor position from before the edit too,
+    // so the editor's report of the edit looks like a tap. On a Pixel 8 that learned "w" while "hellp worlf  " was
+    // deleted with backspace, and "p" from "3stimate 5pm ".
+    @Test fun `deleting text with backspace learns nothing, also in a laggy editor`() {
+        reset()
+        chainInput("hellp worlf  ")
+        addedWords.clear()
+        laggyEditor = true
+        while (text.isNotEmpty()) laggyKeyPress(KeyCode.DELETE)
+        laggyEditor = false
+        setCursorPosition(0)
+        assertEquals(listOf(), addedWords)
+        assertEquals(listOf(), unlearnedWords)
+        reset()
+        chainInput("3stimate 5pm ")
+        addedWords.clear()
+        laggyEditor = true
+        while (text.isNotEmpty()) laggyKeyPress(KeyCode.DELETE)
+        laggyEditor = false
+        assertEquals(listOf(), addedWords)
+        assertEquals(listOf(), unlearnedWords)
+        // a word starting with ' isn't picked up again, so backspace deletes it as plain text
+        reset()
+        chainInput("so 'tisx ")
+        addedWords.clear()
+        repeat(2) { functionalKeyPress(KeyCode.DELETE) }
+        assertEquals("so 'tis", text)
+        setCursorPosition(0) // a tap elsewhere
+        assertEquals(listOf(), addedWords)
+    }
+
+    // on a Pixel 8 the first undo in "the keyxboard" (cursor after x) logged "keyboard" as learned
+    @Test fun `undo and redo learn nothing, also in a laggy editor`() {
+        reset()
+        chainInput("the keyboard")
+        android.os.SystemClock.sleep(500) // a tap comes a while after typing
+        setCursorPosition(7) // key|board
+        addedWords.clear()
+        laggyEditor = true
+        laggyKeyPress('x'.code)
+        assertEquals("the keyxboard", text)
+        laggyKeyPress(KeyCode.UNDO)
+        assertEquals("the keyboard", text)
+        laggyKeyPress(KeyCode.REDO)
+        assertEquals("the keyxboard", text)
+        laggyKeyPress(KeyCode.UNDO)
+        laggyEditor = false
+        setCursorPosition(0)
+        assertEquals(listOf(), addedWords)
+        assertEquals(listOf(), unlearnedWords)
+    }
+
+    @Test fun `a word typed right after a digit is not learned on its own`() {
+        reset()
+        chainInput("5pm ")
+        assertEquals(listOf(), addedWords)
+        chainInput("3stimate ")
+        assertEquals(listOf("3stimate"), addedWords)
+    }
+
     @Test fun `editing a swipe before its commit counts only the final word`() {
         reset()
         latinIME.prefs().edit { putBoolean(Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD, false) }
@@ -964,6 +1054,9 @@ class InputLogicTest {
         currentInputType = InputType.TYPE_CLASS_TEXT
         lastAddedWord = ""
         unlearnedWords.clear()
+        addedWords.clear()
+        laggyEditor = false
+        staleText = null
 
         // reset settings
         latinIME.prefs().edit { clear() }
@@ -1069,6 +1162,19 @@ class InputLogicTest {
         assertEquals(cursor, connection.expectedSelectionStart)
         assertEquals(cursor, connection.expectedSelectionEnd)
         return cursor
+    }
+
+    // a key in a laggy editor: the editor reports the new cursor after the key (as a phone's editor does, here before
+    // the keyboard's posted messages run), and only then answers reads with its current text
+    private fun laggyKeyPress(code: Int) {
+        val oldStart = selectionStart
+        val oldEnd = selectionEnd
+        latinIME.onEvent(if (code < 0) Event.createSoftwareKeypressEvent(Event.NOT_A_CODE_POINT, code, 0,
+                Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false)
+            else Event.createEventForCodePointFromUnknownSource(code))
+        staleText = null
+        latinIME.onUpdateSelection(oldStart, oldEnd, selectionStart, selectionEnd, composingStart, composingEnd)
+        handleMessages()
     }
 
     // just sets the text and starts input so connection it set up correctly
@@ -1179,6 +1285,14 @@ private val textBeforeCursor get() = text.substring(0, selectionStart)
 private val textAfterCursor get() = text.substring(selectionEnd)
 private val selectedText get() = text.substring(selectionStart, selectionEnd)
 private val cursor get() = if (selectionStart == selectionEnd) selectionStart else -1
+// a laggy editor (like some note apps) answers reads with its text and cursor from before the keyboard's last edit, until
+// it has reported the new cursor (see laggyKeyPress)
+private var laggyEditor = false
+private var staleText: String? = null
+private var staleSelection = 0
+private fun beforeEdit() {
+    if (laggyEditor && staleText == null) { staleText = text; staleSelection = selectionStart }
+}
 
 // composingText should return everything, but RichInputConnection.mComposingText only returns up to cursor
 private val composingText get() = if (composingStart == -1 || composingEnd == -1) ""
@@ -1188,9 +1302,9 @@ private val composingText get() = if (composingStart == -1 || composingEnd == -1
 private val ic = object : InputConnection {
     // pretty clear (though this may be slow depending on the editor)
     // bad return value here is likely the cause for that weird bug improved/fixed by fixIncorrectLength
-    override fun getTextBeforeCursor(p0: Int, p1: Int): CharSequence = textBeforeCursor.take(p0)
+    override fun getTextBeforeCursor(p0: Int, p1: Int): CharSequence = (staleText?.substring(0, staleSelection) ?: textBeforeCursor).take(p0)
     // pretty clear (though this may be slow depending on the editor)
-    override fun getTextAfterCursor(p0: Int, p1: Int): CharSequence = textAfterCursor.take(p0)
+    override fun getTextAfterCursor(p0: Int, p1: Int): CharSequence = (staleText?.substring(staleSelection) ?: textAfterCursor).take(p0)
     // pretty clear
     override fun getSelectedText(p0: Int): CharSequence? = if (selectionStart == selectionEnd) null
         else text.substring(selectionStart, selectionEnd)
@@ -1198,6 +1312,7 @@ private val ic = object : InputConnection {
     // this REPLACES currently composing text (even if at a different position)
     // moves the cursor: positive means relative to composing text start, negative means relative to start
     override fun setComposingText(newText: CharSequence, cursor: Int): Boolean {
+        beforeEdit()
         // first remove the composing text if any
         if (composingStart != -1 && composingEnd != -1)
             text = text.substring(0, composingStart) + text.substring(composingEnd)
@@ -1262,6 +1377,7 @@ private val ic = object : InputConnection {
         return false
     }
     override fun setSelection(p0: Int, p1: Int): Boolean {
+        beforeEdit()
         selectionStart = p0
         selectionEnd = p1
         // todo: call InputMethodService.onUpdateSelection(int, int, int, int, int, int), but only after batch edit is done!
@@ -1271,6 +1387,7 @@ private val ic = object : InputConnection {
     // chars, not codepoints or glyphs
     // todo: may delete only one half of a surrogate pair, but this should be avoided by RichInputConnection (maybe throw error)
     override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
+        beforeEdit()
         // delete only before or after selection
         text = textBeforeCursor.substring(0, textBeforeCursor.length - beforeLength) +
                 text.substring(selectionStart, selectionEnd) +
@@ -1296,6 +1413,7 @@ private val ic = object : InputConnection {
     }
     override fun sendKeyEvent(p0: KeyEvent): Boolean {
         if (p0.action != KeyEvent.ACTION_DOWN) return true // only change the text on key down, like RichInputConnection does
+        beforeEdit()
         if (p0.keyCode == KeyEvent.KEYCODE_DEL) {
             if (selectionEnd == 0) return true // nothing to delete
             if (selectedText.isEmpty()) {
@@ -1326,8 +1444,8 @@ private val ic = object : InputConnection {
     override fun getExtractedText(p0: ExtractedTextRequest?, p1: Int): ExtractedText {
         return ExtractedText().also {
             it.startOffset = 0
-            it.selectionStart = selectionStart
-            it.selectionEnd = selectionEnd
+            it.selectionStart = if (staleText != null) staleSelection else selectionStart
+            it.selectionEnd = if (staleText != null) staleSelection else selectionEnd
         }
     }
     // only effect is flashing, so whatever...
@@ -1400,6 +1518,7 @@ class ShadowFacilitator2 {
                          ngramContext: NgramContext, timeStampInSeconds: Long,
                          blockPotentiallyOffensive: Boolean) {
         lastAddedWord = suggestion
+        addedWords.add(suggestion)
     }
     // a picked suggestion is learned with extra uses
     @Implementation
@@ -1408,6 +1527,7 @@ class ShadowFacilitator2 {
                          blockPotentiallyOffensive: Boolean, extraUses: Int) {
         lastAddedWord = suggestion
         lastAddedExtraUses = extraUses
+        addedWords.add(suggestion)
     }
     @Implementation
     fun unlearnOneUse(word: String) {
@@ -1417,5 +1537,6 @@ class ShadowFacilitator2 {
         var lastAddedWord = ""
         var lastAddedExtraUses = 0
         val unlearnedWords = mutableListOf<String>()
+        val addedWords = mutableListOf<String>() // every word learned, in order
     }
 }

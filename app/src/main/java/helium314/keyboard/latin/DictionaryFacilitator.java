@@ -174,6 +174,13 @@ public interface DictionaryFacilitator {
         return -1;
     }
 
+    /** Reads learned counts as {@link #getLearnedCount}, but always in the learned words of the language in use now,
+     *  also when that switches later (multilingual typing): the corrections log reads a word's count before a change
+     *  and again a moment after it, and with the language read each time those came from two languages' stores. */
+    default helium314.keyboard.latin.personalization.LearningEventLog.Counts getLearnedCountsNow() {
+        return this::getLearnedCount;
+    }
+
     @NonNull SuggestionResults getSuggestionResults(final ComposedData composedData,
             final NgramContext ngramContext, @NonNull final Keyboard keyboard,
             final SettingsValuesForSuggestion settingsValuesForSuggestion, final int sessionId,
