@@ -830,6 +830,17 @@ class InputLogicTest {
         assertEquals("hello", lastAddedWord)
     }
 
+    @Test fun `picking the picked up word again from the strip counts like any strip pick`() {
+        reset()
+        chainInput("hello ")
+        functionalKeyPress(KeyCode.DELETE) // picked up again
+        lastAddedWord = ""
+        pickSuggestion("hello")
+        assertEquals("hello", lastAddedWord) // a re-tap is a deliberate confirmation: counted (2026-10-04)
+        assertEquals(3, helium314.keyboard.latin.ShadowFacilitator2.lastAddedExtraUses) // 1 + 3 extra, as every strip pick
+        assertEquals(listOf(), unlearnedWords)
+    }
+
     @Test fun `committing a picked up word unchanged takes nothing back and adds nothing`() {
         reset()
         chainInput("hello ")
@@ -1396,6 +1407,7 @@ class ShadowFacilitator2 {
                          ngramContext: NgramContext, timeStampInSeconds: Long,
                          blockPotentiallyOffensive: Boolean, extraUses: Int) {
         lastAddedWord = suggestion
+        lastAddedExtraUses = extraUses
     }
     @Implementation
     fun unlearnOneUse(word: String) {
@@ -1403,6 +1415,7 @@ class ShadowFacilitator2 {
     }
     companion object {
         var lastAddedWord = ""
+        var lastAddedExtraUses = 0
         val unlearnedWords = mutableListOf<String>()
     }
 }
