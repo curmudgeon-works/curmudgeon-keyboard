@@ -1563,7 +1563,7 @@ public class LatinIME extends InputMethodService implements
             helium314.keyboard.latin.personalization.LearningEventLog.log(
                     helium314.keyboard.latin.personalization.LearningEventLog.REMOVED,
                     helium314.keyboard.latin.personalization.LearningEventLog.STRIP, word, "",
-                    mDictionaryFacilitator.getCurrentLocale().toLanguageTag(), mDictionaryFacilitator::getLearnedCount);
+                    mDictionaryFacilitator.getCurrentLocale().toLanguageTag(), mDictionaryFacilitator.getLearnedCountsNow());
         mDictionaryFacilitator.removeWord(word);
         // its recent and frequent uses go too: typed again, it starts from the bottom like a new word
         helium314.keyboard.latin.utils.HotWords.INSTANCE.forget(word);

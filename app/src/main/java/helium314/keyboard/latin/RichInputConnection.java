@@ -883,6 +883,38 @@ public final class RichInputConnection implements PrivateCommandPerformer {
         return StringUtilsKt.getTouchedWordRange(before, after, script, spacingAndPunctuations);
     }
 
+    /**
+     * The word at the cursor as {@link #getWordRangeAtCursor}, but with the text before the cursor from the keyboard's
+     * own record of its edits: some editors answer with their text from before the keyboard's last edit (a deleted
+     * letter is still there, a typed one not yet), which would make a word the user doesn't see, and the reload that
+     * mismatch triggers takes the cursor back to before the edit, so the editor's report of it looks like a tap.
+     * The text after the cursor doesn't change with an edit before it, so it's read from the editor.
+     */
+    @Nullable public TextRange getWordRangeAtCursorAsEdited(final SpacingAndPunctuations spacingAndPunctuations,
+            final String script) {
+        mIC = mParent.getCurrentInputConnection();
+        if (!isConnected()) {
+            return null;
+        }
+        final CharSequence before = getTextBeforeCursor(NUM_CHARS_TO_GET_BEFORE_CURSOR, 0);
+        final CharSequence after = getTextAfterCursorAndDetectLaggyConnection(
+                OPERATION_GET_WORD_RANGE_AT_CURSOR,
+                SLOW_INPUT_CONNECTION_ON_PARTIAL_RELOAD_MS,
+                NUM_CHARS_TO_GET_AFTER_CURSOR,
+                0);
+        if (before == null || after == null) {
+            return null;
+        }
+        return StringUtilsKt.getTouchedWordRange(before, after, script, spacingAndPunctuations);
+    }
+
+    /** Whether the composing word follows a digit directly ("pm" in "5pm"), as far as the keyboard's record goes. */
+    public boolean isComposingTextAfterDigit() {
+        final int length = mCommittedTextBeforeComposingText.length();
+        return mComposingText.length() > 0 && length > 0
+                && Character.isDigit(Character.codePointBefore(mCommittedTextBeforeComposingText, length));
+    }
+
     public boolean isCursorTouchingWord(final SpacingAndPunctuations spacingAndPunctuations,
             boolean checkTextAfter) {
         if (checkTextAfter && isCursorFollowedByWordCharacter(spacingAndPunctuations)) {

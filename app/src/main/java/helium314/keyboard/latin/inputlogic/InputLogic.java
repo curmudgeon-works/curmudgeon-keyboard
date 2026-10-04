@@ -490,6 +490,7 @@ public final class InputLogic {
             // we'd have the suggestion strip noticeably janky. To avoid that, we don't clear
             // it here, which means we'll keep outdated suggestions for a split second but the
             // visual result is better.
+            learnEditedWordLeftByCursor(settingsValues);
             resetEntireInputState(newSelStart, newSelEnd, false /* clearSuggestionStrip */);
             // If the user is in the middle of correcting a word, we should learn it before moving
             // the cursor away.
@@ -540,6 +541,7 @@ public final class InputLogic {
     public InputTransaction onCodeInput(final SettingsValues settingsValues,
             @NonNull final Event event, final int keyboardShiftMode,
             final String currentKeyboardScript, final LatinIME.UIHandler handler) {
+        final boolean wasCorrectingByCursor = !TextUtils.isEmpty(mWordBeingCorrectedByCursor);
         mWordBeingCorrectedByCursor = null;
         mJustRevertedACommit = false;
         final LastComposedWord lastComposedWordBefore = mLastComposedWord;
@@ -592,13 +594,15 @@ public final class InputLogic {
             }
             currentEvent = currentEvent.getNextEvent();
         }
-        // Try to record the word being corrected when the user enters a word character or
-        // the backspace key.
+        // Try to record the word being corrected when the user types a letter into it, and follow it through the
+        // backspaces after that. Backspaces alone only delete text: what they leave is no word (they taught fragments,
+        // "w" left of "worlf"). Read as the keyboard edited it: an editor answering with its text from before the edit
+        // made the word as it was ("keyboard" for "keyxboard") and its report of the edit look like a tap, learning it.
         if (!mConnection.hasSlowInputConnection() && !mWordComposer.isComposingWord()
                 && (settingsValues.isWordCodePoint(processedEvent.getCodePoint())
-                    || processedEvent.getKeyCode() == KeyCode.DELETE)
+                    || (processedEvent.getKeyCode() == KeyCode.DELETE && wasCorrectingByCursor))
                 ) {
-            mWordBeingCorrectedByCursor = getWordAtCursor(settingsValues, currentKeyboardScript);
+            mWordBeingCorrectedByCursor = getWordAtCursorAsEdited(settingsValues, currentKeyboardScript);
         }
         if (!inputTransaction.didAutoCorrect() && processedEvent.getKeyCode() != KeyCode.SHIFT
                 && processedEvent.getKeyCode() != KeyCode.CAPS_LOCK
@@ -1736,6 +1740,19 @@ public final class InputLogic {
         return "";
     }
 
+    /** As getWordAtCursor, with the text before the cursor as the keyboard edited it (see getWordRangeAtCursorAsEdited). */
+    private String getWordAtCursorAsEdited(final SettingsValues settingsValues, final String currentKeyboardScript) {
+        if (!mConnection.hasSelection()
+                && settingsValues.needsToLookupSuggestions()
+                && settingsValues.mSpacingAndPunctuations.mCurrentLanguageHasSpaces) {
+            final TextRange range = mConnection.getWordRangeAtCursorAsEdited(settingsValues.mSpacingAndPunctuations, currentKeyboardScript);
+            if (range != null) {
+                return range.mWord.toString();
+            }
+        }
+        return "";
+    }
+
     /**
      * Returns the number of characters before the cursor that make up the previous "word",
      * including any trailing whitespace/punctuation directly before the cursor. Used by
@@ -1784,9 +1801,11 @@ public final class InputLogic {
     //  accept as is (space, strip pick, swipe kept): +1 (performAdditionToUserHistoryDictionary)
     //  revert an auto-correction: the correction -1; the typed word +1 when it's committed (revertCommit)
     //  delete a fresh swipe: nothing, it was never counted (handleBackspaceEvent)
-    //  change an accepted word later: the old word -1, the new one +1 (commitChosenWord, unlearnWordEditedInPlace)
+    //  change an accepted word later: the old word -1, the new one +1 (commitChosenWord, unlearnWordEditedInPlace,
+    //   learnEditedWordLeftByCursor)
     //  edit a swipe before its commit: the final word +1, as any commit
-    //  deleting text takes nothing back.
+    //  deleting text takes nothing back and learns nothing (no fragment left by backspace), nor do undo and redo;
+    //  a word typed right after a digit ("pm" in "5pm") isn't learned on its own (commitChosenWord).
 
     /** Whether input here changes the learned words at all: as performAdditionToUserHistoryDictionary decides. */
     private boolean learnsHere(final SettingsValues settingsValues) {
@@ -1815,11 +1834,27 @@ public final class InputLogic {
         mEditedInPlaceWord = resumedFrom;
     }
 
-    /** A line in the corrections log, if it's on: call before the change, the counts before are read now. */
+    /**
+     * The cursor leaves the word it picked up again, and it was changed at its end (a tap there, backspace, a letter:
+     * it is still the composing word, which the cursor move drops without a commit): the old word -1, the new one +1,
+     * as a separator would have committed it. Only shortened (or unchanged) it's text being deleted: nothing changes.
+     */
+    private void learnEditedWordLeftByCursor(final SettingsValues settingsValues) {
+        if (!mWordComposer.isComposingWord()) return;
+        final String resumedFrom = mWordComposer.getResumedFrom();
+        final String word = mWordComposer.getTypedWord();
+        if (resumedFrom == null || resumedFrom.startsWith(word) || !learnsHere(settingsValues)) return;
+        logLearningEvent(LearningEventLog.ACCEPTED_EDITED, LearningEventLog.EDIT, resumedFrom, word);
+        mDictionaryFacilitator.unlearnOneUse(resumedFrom);
+        performAdditionToUserHistoryDictionary(settingsValues, word, NgramContext.EMPTY_PREV_WORDS_INFO);
+    }
+
+    /** A line in the corrections log, if it's on: call before the change, the counts before are read now (the counts
+     *  after a moment later, in the same language's learned words). */
     private void logLearningEvent(final String event, final String origin, final String before, final String after) {
         if (!LearningEventLog.isEnabled()) return;
         LearningEventLog.log(event, origin, before, after, mDictionaryFacilitator.getCurrentLocale().toLanguageTag(),
-                mDictionaryFacilitator::getLearnedCount);
+                mDictionaryFacilitator.getLearnedCountsNow());
     }
 
     /** How the word being committed got there, for the corrections log. Call before the composer is reset. */
@@ -2833,6 +2868,9 @@ public final class InputLogic {
             Log.d(TAG, "commitChosenWord() : NgramContext = " + ngramContext);
             startTimeMillis = SystemClock.elapsedRealtime();
         }
+        // a word typed right after a digit ("pm" in "5pm", "st" in "1st"; a single digit before 3 letters is part of the
+        // word, see composeLeadingDigitIfNeeded) is no word on its own: nothing is learned from it
+        final boolean afterDigit = mConnection.isComposingTextAfterDigit();
         mConnection.commitText(chosenWordWithSuggestions, 1);
         if (DebugFlags.DEBUG_ENABLED) {
             long runTimeMillis = SystemClock.elapsedRealtime() - startTimeMillis;
@@ -2849,7 +2887,7 @@ public final class InputLogic {
         // acceptance, maybe just a pause; picked again from the strip it counts (2026-10-04)
         final boolean reAccepted = resumedFrom != null && resumedFrom.equals(chosenWord)
                 && commitType != LastComposedWord.COMMIT_TYPE_MANUAL_PICK;
-        if (learnsHere(settingsValues) && LearningEventLog.isEnabled()) {
+        if (!afterDigit && learnsHere(settingsValues) && LearningEventLog.isEnabled()) {
             final String event;
             final String before;
             if (reAccepted) {
@@ -2869,9 +2907,9 @@ public final class InputLogic {
             logLearningEvent(event, learningOrigin(commitType, chosenWord), before, chosenWord);
         }
         mEditedInPlaceWord = null;
-        if (editedAccepted && learnsHere(settingsValues)) mDictionaryFacilitator.unlearnOneUse(resumedFrom);
+        if (editedAccepted && !afterDigit && learnsHere(settingsValues)) mDictionaryFacilitator.unlearnOneUse(resumedFrom);
         // Add the word to the user history dictionary
-        if (!reAccepted)
+        if (!reAccepted && !afterDigit)
             performAdditionToUserHistoryDictionary(settingsValues, chosenWord, ngramContext,
                     commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK ? PICKED_SUGGESTION_EXTRA_USES : 0);
         if (DebugFlags.DEBUG_ENABLED) {

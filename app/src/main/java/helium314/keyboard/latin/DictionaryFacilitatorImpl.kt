@@ -29,6 +29,7 @@ import helium314.keyboard.latin.dictionary.DictionaryStats
 import helium314.keyboard.latin.dictionary.ExpandableBinaryDictionary
 import helium314.keyboard.latin.dictionary.UserBinaryDictionary
 import helium314.keyboard.latin.permissions.PermissionsUtil
+import helium314.keyboard.latin.personalization.LearningEventLog
 import helium314.keyboard.latin.personalization.PersonalizationHelper
 import helium314.keyboard.latin.personalization.UserHistoryDictionary
 import helium314.keyboard.latin.settings.Settings
@@ -516,8 +517,14 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         putWordIntoValidSpellingWordCache("unlearnOneUse", word.lowercase(Locale.getDefault()))
     }
 
-    override fun getLearnedCount(word: String): Int {
+    override fun getLearnedCount(word: String): Int = learnedCountIn(currentlyPreferredDictionaryGroup, word)
+
+    override fun getLearnedCountsNow(): LearningEventLog.Counts {
         val group = currentlyPreferredDictionaryGroup
+        return LearningEventLog.Counts { learnedCountIn(group, it) }
+    }
+
+    private fun learnedCountIn(group: DictionaryGroup, word: String): Int {
         val history = group.getSubDict(Dictionary.TYPE_USER_HISTORY) ?: return -1
         val count = history.getLearnedCount(word)
         if (count >= 0) return count
