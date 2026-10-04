@@ -132,6 +132,21 @@
     <string name="auto_cap_summary">Capitalize the first word of each sentence</string>
     <!-- Option to edit personal dictionary.-->
     <string name="edit_personal_dictionary">Personal dictionary</string>
+    <!-- Text correction: your learned words, the personal dictionary's and the removed ones, per script -->
+    <string name="learned_words">Learned &amp; blacklisted words</string>
+    <!-- Under the Personal dictionary row there: what only that screen has -->
+    <string name="learned_words_personal_dictionary_summary">Shortcuts, and words for all languages</string>
+    <string name="learned_words_section_yours">Your words</string>
+    <string name="learned_words_section_blacklisted">Blacklisted words</string>
+    <string name="learned_words_none">None</string>
+    <string name="learned_words_loading">Reading your words…</string>
+    <string name="learned_words_typed_once">Typed once</string>
+    <string name="learned_words_typed_times">Typed %d times</string>
+    <string name="learned_words_in_personal_dictionary">In personal dictionary</string>
+    <string name="learned_words_blacklisted_summary">Not suggested from the dictionaries until you type it again</string>
+    <string name="learned_words_action_unblacklist">Un-blacklist</string>
+    <string name="learned_words_remove_message">As long-press Remove: forgets how often you typed it, takes it out of the personal dictionary, and a dictionary word isn\'t suggested until you type it again.</string>
+    <string name="learned_words_unblacklist_message">Suggested from the dictionaries again.</string>
     <!-- Name of the main dictionary, as opposed to auxiliary dictionaries (medical/entertainment/sports...) -->
     <string name="main_dictionary">Main dictionary</string>
     <!-- Option to enable showing suggestions -->

@@ -61,6 +61,7 @@ object SettingsWithoutKey {
     /** Not a setting: a line across the list (e.g. around a screen's saved themes / layouts, which cover all of it). */
     const val DIVIDER = "divider"
     const val EDIT_PERSONAL_DICTIONARY = "edit_personal_dictionary"
+    const val LEARNED_WORDS = "learned_words"
     const val APP = "app"
     const val VERSION = "version"
     const val LICENSE = "license"

@@ -97,7 +97,7 @@ fun PersonalDictionaryScreen(
 }
 
 @Composable
-private fun EditWordDialog(word: Word, locale: Locale?, onDismissRequest: () -> Unit) {
+internal fun EditWordDialog(word: Word, locale: Locale?, onDismissRequest: () -> Unit) { // (also Learned & blacklisted words' add)
     val ctx = LocalContext.current
     val focusRequester = remember { FocusRequester() }
     var newWord by remember { mutableStateOf(word) }
@@ -259,7 +259,7 @@ fun Locale?.getLocaleDisplayNameForUserDictSettings(context: Context) =
     this?.localizedDisplayName(context.resources) ?: context.resources.getString(R.string.user_dict_settings_all_languages)
 
 // weight is frequency but different name towards user
-private data class Word(val word: String, val shortcut: String?, val weight: Int?)
+internal data class Word(val word: String, val shortcut: String?, val weight: Int?)
 
 // getting all words instead of reading directly cursor, because filteredItems expects a list
 private fun getAll(locale: Locale?, context: Context): List<Word> {

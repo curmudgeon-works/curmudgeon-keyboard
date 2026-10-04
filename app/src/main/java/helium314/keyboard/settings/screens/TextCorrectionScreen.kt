@@ -73,7 +73,7 @@ fun TextCorrectionScreen(
     val suggestionsEnabled = suggestionsVisible && prefs.getBoolean(Settings.PREF_SHOW_SUGGESTIONS, Defaults.PREF_SHOW_SUGGESTIONS)
     val gestureEnabled = prefs.getBoolean(Settings.PREF_GESTURE_INPUT, Defaults.PREF_GESTURE_INPUT)
     val items = listOf(
-        SettingsWithoutKey.EDIT_PERSONAL_DICTIONARY,
+        SettingsWithoutKey.LEARNED_WORDS, // (the personal dictionary's own screens: from there)
         R.string.settings_category_correction,
         Settings.PREF_AUTO_CORRECTION,
         if (autocorrectEnabled) Settings.PREF_MORE_AUTO_CORRECTION else null,
@@ -167,7 +167,7 @@ fun TextCorrectionScreen(
         isPending = { it in draft.pending || (it == Settings.PREF_SUGGESTION_RULES && Settings.PREF_SUGGESTION_COUNT in draft.pending)
             || (it == Settings.PREF_AUTOCORRECT_FREQUENT_WORDS && Settings.PREF_TRUST_TYPED_COUNT in draft.pending) },
         simpleModeKeys = setOf(
-            SettingsWithoutKey.EDIT_PERSONAL_DICTIONARY, Settings.PREF_AUTO_CORRECTION, Settings.PREF_AUTO_CAP,
+            SettingsWithoutKey.LEARNED_WORDS, Settings.PREF_AUTO_CORRECTION, Settings.PREF_AUTO_CAP,
             Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE, Settings.PREF_AUTOCORRECT_FREQUENT_WORDS,
             Settings.PREF_KEY_USE_DOUBLE_SPACE_PERIOD, Settings.PREF_AUTOSPACE_AFTER_SUGGESTION,
             Settings.PREF_AUTOSPACE_AFTER_GESTURE_TYPING, Settings.PREF_AUTOSPACE_AFTER_PUNCTUATION,
@@ -197,6 +197,17 @@ private val correctionKeys = listOf(
 )
 
 fun createCorrectionSettings(context: Context) = listOf(
+    Setting(context, SettingsWithoutKey.LEARNED_WORDS, R.string.learned_words) {
+        // a line above it too, like under the headings
+        androidx.compose.foundation.layout.Column {
+            androidx.compose.material3.HorizontalDivider()
+            Preference(
+                name = stringResource(R.string.learned_words),
+                onClick = { SettingsDestination.navigateTo(SettingsDestination.LearnedWords) },
+            ) { NextScreenIcon() }
+        }
+    },
+    // (no longer on the screen: reached from Learned & blacklisted words, and by searching)
     Setting(context, SettingsWithoutKey.EDIT_PERSONAL_DICTIONARY, R.string.edit_personal_dictionary) {
         // a line above it too, like under the headings
         androidx.compose.foundation.layout.Column {

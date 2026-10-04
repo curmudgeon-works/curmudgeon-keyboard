@@ -29,12 +29,14 @@ import helium314.keyboard.latin.dictionary.DictionaryStats
 import helium314.keyboard.latin.dictionary.ExpandableBinaryDictionary
 import helium314.keyboard.latin.dictionary.UserBinaryDictionary
 import helium314.keyboard.latin.permissions.PermissionsUtil
+import helium314.keyboard.latin.personalization.PersonalizationHelper
 import helium314.keyboard.latin.personalization.UserHistoryDictionary
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsValuesForSuggestion
 import helium314.keyboard.latin.utils.HotWords
 import helium314.keyboard.latin.utils.LanguagePriority
 import helium314.keyboard.latin.utils.Log
+import helium314.keyboard.latin.utils.RemovedWords
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.SuggestionResults
 import helium314.keyboard.latin.utils.getSecondaryLocales
@@ -44,7 +46,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
-import java.io.IOException
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
@@ -61,6 +62,10 @@ import java.util.concurrent.TimeUnit
  */
 class DictionaryFacilitatorImpl : DictionaryFacilitator {
     private var dictionaryGroups = listOf(DictionaryGroup())
+
+    init {
+        synchronized(liveFacilitators) { liveFacilitators.add(this) }
+    }
 
     @Volatile
     private var mLatchForWaitingLoadingMainDictionaries = CountDownLatch(0)
@@ -685,6 +690,31 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
     companion object {
         private val TAG = DictionaryFacilitatorImpl::class.java.simpleName
 
+        // every facilitator of the process (keyboard, spell checker, emoji search), for removeWord from the settings
+        private val liveFacilitators = java.util.Collections.newSetFromMap(java.util.WeakHashMap<DictionaryFacilitatorImpl, Boolean>())
+
+        /**
+         * Long-press Remove of [words] in [locale], from outside the keyboard (the settings screen "Learned & blacklisted
+         * words"): through the dictionaries of that language a running keyboard has loaded, else through its main
+         * dictionary loaded for this. The learned words are the shared UserHistoryDictionary objects and the blacklist the
+         * shared RemovedWords list, so the running keyboard has it at once. Call off the main thread.
+         */
+        @JvmStatic
+        fun removeWords(context: Context, locale: Locale, words: Collection<String>) {
+            val live = synchronized(liveFacilitators) { liveFacilitators.toList() }
+                .firstNotNullOfOrNull { f -> f.dictionaryGroups.firstOrNull { it.locale == locale && it.hasDict(Dictionary.TYPE_MAIN) } }
+            if (live != null) return words.forEach { live.removeWord(it) }
+            val mainDict = DictionaryFactory.createMainDictionaryCollection(context, locale, false)
+            try {
+                val history = PersonalizationHelper.getUserHistoryDictionary(context, locale)
+                val group = DictionaryGroup(locale, mainDict, mapOf(Dictionary.TYPE_USER_HISTORY to history), context)
+                words.forEach { group.removeWord(it) }
+                history.onFinishInput() // written to the file now: the keyboard may not be running
+            } finally {
+                mainDict.close()
+            }
+        }
+
         // HACK: This threshold is being used when adding a capitalized entry in the User History dictionary.
         private const val CAPITALIZED_FORM_MAX_PROBABILITY_FOR_INSERT = 140
 
@@ -853,44 +883,15 @@ private class DictionaryGroup(
 
     // --------------- Blacklist -------------------
 
-    private val scope = CoroutineScope(Dispatchers.IO)
+    // words cannot be (permanently) removed from some dictionaries, so we use a blacklist for "removing" words; the
+    // lists are shared with the settings screen "Learned & blacklisted words" (same objects, same process), so what's
+    // changed there counts here at once. Re-read when the group is set up (e.g. after a restore replaced the files).
+    private val blacklist = context?.takeIf { it.filesDir != null }?.let { RemovedWords.blacklist(it, locale).apply { reloadAsync() } }
 
-    // words cannot be (permanently) removed from some dictionaries, so we use a blacklist for "removing" words
-    private val blacklistFile = if (context?.filesDir == null) null
-    else {
-        val file = File(context.filesDir.absolutePath + File.separator + "blacklists" + File.separator + locale.toLanguageTag() + ".txt")
-        if (file.isDirectory) file.delete() // this apparently was an issue in some versions
-        if (file.parentFile?.exists() == true || file.parentFile?.mkdirs() == true) file
-        else null
-    }
-
-    private val blacklist = hashSetOf<String>().apply {
-        if (blacklistFile?.isFile != true) return@apply
-        scope.launch {
-            synchronized(this) {
-                try {
-                    addAll(blacklistFile.readLines())
-                } catch (e: IOException) {
-                    Log.e(TAG, "Exception while trying to read blacklist from ${blacklistFile.name}", e)
-                }
-            }
-        }
-    }
-
-    fun isBlacklisted(word: String) = blacklist.contains(word)
+    fun isBlacklisted(word: String) = blacklist?.contains(word) == true
 
     fun addToBlacklist(word: String) {
-        if (!blacklist.add(word) || blacklistFile == null) return
-        scope.launch {
-            synchronized(this) {
-                try {
-                    if (blacklistFile.isDirectory) blacklistFile.delete()
-                    blacklistFile.appendText("$word\n")
-                } catch (e: IOException) {
-                    Log.e(TAG, "Exception while trying to add word \"$word\" to blacklist ${blacklistFile.name}", e)
-                }
-            }
-        }
+        blacklist?.add(word)
     }
 
     // --------------- Dictionary handling -------------------
