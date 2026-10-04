@@ -143,10 +143,12 @@
     <string name="learned_words_typed_once">Typed once</string>
     <string name="learned_words_typed_times">Typed %d times</string>
     <string name="learned_words_in_personal_dictionary">In personal dictionary</string>
-    <string name="learned_words_blacklisted_summary">Not suggested from the dictionaries until you type it again</string>
+    <string name="learned_words_blacklisted_summary">Not suggested or swiped until it comes back: removed once, when you type it again; twice, after typing it 3 times; 3 times, after typing it 3 times and tapping the + next to it; more, only with Un-blacklist</string>
+    <string name="learned_words_removed_once">Removed once</string>
+    <string name="learned_words_removed_times">Removed %d times</string>
     <string name="learned_words_action_unblacklist">Un-blacklist</string>
-    <string name="learned_words_remove_message">As long-press Remove: forgets how often you typed it, takes it out of the personal dictionary, and a dictionary word isn\'t suggested until you type it again.</string>
-    <string name="learned_words_unblacklist_message">Suggested from the dictionaries again.</string>
+    <string name="learned_words_remove_message">As long-press Remove: forgets how often you typed it, takes it out of the personal dictionary, and it isn\'t suggested until you type it again (the more often removed, the more it takes).</string>
+    <string name="learned_words_unblacklist_message">Suggested again, and how often it was removed starts over.</string>
     <!-- Name of the main dictionary, as opposed to auxiliary dictionaries (medical/entertainment/sports...) -->
     <string name="main_dictionary">Main dictionary</string>
     <!-- Option to enable showing suggestions -->
@@ -475,7 +477,9 @@
     <string name="keyboards_title">All keyboards</string>
     <!-- Long-press menu on a suggestion, %s is the word -->
     <string name="remove_suggestion">Remove \"%s\" from suggestions?</string>
-    <string name="remove_suggestion_message">It comes back if you type it again. If the keyboard had learned it from your typing, that learning starts over.</string>
+    <string name="remove_suggestion_message">It comes back if you type it again (the more often you remove it, the more it takes). If the keyboard had learned it from your typing, that learning starts over.</string>
+    <!-- content description of the "+" after a typed word that was removed 3 times: tapping it brings the word back -->
+    <string name="bring_back_removed_word">Bring back \"%s\"</string>
     <string name="no_dictionary_short">No dictionary</string>
     <string name="keyboard_languages">Languages</string>
     <string name="key_popups_title">Long-press popups</string>

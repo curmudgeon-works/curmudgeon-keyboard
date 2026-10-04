@@ -341,8 +341,8 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
                 wasCurrentWordAutoCapitalized, timeStampInSeconds.toInt(), blockPotentiallyOffensive, extraUses
             )
             ngramContextForCurrentWord = ngramContextForCurrentWord.getNextNgramContext(WordInfo(currentWord))
-            // (a removed word typed again stays removed from the dictionaries: it comes back as a learned word only,
-            // starting from the bottom like any new word; 2026-10-03)
+            // (a removed word typed again often enough to be back stays removed from the dictionaries: it comes back as a
+            // learned word only, starting from the bottom like any new word; 2026-10-03)
         }
     }
 
@@ -399,9 +399,10 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         }
         // We demote unrecognized words (frequency <= 0) by specifying them as "invalid".
         // We don't add words with 0-frequency (assuming they would be profanity etc.).
-        // A dictionary word removed with long-press is learned like a new word too (its first use again restores it,
-        // see isRestored: from then on it's learned as the real word it is).
-        val isValid = mainFreq > 0 && (!dictionaryGroup.isBlacklisted(wordToUse) || isRestored(wordToUse))
+        // A dictionary word removed with long-press is learned like a new word too until it's back (see isRemovedWord:
+        // from then on it's learned as the real word it is). RemovedWords.hasEnoughUses counts on this: stored at 0 by
+        // its first use, 1 more per further use.
+        val isValid = mainFreq > 0 && !isRemovedWord(wordToUse)
         UserHistoryDictionary.addToDictionary(userHistoryDictionary, ngramContext, wordToUse, isValid, timeStampInSeconds)
         // each further use raises the word's level once more (the word alone: the word pair was counted above)
         repeat(extraUses) {
@@ -417,6 +418,8 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         val userHistoryDict = dictionaryGroup.getSubDict(Dictionary.TYPE_USER_HISTORY) ?: return
         if (isValidWord(word, DictionaryFacilitator.ALL_DICTIONARY_TYPES, dictionaryGroup))
             return // valid word, no reason to auto-add it to personal dict
+        if (isRemovedWord(word))
+            return // removed and not back yet: typing it is how it comes back, not a reason to keep it
         if (userDict.isInDictionary(word))
             return // should never happen, but better be safe
 
@@ -564,10 +567,10 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
 
             for (info in dictionarySuggestions) {
                 val word = info.word
-                // don't add blacklisted words and unsupported emojis; a removed word you have typed again since comes
-                // from your learned words (or your personal dictionary) only
+                // don't add blacklisted words and unsupported emojis; a removed word that's back (see isRemovedWord) comes
+                // from your learned words (or your personal dictionary) only, and not before it's back
                 val ownWord = info.mSourceDict.mDictType == Dictionary.TYPE_USER_HISTORY || info.mSourceDict.mDictType == Dictionary.TYPE_USER
-                if ((isBlacklisted(word) && !ownWord) || SupportedEmojis.isUnsupported(word))
+                if ((isBlacklisted(word) && !ownWord) || (ownWord && isRemovedWord(word)) || SupportedEmojis.isUnsupported(word))
                     continue
                 if (checkForGarbage
                     // consider the user might use custom main dictionary containing shortcuts
@@ -599,22 +602,44 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         return valid || isTrustedWord(word) || isRestoredWord(word)
     }
 
-    // A removed word typed again since (it's in the learned words, in any capitalization): restored. The removed list
-    // still keeps the dictionary's own copy out of the suggestions, so its place there comes from the learned copy
-    // alone, starting at the bottom like a new word; typed, it's a real word (not corrected, not underlined).
-    private fun isRestored(word: String): Boolean {
-        val lower = word.lowercase()
-        return dictionaryGroups.any { group ->
-            val history = group.getSubDict(Dictionary.TYPE_USER_HISTORY) ?: return@any false
-            history.getLearnedCount(word) >= 0 || (lower != word && history.getLearnedCount(lower) >= 0)
-        }
+    // The removed-word entry of [word] (as typed or in lowercase) over the languages: the most strikes count.
+    private fun removedEntry(word: String): RemovedWords.Entry? {
+        var result: RemovedWords.Entry? = null
+        for (group in dictionaryGroups) group.removedEntry(word)?.let { result = it.max(result) }
+        return result
     }
 
-    override fun isRestoredWord(word: String): Boolean {
-        if (word.isEmpty() || !(isBlacklisted(word) || isBlacklisted(word.lowercase()))) return false
+    // How often [word] was learned (in any capitalization, any language): RemovedWords.hasEnoughUses reads it.
+    private fun learnedCount(word: String): Int {
         val lower = word.lowercase()
-        return isRestored(word) && dictionaryGroups.any { g ->
-            g.getDict(Dictionary.TYPE_MAIN)?.let { it.isValidWord(word) || it.isValidWord(lower) } == true }
+        return dictionaryGroups.maxOfOrNull { group ->
+            val history = group.getSubDict(Dictionary.TYPE_USER_HISTORY) ?: return@maxOfOrNull -1
+            maxOf(history.getLearnedCount(word), if (lower != word) history.getLearnedCount(lower) else -1)
+        } ?: -1
+    }
+
+    // A removed word typed often enough since (and on its 3rd strike brought back with the strip's "+"): back, see
+    // RemovedWords.isRemoved. The removed list still keeps the dictionary's own copy out of the suggestions, so its place
+    // there comes from the learned copy alone, starting at the bottom like a new word; typed, a dictionary word is a real
+    // word again (not corrected, not underlined), a word of no dictionary is a learned word like any other.
+    override fun isRestoredWord(word: String): Boolean {
+        if (word.isEmpty()) return false
+        val entry = removedEntry(word) ?: return false
+        if (RemovedWords.isRemoved(entry, learnedCount(word))) return false
+        val lower = word.lowercase()
+        return dictionaryGroups.any { g -> DictionaryFacilitator.ALL_DICTIONARY_TYPES.any { type ->
+            g.getDict(type)?.let { it.isValidWord(word) || it.isValidWord(lower) } == true } }
+    }
+
+    override fun awaitsConfirmation(word: String): Boolean {
+        if (word.isEmpty()) return false
+        val entry = removedEntry(word) ?: return false
+        return RemovedWords.awaitsConfirmation(entry, learnedCount(word))
+    }
+
+    override fun confirmRemovedWord(word: String) {
+        if (!awaitsConfirmation(word)) return
+        for (group in dictionaryGroups) group.confirmRemoved(word)
     }
 
     // typed N times: a word that isn't a dictionary word is stored at count 0 by its first use, so count N - 1 (and a
@@ -623,6 +648,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         if (word.isEmpty()) return false
         val values = Settings.getValues() ?: return false
         if (!values.mAutocorrectFrequentWords) return false
+        if (isRemovedWord(word)) return false // its learned copy counts the uses that bring it back, not trust
         val needed = values.mTrustTypedCount - 1
         val lower = word.lowercase()
         return dictionaryGroups.any { group ->
@@ -651,8 +677,12 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
 
     private fun isBlacklisted(word: String): Boolean = dictionaryGroups.any { it.isBlacklisted(word) }
 
-    // removed with long-press and not typed again since (typed again, it's restored: see isRestored)
-    override fun isRemovedWord(word: String): Boolean = (isBlacklisted(word) || isBlacklisted(word.lowercase())) && !isRestored(word)
+    // removed with long-press and not back yet (RemovedWords.isRemoved: the strikes say how it comes back)
+    override fun isRemovedWord(word: String): Boolean {
+        if (word.isEmpty()) return false
+        val entry = removedEntry(word) ?: return false // (the usual case: no counts read)
+        return RemovedWords.isRemoved(entry, learnedCount(word))
+    }
 
     override fun removeWord(word: String) {
         for (dictionaryGroup in dictionaryGroups) {
@@ -708,12 +738,12 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         fun removeWords(context: Context, locale: Locale, words: Collection<String>) {
             val live = synchronized(liveFacilitators) { liveFacilitators.toList() }
                 .firstNotNullOfOrNull { f -> f.dictionaryGroups.firstOrNull { it.locale == locale && it.hasDict(Dictionary.TYPE_MAIN) } }
-            if (live != null) return words.forEach { live.removeWord(it) }
+            if (live != null) return live.removeWords(words)
             val mainDict = DictionaryFactory.createMainDictionaryCollection(context, locale, false)
             try {
                 val history = PersonalizationHelper.getUserHistoryDictionary(context, locale)
                 val group = DictionaryGroup(locale, mainDict, mapOf(Dictionary.TYPE_USER_HISTORY to history), context)
-                words.forEach { group.removeWord(it) }
+                group.removeWords(words)
                 history.onFinishInput() // written to the file now: the keyboard may not be running
             } finally {
                 mainDict.close()
@@ -837,8 +867,16 @@ private class DictionaryGroup(
 ) {
     private val subDicts: ConcurrentHashMap<String, ExpandableBinaryDictionary> = ConcurrentHashMap(subDicts)
 
-    /** Removes a word from all dictionaries in this group. If the word is in a read-only dictionary, it is blacklisted. */
-    fun removeWord(word: String) {
+    /** Removes a word from all dictionaries in this group, and gives it one more strike on the blacklist. */
+    fun removeWord(word: String) = removeWords(listOf(word))
+
+    /** [removeWord] for several words; spellings of one word ("The", "the") are one Remove: one strike. */
+    fun removeWords(words: Collection<String>) {
+        words.mapTo(LinkedHashSet()) { removeEverywhere(it) }.forEach { strike(it) }
+    }
+
+    /** Takes [word] out of this group's dictionaries. @return the spelling its blacklist entry has */
+    private fun removeEverywhere(word: String): String {
         // from the learned words and the personal dictionary in every capitalization ("Hello" at a sentence start was
         // learned as "hello"; "HELLO" with caps lock)
         val lower = word.lowercase(locale)
@@ -847,33 +885,27 @@ private class DictionaryGroup(
             getSubDict(Dictionary.TYPE_USER_HISTORY)?.removeUnigramEntryDynamically(form)
             getSubDict(Dictionary.TYPE_USER)?.removeUnigramEntryDynamically(form)
         }
-        // and from the swipe vocabularies already built (the removed words list below keeps it out of rebuilds)
+        // and from the swipe vocabularies already built (the removed words list keeps it out of rebuilds)
         GestureDecoderVocabulary.onWordRemoved(locale, word)
 
         val contactsDict = getSubDict(Dictionary.TYPE_CONTACTS)
         if (contactsDict != null && contactsDict.isInDictionary(word)) {
             contactsDict.removeUnigramEntryDynamically(word) // will be gone until next reload of dict
-            addToBlacklist(word)
-            return
+            return word
         }
 
         val appsDict = getSubDict(Dictionary.TYPE_APPS)
         if (appsDict != null && appsDict.isInDictionary(word)) {
             appsDict.removeUnigramEntryDynamically(word) // will be gone until next reload of dict
-            addToBlacklist(word)
-            return
+            return word
         }
 
-        val mainDict = mainDict ?: return
-        if (mainDict.isValidWord(word)) {
-            addToBlacklist(word)
-            return
-        }
-
-        val lowercase = word.lowercase(locale)
-        if (getDict(Dictionary.TYPE_MAIN)!!.isValidWord(lowercase)) {
-            addToBlacklist(lowercase)
-        }
+        val mainDict = mainDict
+        if (mainDict != null && mainDict.isValidWord(word)) return word
+        // a dictionary word capitalized (sentence start), and a word of no dictionary (learned, personal): lowercase,
+        // which covers every capitalization (the checks look at the word and its lowercase; all of them were deleted
+        // above). Every removed word gets its entry, for its strikes.
+        return lower
     }
 
     // --------------- Confidence for multilingual typing -------------------
@@ -922,8 +954,25 @@ private class DictionaryGroup(
 
     fun isBlacklisted(word: String) = blacklist?.contains(word) == true
 
-    fun addToBlacklist(word: String) {
-        if (blacklist?.add(word) == true) GestureDecoderVocabulary.onWordBlacklisted(locale, word)
+    /** [word]'s entry as typed or in lowercase, see RemovedWords.WordListFile.entryFor. */
+    fun removedEntry(word: String): RemovedWords.Entry? = blacklist?.entryFor(word)
+
+    private fun strike(word: String) {
+        if (blacklist == null) return
+        blacklist.strike(word)
+        GestureDecoderVocabulary.onWordBlacklisted(locale, word)
+    }
+
+    /** [word] (or its lowercase entry) brought back with the strip's "+": swiped again too, from its learned copy. */
+    fun confirmRemoved(word: String) {
+        val list = blacklist ?: return
+        val lower = word.lowercase(locale)
+        val listed = if (list.contains(word)) word else lower
+        if (!list.confirm(listed)) return
+        val history = getSubDict(Dictionary.TYPE_USER_HISTORY) ?: return
+        // the learned copy carries it now (in the vocabularies built so far it was left out)
+        val learned = listOf(word, lower).firstOrNull { history.getLearnedCount(it) >= 0 } ?: return
+        GestureDecoderVocabulary.onWordLearned(history.mContext, locale, learned)
     }
 
     // --------------- Dictionary handling -------------------

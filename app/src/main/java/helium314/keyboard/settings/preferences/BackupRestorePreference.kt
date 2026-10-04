@@ -52,6 +52,7 @@ import helium314.keyboard.latin.utils.getSecondaryLocales
 import helium314.keyboard.latin.utils.ExecutorUtils
 import helium314.keyboard.latin.utils.LayoutUtilsCustom
 import helium314.keyboard.latin.utils.Log
+import helium314.keyboard.latin.utils.RemovedWords
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.getActivity
 import helium314.keyboard.latin.utils.prefs
@@ -438,11 +439,9 @@ private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: Restore
         val locales = choice.keyboards.flatMap { listOf(it.locale) + getSecondaryLocales(it.extraValues) }.associateBy { it.toLanguageTag() }
         for ((tag, locale) in locales) {
             File(learnedDir, "${UserHistoryDictionary.NAME}.$tag.dict").takeIf { it.exists() }?.let { mergeLearnedWords(ctx, it, locale) }
+            // (through the list object the keyboard holds: a word on both keeps the most strikes)
             File(learnedDir, "blacklists${File.separator}$tag.txt").takeIf { it.isFile }?.let { backupList ->
-                val phoneList = File(filesDir, "blacklists${File.separator}$tag.txt")
-                val have = if (phoneList.isFile) phoneList.readLines().toSet() else emptySet()
-                val add = backupList.readLines().filter { it.isNotBlank() && it !in have }
-                if (add.isNotEmpty()) { phoneList.parentFile?.mkdirs(); phoneList.appendText(add.joinToString("\n", postfix = "\n")) }
+                RemovedWords.blacklist(ctx, locale).combine(backupList.readLines())
             }
         }
         learnedDir.deleteRecursively()

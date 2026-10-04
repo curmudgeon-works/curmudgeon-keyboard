@@ -31,15 +31,23 @@ import java.util.concurrent.TimeUnit;
  */
 public interface DictionaryFacilitator {
 
-    /** A word the user removed (long-press Remove): kept out of the suggestions, swiped ones too. */
+    /** A word the user removed (long-press Remove) and not back yet (RemovedWords.isRemoved): kept out of the
+     *  suggestions, swiped ones too. */
     default boolean isRemovedWord(final String word) { return false; }
 
     /** A word the user typed often enough to trust ("Trust words you've typed N+ times"): auto-correct leaves it
      *  alone and the spell checker counts it as spelled right. */
     default boolean isTrustedWord(final String word) { return false; }
 
-    /** A dictionary word the user removed and has typed again since: a real word again (ranked as a new learned word). */
+    /** A dictionary word the user removed that's back (typed again often enough): a real word again (ranked as a new
+     *  learned word). */
     default boolean isRestoredWord(final String word) { return false; }
+
+    /** A word removed 3 times, typed often enough since: it comes back when the user taps the "+" the strip shows. */
+    default boolean awaitsConfirmation(final String word) { return false; }
+
+    /** The strip's "+" was tapped for a word that {@link #awaitsConfirmation}: it's back. */
+    default void confirmRemovedWord(final String word) { }
 
     String[] ALL_DICTIONARY_TYPES = new String[] {
             Dictionary.TYPE_MAIN,
@@ -117,8 +125,8 @@ public interface DictionaryFacilitator {
             final String dictNamePrefix,
             @Nullable final DictionaryInitializationListener listener);
 
-    /** removes the word from all editable dictionaries (Android's personal dictionary too, in any capitalization), and adds
-     *  it to a blacklist in case it's in a read-only dictionary */
+    /** removes the word from all editable dictionaries (Android's personal dictionary too, in any capitalization), and gives
+     *  it one more strike on the blacklist (RemovedWords: the more strikes, the harder it comes back) */
     void removeWord(String word);
 
     void closeDictionaries();
