@@ -31,6 +31,8 @@ object FrequentLongWords {
 
     private val caches = ConcurrentHashMap<String, Cache>()
     private val refreshing = ConcurrentHashMap.newKeySet<String>()
+    // removed words (lower case) -> when: a re-read that was already running when a word was removed leaves it out
+    private val forgotten = ConcurrentHashMap<String, Long>()
 
     private fun qualifies(word: String) = word.length >= MIN_LENGTH || word.contains('@') || word.contains('.')
 
@@ -56,11 +58,13 @@ object FrequentLongWords {
 
     /** The word was removed (long-press; its learned uses are gone too): out of the lists until it's frequent again. */
     fun forget(word: String) {
+        forgotten[word.lowercase()] = SystemClock.elapsedRealtime()
         for ((key, cache) in caches) caches[key] = Cache(cache.entries.filterNot { it.lower == word.lowercase() }, cache.time)
     }
 
     private fun refreshAsync(context: Context, locale: Locale, key: String) {
         if (!refreshing.add(key)) return
+        val started = SystemClock.elapsedRealtime()
         Thread({
             try {
                 val history = PersonalizationHelper.getUserHistoryDictionary(context, locale)
@@ -80,6 +84,8 @@ object FrequentLongWords {
                     if (wp.probability < MIN_PROBABILITY || !qualifies(word)) null
                     else Entry(word, word.lowercase(), wp.probability, history)
                 }.distinctBy { it.word }
+                    // (removed while this ran: its read may predate the removal)
+                    .filterNot { (forgotten[it.lower] ?: Long.MIN_VALUE) >= started }
                 caches[key] = Cache(entries, SystemClock.elapsedRealtime())
                 // counts only: the words are the user's own and never go to the log
                 Log.d(TAG, "$key: ${entries.size} frequent long words of ${props.size} history words (${props.distinctBy { it.mWord }.size} distinct)")

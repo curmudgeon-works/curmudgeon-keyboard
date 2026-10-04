@@ -144,12 +144,10 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
 
         val locales = getUsedLocales(newLocale, context)
 
-        // personalized suggestions off: the learned words and the personal dictionary stay on the phone, unused (nothing
-        // suggested from them, nothing learned) until it's on again
         val subDictTypesToUse = listOfNotNull(
-            if (usePersonalizedDicts) Dictionary.TYPE_USER else null,
+            Dictionary.TYPE_USER,
             if (useAppsDict) Dictionary.TYPE_APPS else null,
-            if (usePersonalizedDicts) Dictionary.TYPE_USER_HISTORY else null,
+            Dictionary.TYPE_USER_HISTORY, // (always learning; "Suggest learned & personal words" only decides what's offered)
             if (useContactsDict && PermissionsUtil.checkAllPermissionsGranted(context, Manifest.permission.READ_CONTACTS))
                 Dictionary.TYPE_CONTACTS else null
         )
@@ -310,7 +308,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         putWordIntoValidSpellingWordCache("addToUserHistory", suggestion)
 
         val words = suggestion.splitOnWhitespace().dropLastWhile { it.isEmpty() }
-        if (Settings.getValues()?.mUsePersonalizedDicts != false) words.forEach { HotWords.onWordCommitted(it) }
+        words.forEach { HotWords.onWordCommitted(it) }
 
         // increase / decrease confidence
         if (words.size == 1) // ignore if more than a single word, which only happens with (badly working) spaceAwareGesture
@@ -540,7 +538,10 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         // the user's fixed priority for the language, on top of the automatic confidence (cached, see LanguagePriority)
         val (priorityFactor, historyShared) = LanguagePriority.forSuggestions(dictGroup.locale) { Settings.getCurrentContext()?.prefs() }
         val groupWeight = dictGroup.getWeightForLocale(dictionaryGroups, composedData.mIsBatchMode) * priorityFactor
+        // "Suggest learned & personal words" off: what was learned and the personal dictionary aren't offered (still learned)
+        val personal = Settings.getValues()?.mUsePersonalizedDicts != false
         for (dictType in DictionaryFacilitator.ALL_DICTIONARY_TYPES) {
+            if (!personal && (dictType == Dictionary.TYPE_USER_HISTORY || dictType == Dictionary.TYPE_USER)) continue
             val dictionary = dictGroup.getDict(dictType) ?: continue
             // words learned in a language that shares them count like the highest priority language
             val weightForLocale = if (historyShared && dictType == Dictionary.TYPE_USER_HISTORY) 1f else groupWeight

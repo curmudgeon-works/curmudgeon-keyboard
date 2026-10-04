@@ -101,10 +101,11 @@ fun TextCorrectionScreen(
         // (right after Show suggestions and the rows indented under it)
         Settings.PREF_BIGRAM_PREDICTIONS,
         Settings.PREF_KEY_USE_PERSONALIZED_DICTS,
+        // right after it: what stops the learning (advanced, but not while suggesting learned words is off)
+        Settings.PREF_ALWAYS_INCOGNITO_MODE,
         if (prefs.getBoolean(Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Defaults.PREF_KEY_USE_PERSONALIZED_DICTS))
             Settings.PREF_ADD_TO_PERSONAL_DICTIONARY else null,
         Settings.PREF_SUGGESTION_RULES, // Customize suggestions: how many, rules for the 2nd one on (from Others; advanced)
-        Settings.PREF_ALWAYS_INCOGNITO_MODE, // (from Advanced; advanced here too) never learn, like incognito fields
         // (PREF_CENTER_SUGGESTION_TEXT_TO_ENTER, "show the word space will type as the middle suggestion", is no longer
         // shown: the strip has no middle and shows the typed word first anyway; its Setting stays, off, see SettingsValues)
         if (suggestionsEnabled || autocorrectEnabled) Settings.PREF_SUGGEST_EMOJIS else null,
@@ -173,7 +174,8 @@ fun TextCorrectionScreen(
             Settings.PREF_SHOW_SUGGESTIONS, Settings.PREF_BIGRAM_PREDICTIONS, Settings.PREF_KEY_USE_PERSONALIZED_DICTS,
             // (suggest emojis and contact names: advanced)
             Settings.PREF_ADD_TO_PERSONAL_DICTIONARY,
-        ),
+        ) + (if (prefs.getBoolean(Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Defaults.PREF_KEY_USE_PERSONALIZED_DICTS)) emptySet()
+            else setOf(Settings.PREF_ALWAYS_INCOGNITO_MODE)),
     )
     draft.dialogs()
     }

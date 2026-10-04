@@ -598,8 +598,8 @@ public class LatinIME extends InputMethodService implements
 
     private void refreshPersonalizationDictionarySession(
             final SettingsValues currentSettingsValues) {
-        // (personalized suggestions off no longer deletes the learned words: they're kept, unused, see
-        // DictionaryFacilitatorImpl.resetDictionaries)
+        // ("Suggest learned & personal words" off no longer deletes the learned words: they're kept and still learned,
+        // only not offered, see DictionaryFacilitatorImpl.getSuggestionResults)
     }
 
     // Note that this method is called from a non-UI thread.
@@ -1563,7 +1563,8 @@ public class LatinIME extends InputMethodService implements
         // its recent and frequent uses go too: typed again, it starts from the bottom like a new word
         helium314.keyboard.latin.utils.HotWords.INSTANCE.forget(word);
         helium314.keyboard.latin.utils.FrequentLongWords.INSTANCE.forget(word);
-        // the strip and the pending auto-correction both lose the word
+        // the strip and the pending auto-correction both lose the word (an empty strip leaves the old one standing)
+        if (remaining.isEmpty()) mInputLogic.dropAutoCorrection();
         setSuggestedWords(remaining);
     }
 

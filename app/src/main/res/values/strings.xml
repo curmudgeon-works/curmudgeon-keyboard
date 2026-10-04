@@ -115,7 +115,7 @@
     <!-- Description for option enabling or disabling the use of installed app names for suggestion and correction -->
     <string name="use_apps_dict_summary">Use names of installed apps for suggestions and corrections</string>
     <!-- Option name for enabling the use by the keyboards of sent/received messages, e-mail and typing history to improve suggestion accuracy -->
-    <string name="use_personalized_dicts">Personalized suggestions</string>
+    <string name="use_personalized_dicts">Suggest learned &amp; personal words</string>
     <!-- Dialog message informing that dictionaries will be deleted on changing the setting -->
     <string name="disable_personalized_dicts_message">Warning: Disabling this setting will clear learned data</string>
     <!-- Option name for adding learned words to personal dictionary -->
@@ -1271,7 +1271,7 @@ New dictionary:
 \n► In the event of an application crash, you will be prompted whether you want the crash logs when you open the Settings. &lt;br&gt; &lt;br&gt;
 \n► When using multilingual typing, space bar will show an confidence value used for determining the currently used language. &lt;br&gt; &lt;br&gt;
 \n► Suggestions will have some tiny numbers on top showing some internal score and source dictionary (can be disabled).</string>
-    <string name="use_personalized_dicts_summary">Learn from your communications and typed data to improve suggestions</string>
+    <string name="use_personalized_dicts_summary">Doesn\'t disable learning of new words (Force incognito mode does)</string>
     <!-- Label for soft enter key when it performs GO action.  Must be short to fit on key. 5 chars or less is preferable. -->
     <string name="label_go_key">Go</string>
     <!-- Label for soft enter key when it performs NEXT action.  Must be short to fit on key. 5 chars or less is preferable. -->

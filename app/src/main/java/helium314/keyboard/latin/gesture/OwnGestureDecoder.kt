@@ -160,6 +160,7 @@ object OwnGestureDecoder {
         val tuning = prefs?.let { Tuning.read(it) } ?: Tuning.DEFAULT
         currentTuning = tuning
         GestureDecoderVocabulary.historyBoost = tuning.historyBoost
+        GestureDecoderVocabulary.includeLearned = Settings.getValues()?.mUsePersonalizedDicts != false
         val specs = locales.map {
             GestureDecoderVocabulary.LocaleSpec(it,
                 prefs?.let { p -> LanguagePriority.factor(p, it) } ?: 1f,

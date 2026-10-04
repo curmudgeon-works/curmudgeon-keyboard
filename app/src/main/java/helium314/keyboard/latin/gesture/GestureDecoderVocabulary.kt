@@ -43,15 +43,26 @@ object GestureDecoderVocabulary {
         set(value) {
             if (value == field) return
             field = value
-            // learned words are merged into every cached vocabulary with the boost baked in: rebuild them in the
-            // background while the current ones keep serving swipes (clearing them emptied every swipe until the rebuild,
-            // e.g. right after switching to a keyboard with its own boost)
-            val context = Settings.getCurrentContext() ?: run { cache.clear(); merged.clear(); return }
-            val entries = mainEntries.toMap()
-            Thread({
-                for ((key, list) in entries) runCatching { publishNow(key, key.constructLocale(), context, list) }
-            }, "GestureVocabBoost").start()
+            rebuildWithLearned()
         }
+    /** "Suggest learned & personal words": off, learned words aren't swiped either (they're still learned). */
+    @Volatile var includeLearned: Boolean = true
+        set(value) {
+            if (value == field) return
+            field = value
+            rebuildWithLearned()
+        }
+
+    // learned words are merged into every cached vocabulary with the boost baked in: rebuild them in the
+    // background while the current ones keep serving swipes (clearing them emptied every swipe until the rebuild,
+    // e.g. right after switching to a keyboard with its own boost)
+    private fun rebuildWithLearned() {
+        val context = Settings.getCurrentContext() ?: run { cache.clear(); merged.clear(); return }
+        val entries = mainEntries.toMap()
+        Thread({
+            for ((key, list) in entries) runCatching { publishNow(key, key.constructLocale(), context, list) }
+        }, "GestureVocabBoost").start()
+    }
     private const val CACHE_DIR = "own_gesture_vocab"
     private const val CACHE_VERSION = 1
     // user-history dict loads asynchronously; on cold start wordPropertiesForSyncing
@@ -196,7 +207,7 @@ object GestureDecoderVocabulary {
      * user history when they are built, so a new word could otherwise not be swiped until the next rebuild).
      */
     fun onWordLearned(context: Context, locale: Locale, word: String) {
-        if (!isDecodableWord(word)) return
+        if (!isDecodableWord(word) || !includeLearned) return
         learnExecutor.schedule({
             try {
                 val probability = PersonalizationHelper.getUserHistoryDictionary(context, locale).getFrequency(word)
@@ -289,6 +300,7 @@ object GestureDecoderVocabulary {
      * this is a max-merge.
      */
     private fun historyEntries(context: Context, locale: Locale, retries: Int): List<Pair<String, Int>> {
+        if (!includeLearned) return emptyList()
         try {
             val history = PersonalizationHelper.getUserHistoryDictionary(context, locale)
             var props = history.wordPropertiesForSyncing

@@ -653,6 +653,11 @@ public final class InputLogic {
 
     // TODO: on the long term, this method should become private, but it will be difficult.
     // Especially, how do we deal with InputMethodService.onDisplayCompletions?
+    /** Nothing is auto-corrected any more (the strip's last word was removed): space types what was typed. */
+    public void dropAutoCorrection() {
+        mWordComposer.setAutoCorrection(null);
+    }
+
     public void setSuggestedWords(final SuggestedWords suggestedWords) {
         if (!suggestedWords.isEmpty()) {
             final SuggestedWordInfo suggestedWordInfo;
