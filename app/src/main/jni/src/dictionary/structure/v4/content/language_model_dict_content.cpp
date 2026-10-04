@@ -357,14 +357,9 @@ bool LanguageModelDictContent::updateAllProbabilityEntriesForGCInner(const int b
                 continue;
             }
             if (needsToHalveCounters) {
+                // (an entry halved to 0 stays: learned words are never deleted, a count of 0 is the
+                // stored state of a word typed once)
                 const int updatedCount = originalHistoricalInfo->getCount() / 2;
-                if (updatedCount == 0) {
-                    // Remove the entry.
-                    if (!mTrieMap.remove(entry.key(), bitmapEntryIndex)) {
-                        return false;
-                    }
-                    continue;
-                }
                 const HistoricalInfo historicalInfoToSave(originalHistoricalInfo->getTimestamp(),
                         originalHistoricalInfo->getLevel(), updatedCount);
                 const ProbabilityEntry updatedEntry(probabilityEntry.getFlags(),

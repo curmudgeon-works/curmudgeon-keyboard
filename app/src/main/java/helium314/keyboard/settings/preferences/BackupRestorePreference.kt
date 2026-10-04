@@ -697,9 +697,10 @@ private val backupFilePatterns by lazy { listOf(
 ) }
 
 /**
- * Adds the learned words of a backed-up store ([dictDir], unpacked) to the phone's for [locale]: each word pair and word
- * is replayed as often as its level says (one use raises a level), with its last use's time, so a word comes out about
- * as strong as it was; words the phone already knows get stronger.
+ * Adds the learned words of a backed-up store ([dictDir], unpacked) to the phone's for [locale]: each word and word pair
+ * (and longer) is replayed once with its stored count ([ownCounts]) and the time of its last use (the newer of the
+ * backed-up and the phone's), so a word comes out as often typed as it was and keeps fading from where it was
+ * (LearnedDecay); the counts of words the phone already knows add up.
  */
 private fun mergeLearnedWords(ctx: Context, dictDir: File, locale: Locale) {
     val backupDict = com.android.inputmethod.latin.BinaryDictionary(dictDir.absolutePath, 0, dictDir.length(), true, locale,
@@ -716,21 +717,69 @@ private fun mergeLearnedWords(ctx: Context, dictDir: File, locale: Locale) {
     } while (token != 0)
     backupDict.close()
     val isWord = words.associate { it.mWord to !it.mIsNotAWord }
-    val viaPairs = HashMap<String, Int>() // a pair's replay counts its word too
-    for (wp in words) for (ngram in wp.mNgrams.orEmpty()) {
-        val target = ngram.mTargetWord.mWord
-        val info = ngram.mTargetWord.mProbabilityInfo
-        repeat(info.mLevel.coerceIn(1, 15)) {
-            phone.updateEntriesForWord(ngram.mNgramContext, target, isWord[target] ?: true, 1, info.mTimestamp)
-        }
-        viaPairs[target] = (viaPairs[target] ?: 0) + info.mLevel.coerceIn(1, 15)
+    fun contextOf(c: helium314.keyboard.latin.NgramContext) = (1..c.prevWordCount).map { n ->
+        if (c.isNthPrevWordBeginningOfSentence(n)) LearnedEntry.SENTENCE_START else c.getNthPrevWord(n)?.toString() ?: ""
     }
+    // every entry, with the context to replay it in (a sentence start isn't replayed as a word: the pairs it starts
+    // count it)
+    val entries = ArrayList<LearnedEntry>()
+    val contexts = ArrayList<helium314.keyboard.latin.NgramContext>()
+    val newWords = ArrayList<helium314.keyboard.latin.makedict.WordProperty>()
     for (wp in words) {
-        if (wp.mIsBeginningOfSentence) continue
-        val level = wp.mProbabilityInfo.mLevel.coerceIn(1, 15)
-        repeat((level - (viaPairs[wp.mWord] ?: 0)).coerceAtLeast(if (viaPairs.containsKey(wp.mWord)) 0 else 1)) {
-            phone.updateEntriesForWord(helium314.keyboard.latin.NgramContext.EMPTY_PREV_WORDS_INFO, wp.mWord, !wp.mIsNotAWord, 1, wp.mProbabilityInfo.mTimestamp)
+        // the phone's copy of the word and of the pairs it starts: their last uses, when newer, are kept
+        val onPhone = phone.getLearnedWordProperty(wp.mWord, wp.mIsBeginningOfSentence)
+        if (onPhone == null && !wp.mIsBeginningOfSentence) newWords.add(wp)
+        val phoneTimes = onPhone?.mNgrams.orEmpty().associate {
+            (listOf(it.mTargetWord.mWord) + contextOf(it.mNgramContext)) to it.mTargetWord.mProbabilityInfo.mTimestamp
         }
+        if (!wp.mIsBeginningOfSentence) {
+            val info = wp.mProbabilityInfo
+            entries.add(LearnedEntry(wp.mWord, emptyList(), info.mCount,
+                maxOf(info.mTimestamp, onPhone?.mProbabilityInfo?.mTimestamp ?: 0)))
+            contexts.add(helium314.keyboard.latin.NgramContext.EMPTY_PREV_WORDS_INFO)
+        }
+        for (ngram in wp.mNgrams.orEmpty()) {
+            val target = ngram.mTargetWord.mWord
+            val info = ngram.mTargetWord.mProbabilityInfo
+            val context = contextOf(ngram.mNgramContext)
+            entries.add(LearnedEntry(target, context, info.mCount,
+                maxOf(info.mTimestamp, phoneTimes[listOf(target) + context] ?: 0)))
+            contexts.add(ngram.mNgramContext)
+        }
+    }
+    // words new to the phone first, at count 0: a pair is only stored when the phone knows the word before it
+    for (wp in newWords) phone.updateEntriesForWord(helium314.keyboard.latin.NgramContext.EMPTY_PREV_WORDS_INFO,
+        wp.mWord, !wp.mIsNotAWord, 0, wp.mProbabilityInfo.mTimestamp)
+    // oldest first: a replay also sets the time of the shorter entries it counts (the word of a pair), whose own last
+    // use is never older, so replayed after it, that one stays
+    val own = ownCounts(entries)
+    for (i in entries.indices.sortedBy { entries[it].time }) {
+        val e = entries[i]
+        phone.updateEntriesForWord(contexts[i], e.word, isWord[e.word] ?: true, own[i], e.time)
     }
     phone.onFinishInput() // saved
+}
+
+/** A learned entry of a backed-up store: [word] after [context] (the words before it, nearest first; empty: the word
+ *  itself), with its stored [count] and last use [time] (seconds). */
+internal class LearnedEntry(val word: String, val context: List<String>, val count: Int, val time: Int) {
+    companion object { const val SENTENCE_START = "\u0000" } // (no word contains it)
+}
+
+/**
+ * The count each of [entries] replays: one use of a word after some words also counted every shorter entry ending in it
+ * (the pair counts the word, 3 words count the pair), so each replays its stored count minus those of the entries one
+ * word longer that contain it. A word's stored count already holds its first use (a word of no dictionary is stored at
+ * 0 by it), so a word replayed with its count, as a dictionary word, comes out with the same count.
+ */
+internal fun ownCounts(entries: List<LearnedEntry>): IntArray {
+    val index = HashMap<List<String>, Int>()
+    entries.forEachIndexed { i, e -> index[listOf(e.word) + e.context] = i }
+    val own = IntArray(entries.size) { entries[it].count }
+    for (e in entries) {
+        if (e.context.isEmpty()) continue
+        val shorter = index[listOf(e.word) + e.context.dropLast(1)] ?: continue
+        own[shorter] -= e.count
+    }
+    return IntArray(own.size) { own[it].coerceAtLeast(0) }
 }

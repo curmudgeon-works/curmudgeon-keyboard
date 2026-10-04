@@ -35,6 +35,7 @@ import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsValuesForSuggestion
 import helium314.keyboard.latin.utils.HotWords
 import helium314.keyboard.latin.utils.LanguagePriority
+import helium314.keyboard.latin.utils.LearnedDecay
 import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.RemovedWords
 import helium314.keyboard.latin.utils.SubtypeSettings
@@ -643,17 +644,21 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
     }
 
     // typed N times: a word that isn't a dictionary word is stored at count 0 by its first use, so count N - 1 (and a
-    // removed word is learned like one); written with or without the sentence-start capital
+    // removed word is learned like one), faded by the time since its last use (LearnedDecay: trust is lost slowly);
+    // written with or without the sentence-start capital
     override fun isTrustedWord(word: String): Boolean {
         if (word.isEmpty()) return false
         val values = Settings.getValues() ?: return false
         if (!values.mAutocorrectFrequentWords) return false
         if (isRemovedWord(word)) return false // its learned copy counts the uses that bring it back, not trust
-        val needed = values.mTrustTypedCount - 1
+        val typed = values.mTrustTypedCount
+        val now = System.currentTimeMillis() / 1000
         val lower = word.lowercase()
+        fun trusted(history: ExpandableBinaryDictionary, w: String) = history.getLearnedInfo(w)
+            ?.let { LearnedDecay.isTrusted(it.mCount, it.mTimestamp, now, typed) } == true
         return dictionaryGroups.any { group ->
             val history = group.getSubDict(Dictionary.TYPE_USER_HISTORY) ?: return@any false
-            history.getLearnedCount(word) >= needed || (lower != word && history.getLearnedCount(lower) >= needed)
+            trusted(history, word) || (lower != word && trusted(history, lower))
         }
     }
 
