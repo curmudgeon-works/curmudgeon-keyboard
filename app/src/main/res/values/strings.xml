@@ -418,6 +418,10 @@
     <string name="swipe_metrics_none">No swipes logged yet</string>
     <string name="swipe_metrics_line">%1$d swipes · first choice right %2$d%% · picked from the strip %3$d%% · never offered %4$d%% · decode %5$d ms on average, %6$d ms at most</string>
     <string name="swipe_metrics_clear">Clear the log</string>
+    <string name="learning_log">Log corrections</string>
+    <string name="learning_log_summary">Keep a local log of what each correction does to the learned words. Nothing leaves the phone.</string>
+    <string name="learning_log_none">No corrections logged yet</string>
+    <string name="learning_log_line">%1$d accepted · %2$d auto-corrections reverted · %3$d swipes deleted · %4$d words edited later · %5$d swipes edited · %6$d removed · %7$d restored</string>
     <!-- Description of the setting to record swipes into a local corpus file -->
     <string name="record_gesture_corpus_summary">Log every swipe (touch path, keyboard layout, suggested words and your corrections) to gesture_corpus.jsonl in this app\'s external files folder. Local only, never uploaded. Includes the words you swipe.</string>
     <!-- Message in load gesture library dialog -->

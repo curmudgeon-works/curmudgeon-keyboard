@@ -7,6 +7,7 @@
 package helium314.keyboard.latin;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import helium314.keyboard.event.CombinerChain;
 import helium314.keyboard.event.Event;
@@ -45,6 +46,11 @@ public final class WordComposer {
     private SuggestedWordInfo mAutoCorrection;
     private boolean mIsResumed;
     private boolean mIsBatchMode;
+    // For the learning rules: the word as it stood in the text when the cursor picked it up again (it was counted when
+    // it was accepted, so changing it takes that use back), and the word a swipe produced (to tell a swipe edited
+    // before its commit). Null when there is none; both end with the composition.
+    @Nullable private String mResumedFrom;
+    @Nullable private String mSwipedWord;
     // A memory of the last rejected batch mode suggestion, if any. This goes like this: the user
     // gestures a word, is displeased with the results and hits backspace, then gestures again.
     // At the very least we should avoid re-suggesting the same thing, and to do that we memorize
@@ -110,6 +116,8 @@ public final class WordComposer {
         mIsResumed = false;
         mIsBatchMode = false;
         mRejectedBatchModeSuggestion = null;
+        mResumedFrom = null;
+        mSwipedWord = null;
         refreshTypedWordCache();
         mCursorPositionWithinWord = 0;
     }
@@ -273,6 +281,7 @@ public final class WordComposer {
     public void setBatchInputWord(final String word) {
         reset();
         mIsBatchMode = true;
+        mSwipedWord = word;
         final int length = word.length();
         for (int i = 0; i < length; i = Character.offsetByCodePoints(word, i, 1)) {
             final int codePoint = Character.codePointAt(word, i);
@@ -449,6 +458,8 @@ public final class WordComposer {
         mCursorPositionWithinWord = 0;
         mIsResumed = false;
         mRejectedBatchModeSuggestion = null;
+        mResumedFrom = null;
+        mSwipedWord = null;
         return lastComposedWord;
     }
 
@@ -467,6 +478,23 @@ public final class WordComposer {
 
     public boolean isBatchMode() {
         return mIsBatchMode;
+    }
+
+    /** The word the cursor picked up again for this composition (see {@link #setResumedFrom}), or null. */
+    @Nullable
+    public String getResumedFrom() {
+        return mResumedFrom;
+    }
+
+    /** Marks the composition as an accepted word picked up again by the cursor (null: it isn't one). */
+    public void setResumedFrom(@Nullable final String word) {
+        mResumedFrom = word;
+    }
+
+    /** The word the swipe that started this composition produced, or null if it wasn't a swipe. */
+    @Nullable
+    public String getSwipedWord() {
+        return mSwipedWord;
     }
 
     public void unsetBatchMode() {

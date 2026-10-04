@@ -377,6 +377,18 @@ bool Ver4PatriciaTriePolicy::updateEntriesForWordWithNgramContext(
                 "dictionary.");
         return false;
     }
+    if (historicalInfo.getCount() < 0) {
+        // Curmudgeon: a negative count takes uses back (a reverted auto-correction, an accepted word edited later).
+        // Only the word's own count goes down, not its word pairs: the pair it was learned in may not be the
+        // context it is taken back in (an edit much later), and a word at count 0 is no word in any context
+        // (getWordAttributes), so its pairs can't bring it back. A word never stored is not added.
+        const int wordId = getWordId(wordCodePoints, false /* forceLowerCaseSearch */);
+        if (wordId == NOT_A_WORD_ID) {
+            return false;
+        }
+        return mBuffers->getMutableLanguageModelDictContent()->takeBackUses(wordId,
+                -historicalInfo.getCount());
+    }
     const bool updateAsAValidWord = ngramContext->isNthPrevWordBeginningOfSentence(1 /* n */) ?
             false : isValidWord;
     int wordId = getWordId(wordCodePoints, false /* tryLowerCaseSearch */);

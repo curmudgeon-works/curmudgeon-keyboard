@@ -479,6 +479,8 @@ public final class BinaryDictionary extends Dictionary {
     }
 
     // Update entries for the word occurrence with the ngramContext.
+    // A negative count takes uses back from the word's own count (Curmudgeon, v4 native: never below 0, the entry and
+    // its timestamp stay, a word not stored isn't added; ngramContext, isValidWord and timestamp are not used then).
     public boolean updateEntriesForWordWithNgramContext(@NonNull final NgramContext ngramContext,
             final String word, final boolean isValidWord, final int count, final int timestamp) {
         if (TextUtils.isEmpty(word)) {

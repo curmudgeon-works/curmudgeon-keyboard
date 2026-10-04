@@ -348,6 +348,26 @@ abstract public class ExpandableBinaryDictionary extends Dictionary {
         });
     }
 
+    /**
+     * Takes one use of [word] back (a reverted auto-correction, an accepted word edited later): its learned count goes
+     * down by one, never below 0. The entry stays, with its word pairs and the time of its last real use; at 0 it is
+     * like a word never typed. When [word] has no count to take back, [otherForm] is tried (the lowercase form a word
+     * capitalized by the sentence start was learned in). Decided under the write lock, after the updates queued before.
+     */
+    public void decrementEntryDynamically(@NonNull final String word, @Nullable final String otherForm) {
+        updateDictionaryWithWriteLock(() -> {
+            final BinaryDictionary binaryDictionary = getBinaryDictionary();
+            if (binaryDictionary == null) {
+                return;
+            }
+            final String form = learnedCountLocked(word) > 0 ? word
+                    : otherForm != null && learnedCountLocked(otherForm) > 0 ? otherForm : null;
+            if (form == null) return; // never counted, or already at 0: nothing to take back
+            binaryDictionary.updateEntriesForWordWithNgramContext(NgramContext.EMPTY_PREV_WORDS_INFO, form,
+                    true /* isValidWord, unused */, -1 /* count */, 0 /* timestamp, unused */);
+        });
+    }
+
     @Override
     public ArrayList<SuggestedWordInfo> getSuggestions(final ComposedData composedData,
             final NgramContext ngramContext, final long proximityInfoHandle,
@@ -415,10 +435,7 @@ abstract public class ExpandableBinaryDictionary extends Dictionary {
             lockAcquired = mLock.readLock().tryLock(
                     TIMEOUT_FOR_READ_OPS_IN_MILLISECONDS, TimeUnit.MILLISECONDS);
             if (lockAcquired && mBinaryDictionary != null) {
-                final WordProperty property = mBinaryDictionary.getWordProperty(word, false);
-                // (a word not stored comes back without a timestamp)
-                if (property == null || property.mProbabilityInfo.mTimestamp <= 0) return -1;
-                return property.mProbabilityInfo.mCount;
+                return learnedCountLocked(word);
             }
         } catch (final InterruptedException e) {
             Log.e(TAG, "Interrupted tryLock() in getLearnedCount().", e);
@@ -428,6 +445,14 @@ abstract public class ExpandableBinaryDictionary extends Dictionary {
             }
         }
         return -1;
+    }
+
+    private int learnedCountLocked(final String word) {
+        if (mBinaryDictionary == null) return -1;
+        final WordProperty property = mBinaryDictionary.getWordProperty(word, false);
+        // (a word not stored comes back without a timestamp)
+        if (property == null || property.mProbabilityInfo.mTimestamp <= 0) return -1;
+        return property.mProbabilityInfo.mCount;
     }
 
     protected boolean isInDictionaryLocked(final String word) {

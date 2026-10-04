@@ -56,6 +56,7 @@ import helium314.keyboard.latin.settings.Defaults;
 import helium314.keyboard.latin.settings.SettingsValues;
 import helium314.keyboard.latin.gesture.GestureCorpusRecorder;
 import helium314.keyboard.latin.gesture.GestureStats;
+import helium314.keyboard.latin.personalization.LearningEventLog;
 import helium314.keyboard.latin.settings.SpacingAndPunctuations;
 import helium314.keyboard.latin.suggestions.SuggestionStripViewAccessor;
 import helium314.keyboard.latin.utils.AsyncResultHolder;
@@ -136,6 +137,10 @@ public final class InputLogic {
     // The word being corrected while the cursor is in the middle of the word.
     // Note: This does not have a composing span, so it must be handled separately.
     private String mWordBeingCorrectedByCursor = null;
+    // An accepted word the user is changing in place (the cursor inside it), which took back its use when the change
+    // began (unlearnWordEditedInPlace): the word it becomes is learned when the cursor leaves it. Until then, words the
+    // cursor picks up are the half-edited word, not accepted ones. Null when no such edit is going on.
+    private String mEditedInPlaceWord = null;
 
     private boolean mJustRevertedACommit = false;
 
@@ -169,6 +174,7 @@ public final class InputLogic {
     public void startInput(final String combiningSpec, final SettingsValues settingsValues) {
         mEnteredText = null;
         mWordBeingCorrectedByCursor = null;
+        mEditedInPlaceWord = null;
         mConnection.onStartInput();
         if (!mWordComposer.getTypedWord().isEmpty()) {
             // For messaging apps that offer send button, the IME does not get the opportunity
@@ -488,9 +494,13 @@ public final class InputLogic {
             // If the user is in the middle of correcting a word, we should learn it before moving
             // the cursor away.
             if (!TextUtils.isEmpty(mWordBeingCorrectedByCursor)) {
+                if (learnsHere(settingsValues))
+                    logLearningEvent(LearningEventLog.ACCEPTED, LearningEventLog.EDIT,
+                            mEditedInPlaceWord == null ? "" : mEditedInPlaceWord, mWordBeingCorrectedByCursor);
                 performAdditionToUserHistoryDictionary(settingsValues, mWordBeingCorrectedByCursor,
                         NgramContext.EMPTY_PREV_WORDS_INFO);
             }
+            mEditedInPlaceWord = null; // the cursor left the word: the edit is over
         } else {
             // resetEntireInputState calls resetCachesUponCursorMove, but forcing the
             // composition to end. But in all cases where we don't reset the entire input
@@ -622,7 +632,7 @@ public final class InputLogic {
                 // If we are in the middle of a recorrection, we need to commit the recorrection
                 // first so that we can insert the batch input at the current cursor position.
                 // We also need to unlearn the original word that is now being corrected.
-                unlearnWord(mWordComposer.getTypedWord(), settingsValues, Constants.EVENT_BACKSPACE);
+                unlearnWordEditedInPlace(settingsValues);
                 resetEntireInputState(mConnection.getExpectedSelectionStart(), mConnection.getExpectedSelectionEnd(), true);
             } else if (mWordComposer.isSingleLetter() && ! isInlineEmojiSearchAction()) {
                 // We auto-correct the previous (typed, not gestured) string iff it's one character
@@ -1109,7 +1119,7 @@ public final class InputLogic {
                     // If we are in the middle of a recorrection, we need to commit the recorrection
                     // first so that we can insert the character at the current cursor position.
                     // We also need to unlearn the original word that is now being corrected.
-                    unlearnWord(mWordComposer.getTypedWord(), sv, Constants.EVENT_BACKSPACE);
+                    unlearnWordEditedInPlace(sv);
                     resetEntireInputState(mConnection.getExpectedSelectionStart(),
                             mConnection.getExpectedSelectionEnd(), true /* clearSuggestionStrip */);
                 } else {
@@ -1200,7 +1210,7 @@ public final class InputLogic {
             // If we are in the middle of a recorrection, we need to commit the recorrection
             // first so that we can insert the character at the current cursor position.
             // We also need to unlearn the original word that is now being corrected.
-            unlearnWord(mWordComposer.getTypedWord(), inputTransaction.getSettingsValues(), Constants.EVENT_BACKSPACE);
+            unlearnWordEditedInPlace(inputTransaction.getSettingsValues());
             resetEntireInputState(mConnection.getExpectedSelectionStart(), mConnection.getExpectedSelectionEnd(), true);
             isComposingWord = false;
         }
@@ -1326,7 +1336,7 @@ public final class InputLogic {
             // If we are in the middle of a recorrection, we need to commit the recorrection
             // first so that we can insert the separator at the current cursor position.
             // We also need to unlearn the original word that is now being corrected.
-            unlearnWord(mWordComposer.getTypedWord(), inputTransaction.getSettingsValues(), Constants.EVENT_BACKSPACE);
+            unlearnWordEditedInPlace(inputTransaction.getSettingsValues());
             resetEntireInputState(mConnection.getExpectedSelectionStart(),
                     mConnection.getExpectedSelectionEnd(), true /* clearSuggestionStrip */);
         }
@@ -1505,8 +1515,7 @@ public final class InputLogic {
             // If we are in the middle of a recorrection, we need to commit the recorrection
             // first so that we can remove the character at the current cursor position.
             // We also need to unlearn the original word that is now being corrected.
-            unlearnWord(mWordComposer.getTypedWord(), inputTransaction.getSettingsValues(),
-                    Constants.EVENT_BACKSPACE);
+            unlearnWordEditedInPlace(inputTransaction.getSettingsValues());
             resetEntireInputState(mConnection.getExpectedSelectionStart(),
                     mConnection.getExpectedSelectionEnd(), true /* clearSuggestionStrip */);
             // When we exit this if-clause, mWordComposer.isComposingWord() will return false.
@@ -1521,10 +1530,10 @@ public final class InputLogic {
                 mWordComposer.setRejectedBatchModeSuggestion(rejectedSuggestion);
                 GestureCorpusRecorder.INSTANCE.onWordDeleted();
                 GestureStats.INSTANCE.onDeleted();
-                if (!TextUtils.isEmpty(rejectedSuggestion)) {
-                    unlearnWord(rejectedSuggestion, inputTransaction.getSettingsValues(),
-                            Constants.EVENT_REJECTION);
-                }
+                // learning rules: a swiped word counts when it's committed, so a fresh one deleted was never
+                // counted and nothing is taken back (this used to wipe the word from the learned words)
+                if (!TextUtils.isEmpty(rejectedSuggestion) && learnsHere(inputTransaction.getSettingsValues()))
+                    logLearningEvent(LearningEventLog.SWIPE_DELETED, LearningEventLog.SWIPED, rejectedSuggestion, "");
                 StatsUtils.onBackspaceWordDelete(rejectedSuggestion.length());
             } else {
                 mWordComposer.applyProcessedEvent(event);
@@ -1559,6 +1568,9 @@ public final class InputLogic {
                         && inputTransaction.getSettingsValues().mSpacingAndPunctuations.mCurrentLanguageHasSpaces) {
                     restartSuggestionsOnWordTouchedByCursor(inputTransaction.getSettingsValues(), currentKeyboardScript);
                 }
+                // the word put back was never counted (the correction was): it is learned like a new word when it's
+                // committed, not taken back as an accepted word changed
+                mWordComposer.setResumedFrom(null);
                 return;
             }
             // swipe, space, backspace: the swiped word comes back with the strip it had after the swipe (the revert above
@@ -1766,6 +1778,56 @@ public final class InputLogic {
         final NgramContext ngramContext = mConnection.getNgramContextFromNthPreviousWord(settingsValues.mSpacingAndPunctuations, 2);
         final long timeStampInSeconds = TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis());
         mDictionaryFacilitator.unlearnFromUserHistory(word, ngramContext, timeStampInSeconds, eventType);
+    }
+
+    // ---- learning rules (2026-10-04): a correction takes back only the use it undoes ----
+    //  accept as is (space, strip pick, swipe kept): +1 (performAdditionToUserHistoryDictionary)
+    //  revert an auto-correction: the correction -1; the typed word +1 when it's committed (revertCommit)
+    //  delete a fresh swipe: nothing, it was never counted (handleBackspaceEvent)
+    //  change an accepted word later: the old word -1, the new one +1 (commitChosenWord, unlearnWordEditedInPlace)
+    //  edit a swipe before its commit: the final word +1, as any commit
+    //  deleting text takes nothing back.
+
+    /** Whether input here changes the learned words at all: as performAdditionToUserHistoryDictionary decides. */
+    private boolean learnsHere(final SettingsValues settingsValues) {
+        return settingsValues.isSuggestionsEnabledPerUserSettings() && !settingsValues.mIncognitoModeEnabled
+                && !mConnection.hasSlowInputConnection();
+    }
+
+    /** Takes back the one use [word] was counted with, logged as [event] ([after]: the word it became, if known yet). */
+    private void unlearnOneUse(final String word, final String event, final String origin, final String after,
+            final SettingsValues settingsValues) {
+        if (TextUtils.isEmpty(word) || !learnsHere(settingsValues)) return;
+        logLearningEvent(event, origin, word, after); // (reads the counts before the change)
+        mDictionaryFacilitator.unlearnOneUse(word);
+    }
+
+    /**
+     * The cursor sits inside a word it picked up again and the user changes it there (a letter, a backspace, a
+     * separator or a swipe inside it): the word takes back the use it was counted with when it was accepted. The word
+     * it becomes is learned when the cursor leaves it (mWordBeingCorrectedByCursor). A word still being typed (the
+     * cursor moved within it) was never counted, so nothing is taken back from it.
+     */
+    private void unlearnWordEditedInPlace(final SettingsValues settingsValues) {
+        final String resumedFrom = mWordComposer.getResumedFrom();
+        if (resumedFrom == null) return;
+        unlearnOneUse(resumedFrom, LearningEventLog.ACCEPTED_EDITED, LearningEventLog.EDIT, "", settingsValues);
+        mEditedInPlaceWord = resumedFrom;
+    }
+
+    /** A line in the corrections log, if it's on: call before the change, the counts before are read now. */
+    private void logLearningEvent(final String event, final String origin, final String before, final String after) {
+        if (!LearningEventLog.isEnabled()) return;
+        LearningEventLog.log(event, origin, before, after, mDictionaryFacilitator.getCurrentLocale().toLanguageTag(),
+                mDictionaryFacilitator::getLearnedCount);
+    }
+
+    /** How the word being committed got there, for the corrections log. Call before the composer is reset. */
+    private String learningOrigin(final int commitType, final String chosenWord) {
+        if (commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK)
+            return mWordComposer.isComposingWord() ? LearningEventLog.STRIP : LearningEventLog.PREDICTION;
+        if (!chosenWord.equals(mWordComposer.getTypedWord())) return LearningEventLog.AUTOCORRECT;
+        return mWordComposer.isBatchMode() ? LearningEventLog.SWIPED : LearningEventLog.TYPED;
     }
 
     /**
@@ -2127,7 +2189,17 @@ public final class InputLogic {
             mConnection.finishComposingText();
             return;
         }
+        // (a cursor moved within the word being composed comes here too, and the composition is set up again)
+        final boolean wasComposing = mWordComposer.isComposingWord();
+        final String resumedBefore = mWordComposer.getResumedFrom();
         restartSuggestions(range);
+        // learning rules: a word already in the text counts as accepted (the keyboard can't tell who typed it, and
+        // what it typed was counted at its commit), so changing it takes that use back. Not a word still being typed
+        // (it stays what it was), and not the half-changed word of an edit in place, which took the use back already.
+        final String word = range.mWord.toString();
+        if (!mWordComposer.isComposingWord() || !word.equals(mWordComposer.getTypedWord())) return;
+        if (wasComposing) mWordComposer.setResumedFrom(resumedBefore);
+        else if (mEditedInPlaceWord == null) mWordComposer.setResumedFrom(word);
     }
 
     private void restartSuggestions(final TextRange range) {
@@ -2208,6 +2280,7 @@ public final class InputLogic {
         mConnection.beginBatchEdit();
         mConnection.deleteTextBeforeCursor(word.length());
         mWordComposer.setBatchInputWord(word);
+        mWordComposer.setResumedFrom(word); // it was counted when its space committed it (a reverted commit clears this)
         GestureCorpusRecorder.INSTANCE.onWordResumed(word);
         setComposingTextInternal(word, 1);
         mConnection.endBatchEdit();
@@ -2241,10 +2314,10 @@ public final class InputLogic {
             }
         }
         mConnection.deleteTextBeforeCursor(deleteLength);
-        if (!TextUtils.isEmpty(committedWord)) {
-            unlearnWord(committedWordString, inputTransaction.getSettingsValues(),
-                    Constants.EVENT_REVERT);
-        }
+        // learning rules: the correction loses the one use its commit counted (it used to be wiped from the learned
+        // words); the typed word put back is learned when it's committed
+        unlearnOneUse(committedWordString, LearningEventLog.AUTOCORRECT_REVERTED, LearningEventLog.AUTOCORRECT,
+                originallyTypedWord.toString(), inputTransaction.getSettingsValues());
         final String stringToCommit = originallyTypedWord +
                 (usePhantomSpace ? "" : separatorString);
         final SpannableString textToCommit = new SpannableString(stringToCommit);
@@ -2767,6 +2840,29 @@ public final class InputLogic {
                     + "Connection.commitText");
             startTimeMillis = SystemClock.elapsedRealtime();
         }
+        // learning rules: an accepted word picked up again and committed as another word takes back the use it was
+        // counted with; the word committed counts as usual (below)
+        final String resumedFrom = mWordComposer.getResumedFrom();
+        final String swipedWord = mWordComposer.getSwipedWord();
+        final boolean editedAccepted = resumedFrom != null && !resumedFrom.equals(chosenWord);
+        if (learnsHere(settingsValues) && LearningEventLog.isEnabled()) {
+            final String event;
+            final String before;
+            if (editedAccepted) {
+                event = LearningEventLog.ACCEPTED_EDITED;
+                before = resumedFrom;
+            } else if (swipedWord != null && !mWordComposer.isBatchMode() && !swipedWord.equals(chosenWord)) {
+                event = LearningEventLog.SWIPE_EDITED;
+                before = swipedWord;
+            } else {
+                event = LearningEventLog.ACCEPTED;
+                before = mEditedInPlaceWord != null ? mEditedInPlaceWord
+                        : swipedWord != null ? swipedWord : mWordComposer.getTypedWord();
+            }
+            logLearningEvent(event, learningOrigin(commitType, chosenWord), before, chosenWord);
+        }
+        mEditedInPlaceWord = null;
+        if (editedAccepted && learnsHere(settingsValues)) mDictionaryFacilitator.unlearnOneUse(resumedFrom);
         // Add the word to the user history dictionary
         performAdditionToUserHistoryDictionary(settingsValues, chosenWord, ngramContext,
                 commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK ? PICKED_SUGGESTION_EXTRA_USES : 0);

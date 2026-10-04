@@ -281,6 +281,7 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
                 GroupTitle(R.string.swipe_logging)
                 SettingsActivity.settingsContainer[Settings.PREF_RECORD_GESTURE_CORPUS]?.Preference()
                 SettingsActivity.settingsContainer[Settings.PREF_SWIPE_METRICS]?.Preference()
+                SettingsActivity.settingsContainer[Settings.PREF_LEARNING_LOG]?.Preference()
             } }
         }
       }

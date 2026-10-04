@@ -16,6 +16,7 @@ import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.keyboard.MainKeyboardView
 import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode
 import helium314.keyboard.latin.ShadowFacilitator2.Companion.lastAddedWord
+import helium314.keyboard.latin.ShadowFacilitator2.Companion.unlearnedWords
 import helium314.keyboard.latin.SuggestedWords.SuggestedWordInfo
 import helium314.keyboard.latin.common.Constants
 import helium314.keyboard.latin.common.LocaleUtils.constructLocale
@@ -791,6 +792,102 @@ class InputLogicTest {
         //  need to avoid getting into the mWordComposer.isBatchMode() part of handleBackspaceEvent
     }
 
+    // ---- learning rules: a correction takes back only the use it undoes ----
+
+    @Test fun `reverting an auto-correction takes one use back from the correction, the typed word counts when committed`() {
+        reset()
+        setInputType(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_AUTO_CORRECT)
+        chainInput("hullo")
+        getAutocorrectedWithSpaceAfter("hello", "hullo")
+        assertEquals("hello", lastAddedWord)
+        functionalKeyPress(KeyCode.DELETE)
+        assertEquals("hullo", text)
+        assertEquals(listOf("hello"), unlearnedWords)
+        input(' ')
+        assertEquals("hullo ", text)
+        assertEquals("hullo", lastAddedWord)
+        assertEquals(listOf("hello"), unlearnedWords) // the typed word put back is no accepted word changed
+    }
+
+    @Test fun `deleting a fresh swipe takes nothing back`() {
+        reset()
+        glideTypingInput("hello")
+        functionalKeyPress(KeyCode.DELETE)
+        assertEquals("", text)
+        assertEquals(listOf(), unlearnedWords)
+        assertEquals("", lastAddedWord) // and it was never counted
+    }
+
+    @Test fun `changing an accepted word at its end takes its use back`() {
+        reset()
+        chainInput("helo ")
+        assertEquals("helo", lastAddedWord)
+        functionalKeyPress(KeyCode.DELETE) // the space: helo is picked up again
+        functionalKeyPress(KeyCode.DELETE)
+        chainInput("lo ")
+        assertEquals("hello ", text)
+        assertEquals(listOf("helo"), unlearnedWords)
+        assertEquals("hello", lastAddedWord)
+    }
+
+    @Test fun `committing a picked up word unchanged takes nothing back`() {
+        reset()
+        chainInput("hello ")
+        functionalKeyPress(KeyCode.DELETE)
+        input(' ')
+        assertEquals("hello ", text)
+        assertEquals(listOf(), unlearnedWords)
+    }
+
+    @Test fun `deleting an accepted word takes nothing back`() {
+        reset()
+        chainInput("hello there ")
+        repeat(6) { functionalKeyPress(KeyCode.DELETE) }
+        assertEquals("hello ", text)
+        chainInput("you ")
+        assertEquals(listOf(), unlearnedWords)
+        assertEquals("you", lastAddedWord)
+    }
+
+    @Test fun `changing an accepted word in the middle takes its use back, the new word counts when the cursor leaves`() {
+        reset()
+        setText("helo there")
+        setCursorPosition(3) // hel|o: the word is picked up again
+        input('l')
+        assertEquals("hello there", text)
+        assertEquals(listOf("helo"), unlearnedWords)
+        input('l') // further changes take nothing more back
+        assertEquals(listOf("helo"), unlearnedWords)
+        functionalKeyPress(KeyCode.DELETE)
+        functionalKeyPress(KeyCode.DELETE) // (a backspace picks up the half-changed word again: not an accepted one)
+        input('l')
+        assertEquals("hello there", text)
+        assertEquals(listOf("helo"), unlearnedWords)
+        setCursorPosition(text.length)
+        assertEquals("hello", lastAddedWord)
+    }
+
+    @Test fun `a word still being typed takes nothing back when changed in the middle`() {
+        reset()
+        chainInput("helo")
+        setCursorPosition(3)
+        input('l')
+        assertEquals("hello", text)
+        assertEquals(listOf(), unlearnedWords)
+    }
+
+    @Test fun `editing a swipe before its commit counts only the final word`() {
+        reset()
+        latinIME.prefs().edit { putBoolean(Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD, false) }
+        glideTypingInput("hello")
+        functionalKeyPress(KeyCode.DELETE)
+        functionalKeyPress(KeyCode.DELETE)
+        chainInput("p ")
+        assertEquals("help ", text)
+        assertEquals(listOf(), unlearnedWords)
+        assertEquals("help", lastAddedWord)
+    }
+
     @Test fun timestamp() {
         reset()
         chainInput("hello")
@@ -853,6 +950,7 @@ class InputLogicTest {
         batchEdit = 0
         currentInputType = InputType.TYPE_CLASS_TEXT
         lastAddedWord = ""
+        unlearnedWords.clear()
 
         // reset settings
         latinIME.prefs().edit { clear() }
@@ -1297,7 +1395,12 @@ class ShadowFacilitator2 {
                          blockPotentiallyOffensive: Boolean, extraUses: Int) {
         lastAddedWord = suggestion
     }
+    @Implementation
+    fun unlearnOneUse(word: String) {
+        unlearnedWords.add(word)
+    }
     companion object {
         var lastAddedWord = ""
+        val unlearnedWords = mutableListOf<String>()
     }
 }

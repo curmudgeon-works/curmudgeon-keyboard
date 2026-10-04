@@ -33,6 +33,7 @@ object KeyboardProfiles {
         Settings.PREF_SHOW_SETUP_WIZARD_ICON, Settings.PREF_ENABLE_CLIPBOARD_HISTORY,
         Settings.PREF_CLIPBOARD_HISTORY_SIZE, Settings.PREF_CLIPBOARD_HISTORY_PINNED_FIRST,
         Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_SWIPE_METRICS, Settings.PREF_AUTO_PREVIEW_KEYBOARD, // logs of the user's swiping: one file, one switch
+        Settings.PREF_LEARNING_LOG, // and of what corrections do to the learned words
         PREF_SEPARATE, PREF_IDS, PREF_NEXT_ID,
         "key_popup_sets", // saved popup sets are meant to be reused across keyboards
         "appearance_looks", // saved looks too
