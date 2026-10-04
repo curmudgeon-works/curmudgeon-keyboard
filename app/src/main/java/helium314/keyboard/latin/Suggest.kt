@@ -156,7 +156,10 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
             // typed word and the best suggestion, since the engine's per-character completion cost keeps them late
             val context = Settings.getCurrentContext()
             if (context != null) {
-                val frequent = FrequentLongWords.matching(context, mDictionaryFacilitator.locales, wordComposer.typedWord)
+                // (your own words, frequent and hot: not with personalized suggestions off)
+                val personal = Settings.getValues().mUsePersonalizedDicts
+                val frequent = if (!personal) emptyList()
+                    else FrequentLongWords.matching(context, mDictionaryFacilitator.locales, wordComposer.typedWord)
                 // "Trust words you've typed N+ times" on: the first goes in the auto-correction's slot (space commits
                 // it when a correction is coming); off: right after it, and the correction stays what it was
                 val frequentCorrects = Settings.getValues().mAutocorrectFrequentWords
@@ -183,7 +186,8 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
                     ?: Dictionary.DICTIONARY_APPLICATION_DEFINED
                 // ("Trust words you've typed N+ times" off: right after the correction, which stays what space types)
                 var hotSlot = min(if (frequentCorrects || !hasAutoCorrection) 1 else 2, suggestionsList.size)
-                for (info in HotWords.matching(wordComposer.typedWord, hotSource).filterNot { mDictionaryFacilitator.isRemovedWord(it.mWord) }) {
+                for (info in (if (personal) HotWords.matching(wordComposer.typedWord, hotSource) else emptyList())
+                        .filterNot { mDictionaryFacilitator.isRemovedWord(it.mWord) }) {
                     suggestionsList.removeAll { it.mWord == info.mWord }
                     suggestionsList.add(min(hotSlot, suggestionsList.size), info)
                     hotSlot++

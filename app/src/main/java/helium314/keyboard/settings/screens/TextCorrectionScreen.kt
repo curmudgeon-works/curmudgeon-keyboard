@@ -296,25 +296,8 @@ fun createCorrectionSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_KEY_USE_PERSONALIZED_DICTS,
         R.string.use_personalized_dicts, R.string.use_personalized_dicts_summary
     ) { setting ->
-        var showConfirmDialog by rememberSaveable { mutableStateOf(false) }
-        SwitchPreference(setting, Defaults.PREF_KEY_USE_PERSONALIZED_DICTS,
-            allowCheckedChange = {
-                showConfirmDialog = !it
-                it
-            }
-        )
-        if (showConfirmDialog) {
-            val prefs = LocalContext.current.prefs()
-            ConfirmationDialog(
-                onDismissRequest = { showConfirmDialog = false },
-                onConfirmed = {
-                    prefs.edit { putBoolean(setting.key, false) }
-                },
-                title = { Text(setting.title) },
-                content = { Text(stringResource(R.string.disable_personalized_dicts_message)) }
-            )
-        }
-
+        // (off keeps what was learned: nothing to warn about)
+        SwitchPreference(setting, Defaults.PREF_KEY_USE_PERSONALIZED_DICTS)
     },
     Setting(context, Settings.PREF_BIGRAM_PREDICTIONS,
         R.string.bigram_prediction

@@ -598,11 +598,8 @@ public class LatinIME extends InputMethodService implements
 
     private void refreshPersonalizationDictionarySession(
             final SettingsValues currentSettingsValues) {
-        if (!currentSettingsValues.mUsePersonalizedDicts) {
-            // Remove user history dictionaries.
-            PersonalizationHelper.removeAllUserHistoryDictionaries(this);
-            mDictionaryFacilitator.clearUserHistoryDictionary(this);
-        }
+        // (personalized suggestions off no longer deletes the learned words: they're kept, unused, see
+        // DictionaryFacilitatorImpl.resetDictionaries)
     }
 
     // Note that this method is called from a non-UI thread.

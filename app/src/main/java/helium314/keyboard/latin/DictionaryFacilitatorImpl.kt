@@ -144,8 +144,10 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
 
         val locales = getUsedLocales(newLocale, context)
 
+        // personalized suggestions off: the learned words and the personal dictionary stay on the phone, unused (nothing
+        // suggested from them, nothing learned) until it's on again
         val subDictTypesToUse = listOfNotNull(
-            Dictionary.TYPE_USER,
+            if (usePersonalizedDicts) Dictionary.TYPE_USER else null,
             if (useAppsDict) Dictionary.TYPE_APPS else null,
             if (usePersonalizedDicts) Dictionary.TYPE_USER_HISTORY else null,
             if (useContactsDict && PermissionsUtil.checkAllPermissionsGranted(context, Manifest.permission.READ_CONTACTS))
@@ -308,7 +310,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         putWordIntoValidSpellingWordCache("addToUserHistory", suggestion)
 
         val words = suggestion.splitOnWhitespace().dropLastWhile { it.isEmpty() }
-        words.forEach { HotWords.onWordCommitted(it) }
+        if (Settings.getValues()?.mUsePersonalizedDicts != false) words.forEach { HotWords.onWordCommitted(it) }
 
         // increase / decrease confidence
         if (words.size == 1) // ignore if more than a single word, which only happens with (badly working) spaceAwareGesture
@@ -758,11 +760,14 @@ private class DictionaryGroup(
 
     /** Removes a word from all dictionaries in this group. If the word is in a read-only dictionary, it is blacklisted. */
     fun removeWord(word: String) {
-        // remove from user history
-        getSubDict(Dictionary.TYPE_USER_HISTORY)?.removeUnigramEntryDynamically(word)
-
-        // and from personal dictionary
-        getSubDict(Dictionary.TYPE_USER)?.removeUnigramEntryDynamically(word)
+        // from the learned words and the personal dictionary in every capitalization ("Hello" at a sentence start was
+        // learned as "hello"; "HELLO" with caps lock)
+        val lower = word.lowercase(locale)
+        val forms = linkedSetOf(word, lower, word.uppercase(locale), lower.replaceFirstChar { it.titlecase(locale) })
+        for (form in forms) {
+            getSubDict(Dictionary.TYPE_USER_HISTORY)?.removeUnigramEntryDynamically(form)
+            getSubDict(Dictionary.TYPE_USER)?.removeUnigramEntryDynamically(form)
+        }
 
         val contactsDict = getSubDict(Dictionary.TYPE_CONTACTS)
         if (contactsDict != null && contactsDict.isInDictionary(word)) {
