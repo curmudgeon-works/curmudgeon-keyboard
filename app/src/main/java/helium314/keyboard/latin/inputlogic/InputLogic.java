@@ -1876,7 +1876,7 @@ public final class InputLogic {
             if (LearningEventLog.isEnabled())
                 LearningEventLog.log(isUndo ? LearningEventLog.UNDO : LearningEventLog.REDO, l.getOrigin(),
                         uses < 0 ? word : "", uses < 0 ? "" : word,
-                        mDictionaryFacilitator.getCurrentLocale().toLanguageTag(),
+                        mDictionaryFacilitator.getLearnedWordsLabel(word), // (the store by script, like every line)
                         mDictionaryFacilitator.getLearnedCountsNow(), (uses > 0 ? "+" : "") + uses);
             if (uses < 0) {
                 for (int i = 0; i < -uses; i++) mDictionaryFacilitator.unlearnOneUse(word);
