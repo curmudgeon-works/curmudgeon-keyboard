@@ -255,6 +255,9 @@ public class SuggestedWords {
         // in java for re-correction)
         public static final int KIND_RESUMED = 9;
         public static final int KIND_OOV_CORRECTION = 10; // Most probable string correction
+        // everything typed since the last space, when more than the word being typed ("sender+tag@gmail.com" while
+        // typing "tag@gmail.com"): tapped, it's learned and the text stays as it is
+        public static final int KIND_WHOLE_RUN = 11;
 
         public static final int KIND_FLAG_POSSIBLY_OFFENSIVE = 0x80000000;
         public static final int KIND_FLAG_EXACT_MATCH = 0x40000000;

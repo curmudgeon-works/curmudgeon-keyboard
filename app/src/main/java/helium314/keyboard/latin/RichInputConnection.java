@@ -1077,8 +1077,23 @@ public final class RichInputConnection implements PrivateCommandPerformer {
         return StringUtilsKt.hasLetterBeforeLastSpaceBeforeCursor(mCommittedTextBeforeComposingText);
     }
 
+    /** An "@" since the last space, with fewer than 5 full stops after it (mail.example.whatever.co.uk has 4;
+     *  2026-10-04): no auto-space after its full stops. */
     public boolean wordBeforeCursorMayBeEmail() {
-        return mCommittedTextBeforeComposingText.lastIndexOf(" ") < mCommittedTextBeforeComposingText.lastIndexOf("@");
+        final int at = mCommittedTextBeforeComposingText.lastIndexOf("@");
+        if (mCommittedTextBeforeComposingText.lastIndexOf(" ") >= at) return false;
+        int periods = 0;
+        for (int i = at + 1; i < mCommittedTextBeforeComposingText.length(); i++) {
+            if (mCommittedTextBeforeComposingText.charAt(i) == '.') periods++;
+        }
+        return periods < 5;
+    }
+
+    /** The committed text glued to the composing word: back from it to the last whitespace (as far as it's known). */
+    public String committedRunBeforeComposingText() {
+        int start = mCommittedTextBeforeComposingText.length();
+        while (start > 0 && !Character.isWhitespace(mCommittedTextBeforeComposingText.charAt(start - 1))) start--;
+        return mCommittedTextBeforeComposingText.substring(start);
     }
 
     public CharSequence textBeforeCursorUntilLastWhitespaceOrDoubleSlash() {

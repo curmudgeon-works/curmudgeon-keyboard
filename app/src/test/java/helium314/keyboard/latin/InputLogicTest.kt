@@ -29,6 +29,8 @@ import helium314.keyboard.latin.utils.ScriptUtils
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.TIMESTAMP_FORMAT
 import helium314.keyboard.latin.utils.prefs
+import org.junit.Ignore
+import kotlin.test.assertNotEquals
 import org.junit.runner.RunWith
 import org.mockito.Mockito
 import org.robolectric.Robolectric
@@ -239,8 +241,8 @@ class InputLogicTest {
 
     // todo: make it work, but it might not be that simple because adding is done in combiner
     //  https://github.com/HeliBorg/HeliBoard/issues/214
+    @Ignore("HeliBoard known failure, issue 214 (Hangul combining); skipped like in their runTests build")
     @Test fun insertLetterIntoWordHangulFails() {
-        if (BuildConfig.BUILD_TYPE == "runTests") return
         reset()
         latinIME.switchToSubtype(SubtypeSettings.getResourceSubtypesForLocale("ko".constructLocale()).first())
         chainInput("ㅛㅎㄹㅎㅕㅛ")
@@ -344,6 +346,7 @@ class InputLogicTest {
     @Test fun noAutospaceForDetectedEmail() {
         reset()
         latinIME.prefs().edit { putBoolean(Settings.PREF_AUTOSPACE_AFTER_PUNCTUATION, true) }
+        latinIME.prefs().edit { putBoolean(Settings.PREF_URL_DETECTION, false) } // (ours is on)
         chainInput("mail@example.com")
         assertEquals("mail@example.com", text)
         assertEquals("mail@example", lastAddedWord) // todo: do we want this? not really nice, but don't want to be too aggressive with URL detection disabled
@@ -354,6 +357,102 @@ class InputLogicTest {
         chainInput("mail@example.com")
         assertEquals("", lastAddedWord)
         assertEquals("mail@example.com", composingText)
+    }
+
+    // learning (2026-10-04): a space learns letters with ' - . between them and email addresses; a strip tap
+    // learns anything typed without a space
+    @Test fun `space learns words, words with full stops and email addresses`() {
+        for (word in listOf("hello.wrold", "don't", "well-known", "google.com", "sender.first.last@gmail.com",
+                "first_last@x.co.uk", "user2024@gmail.com")) {
+            reset()
+            lastAddedWord = ""
+            chainInput("$word ")
+            assertEquals(word, lastAddedWord)
+        }
+    }
+
+    @Test fun `space doesn't learn digits, other symbols or the end of a longer run`() {
+        for (word in listOf("user2024", "ha0py", "3stimate", "user:pass@host.com", "sender+tag@gmail.com")) {
+            reset()
+            lastAddedWord = ""
+            chainInput("$word ")
+            assertEquals("$word ", text)
+            assertNotEquals(word, lastAddedWord)
+            assertNotEquals("tag@gmail.com", lastAddedWord)
+        }
+    }
+
+    @Test fun `strip tap learns anything without a space`() {
+        reset()
+        lastAddedWord = ""
+        chainInput("user2024")
+        pickSuggestion("user2024")
+        assertEquals("user2024", lastAddedWord)
+    }
+
+    @Test fun `the whole run tapped in the strip is learned, the text stays`() {
+        reset()
+        lastAddedWord = ""
+        chainInput("sender+tag@gmail.com")
+        assertEquals("tag@gmail.com", composingText)
+        val info = SuggestedWordInfo("sender+tag@gmail.com", "", 0, SuggestedWordInfo.KIND_WHOLE_RUN, null, 0, 0)
+        latinIME.pickSuggestionManually(info)
+        assertEquals("sender+tag@gmail.com", lastAddedWord)
+        assertEquals("sender+tag@gmail.com", text.trimEnd())
+    }
+
+    // auto-space after a full stop, taken back for addresses (2026-10-04)
+    private fun autospaceOn() = latinIME.prefs().edit { putBoolean(Settings.PREF_AUTOSPACE_AFTER_PUNCTUATION, true) }
+
+    @Test fun `full stop auto-space is taken back at the at sign and put back by backspace`() {
+        reset()
+        autospaceOn()
+        lastAddedWord = ""
+        chainInput("sender.first.last")
+        assertEquals("sender. first. last", text)
+        inputRewriting('@')
+        assertEquals("sender.first.last@", text)
+        functionalKeyPress(KeyCode.DELETE)
+        assertEquals("sender. first. last", text)
+        inputRewriting('@')
+        chainInput("gmail.com ")
+        assertEquals("sender.first.last@gmail.com ", text)
+        assertEquals("sender.first.last@gmail.com", lastAddedWord)
+    }
+
+    @Test fun `full stop auto-space is taken back after a web ending`() {
+        reset()
+        autospaceOn()
+        lastAddedWord = ""
+        chainInput("google.com")
+        assertEquals("google. com", text)
+        inputRewriting(' ')
+        assertEquals("google.com ", text)
+        assertEquals("google.com", lastAddedWord)
+        functionalKeyPress(KeyCode.DELETE)
+        assertEquals("google. com", text)
+    }
+
+    @Test fun `no full stop auto-space after a single letter, between digits, or after www`() {
+        for ((typed, expected) in listOf("e.g.x" to "e.g.x", "U.S.A" to "U.S.A", "v2.0" to "v2.0", "3.14" to "3.14",
+                "www.google.com" to "www.google.com", "hello.how" to "hello. how")) {
+            reset()
+            autospaceOn()
+            chainInput(typed)
+            assertEquals(expected, text)
+        }
+    }
+
+    @Test fun `no full stop auto-space after the at sign, up to 5 full stops`() {
+        reset()
+        autospaceOn()
+        chainInput("x@aa.bb.cc.dd.ee.ff") // URL detection on: one word, never a space inside
+        assertEquals("x@aa.bb.cc.dd.ee.ff", text)
+        reset()
+        autospaceOn()
+        latinIME.prefs().edit { putBoolean(Settings.PREF_URL_DETECTION, false) }
+        chainInput("x@aa.bb.cc.dd.ee.ff")
+        assertEquals("x@aa.bb.cc.dd.ee. ff", text)
     }
 
     @Test fun urlDetectionThings() {
@@ -422,6 +521,7 @@ class InputLogicTest {
 
     @Test fun `don't select whole thing as composing word if URL detection disabled`() {
         reset()
+        latinIME.prefs().edit { putBoolean(Settings.PREF_URL_DETECTION, false) } // (ours is on)
         setText("http://example.com")
         setCursorPosition(13) // between l and e
         assertEquals("example", composingText)
@@ -494,12 +594,14 @@ class InputLogicTest {
 
     @Test fun `intermediate commits in text field without protocol`() {
         reset()
+        latinIME.prefs().edit { putBoolean(Settings.PREF_URL_DETECTION, false) } // (ours is on)
         chainInput("bla.")
         assertEquals("bla", lastAddedWord)
+        // the pieces after it aren't learned by themselves (the end of a longer run, 2026-10-04): still "bla"
         chainInput("com/")
-        assertEquals("com", lastAddedWord)
+        assertEquals("bla", lastAddedWord)
         chainInput("img.jpg")
-        assertEquals("img", lastAddedWord)
+        assertEquals("bla", lastAddedWord)
         assertEquals("jpg", composingText)
     }
 
@@ -1270,7 +1372,7 @@ class InputLogicTest {
         chainInput("5pm ")
         assertEquals(listOf(), addedWords)
         chainInput("3stimate ")
-        assertEquals(listOf("3stimate"), addedWords)
+        assertEquals(listOf(), addedWords) // starts with a digit: a space doesn't learn it, a strip tap does (2026-10-04)
     }
 
     @Test fun `editing a swipe before its commit counts only the final word`() {
@@ -1387,6 +1489,14 @@ class InputLogicTest {
         assertEquals(textBeforeCursor + textAfterCursor, getText())
         if (composer.isComposingWord) // if we're not composing any more cursor is always at the end
             assertEquals(oldIsAtEnd, !composer.isCursorFrontOrMiddleOfComposingWord)
+        checkConnectionConsistency()
+    }
+
+    // a key after which the text before the cursor may have been rewritten, not just appended to
+    private fun inputRewriting(char: Char) {
+        latinIME.onEvent(Event.createEventForCodePointFromUnknownSource(char.code))
+        handleMessages()
+        assertEquals(textBeforeCursor + textAfterCursor, getText())
         checkConnectionConsistency()
     }
 

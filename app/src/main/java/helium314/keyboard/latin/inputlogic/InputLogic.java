@@ -72,9 +72,12 @@ import helium314.keyboard.latin.utils.TextPlacement;
 import helium314.keyboard.latin.utils.TextRange;
 import helium314.keyboard.latin.utils.TimestampKt;
 
+import helium314.keyboard.latin.utils.WebEndings;
+
 import java.util.ArrayList;
 import java.util.Locale;
 import java.util.TreeSet;
+import java.util.regex.Pattern;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -104,6 +107,13 @@ public final class InputLogic {
     // (a swiped word brought back by swipe, space, backspace is deleted a character at a time)
     private boolean mJustSwiped = false;
     private boolean mSwipeIsFresh = false; // mJustSwiped as it was when the current key event began
+    // auto-space after a full stop (2026-10-04): what the keyboard did itself since the user's last space, to take
+    // back when the text turns out to be an address ("Sender. First. Last" + "@" -> "sender.first.last@")
+    private final ArrayList<Integer> mRunAutoSpaces = new ArrayList<>(); // where it added a space after a full stop
+    private final ArrayList<Integer> mRunAutoCaps = new ArrayList<>(); // where it capitalized a word's first letter
+    private final ArrayList<String> mRunLearnedWords = new ArrayList<>(); // what it learned meanwhile (with mRunLearnedUses)
+    private final ArrayList<Integer> mRunLearnedUses = new ArrayList<>();
+    @Nullable private CollapsedRun mCollapsedRun; // the last such take-back, for backspace on its "@" (or ending) to undo
     // This has package visibility so it can be accessed from InputLogicHandler.
     /* package */ final WordComposer mWordComposer;
     public final RichInputConnection mConnection;
@@ -187,6 +197,8 @@ public final class InputLogic {
         }
         mWordComposer.restartCombining(combiningSpec);
         resetComposingState(true /* alsoResetLastComposedWord */);
+        resetRun();
+        mCollapsedRun = null;
         mDeleteCount = 0;
         // New editor: its text has nothing to do with the old history, and deleted text must not leak into it.
         mEditHistory.clear();
@@ -357,6 +369,8 @@ public final class InputLogic {
             final SuggestedWordInfo suggestionInfo, final int keyboardShiftState,
             final String currentKeyboardScript, final LatinIME.UIHandler handler) {
         editContinues(); // picking a word replaces the one being typed: same step, but no more redo
+        if (suggestionInfo.isKindOf(SuggestedWordInfo.KIND_WHOLE_RUN))
+            return pickWholeRun(settingsValues, suggestionInfo, keyboardShiftState, handler);
         if (isInlineEmojiSearchAction()) {
             deleteTextReplacedByEmoji();
         }
@@ -435,6 +449,55 @@ public final class InputLogic {
     }
 
     /**
+     * The strip also offers everything typed since the last space when the word being typed is only its end
+     * ("sender+tag@gmail.com" while typing "tag@gmail.com": "+" ends a word), so anything without a space can be
+     * learned by a tap (2026-10-04). Not after opening punctuation alone ("(hello"), not twice.
+     */
+    private SuggestedWords withWholeRun(final SuggestedWords suggestedWords) {
+        if (!mWordComposer.isComposingWord() || mWordComposer.isBatchMode()) return suggestedWords;
+        final String before = mConnection.committedRunBeforeComposingText();
+        boolean hasLetterOrDigit = false;
+        for (int i = 0; i < before.length(); i = before.offsetByCodePoints(i, 1)) {
+            if (Character.isLetterOrDigit(before.codePointAt(i))) { hasLetterOrDigit = true; break; }
+        }
+        if (!hasLetterOrDigit) return suggestedWords;
+        final String run = before + mWordComposer.getTypedWord();
+        for (int i = 0; i < suggestedWords.size(); i++) {
+            if (run.equals(suggestedWords.getWord(i))) return suggestedWords;
+        }
+        final ArrayList<SuggestedWordInfo> infos = new ArrayList<>(suggestedWords.size() + 1);
+        for (int i = 0; i < suggestedWords.size(); i++) infos.add(suggestedWords.getInfo(i));
+        // third, after the typed word and the auto-correction (the strip drops words past twice its width)
+        infos.add(Math.min(2, infos.size()), new SuggestedWordInfo(run, "", 0, SuggestedWordInfo.KIND_WHOLE_RUN, Dictionary.DICTIONARY_USER_TYPED,
+                SuggestedWordInfo.NOT_AN_INDEX, SuggestedWordInfo.NOT_A_CONFIDENCE));
+        return new SuggestedWords(infos, suggestedWords.mRawSuggestions, suggestedWords.mTypedWordInfo,
+                suggestedWords.mTypedWordValid, suggestedWords.mWillAutoCorrect, suggestedWords.mIsObsoleteSuggestions,
+                suggestedWords.mInputStyle, suggestedWords.mSequenceNumber);
+    }
+
+    /** The whole run tapped in the strip: learned like a strip pick (+4); the text stays as typed. */
+    private InputTransaction pickWholeRun(final SettingsValues settingsValues, final SuggestedWordInfo suggestionInfo,
+            final int keyboardShiftState, final LatinIME.UIHandler handler) {
+        final Event event = Event.createSuggestionPickedEvent(suggestionInfo);
+        final InputTransaction inputTransaction = new InputTransaction(settingsValues,
+                event, SystemClock.uptimeMillis(), mSpaceState, keyboardShiftState);
+        final String run = suggestionInfo.mWord;
+        if (learnsHere(settingsValues))
+            logLearningEvent(LearningEventLog.ACCEPTED, LearningEventLog.STRIP, mWordComposer.getTypedWord(), run);
+        performAdditionToUserHistoryDictionary(settingsValues, run, NgramContext.EMPTY_PREV_WORDS_INFO,
+                PICKED_SUGGESTION_EXTRA_USES, LearningEventLog.STRIP);
+        mConnection.beginBatchEdit();
+        mConnection.finishComposingText();
+        resetComposingState(true);
+        mConnection.endBatchEdit();
+        if (settingsValues.mAutospaceAfterSuggestion)
+            mSpaceState = SpaceState.PHANTOM;
+        inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_NOW);
+        handler.postUpdateSuggestionStrip(SuggestedWords.INPUT_STYLE_NONE);
+        return inputTransaction;
+    }
+
+    /**
      * Consider an update to the cursor position. Evaluate whether this update has happened as
      * part of normal typing or whether it was an explicit cursor move by the user. In any case,
      * do the necessary adjustments.
@@ -501,7 +564,7 @@ public final class InputLogic {
             // If the user is in the middle of correcting a word, we should learn it before moving
             // the cursor away.
             if (!TextUtils.isEmpty(mWordBeingCorrectedByCursor)) {
-                if (learnsHere(settingsValues))
+                if (learnsHere(settingsValues) && !notLearnedBySpace(mWordBeingCorrectedByCursor, LearningEventLog.EDIT))
                     logLearningEvent(LearningEventLog.ACCEPTED, LearningEventLog.EDIT,
                             mEditedInPlaceWord == null ? "" : mEditedInPlaceWord, mWordBeingCorrectedByCursor);
                 // an accepted word corrected in place (it took back its use) counts like a strip pick; other words
@@ -581,6 +644,8 @@ public final class InputLogic {
         }
         mLastKeyTime = inputTransaction.getTimestamp();
         mConnection.beginBatchEdit();
+        if (processedEvent.getKeyCode() != KeyCode.DELETE && processedEvent.getCodePoint() == '@')
+            collapseRun(settingsValues, false);
         if (!mWordComposer.isComposingWord()) {
             // TODO: is this useful? It doesn't look like it should be done here, but rather after
             // a word is committed.
@@ -1215,6 +1280,9 @@ public final class InputLogic {
         if (SpaceState.PHANTOM == inputTransaction.getSpaceState()
                 && !settingsValues.isWordConnector(codePoint)
                 && !settingsValues.isUsuallyFollowedBySpace(codePoint) // only relevant in rare cases
+                // a digit after "2." is a number going on ("v2.0", "3.14"), not a new sentence
+                && !(Character.isDigit(codePoint) && mConnection.getCodePointBeforeCursor() == Constants.CODE_PERIOD
+                        && Character.isDigit(mConnection.getCharBeforeBeforeCursor()))
         ) {
             if (isComposingWord) {
                 // Sanity check
@@ -1349,6 +1417,8 @@ public final class InputLogic {
             final LatinIME.UIHandler handler) {
         final int codePoint = event.getCodePoint();
         final SettingsValues settingsValues = inputTransaction.getSettingsValues();
+        if (isWebEndingAfterAddedSpace()) collapseRun(settingsValues, true);
+        if (Character.isWhitespace(codePoint)) resetRun();
         final boolean wasComposingWord = mWordComposer.isComposingWord();
         // We avoid sending spaces in languages without spaces if we were composing.
         final boolean shouldAvoidSendingCode = Constants.CODE_SPACE == codePoint
@@ -1421,7 +1491,7 @@ public final class InputLogic {
             }
         } else {
             if (SpaceState.PHANTOM == inputTransaction.getSpaceState()
-                    && codePoint != Constants.CODE_PERIOD
+                    && !(codePoint == Constants.CODE_PERIOD && singleLetterBeforeCursor())
                     && (settingsValues.isUsuallyFollowedBySpace(codePoint) || isInsideDoubleQuoteOrAfterDigit)) {
                 // If we are in phantom space state, and the user presses a separator, we want to
                 // stay in phantom space state so that the next keypress has a chance to add the
@@ -1433,7 +1503,6 @@ public final class InputLogic {
                 // separator does not normally need a space on the right (that's the difference
                 // between swappers and strippers), so we should not stay in phantom space state if
                 // the separator is a stripper. Hence the additional test above.
-                // Period is excluded: user controls spacing after period manually.
                 mSpaceState = SpaceState.PHANTOM;
             } else {
                 // mSpaceState is still SpaceState.NONE, but some characters should typically
@@ -1443,9 +1512,13 @@ public final class InputLogic {
                 // setting phantom space state after ending a sentence with a non-word.
                 // A double quote behaves like it's usually followed by space if we're inside
                 // a double quote.
+                // a full stop too (2026-10-04; until then never: "e.g.", addresses), except after a single letter
+                // ("e.g.", "U.S."); after "www", inside an address ("@" before it) and between digits no space is added
+                // (insertAutomaticSpaceIfOptionsAndTextAllow, handleNonSeparatorEvent), and an address typed with the
+                // spaces in loses them again at its "@" or its ending (collapseRun)
                 if (wasComposingWord
                         && settingsValues.mAutospaceAfterPunctuation
-                        && codePoint != Constants.CODE_PERIOD
+                        && !(codePoint == Constants.CODE_PERIOD && singleLetterBeforeCursor())
                         && (settingsValues.isUsuallyFollowedBySpace(codePoint) || isInsideDoubleQuoteOrAfterDigit)) {
                     mSpaceState = SpaceState.PHANTOM;
                 }
@@ -1476,6 +1549,11 @@ public final class InputLogic {
             final String currentKeyboardScript) {
         mSpaceState = SpaceState.NONE;
         mDeleteCount++;
+        if (!event.isKeyRepeat() && restoreCollapsedRun(inputTransaction.getSettingsValues())) {
+            inputTransaction.setRequiresUpdateSuggestions();
+            inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_NOW);
+            return;
+        }
 
         // Word-level delete when backspace is held: each repeat tick removes the
         // previous word (plus any trailing whitespace/punctuation) instead of one char.
@@ -2154,6 +2232,7 @@ public final class InputLogic {
             mDictionaryFacilitator.adjustConfidences(word, wasAutoCapitalized);
             return;
         }
+        if (notLearnedBySpace(word, origin)) return;
         final int timeStampInSeconds = (int)TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis());
         if (extraUses == 0)
             mDictionaryFacilitator.addToUserHistory(word, wasAutoCapitalized, ngramContext,
@@ -2161,6 +2240,21 @@ public final class InputLogic {
         else mDictionaryFacilitator.addToUserHistory(word, wasAutoCapitalized, ngramContext,
                 timeStampInSeconds, settingsValues.mBlockPotentiallyOffensive, extraUses);
         recordLearning(word, 1 + extraUses, origin, wasAutoCapitalized, ngramContext);
+        mRunLearnedWords.add(word);
+        mRunLearnedUses.add(1 + extraUses);
+    }
+
+    // what a space (punctuation, an edit) learns: letters, with ' - . between them (don't, well-known, hello.world,
+    // google.com; an apostrophe may also start or end it: 'til, students'), or an email address (letters, digits and
+    // . _ - around the @). A tap in the strip learns anything without a space (2026-10-04).
+    private static final Pattern LEARNED_BY_SPACE = Pattern.compile(
+            "['\u2019]?[\\p{L}\\p{M}]+(?:['\u2019.\\-][\\p{L}\\p{M}]+)*['\u2019]?"
+            + "|[\\p{L}\\p{M}0-9._\\-]+@[\\p{L}\\p{M}0-9._\\-]+");
+
+    /** Whether [word], committed from [origin], is learned: anything picked from the strip, else [LEARNED_BY_SPACE]. */
+    private static boolean notLearnedBySpace(final String word, final String origin) {
+        if (LearningEventLog.STRIP.equals(origin) || LearningEventLog.PREDICTION.equals(origin)) return false;
+        return !LEARNED_BY_SPACE.matcher(word).matches();
     }
 
     // strip word separators from end (may be necessary for urls, e.g. when the user has typed
@@ -2225,7 +2319,7 @@ public final class InputLogic {
             // Prefer clipboard suggestions (if available and setting is enabled) over beginning of sentence predictions.
             if (!(suggestedWords.mInputStyle == SuggestedWords.INPUT_STYLE_BEGINNING_OF_SENTENCE_PREDICTION
                     && mLatinIME.tryShowClipboardSuggestion())) {
-                mSuggestionStripViewAccessor.setSuggestions(suggestedWords);
+                mSuggestionStripViewAccessor.setSuggestions(withWholeRun(suggestedWords));
             }
             if (! suggestedWords.isEmpty() && settingsValues.isSuggestionsEnabledPerUserSettings() && isInlineEmojiSearchAction()) {
                 mSuggestionStripViewAccessor.showSuggestionStrip();
@@ -2641,6 +2735,8 @@ public final class InputLogic {
     // TODO: how is this different from startInput ?!
     private void resetEntireInputState(final int newSelStart, final int newSelEnd,
             final boolean clearSuggestionStrip) {
+        resetRun(); // the cursor went elsewhere: positions noted for the run no longer hold
+        mCollapsedRun = null;
         final boolean shouldFinishComposition = mWordComposer.isComposingWord();
         resetComposingState(true /* alsoResetLastComposedWord */);
         if (clearSuggestionStrip) {
@@ -2761,6 +2857,172 @@ public final class InputLogic {
      *
      * @param settingsValues the current values of the settings.
      */
+    // ---- auto-space after a full stop, taken back for addresses (2026-10-04) ----
+    //  "sender.first.last" shows as "Sender. First. Last" (space and capital as after any sentence); typing "@" takes back
+    //  every space and capital the keyboard added since the user's own last space ("sender.first.last@"), backspace on
+    //  that "@" brings them back. After an "@" no space is added (up to 5 full stops: mail.example.whatever.co.uk). A web
+    //  ending that isn't a word ("com", "org", "uk"; not "net", "in") finished right after an added space does the same
+    //  ("google. Com" + space -> "google.com "). Words learned along the way are taken back, the address is learned whole.
+
+    /** The text before the cursor ends in a single letter after no letter ("e.", "U.S"): an abbreviation's full stop. */
+    private boolean singleLetterBeforeCursor() {
+        final CharSequence before = mConnection.getTextBeforeCursor(3, 0);
+        if (before == null || before.length() == 0) return false;
+        final int last = Character.codePointBefore(before, before.length());
+        if (!Character.isLetter(last)) return false;
+        final int start = before.length() - Character.charCount(last);
+        return start == 0 || !Character.isLetter(Character.codePointBefore(before, start));
+    }
+
+    /** Letters or digits are glued before the word being typed: it's only the end of what was typed without a space. */
+    private boolean composingEndsLongerRun() {
+        final String before = mConnection.committedRunBeforeComposingText();
+        for (int i = 0; i < before.length(); i = before.offsetByCodePoints(i, 1)) {
+            if (Character.isLetterOrDigit(before.codePointAt(i))) return true;
+        }
+        return false;
+    }
+
+    private void resetRun() {
+        mRunAutoSpaces.clear();
+        mRunAutoCaps.clear();
+        mRunLearnedWords.clear();
+        mRunLearnedUses.clear();
+    }
+
+    /** The word being typed is a web ending ("Com") right after a space the keyboard added after a full stop. */
+    private boolean isWebEndingAfterAddedSpace() {
+        if (mRunAutoSpaces.isEmpty() || !mWordComposer.isComposingWord() || mWordComposer.isBatchMode()
+                || mWordComposer.isCursorFrontOrMiddleOfComposingWord() || mConnection.hasSelection()) return false;
+        final String word = mWordComposer.getTypedWord();
+        final int wordStart = mConnection.getExpectedSelectionStart() - word.length();
+        if (!mRunAutoSpaces.contains(wordStart - 1)) return false;
+        if (!WebEndings.INSTANCE.isWebEnding(mLatinIME, word)) return false;
+        return !mDictionaryFacilitator.isMainDictionaryWord(word);
+    }
+
+    /** What a take-back changed, for backspace on its "@" or ending to put back. */
+    private static final class CollapsedRun {
+        final int start; // where the changed text starts
+        final String before; // the text as it was, from start to the cursor
+        final String after; // the text after the take-back, from start to the cursor (then comes the "@" or separator)
+        final ArrayList<Integer> spaces, caps;
+        final ArrayList<String> unlearned; // taken back (with unlearnedUses), learned again on restore
+        final ArrayList<Integer> unlearnedUses;
+        @Nullable final String learned; // the address learned whole, taken back on restore
+        CollapsedRun(int start, String before, String after, ArrayList<Integer> spaces, ArrayList<Integer> caps,
+                ArrayList<String> unlearned, ArrayList<Integer> unlearnedUses, @Nullable String learned) {
+            this.start = start; this.before = before; this.after = after; this.spaces = spaces; this.caps = caps;
+            this.unlearned = unlearned; this.unlearnedUses = unlearnedUses; this.learned = learned;
+        }
+    }
+
+    /**
+     * Takes back the spaces and capitals the keyboard added since the user's last space (see above), before "@" is
+     * typed or, with [learnWhole], before the separator after a web ending (then the address is learned as one word).
+     */
+    private void collapseRun(final SettingsValues settingsValues, final boolean learnWhole) {
+        if (mRunAutoSpaces.isEmpty() || mConnection.hasSelection()) return;
+        if (mWordComposer.isComposingWord() && (mWordComposer.isBatchMode() || mWordComposer.isCursorFrontOrMiddleOfComposingWord()))
+            return;
+        final int cursor = mConnection.getExpectedSelectionStart();
+        // the word being typed: its capital counts too, then it's left as plain text (not learned on its own)
+        if (mWordComposer.isComposingWord()) {
+            final String typed = mWordComposer.getTypedWord();
+            if (mWordComposer.wasAutoCapitalized() && !typed.isEmpty() && Character.isUpperCase(typed.codePointAt(0)))
+                mRunAutoCaps.add(cursor - typed.length());
+            mConnection.finishComposingText();
+            resetComposingState(true);
+        }
+        int start = cursor;
+        for (final int p : mRunAutoSpaces) start = Math.min(start, p);
+        for (final int p : mRunAutoCaps) start = Math.min(start, p);
+        if (start < 0 || start >= cursor) { resetRun(); return; }
+        final CharSequence text = mConnection.getTextBeforeCursor(cursor - start, 0);
+        if (text == null || text.length() != cursor - start) { resetRun(); return; }
+        final String before = text.toString();
+        final StringBuilder after = new StringBuilder(before.length());
+        for (int i = 0; i < before.length(); ) {
+            final int cp = before.codePointAt(i);
+            final int pos = start + i;
+            if (cp == Constants.CODE_SPACE && mRunAutoSpaces.contains(pos)) {
+                // dropped
+            } else if (mRunAutoCaps.contains(pos) && Character.isUpperCase(cp)) {
+                after.appendCodePoint(Character.toLowerCase(cp));
+            } else after.appendCodePoint(cp);
+            i += Character.charCount(cp);
+        }
+        // the words learned along the way were pieces of the address
+        final ArrayList<String> unlearned = new ArrayList<>(mRunLearnedWords);
+        final ArrayList<Integer> unlearnedUses = new ArrayList<>(mRunLearnedUses);
+        if (learnsHere(settingsValues)) {
+            for (int i = 0; i < unlearned.size(); i++) {
+                final String w = unlearned.get(i);
+                logLearningEvent(LearningEventLog.ACCEPTED_EDITED, LearningEventLog.EDIT, w, "");
+                for (int u = 0; u < unlearnedUses.get(i); u++) mDictionaryFacilitator.unlearnOneUse(w);
+                recordLearning(w, -unlearnedUses.get(i), LearningEventLog.EDIT, false, NgramContext.EMPTY_PREV_WORDS_INFO);
+            }
+        }
+        mConnection.deleteTextBeforeCursor(before.length());
+        mConnection.commitText(after, 1);
+        final ArrayList<Integer> spaces = new ArrayList<>(mRunAutoSpaces), caps = new ArrayList<>(mRunAutoCaps);
+        resetRun();
+        String learned = null;
+        if (learnWhole) {
+            final String whole = mConnection.committedRunBeforeComposingText();
+            if (!whole.isEmpty()) {
+                performAdditionToUserHistoryDictionary(settingsValues, whole, NgramContext.EMPTY_PREV_WORDS_INFO, 0,
+                        LearningEventLog.TYPED);
+                learned = whole;
+                resetRun(); // (performAddition noted it for the run: this run is over)
+            }
+        }
+        mCollapsedRun = new CollapsedRun(start, before, after.toString(), spaces, caps, unlearned, unlearnedUses, learned);
+        mSpaceState = SpaceState.NONE;
+    }
+
+    /** Backspace right after the "@" or separator that took the spaces back: puts them (and the capitals) back. */
+    private boolean restoreCollapsedRun(final SettingsValues settingsValues) {
+        final CollapsedRun run = mCollapsedRun;
+        if (run == null || mConnection.hasSelection()) return false;
+        if (mWordComposer.isComposingWord() && mWordComposer.isCursorFrontOrMiddleOfComposingWord()) return false;
+        final int cursor = mConnection.getExpectedSelectionStart();
+        final int triggerEnd = cursor - run.start; // the changed text plus its "@" or separator
+        if (triggerEnd <= run.after.length()) return false;
+        final CharSequence text = mConnection.getTextBeforeCursor(triggerEnd, 0);
+        if (text == null || text.length() != triggerEnd || !text.toString().startsWith(run.after)) return false;
+        final String trigger = text.toString().substring(run.after.length());
+        if (trigger.codePointCount(0, trigger.length()) != 1) return false;
+        mCollapsedRun = null;
+        if (mWordComposer.isComposingWord()) {
+            mConnection.finishComposingText();
+            resetComposingState(true);
+        }
+        mConnection.deleteTextBeforeCursor(triggerEnd);
+        mConnection.commitText(run.before, 1);
+        if (learnsHere(settingsValues)) {
+            if (run.learned != null) {
+                mDictionaryFacilitator.unlearnOneUse(run.learned);
+                recordLearning(run.learned, -1, LearningEventLog.EDIT, false, NgramContext.EMPTY_PREV_WORDS_INFO);
+            }
+            final int now = (int) TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis());
+            for (int i = 0; i < run.unlearned.size(); i++) {
+                final int uses = run.unlearnedUses.get(i);
+                if (uses <= 1) mDictionaryFacilitator.addToUserHistory(run.unlearned.get(i), false,
+                        NgramContext.EMPTY_PREV_WORDS_INFO, now, settingsValues.mBlockPotentiallyOffensive);
+                else mDictionaryFacilitator.addToUserHistory(run.unlearned.get(i), false,
+                        NgramContext.EMPTY_PREV_WORDS_INFO, now, settingsValues.mBlockPotentiallyOffensive, uses - 1);
+                recordLearning(run.unlearned.get(i), uses, LearningEventLog.EDIT, false, NgramContext.EMPTY_PREV_WORDS_INFO);
+            }
+        }
+        resetRun();
+        mRunAutoSpaces.addAll(run.spaces);
+        mRunAutoCaps.addAll(run.caps);
+        mRunLearnedWords.addAll(run.unlearned);
+        mRunLearnedUses.addAll(run.unlearnedUses);
+        return true;
+    }
+
     private void insertAutomaticSpaceIfOptionsAndTextAllow(final SettingsValues settingsValues) {
         if (settingsValues.shouldInsertSpacesAutomatically()
                 && settingsValues.mSpacingAndPunctuations.mCurrentLanguageHasSpaces
@@ -2768,6 +3030,8 @@ public final class InputLogic {
                 && !mConnection.textBeforeCursorLooksLikeURL() // adding this check to textBeforeCursorMayBeUrlOrSimilar might not be wanted for word continuation (see effect on unit tests)
                 && !(mConnection.getCodePointBeforeCursor() == Constants.CODE_PERIOD && mConnection.wordBeforeCursorMayBeEmail())
         ) {
+            if (mConnection.getCodePointBeforeCursor() == Constants.CODE_PERIOD && !mConnection.hasSelection())
+                mRunAutoSpaces.add(mConnection.getExpectedSelectionStart());
             mConnection.commitCodePoint(Constants.CODE_SPACE);
             // todo: why not remove phantom space state?
         }
@@ -2946,7 +3210,13 @@ public final class InputLogic {
         }
         // a word typed right after a digit ("pm" in "5pm", "st" in "1st"; a single digit before 3 letters is part of the
         // word, see composeLeadingDigitIfNeeded) is no word on its own: nothing is learned from it
-        final boolean afterDigit = mConnection.isComposingTextAfterDigit();
+        final boolean afterDigit = mConnection.isComposingTextAfterDigit()
+                // only the end of a longer run without a space ("tag@gmail.com" of "sender+tag@gmail.com"): a space
+                // doesn't learn the piece, the strip offers the whole run (withWholeRun; 2026-10-04)
+                || commitType != LastComposedWord.COMMIT_TYPE_MANUAL_PICK && composingEndsLongerRun();
+        if (mWordComposer.wasAutoCapitalized() && !mWordComposer.isCursorFrontOrMiddleOfComposingWord()
+                && !chosenWord.isEmpty() && Character.isUpperCase(chosenWord.codePointAt(0)))
+            mRunAutoCaps.add(mConnection.getExpectedSelectionStart() - mWordComposer.getTypedWord().length());
         mConnection.commitText(chosenWordWithSuggestions, 1);
         if (DebugFlags.DEBUG_ENABLED) {
             long runTimeMillis = SystemClock.elapsedRealtime() - startTimeMillis;
@@ -2964,7 +3234,7 @@ public final class InputLogic {
         final boolean reAccepted = resumedFrom != null && resumedFrom.equals(chosenWord)
                 && commitType != LastComposedWord.COMMIT_TYPE_MANUAL_PICK;
         final String origin = learningOrigin(commitType, chosenWord);
-        if (!afterDigit && learnsHere(settingsValues) && LearningEventLog.isEnabled()) {
+        if (!afterDigit && !notLearnedBySpace(chosenWord, origin) && learnsHere(settingsValues) && LearningEventLog.isEnabled()) {
             final String event;
             final String before;
             if (reAccepted) {

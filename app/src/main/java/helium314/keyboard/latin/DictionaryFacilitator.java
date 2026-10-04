@@ -169,6 +169,10 @@ public interface DictionaryFacilitator {
      *  edited later): its count goes down by one, never below 0, and the word stays stored. */
     default void unlearnOneUse(final String word) {}
 
+    /** Whether [word] (or its lowercase) is in the main dictionary of one of the keyboard's languages: learned and
+     *  personal words don't count. */
+    default boolean isMainDictionaryWord(final String word) { return false; }
+
     /** How often [word] was learned (in the learned words of its script; as written, else lowercase), -1 if it isn't stored. */
     default int getLearnedCount(final String word) {
         return -1;

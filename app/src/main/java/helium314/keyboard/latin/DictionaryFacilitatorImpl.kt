@@ -773,6 +773,14 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         return maxOf(dict.getFrequency(word), dict.getFrequency(word.lowercase(locale)))
     }
 
+    override fun isMainDictionaryWord(word: String): Boolean {
+        if (word.isEmpty()) return false
+        return dictionaryGroups.any { group ->
+            val main = group.getDict(Dictionary.TYPE_MAIN) ?: return@any false
+            main.isValidWord(word) || main.isValidWord(word.lowercase(group.locale))
+        }
+    }
+
     // this is unused, so leave it for now (redirecting to isValidWord seems to defeat the purpose...)
     override fun isValidSuggestionWord(word: String): Boolean {
         return isValidWord(word, DictionaryFacilitator.ALL_DICTIONARY_TYPES, dictionaryGroups[0])
