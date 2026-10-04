@@ -394,8 +394,9 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         }
         // We demote unrecognized words (frequency <= 0) by specifying them as "invalid".
         // We don't add words with 0-frequency (assuming they would be profanity etc.).
-        // A dictionary word removed with long-press is learned like a new word too.
-        val isValid = mainFreq > 0 && !dictionaryGroup.isBlacklisted(wordToUse)
+        // A dictionary word removed with long-press is learned like a new word too (its first use again restores it,
+        // see isRestored: from then on it's learned as the real word it is).
+        val isValid = mainFreq > 0 && (!dictionaryGroup.isBlacklisted(wordToUse) || isRestored(wordToUse))
         UserHistoryDictionary.addToDictionary(userHistoryDictionary, ngramContext, wordToUse, isValid, timeStampInSeconds)
         // each further use raises the word's level once more (the word alone: the word pair was counted above)
         repeat(extraUses) {
@@ -589,8 +590,26 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         val valid = mValidSpellingWordReadCache?.get(word)
             ?: dictionaryGroups.any { isValidWord(word, DictionaryFacilitator.ALL_DICTIONARY_TYPES, it) }
                 .also { mValidSpellingWordReadCache?.put(word, it) }
-        // (not cached: it changes as the word is typed, and with the setting)
-        return valid || isTrustedWord(word)
+        // (not cached: they change as the word is typed, and with the setting)
+        return valid || isTrustedWord(word) || isRestoredWord(word)
+    }
+
+    // A removed word typed again since (it's in the learned words, in any capitalization): restored. The removed list
+    // still keeps the dictionary's own copy out of the suggestions, so its place there comes from the learned copy
+    // alone, starting at the bottom like a new word; typed, it's a real word (not corrected, not underlined).
+    private fun isRestored(word: String): Boolean {
+        val lower = word.lowercase()
+        return dictionaryGroups.any { group ->
+            val history = group.getSubDict(Dictionary.TYPE_USER_HISTORY) ?: return@any false
+            history.getLearnedCount(word) >= 0 || (lower != word && history.getLearnedCount(lower) >= 0)
+        }
+    }
+
+    override fun isRestoredWord(word: String): Boolean {
+        if (word.isEmpty() || !(isBlacklisted(word) || isBlacklisted(word.lowercase()))) return false
+        val lower = word.lowercase()
+        return isRestored(word) && dictionaryGroups.any { g ->
+            g.getDict(Dictionary.TYPE_MAIN)?.let { it.isValidWord(word) || it.isValidWord(lower) } == true }
     }
 
     // typed N times: a word that isn't a dictionary word is stored at count 0 by its first use, so count N - 1 (and a
@@ -627,9 +646,8 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
 
     private fun isBlacklisted(word: String): Boolean = dictionaryGroups.any { it.isBlacklisted(word) }
 
-    // removed with long-press and not typed again since (typed again, it's a learned word like any other)
-    override fun isRemovedWord(word: String): Boolean = (isBlacklisted(word) || isBlacklisted(word.lowercase()))
-        && dictionaryGroups.none { it.getSubDict(Dictionary.TYPE_USER_HISTORY)?.isInDictionary(word) == true }
+    // removed with long-press and not typed again since (typed again, it's restored: see isRestored)
+    override fun isRemovedWord(word: String): Boolean = (isBlacklisted(word) || isBlacklisted(word.lowercase())) && !isRestored(word)
 
     override fun removeWord(word: String) {
         for (dictionaryGroup in dictionaryGroups) {
@@ -870,20 +888,6 @@ private class DictionaryGroup(
                     blacklistFile.appendText("$word\n")
                 } catch (e: IOException) {
                     Log.e(TAG, "Exception while trying to add word \"$word\" to blacklist ${blacklistFile.name}", e)
-                }
-            }
-        }
-    }
-
-    fun removeFromBlacklist(word: String) {
-        if (!blacklist.remove(word) || blacklistFile == null) return
-        scope.launch {
-            synchronized(this) {
-                try {
-                    val newLines = blacklistFile.readLines().filterNot { it == word }
-                    blacklistFile.writeText(newLines.joinToString("\n"))
-                } catch (e: IOException) {
-                    Log.e(TAG, "Exception while trying to remove word \"$word\" to blacklist ${blacklistFile.name}", e)
                 }
             }
         }

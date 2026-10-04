@@ -38,6 +38,9 @@ public interface DictionaryFacilitator {
      *  alone and the spell checker counts it as spelled right. */
     default boolean isTrustedWord(final String word) { return false; }
 
+    /** A dictionary word the user removed and has typed again since: a real word again (ranked as a new learned word). */
+    default boolean isRestoredWord(final String word) { return false; }
+
     String[] ALL_DICTIONARY_TYPES = new String[] {
             Dictionary.TYPE_MAIN,
             Dictionary.TYPE_CONTACTS,

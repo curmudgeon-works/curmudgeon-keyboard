@@ -249,8 +249,9 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
         // We allow auto-correction if whitelisting is not required or the word is whitelisted,
         // or if the word had more than one char and was not suggested.
         val allowsToBeAutoCorrected: Boolean
-        if (mDictionaryFacilitator.isTrustedWord(consideredWord)) {
-            allowsToBeAutoCorrected = false // typed often enough to be yours ("Trust words you've typed N+ times")
+        if (mDictionaryFacilitator.isTrustedWord(consideredWord) || mDictionaryFacilitator.isRestoredWord(consideredWord)) {
+            // typed often enough to be yours ("Trust words you've typed N+ times"), or a removed word you've brought back
+            allowsToBeAutoCorrected = false
         } else if (SHOULD_AUTO_CORRECT_USING_NON_WHITE_LISTED_SUGGESTION
                 || firstSuggestionInContainer?.isKindOf(SuggestedWordInfo.KIND_WHITELIST) == true
                 || (consideredWord.length > 1
