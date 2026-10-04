@@ -829,6 +829,7 @@ class InputLogicTest {
         assertEquals("hello ", text)
         assertEquals(listOf("helo"), unlearnedWords)
         assertEquals("hello", lastAddedWord)
+        assertEquals(3, helium314.keyboard.latin.ShadowFacilitator2.lastAddedExtraUses) // corrected by hand: like a strip pick
     }
 
     @Test fun `picking the picked up word again from the strip counts like any strip pick`() {
@@ -879,6 +880,7 @@ class InputLogicTest {
         assertEquals(listOf("helo"), unlearnedWords)
         setCursorPosition(text.length)
         assertEquals("hello", lastAddedWord)
+        assertEquals(3, helium314.keyboard.latin.ShadowFacilitator2.lastAddedExtraUses) // corrected by hand: like a strip pick
     }
 
     @Test fun `a word still being typed takes nothing back when changed in the middle`() {
@@ -901,6 +903,7 @@ class InputLogicTest {
         setCursorPosition(text.length) // a tap elsewhere: the edit is over
         assertEquals(listOf("hello"), unlearnedWords)
         assertEquals(listOf("hello", "world", "hellp"), addedWords)
+        assertEquals(3, helium314.keyboard.latin.ShadowFacilitator2.lastAddedExtraUses) // corrected by hand: like a strip pick
         input(' ')
         assertEquals(listOf("hello"), unlearnedWords)
         assertEquals(listOf("hello", "world", "hellp"), addedWords)
@@ -1518,6 +1521,7 @@ class ShadowFacilitator2 {
                          ngramContext: NgramContext, timeStampInSeconds: Long,
                          blockPotentiallyOffensive: Boolean) {
         lastAddedWord = suggestion
+        lastAddedExtraUses = 0
         addedWords.add(suggestion)
     }
     // a picked suggestion is learned with extra uses

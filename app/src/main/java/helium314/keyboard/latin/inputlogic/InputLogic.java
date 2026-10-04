@@ -498,8 +498,10 @@ public final class InputLogic {
                 if (learnsHere(settingsValues))
                     logLearningEvent(LearningEventLog.ACCEPTED, LearningEventLog.EDIT,
                             mEditedInPlaceWord == null ? "" : mEditedInPlaceWord, mWordBeingCorrectedByCursor);
+                // an accepted word corrected in place (it took back its use) counts like a strip pick; other words
+                // changed in place as before
                 performAdditionToUserHistoryDictionary(settingsValues, mWordBeingCorrectedByCursor,
-                        NgramContext.EMPTY_PREV_WORDS_INFO);
+                        NgramContext.EMPTY_PREV_WORDS_INFO, mEditedInPlaceWord != null ? PICKED_SUGGESTION_EXTRA_USES : 0);
             }
             mEditedInPlaceWord = null; // the cursor left the word: the edit is over
         } else {
@@ -1846,7 +1848,9 @@ public final class InputLogic {
         if (resumedFrom == null || resumedFrom.startsWith(word) || !learnsHere(settingsValues)) return;
         logLearningEvent(LearningEventLog.ACCEPTED_EDITED, LearningEventLog.EDIT, resumedFrom, word);
         mDictionaryFacilitator.unlearnOneUse(resumedFrom);
-        performAdditionToUserHistoryDictionary(settingsValues, word, NgramContext.EMPTY_PREV_WORDS_INFO);
+        // corrected by hand: as deliberate as a strip pick (2026-10-04)
+        performAdditionToUserHistoryDictionary(settingsValues, word, NgramContext.EMPTY_PREV_WORDS_INFO,
+                PICKED_SUGGESTION_EXTRA_USES);
     }
 
     /** A line in the corrections log, if it's on: call before the change, the counts before are read now (the counts
@@ -2911,7 +2915,8 @@ public final class InputLogic {
         // Add the word to the user history dictionary
         if (!reAccepted && !afterDigit)
             performAdditionToUserHistoryDictionary(settingsValues, chosenWord, ngramContext,
-                    commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK ? PICKED_SUGGESTION_EXTRA_USES : 0);
+                    // a strip pick, or an accepted word corrected by hand: deliberate, extra uses
+                    commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK || editedAccepted ? PICKED_SUGGESTION_EXTRA_USES : 0);
         if (DebugFlags.DEBUG_ENABLED) {
             long runTimeMillis = SystemClock.elapsedRealtime() - startTimeMillis;
             Log.d(TAG, "commitChosenWord() : " + runTimeMillis + " ms to run "
