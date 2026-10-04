@@ -102,6 +102,7 @@ fun AdvancedSettingsScreen(
         SettingsWithoutKey.FACTORY_RESET,
         if (BuildConfig.DEBUG || prefs.getBoolean(DebugSettings.PREF_SHOW_DEBUG_SETTINGS, Defaults.PREF_SHOW_DEBUG_SETTINGS))
             SettingsWithoutKey.DEBUG_SETTINGS else null,
+        SettingsWithoutKey.ABOUT_SCREEN, // last (moved from the main screen, 2026-10-04)
         // (once under Experimental; the emoji version is on Appearance's Emoji group, next to the emoji font, URL
         //  detection on Text correction's Correction group)
         // (recording the swipe corpus and logging swipe results: on the Swipe screen, Swipe logging)
@@ -240,6 +241,13 @@ fun createAdvancedSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_REDO_UNIT, R.string.redo_unit) {
         UnitChoiceRow(it, Defaults.PREF_REDO_UNIT)
+    },
+    Setting(context, SettingsWithoutKey.ABOUT_SCREEN, R.string.settings_screen_about) {
+        Preference(
+            name = it.title,
+            onClick = { SettingsDestination.navigateTo(SettingsDestination.About) },
+            icon = R.drawable.ic_settings_about
+        ) { NextScreenIcon() }
     },
     Setting(context, SettingsWithoutKey.DEBUG_SETTINGS, R.string.debug_settings_title) {
         Preference(

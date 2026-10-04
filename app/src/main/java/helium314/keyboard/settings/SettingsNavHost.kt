@@ -69,10 +69,7 @@ fun SettingsNavHost(
         popExitTransition = { slideOutHorizontally(targetOffsetX = { +it * dir }, animationSpec = animation) }
     ) {
         composable(SettingsDestination.Keyboards) {
-            KeyboardsScreen(
-                onClickAbout = { navController.navigate(SettingsDestination.About) },
-                onClickBack = ::goBack,
-            )
+            KeyboardsScreen(onClickBack = ::goBack)
         }
         composable(SettingsDestination.Languages + "{keyboard}") {
             LanguageListScreen(initialKeyboard = it.arguments?.getString("keyboard")!!.toSettingsSubtype(), onClickBack = ::goBack)

@@ -76,7 +76,6 @@ import helium314.keyboard.settings.preferences.Preference
  */
 @Composable
 fun KeyboardsScreen(
-    onClickAbout: () -> Unit,
     onClickBack: () -> Unit,
 ) {
     val ctx = LocalContext.current
@@ -227,11 +226,7 @@ fun KeyboardsScreen(
                     )
                 // with separate settings: Advanced once, for all keyboards (its settings are app-wide)
                 if (separate) AdvancedEntry()
-                Preference(
-                    name = stringResource(R.string.settings_screen_about),
-                    onClick = onClickAbout,
-                    icon = R.drawable.ic_settings_about
-                ) { NextScreenIcon() }
+                // (About: the last row of Advanced, 2026-10-04)
             }
         }
         val enabledNow = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }
