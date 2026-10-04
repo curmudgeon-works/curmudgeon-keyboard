@@ -121,6 +121,17 @@ class InputLogicTest {
         assertEquals("there", composingText)
     }
 
+    // a digit mistapped inside a word ("Ha0py" for happy): space + backspace brings back the whole word for its
+    // suggestions, not just "py" after the digit
+    @Test fun `delete after a word with a digit resumes the whole word`() {
+        reset()
+        chainInput("Ha0py ")
+        functionalKeyPress(KeyCode.DELETE)
+        assertEquals("Ha0py", text)
+        assertEquals("Ha0py", composingText)
+        assertEquals("Ha0py", composer.typedWord)
+    }
+
     @Test fun deleteInsideWord() {
         reset()
         setText("hello you there")

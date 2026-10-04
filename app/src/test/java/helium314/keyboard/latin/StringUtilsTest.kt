@@ -91,6 +91,15 @@ class StringUtilsTest {
         checkTextRange("(hi", ")", sp, script, 1, 3)
         checkTextRange("", "word", sp, script, 0, 4)
 
+        // a digit inside a word is part of it, as when typing it ("Ha0py": a mistap on the number row); not at its start
+        checkTextRange("so Ha0py", "", sp, script, 3, 8)
+        checkTextRange("so Ha0", "py", sp, script, 3, 8)
+        checkTextRange("so Ha", "0py now", sp, script, 3, 8)
+        checkTextRange("th3", "", sp, script, 0, 3)
+        checkTextRange("at 5pm", "", sp, script, 4, 6)
+        checkTextRange("in 2024", "", sp, script, 7, 7)
+        checkTextRange("in ", "2024", sp, script, 3, 3)
+
         checkTextRange("mail: blorb@", "florb.com or", sp, script, 12, 17)
         checkTextRange("mail: blorb@", "florb.com or", spUrl, script, 6, 21)
         checkTextRange("mail: blor", "b@florb.com or", sp, script, 6, 11)
