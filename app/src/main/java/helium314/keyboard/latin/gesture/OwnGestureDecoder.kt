@@ -59,15 +59,16 @@ object OwnGestureDecoder {
             (if (Math.round(fastFrom * 10) / 10f != Defaults.PREF_GESTURE_FAST_SPEED) String.format(Locale.ROOT, " V%.1f", fastFrom) else "")
 
         /** The tuning as the sliders show it: each value 0 to 1 over its slider's range ([RANGES] order). */
-        val shown: List<Float> get() = listOf(turn, slowdown, kushler, historyBoost.toFloat(), fastFrom, fastCommon, cornerMiss)
+        val shown: List<Float> get() = listOf(turn, slowdown, kushler, historyBoost.toFloat(), fastCommon, cornerMiss, fastFrom)
             .zip(RANGES) { v, top -> v / top }
         override fun equals(other: Any?) = other is Tuning && other.key == key
         override fun hashCode() = key.hashCode()
 
         companion object {
-            /** Each slider's top (its bottom is 0): turns, slowdowns, blend, learned-word boost, fast-swipe speed (key
-             *  widths per second), fast swipes and common words, fast swipes and corners. Shown 0 to 1 over these. */
-            val RANGES = listOf(1.5f, 1f, 1f, 128f, 40f, 0.2f, 0.2f)
+            /** Each slider's top (its bottom is 0), in slider order: turns, slowdowns, blend, learned-word boost, fast
+             *  swipes and common words, fast swipes and corners, fast swipe threshold (key widths per second, the 7th
+             *  parameter). Shown 0 to 1 over these. */
+            val RANGES = listOf(1.5f, 1f, 1f, 128f, 0.2f, 0.2f, 40f)
 
             val DEFAULT = Tuning(Defaults.PREF_GESTURE_TURN_WEIGHT,
                 Defaults.PREF_GESTURE_SLOWDOWN_WEIGHT, Defaults.PREF_GESTURE_KUSHLER_WEIGHT, Defaults.PREF_GESTURE_HISTORY_BOOST)

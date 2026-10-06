@@ -126,13 +126,13 @@ fun LearningSwipingScreen(onClickBack: () -> Unit) {
                 WeightSlider(draft.pending, Settings.PREF_GESTURE_KUSHLER_WEIGHT, Defaults.PREF_GESTURE_KUSHLER_WEIGHT, R.string.swipe_tuning_blend, 0f..1f,
                     R.string.swipe_tuning_blend_summary)
                 BoostSlider(draft.pending)
-                // what counts as a fast swipe: the two sliders after it start at this speed (2026-10-06)
-                WeightSlider(draft.pending, Settings.PREF_GESTURE_FAST_SPEED, Defaults.PREF_GESTURE_FAST_SPEED, R.string.swipe_tuning_fast_speed,
-                    0f..OwnGestureDecoder.Tuning.RANGES[4], R.string.swipe_tuning_fast_speed_summary)
                 WeightSlider(draft.pending, Settings.PREF_GESTURE_FAST_COMMON_WORDS, Defaults.PREF_GESTURE_FAST_COMMON_WORDS, R.string.swipe_tuning_fast_common,
                     0f..0.2f, R.string.swipe_tuning_fast_common_summary, decimals = 2)
                 WeightSlider(draft.pending, Settings.PREF_GESTURE_CORNER_MISS, Defaults.PREF_GESTURE_CORNER_MISS, R.string.swipe_tuning_corner_miss,
                     0f..0.2f, R.string.swipe_tuning_corner_miss_summary, decimals = 2)
+                // the fast swipe threshold, last as the 7th parameter (2026-10-06): the two sliders above start at this speed
+                WeightSlider(draft.pending, Settings.PREF_GESTURE_FAST_SPEED, Defaults.PREF_GESTURE_FAST_SPEED, R.string.swipe_tuning_fast_speed,
+                    0f..OwnGestureDecoder.Tuning.RANGES[6], R.string.swipe_tuning_fast_speed_summary)
             } }
 
             PreferenceCategory(stringResource(R.string.swipe_tuning_stats))

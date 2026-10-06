@@ -355,9 +355,9 @@
     <string name="swipe_tuning_fast_common">Fast swipes prioritize common words</string>
     <string name="swipe_tuning_fast_common_summary">The faster you swipe, the more common words win</string>
     <string name="swipe_tuning_fast_speed">Fast swipe threshold</string>
-    <string name="swipe_tuning_fast_speed_summary">Above this speed, the two sliders below kick in</string>
+    <string name="swipe_tuning_fast_speed_summary">Speed at which the above sliders kick in</string>
     <!-- A row of the statistics: the seven sliders' values as shown (0 to 1), in slider order -->
-    <string name="swipe_tuning_key_shown">Turns %1$s · Slowdowns %2$s · Inflections vs path %3$s · Boost %4$s · Fast at %5$s · Common words %6$s · Corners %7$s</string>
+    <string name="swipe_tuning_key_shown">Turns %1$s · Slowdowns %2$s · Inflections vs path %3$s · Boost %4$s · Common words %5$s · Corners %6$s · Fast at %7$s</string>
     <string name="swipe_tuning_corner_miss">Fast swipes forgive missed corners</string>
     <string name="swipe_tuning_corner_miss_summary">The faster you swipe, the further a corner may land from its key</string>
     <string name="swipe_tuning_history_boost">Learned word boost</string>
