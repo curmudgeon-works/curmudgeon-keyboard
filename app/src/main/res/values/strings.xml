@@ -344,8 +344,8 @@
     <string name="space_swipe_move_cursor">Swipe spacebar to move cursor</string>
     <string name="space_swipe_move_cursor_summary">Slide left or right along the spacebar to move the cursor</string>
     <string name="swipe_tuning_summary">How much the decoder trusts the points where your finger turns, stops or slows down, and how much of a word\'s score comes from those points rather than from the overall shape. Try a setting for a while: the results below show how each one did for you.</string>
-    <string name="swipe_tuning_turns">Inflection 1: Turns</string>
-    <string name="swipe_tuning_slowdowns">Inflection 2: Slowdowns</string>
+    <string name="swipe_tuning_turns">Turns</string>
+    <string name="swipe_tuning_slowdowns">Slowdowns</string>
     <string name="swipe_tuning_blend">Inflections vs whole path</string>
     <string name="swipe_tuning_turns_summary">How much the points where your finger turns count (0 to 1.5)</string>
     <string name="swipe_tuning_slowdowns_summary">How much slowing over a key favours its letter (0 to 1)</string>
@@ -356,8 +356,9 @@
     <string name="swipe_tuning_fast_common_summary">The faster you swipe, the more common words win</string>
     <string name="swipe_tuning_fast_speed">Fast swipe threshold</string>
     <string name="swipe_tuning_fast_speed_summary">Speed at which the above sliders kick in</string>
-    <!-- A row of the statistics: the seven sliders' values as shown (0 to 1), in slider order -->
-    <string name="swipe_tuning_key_shown">Turns %1$s · Slowdowns %2$s · Inflections vs path %3$s · Boost %4$s · Common words %5$s · Corners %6$s · Fast at %7$s</string>
+    <!-- A row of the statistics: the seven sliders' values as shown (0 to 1), in slider order: Turns, Slowdowns,
+         Inflections vs whole path, Learned word boost, Common words, Missed corners, Fast swipe threshold -->
+    <string name="swipe_tuning_key_shown">T %1$s · S %2$s · I %3$s · L %4$s · C %5$s · M %6$s · F %7$s</string>
     <string name="swipe_tuning_corner_miss">Fast swipes forgive missed corners</string>
     <string name="swipe_tuning_corner_miss_summary">The faster you swipe, the further a corner may land from its key</string>
     <string name="swipe_tuning_history_boost">Learned word boost</string>
@@ -395,16 +396,16 @@
     <!-- The row under the "Customize suggestions" heading of Refine suggestions & learning (2026-10-06) -->
     <string name="customize_suggestions_row">Order of suggestions</string>
     <string name="suggestion_count_title">Number of suggestions: %s</string>
-    <!-- The "Number of suggestions" tile (2026-10-06): its title, the stepper's short word for automatic, the typing hint -->
+    <!-- The "Number of suggestions" tile (2026-10-06): its title, and its subtext while the number is automatic -->
     <string name="suggestion_count">Number of suggestions</string>
-    <string name="suggestion_count_auto_short">Auto</string>
+    <string name="suggestion_count_fills">As many as fill the strip</string>
     <string name="suggestion_count_auto">Automatic (fills the strip)</string>
     <string name="suggestion_count_n">%s suggestions</string>
     <string name="suggestion_rules_set">%s positions set</string>
     <string name="suggestion_rules_intro">The 1st suggestion is always the best match. From the 2nd on:</string>
     <string name="suggestion_rule_add">Set the %s</string>
     <string name="suggestion_rule_for">The %s suggestion</string>
-    <string name="suggestion_rule_default">As usual</string>
+    <string name="suggestion_rule_default">Default</string>
     <string name="suggestion_rule_language">A %s word</string>
     <string name="suggestion_rule_language_n">language %s</string>
     <string name="suggestion_rule_first_letter">A different first letter than the 1st</string>

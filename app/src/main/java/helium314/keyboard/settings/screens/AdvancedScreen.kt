@@ -109,7 +109,10 @@ fun AdvancedSettingsScreen(
         // to itself (moved from the Keyboards screen; app-wide, so here); the menus indented under the switch
         R.string.per_keyboard_title,
         SettingsWithoutKey.SEPARATE_SETTINGS,
-        *(if (separate) helium314.keyboard.latin.settings.KeyboardProfiles.Group.entries.map { it.prefKey }.toTypedArray() else emptyArray<String>()),
+        *(if (separate) helium314.keyboard.latin.settings.KeyboardProfiles.Group.entries
+            // (Refine suggestions & learning: no row while the menu isn't shown, see REFINE_MENU_SHOWN)
+            .filter { it != helium314.keyboard.latin.settings.KeyboardProfiles.Group.REFINE || helium314.keyboard.settings.REFINE_MENU_SHOWN }
+            .map { it.prefKey }.toTypedArray() else emptyArray<String>()),
         // learned & blacklisted words (files, their own switch); shown without separate settings too while they're per keyboard
         if (separate || !LearnedStores.isShared(real)) Settings.PREF_SHARE_LEARNED_WORDS else null,
         SettingsWithoutKey.DIVIDER, // a line above About (2026-10-06)

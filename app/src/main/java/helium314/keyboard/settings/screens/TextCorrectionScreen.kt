@@ -104,7 +104,9 @@ fun TextCorrectionScreen(
         Settings.PREF_ALWAYS_INCOGNITO_MODE,
         if (prefs.getBoolean(Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Defaults.PREF_KEY_USE_PERSONALIZED_DICTS))
             Settings.PREF_ADD_TO_PERSONAL_DICTIONARY else null,
-        // (Customize suggestions moved to Refine suggestions & learning, 2026-10-06)
+        // the number of suggestions (its tile on Refine suggestions & learning while that menu isn't shown, 2026-10-06;
+        // the order of suggestions stays there, at its default)
+        if (!helium314.keyboard.settings.REFINE_MENU_SHOWN) Settings.PREF_SUGGESTION_COUNT else null,
         // (PREF_CENTER_SUGGESTION_TEXT_TO_ENTER, "show the word space will type as the middle suggestion", is no longer
         // shown: the strip has no middle and shows the typed word first anyway; its Setting stays, off, see SettingsValues)
         if (suggestionsEnabled || autocorrectEnabled) Settings.PREF_SUGGEST_EMOJIS else null,

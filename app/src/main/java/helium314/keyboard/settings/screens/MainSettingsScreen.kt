@@ -155,6 +155,7 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
 /** "Refine swipe and learning" (advanced only): once for all keyboards, or under each keyboard when it keeps its own. */
 @Composable
 fun RefineEntry(onEnter: () -> Unit = {}) {
+    if (!helium314.keyboard.settings.REFINE_MENU_SHOWN) return // (not in the public build yet)
     val advanced by SettingsMode.state(LocalContext.current)
     AdvancedTint(advanced) {
         Preference(

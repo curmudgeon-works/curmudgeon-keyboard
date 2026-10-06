@@ -133,9 +133,9 @@ fun CustomizeSuggestionsPreference(setting: Setting) {
 }
 
 /**
- * "Number of suggestions" (its own tile, 2026-10-06): − and + step from Automatic (0, fills the strip) to
- * [SuggestedWords.MAX_SUGGESTIONS]; tapping the number turns it into a box in place to type it (Done or leaving the
- * box saves; empty = Automatic; out of range is clamped).
+ * "Number of suggestions" (its own tile, 2026-10-06): always a number. Automatic (0, as many as fill the strip) shows
+ * the count it uses now; − and + step from there to a set number (1 to [SuggestedWords.MAX_SUGGESTIONS]); tapping the
+ * number turns it into a box in place to type it (Done or leaving the box saves; empty = automatic again).
  */
 @Composable
 fun SuggestionCountPreference(setting: Setting) {
@@ -146,15 +146,17 @@ fun SuggestionCountPreference(setting: Setting) {
         count = n.coerceIn(0, SuggestedWords.MAX_SUGGESTIONS)
         prefs.edit { putInt(Settings.PREF_SUGGESTION_COUNT, count) }
     }
+    // what the strip shows: the set number, or (automatic) as many as fill it now
+    val shown = if (count > 0) count else helium314.keyboard.latin.Suggest.stripFillTarget.coerceIn(1, SuggestedWords.MAX_SUGGESTIONS)
     Preference(
         name = setting.title,
         onClick = { editing = true },
-        description = if (count == 0) stringResource(R.string.suggestion_count_auto) else null,
+        description = if (count == 0) stringResource(R.string.suggestion_count_fills) else null,
     ) {
-        TextButton(onClick = { set(count - 1) }, enabled = count > 0) { Text("−", style = MaterialTheme.typography.titleLarge) }
+        TextButton(onClick = { set(shown - 1) }, enabled = shown > 1) { Text("−", style = MaterialTheme.typography.titleLarge) }
         if (editing) {
             val state = androidx.compose.foundation.text.input.rememberTextFieldState(
-                if (count == 0) "" else count.toString(), androidx.compose.ui.text.TextRange(0, if (count == 0) 0 else count.toString().length))
+                shown.toString(), androidx.compose.ui.text.TextRange(0, shown.toString().length))
             val focus = remember { androidx.compose.ui.focus.FocusRequester() }
             var hadFocus by remember { mutableStateOf(false) }
             fun commit() {
@@ -181,10 +183,9 @@ fun SuggestionCountPreference(setting: Setting) {
             )
             androidx.compose.runtime.LaunchedEffect(Unit) { focus.requestFocus() }
         } else TextButton(onClick = { editing = true }) {
-            Text(if (count == 0) stringResource(R.string.suggestion_count_auto_short) else count.toString(),
-                style = MaterialTheme.typography.titleMedium)
+            Text(shown.toString(), style = MaterialTheme.typography.titleMedium)
         }
-        TextButton(onClick = { set(count + 1) }, enabled = count < SuggestedWords.MAX_SUGGESTIONS) {
+        TextButton(onClick = { set(shown + 1) }, enabled = shown < SuggestedWords.MAX_SUGGESTIONS) {
             Text("+", style = MaterialTheme.typography.titleLarge)
         }
     }
