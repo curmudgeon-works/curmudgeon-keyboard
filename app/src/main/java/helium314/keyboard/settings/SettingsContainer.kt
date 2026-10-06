@@ -47,9 +47,17 @@ class Setting(
 
     @Composable
     fun Preference() {
+        // on a menu shared by all keyboards, a setting that another menu keeps per keyboard is that menu's (not shown here)
+        val menu = LocalSettingsMenu.current
+        if (menu != null && helium314.keyboard.latin.settings.KeyboardProfiles.hiddenOn(
+                helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(androidx.compose.ui.platform.LocalContext.current), menu, key))
+            return
         content(this)
     }
 }
+
+/** The top-level menu a screen belongs to (for [Setting.Preference]); null outside them (search, App settings). */
+val LocalSettingsMenu = androidx.compose.runtime.compositionLocalOf<helium314.keyboard.latin.settings.KeyboardProfiles.Group?> { null }
 
 // intentionally not putting individual debug settings in here so user knows the context
 private fun createSettings(context: Context) = createAboutSettings(context) + createAppearanceSettings(context) +
@@ -72,6 +80,7 @@ object SettingsWithoutKey {
     const val RATE = "rate"
     const val SHARE = "share"
     const val SAVE_LOG = "save_log"
+    const val SEPARATE_SETTINGS = "separate_settings_row" // the switch itself is KeyboardProfiles' own key
     const val BACKUP_RESTORE = "backup_restore"
     const val FACTORY_RESET = "factory_reset"
     const val DEBUG_SETTINGS = "screen_debug"

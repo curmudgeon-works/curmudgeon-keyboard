@@ -180,7 +180,7 @@ fun TextCorrectionScreen(
 }
 
 /** Every preference on the Text correction screen (shown or not), for its tick / cross and its preview. */
-private val correctionKeys = listOf(
+internal val correctionKeys = listOf(
     Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE, Settings.PREF_AUTO_CORRECTION, Settings.PREF_MORE_AUTO_CORRECTION,
     Settings.PREF_AUTOCORRECT_SHORTCUTS, Settings.PREF_AUTOCORRECT_WITH_DIGITS, Settings.PREF_AUTO_CORRECT_THRESHOLD,
     Settings.PREF_AUTO_CAP, Settings.PREF_KEY_USE_DOUBLE_SPACE_PERIOD, Settings.PREF_AUTOSPACE_AFTER_PUNCTUATION,

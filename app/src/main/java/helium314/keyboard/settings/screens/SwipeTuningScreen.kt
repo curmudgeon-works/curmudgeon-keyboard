@@ -53,7 +53,7 @@ import androidx.core.content.edit
 import kotlin.math.roundToInt
 
 /** The "Swipe settings" group's preferences (not the decoder weights of "Swipe tuning"). */
-private val swipeSettingKeys = listOf(
+internal val swipeSettingKeys = listOf(
     Settings.PREF_GESTURE_INPUT, Settings.PREF_GESTURE_PREVIEW_TRAIL, Settings.PREF_GESTURE_TRAIL_THICKNESS,
     Settings.PREF_GESTURE_TRAIL_WHOLE, Settings.PREF_GESTURE_TRAIL_WHOLE_LINGER, Settings.PREF_DELETE_SWIPE, Settings.PREF_DELETE_SWIPE_SPEED, Settings.PREF_AUTOSPACE_AFTER_GESTURE_TYPING, Settings.PREF_GESTURE_FAST_TYPING_COOLDOWN,
     Settings.PREF_GESTURE_TRAIL_FADEOUT_DURATION, Settings.PREF_GESTURE_CAPS_SWIPE,

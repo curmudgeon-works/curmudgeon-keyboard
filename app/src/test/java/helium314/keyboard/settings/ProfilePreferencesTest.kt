@@ -7,6 +7,7 @@ import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.ProfilePreferences
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -20,6 +21,12 @@ class ProfilePreferencesTest {
     @Before fun setUp() {
         real = ApplicationProvider.getApplicationContext<Context>().getSharedPreferences("profile_test", Context.MODE_PRIVATE)
         real.edit().clear().putBoolean("separate_settings_per_keyboard", true).commit()
+        KeyboardProfiles.loadGroups(real) // the menus back to their defaults (only Refine swipe and learning shared)
+    }
+
+    @org.junit.After fun tearDown() {
+        real.edit().clear().commit()
+        KeyboardProfiles.loadGroups(real)
     }
 
     private fun set(id: Int) = ProfilePreferences(real) { id }
@@ -169,5 +176,66 @@ class ProfilePreferencesTest {
         repeat(3) { hw.onWordCommitted("i'm") }
         assertEquals("I'm", hw.matching("I'", dict).first().mWord) // one capital, not caps lock
         hw.clear()
+    }
+
+    // ---- per keyboard by menu (App settings > Per keyboard) ----
+    private val autoCap = helium314.keyboard.latin.settings.Settings.PREF_AUTO_CAP // Text correction only
+    private val spaceAfterSwipe = helium314.keyboard.latin.settings.Settings.PREF_AUTOSPACE_AFTER_GESTURE_TYPING // Swipe and Text correction
+    private val turn = helium314.keyboard.latin.settings.Settings.PREF_GESTURE_TURN_WEIGHT // Refine swipe and learning
+    private val correction = KeyboardProfiles.Group.TEXT_CORRECTION
+
+    @Test fun aMenuMadeSharedTakesTheChosenKeyboardsValuesAndDropsTheOwnCopies() {
+        real.edit().putBoolean(autoCap, true).putBoolean("p1/$autoCap", true).putBoolean("p2/$autoCap", false).commit()
+        assertFalse(KeyboardProfiles.isGlobal(autoCap))
+        KeyboardProfiles.setGroupShared(real, correction, true, winnerId = 2)
+        assertTrue(KeyboardProfiles.isGlobal(autoCap))
+        assertFalse(real.getBoolean(autoCap, true)) // keyboard 2's value
+        assertFalse(real.contains("p1/$autoCap"))
+        assertFalse(real.contains("p2/$autoCap"))
+        assertFalse(set(1).getBoolean(autoCap, true))
+        set(1).edit().putBoolean(autoCap, true).commit() // one set for all now
+        assertTrue(set(2).getBoolean(autoCap, false))
+    }
+
+    @Test fun theChosenKeyboardAtItsDefaultLeavesTheSharedValueAtItsDefault() {
+        real.edit().putBoolean(autoCap, false).putBoolean("p1/~$autoCap", true).commit() // keyboard 1: "Default"
+        KeyboardProfiles.setGroupShared(real, correction, true, winnerId = 1)
+        assertFalse(real.contains(autoCap))
+        assertFalse(real.contains("p1/~$autoCap"))
+    }
+
+    @Test fun aMenuBackToPerKeyboardStartsEachKeyboardFromTheSharedValues() {
+        KeyboardProfiles.setGroupShared(real, correction, true, winnerId = 1)
+        real.edit().putBoolean(autoCap, false).commit()
+        KeyboardProfiles.setGroupShared(real, correction, false, winnerId = KeyboardProfiles.SHARED)
+        assertFalse(KeyboardProfiles.isGlobal(autoCap))
+        assertFalse(set(1).getBoolean(autoCap, true))
+        set(1).edit().putBoolean(autoCap, true).commit()
+        assertFalse(set(2).getBoolean(autoCap, true)) // keyboard 2 keeps the shared value
+    }
+
+    @Test fun aSettingOnTwoMenusBelongsToThePerKeyboardOne() {
+        KeyboardProfiles.setGroupShared(real, correction, true, winnerId = 1)
+        // Swipe still per keyboard: the setting stays each keyboard's own, and shared Text correction doesn't show it
+        assertFalse(KeyboardProfiles.isGlobal(spaceAfterSwipe))
+        assertTrue(KeyboardProfiles.hiddenOn(real, correction, spaceAfterSwipe))
+        assertFalse(KeyboardProfiles.hiddenOn(real, KeyboardProfiles.Group.SWIPE, spaceAfterSwipe))
+        assertFalse(KeyboardProfiles.hiddenOn(real, correction, autoCap)) // only on Text correction: shown
+        // both shared: one value, shown on both
+        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.SWIPE, true, winnerId = 1)
+        assertTrue(KeyboardProfiles.isGlobal(spaceAfterSwipe))
+        assertFalse(KeyboardProfiles.hiddenOn(real, correction, spaceAfterSwipe))
+        // without separate settings nothing is hidden
+        real.edit().putBoolean("separate_settings_per_keyboard", false).commit()
+        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.SWIPE, false, winnerId = KeyboardProfiles.SHARED)
+        assertFalse(KeyboardProfiles.hiddenOn(real, correction, spaceAfterSwipe))
+    }
+
+    @Test fun refineSwipeAndLearningIsSharedUntilMadePerKeyboard() {
+        assertTrue(KeyboardProfiles.isGlobal(turn))
+        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.REFINE, false, winnerId = KeyboardProfiles.SHARED)
+        assertFalse(KeyboardProfiles.isGlobal(turn))
+        set(1).edit().putFloat(turn, 0.3f).commit()
+        assertEquals(0.3f, real.getFloat("p1/$turn", 0f))
     }
 }

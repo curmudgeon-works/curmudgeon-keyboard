@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
+import helium314.keyboard.latin.utils.getActivity
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.key
@@ -87,9 +89,12 @@ fun KeyboardsScreen(
     var keyboardToRename: SettingsSubtype? by remember { mutableStateOf(null) }
     var newKeyboard: SettingsSubtype? by remember { mutableStateOf(null) } // added, asks where its settings come from
     val real = ctx.realPrefs()
-    var separate by remember { mutableStateOf(KeyboardProfiles.isSeparate(real)) }
-    var askEnable by remember { mutableStateOf(false) } // some keyboards have an older set: keep or reset?
-    var askDisable by remember { mutableStateOf(false) } // which set becomes the shared one?
+    // the switch is on App settings > Per keyboard now: read again whenever a setting changes (coming back from there)
+    val changed = (ctx.getActivity() as? helium314.keyboard.settings.SettingsActivity)?.prefChanged?.collectAsState()
+    @Suppress("UNUSED_EXPRESSION") changed?.value
+    val separate = KeyboardProfiles.isSeparate(real)
+    // the menus all keyboards share (separate settings): shown once below the keyboards, not under each
+    fun sharedMenu(group: KeyboardProfiles.Group) = KeyboardProfiles.isShared(real, group)
     val expanded = remember { mutableStateListOf<SettingsSubtype>() } // several keyboards can be unfolded at once
     // the settings screens edit the shared set unless a keyboard's own section was entered; with separate settings
     // this screen's search edits the keyboard in use (the shared set is read by no keyboard then)
@@ -101,25 +106,8 @@ fun KeyboardsScreen(
         title = stringResource(R.string.ime_settings),
         settings = emptyList(),
     ) {
-        // the switch stays visible at the bottom, the list scrolls above it
-        val toggleBar: @Composable () -> Unit = {
-            Surface(tonalElevation = 3.dp, shadowElevation = 8.dp) {
-                Column(Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))) {
-                    // off = one set of settings for every keyboard (the sections above); on = each keyboard its own
-                    fun toggle(on: Boolean) {
-                        // both ways ask first, saying what happens
-                        if (on) askEnable = true else askDisable = true
-                        KeyboardProfiles.refreshImeId(real)
-                    }
-                    Preference(
-                        name = stringResource(R.string.separate_settings_per_keyboard),
-                        onClick = { toggle(!separate) },
-                        icon = R.drawable.ic_settings_preferences
-                    ) { Switch(checked = separate, onCheckedChange = { toggle(it) }) }
-                }
-            }
-        }
-        Scaffold(contentWindowInsets = WindowInsets(0), bottomBar = toggleBar) { innerPadding ->
+        // (the separate-settings switch was a bar at the bottom here: now on App settings > Per keyboard)
+        Scaffold(contentWindowInsets = WindowInsets(0)) { innerPadding ->
             @Suppress("UNUSED_EXPRESSION") generation
             val enabled = SubtypeSettings.getEnabledSubtypes(true)
             // drag-to-reorder by the grip: the dragged row follows the finger and swaps with its neighbours
@@ -202,7 +190,10 @@ fun KeyboardsScreen(
                     }
                     if (isExpanded)
                         KeyboardSettingsEntries(keyboard, Modifier.padding(start = 24.dp), showAdvanced = false,
-                            onEnter = { KeyboardProfiles.editingId = KeyboardProfiles.idFor(real, keyboard) })
+                            onEnter = { KeyboardProfiles.editingId = KeyboardProfiles.idFor(real, keyboard) },
+                            // with separate settings only the menus each keyboard keeps to itself
+                            groups = if (separate) { g -> !sharedMenu(g) } else null,
+                            showRefine = separate && !sharedMenu(KeyboardProfiles.Group.REFINE))
                     }
                 }
                 Preference(
@@ -225,33 +216,18 @@ fun KeyboardsScreen(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                     )
                 // with separate settings: Advanced once, for all keyboards (its settings are app-wide)
-                if (separate) AdvancedEntry()
+                if (separate && enabled.size > 1) {
+                    // the menus every keyboard shares, once (they edit one set for all)
+                    val inUse = SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype()
+                    KeyboardSettingsEntries(inUse, showLanguages = false, showAdvanced = false,
+                        onEnter = { KeyboardProfiles.editingId = KeyboardProfiles.idFor(real, inUse) },
+                        groups = { g -> sharedMenu(g) })
+                }
+                if (separate) AdvancedEntry(showRefine = sharedMenu(KeyboardProfiles.Group.REFINE))
                 // (About: the last row of Advanced, 2026-10-04)
             }
         }
         val enabledNow = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }
-        if (askEnable)
-            ConfirmationDialog(
-                onDismissRequest = { askEnable = false },
-                // each keyboard gets its saved settings back; one without starts from a copy of the common ones
-                onConfirmed = { KeyboardProfiles.enable(real, enabledNow, keepExisting = true); KeyboardProfiles.refreshImeId(real); separate = true; askEnable = false; expanded.add(SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype()) },
-                title = { Text(stringResource(R.string.separate_settings_per_keyboard)) },
-                content = { Text(stringResource(R.string.separate_settings_enable_message)) },
-                confirmButtonText = stringResource(R.string.separate_settings_turn_on),
-                cancelButtonText = stringResource(R.string.separate_settings_keep_one), // (Android's order: Cancel, then OK)
-            )
-        if (askDisable) {
-            // the primary keyboard: the first in the list (and in the switching order)
-            val primary = enabledNow.firstOrNull() ?: SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype()
-            ConfirmationDialog(
-                onDismissRequest = { askDisable = false },
-                onConfirmed = { KeyboardProfiles.disable(real, primary); KeyboardProfiles.refreshImeId(real); separate = false; askDisable = false },
-                title = { Text(stringResource(R.string.separate_settings_disable_title)) },
-                content = { Text(stringResource(R.string.separate_settings_disable_message, keyboardName(primary, ctx))) },
-                confirmButtonText = stringResource(R.string.separate_settings_use_primary),
-                cancelButtonText = stringResource(R.string.separate_settings_keep_separate), // (Android's order: Cancel, then OK)
-            )
-        }
         keyboardMenu?.let { keyboard ->
             val rename = stringResource(R.string.rename_keyboard)
             val delete = stringResource(R.string.delete)

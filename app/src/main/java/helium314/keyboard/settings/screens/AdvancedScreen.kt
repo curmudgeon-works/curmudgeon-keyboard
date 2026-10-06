@@ -88,7 +88,17 @@ fun AdvancedSettingsScreen(
     val b = (LocalContext.current.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
     if ((b?.value ?: 0) < 0)
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
+    val real = LocalContext.current.realPrefs()
+    val separate = helium314.keyboard.latin.settings.KeyboardProfiles.isSeparate(real)
     val items = listOf(
+        // each keyboard its own settings or one set for all, and with separate settings which menus each keyboard keeps
+        // to itself (moved from the Keyboards screen; app-wide, so here)
+        R.string.per_keyboard_title,
+        SettingsWithoutKey.SEPARATE_SETTINGS,
+        *(if (separate) helium314.keyboard.latin.settings.KeyboardProfiles.Group.entries.map { it.prefKey }.toTypedArray() else emptyArray<String>()),
+        // learned & blacklisted words (files, their own switch); shown without separate settings too while they're per keyboard
+        if (separate || !LearnedStores.isShared(real)) Settings.PREF_SHARE_LEARNED_WORDS else null,
+        R.string.settings_category_this_app,
         // (force incognito: on Text correction, next to learning from what you type)
         // (on Layout & Typing: long-press delay and symbols-key numpad (Typing), space key changes input method
         //  (Layout), delete swipe (Backspace); space bar swipes on Swiping; "more diacritics" is the popup presets)
@@ -98,7 +108,7 @@ fun AdvancedSettingsScreen(
         // settings shared by all keyboards
         Settings.PREF_AUTO_PREVIEW_KEYBOARD, // settings screens bring up the preview keyboard by themselves
         Settings.PREF_SAVE_SUBTYPE_PER_APP, // which keyboard comes up in an app (moved from Layout & Typing)
-        Settings.PREF_SHARE_LEARNED_WORDS, // one set of learned & blacklisted words for all keyboards, or one each
+        // (learned & blacklisted words for all keyboards or one set each: under Per keyboard, above)
         SettingsWithoutKey.BACKUP_RESTORE,
         SettingsWithoutKey.FACTORY_RESET,
         if (BuildConfig.DEBUG || prefs.getBoolean(DebugSettings.PREF_SHOW_DEBUG_SETTINGS, Defaults.PREF_SHOW_DEBUG_SETTINGS))
@@ -219,9 +229,15 @@ fun createAdvancedSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_ABC_AFTER_CLIP, R.string.switch_keyboard_after, R.string.after_clip) {
         SwitchPreference(it, Defaults.PREF_ABC_AFTER_CLIP)
     },
-    Setting(context, Settings.PREF_SHARE_LEARNED_WORDS, R.string.share_learned_words) { setting ->
+    Setting(context, Settings.PREF_SHARE_LEARNED_WORDS, R.string.learned_words_per_keyboard) { setting ->
         ShareLearnedWordsPreference(setting)
     },
+    Setting(context, SettingsWithoutKey.SEPARATE_SETTINGS, R.string.separate_settings_per_keyboard) { setting ->
+        SeparateSettingsPreference(setting)
+    },
+    *helium314.keyboard.latin.settings.KeyboardProfiles.Group.entries.map { group ->
+        Setting(context, group.prefKey, groupTitle(group)) { setting -> GroupPreference(setting, group) }
+    }.toTypedArray(),
     Setting(context, SettingsWithoutKey.BACKUP_RESTORE, R.string.backup_restore_title) {
         BackupRestorePreference(it)
     },
@@ -398,8 +414,9 @@ private fun ShareLearnedWordsPreference(setting: Setting) {
     var shared by remember { mutableStateOf(LearnedStores.isShared(real)) }
     var asking by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    // on = each keyboard its own, like the other rows under Per keyboard
     Preference(name = setting.title, onClick = { asking = true }) {
-        Switch(checked = shared, onCheckedChange = { asking = true })
+        Switch(checked = !shared, onCheckedChange = { asking = true })
     }
     if (asking) ConfirmationDialog(
         onDismissRequest = { asking = false },
@@ -417,6 +434,105 @@ private fun ShareLearnedWordsPreference(setting: Setting) {
         title = { Text(setting.title) },
         content = { Text(stringResource(if (shared) R.string.share_learned_words_off_message else R.string.share_learned_words_on_message)) },
     )
+}
+
+/** The menu a Per keyboard row is for, named as on the main screen. */
+private fun groupTitle(group: helium314.keyboard.latin.settings.KeyboardProfiles.Group) = when (group) {
+    helium314.keyboard.latin.settings.KeyboardProfiles.Group.LAYOUT -> R.string.settings_screen_preferences
+    helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE -> R.string.settings_screen_appearance
+    helium314.keyboard.latin.settings.KeyboardProfiles.Group.SWIPE -> R.string.swipe_screen
+    helium314.keyboard.latin.settings.KeyboardProfiles.Group.TEXT_CORRECTION -> R.string.settings_screen_correction
+    helium314.keyboard.latin.settings.KeyboardProfiles.Group.REFINE -> R.string.learning_swiping_screen
+}
+
+/** "Separate settings per keyboard" (moved from the Keyboards screen): both ways ask first, saying what happens. */
+@Composable
+private fun SeparateSettingsPreference(setting: Setting) {
+    val ctx = LocalContext.current
+    val real = ctx.realPrefs()
+    var separate by remember { mutableStateOf(helium314.keyboard.latin.settings.KeyboardProfiles.isSeparate(real)) }
+    var asking by remember { mutableStateOf(false) }
+    Preference(name = setting.title, description = stringResource(R.string.separate_settings_per_keyboard_summary),
+        onClick = { asking = true }) { Switch(checked = separate, onCheckedChange = { asking = true }) }
+    if (!asking) return
+    val enabledNow = helium314.keyboard.latin.utils.SubtypeSettings.getEnabledSubtypes(true)
+        .map { with(helium314.keyboard.latin.settings.SettingsSubtype) { it.toSettingsSubtype() } }
+    if (!separate)
+        ConfirmationDialog(
+            onDismissRequest = { asking = false },
+            // each keyboard gets its saved settings back; one without starts from a copy of the common ones
+            onConfirmed = {
+                helium314.keyboard.latin.settings.KeyboardProfiles.enable(real, enabledNow, keepExisting = true)
+                helium314.keyboard.latin.settings.KeyboardProfiles.refreshImeId(real)
+                separate = true; asking = false
+            },
+            title = { Text(setting.title) },
+            content = { Text(stringResource(R.string.separate_settings_enable_message)) },
+            confirmButtonText = stringResource(R.string.separate_settings_turn_on),
+            cancelButtonText = stringResource(R.string.separate_settings_keep_one), // (Android's order: Cancel, then OK)
+        )
+    else {
+        // the primary keyboard: the first in the list (and in the switching order)
+        val primary = enabledNow.firstOrNull()
+            ?: with(helium314.keyboard.latin.settings.SettingsSubtype) { helium314.keyboard.latin.utils.SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype() }
+        ConfirmationDialog(
+            onDismissRequest = { asking = false },
+            onConfirmed = {
+                helium314.keyboard.latin.settings.KeyboardProfiles.disable(real, primary)
+                helium314.keyboard.latin.settings.KeyboardProfiles.refreshImeId(real)
+                separate = false; asking = false
+            },
+            title = { Text(stringResource(R.string.separate_settings_disable_title)) },
+            content = { Text(stringResource(R.string.separate_settings_disable_message, keyboardName(primary, ctx))) },
+            confirmButtonText = stringResource(R.string.separate_settings_use_primary),
+            cancelButtonText = stringResource(R.string.separate_settings_keep_separate), // (Android's order: Cancel, then OK)
+        )
+    }
+}
+
+/** One menu under Per keyboard: on = each keyboard its own settings there, off = one set for all keyboards. Going to
+ *  one set asks whose settings all keyboards take: the primary keyboard's preselected. */
+@Composable
+private fun GroupPreference(setting: Setting, group: helium314.keyboard.latin.settings.KeyboardProfiles.Group) {
+    val ctx = LocalContext.current
+    val real = ctx.realPrefs()
+    var perKeyboard by remember { mutableStateOf(!helium314.keyboard.latin.settings.KeyboardProfiles.isShared(real, group)) }
+    var asking by remember { mutableStateOf(false) }
+    Preference(name = setting.title, onClick = { asking = true }) { Switch(checked = perKeyboard, onCheckedChange = { asking = true }) }
+    if (!asking) return
+    val keyboards = helium314.keyboard.latin.utils.SubtypeSettings.getEnabledSubtypes(true)
+        .map { with(helium314.keyboard.latin.settings.SettingsSubtype) { it.toSettingsSubtype() } }
+    fun applyChoice(shared: Boolean, winner: helium314.keyboard.latin.settings.SettingsSubtype?) {
+        val winnerId = winner?.let { helium314.keyboard.latin.settings.KeyboardProfiles.idFor(real, it) }
+            ?: helium314.keyboard.latin.settings.KeyboardProfiles.SHARED
+        helium314.keyboard.latin.settings.KeyboardProfiles.setGroupShared(real, group, shared, winnerId)
+        helium314.keyboard.latin.settings.KeyboardProfiles.refreshImeId(real)
+        KeyboardSwitcher.getInstance().setThemeNeedsReload()
+        perKeyboard = !shared; asking = false
+    }
+    if (!perKeyboard)
+        ConfirmationDialog(
+            onDismissRequest = { asking = false },
+            onConfirmed = { applyChoice(false, null) },
+            title = { Text(setting.title) },
+            content = { Text(stringResource(R.string.per_keyboard_group_on_message, setting.title)) },
+        )
+    else if (keyboards.size < 2) applyChoice(true, keyboards.firstOrNull()) // nothing to choose from
+    else
+        // whose settings all keyboards take: the primary keyboard (the first in the list) unless another is picked
+        helium314.keyboard.settings.dialogs.ListPickerDialog(
+            onDismissRequest = { asking = false },
+            items = keyboards,
+            onItemSelected = { applyChoice(true, it) },
+            title = { Column {
+                Text(stringResource(R.string.per_keyboard_group_off_title, setting.title))
+                Text(stringResource(R.string.per_keyboard_group_off_message, setting.title),
+                    style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+            } },
+            selectedItem = keyboards.first(),
+            getItemName = { keyboardName(it, ctx) },
+            confirmImmediately = false,
+        )
 }
 
 @Composable

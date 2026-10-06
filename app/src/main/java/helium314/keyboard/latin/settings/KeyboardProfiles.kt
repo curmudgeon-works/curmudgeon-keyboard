@@ -39,9 +39,96 @@ object KeyboardProfiles {
         "key_popup_sets", // saved popup sets are meant to be reused across keyboards
         "appearance_looks", // saved looks too
         "layout_presets", // and saved Layouts
-    ) + learningSwipingKeys
+    ) + Group.entries.map { it.prefKey }
 
-    /** "Refine swipe and learning" (2026-10-04): the same for every keyboard (your hand, your words). */
+    /**
+     * The top-level menus whose settings can be the keyboard's own or shared by all keyboards (App settings > Per
+     * keyboard). A setting on two menus (auto-space after a swipe: Swipe and Text correction) is shared only when both
+     * are; when one is per keyboard it belongs to that one and the shared menu doesn't show it ([hiddenOn]).
+     * Learned & blacklisted words are files, not settings: their own switch (LearnedStores.isShared).
+     */
+    enum class Group(val prefKey: String, val sharedByDefault: Boolean) {
+        LAYOUT("share_group_layout", false),
+        APPEARANCE("share_group_appearance", false),
+        SWIPE("share_group_swipe", false),
+        TEXT_CORRECTION("share_group_correction", false),
+        REFINE("share_group_refine", true); // "Refine swipe and learning": your hand and your words, so one set by default
+
+        fun contains(key: String): Boolean = when (this) {
+            LAYOUT -> helium314.keyboard.settings.LayoutDraft.inScope(key)
+            APPEARANCE -> helium314.keyboard.settings.AppearanceLooks.onScreen(key)
+            SWIPE -> key in helium314.keyboard.settings.screens.swipeSettingKeys
+            TEXT_CORRECTION -> key in helium314.keyboard.settings.screens.correctionKeys
+            REFINE -> key in learningSwipingKeys
+        }
+    }
+
+    /** The groups shared by all keyboards, read once ([loadGroups]) since every preference read asks. */
+    @Volatile private var sharedGroups: Set<Group> = Group.entries.filterTo(HashSet()) { it.sharedByDefault }
+    private val groupsOfKey = java.util.concurrent.ConcurrentHashMap<String, Set<Group>>()
+
+    fun loadGroups(real: SharedPreferences) {
+        sharedGroups = Group.entries.filterTo(HashSet()) { isShared(real, it) }
+    }
+
+    fun isShared(real: SharedPreferences, group: Group) = real.getBoolean(group.prefKey, group.sharedByDefault)
+
+    /** The menus [key] is on (none: a setting of no menu here, it stays the keyboard's own). */
+    fun groupsOf(key: String): Set<Group> = groupsOfKey.getOrPut(key) { Group.entries.filterTo(HashSet()) { it.contains(key) } }
+
+    private fun sharedByGroups(key: String, shared: Set<Group> = sharedGroups): Boolean {
+        val groups = groupsOf(key)
+        return groups.isNotEmpty() && shared.containsAll(groups)
+    }
+
+    /** True when [key] is not shown on [menu]: separate settings, [menu] shared, and the setting is also on a menu that
+     *  is per keyboard, which owns it. */
+    fun hiddenOn(real: SharedPreferences, menu: Group, key: String): Boolean =
+        isSeparate(real) && menu in sharedGroups && groupsOf(key).any { it !in sharedGroups }
+
+    /**
+     * [group] becomes shared by all keyboards ([shared]) or each keyboard's own. Becoming shared, the settings that
+     * turn shared take the values of keyboard [winnerId] and every keyboard's own copy goes; becoming per keyboard,
+     * each keyboard starts from the shared values (its reads fall back to them). Background pictures follow Appearance.
+     */
+    @Synchronized
+    fun setGroupShared(real: SharedPreferences, group: Group, shared: Boolean, winnerId: Int) {
+        val before = sharedGroups
+        val after = if (shared) before + group else before - group
+        val editor = real.edit()
+        if (shared && isSeparate(real)) {
+            val winnerValues = HashMap<String, Any?>()
+            val winnerDefaults = HashSet<String>()
+            for ((stored, value) in real.all) {
+                if (!(stored.startsWith(PREFIX) && stored.contains(SEPARATOR))) continue
+                val sep = stored.indexOf(SEPARATOR)
+                val id = stored.substring(PREFIX.length, sep).toIntOrNull() ?: continue
+                val raw = stored.substring(sep + 1)
+                val plain = raw.removePrefix(TOMBSTONE)
+                if (!sharedByGroups(plain, after) || sharedByGroups(plain, before)) continue
+                if (id == winnerId) { if (raw.startsWith(TOMBSTONE)) winnerDefaults.add(plain) else winnerValues[plain] = value }
+                editor.remove(stored)
+            }
+            // a value of its own wins over a "default" mark left behind (as in [copy])
+            for (plain in winnerDefaults) if (plain !in winnerValues) editor.remove(plain)
+            for ((plain, value) in winnerValues) put(editor, plain, value)
+        }
+        editor.putBoolean(group.prefKey, shared)
+        editor.commit()
+        sharedGroups = after
+        if (group == Group.APPEARANCE && isSeparate(real)) {
+            if (shared) copyFiles(winnerId, SHARED)
+            else for (id in profileIds(real)) copyFiles(SHARED, id)
+        }
+        helium314.keyboard.latin.utils.SettingsEventLog.log("group ${group.name} ${if (shared) "shared, from set $winnerId" else "per keyboard"}")
+    }
+
+    private fun profileIds(real: SharedPreferences): List<Int> {
+        val map = ids(real)
+        return map.keys().asSequence().map { map.optInt(it, SHARED) }.filter { it != SHARED }.distinct().toList()
+    }
+
+    /** "Refine swipe and learning" (2026-10-04): shared by all keyboards unless its group is per keyboard ([Group.REFINE]). */
     private val learningSwipingKeys: Set<String> get() = setOf(
         Settings.PREF_GESTURE_TURN_WEIGHT, Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Settings.PREF_GESTURE_KUSHLER_WEIGHT,
         Settings.PREF_GESTURE_HISTORY_BOOST, Settings.PREF_GESTURE_FAST_COMMON_WORDS, Settings.PREF_GESTURE_CORNER_MISS,
@@ -50,7 +137,8 @@ object KeyboardProfiles {
     // ("share_user_history_": the retired per-language share switch, kept global so old keys stay where they are)
     private val globalPrefixes = listOf(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX, "language_priority_", "share_user_history_", LanguagePriority.PREF_ADDED_PREFIX, "debug_", "gesture_stats")
 
-    fun isGlobal(key: String) = key in globalKeys || globalPrefixes.any { key.startsWith(it) } || key.startsWith(PREFIX) && key.contains(SEPARATOR)
+    fun isGlobal(key: String) = key in globalKeys || globalPrefixes.any { key.startsWith(it) } || (key.startsWith(PREFIX) && key.contains(SEPARATOR)) ||
+        sharedByGroups(key)
 
     fun isSeparate(real: SharedPreferences) = real.getBoolean(PREF_SEPARATE, false)
 
@@ -253,6 +341,7 @@ object KeyboardProfiles {
     @Volatile var editingId: Int = SHARED
 
     fun refreshImeId(real: SharedPreferences) {
+        loadGroups(real) // (a restore can bring other group choices)
         // the learned words of the keyboard in use too, when each keyboard has its own
         helium314.keyboard.latin.personalization.LearnedStores.refresh(real)
         val old = imeId
@@ -283,7 +372,7 @@ object KeyboardProfiles {
     fun profileFile(context: android.content.Context, name: String): java.io.File {
         val dir = helium314.keyboard.latin.utils.DeviceProtectedUtils.getFilesDir(context)
         val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(context)
-        val id = if (!isSeparate(real)) SHARED
+        val id = if (!isSeparate(real) || Group.APPEARANCE in sharedGroups) SHARED
             else if (context.getActivity() != null) editingId else imeId
         return java.io.File(dir, name + suffix(id))
     }

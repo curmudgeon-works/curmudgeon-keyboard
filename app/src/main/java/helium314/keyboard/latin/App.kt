@@ -34,6 +34,7 @@ class App : Application() {
         // the background pictures and emoji font are per keyboard with separate settings: where they are, and a copy for
         // the keyboards that had their own set before that
         helium314.keyboard.latin.settings.KeyboardProfiles.filesDir = helium314.keyboard.latin.utils.DeviceProtectedUtils.getFilesDir(this)
+        helium314.keyboard.latin.settings.KeyboardProfiles.loadGroups(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
         helium314.keyboard.latin.settings.KeyboardProfiles.migrateFiles(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
         helium314.keyboard.latin.settings.KeyboardProfiles.migrateLearningSwiping(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
         helium314.keyboard.latin.settings.KeyboardProfiles.forgetSetting(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this), "gesture_space_aware")

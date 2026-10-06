@@ -106,8 +106,11 @@ fun LearningSwipingScreen(onClickBack: () -> Unit) {
             // ---- swiping: how the decoder weighs a swipe (only while swiping is on), and how each weighting did
             helium314.keyboard.settings.AdvancedReveal(gestureOn) { Column {
                 GroupTitle(R.string.swipe_tuning)
-                // (the group's explanation, R.string.swipe_tuning_summary, is kept but not shown: each slider says what it
-                // does and its scale instead)
+                // one snappy line on what the sliders are (the longer R.string.swipe_tuning_summary is kept but not
+                // shown: each slider says what it does and its scale)
+                Text(stringResource(R.string.swipe_tuning_subtext), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 22.dp, end = 16.dp, bottom = 4.dp))
                 WeightSlider(draft.pending, Settings.PREF_GESTURE_TURN_WEIGHT, Defaults.PREF_GESTURE_TURN_WEIGHT, R.string.swipe_tuning_turns, 0f..1.5f,
                     R.string.swipe_tuning_turns_summary)
                 WeightSlider(draft.pending, Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Defaults.PREF_GESTURE_SLOWDOWN_WEIGHT, R.string.swipe_tuning_slowdowns, 0f..1f,

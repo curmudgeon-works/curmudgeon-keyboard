@@ -84,13 +84,13 @@ fun SettingsNavHost(
             AboutScreen(onClickBack = ::goBack)
         }
         composable(SettingsDestination.TextCorrection) {
-            TextCorrectionScreen(onClickBack = ::goBack)
+            androidx.compose.runtime.CompositionLocalProvider(LocalSettingsMenu provides helium314.keyboard.latin.settings.KeyboardProfiles.Group.TEXT_CORRECTION) { TextCorrectionScreen(onClickBack = ::goBack) }
         }
         composable(SettingsDestination.Preferences) {
             PreferencesScreen(onClickBack = ::goBack)
         }
         composable(SettingsDestination.Toolbar) {
-            ToolbarScreen(onClickBack = ::goBack)
+            androidx.compose.runtime.CompositionLocalProvider(LocalSettingsMenu provides helium314.keyboard.latin.settings.KeyboardProfiles.Group.LAYOUT) { ToolbarScreen(onClickBack = ::goBack) }
         }
 /*      will be added as part of passive data gathering
         composable(SettingsDestination.DataReview) {
@@ -100,13 +100,13 @@ fun SettingsNavHost(
             AdvancedSettingsScreen(onClickBack = ::goBack)
         }
         composable(SettingsDestination.LearningSwiping) {
-            helium314.keyboard.settings.screens.LearningSwipingScreen(onClickBack = ::goBack)
+            androidx.compose.runtime.CompositionLocalProvider(LocalSettingsMenu provides helium314.keyboard.latin.settings.KeyboardProfiles.Group.REFINE) { helium314.keyboard.settings.screens.LearningSwipingScreen(onClickBack = ::goBack) }
         }
         composable(SettingsDestination.Debug) {
             DebugScreen(onClickBack = ::goBack)
         }
         composable(SettingsDestination.Appearance) {
-            AppearanceScreen(onClickBack = ::goBack)
+            androidx.compose.runtime.CompositionLocalProvider(LocalSettingsMenu provides helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE) { AppearanceScreen(onClickBack = ::goBack) }
         }
         composable(SettingsDestination.PersonalDictionary + "{locale}") {
             val locale = it.arguments?.getString("locale")?.takeIf { loc -> loc.isNotBlank() }?.constructLocale()
@@ -150,10 +150,10 @@ fun SettingsNavHost(
             ColorsScreen(isNight = true, theme = it.arguments?.getString("theme"), onClickBack = ::goBack)
         }
         composable(SettingsDestination.Subtype + "{subtype}") {
-            SubtypeScreen(initialSubtype = it.arguments?.getString("subtype")!!.toSettingsSubtype(), onClickBack = ::goBack)
+            androidx.compose.runtime.CompositionLocalProvider(LocalSettingsMenu provides helium314.keyboard.latin.settings.KeyboardProfiles.Group.LAYOUT) { SubtypeScreen(initialSubtype = it.arguments?.getString("subtype")!!.toSettingsSubtype(), onClickBack = ::goBack) }
         }
         composable(SettingsDestination.SwipeTuning + "{subtype}") {
-            SwipeTuningScreen(keyboard = it.arguments?.getString("subtype")!!.toSettingsSubtype(), onClickBack = ::goBack)
+            androidx.compose.runtime.CompositionLocalProvider(LocalSettingsMenu provides helium314.keyboard.latin.settings.KeyboardProfiles.Group.SWIPE) { SwipeTuningScreen(keyboard = it.arguments?.getString("subtype")!!.toSettingsSubtype(), onClickBack = ::goBack) }
         }
     }
     if (target.value != SettingsDestination.Keyboards/* && target.value != navController.currentBackStackEntry?.destination?.route*/)
