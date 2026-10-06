@@ -49,6 +49,7 @@ internal val swipeTuningKeys = listOf(
     Settings.PREF_GESTURE_TURN_WEIGHT, Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Settings.PREF_GESTURE_KUSHLER_WEIGHT,
     Settings.PREF_GESTURE_HISTORY_BOOST, Settings.PREF_GESTURE_FAST_COMMON_WORDS, Settings.PREF_GESTURE_CORNER_MISS,
     Settings.PREF_GESTURE_FAST_SPEED,
+    Settings.PREF_SUGGESTION_COUNT, Settings.PREF_SUGGESTION_RULES,
 )
 
 /**
@@ -104,6 +105,12 @@ fun LearningSwipingScreen(onClickBack: () -> Unit) {
         }) { innerPadding ->
         Column(Modifier.padding(innerPadding).then(tapReveal.list).verticalScroll(listScroll)) {
           androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.preferences.LocalRowStart provides 22.dp) {
+            // ---- customize suggestions (moved from Text correction, 2026-10-06): how many, and a rule per position
+            GroupTitle(R.string.customize_suggestions)
+            androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.preferences.LocalPendingChange provides
+                    (Settings.PREF_SUGGESTION_RULES in draft.pending || Settings.PREF_SUGGESTION_COUNT in draft.pending)) {
+                SettingsActivity.settingsContainer[Settings.PREF_SUGGESTION_RULES]?.Preference()
+            }
             // ---- swiping: how the decoder weighs a swipe (only while swiping is on), and how each weighting did
             helium314.keyboard.settings.AdvancedReveal(gestureOn) { Column {
                 GroupTitle(R.string.swipe_tuning)

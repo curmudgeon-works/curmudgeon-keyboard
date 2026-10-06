@@ -160,22 +160,19 @@ fun RefineEntry(onEnter: () -> Unit = {}) {
         Preference(
             name = stringResource(R.string.learning_swiping_screen),
             onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.LearningSwiping) },
-            icon = R.drawable.ic_settings_gesture
+            icon = R.drawable.ic_settings_refine // "tune" (2026-10-06): its own icon, not Swiping's
         ) { NextScreenIcon() }
     }
 }
 
-/** The entries shown only in advanced mode, the same for every keyboard: "Refine swipe and learning" and the app's
- *  own settings (App settings, once named Advanced). */
+/** The entries the same for every keyboard: "Refine suggestions & learning" (advanced only) and the app's own settings
+ *  (App settings, once named Advanced; shown in simple mode too since 2026-10-06). */
 @Composable
 fun AdvancedEntry(onEnter: () -> Unit = {}, showRefine: Boolean = true) {
-    val advanced by SettingsMode.state(LocalContext.current)
     if (showRefine) RefineEntry(onEnter)
-    AdvancedTint(advanced) {
-        Preference(
-            name = stringResource(R.string.settings_screen_advanced),
-            onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Advanced) },
-            icon = R.drawable.ic_settings_advanced
-        ) { NextScreenIcon() }
-    }
+    Preference(
+        name = stringResource(R.string.settings_screen_advanced),
+        onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Advanced) },
+        icon = R.drawable.ic_settings_advanced
+    ) { NextScreenIcon() }
 }

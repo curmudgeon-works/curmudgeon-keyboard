@@ -104,7 +104,7 @@ fun TextCorrectionScreen(
         Settings.PREF_ALWAYS_INCOGNITO_MODE,
         if (prefs.getBoolean(Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Defaults.PREF_KEY_USE_PERSONALIZED_DICTS))
             Settings.PREF_ADD_TO_PERSONAL_DICTIONARY else null,
-        Settings.PREF_SUGGESTION_RULES, // Customize suggestions: how many, rules for the 2nd one on (from Others; advanced)
+        // (Customize suggestions moved to Refine suggestions & learning, 2026-10-06)
         // (PREF_CENTER_SUGGESTION_TEXT_TO_ENTER, "show the word space will type as the middle suggestion", is no longer
         // shown: the strip has no middle and shows the typed word first anyway; its Setting stays, off, see SettingsValues)
         if (suggestionsEnabled || autocorrectEnabled) Settings.PREF_SUGGEST_EMOJIS else null,
@@ -191,7 +191,7 @@ internal val correctionKeys = listOf(
     Settings.PREF_BIGRAM_PREDICTIONS, Settings.PREF_SUGGEST_PUNCTUATION, Settings.PREF_PUNCTUATION_SUGGESTIONS,
     Settings.PREF_SUGGEST_CLIPBOARD_CONTENT, Settings.PREF_USE_CONTACTS, Settings.PREF_USE_APPS, Settings.PREF_ADD_TO_PERSONAL_DICTIONARY,
     Settings.PREF_URL_DETECTION,
-    Settings.PREF_SUGGESTION_COUNT, Settings.PREF_SUGGESTION_RULES,
+    // (PREF_SUGGESTION_COUNT / PREF_SUGGESTION_RULES: Refine suggestions & learning since 2026-10-06)
 )
 
 fun createCorrectionSettings(context: Context) = listOf(

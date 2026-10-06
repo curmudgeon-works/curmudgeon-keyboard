@@ -132,6 +132,7 @@ object KeyboardProfiles {
     private val learningSwipingKeys: Set<String> get() = setOf(
         Settings.PREF_GESTURE_TURN_WEIGHT, Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Settings.PREF_GESTURE_KUSHLER_WEIGHT,
         Settings.PREF_GESTURE_HISTORY_BOOST, Settings.PREF_GESTURE_FAST_COMMON_WORDS, Settings.PREF_GESTURE_CORNER_MISS, Settings.PREF_GESTURE_FAST_SPEED,
+        Settings.PREF_SUGGESTION_COUNT, Settings.PREF_SUGGESTION_RULES, // Customize suggestions (from Text correction, 2026-10-06)
         Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, Settings.PREF_TRUST_TYPED_COUNT,
     )
     // ("share_user_history_": the retired per-language share switch, kept global so old keys stay where they are)
@@ -441,6 +442,30 @@ object KeyboardProfiles {
                     if (stored.startsWith(PREFIX) && stored.endsWith("$SEPARATOR$key")) remove(stored)
             }
             putBoolean("learning_swiping_global", true)
+        }.apply()
+    }
+
+    /**
+     * Once (2026-10-06): Customize suggestions moved from Text correction (per keyboard) to Refine suggestions &
+     * learning (shared by default). The keyboard in use keeps what it had: its own count and rules, if it has its own
+     * settings, become the shared ones; every keyboard's own copy is removed.
+     */
+    fun migrateSuggestionsToRefine(real: SharedPreferences) {
+        if (real.getBoolean("suggestions_refine_moved", false)) return
+        val inUse = if (isSeparate(real)) idFor(real, selectedKeyboard(real)) else SHARED
+        val all = real.all
+        real.edit().apply {
+            for (key in listOf(Settings.PREF_SUGGESTION_COUNT, Settings.PREF_SUGGESTION_RULES)) {
+                if (inUse != SHARED) when (val v = all["$PREFIX$inUse$SEPARATOR$key"]) {
+                    is Int -> putInt(key, v)
+                    is String -> putString(key, v)
+                }
+                // every keyboard's own copy goes, as in migrateLearningSwiping: stale values must not come back if the
+                // menu is made per keyboard later
+                for (stored in all.keys)
+                    if (stored.startsWith(PREFIX) && stored.endsWith("$SEPARATOR$key")) remove(stored)
+            }
+            putBoolean("suggestions_refine_moved", true)
         }.apply()
     }
 

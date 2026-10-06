@@ -91,13 +91,7 @@ fun AdvancedSettingsScreen(
     val real = LocalContext.current.realPrefs()
     val separate = helium314.keyboard.latin.settings.KeyboardProfiles.isSeparate(real)
     val items = listOf(
-        // each keyboard its own settings or one set for all, and with separate settings which menus each keyboard keeps
-        // to itself (moved from the Keyboards screen; app-wide, so here)
-        R.string.per_keyboard_title,
-        SettingsWithoutKey.SEPARATE_SETTINGS,
-        *(if (separate) helium314.keyboard.latin.settings.KeyboardProfiles.Group.entries.map { it.prefKey }.toTypedArray() else emptyArray<String>()),
-        // learned & blacklisted words (files, their own switch); shown without separate settings too while they're per keyboard
-        if (separate || !LearnedStores.isShared(real)) Settings.PREF_SHARE_LEARNED_WORDS else null,
+        // App settings first (2026-10-06): the settings of the app as a whole
         R.string.settings_category_this_app,
         // (force incognito: on Text correction, next to learning from what you type)
         // (on Layout & Typing: long-press delay and symbols-key numpad (Typing), space key changes input method
@@ -105,25 +99,31 @@ fun AdvancedSettingsScreen(
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) Settings.PREF_SHOW_SETUP_WIZARD_ICON else null,
         // (switching back to letters after…: one row with a dialog on Layout & Typing's Typing group)
         // (the physical keyboard's emoji key and the timestamp format: on Others)
-        // settings shared by all keyboards
         Settings.PREF_AUTO_PREVIEW_KEYBOARD, // settings screens bring up the preview keyboard by themselves
         Settings.PREF_SAVE_SUBTYPE_PER_APP, // which keyboard comes up in an app (moved from Layout & Typing)
-        // (learned & blacklisted words for all keyboards or one set each: under Per keyboard, above)
         SettingsWithoutKey.BACKUP_RESTORE,
         SettingsWithoutKey.FACTORY_RESET,
         if (BuildConfig.DEBUG || prefs.getBoolean(DebugSettings.PREF_SHOW_DEBUG_SETTINGS, Defaults.PREF_SHOW_DEBUG_SETTINGS))
             SettingsWithoutKey.DEBUG_SETTINGS else null,
+        // each keyboard its own settings or one set for all, and with separate settings which menus each keyboard keeps
+        // to itself (moved from the Keyboards screen; app-wide, so here); the menus indented under the switch
+        R.string.per_keyboard_title,
+        SettingsWithoutKey.SEPARATE_SETTINGS,
+        *(if (separate) helium314.keyboard.latin.settings.KeyboardProfiles.Group.entries.map { it.prefKey }.toTypedArray() else emptyArray<String>()),
+        // learned & blacklisted words (files, their own switch); shown without separate settings too while they're per keyboard
+        if (separate || !LearnedStores.isShared(real)) Settings.PREF_SHARE_LEARNED_WORDS else null,
+        SettingsWithoutKey.DIVIDER, // a line above About (2026-10-06)
         SettingsWithoutKey.ABOUT_SCREEN, // last (moved from the main screen, 2026-10-04)
         // (once under Experimental; the emoji version is on Appearance's Emoji group, next to the emoji font, URL
         //  detection on Text correction's Correction group)
-        // (recording the swipe corpus and logging swipe results: on the Swipe screen, Swipe logging)
+        // (recording the swipe corpus and logging swipe results: on Refine suggestions & learning)
     )
     SearchSettingsScreen(
         onClickBack = onClickBack,
         title = stringResource(R.string.settings_screen_advanced),
         settings = items,
-        // (no simple set: the screen as a whole is advanced, its entry on the main screen shows only in advanced mode;
-        // everything in it shows, untinted)
+        // (no simple set: everything in it shows, untinted; its entry on the main screen shows in simple mode too since
+        // 2026-10-06)
     )
 }
 
@@ -232,7 +232,7 @@ fun createAdvancedSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_SHARE_LEARNED_WORDS, R.string.learned_words_per_keyboard) { setting ->
         ShareLearnedWordsPreference(setting)
     },
-    Setting(context, SettingsWithoutKey.SEPARATE_SETTINGS, R.string.separate_settings_per_keyboard) { setting ->
+    Setting(context, SettingsWithoutKey.SEPARATE_SETTINGS, R.string.separate_settings_use) { setting ->
         SeparateSettingsPreference(setting)
     },
     *helium314.keyboard.latin.settings.KeyboardProfiles.Group.entries.map { group ->
@@ -258,7 +258,7 @@ fun createAdvancedSettings(context: Context) = listOf(
         UnitChoiceRow(it, Defaults.PREF_UNDO_UNIT)
     },
     // how many suggestions the strip shows, and rules for the 2nd one on (SuggestionRules)
-    Setting(context, Settings.PREF_SUGGESTION_RULES, R.string.customize_suggestions) {
+    Setting(context, Settings.PREF_SUGGESTION_RULES, R.string.customize_suggestions_row) {
         CustomizeSuggestionsPreference(it)
     },
     Setting(context, Settings.PREF_SUGGESTION_WORD_PADDING, R.string.suggestion_spacing_title) { setting ->
@@ -445,7 +445,16 @@ private fun groupTitle(group: helium314.keyboard.latin.settings.KeyboardProfiles
     helium314.keyboard.latin.settings.KeyboardProfiles.Group.REFINE -> R.string.learning_swiping_screen
 }
 
-/** "Separate settings per keyboard" (moved from the Keyboards screen): both ways ask first, saying what happens. */
+/** The icon a menu has on the main screen. */
+private fun groupIcon(group: helium314.keyboard.latin.settings.KeyboardProfiles.Group) = when (group) {
+    helium314.keyboard.latin.settings.KeyboardProfiles.Group.LAYOUT -> R.drawable.ic_settings_preferences
+    helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE -> R.drawable.ic_settings_appearance
+    helium314.keyboard.latin.settings.KeyboardProfiles.Group.SWIPE -> R.drawable.ic_settings_gesture
+    helium314.keyboard.latin.settings.KeyboardProfiles.Group.TEXT_CORRECTION -> R.drawable.ic_settings_correction
+    helium314.keyboard.latin.settings.KeyboardProfiles.Group.REFINE -> R.drawable.ic_settings_refine
+}
+
+/** "Use separate settings" (moved from the Keyboards screen): both ways ask first, saying what happens. */
 @Composable
 private fun SeparateSettingsPreference(setting: Setting) {
     val ctx = LocalContext.current
@@ -498,7 +507,12 @@ private fun GroupPreference(setting: Setting, group: helium314.keyboard.latin.se
     val real = ctx.realPrefs()
     var perKeyboard by remember { mutableStateOf(!helium314.keyboard.latin.settings.KeyboardProfiles.isShared(real, group)) }
     var asking by remember { mutableStateOf(false) }
-    Preference(name = setting.title, onClick = { asking = true }) { Switch(checked = perKeyboard, onCheckedChange = { asking = true }) }
+    // indented under "Use separate settings", with the menu's icon from the main screen, ticked = this menu per keyboard
+    androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.preferences.LocalRowStart provides 40.dp) {
+        Preference(name = setting.title, onClick = { asking = true }, icon = groupIcon(group)) {
+            androidx.compose.material3.Checkbox(checked = perKeyboard, onCheckedChange = { asking = true })
+        }
+    }
     if (!asking) return
     val keyboards = helium314.keyboard.latin.utils.SubtypeSettings.getEnabledSubtypes(true)
         .map { with(helium314.keyboard.latin.settings.SettingsSubtype) { it.toSettingsSubtype() } }

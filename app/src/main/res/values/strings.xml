@@ -54,7 +54,7 @@
     <!-- Settings screen title for advanced settings -->
     <string name="settings_screen_advanced">App settings</string>
     <!-- the top-level menu with the swipe tuning and how the keyboard learns (2026-10-04) -->
-    <string name="learning_swiping_screen">Refine swipe and learning</string>
+    <string name="learning_swiping_screen">Refine suggestions &amp; learning</string>
     <string name="learning_group">Learning</string>
     <!-- Settings screen title for keyboard theme settings -->
     <string name="settings_screen_theme">Theme</string>
@@ -294,7 +294,7 @@
     <string name="restore_clipboard">Clipboard history</string>
     <string name="restore_replaces_note">What\'s chosen replaces what the phone has now; learned words are added to the phone\'s.</string>
     <!-- Swipe tuning screen (own gesture decoder): inflection weights and per-setting statistics -->
-    <string name="swipe_tuning">Swipe parameter tuning</string>
+    <string name="swipe_tuning">Swipe suggestion parameters</string>
     <!-- One line under the heading: what the six sliders below are -->
     <string name="swipe_tuning_subtext">Six dials that decide which word your swipe means</string>
     <!-- The per-keyboard screen with the swipe settings and the swipe tuning -->
@@ -351,7 +351,7 @@
     <string name="swipe_tuning_slowdowns_summary">How much slowing over a key favours its letter (0 to 1)</string>
     <string name="swipe_tuning_blend_summary">1 = only turns and slowdowns count, 0 = only the whole path</string>
     <string name="swipe_other">Other swipes</string>
-    <string name="swipe_logging">Swipe logging</string>
+    <string name="swipe_logging">Suggestion logging &amp; optimization</string>
     <string name="swipe_tuning_fast_common">Fast swipes prioritize common words</string>
     <string name="swipe_tuning_fast_common_summary">The faster you swipe, the more common words win</string>
     <string name="swipe_tuning_fast_speed">Fast swipe threshold</string>
@@ -392,6 +392,8 @@
     <string name="undo_unit_word_short">Word</string>
     <!-- Customize suggestions (Others): how many suggestions, and a rule per position from the 2nd on -->
     <string name="customize_suggestions">Customize suggestions</string>
+    <!-- The row under the "Customize suggestions" heading of Refine suggestions & learning (2026-10-06) -->
+    <string name="customize_suggestions_row">Number and order of suggestions</string>
     <string name="suggestion_count_title">Number of suggestions: %s</string>
     <string name="suggestion_count_auto">Automatic (fills the strip)</string>
     <string name="suggestion_count_n">%s suggestions</string>
@@ -555,15 +557,17 @@
     <string name="delete_keyboard_title">Delete this keyboard?</string>
     <string name="delete_keyboard_message">\"%s\" will be removed, with its languages, their priorities and its layout choice. This cannot be undone. Learned words and dictionaries are kept.</string>
     <string name="separate_settings_per_keyboard">Separate settings per keyboard</string>
+    <!-- The switch under the "Separate settings per keyboard" heading of App settings (2026-10-06) -->
+    <string name="separate_settings_use">Use separate settings</string>
     <!-- App settings: the group with the separate-settings switch and one switch per top-level menu -->
-    <string name="per_keyboard_title">Per keyboard</string>
-    <string name="settings_category_this_app">This app</string>
+    <string name="per_keyboard_title">Separate settings per keyboard</string>
+    <string name="settings_category_this_app">App settings</string>
     <!-- %s is a menu name like Appearance -->
     <string name="per_keyboard_group_on_message">Each keyboard will have its own %s settings, starting from the ones all keyboards use now.</string>
     <string name="per_keyboard_group_off_title">Same %s for all keyboards</string>
     <string name="per_keyboard_group_off_message">All keyboards will use one keyboard\'s %s settings; the others\' own settings there go. Use the settings of:</string>
     <string name="learned_words_per_keyboard">Learned &amp; blacklisted words</string>
-    <string name="separate_settings_per_keyboard_summary">Off: the settings above apply to every keyboard. On: each keyboard has its own, starting from a copy of the shared ones</string>
+    <string name="separate_settings_per_keyboard_summary">Off: the settings below apply to every keyboard. On: each keyboard has its own, starting from a copy of the shared ones</string>
     <string name="separate_settings_enable_message">Every keyboard will use its own settings.\n\nTurning this off later gives all keyboards the primary keyboard\'s settings. Each keyboard\'s own settings stay saved and come back when you turn this on again.</string>
     <string name="separate_settings_hint">Each keyboard\'s own settings are under its entry above: tap a keyboard to unfold them. The menus all keyboards share are below. Which menus each keyboard keeps to itself, and the switch for separate settings: App settings, Per keyboard.</string>
     <string name="separate_settings_turn_on">Ok: Use separate settings</string>
