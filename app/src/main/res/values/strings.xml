@@ -543,9 +543,7 @@
     <string name="key_popups_delete_set_title">Delete the popup set \"%s\"?</string>
     <string name="key_popups_preset_standard">Curmudgeon</string>
     <string name="key_popups_preset_heliboard">HeliBoard</string>
-    <string name="key_popups_preset_main">Main accented letters</string>
-    <string name="key_popups_preset_more">More accented letters</string>
-    <string name="key_popups_preset_all">All accented letters</string>
+    <string name="key_popups_preset_heliboard_packed">HeliBoard Packed</string>
     <string name="key_popups_preset_arabic">Arabic-script symbols</string>
     <string name="key_popups_add">Add your own</string>
     <string name="key_popups_add_button">Add</string>

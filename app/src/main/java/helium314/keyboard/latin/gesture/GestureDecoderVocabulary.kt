@@ -67,7 +67,7 @@ object GestureDecoderVocabulary {
     // background while the current ones keep serving swipes (clearing them emptied every swipe until the rebuild,
     // e.g. right after switching to a keyboard with its own boost)
     private fun rebuildWithLearned() {
-        val context = Settings.getCurrentContext() ?: run { cache.clear(); merged.clear(); learned.clear(); return }
+        val context = Settings.getCurrentContext() ?: run { cache.clear(); clearMerged(); learned.clear(); return }
         val entries = mainEntries.toMap()
         Thread({
             for ((key, list) in entries) runCatching { publishNow(key, key.constructLocale(), context, list) }
@@ -169,7 +169,14 @@ object GestureDecoderVocabulary {
     }
     private val mergeLocks = ConcurrentHashMap<String, Any>()
 
+    // counts the clears of [merged]: a merge that was running across one (a language rebuilt with learned words that
+    // came in late) serves its own swipe but isn't kept, so the waiting rebuild makes a fresh one (review 2026-10-06:
+    // with the lock, the rebuild took the stale list and the late learned words were missing again, as before 0.3.007)
+    private val mergeGeneration = java.util.concurrent.atomic.AtomicInteger()
+    private fun clearMerged() { mergeGeneration.incrementAndGet(); merged.clear() }
+
     private fun merge(key: String, specs: List<LocaleSpec>): Vocabulary? {
+        val generation = mergeGeneration.get()
         val context = Settings.getCurrentContext() ?: return null
         val mergeStart = SystemClock.elapsedRealtime()
         val vocab = Vocabulary(emptyList())
@@ -192,8 +199,10 @@ object GestureDecoderVocabulary {
         Log.d(TAG, "merged vocabulary for $key: ${vocab.size} words")
         logVocab("swipe vocabulary for $key: ${vocab.size} words, learned ${scriptsDone.sumOf { learned[storeKey(it, LearnedStores.currentPool)]?.size ?: 0 }}, " +
                 "merged in ${SystemClock.elapsedRealtime() - mergeStart} ms on ${Thread.currentThread().name}")
-        merged[key] = vocab
-        mergedSpecs[key] = specs
+        if (mergeGeneration.get() == generation) {
+            merged[key] = vocab
+            mergedSpecs[key] = specs
+        }
         return vocab
     }
 
@@ -271,7 +280,7 @@ object GestureDecoderVocabulary {
         common.clear()
         contractions.clear()
         noDictionary.clear()
-        merged.clear()
+        clearMerged()
         mergedSpecs.clear()
         learned.clear()
         wanted.clear()
@@ -387,7 +396,7 @@ object GestureDecoderVocabulary {
             this.mainEntries[key] = mainEntries
             common.remove(key)
             contractions.remove(key)
-            merged.clear() // multilingual vocabularies containing this locale are rebuilt below or on the next swipe
+            clearMerged() // multilingual vocabularies containing this locale are rebuilt below or on the next swipe
             // the keyboards that asked for this language's merged vocabulary before it was ready get it now, on this
             // build thread, instead of at their first swipe
             for ((mergedKey, specs) in wanted)

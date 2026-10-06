@@ -57,12 +57,12 @@ object LayoutPresets {
     /** The settings part as it is now (plain keys, the edited keyboard's set). */
     fun current(prefs: SharedPreferences): Map<String, Any?> = prefs.all.filterKeys { inScope(it) }
 
-    /** What a Layout saves for [keyboard]: its keys, the settings set now, and every other one at its default with the
-     *  default value written out, like a backup (null where the default isn't fixed or absence means something). */
+    /** What a Layout saves for [keyboard]: its keys, the settings set now (picked), and every other one as "not set"
+     *  (null: applying it puts the default back, whatever the default is then; 0.3.008, as for themes). */
     fun snapshot(ctx: Context, keyboard: SettingsSubtype): Map<String, Any?> {
         val values = HashMap<String, Any?>()
-        LayoutDraft.keys.filter { inScope(it) }.forEach { values[it] = SettingDefaults.of(it) }
-        values.putAll(sizeDefaults)
+        LayoutDraft.keys.filter { inScope(it) }.forEach { values[it] = null }
+        values.putAll(sizeKeys)
         values.putAll(current(ctx.prefs()))
         values[SCRIPT] = keyboard.locale.script()
         values[MORE_POPUPS] = keyboard.getExtraValueOf(ExtraValue.MORE_POPUPS)
@@ -141,8 +141,8 @@ object LayoutPresets {
         KeyboardSwitcher.getInstance().setThemeNeedsReload()
     }
 
-    /** A Layout saved before the defaults were written out has a size missing when it was at its default. */
-    private val sizeDefaults by lazy { SettingDefaults.all.filterKeys { key -> sizePrefixes.any { key.startsWith(it) } } }
+    /** The sizes, each "not set": a Layout saved before 2026-10-03 has a size missing when it was at its default. */
+    private val sizeKeys by lazy { SettingDefaults.all.keys.filter { key -> sizePrefixes.any { key.startsWith(it) } }.associateWith { null } }
     private val sizePrefixes = listOf(Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, Settings.PREF_SPLIT_SPACER_SCALE_PREFIX,
         Settings.PREF_BOTTOM_ROW_SCALE_PREFIX, Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX, Settings.PREF_SIDE_PADDING_SCALE_PREFIX)
 
@@ -162,7 +162,7 @@ object LayoutPresets {
             (0 until arr.length()).map { i ->
                 val o = arr.getJSONObject(i)
                 val v = o.getJSONObject("values")
-                Preset(o.getString("name"), sizeDefaults + v.keys().asSequence().associateWith { key ->
+                Preset(o.getString("name"), sizeKeys + v.keys().asSequence().associateWith { key ->
                     v.getJSONObject(key).let { if (it.has("d")) null else AppearanceLooks.fromJson(it) } })
             }
         }.getOrDefault(emptyList())

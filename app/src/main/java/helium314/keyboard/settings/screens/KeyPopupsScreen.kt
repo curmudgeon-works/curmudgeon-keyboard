@@ -89,7 +89,6 @@ import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.keyboard.internal.keyboard_parser.morePopupKeysResId
 import helium314.keyboard.keyboard.internal.keyboard_parser.POPUP_KEYS_ALL
 import helium314.keyboard.keyboard.internal.keyboard_parser.POPUP_KEYS_MAIN
-import helium314.keyboard.keyboard.internal.keyboard_parser.POPUP_KEYS_MORE
 import helium314.keyboard.keyboard.internal.keyboard_parser.POPUP_KEYS_NORMAL
 import helium314.keyboard.latin.common.Constants.Subtype.ExtraValue
 import helium314.keyboard.latin.utils.NextScreenIcon
@@ -141,9 +140,9 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
             // HeliBoard's own, the default since 0.3.008: its accents level, no symbol map, and its popup order (as HeliBoard ships it, checked
             // against upstream 415c45f1 of 2026-09-30); the hint is the first popup entry, as everywhere here
             Preset(R.string.key_popups_preset_heliboard, POPUP_KEYS_MAIN, null, symbolMap = "", popupOrder = POPUP_KEYS_ORDER_DEFAULT),
-            // (no "Main accented letters": with no map it's exactly HeliBoard's default)
-            Preset(R.string.key_popups_preset_more, POPUP_KEYS_MORE, null, symbolMap = "", popupOrder = POPUP_KEYS_ORDER_DEFAULT),
-            Preset(R.string.key_popups_preset_all, POPUP_KEYS_ALL, null, symbolMap = "", popupOrder = POPUP_KEYS_ORDER_DEFAULT),
+            // HeliBoard Packed: HeliBoard's with every variant a key has (2026-10-06: "More accented letters" dropped; that
+            // level stays in the accents setting)
+            Preset(R.string.key_popups_preset_heliboard_packed, POPUP_KEYS_ALL, null, symbolMap = "", popupOrder = POPUP_KEYS_ORDER_DEFAULT),
         ).let { builtIn ->
             // the Arabic-script symbols page only makes sense for keyboards of that script
             if (keyboard.locale.script() == ScriptUtils.SCRIPT_ARABIC) builtIn + Preset(R.string.key_popups_preset_arabic, POPUP_KEYS_NORMAL, "symbols_arabic", symbolMap = "", popupOrder = POPUP_KEYS_ORDER_DEFAULT)

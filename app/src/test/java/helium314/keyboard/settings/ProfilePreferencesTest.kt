@@ -92,11 +92,6 @@ class ProfilePreferencesTest {
         // a renamed Layout is still the one tapped in the list
         val values = mapOf<String, Any?>(helium314.keyboard.latin.settings.Settings.PREF_SHOW_NUMBER_ROW to true)
         assertEquals(LayoutPresets.Preset("Old", values), LayoutPresets.Preset("New", HashMap(values)))
-        val ac = helium314.keyboard.latin.settings.Settings.PREF_AUTO_CORRECTION
-        val out = SettingDefaults.explicit(mapOf("p3/~$ac" to true))
-        assertEquals(defaults[ac], out[ac]) // the shared set's default written out
-        assertEquals(defaults[ac], out["p3/$ac"]) // keyboard 3's mark became its value
-        assertFalse(out.containsKey("p3/~$ac"))
     }
 
     @Test fun layoutPresetsKeepTheirValuesAndSkipPopups() {
@@ -116,9 +111,10 @@ class ProfilePreferencesTest {
         val back = LayoutPresets.load(real).single()
         assertEquals("Mine", back.name)
         assertEquals(preset.values, back.values.filterKeys { it in preset.values }) // null (at its default) and the custom keys' text survive
-        // a Layout without the sizes (saved before the defaults were written out) puts them back to their default
-        assertEquals(helium314.keyboard.latin.settings.Defaults.PREF_KEYBOARD_HEIGHT_SCALE[0],
-            back.values[helium314.keyboard.latin.settings.createPrefKeyForBooleanSettings(helium314.keyboard.latin.settings.Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, 0, 2)])
+        // a Layout without the sizes (saved before 2026-10-03) has them "not set": applying it puts them back to the default
+        val height = helium314.keyboard.latin.settings.createPrefKeyForBooleanSettings(helium314.keyboard.latin.settings.Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, 0, 2)
+        assert(back.values.containsKey(height))
+        assertEquals(null, back.values[height])
     }
 
     @Test fun keyboardBecomingAnotherKeepsBothSets() {

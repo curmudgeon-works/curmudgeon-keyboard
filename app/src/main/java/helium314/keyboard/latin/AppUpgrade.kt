@@ -39,6 +39,8 @@ import helium314.keyboard.latin.utils.mainLayoutNameOrQwerty
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.protectedPrefs
 import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.settings.LayoutPresets
+import helium314.keyboard.settings.AppearanceLooks
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.latin.utils.upgradeToolbarPrefs
 import helium314.keyboard.settings.screens.colorPrefsAndResIds
@@ -56,23 +58,80 @@ fun checkVersionUpgrade(context: Context) {
     if (oldVersion != BuildConfig.MIGRATION_VERSION)
         AppUpgrade.onUpgrade(context)
     curmudgeonUpgrades(prefs, freshInstall = oldVersion == 0)
+    pickedOnlyUpgrade(context.realPrefs(), freshInstall = oldVersion == 0)
     ownSetUpgrades(context.realPrefs(), freshInstall = oldVersion == 0)
 }
 
-/** The defaults 0.3.008 changed, with what they were: installs from before keep these (review 2026-10-06). */
-private val launch3008OldDefaults: List<Pair<String, Any>> = listOf(
+/** Set once [pickedOnlyUpgrade] ran; a backup made since carries it, one from before doesn't (its restore runs it again). */
+const val PICKED_ONLY_DONE = "settings_picked_only_done"
+
+/** The defaults 0.3.008 changed, with their value before: stored at that value, a setting counts as at its default. */
+private val defaultsBefore3008: Map<String, Any> = mapOf(
     Settings.PREF_MORE_POPUP_KEYS to "all",
     Settings.PREF_SYMBOL_POPUP_MAP to Defaults.CURMUDGEON_SYMBOL_POPUP_MAP,
     Settings.PREF_SUGGESTION_TEXT_COLOR to Defaults.PREF_SUGGESTION_TEXT_COLOR,
-    Settings.PREF_LONG_PRESS_SYMBOL_ACTION to "none", // unless the old "numpad on long-press" switch is on
+    Settings.PREF_LONG_PRESS_SYMBOL_ACTION to "none",
 )
+
+/** Whether a stored [value] of [key] is at its default: the default now, or the one before 0.3.008. Long-press ?123 not
+ *  while the old numpad switch is on ([numpadOn]): not set, it reads the numpad there. */
+private fun atDefault(key: String, value: Any?, numpadOn: Boolean): Boolean {
+    if (value == null) return false
+    if (key == Settings.PREF_LONG_PRESS_SYMBOL_ACTION && numpadOn) return false
+    val now = helium314.keyboard.settings.SettingDefaults.of(key)
+    if (now != null && helium314.keyboard.settings.KnownDefaults.same(key, value, now)) return true
+    return defaultsBefore3008[key] == value
+}
+
+/** [values] (plain keys, e.g. a keyboard's settings in a backup from before 0.3.008) without the ones at their default. */
+internal fun withoutDefaults(values: Map<String, Any?>): Map<String, Any?> {
+    val numpadOn = values[Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD] == true
+    return values.filterNot { (key, value) -> atDefault(key, value, numpadOn) }
+}
+
+/**
+ * 0.3.008: a stored setting is one you picked, as in any Android app; one not stored follows the defaults, also when they
+ * change. Before, backups (from 2026-10-03), saved themes and Layouts (from 2026-10-02) and upgrade steps also wrote
+ * settings down at their default, which froze them. Once, and again after restoring a backup from before: every stored
+ * setting at its default (now, or before 0.3.008) is unset, in the shared set (removed) and in every keyboard's own set,
+ * also of keyboards whose set isn't in use (a reset mark, so it doesn't take the shared value instead); the saved themes
+ * and Layouts likewise. A default picked before can't be told apart: it goes too (2026-10-06).
+ */
+internal fun pickedOnlyUpgrade(real: SharedPreferences, freshInstall: Boolean) {
+    if (real.getBoolean(PICKED_ONLY_DONE, false)) return
+    if (!freshInstall) {
+        val all = real.all
+        val numpad = Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD
+        val sharedNumpad = all[numpad] == true
+        fun numpadOn(id: Int) = all[KeyboardProfiles.ownKey(id, numpad)] as? Boolean
+            ?: (!all.containsKey(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + numpad)) && sharedNumpad)
+        real.edit {
+            for ((stored, value) in all) {
+                val own = KeyboardProfiles.splitOwnKey(stored)
+                if (own == null) {
+                    if (atDefault(stored, value, sharedNumpad)) remove(stored)
+                    continue
+                }
+                val (id, key) = own
+                if (key.startsWith(KeyboardProfiles.TOMBSTONE) || !atDefault(key, value, numpadOn(id))) continue
+                remove(stored)
+                putBoolean(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + key), true)
+            }
+        }
+        AppearanceLooks.save(real, AppearanceLooks.load(real).map { look -> AppearanceLooks.Look(look.name,
+            look.values.mapValues { (key, value) -> if (atDefault(key, value, sharedNumpad)) null else value }) })
+        LayoutPresets.save(real, LayoutPresets.load(real).map { preset -> LayoutPresets.Preset(preset.name,
+            preset.values.mapValues { (key, value) -> if (atDefault(key, value, preset.values[numpad] as? Boolean ?: sharedNumpad)) null else value }) })
+    }
+    real.edit { putBoolean(PICKED_ONLY_DONE, true) }
+}
 
 /**
  * The steps of [curmudgeonUpgrades] that change a keyboard's look or behaviour, for every keyboard's own set (separate
  * settings): run on the stored entries of that set ("p<id>/…"), as reading them through the set would see the shared
  * set's values and its "done" flags. Each set keeps its own flags.
  */
-internal fun ownSetUpgrades(real: SharedPreferences, freshInstall: Boolean) {
+private fun ownSetUpgrades(real: SharedPreferences, freshInstall: Boolean) {
     val ids = runCatching { org.json.JSONObject(real.getString("keyboard_profile_ids", "{}")!!) }.getOrNull() ?: return
     for (name in ids.keys()) {
         val id = ids.optInt(name, KeyboardProfiles.SHARED)
@@ -94,25 +153,12 @@ internal fun ownSetUpgrades(real: SharedPreferences, freshInstall: Boolean) {
             putBoolean(k(Settings.PREF_GESTURE_PREVIEW_TRAIL), true)
             putBoolean(k("trail_thickness_migrated"), true)
         }
-        // 0.3.008 (see curmudgeonUpgrades): a set that reads the default for one of these (its "reset to default" mark)
-        // keeps the default it had before; one without a mark reads the shared value, which that step kept already
-        if (!real.getBoolean(k("defaults_launch_3008_done"), false)) real.edit {
-            if (!freshInstall) for ((key, old) in launch3008OldDefaults) {
-                val mark = k(KeyboardProfiles.TOMBSTONE + key)
-                if (k(key) == key || !real.contains(mark) || real.contains(k(key))) continue
-                if (key == Settings.PREF_LONG_PRESS_SYMBOL_ACTION && (real.all[k(Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD)] as? Boolean
-                        ?: real.getBoolean(Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, false))) continue
-                KeyboardProfiles.put(this, k(key), old)
-                remove(mark)
-            }
-            putBoolean(k("defaults_launch_3008_done"), true)
-        }
     }
 }
 
 /** Our own settings changes: each checks its own state, so running them on every start is cheap and safe
  *  (MIGRATION_VERSION stays at upstream's, so onUpgrade doesn't run for them). */
-internal fun curmudgeonUpgrades(prefs: SharedPreferences, freshInstall: Boolean) {
+private fun curmudgeonUpgrades(prefs: SharedPreferences, freshInstall: Boolean) {
     // 0.3.001: the "same font as the keys" switch is gone (one Fonts dialog, each text its own font): where it was on
     // (its old default), symbols and suggestions take the key font as their own, so nothing changes on screen
     if (!prefs.getBoolean("fonts_follow_migrated", false)) {
@@ -158,18 +204,6 @@ internal fun curmudgeonUpgrades(prefs: SharedPreferences, freshInstall: Boolean)
             putString(Settings.PREF_TOOLBAR_VISIBILITY, Settings.readToolbarVisibility(prefs))
             // these showed no suggestions: they stay without them
             if (old == "TOOLBAR_KEYS" || old == "HIDDEN") putBoolean(Settings.PREF_SHOW_SUGGESTIONS, false)
-        }
-    }
-    // 0.3.008: new defaults (HeliBoard's popups: main accents, no symbol map; the suggestion colour follows the swipe
-    // trail; long-press ?123 opens the settings): installs from before keep what they had (review 2026-10-06)
-    if (!prefs.getBoolean("defaults_launch_3008_done", false)) {
-        prefs.edit {
-            if (!freshInstall) for ((key, old) in launch3008OldDefaults) {
-                if (prefs.contains(key)) continue
-                if (key == Settings.PREF_LONG_PRESS_SYMBOL_ACTION && prefs.getBoolean(Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, false)) continue
-                KeyboardProfiles.put(this, key, old)
-            }
-            putBoolean("defaults_launch_3008_done", true)
         }
     }
     // 0.1.004: key-press vibration and sound became on by default; installs from before keep what they had

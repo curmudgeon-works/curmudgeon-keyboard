@@ -55,21 +55,4 @@ object SettingDefaults {
      *  applied) for one whose absence means something or whose default isn't fixed. */
     fun of(key: String): Any? = all[key]
 
-    private val ownMark = Regex("^p(\\d+)/${Regex.escape(KeyboardProfiles.TOMBSTONE)}(.+)$")
-
-    /** [stored] (the raw preference file) with every setting at its default written out: the shared set gets the
-     *  defaults it lacks, and a keyboard's "default" marks become its own default values. */
-    fun explicit(stored: Map<String, Any?>): Map<String, Any?> {
-        val out = HashMap(stored)
-        for ((key, default) in all) if (key !in out) out[key] = default
-        for ((key, value) in stored) {
-            val m = ownMark.matchEntire(key) ?: continue
-            val plain = m.groupValues[2]
-            val default = all[plain] ?: continue
-            if (value != true) continue
-            out.remove(key)
-            out.putIfAbsent("p${m.groupValues[1]}/$plain", default)
-        }
-        return out
-    }
 }

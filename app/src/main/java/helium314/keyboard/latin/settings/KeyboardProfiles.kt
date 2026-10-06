@@ -143,6 +143,19 @@ object KeyboardProfiles {
 
     fun isSeparate(real: SharedPreferences) = real.getBoolean(PREF_SEPARATE, false)
 
+    /** A stored key of a keyboard's own set as its set id and plain key (a mark keeps its [TOMBSTONE]); null for a key of
+     *  the shared set or an app-wide one. */
+    fun splitOwnKey(stored: String): Pair<Int, String>? {
+        if (!stored.startsWith(PREFIX)) return null
+        val sep = stored.indexOf(SEPARATOR)
+        if (sep < 0) return null
+        val id = stored.substring(PREFIX.length, sep).toIntOrNull() ?: return null
+        return id to stored.substring(sep + 1)
+    }
+
+    /** [key] in keyboard set [id], whether or not the key is shared now (as stored, unlike [prefixedKey]). */
+    fun ownKey(id: Int, key: String) = "$PREFIX$id$SEPARATOR$key"
+
     fun prefixedKey(id: Int, key: String) = if (id == SHARED || isGlobal(key)) key else "$PREFIX$id$SEPARATOR$key"
 
     /** The key as the app knows it, or null if [key] belongs to another profile than [id]. */

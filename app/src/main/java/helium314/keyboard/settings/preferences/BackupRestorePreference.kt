@@ -193,9 +193,10 @@ private fun backupLauncher(onError: (String) -> Unit): ManagedActivityResultLaun
                         zipStream.closeEntry()
                     }
                     zipStream.putNextEntry(ZipEntry(PREFS_FILE_NAME))
-                    // every keyboard's set, not just the edited one; settings at their default written out too, so a phone or
-                    // version with other defaults restores what this one did
-                    settingsToJsonStream(helium314.keyboard.settings.SettingDefaults.explicit(ctx.realPrefs().all).mapKeys { it.key as String? }, zipStream)
+                    // every keyboard's set, not just the edited one: what is stored (the settings you picked, and the keyboards'
+                    // "reset to default" marks), so a setting left at its default follows the defaults of the version it's
+                    // restored on (0.3.008; from 2026-10-03 every default was written out, which froze them)
+                    settingsToJsonStream(ctx.realPrefs().all.mapKeys { it.key as String? }, zipStream)
                     zipStream.closeEntry()
                     zipStream.putNextEntry(ZipEntry(PROTECTED_PREFS_FILE_NAME))
                     settingsToJsonStream(ctx.protectedPrefs().all, zipStream)
@@ -509,7 +510,10 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
     val backup = pending.prefs
     // its own set when the backup kept one, else the backup's shared set was what it used
     // (the backup's shared set with the keyboard's own on top: what it read on the old phone)
-    val settings = chosen.associateWith { KeyboardProfiles.effectiveSettingsIn(backup, it) }
+    // (a backup from before 0.3.008 wrote every setting at its default down: those are left out, so they follow the
+    // defaults here; see pickedOnlyUpgrade)
+    val settings = chosen.associateWith { KeyboardProfiles.effectiveSettingsIn(backup, it)
+        .let { values -> if (backup[helium314.keyboard.latin.PICKED_ONLY_DONE] == true) values else helium314.keyboard.latin.withoutDefaults(values) } }
     if (withSettings && !KeyboardProfiles.isSeparate(real))
         KeyboardProfiles.enable(real, SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }, keepExisting = true)
 

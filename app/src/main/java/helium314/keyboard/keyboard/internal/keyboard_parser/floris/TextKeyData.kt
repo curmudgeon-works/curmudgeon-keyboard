@@ -111,12 +111,22 @@ sealed interface KeyData : AbstractKeyData {
             return keys
         }
 
+        /** The period key's popups with the apostrophe where the comma was first (what press and hold types), and the
+         *  comma where the apostrophe was: the comma has its own key (2026-10-06). Lists without both stay as they are. */
+        internal fun apostropheFirst(popupKeys: Collection<String>): List<String> {
+            val keys = popupKeys.toMutableList()
+            val first = keys.indexOfFirst { !it.startsWith(Key.POPUP_KEYS_AUTO_COLUMN_ORDER) && !it.startsWith(Key.POPUP_KEYS_FIXED_COLUMN_ORDER) }
+            val apostrophe = keys.indexOf("'")
+            if (first >= 0 && keys[first] == "\\," && apostrophe >= 0) { keys[first] = "'"; keys[apostrophe] = "\\," }
+            return keys
+        }
+
         private fun getPunctuationPopupKeys(params: KeyboardParams): List<String> {
             if (params.mId.mElementId == KeyboardId.ELEMENT_SYMBOLS || params.mId.mElementId == KeyboardId.ELEMENT_SYMBOLS_SHIFTED)
                 return listOf("…")
             if (params.mId.isNumberLayout)
                 return listOf(":", "…", ";", "∞", "π", "√", "°", "^")
-            val popupKeys = params.mLocaleKeyboardInfos.getPopupKeys("punctuation")!!.toMutableList()
+            val popupKeys = apostropheFirst(params.mLocaleKeyboardInfos.getPopupKeys("punctuation")!!).toMutableList()
             if (params.mId.mSubtype.isRtlSubtype) {
                 for (i in popupKeys.indices)
                     popupKeys[i] = popupKeys[i].rtlLabel(params) // for parentheses
