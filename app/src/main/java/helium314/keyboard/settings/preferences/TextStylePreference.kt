@@ -34,7 +34,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
+import helium314.keyboard.latin.utils.getActivity
+import helium314.keyboard.settings.SettingsActivity
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -482,10 +485,11 @@ fun SuggestionColorRow(reload: () -> Unit) {
         parentHidden?.value = showPicker
         onDispose { parentHidden?.value = false }
     }
-    // what the strip shows: the colour picked, else the theme's swipe trail colour (since 0.3.008)
-    // (the theme's colours read on every redraw: a theme or day / night change while this is open shows at once)
-    val color = helium314.keyboard.latin.utils.suggestionTextColor(prefs,
-        helium314.keyboard.keyboard.KeyboardTheme.getColorsForCurrentTheme(ctx))
+    // what the strip shows: the colour picked, else the theme's swipe trail colour (since 0.3.008), read again when a
+    // setting changes (a theme change while this is open shows at once; review 2026-10-06: not on every redraw)
+    val changed = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
+    val color = remember(changed?.value) { helium314.keyboard.latin.utils.suggestionTextColor(prefs,
+        helium314.keyboard.keyboard.KeyboardTheme.getColorsForCurrentTheme(ctx)) }
     Row(verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().clickable { showPicker = true }.padding(vertical = 6.dp)) {
         Text(stringResource(R.string.suggestion_text_color), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)

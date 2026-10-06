@@ -38,6 +38,7 @@ class App : Application() {
         helium314.keyboard.latin.settings.KeyboardProfiles.migrateFiles(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
         helium314.keyboard.latin.settings.KeyboardProfiles.migrateLearningSwiping(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
         helium314.keyboard.latin.settings.KeyboardProfiles.migrateSuggestionsToRefine(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
+        helium314.keyboard.latin.settings.KeyboardProfiles.removeMovedMarkers(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
         helium314.keyboard.latin.settings.KeyboardProfiles.forgetSetting(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this), "gesture_space_aware")
         // every picture loaded so far joins the picture list all keyboards choose from
         helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this).let { real ->

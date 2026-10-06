@@ -172,6 +172,7 @@ object OwnGestureDecoder {
         // a stale "no vocabulary" mislabeled the next dead swipe in the results log)
         lastVocabularyMissing = false
         lastDecodeMs = 0
+        lastSpeedKeysPerSecond = 0f
         val locale = locales.first()
         val points = adaptPointers(composedData)
         if (points.size < 2) return results

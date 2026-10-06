@@ -160,6 +160,16 @@ object GestureDecoderVocabulary {
         var allReady = true
         for (spec in specs) if (getOrBuildAsync(spec.locale) == null) allReady = false
         if (!allReady) { wanted[key] = specs; return null }
+        // one merge per list: the keyboard's warm-up and the first swipe may both get here; the second waits for the
+        // first's result instead of doing the same work at the same time (review 2026-10-06)
+        synchronized(mergeLocks.getOrPut(key) { Any() }) {
+            merged[key]?.let { return it }
+            return merge(key, specs)
+        }
+    }
+    private val mergeLocks = ConcurrentHashMap<String, Any>()
+
+    private fun merge(key: String, specs: List<LocaleSpec>): Vocabulary? {
         val context = Settings.getCurrentContext() ?: return null
         val mergeStart = SystemClock.elapsedRealtime()
         val vocab = Vocabulary(emptyList())
@@ -401,18 +411,19 @@ object GestureDecoderVocabulary {
 
     /**
      * Warms the vocabularies for [specs] when the keyboard opens, off the main thread (review 2026-10-06: merging a
-     * two-language vocabulary, and reading a store not read yet, could stall the keyboard's opening). A warm-up
-     * already waiting makes this one unnecessary.
+     * two-language vocabulary, and reading a store not read yet, could stall the keyboard's opening). A warm-up still
+     * waiting takes the latest keyboard's list instead of its own (review 2026-10-06: switching keyboards quickly left
+     * the new one cold).
      */
     fun prewarm(specs: List<LocaleSpec>) {
-        if (!prewarmPending.compareAndSet(false, true)) return
+        if (prewarmWanted.getAndSet(specs) != null) return // the waiting one takes these
         prewarmExecutor.execute {
-            prewarmPending.set(false)
-            try { getOrBuildAsync(specs) } catch (t: Throwable) { Log.w(TAG, "could not warm the gesture vocabulary", t) }
+            val latest = prewarmWanted.getAndSet(null) ?: return@execute
+            try { getOrBuildAsync(latest) } catch (t: Throwable) { Log.w(TAG, "could not warm the gesture vocabulary", t) }
         }
     }
     private val prewarmExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { Thread(it, "GestureVocabWarm").apply { isDaemon = true } }
-    private val prewarmPending = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val prewarmWanted = java.util.concurrent.atomic.AtomicReference<List<LocaleSpec>?>(null)
 
     // merged vocabularies asked for before every language was built (the keyboard's open warms them): built by the
     // last language's build, see publishNow

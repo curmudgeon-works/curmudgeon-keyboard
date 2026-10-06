@@ -429,17 +429,30 @@ object KeyboardProfiles {
         it.startsWith(PREFIX) && (it.endsWith("$SEPARATOR$key") || it.endsWith("$SEPARATOR$TOMBSTONE$key")) }
 
     /** Moves the value [inUse] (a keyboard's id) has for [key] to the plain settings: its value, or the default if it was
-     *  reset there (the plain value goes). */
+     *  reset there (the plain value goes). A value beats a marker, as everywhere else in this file. */
     private fun SharedPreferences.Editor.takeOwn(all: Map<String, *>, inUse: Int, key: String) {
         if (inUse == SHARED) return
-        if (all.containsKey("$PREFIX$inUse$SEPARATOR$TOMBSTONE$key")) { remove(key); return }
         when (val v = all["$PREFIX$inUse$SEPARATOR$key"]) {
             is Boolean -> putBoolean(key, v)
             is Int -> putInt(key, v)
             is Long -> putLong(key, v)
             is Float -> putFloat(key, v)
             is String -> putString(key, v)
+            else -> if (all.containsKey("$PREFIX$inUse$SEPARATOR$TOMBSTONE$key")) remove(key)
         }
+    }
+
+    /** Once: the "reset to default" markers the two moves above left behind on phones that ran them before they removed
+     *  markers too (0.3.006 / 0.3.007; review 2026-10-06): harmless now, wrong if those menus are made per keyboard. */
+    fun removeMovedMarkers(real: SharedPreferences) {
+        if (real.getBoolean("moved_markers_removed", false)) return
+        val all = real.all
+        val keys = learningSwipingKeys + listOf(Settings.PREF_SUGGESTION_COUNT, Settings.PREF_SUGGESTION_RULES)
+        real.edit().apply {
+            for (key in keys) for (stored in all.keys)
+                if (stored.startsWith(PREFIX) && stored.endsWith("$SEPARATOR$TOMBSTONE$key")) remove(stored)
+            putBoolean("moved_markers_removed", true)
+        }.apply()
     }
 
     /** Once: the settings that became the same for every keyboard ([learningSwipingKeys]) take the values of the keyboard

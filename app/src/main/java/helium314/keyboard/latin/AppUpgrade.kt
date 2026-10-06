@@ -59,12 +59,20 @@ fun checkVersionUpgrade(context: Context) {
     ownSetUpgrades(context.realPrefs(), freshInstall = oldVersion == 0)
 }
 
+/** The defaults 0.3.008 changed, with what they were: installs from before keep these (review 2026-10-06). */
+private val launch3008OldDefaults: List<Pair<String, Any>> = listOf(
+    Settings.PREF_MORE_POPUP_KEYS to "all",
+    Settings.PREF_SYMBOL_POPUP_MAP to Defaults.CURMUDGEON_SYMBOL_POPUP_MAP,
+    Settings.PREF_SUGGESTION_TEXT_COLOR to Defaults.PREF_SUGGESTION_TEXT_COLOR,
+    Settings.PREF_LONG_PRESS_SYMBOL_ACTION to "none", // unless the old "numpad on long-press" switch is on
+)
+
 /**
  * The steps of [curmudgeonUpgrades] that change a keyboard's look or behaviour, for every keyboard's own set (separate
  * settings): run on the stored entries of that set ("p<id>/…"), as reading them through the set would see the shared
  * set's values and its "done" flags. Each set keeps its own flags.
  */
-private fun ownSetUpgrades(real: SharedPreferences, freshInstall: Boolean) {
+internal fun ownSetUpgrades(real: SharedPreferences, freshInstall: Boolean) {
     val ids = runCatching { org.json.JSONObject(real.getString("keyboard_profile_ids", "{}")!!) }.getOrNull() ?: return
     for (name in ids.keys()) {
         val id = ids.optInt(name, KeyboardProfiles.SHARED)
@@ -86,12 +94,25 @@ private fun ownSetUpgrades(real: SharedPreferences, freshInstall: Boolean) {
             putBoolean(k(Settings.PREF_GESTURE_PREVIEW_TRAIL), true)
             putBoolean(k("trail_thickness_migrated"), true)
         }
+        // 0.3.008 (see curmudgeonUpgrades): a set that reads the default for one of these (its "reset to default" mark)
+        // keeps the default it had before; one without a mark reads the shared value, which that step kept already
+        if (!real.getBoolean(k("defaults_launch_3008_done"), false)) real.edit {
+            if (!freshInstall) for ((key, old) in launch3008OldDefaults) {
+                val mark = k(KeyboardProfiles.TOMBSTONE + key)
+                if (k(key) == key || !real.contains(mark) || real.contains(k(key))) continue
+                if (key == Settings.PREF_LONG_PRESS_SYMBOL_ACTION && (real.all[k(Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD)] as? Boolean
+                        ?: real.getBoolean(Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, false))) continue
+                KeyboardProfiles.put(this, k(key), old)
+                remove(mark)
+            }
+            putBoolean(k("defaults_launch_3008_done"), true)
+        }
     }
 }
 
 /** Our own settings changes: each checks its own state, so running them on every start is cheap and safe
  *  (MIGRATION_VERSION stays at upstream's, so onUpgrade doesn't run for them). */
-private fun curmudgeonUpgrades(prefs: SharedPreferences, freshInstall: Boolean) {
+internal fun curmudgeonUpgrades(prefs: SharedPreferences, freshInstall: Boolean) {
     // 0.3.001: the "same font as the keys" switch is gone (one Fonts dialog, each text its own font): where it was on
     // (its old default), symbols and suggestions take the key font as their own, so nothing changes on screen
     if (!prefs.getBoolean("fonts_follow_migrated", false)) {
@@ -143,12 +164,10 @@ private fun curmudgeonUpgrades(prefs: SharedPreferences, freshInstall: Boolean) 
     // trail; long-press ?123 opens the settings): installs from before keep what they had (review 2026-10-06)
     if (!prefs.getBoolean("defaults_launch_3008_done", false)) {
         prefs.edit {
-            if (!freshInstall) {
-                if (!prefs.contains(Settings.PREF_MORE_POPUP_KEYS)) putString(Settings.PREF_MORE_POPUP_KEYS, "all")
-                if (!prefs.contains(Settings.PREF_SYMBOL_POPUP_MAP)) putString(Settings.PREF_SYMBOL_POPUP_MAP, Defaults.CURMUDGEON_SYMBOL_POPUP_MAP)
-                if (!prefs.contains(Settings.PREF_SUGGESTION_TEXT_COLOR)) putInt(Settings.PREF_SUGGESTION_TEXT_COLOR, Defaults.PREF_SUGGESTION_TEXT_COLOR)
-                if (!prefs.contains(Settings.PREF_LONG_PRESS_SYMBOL_ACTION) && !prefs.getBoolean(Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, false))
-                    putString(Settings.PREF_LONG_PRESS_SYMBOL_ACTION, "none")
+            if (!freshInstall) for ((key, old) in launch3008OldDefaults) {
+                if (prefs.contains(key)) continue
+                if (key == Settings.PREF_LONG_PRESS_SYMBOL_ACTION && prefs.getBoolean(Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, false)) continue
+                KeyboardProfiles.put(this, key, old)
             }
             putBoolean("defaults_launch_3008_done", true)
         }

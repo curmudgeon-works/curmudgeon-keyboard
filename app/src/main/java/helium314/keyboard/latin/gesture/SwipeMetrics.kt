@@ -12,8 +12,8 @@ import java.util.concurrent.Executors
  * time): first choice right (kept as swiped), picked from the strip (with the rank), never offered (deleted,
  * retyped or edited into another word). One tab-separated line per outcome in `swipe_results.tsv` in the app's
  * external files dir: time, swipe id, outcome, rank, swiped word, final word, decode ms, speed (key widths per
- * second), tuning key, decoder version ([helium314.keyboard.gesture.DECODER_VERSION]), app version. Nothing leaves
- * the phone. A swipe whose word is edited again later gets a second line with the
+ * second), tuning key, decoder version ([helium314.keyboard.gesture.DECODER_VERSION]), app version, keyboard start
+ * ([START]: swipe ids begin again at every start). Nothing leaves the phone. A swipe whose word is edited again later gets a second line with the
  * same id; the summary keeps the last.
  *
  * Fed by [GestureCorpusRecorder], which follows each swiped word until it is settled, whether or not the corpus
@@ -30,6 +30,9 @@ object SwipeMetrics {
     const val OUTCOME_NONE = "none"
     /** the swipe came before the vocabulary was built (right after a start): a dead swipe, nothing written */
     const val OUTCOME_NO_VOCABULARY = "novocab"
+
+    /** This start of the keyboard, on every line: with the id it names one swipe (lines from before 2026-10-06 have none). */
+    private val START = System.currentTimeMillis().toString(36)
 
     private val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "swipe-metrics").apply { isDaemon = true } }
     @Volatile private var file: File? = null
@@ -48,7 +51,7 @@ object SwipeMetrics {
             try {
                 file?.appendText(listOf(time, id, outcome, rank, swiped, finalWord ?: "", decodeMs,
                     String.format(java.util.Locale.ROOT, "%.1f", keysPerSecond), tuningKey,
-                    helium314.keyboard.gesture.DECODER_VERSION, helium314.keyboard.latin.BuildConfig.VERSION_NAME).joinToString("\t") + "\n")
+                    helium314.keyboard.gesture.DECODER_VERSION, helium314.keyboard.latin.BuildConfig.VERSION_NAME, START).joinToString("\t") + "\n")
             } catch (e: Exception) {
                 Log.w(TAG, "could not log a swipe outcome", e)
             }
@@ -86,7 +89,7 @@ object SwipeMetrics {
     fun read(): Results {
         val f = file
         if (f == null || !f.isFile) return Results(emptyList(), emptyList())
-        val last = LinkedHashMap<Pair<Int, Long>, Outcome>()
+        val last = LinkedHashMap<Pair<String, Long>, Outcome>()
         val restarts = ArrayList<Long>()
         var run = 0
         var maxId = 0L
@@ -100,9 +103,13 @@ object SwipeMetrics {
                 // a new run of ids (the keyboard started again) starts at 1 (2 if the first swipe's line was lost); a line
                 // a little below the highest is the latest swipe logged again after dead swipes took ids in between
                 // (review 2026-10-06: counted it twice)
-                if (id < maxId && (id <= 2 || maxId - id > RELOG_SPAN)) { run++; maxId = 0L }
-                maxId = maxOf(maxId, id)
-                val key = run to id
+                // lines naming their keyboard start need no guessing (review 2026-10-06: the guess still counted some twice)
+                val start = p.getOrNull(11)?.takeIf { it.isNotEmpty() }
+                if (start == null) {
+                    if (id < maxId && (id <= 2 || maxId - id > RELOG_SPAN)) { run++; maxId = 0L }
+                    maxId = maxOf(maxId, id)
+                }
+                val key = (start ?: "run$run") to id
                 last.remove(key) // (re-inserted: the order stays by time of the last outcome)
                 last[key] = Outcome(time, p[2], p[3].toIntOrNull() ?: -1, p[6].toIntOrNull(), p.getOrElse(8) { "" })
             }
