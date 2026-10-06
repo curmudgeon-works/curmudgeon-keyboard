@@ -20,6 +20,8 @@ object SettingDefaults {
         Settings.PREF_KEY_VERTICAL_GAP, Settings.PREF_LANGUAGE_SWITCH_KEY, Settings.PREF_SOUND_ON,
         Settings.PREF_SPACE_HORIZONTAL_SWIPE, Settings.PREF_SPACE_VERTICAL_SWIPE, Settings.PREF_TOOLBAR_MODE,
         Settings.PREF_TOOLBAR_VISIBILITY, Settings.PREF_VIBRATE_ON,
+        // not set = the swipe trail's colour (0.3.008): a theme or a backup must not write the fallback orange down
+        Settings.PREF_SUGGESTION_TEXT_COLOR,
     )
 
     /** Key -> fixed default, for the settings that are per keyboard (or shared) and whose absence means nothing. */

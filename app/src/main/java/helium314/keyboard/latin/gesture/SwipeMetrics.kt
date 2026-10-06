@@ -71,14 +71,17 @@ object SwipeMetrics {
     /** The log read once: every swipe's outcome, oldest first, and the times tracking was restarted. */
     class Results(val outcomes: List<Outcome>, val restarts: List<Long>)
 
+    /** How far below the highest id a swipe logged again can be (the dead swipes after it took the ids between). */
+    private const val RELOG_SPAN = 5
+
     /** A line that restarts the tracking: the summaries and the chart can start from it, nothing is deleted. */
     private const val MARK_RESTART = "restart"
 
     /**
      * Reads the whole log. A swipe edited again later has a second line with its id: the last one counts. Ids start
-     * from 1 again on every start of the keyboard, so a lower id than the one before begins a new run of ids (a swipe
-     * logged again is always the latest swipe, never an older one); before 2026-10-05 the summary kept one swipe per
-     * id across all runs, and counted 189 of 637 swipes in one day.
+     * from 1 again on every start of the keyboard, so an id back at 1 or 2 (or far below the highest) begins a new run
+     * of ids; a swipe logged again is always the latest swipe, a few ids below the highest at most. Before 2026-10-05
+     * the summary kept one swipe per id across all runs, and counted 189 of 637 swipes in one day.
      */
     fun read(): Results {
         val f = file
@@ -94,7 +97,10 @@ object SwipeMetrics {
                 if (p.size >= 3 && p[2] == MARK_RESTART) { restarts.add(time); return@forEachLine }
                 if (p.size < 7) return@forEachLine
                 val id = p[1].toLongOrNull() ?: return@forEachLine
-                if (id < maxId) { run++; maxId = 0L }
+                // a new run of ids (the keyboard started again) starts at 1 (2 if the first swipe's line was lost); a line
+                // a little below the highest is the latest swipe logged again after dead swipes took ids in between
+                // (review 2026-10-06: counted it twice)
+                if (id < maxId && (id <= 2 || maxId - id > RELOG_SPAN)) { run++; maxId = 0L }
                 maxId = maxOf(maxId, id)
                 val key = run to id
                 last.remove(key) // (re-inserted: the order stays by time of the last outcome)

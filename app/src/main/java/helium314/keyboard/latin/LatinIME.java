@@ -853,7 +853,7 @@ public class LatinIME extends InputMethodService implements
         final java.util.List<Locale> locales = mDictionaryFacilitator.getLocales();
         if (sv != null && sv.mGestureInputEnabled && !locales.isEmpty()) {
             final helium314.keyboard.latin.gesture.GestureDecoderVocabulary v = helium314.keyboard.latin.gesture.GestureDecoderVocabulary.INSTANCE;
-            v.getOrBuildAsync(v.specsFor(this, locales));
+            v.prewarm(v.specsFor(this, locales)); // (in the background: review 2026-10-06)
         }
         // Switch to the null consumer to handle cases leading to early exit below, for which we
         // also wouldn't be consuming gesture data.

@@ -78,9 +78,6 @@ object GestureCorpusRecorder {
         if (size < 2) return
         // a swipe still open when the next one comes was kept as it came
         if (pendingId >= 0) finish(SwipeMetrics.OUTCOME_KEPT, -1, null)
-        val xs = pointers.xCoordinates.copyOf(size)
-        val ys = pointers.yCoordinates.copyOf(size)
-        val ts = pointers.times.copyOf(size)
         // the native decoder reports the same word once per dictionary it was found in; keep the best-ranked
         val cands = candidates.distinctBy { it.mWord }.take(MAX_CANDIDATES).map { it.mWord to it.mScore }
         if (cands.isEmpty()) { // nothing to follow: a dead swipe or a decode failure, logged so "never offered" stays honest
@@ -89,10 +86,6 @@ object GestureCorpusRecorder {
                 OwnGestureDecoder.lastDecodeMs, OwnGestureDecoder.lastSpeedKeysPerSecond, OwnGestureDecoder.currentTuning.key)
             return
         }
-        val keys = letterKeys(keyboard)
-        val kbW = keyboard.mOccupiedWidth
-        val kbH = keyboard.mOccupiedHeight
-        val layoutName = keyboard.mId.mSubtype.mainLayoutName
         val id = counter.incrementAndGet()
         val time = System.currentTimeMillis()
         pendingId = id
@@ -103,6 +96,14 @@ object GestureCorpusRecorder {
         lastSpeed = OwnGestureDecoder.lastSpeedKeysPerSecond // the decoder's own figure, from the preprocessed path
         lastTuning = OwnGestureDecoder.currentTuning.key
         if (!isEnabled()) return
+        // the trace and the keys only when the corpus is recorded (review 2026-10-06: they were copied for every swipe)
+        val xs = pointers.xCoordinates.copyOf(size)
+        val ys = pointers.yCoordinates.copyOf(size)
+        val ts = pointers.times.copyOf(size)
+        val keys = letterKeys(keyboard)
+        val kbW = keyboard.mOccupiedWidth
+        val kbH = keyboard.mOccupiedHeight
+        val layoutName = keyboard.mId.mSubtype.mainLayoutName
         executor.execute {
             try {
                 val obj = JSONObject()

@@ -139,6 +139,20 @@ private fun curmudgeonUpgrades(prefs: SharedPreferences, freshInstall: Boolean) 
             if (old == "TOOLBAR_KEYS" || old == "HIDDEN") putBoolean(Settings.PREF_SHOW_SUGGESTIONS, false)
         }
     }
+    // 0.3.008: new defaults (HeliBoard's popups: main accents, no symbol map; the suggestion colour follows the swipe
+    // trail; long-press ?123 opens the settings): installs from before keep what they had (review 2026-10-06)
+    if (!prefs.getBoolean("defaults_launch_3008_done", false)) {
+        prefs.edit {
+            if (!freshInstall) {
+                if (!prefs.contains(Settings.PREF_MORE_POPUP_KEYS)) putString(Settings.PREF_MORE_POPUP_KEYS, "all")
+                if (!prefs.contains(Settings.PREF_SYMBOL_POPUP_MAP)) putString(Settings.PREF_SYMBOL_POPUP_MAP, Defaults.CURMUDGEON_SYMBOL_POPUP_MAP)
+                if (!prefs.contains(Settings.PREF_SUGGESTION_TEXT_COLOR)) putInt(Settings.PREF_SUGGESTION_TEXT_COLOR, Defaults.PREF_SUGGESTION_TEXT_COLOR)
+                if (!prefs.contains(Settings.PREF_LONG_PRESS_SYMBOL_ACTION) && !prefs.getBoolean(Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, false))
+                    putString(Settings.PREF_LONG_PRESS_SYMBOL_ACTION, "none")
+            }
+            putBoolean("defaults_launch_3008_done", true)
+        }
+    }
     // 0.1.004: key-press vibration and sound became on by default; installs from before keep what they had
     if (!prefs.getBoolean("defaults_feedback_on_done", false)) {
         prefs.edit {

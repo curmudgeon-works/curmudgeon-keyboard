@@ -9,7 +9,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SymbolPopupMapTest {
-    @Test fun defaultMapMatchesFormerHardCodedOverlay() {
+    @Test fun curmudgeonMapMatchesFormerHardCodedOverlay() {
         val map = KeyboardParser.parseSymbolPopupMap(Defaults.CURMUDGEON_SYMBOL_POPUP_MAP)
         assertEquals(listOf("~", "`"), map["q"])
         assertEquals(listOf("×"), map["w"]); assertEquals(listOf("÷"), map["e"])

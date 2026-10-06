@@ -140,7 +140,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                 popupOrder = POPUP_KEYS_ORDER_DEFAULT),
             // HeliBoard's own, the default since 0.3.008: its accents level, no symbol map, and its popup order (as HeliBoard ships it, checked
             // against upstream 415c45f1 of 2026-09-30); the hint is the first popup entry, as everywhere here
-            Preset(R.string.key_popups_preset_heliboard, POPUP_KEYS_MAIN, null, symbolMap = "", popupOrder = HELIBOARD_POPUP_ORDER),
+            Preset(R.string.key_popups_preset_heliboard, POPUP_KEYS_MAIN, null, symbolMap = "", popupOrder = POPUP_KEYS_ORDER_DEFAULT),
             // (no "Main accented letters": with no map it's exactly HeliBoard's default)
             Preset(R.string.key_popups_preset_more, POPUP_KEYS_MORE, null, symbolMap = "", popupOrder = POPUP_KEYS_ORDER_DEFAULT),
             Preset(R.string.key_popups_preset_all, POPUP_KEYS_ALL, null, symbolMap = "", popupOrder = POPUP_KEYS_ORDER_DEFAULT),
@@ -524,12 +524,11 @@ fun TryItBar(keyboard: SettingsSubtype, state: TryItState, onFocus: (Boolean) ->
 
 /** A built-in set ([name] resource) or one the user saved ([userName], with its per-key arrangement). */
 /** HeliBoard's popup order (language accents, numbers, symbols, layout, other languages, all on), as it ships. */
-private val HELIBOARD_POPUP_ORDER = listOf("language_priority", "number", "symbols", "layout", "language")
-    .joinToString(helium314.keyboard.latin.common.Constants.Separators.ENTRY) { it + helium314.keyboard.latin.common.Constants.Separators.KV + true }
+// (HeliBoard's popup order is POPUP_KEYS_ORDER_DEFAULT itself, checked against upstream 415c45f1: one copy, review 2026-10-06)
 
 private data class Preset(val name: Int, val morePopups: String, val symbolsLayout: String?, // (data: equal by content, the list rebuilds them on every change)
                      val userName: String? = null, val overrides: Map<String, List<String>>? = null,
-                     val symbolMap: String? = null, // the letter -> symbols map; null = the Curmudgeon one, "" = none (HeliBoard)
+                     val symbolMap: String? = null, // the letter -> symbols map it sets; null = leaves the map as it is, "" = none (HeliBoard)
                      val popupOrder: String? = null) // the popup order it sets; null = leaves the order as it is
 
 private class KeyInfo(val label: String, val title: String, val popups: List<String>, val pool: List<String>, val overrideKey: String = label)

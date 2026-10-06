@@ -120,7 +120,10 @@ fun TextCorrectionScreen(
     )
     // every change applies at once and can be tried in the box at the bottom (the keyboard comes up for a moment, as on
     // Appearance); the top bar's tick keeps the changes since the screen opened, the cross undoes them
-    val draft = helium314.keyboard.settings.rememberPrefsDraft("correction", correctionKeys, onClickBack)
+    // (the number of suggestions too while its tile is here, so the cross undoes it and it shows as changed; its
+    // per-keyboard group stays Refine's: review 2026-10-06)
+    val draft = helium314.keyboard.settings.rememberPrefsDraft("correction",
+        if (helium314.keyboard.settings.REFINE_MENU_SHOWN) correctionKeys else correctionKeys + Settings.PREF_SUGGESTION_COUNT, onClickBack)
     val tryIt = remember { TryItState() }
     // the keyboard being edited (its own settings), else the one in use: the preview switches to it
     val keyboard = helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(LocalContext.current))

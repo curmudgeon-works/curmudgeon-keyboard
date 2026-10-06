@@ -474,7 +474,7 @@ val LocalSubDialogOpen = androidx.compose.runtime.compositionLocalOf<androidx.co
 fun SuggestionColorRow(reload: () -> Unit) {
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
-    helium314.keyboard.settings.KnownDefaults.note(Settings.PREF_SUGGESTION_TEXT_COLOR, Defaults.PREF_SUGGESTION_TEXT_COLOR)
+    // (no fixed default noted: not set means the swipe trail's colour, so any colour picked, orange too, is a change)
     var showPicker by remember { mutableStateOf(false) }
     // the Fonts dialog steps aside while the picker is up
     val parentHidden = LocalSubDialogOpen.current
@@ -483,8 +483,9 @@ fun SuggestionColorRow(reload: () -> Unit) {
         onDispose { parentHidden?.value = false }
     }
     // what the strip shows: the colour picked, else the theme's swipe trail colour (since 0.3.008)
+    // (the theme's colours read on every redraw: a theme or day / night change while this is open shows at once)
     val color = helium314.keyboard.latin.utils.suggestionTextColor(prefs,
-        remember { helium314.keyboard.keyboard.KeyboardTheme.getColorsForCurrentTheme(ctx) })
+        helium314.keyboard.keyboard.KeyboardTheme.getColorsForCurrentTheme(ctx))
     Row(verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().clickable { showPicker = true }.padding(vertical = 6.dp)) {
         Text(stringResource(R.string.suggestion_text_color), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)

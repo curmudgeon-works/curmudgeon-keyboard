@@ -423,6 +423,25 @@ object KeyboardProfiles {
         }
     }
 
+    /** Every keyboard's own entries for [key] in [all]: its value, and its "reset to default" marker ([TOMBSTONE];
+     *  review 2026-10-06: the migrations below missed the markers). */
+    private fun ownEntries(all: Map<String, *>, key: String) = all.keys.filter {
+        it.startsWith(PREFIX) && (it.endsWith("$SEPARATOR$key") || it.endsWith("$SEPARATOR$TOMBSTONE$key")) }
+
+    /** Moves the value [inUse] (a keyboard's id) has for [key] to the plain settings: its value, or the default if it was
+     *  reset there (the plain value goes). */
+    private fun SharedPreferences.Editor.takeOwn(all: Map<String, *>, inUse: Int, key: String) {
+        if (inUse == SHARED) return
+        if (all.containsKey("$PREFIX$inUse$SEPARATOR$TOMBSTONE$key")) { remove(key); return }
+        when (val v = all["$PREFIX$inUse$SEPARATOR$key"]) {
+            is Boolean -> putBoolean(key, v)
+            is Int -> putInt(key, v)
+            is Long -> putLong(key, v)
+            is Float -> putFloat(key, v)
+            is String -> putString(key, v)
+        }
+    }
+
     /** Once: the settings that became the same for every keyboard ([learningSwipingKeys]) take the values of the keyboard
      *  in use (with separate settings), and the keyboards' own copies go. */
     fun migrateLearningSwiping(real: SharedPreferences) {
@@ -431,15 +450,8 @@ object KeyboardProfiles {
         val all = real.all
         real.edit().apply {
             for (key in learningSwipingKeys) {
-                if (inUse != SHARED) when (val v = all["$PREFIX$inUse$SEPARATOR$key"]) {
-                    is Boolean -> putBoolean(key, v)
-                    is Int -> putInt(key, v)
-                    is Long -> putLong(key, v)
-                    is Float -> putFloat(key, v)
-                    is String -> putString(key, v)
-                }
-                for (stored in all.keys)
-                    if (stored.startsWith(PREFIX) && stored.endsWith("$SEPARATOR$key")) remove(stored)
+                takeOwn(all, inUse, key)
+                for (stored in ownEntries(all, key)) remove(stored)
             }
             putBoolean("learning_swiping_global", true)
         }.apply()
@@ -456,14 +468,10 @@ object KeyboardProfiles {
         val all = real.all
         real.edit().apply {
             for (key in listOf(Settings.PREF_SUGGESTION_COUNT, Settings.PREF_SUGGESTION_RULES)) {
-                if (inUse != SHARED) when (val v = all["$PREFIX$inUse$SEPARATOR$key"]) {
-                    is Int -> putInt(key, v)
-                    is String -> putString(key, v)
-                }
-                // every keyboard's own copy goes, as in migrateLearningSwiping: stale values must not come back if the
-                // menu is made per keyboard later
-                for (stored in all.keys)
-                    if (stored.startsWith(PREFIX) && stored.endsWith("$SEPARATOR$key")) remove(stored)
+                takeOwn(all, inUse, key)
+                // every keyboard's own copy (and reset marker) goes, as in migrateLearningSwiping: stale values must not
+                // come back if the menu is made per keyboard later
+                for (stored in ownEntries(all, key)) remove(stored)
             }
             putBoolean("suggestions_refine_moved", true)
         }.apply()
@@ -472,10 +480,12 @@ object KeyboardProfiles {
     /** Once: a setting the app no longer has is switched off and then forgotten, in the plain settings and in every
      *  keyboard's own set (2026-10-05: "Phrase gesture", which only Google's removed swipe library read). */
     fun forgetSetting(real: SharedPreferences, key: String) {
-        val stored = real.all.keys.filter { it == key || (it.startsWith(PREFIX) && it.endsWith("$SEPARATOR$key")) }
-        if (stored.isEmpty()) return
+        val all = real.all
+        val stored = all.keys.filter { it == key || (it.startsWith(PREFIX) && it.endsWith("$SEPARATOR$key")) }
+        val markers = ownEntries(all, key) - stored.toSet()
+        if (stored.isEmpty() && markers.isEmpty()) return
         real.edit().apply { for (k in stored) putBoolean(k, false) }.apply()
-        real.edit().apply { for (k in stored) remove(k) }.apply()
+        real.edit().apply { for (k in stored + markers) remove(k) }.apply()
     }
 
     /** Once: keyboards that got their own set before the files were per keyboard get a copy of the plain ones. */

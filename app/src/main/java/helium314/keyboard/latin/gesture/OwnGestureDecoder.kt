@@ -112,6 +112,7 @@ object OwnGestureDecoder {
         private set
     /** How long the last decode took on this phone, for the swipe statistics. */
     @Volatile var lastDecodeMs: Long = 0
+        private set
     /** The last swipe found no vocabulary at all (still building after a start): a dead swipe, logged as such. */
     @Volatile var lastVocabularyMissing = false
         private set
@@ -167,6 +168,10 @@ object OwnGestureDecoder {
         wanted: Int = 0,
     ): SuggestionResults {
         val results = SuggestionResults(SuggestedWords.MAX_SUGGESTIONS, false, false)
+        // this swipe's own facts from here on: an early return must not leave the last swipe's behind (review 2026-10-06:
+        // a stale "no vocabulary" mislabeled the next dead swipe in the results log)
+        lastVocabularyMissing = false
+        lastDecodeMs = 0
         val locale = locales.first()
         val points = adaptPointers(composedData)
         if (points.size < 2) return results

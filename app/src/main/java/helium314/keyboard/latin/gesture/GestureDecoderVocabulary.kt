@@ -281,8 +281,8 @@ object GestureDecoderVocabulary {
                 if (isExcluded(context, locale, word, learned = true)) return@schedule
                 val probability = PersonalizationHelper.getUserHistoryDictionary(context, script, pool).getFrequency(word)
                 if (probability <= 0) return@schedule
-                val freq = (probability + historyBoost).coerceIn(1, 255)
-                learned[storeKey(script, pool)]?.put(word, freq)
+                val freq = boosted(probability)
+                learned[storeKey(script, pool)]?.put(word, probability) // (raw: the boost is added where it's used)
                 for ((tag, vocab) in cache) if (tag.constructLocale().script() == script) vocab.add(word, freq)
                 // (at full weight, as when the vocabulary was built)
                 for ((key, vocab) in merged)
@@ -394,10 +394,25 @@ object GestureDecoderVocabulary {
         if (!includeLearned) return emptyList()
         val k = storeKey(locale.script(), LearnedStores.currentPool)
         synchronized(readLocks.getOrPut(k) { Any() }) {
-            learned[k]?.takeIf { it.isNotEmpty() }?.let { m -> return m.map { it.key to it.value } }
+            learned[k]?.takeIf { it.isNotEmpty() }?.let { m -> return m.map { it.key to boosted(it.value) } }
             return historyEntries(context, locale, retries)
         }
     }
+
+    /**
+     * Warms the vocabularies for [specs] when the keyboard opens, off the main thread (review 2026-10-06: merging a
+     * two-language vocabulary, and reading a store not read yet, could stall the keyboard's opening). A warm-up
+     * already waiting makes this one unnecessary.
+     */
+    fun prewarm(specs: List<LocaleSpec>) {
+        if (!prewarmPending.compareAndSet(false, true)) return
+        prewarmExecutor.execute {
+            prewarmPending.set(false)
+            try { getOrBuildAsync(specs) } catch (t: Throwable) { Log.w(TAG, "could not warm the gesture vocabulary", t) }
+        }
+    }
+    private val prewarmExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { Thread(it, "GestureVocabWarm").apply { isDaemon = true } }
+    private val prewarmPending = java.util.concurrent.atomic.AtomicBoolean(false)
 
     // merged vocabularies asked for before every language was built (the keyboard's open warms them): built by the
     // last language's build, see publishNow
@@ -440,6 +455,7 @@ object GestureDecoderVocabulary {
                 Thread.sleep(HISTORY_RETRY_DELAY_MS)
                 props = history.allWordPropertiesBlocking
             }
+            val raw = ConcurrentHashMap<String, Int>((props?.size ?: 0) * 2)
             val entries = ArrayList<Pair<String, Int>>(props?.size ?: 0)
             var notCounted = 0
             for (wp in props.orEmpty()) {
@@ -448,9 +464,10 @@ object GestureDecoderVocabulary {
                 // not counted yet (a word outside the dictionaries is stored at 0 by its first use): left out, as
                 // onWordLearned leaves it out
                 if (wp.probability <= 0) { notCounted++; continue }
-                entries.add(word to (wp.probability + historyBoost).coerceIn(1, 255))
+                raw[word] = wp.probability
+                entries.add(word to boosted(wp.probability))
             }
-            learned[storeKey(script, pool)] = ConcurrentHashMap<String, Int>(entries.size * 2).apply { for ((w, f) in entries) put(w, f) }
+            learned[storeKey(script, pool)] = raw
             val ms = SystemClock.elapsedRealtime() - start
             Log.d(TAG, "read ${entries.size} user-history words for $locale (after $attempts empty reads)")
             logVocab("learned words read for $script/$pool: ${props?.size ?: -1} in the store, ${entries.size} in the swipe " +
@@ -462,15 +479,19 @@ object GestureDecoderVocabulary {
         }
     }
 
-    // the learned words of each store (script and pool) as the vocabularies have them, so a multilingual vocabulary can
-    // be put together on the swipe's thread without reading the store; kept up to date by onWordLearned / onWordRemoved
+    // the learned words of each store (script and pool) with their own weight (0..255, WITHOUT the boost: a boost
+    // changed later must apply to them too; review 2026-10-06), so a multilingual vocabulary can be put together
+    // without reading the store again; kept up to date by onWordLearned / onWordRemoved
     private val learned = ConcurrentHashMap<String, ConcurrentHashMap<String, Int>>()
+
+    /** A learned word's weight in the swipe vocabularies: its own plus the current [historyBoost]. */
+    private fun boosted(probability: Int) = (probability + historyBoost).coerceIn(1, 255)
     private fun storeKey(script: String, pool: Int) = "$script/$pool"
 
     /** [locale]'s learned words for a multilingual vocabulary: the list read by its own build, else read now. */
     private fun learnedOf(context: Context, locale: Locale): List<Pair<String, Int>> {
         if (!includeLearned) return emptyList()
-        learned[storeKey(locale.script(), LearnedStores.currentPool)]?.let { m -> return m.map { it.key to it.value } }
+        learned[storeKey(locale.script(), LearnedStores.currentPool)]?.let { m -> return m.map { it.key to boosted(it.value) } }
         return historyEntries(context, locale, retries = 0)
     }
 

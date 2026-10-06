@@ -1183,9 +1183,11 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
                 return;
             }
             if (!action.equals("none")) {
-                // settings or emoji: this key is done, the other screen opens
+                // settings or emoji: this key is done, the other screen opens. The press already switched to the symbols,
+                // so back to the letters first, or the keyboard comes back on symbols (review 2026-10-06)
                 cancelKeyTracking();
                 sListener.onReleaseKey(code, false);
+                sListener.onCodeInput(KeyCode.ALPHA, mLastX, mLastY, false);
                 sListener.onCodeInput(action.equals("settings") ? KeyCode.SETTINGS : KeyCode.EMOJI, mLastX, mLastY, false);
                 return;
             }

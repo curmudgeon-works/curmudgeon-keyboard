@@ -3262,11 +3262,17 @@ public final class InputLogic {
             recordLearning(resumedFrom, -1, LearningEventLog.EDIT, false, NgramContext.EMPTY_PREV_WORDS_INFO);
         }
         // corrected by hand: an accepted word changed, a swiped word changed before it was committed, or a word typed
-        // where a swipe was just deleted (the swipe didn't offer it)
+        // where a swipe was just deleted (the swipe didn't offer it). That last one only as typed (not an
+        // auto-correction) and only a known word (a dictionary's, or learned before): a fresh typo typed after a deleted
+        // swipe gets the usual single use (review 2026-10-06: "teh" would have become a trusted word)
+        final boolean retypedAfterDeletedSwipe = swipedWord == null && !mWordComposer.isBatchMode()
+                && commitType == LastComposedWord.COMMIT_TYPE_USER_TYPED_WORD
+                && chosenWord.equals(mWordComposer.getTypedWord())
+                && GestureCorpusRecorder.INSTANCE.isRetypeAfterDeletedSwipe()
+                && (mDictionaryFacilitator.isMainDictionaryWord(chosenWord) || mDictionaryFacilitator.getLearnedCount(chosenWord) > 0);
         final boolean editedByHand = editedAccepted
                 || (swipedWord != null && !mWordComposer.isBatchMode() && !swipedWord.equalsIgnoreCase(chosenWord))
-                || (swipedWord == null && !mWordComposer.isBatchMode() && commitType != LastComposedWord.COMMIT_TYPE_MANUAL_PICK
-                        && GestureCorpusRecorder.INSTANCE.isRetypeAfterDeletedSwipe());
+                || retypedAfterDeletedSwipe;
         // Add the word to the user history dictionary
         if (!reAccepted && !afterDigit)
             performAdditionToUserHistoryDictionary(settingsValues, chosenWord, ngramContext,
