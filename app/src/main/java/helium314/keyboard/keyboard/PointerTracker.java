@@ -1175,10 +1175,20 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
                 return;
             }
         }
-        if (code == KeyCode.SYMBOL_ALPHA && Settings.getValues().mLongPressSymbolsForNumpad) {
-            // toggle numpad with sliding input enabled, forcing return to the alpha layout when done
-            sListener.toggleNumpad(true, true);
-            return;
+        if (code == KeyCode.SYMBOL_ALPHA) {
+            final String action = Settings.getValues().mLongPressSymbolAction;
+            if (action.equals("numpad")) {
+                // toggle numpad with sliding input enabled, forcing return to the alpha layout when done
+                sListener.toggleNumpad(true, true);
+                return;
+            }
+            if (!action.equals("none")) {
+                // settings or emoji: this key is done, the other screen opens
+                cancelKeyTracking();
+                sListener.onReleaseKey(code, false);
+                sListener.onCodeInput(action.equals("settings") ? KeyCode.SETTINGS : KeyCode.EMOJI, mLastX, mLastY, false);
+                return;
+            }
         }
 
         setReleasedKeyGraphics(key, false);
@@ -1347,7 +1357,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         final int delay;
         if (repeatCount == 1) {
             if (isDelete) mBackspaceHoldStart = SystemClock.uptimeMillis();
-            delay = isDelete ? Settings.getValues().mKeyLongpressTimeout : sParams.mKeyRepeatStartTimeout;
+            delay = isDelete ? Settings.getValues().mBackspaceLongpressDelay : sParams.mKeyRepeatStartTimeout;
         } else if (isDelete) {
             delay = backspaceInterval(Settings.getValues(), SystemClock.uptimeMillis() - mBackspaceHoldStart);
         } else {

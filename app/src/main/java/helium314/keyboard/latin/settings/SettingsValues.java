@@ -127,6 +127,7 @@ public class SettingsValues {
     public final int mGestureTrailFadeoutDuration;
     public final boolean mSlidingKeyInputPreviewEnabled;
     public final int mKeyLongpressTimeout;
+    public final int mBackspaceLongpressDelay;
     public final boolean mIsSplitKeyboardEnabled;
     public final float mSplitKeyboardSpacerRelativeWidth;
     public final int mScreenMetrics;
@@ -197,7 +198,7 @@ public class SettingsValues {
     public final boolean mSuggestClipboardContent;
     public final SettingsValuesForSuggestion mSettingsValuesForSuggestion;
     public final boolean mIncognitoModeEnabled;
-    public final boolean mLongPressSymbolsForNumpad;
+    public final String mLongPressSymbolAction;
 
     // User-defined colors
     public final Colors mColors;
@@ -307,6 +308,8 @@ public class SettingsValues {
 
         // Compute other readable settings
         mKeyLongpressTimeout = prefs.getInt(Settings.PREF_KEY_LONGPRESS_TIMEOUT, Defaults.PREF_KEY_LONGPRESS_TIMEOUT);
+        // backspace's own delay; until it is set it follows the key long press delay, so nothing changes on upgrade
+        mBackspaceLongpressDelay = prefs.getInt(Settings.PREF_BACKSPACE_LONGPRESS_DELAY, mKeyLongpressTimeout);
         mKeypressVibrationDuration = prefs.getInt(Settings.PREF_VIBRATION_DURATION_SETTINGS, Defaults.PREF_VIBRATION_DURATION_SETTINGS);
         mKeypressSoundVolume = prefs.getFloat(Settings.PREF_KEYPRESS_SOUND_VOLUME, Defaults.PREF_KEYPRESS_SOUND_VOLUME);
         mKeypressSound = prefs.getString(Settings.PREF_KEYPRESS_SOUND, Defaults.PREF_KEYPRESS_SOUND);
@@ -378,14 +381,13 @@ public class SettingsValues {
         mUseContactsDictionary = SettingsValues.readUseContactsEnabled(prefs, context);
         mUseAppsDictionary = prefs.getBoolean(Settings.PREF_USE_APPS, Defaults.PREF_USE_APPS);
         mNarrowKeyGaps = false; // the switch is gone: the key gap sliders set the gaps
-        mSettingsValuesForSuggestion = new SettingsValuesForSuggestion(
-                mBlockPotentiallyOffensive,
-                prefs.getBoolean(Settings.PREF_GESTURE_SPACE_AWARE, Defaults.PREF_GESTURE_SPACE_AWARE)
-        );
+        mSettingsValuesForSuggestion = new SettingsValuesForSuggestion(mBlockPotentiallyOffensive);
         mSpacingAndPunctuations = new SpacingAndPunctuations(res, mUrlDetectionEnabled);
         mBottomPaddingScale = Settings.readBottomPaddingScale(prefs, isLandscape, isFolded);
         mSidePaddingScale = Settings.readSidePaddingScale(prefs, isLandscape, mIsSplitKeyboardEnabled, isFolded);
-        mLongPressSymbolsForNumpad = prefs.getBoolean(Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, Defaults.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD);
+        // the old on/off switch became this choice; an old "on" carries over as numpad
+        mLongPressSymbolAction = prefs.getString(Settings.PREF_LONG_PRESS_SYMBOL_ACTION,
+                prefs.getBoolean(Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, false) ? "numpad" : Defaults.PREF_LONG_PRESS_SYMBOL_ACTION);
         mAlphaAfterEmojiInEmojiView = prefs.getBoolean(Settings.PREF_ABC_AFTER_EMOJI, Defaults.PREF_ABC_AFTER_EMOJI);
         mAlphaAfterClipHistoryEntry = prefs.getBoolean(Settings.PREF_ABC_AFTER_CLIP, Defaults.PREF_ABC_AFTER_CLIP);
         mAlphaAfterSymbolAndSpace = prefs.getBoolean(Settings.PREF_ABC_AFTER_SYMBOL_SPACE, Defaults.PREF_ABC_AFTER_SYMBOL_SPACE);

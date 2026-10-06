@@ -83,7 +83,7 @@ fun TextCorrectionScreen(
         // (backspace reverts autocorrect: in the Backspace group of the Preferences screen)
         Settings.PREF_AUTO_CAP,
         Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE,
-        // (your own words winning over corrections, "Trust words you've typed": on Advanced learning and swiping)
+        // (your own words winning over corrections, "Trust words you've typed": on Refine swipe and learning)
         Settings.PREF_URL_DETECTION, // (from Advanced; advanced here too) web and email addresses as one word
         R.string.settings_category_space,
         Settings.PREF_AUTOSPACE_AFTER_SUGGESTION,

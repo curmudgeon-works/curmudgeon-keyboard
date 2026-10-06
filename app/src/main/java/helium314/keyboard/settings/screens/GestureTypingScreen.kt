@@ -42,7 +42,7 @@ fun gestureTypingItems(prefs: SharedPreferences): List<String?> {
 }
 
 val gestureTypingSimpleModeKeys = setOf(
-    Settings.PREF_GESTURE_INPUT, Settings.PREF_GESTURE_PREVIEW_TRAIL, Settings.PREF_GESTURE_SPACE_AWARE,
+    Settings.PREF_GESTURE_INPUT, Settings.PREF_GESTURE_PREVIEW_TRAIL,
 )
 
 fun createGestureTypingSettings(context: Context) = listOf(
@@ -51,9 +51,6 @@ fun createGestureTypingSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_GESTURE_PREVIEW_TRAIL, R.string.gesture_preview_trail) {
         SwitchPreference(it, Defaults.PREF_GESTURE_PREVIEW_TRAIL)
-    },
-    Setting(context, Settings.PREF_GESTURE_SPACE_AWARE, R.string.gesture_space_aware, R.string.gesture_space_aware_summary) {
-        SwitchPreference(it, Defaults.PREF_GESTURE_SPACE_AWARE)
     },
     Setting(context, Settings.PREF_GESTURE_CAPS_SWIPE, R.string.gesture_caps_swipe) {
         SwitchPreference(it, Defaults.PREF_GESTURE_CAPS_SWIPE)

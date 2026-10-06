@@ -348,7 +348,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         words.forEach { HotWords.onWordCommitted(it) }
 
         // increase / decrease confidence
-        if (words.size == 1) // ignore if more than a single word, which only happens with (badly working) spaceAwareGesture
+        if (words.size == 1) // ignore if more than a single word (a multi-word commit: pasted text, or a phrase from an older swipe library)
             adjustConfidences(suggestion, wasAutoCapitalized)
 
         // Add word to user dictionary if it is in no other dictionary except user history dictionary (i.e. typed again).
@@ -550,7 +550,10 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         // a word capitalized only by the sentence start was learned lowercase (addWordToUserHistory): that form is
         // tried when the word as written has no count
         val lower = word.lowercase(currentlyPreferredDictionaryGroup.locale)
-        historyFor(word)?.decrementEntryDynamically(word, if (lower != word) lower else null)
+        historyFor(word)?.let {
+            it.decrementEntryDynamically(word, if (lower != word) lower else null)
+            UserHistoryDictionary.saveSoon(it)
+        }
         // a word taken back to 0 is no word any more, unless a dictionary has it
         putWordIntoValidSpellingWordCache("unlearnOneUse", word.lowercase(Locale.getDefault()))
     }

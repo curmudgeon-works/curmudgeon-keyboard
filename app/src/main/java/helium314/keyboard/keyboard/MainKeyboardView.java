@@ -619,6 +619,7 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
 
     public void closing() {
         cancelAllOngoingEvents();
+        mGestureTrailsDrawingPreview.dismissAllTrails();
         mPopupKeysKeyboardCache.clear();
     }
 

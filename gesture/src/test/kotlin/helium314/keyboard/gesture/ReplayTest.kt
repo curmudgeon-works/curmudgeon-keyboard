@@ -55,8 +55,21 @@ class ReplayTest {
                 .sortedByDescending { it.second }
             val freqs = entries.map { it.second }
             val ref = reference
+            // GESTURE_REPLAY_NORMALIZE=ties: words sharing a frequency share the reference value at the middle of
+            // their rank span (the Hinglish list's top 143 words are all 254; by plain rank the alphabet decides)
+            val tieValue = IntArray(entries.size)
+            if (tieAware && ref != null) {
+                var a = 0
+                while (a < entries.size) {
+                    var b = a
+                    while (b + 1 < entries.size && entries[b + 1].second == entries[a].second) b++
+                    val v = ref[((a + b) / 2).coerceAtMost(ref.lastIndex)]
+                    for (i in a..b) tieValue[i] = v
+                    a = b + 1
+                }
+            }
             entries.forEachIndexed { i, (word, freq) ->
-                val f = if (normalize && ref != null) ref[i.coerceAtMost(ref.lastIndex)] else freq
+                val f = if (normalize && ref != null) (if (tieAware) tieValue[i] else ref[i.coerceAtMost(ref.lastIndex)]) else freq
                 vocab.add(word, (f * factor).toInt().coerceAtLeast(1))
             }
             if (reference == null) reference = freqs
@@ -65,6 +78,7 @@ class ReplayTest {
     }
 
     private val normalizeScales = System.getenv("GESTURE_REPLAY_NORMALIZE") != "0"
+    private val tieAware = System.getenv("GESTURE_REPLAY_NORMALIZE") == "ties"
     private val hiFactor = System.getenv("GESTURE_REPLAY_HI_FACTOR")?.toFloatOrNull() ?: 0.85f
 
     private fun corpus(dir: File): List<Swipe> = File(dir, "corpus.tsv").readLines().map { line ->

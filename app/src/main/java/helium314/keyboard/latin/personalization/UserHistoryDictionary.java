@@ -20,6 +20,9 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -82,6 +85,32 @@ public class UserHistoryDictionary extends ExpandableBinaryDictionary {
         }
         userHistoryDictionary.updateEntriesForWord(ngramContext, word,
                 isValid, 1 /* count */, timestamp);
+        saveSoon(userHistoryDictionary);
+    }
+
+    // Learned words reach the file when the keyboard leaves a text field (onFinishInput). Typing in one field for a long
+    // time kept them in memory only, and a restart (an update, Android ending the keyboard) lost them: 2026-10-05, twenty
+    // minutes in one chat lost to an update. So they are also saved once learning pauses for SAVE_AFTER_MS.
+    private static final long SAVE_AFTER_MS = 5000;
+    private static final ScheduledExecutorService sSaver = Executors.newSingleThreadScheduledExecutor(r -> {
+        final Thread t = new Thread(r, "LearnedWordsSave");
+        t.setDaemon(true);
+        return t;
+    });
+    private static final Map<ExpandableBinaryDictionary, ScheduledFuture<?>> sPendingSaves = new HashMap<>();
+
+    /** Saves [store] to its file SAVE_AFTER_MS after the last change (each change moves the save back). */
+    public static void saveSoon(@NonNull final ExpandableBinaryDictionary store) {
+        synchronized (sPendingSaves) {
+            final ScheduledFuture<?> pending = sPendingSaves.get(store);
+            if (pending != null) pending.cancel(false);
+            sPendingSaves.put(store, sSaver.schedule(() -> {
+                synchronized (sPendingSaves) {
+                    sPendingSaves.remove(store);
+                }
+                store.onFinishInput(); // (the flush the end of a text field does: on the store's own thread)
+            }, SAVE_AFTER_MS, TimeUnit.MILLISECONDS));
+        }
     }
 
     @Override

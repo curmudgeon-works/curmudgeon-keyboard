@@ -42,8 +42,6 @@
     <string name="gesture_input_summary">Indtast et ord ved at glide mellem bogstaverne</string>
     <string name="gesture_preview_trail">"Vis glidende trykspor"</string>
     <string name="gesture_floating_preview_text">"Dynamiske ordeksempler"</string>
-    <string name="gesture_space_aware">"Glidende mellemrum"</string>
-    <string name="gesture_space_aware_summary">"Tilføj mellemrum ved at glide til mellemrumstasten"</string>
     <string name="subtype_en_GB">Engelsk (Storbritannien)</string>
     <string name="subtype_en_US">Engelsk (USA)</string>
     <string name="subtype_es_US">"Spansk (USA)"</string>

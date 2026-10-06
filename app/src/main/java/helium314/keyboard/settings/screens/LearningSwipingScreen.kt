@@ -51,7 +51,7 @@ internal val swipeTuningKeys = listOf(
 )
 
 /**
- * "Advanced learning and swiping" (2026-10-04): the swipe decoder's tuning with the statistics of every tuning
+ * "Refine swipe and learning" (2026-10-04): the swipe decoder's tuning with the statistics of every tuning
  * tried and the swipe logs (moved from the Swiping screen), and how the keyboard learns (trusting your words, moved
  * from Text correction; the corrections log). The same for every keyboard (KeyboardProfiles' global keys). More
  * learning rules and swipe traits are to come here.

@@ -845,12 +845,15 @@ public class LatinIME extends InputMethodService implements
         super.onStartInputView(editorInfo, restarting);
 
         mDictionaryFacilitator.onStartInput();
-        // warm the gesture vocabulary when the keyboard opens instead of on the first
-        // swipe, so the disk-cache load (or the one-time build) overlaps with typing
+        // warm the gesture vocabulary when the keyboard opens instead of on the first swipe, so the disk-cache load
+        // (or the one-time build) overlaps with typing. All of the keyboard's languages, as the first swipe will ask
+        // for them: until 2026-10-05 only the main one was warmed, so on a two-language keyboard the second language
+        // and the merged vocabulary were built at the first swipe, and that swipe wrote nothing.
         final SettingsValues sv = mSettings.getCurrent();
-        final Locale mainLocale = mDictionaryFacilitator.getMainLocale();
-        if (sv != null && sv.mGestureInputEnabled && mainLocale != null) {
-            helium314.keyboard.latin.gesture.GestureDecoderVocabulary.INSTANCE.getOrBuildAsync(mainLocale);
+        final java.util.List<Locale> locales = mDictionaryFacilitator.getLocales();
+        if (sv != null && sv.mGestureInputEnabled && !locales.isEmpty()) {
+            final helium314.keyboard.latin.gesture.GestureDecoderVocabulary v = helium314.keyboard.latin.gesture.GestureDecoderVocabulary.INSTANCE;
+            v.getOrBuildAsync(v.specsFor(this, locales));
         }
         // Switch to the null consumer to handle cases leading to early exit below, for which we
         // also wouldn't be consuming gesture data.

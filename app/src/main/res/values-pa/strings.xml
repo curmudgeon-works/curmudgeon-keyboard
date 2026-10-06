@@ -42,8 +42,6 @@
     <string name="gesture_input_summary">"ਅੱਖਰਾਂ ਰਾਹੀਂ ਸਲਾਈਡ ਕਰਕੇ ਇੱਕ ਸ਼ਬਦ ਦਾਖਲ ਕਰੋ"</string>
     <string name="gesture_preview_trail">"ਸੰਕੇਤ ਲੀਹ ਦਿਖਾਓ"</string>
     <string name="gesture_floating_preview_text">"ਸਕਿਰਿਆ ਫਲੋਟਿੰਗ ਪੂਰਵ-ਝਲਕ"</string>
-    <string name="gesture_space_aware">"ਵਾਕਾਂਸ਼ ਸੰਕੇਤ"</string>
-    <string name="gesture_space_aware_summary">"ਸਪੇਸ ਕੁੰਜੀ ਸਰਕਾ ਕੇ ਸੰਕੇਤਾਂ ਦੇ ਦੌਰਾਨ ਸਪੇਸ ਇਨਪੁਟ ਕਰੋ"</string>
     <string name="subtype_en_GB">"ਅੰਗ੍ਰੇਜ਼ੀ (ਯੂਕੇ)"</string>
     <string name="subtype_en_US">"ਅੰਗ੍ਰੇਜੀ (ਅਮਰੀਕਾ)"</string>
     <string name="subtype_es_US">"ਸਪੇਨੀ (ਅਮਰੀਕਾ)"</string>

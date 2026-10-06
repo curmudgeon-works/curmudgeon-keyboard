@@ -11,7 +11,9 @@ import helium314.keyboard.latin.personalization.LearnedStores
 import helium314.keyboard.latin.personalization.PersonalizationHelper
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.DictionaryInfoUtils
+import helium314.keyboard.latin.utils.LanguagePriority
 import helium314.keyboard.latin.utils.Log
+import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.RemovedWords
 import helium314.keyboard.latin.utils.ScriptUtils.script
 import java.io.File
@@ -65,7 +67,7 @@ object GestureDecoderVocabulary {
     // background while the current ones keep serving swipes (clearing them emptied every swipe until the rebuild,
     // e.g. right after switching to a keyboard with its own boost)
     private fun rebuildWithLearned() {
-        val context = Settings.getCurrentContext() ?: run { cache.clear(); merged.clear(); return }
+        val context = Settings.getCurrentContext() ?: run { cache.clear(); merged.clear(); learned.clear(); return }
         val entries = mainEntries.toMap()
         Thread({
             for ((key, list) in entries) runCatching { publishNow(key, key.constructLocale(), context, list) }
@@ -114,9 +116,9 @@ object GestureDecoderVocabulary {
 
     private const val CACHE_DIR = "own_gesture_vocab"
     private const val CACHE_VERSION = 1
-    // user-history dict loads asynchronously; on cold start wordPropertiesForSyncing
-    // times out internally (100 ms) and returns empty — retry instead of silently
-    // dropping the user's personal words from the vocabulary
+    // the learned-words store loads on its own thread; a read before that is done comes back empty, so a cold start
+    // retries a few times. (Until 2026-10-05 the read itself gave up after 100 ms and answered with nothing, which a
+    // store of ~11k words always missed: ~165 ms on a 2026 flagship phone. That read is gone; see historyEntries.)
     private const val HISTORY_RETRIES = 10
     private const val HISTORY_RETRY_DELAY_MS = 200L
     private const val HISTORY_LATE_RETRY_DELAY_MS = 20_000L
@@ -144,14 +146,22 @@ object GestureDecoderVocabulary {
      * scaled by its [LocaleSpec.factor]. Learned words are per script and count fully (as in typing's suggestions):
      * added once per script, unscaled. Null (and per-locale builds kicked off) until every locale's vocabulary exists.
      */
+    /** The languages of a keyboard as the decoder asks for them: each with its priority factor. The keyboard's open
+     *  (LatinIME) warms the same list the first swipe (OwnGestureDecoder) will ask for, so the merge is ready by then. */
+    fun specsFor(context: Context, locales: List<Locale>): List<LocaleSpec> {
+        val prefs = context.prefs()
+        return locales.map { LocaleSpec(it, LanguagePriority.factor(prefs, it)) }
+    }
+
     fun getOrBuildAsync(specs: List<LocaleSpec>): Vocabulary? {
         if (specs.size == 1 && specs[0].factor == 1f) return getOrBuildAsync(specs[0].locale)
         val key = specs.joinToString("|") { it.key }
         merged[key]?.let { return it }
         var allReady = true
         for (spec in specs) if (getOrBuildAsync(spec.locale) == null) allReady = false
-        if (!allReady) return null
+        if (!allReady) { wanted[key] = specs; return null }
         val context = Settings.getCurrentContext() ?: return null
+        val mergeStart = SystemClock.elapsedRealtime()
         val vocab = Vocabulary(emptyList())
         // dictionaries from different sources use different frequency scales (the Hinglish list's top thousand words
         // all sit at 248+, English's "the" is 222), so every further language is put on the first language's scale
@@ -166,10 +176,12 @@ object GestureDecoderVocabulary {
                 vocab.add(word, (freq * spec.factor).toInt().coerceAtLeast(MIN_PROBABILITY))
             // the languages of a script share their learned words: once for all of them
             if (scriptsDone.add(spec.locale.script()))
-                for ((word, freq) in historyEntries(context, spec.locale, retries = 0)) vocab.add(word, freq)
+                for ((word, freq) in learnedOf(context, spec.locale)) vocab.add(word, freq)
         }
         if (vocab.size == 0) return null
         Log.d(TAG, "merged vocabulary for $key: ${vocab.size} words")
+        logVocab("swipe vocabulary for $key: ${vocab.size} words, learned ${scriptsDone.sumOf { learned[storeKey(it, LearnedStores.currentPool)]?.size ?: 0 }}, " +
+                "merged in ${SystemClock.elapsedRealtime() - mergeStart} ms on ${Thread.currentThread().name}")
         merged[key] = vocab
         mergedSpecs[key] = specs
         return vocab
@@ -251,6 +263,8 @@ object GestureDecoderVocabulary {
         noDictionary.clear()
         merged.clear()
         mergedSpecs.clear()
+        learned.clear()
+        wanted.clear()
     }
 
     /**
@@ -268,6 +282,7 @@ object GestureDecoderVocabulary {
                 val probability = PersonalizationHelper.getUserHistoryDictionary(context, script, pool).getFrequency(word)
                 if (probability <= 0) return@schedule
                 val freq = (probability + historyBoost).coerceIn(1, 255)
+                learned[storeKey(script, pool)]?.put(word, freq)
                 for ((tag, vocab) in cache) if (tag.constructLocale().script() == script) vocab.add(word, freq)
                 // (at full weight, as when the vocabulary was built)
                 for ((key, vocab) in merged)
@@ -288,6 +303,7 @@ object GestureDecoderVocabulary {
         learnExecutor.execute {
             try {
                 val tag = locale.toLanguageTag()
+                for (m in learned.values) m.keys.removeIf { it.equals(word, ignoreCase = true) }
                 cache[tag]?.remove(word)
                 for ((key, vocab) in merged)
                     if (mergedSpecs[key]?.any { it.locale.toLanguageTag() == tag } == true) vocab.remove(word)
@@ -354,17 +370,38 @@ object GestureDecoderVocabulary {
     private fun publishNow(key: String, locale: Locale, context: Context, mainEntries: List<Pair<String, Int>>): Int {
         // removed words' dictionary copies stay out (mainEntries keeps them: the merged vocabularies filter alike)
         val vocab = Vocabulary(withoutExcluded(context, locale, mainEntries, learned = false))
-        val history = historyEntries(context, locale, HISTORY_RETRIES)
+        val history = learnedOnce(context, locale, HISTORY_RETRIES)
         for ((word, freq) in history) vocab.add(word, freq)
         if (vocab.size > 0) {
             cache[key] = vocab
             this.mainEntries[key] = mainEntries
             common.remove(key)
             contractions.remove(key)
-            merged.clear() // multilingual vocabularies containing this locale are rebuilt on the next swipe
+            merged.clear() // multilingual vocabularies containing this locale are rebuilt below or on the next swipe
+            // the keyboards that asked for this language's merged vocabulary before it was ready get it now, on this
+            // build thread, instead of at their first swipe
+            for ((mergedKey, specs) in wanted)
+                if (specs.any { it.locale.toLanguageTag() == key } && getOrBuildAsync(specs) != null) wanted.remove(mergedKey)
         }
         return history.size
     }
+
+    // the languages of a script share one learned-words store: the store is read once per build round, by whichever
+    // language's build gets there first, and the others take that list (English and Hinglish both read it before,
+    // at the same time, and the lock on the walk made each read take twice as long)
+    private val readLocks = ConcurrentHashMap<String, Any>()
+    private fun learnedOnce(context: Context, locale: Locale, retries: Int): List<Pair<String, Int>> {
+        if (!includeLearned) return emptyList()
+        val k = storeKey(locale.script(), LearnedStores.currentPool)
+        synchronized(readLocks.getOrPut(k) { Any() }) {
+            learned[k]?.takeIf { it.isNotEmpty() }?.let { m -> return m.map { it.key to it.value } }
+            return historyEntries(context, locale, retries)
+        }
+    }
+
+    // merged vocabularies asked for before every language was built (the keyboard's open warms them): built by the
+    // last language's build, see publishNow
+    private val wanted = ConcurrentHashMap<String, List<LocaleSpec>>()
 
     /**
      * The user-history dictionary loads asynchronously and can still be empty when the
@@ -384,28 +421,75 @@ object GestureDecoderVocabulary {
      * types). Added AFTER the [MAX_WORDS] cap on main-dict words, so personal words
      * are never evicted by the cap. [Vocabulary.add] keeps the higher frequency, so
      * this is a max-merge.
+     *
+     * The whole store is read and waited for (2026-10-05): the old read gave up after 100 ms and a store of tens of
+     * thousands of words often took longer, so after a restart the swiped words ran at their dictionary weight or were
+     * missing (swipe at 74 instead of ~190, curmudgeon not there at all) until each was learned again. Only from a
+     * build thread; the multilingual vocabularies take the list kept here ([learnedOf]).
      */
     private fun historyEntries(context: Context, locale: Locale, retries: Int): List<Pair<String, Int>> {
         if (!includeLearned) return emptyList()
         try {
-            val history = PersonalizationHelper.getUserHistoryDictionary(context, locale)
-            var props = history.wordPropertiesForSyncing
+            val script = locale.script()
+            val pool = LearnedStores.currentPool
+            val history = PersonalizationHelper.getUserHistoryDictionary(context, script, pool)
+            val start = SystemClock.elapsedRealtime()
+            var props = history.allWordPropertiesBlocking
             var attempts = 0
-            while (props.isEmpty() && attempts++ < retries) {
+            while ((props == null || props.isEmpty()) && attempts++ < retries) { // still loading on a cold start
                 Thread.sleep(HISTORY_RETRY_DELAY_MS)
-                props = history.wordPropertiesForSyncing
+                props = history.allWordPropertiesBlocking
             }
-            val entries = ArrayList<Pair<String, Int>>(props.size)
-            for (wp in props) {
+            val entries = ArrayList<Pair<String, Int>>(props?.size ?: 0)
+            var notCounted = 0
+            for (wp in props.orEmpty()) {
                 val word = wp.mWord ?: continue
                 if (!isDecodableWord(word) || isExcluded(context, locale, word, learned = true)) continue
+                // not counted yet (a word outside the dictionaries is stored at 0 by its first use): left out, as
+                // onWordLearned leaves it out
+                if (wp.probability <= 0) { notCounted++; continue }
                 entries.add(word to (wp.probability + historyBoost).coerceIn(1, 255))
             }
+            learned[storeKey(script, pool)] = ConcurrentHashMap<String, Int>(entries.size * 2).apply { for ((w, f) in entries) put(w, f) }
+            val ms = SystemClock.elapsedRealtime() - start
             Log.d(TAG, "read ${entries.size} user-history words for $locale (after $attempts empty reads)")
+            logVocab("learned words read for $script/$pool: ${props?.size ?: -1} in the store, ${entries.size} in the swipe " +
+                    "vocabulary, $notCounted not counted yet, $ms ms, $attempts retries; weights ${histogram(entries)}")
             return entries
         } catch (t: Throwable) {
             Log.w(TAG, "could not read user history for $locale", t)
             return emptyList()
+        }
+    }
+
+    // the learned words of each store (script and pool) as the vocabularies have them, so a multilingual vocabulary can
+    // be put together on the swipe's thread without reading the store; kept up to date by onWordLearned / onWordRemoved
+    private val learned = ConcurrentHashMap<String, ConcurrentHashMap<String, Int>>()
+    private fun storeKey(script: String, pool: Int) = "$script/$pool"
+
+    /** [locale]'s learned words for a multilingual vocabulary: the list read by its own build, else read now. */
+    private fun learnedOf(context: Context, locale: Locale): List<Pair<String, Int>> {
+        if (!includeLearned) return emptyList()
+        learned[storeKey(locale.script(), LearnedStores.currentPool)]?.let { m -> return m.map { it.key to it.value } }
+        return historyEntries(context, locale, retries = 0)
+    }
+
+    private fun histogram(entries: List<Pair<String, Int>>): String {
+        val bands = IntArray(4)
+        for ((_, f) in entries) bands[(f / 64).coerceIn(0, 3)]++
+        return "0-63: ${bands[0]}, 64-127: ${bands[1]}, 128-191: ${bands[2]}, 192-255: ${bands[3]}"
+    }
+
+    /** A line in `swipe_vocab.log` next to the swipe results, while the swipe results log is on: what the swipe
+     *  vocabularies were built from, to check on the phone. Nothing leaves the phone. */
+    private fun logVocab(line: String) {
+        if (!SwipeMetrics.isEnabled()) return
+        val context = Settings.getCurrentContext() ?: return
+        try {
+            File(context.getExternalFilesDir(null) ?: context.filesDir, "swipe_vocab.log")
+                .appendText(java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ROOT).format(java.util.Date()) + "  $line\n")
+        } catch (t: Throwable) {
+            Log.w(TAG, "could not write the swipe vocabulary log", t)
         }
     }
 

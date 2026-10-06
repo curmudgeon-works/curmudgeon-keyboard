@@ -109,6 +109,14 @@ public final class GestureTrailsDrawingPreview extends AbstractDrawingPreview im
         return needsUpdatingGestureTrail;
     }
 
+    /** Drops every trail, so a trail that never vanishes is gone when the keyboard closes. */
+    public void dismissAllTrails() {
+        synchronized (mGestureTrails) {
+            mGestureTrails.clear();
+        }
+        invalidateDrawingView();
+    }
+
     @Override
     public void run() {
         // Update preview.

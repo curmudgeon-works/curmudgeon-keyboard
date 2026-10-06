@@ -42,8 +42,6 @@
     <string name="gesture_input_summary">"إدخال كلمة من خلال التمرير على الأحرف"</string>
     <string name="gesture_preview_trail">اعرض مسار الإيماءة</string>
     <string name="gesture_floating_preview_text">"معاينة نصوص متحركة ديناميكية"</string>
-    <string name="gesture_space_aware">عبارة الإيماءة</string>
-    <string name="gesture_space_aware_summary">"إدخال مسافات خلال الإيماءات من خلال تمرير مفتاح المسافة"</string>
     <string name="subtype_en_GB">"الإنجليزية (المملكة المتحدة)"</string>
     <string name="subtype_en_US">"الإنجليزية (الولايات المتحدة)"</string>
     <string name="subtype_es_US">"الإسبانية (الأميركية)"</string>

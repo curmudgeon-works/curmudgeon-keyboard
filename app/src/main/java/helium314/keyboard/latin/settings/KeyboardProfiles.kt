@@ -41,7 +41,7 @@ object KeyboardProfiles {
         "layout_presets", // and saved Layouts
     ) + learningSwipingKeys
 
-    /** "Advanced learning and swiping" (2026-10-04): the same for every keyboard (your hand, your words). */
+    /** "Refine swipe and learning" (2026-10-04): the same for every keyboard (your hand, your words). */
     private val learningSwipingKeys: Set<String> get() = setOf(
         Settings.PREF_GESTURE_TURN_WEIGHT, Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Settings.PREF_GESTURE_KUSHLER_WEIGHT,
         Settings.PREF_GESTURE_HISTORY_BOOST, Settings.PREF_GESTURE_FAST_COMMON_WORDS, Settings.PREF_GESTURE_CORNER_MISS,
@@ -353,6 +353,15 @@ object KeyboardProfiles {
             }
             putBoolean("learning_swiping_global", true)
         }.apply()
+    }
+
+    /** Once: a setting the app no longer has is switched off and then forgotten, in the plain settings and in every
+     *  keyboard's own set (2026-10-05: "Phrase gesture", which only Google's removed swipe library read). */
+    fun forgetSetting(real: SharedPreferences, key: String) {
+        val stored = real.all.keys.filter { it == key || (it.startsWith(PREFIX) && it.endsWith("$SEPARATOR$key")) }
+        if (stored.isEmpty()) return
+        real.edit().apply { for (k in stored) putBoolean(k, false) }.apply()
+        real.edit().apply { for (k in stored) remove(k) }.apply()
     }
 
     /** Once: keyboards that got their own set before the files were per keyboard get a copy of the plain ones. */

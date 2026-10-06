@@ -68,7 +68,6 @@
     <string name="label_toolbar_key" tools:keep="@string/label_toolbar_key">Erakutsi / ezkutatu tresna-barra</string>
     <string name="label_zwj_key" tools:keep="@string/label_zwj_key">Zero zabalerako juntagailua</string>
     <string name="customize_toolbar_key_codes">Pertsonalizatu tresna-barrako tekla-kodeak</string>
-    <string name="gesture_space_aware_summary">Maglagay ng mga space sa pag-gesture sa pamamagitan ng pag-glide sa space key</string>
     <string name="gesture_fast_typing_cooldown">Cooldown ng mabilis na pag-type</string>
     <string name="delete_swipe">Delete na pag-swipe</string>
     <string name="gesture_floating_preview_dynamic_summary">Ilipat ang preview habang may gesture</string>
@@ -85,7 +84,6 @@
     <string name="enable_clipboard_history">I-enable ang clipboard history</string>
     <string name="suggest_clipboard_content">Imungkahi ang nilalaman ng clipboard</string>
     <string name="suggest_clipboard_content_summary">Pinapakita ang kamakailang kinopya na nilalaman ng clipboard bilang mungkahi</string>
-    <string name="gesture_space_aware">Phrase na gesture</string>
     <string name="bigram_prediction">Mga mungkahi sa susunod na salita</string>
     <string name="bigram_prediction_summary">Gamitin ang nakaraang salita sa paggagawa ng mga mungkahi</string>
     <string name="gesture_floating_preview_static">Floating na preview</string>

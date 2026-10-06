@@ -54,7 +54,7 @@
     <!-- Settings screen title for advanced settings -->
     <string name="settings_screen_advanced">App settings</string>
     <!-- the top-level menu with the swipe tuning and how the keyboard learns (2026-10-04) -->
-    <string name="learning_swiping_screen">Advanced learning and swiping</string>
+    <string name="learning_swiping_screen">Refine swipe and learning</string>
     <string name="learning_group">Learning</string>
     <!-- Settings screen title for keyboard theme settings -->
     <string name="settings_screen_theme">Theme</string>
@@ -165,7 +165,7 @@
     <!-- Description for override app flag to not show suggestions -->
     <string name="prefs_always_show_suggestions_summary">(May cause issues)</string>
     <!-- Option to not override the above flags for InputType.WEB_EDIT_TEXT -->
-    <string name="prefs_always_show_suggestions_except_web_text">Don’t always show suggestions for web edit fields</string>
+    <string name="prefs_always_show_suggestions_except_web_text">Don’t ignore apps’ request for web edit fields</string>
     <!-- Description for prefs_always_show_suggestions_except_web_text -->
     <string name="prefs_always_show_suggestions_except_web_text_summary">(Common cause for issues with ignoring other apps’ request)</string>
     <!-- Option to block potentially offensive words to be shown -->
@@ -215,7 +215,7 @@
     <!-- Description for the "suggest clipboard content" option. This makes the primary clipboard content visible in the suggestion strip view. -->
     <string name="suggest_clipboard_content_summary">Show recently copied clipboard content as a suggestion</string>
     <!-- Option to enable gesture input. The user can input a word by tracing the letters of a word without releasing the finger from the screen.-->
-    <string name="gesture_input">Enable swiping</string>
+    <string name="gesture_input">Swipe input</string>
     <!-- Description for "gesture_input" option. The user can input a word by tracing the letters of a word without releasing the finger from the screen.-->
     <string name="gesture_input_summary">Type a word by swiping through its letters</string>
     <!-- Option to enable gesture trail preview. The user can see a trail of the gesture during gesture input.-->
@@ -229,9 +229,6 @@
     <!-- Description for "gesture_floating_preview_text" option. The user can see a suggested word floating above the moving finger during a gesture input.-->
     <string name="gesture_floating_preview_dynamic_summary">Off: it stays where the swipe started</string>
     <!-- Option to enable space aware gesture input. The user can input multiple words by gliding through the space key during a gesture input.-->
-    <string name="gesture_space_aware">Phrase gesture</string>
-    <!-- Description for "gesture_space_aware" option. The user can input multiple words by gliding through the space key during a gesture input.-->
-    <string name="gesture_space_aware_summary">Input spaces during gestures by gliding to the space key</string>
     <!-- Title of the setting for how far a swipe has to leave the keyboard upwards to capitalize a letter -->
     <string name="gesture_caps_swipe">Swipe above keyboard to capitalize</string>
     <string name="gesture_caps_swipe_summary">While swiping a word, go up above the keyboard to capitalize the letter you left from</string>
@@ -255,7 +252,7 @@
     <string name="gesture_trail_until_touch">Until next touch</string>
     <string name="gesture_trail_fadeout_duration">Swipe trail lifespan</string>
     <!-- Preferences item for enabling clipboard history -->
-    <string name="enable_clipboard_history">Enable clipboard history</string>
+    <string name="enable_clipboard_history">Clipboard history</string>
     <!-- Description for enabling/disabling clipboard history mentioning that if disabled, clipboard content is pasted -->
     <string name="enable_clipboard_history_summary">If disabled, clipboard key will paste clipboard content if any</string>
     <!-- Preferences item for controlling clipboard history retention time -->
@@ -320,7 +317,8 @@
     <!-- Value of the hold-to-delete speed; %d is milliseconds -->
     <string name="backspace_repeat_interval_value">One deletion every %d ms</string>
     <string name="backspace_start_speed">Speed</string>
-    <string name="backspace_speed_up">Holding backspace accelerates deletion</string>
+    <string name="backspace_speed_up">Backspace goes faster when held</string>
+    <string name="backspace_longpress_delay">Backspace long press delay</string>
     <string name="backspace_speed_up_after">Speed up after</string>
     <string name="backspace_top_speed">Top speed</string>
     <!-- %s is a number of seconds like 2.0 -->
@@ -377,7 +375,7 @@
     <!-- The keyboard's own undo / redo (toolbar keys) -->
     <!-- Layout & Typing: the group of the keyboard's own undo / redo settings -->
     <string name="undo_redo_group">Undo and redo</string>
-    <string name="undo_history_length">How far back undo remembers</string>
+    <string name="undo_history_length">Undo history length</string>
     <string name="undo_history_length_steps">%s steps</string>
     <string name="undo_unit">Undo removes</string>
     <string name="redo_unit">Redo restores</string>
@@ -414,7 +412,7 @@
     <!-- Title of the setting to record swipes into a local corpus file -->
     <string name="record_gesture_corpus">Record swipe corpus</string>
     <!-- opt-in local log of swipe outcomes; the summary lines under the switch -->
-    <string name="auto_preview_keyboard">Bring up preview keyboard automatically when changing settings</string>
+    <string name="auto_preview_keyboard">Preview keyboard opens when you change a setting</string>
     <string name="auto_preview_keyboard_summary">Settings you change show their effect on a keyboard right away. Off: it appears only when you tap \"Try it here\"</string>
     <string name="swipe_metrics">Log swipe results</string>
     <string name="swipe_metrics_summary">Keep a local log of how each swipe ends: first choice right, picked from the strip, or never offered (deleted, retyped or edited), with the decode time. Nothing leaves the phone.</string>
@@ -423,6 +421,16 @@
     <string name="swipe_metrics_none">No swipes logged yet</string>
     <string name="swipe_metrics_line">%1$d swipes · first choice right %2$d%% · picked from the strip %3$d%% · never offered %4$d%% · decode %5$d ms on average, %6$d ms at most</string>
     <string name="swipe_metrics_clear">Clear the log</string>
+    <string name="swipe_metrics_chart">Chart</string>
+    <string name="swipe_metrics_restart">Restart tracking</string>
+    <string name="swipe_metrics_range_tuning">Since tuning changed</string>
+    <string name="swipe_metrics_range_restart">Since restart</string>
+    <string name="swipe_metrics_chart_no_restart">Tracking hasn\'t been restarted yet. Restart it below the summary to follow the results from a moment you choose.</string>
+    <string name="swipe_metrics_chart_span">%1$s to now · %2$d swipes</string>
+    <string name="swipe_metrics_chart_first">First choice right</string>
+    <string name="swipe_metrics_chart_never">Never offered</string>
+    <string name="swipe_metrics_chart_decode">Decode time (right axis)</string>
+    <string name="swipe_metrics_chart_now">now</string>
     <string name="learning_log">Log corrections</string>
     <string name="learning_log_summary">Keep a local log of what each correction does to the learned words. Nothing leaves the phone.</string>
     <string name="learning_log_none">No corrections logged yet</string>
@@ -724,7 +732,7 @@
     <!-- Title of the setting enabling long press on space key to change IME -->
     <string name="prefs_long_press_keyboard_to_change_lang">Long-press space to change input method</string>
     <!-- Title of the setting enabling long press on symbols key to switch to numpad -->
-    <string name="prefs_long_press_symbol_for_numpad">Long press symbols key for numpad</string>
+    <string name="prefs_long_press_symbol_for_numpad">Long press symbols key</string>
     <!-- Title of the setting for reduced distance between keys -->
     <string name="prefs_narrow_key_gaps">Narrow key gaps</string>
     <!-- Title of the setting for setting keyboard height -->
@@ -1023,7 +1031,7 @@ language, hence "No language". -->
     <string name="keypress_sound_camera">Camera shutter</string>
     <string name="keypress_sound_beep">Beep</string>
     <!-- Title of the setting for key long press delay -->
-    <string name="prefs_key_longpress_timeout_settings">Key long press delay</string>
+    <string name="prefs_key_longpress_timeout_settings">Long press delay</string>
     <!-- Title of the setting for overriding Android SDK level for showing emojis -->
     <string name="prefs_key_emoji_max_sdk">Override Emoji version</string>
     <!-- Title of the setting for enabling Emoji palette triggered by the Alt key on physical keyboards -->
@@ -1144,7 +1152,7 @@ New dictionary:
     <!-- Option for choosing whether we use a theme that provides borders to keys -->
     <string name="key_borders">Key borders</string>
     <!-- Option for choosing auto day/night theme switch -->
-    <string name="day_night_mode">Light/Dark based on system settings</string>
+    <string name="day_night_mode">Dark mode follows phone</string>
     <!-- Description for "day_night_mode" option. -->
     <string name="day_night_mode_summary">Appearance will follow system settings</string>
     <!-- Option for setting navbar to follow keyboard color -->

@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Build
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -132,6 +133,17 @@ fun createAdvancedSettings(context: Context) = listOf(
             description = { stringResource(R.string.abbreviation_unit_milliseconds, it.toString()) }
         )
     },
+    // backspace's own long press delay (before the first deletion); unset, it shows and uses the key long press delay
+    Setting(context, Settings.PREF_BACKSPACE_LONGPRESS_DELAY, R.string.backspace_longpress_delay) { setting ->
+        val prefs = LocalContext.current.prefs()
+        SliderPreference(
+            name = setting.title,
+            key = setting.key,
+            default = prefs.getInt(Settings.PREF_KEY_LONGPRESS_TIMEOUT, Defaults.PREF_KEY_LONGPRESS_TIMEOUT),
+            range = 100f..700f,
+            description = { stringResource(R.string.abbreviation_unit_milliseconds, it.toString()) }
+        )
+    },
     Setting(context, Settings.PREF_SPACE_HORIZONTAL_SWIPE, R.string.show_horizontal_space_swipe) {
         val items = listOf(
             stringResource(R.string.space_swipe_move_cursor_entry) to KeyboardActionListener.SwipeAction.MOVE_CURSOR.name,
@@ -178,8 +190,14 @@ fun createAdvancedSettings(context: Context) = listOf(
     {
         SwitchPreference(it, Defaults.PREF_SPACE_TO_CHANGE_LANG)
     },
-    Setting(context, Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, R.string.prefs_long_press_symbol_for_numpad) {
-        SwitchPreference(it, Defaults.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD)
+    Setting(context, Settings.PREF_LONG_PRESS_SYMBOL_ACTION, R.string.prefs_long_press_symbol_for_numpad) {
+        val items = listOf(
+            stringResource(R.string.action_none) to "none",
+            stringResource(R.string.space_swipe_toggle_numpad_entry) to "numpad",
+            stringResource(R.string.settings) to "settings",
+            stringResource(R.string.show_emoji_key) to "emoji",
+        )
+        ListPreference(it, items, Defaults.PREF_LONG_PRESS_SYMBOL_ACTION)
     },
     Setting(context, Settings.PREF_SHOW_SETUP_WIZARD_ICON, R.string.show_setup_wizard_icon, R.string.show_setup_wizard_icon_summary) {
         val ctx = LocalContext.current
@@ -319,7 +337,14 @@ fun createAdvancedSettings(context: Context) = listOf(
                                 s.pct(s.neverOffered), s.decodeAverage, s.decodeWorst),
                             style = MaterialTheme.typography.bodySmall)
                     }
-                    TextButton(onClick = { SwipeMetrics.clear(); generation++ }) { Text(stringResource(R.string.swipe_metrics_clear)) }
+                    var showChart by remember { mutableStateOf(false) }
+                    Row {
+                        TextButton(onClick = { showChart = true }) { Text(stringResource(R.string.swipe_metrics_chart)) }
+                        // a marker in the log: the chart can start there, nothing is deleted
+                        TextButton(onClick = { SwipeMetrics.restartTracking(); generation++ }) { Text(stringResource(R.string.swipe_metrics_restart)) }
+                        TextButton(onClick = { SwipeMetrics.clear(); generation++ }) { Text(stringResource(R.string.swipe_metrics_clear)) }
+                    }
+                    if (showChart) helium314.keyboard.settings.SwipeResultsChartDialog { showChart = false }
                 }
             }
         }

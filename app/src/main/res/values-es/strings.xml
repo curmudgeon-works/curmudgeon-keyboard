@@ -42,8 +42,6 @@
     <string name="gesture_input_summary">Escribe una palabra deslizando el dedo sobre las letras</string>
     <string name="gesture_preview_trail">"Mostrar recorrido del gesto"</string>
     <string name="gesture_floating_preview_text">"Vista previa dinámica flotante"</string>
-    <string name="gesture_space_aware">Gestos para frases</string>
-    <string name="gesture_space_aware_summary">Introduce espacios al deslizar el dedo por la tecla Espacio mientras escribes con gestos</string>
     <string name="subtype_en_GB">Inglés (Reino Unido)</string>
     <string name="subtype_en_US">Inglés (EE.UU.)</string>
     <string name="subtype_es_US">"Español (EE.UU.)"</string>

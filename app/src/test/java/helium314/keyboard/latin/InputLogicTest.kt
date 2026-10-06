@@ -931,7 +931,7 @@ class InputLogicTest {
         assertEquals("hello ", text)
         assertEquals(listOf("helo"), unlearnedWords)
         assertEquals("hello", lastAddedWord)
-        assertEquals(3, helium314.keyboard.latin.ShadowFacilitator2.lastAddedExtraUses) // corrected by hand: like a strip pick
+        assertEquals(5, helium314.keyboard.latin.ShadowFacilitator2.lastAddedExtraUses) // corrected by hand: more than a strip pick (2026-10-05)
     }
 
     @Test fun `picking the picked up word again from the strip counts like any strip pick`() {
@@ -982,7 +982,7 @@ class InputLogicTest {
         assertEquals(listOf("helo"), unlearnedWords)
         setCursorPosition(text.length)
         assertEquals("hello", lastAddedWord)
-        assertEquals(3, helium314.keyboard.latin.ShadowFacilitator2.lastAddedExtraUses) // corrected by hand: like a strip pick
+        assertEquals(5, helium314.keyboard.latin.ShadowFacilitator2.lastAddedExtraUses) // corrected by hand: more than a strip pick (2026-10-05)
     }
 
     @Test fun `a word still being typed takes nothing back when changed in the middle`() {
@@ -1005,7 +1005,7 @@ class InputLogicTest {
         setCursorPosition(text.length) // a tap elsewhere: the edit is over
         assertEquals(listOf("hello"), unlearnedWords)
         assertEquals(listOf("hello", "world", "hellp"), addedWords)
-        assertEquals(3, helium314.keyboard.latin.ShadowFacilitator2.lastAddedExtraUses) // corrected by hand: like a strip pick
+        assertEquals(5, helium314.keyboard.latin.ShadowFacilitator2.lastAddedExtraUses) // corrected by hand: more than a strip pick (2026-10-05)
         input(' ')
         assertEquals(listOf("hello"), unlearnedWords)
         assertEquals(listOf("hello", "world", "hellp"), addedWords)
@@ -1170,7 +1170,7 @@ class InputLogicTest {
         clearLearning()
         functionalKeyPress(KeyCode.UNDO)
         assertEquals("helo ", text)
-        assertEquals(-4, usesOf("hello"))
+        assertEquals(-6, usesOf("hello"))
         assertEquals(1, usesOf("helo"))
         functionalKeyPress(KeyCode.UNDO)
         assertEquals("", text)

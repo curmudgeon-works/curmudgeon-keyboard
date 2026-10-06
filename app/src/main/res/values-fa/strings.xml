@@ -42,8 +42,6 @@
     <string name="gesture_input_summary">"با لغزاندن انگشت روی حروف کلمه وارد کنید"</string>
     <string name="gesture_preview_trail">"نمایش نسخه آزمایشی حرکت"</string>
     <string name="gesture_floating_preview_text">"پیش‌نمایش متحرک پویا"</string>
-    <string name="gesture_space_aware">"‫ورود عبارت با حرکت اشاره‌ای"</string>
-    <string name="gesture_space_aware_summary">"با سراندن انگشت روی کلید فاصله در زمان استفاده از حرکات، فاصله وارد کنید"</string>
     <string name="subtype_en_GB">"انگلیسی (بریتانیا)"</string>
     <string name="subtype_en_US">"انگلیسی (امریکا)"</string>
     <string name="subtype_es_US">"اسپانیایی (امریکا)"</string>

@@ -570,7 +570,7 @@ public final class InputLogic {
                 // an accepted word corrected in place (it took back its use) counts like a strip pick; other words
                 // changed in place as before
                 performAdditionToUserHistoryDictionary(settingsValues, mWordBeingCorrectedByCursor,
-                        NgramContext.EMPTY_PREV_WORDS_INFO, mEditedInPlaceWord != null ? PICKED_SUGGESTION_EXTRA_USES : 0,
+                        NgramContext.EMPTY_PREV_WORDS_INFO, mEditedInPlaceWord != null ? EDITED_WORD_EXTRA_USES : 0,
                         LearningEventLog.EDIT);
             }
             mEditedInPlaceWord = null; // the cursor left the word: the edit is over
@@ -1994,9 +1994,9 @@ public final class InputLogic {
         logLearningEvent(LearningEventLog.ACCEPTED_EDITED, LearningEventLog.EDIT, resumedFrom, word);
         mDictionaryFacilitator.unlearnOneUse(resumedFrom);
         recordLearning(resumedFrom, -1, LearningEventLog.EDIT, false, NgramContext.EMPTY_PREV_WORDS_INFO);
-        // corrected by hand: as deliberate as a strip pick (2026-10-04)
+        // corrected by hand: more deliberate than a strip pick (2026-10-05)
         performAdditionToUserHistoryDictionary(settingsValues, word, NgramContext.EMPTY_PREV_WORDS_INFO,
-                PICKED_SUGGESTION_EXTRA_USES, LearningEventLog.EDIT);
+                EDITED_WORD_EXTRA_USES, LearningEventLog.EDIT);
     }
 
     /** A line in the corrections log, if it's on: call before the change, the counts before are read now (the counts
@@ -2206,6 +2206,9 @@ public final class InputLogic {
 
     /** A word picked from the suggestions counts as this many more uses: it jumps up the ranking, more with each pick. */
     private static final int PICKED_SUGGESTION_EXTRA_USES = 3;
+    /** A word corrected by hand counts as this many more uses: more than a pick, it took more effort (2026-10-05:
+     *  "I obviously made an effort on that word"). */
+    private static final int EDITED_WORD_EXTRA_USES = 5;
 
     /** Learns [suggestion] (1 + [extraUses] uses), kept with the step being typed for undo / redo ([origin]: how it
      *  got there, for the corrections log). */
@@ -3258,11 +3261,18 @@ public final class InputLogic {
             mDictionaryFacilitator.unlearnOneUse(resumedFrom);
             recordLearning(resumedFrom, -1, LearningEventLog.EDIT, false, NgramContext.EMPTY_PREV_WORDS_INFO);
         }
+        // corrected by hand: an accepted word changed, a swiped word changed before it was committed, or a word typed
+        // where a swipe was just deleted (the swipe didn't offer it)
+        final boolean editedByHand = editedAccepted
+                || (swipedWord != null && !mWordComposer.isBatchMode() && !swipedWord.equalsIgnoreCase(chosenWord))
+                || (swipedWord == null && !mWordComposer.isBatchMode() && commitType != LastComposedWord.COMMIT_TYPE_MANUAL_PICK
+                        && GestureCorpusRecorder.INSTANCE.isRetypeAfterDeletedSwipe());
         // Add the word to the user history dictionary
         if (!reAccepted && !afterDigit)
             performAdditionToUserHistoryDictionary(settingsValues, chosenWord, ngramContext,
-                    // a strip pick, or an accepted word corrected by hand: deliberate, extra uses
-                    commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK || editedAccepted ? PICKED_SUGGESTION_EXTRA_USES : 0,
+                    // corrected by hand, or picked from the strip: deliberate, extra uses
+                    editedByHand ? EDITED_WORD_EXTRA_USES
+                            : commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK ? PICKED_SUGGESTION_EXTRA_USES : 0,
                     origin);
         if (DebugFlags.DEBUG_ENABLED) {
             long runTimeMillis = SystemClock.elapsedRealtime() - startTimeMillis;
@@ -3279,6 +3289,8 @@ public final class InputLogic {
         // a swiped word edited into another word (a pick from the strip reports itself)
         if (commitType != LastComposedWord.COMMIT_TYPE_MANUAL_PICK)
             GestureCorpusRecorder.INSTANCE.onWordCommitted(chosenWord);
+        // a typed word committed: a swipe deleted before it is settled
+        if (swipedWord == null) GestureCorpusRecorder.INSTANCE.onTypedWordCommitted();
         if (DebugFlags.DEBUG_ENABLED) {
             long runTimeMillis = SystemClock.elapsedRealtime() - startTimeMillis;
             Log.d(TAG, "commitChosenWord() : " + runTimeMillis + " ms to run "

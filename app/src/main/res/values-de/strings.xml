@@ -42,8 +42,6 @@
     <string name="gesture_input_summary">Gib ein Wort ein, indem du durch die Buchstaben gleitest</string>
     <string name="gesture_preview_trail">Gestenspur anzeigen</string>
     <string name="gesture_floating_preview_text">Schwebender Echtzeit-Vorschlag</string>
-    <string name="gesture_space_aware">"Phrasengeste"</string>
-    <string name="gesture_space_aware_summary">"Leerzeichen durch Bewegung über die Leertaste einfügen"</string>
     <string name="subtype_en_GB">"Englisch (UK)"</string>
     <string name="subtype_en_US">"Englisch (USA)"</string>
     <string name="subtype_es_US">"Spanisch (USA)"</string>

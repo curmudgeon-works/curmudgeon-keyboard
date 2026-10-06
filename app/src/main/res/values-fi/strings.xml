@@ -42,8 +42,6 @@
     <string name="gesture_input_summary">Syötä sana liu\'uttamalla kirjainten läpi</string>
     <string name="gesture_preview_trail">"Näytä eleen jälki"</string>
     <string name="gesture_floating_preview_text">"Dynaaminen kelluva esikatselu"</string>
-    <string name="gesture_space_aware">"Ilmausele"</string>
-    <string name="gesture_space_aware_summary">"Lisää välilyöntejä eleiden aikana liukumalla välilyöntinäppäimelle"</string>
     <string name="subtype_en_GB">"englanti (Iso-Britannia)"</string>
     <string name="subtype_en_US">"englanti (Yhdysvallat)"</string>
     <string name="subtype_es_US">"espanja (Yhdysvallat)"</string>

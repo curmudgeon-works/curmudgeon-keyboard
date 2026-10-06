@@ -42,8 +42,6 @@
     <string name="gesture_input_summary">Szó beírása a betűkön való csúsztatással</string>
     <string name="gesture_preview_trail">Kézmozdulat nyomának megjelenítése</string>
     <string name="gesture_floating_preview_text">"Dinamikus lebegő előnézet"</string>
-    <string name="gesture_space_aware">Kifejezés-ujjmozdulat</string>
-    <string name="gesture_space_aware_summary">A szóköz feletti csúsztatás szóközt szúr be</string>
     <string name="subtype_en_GB">Angol (brit)</string>
     <string name="subtype_en_US">Angol (amerikai)</string>
     <string name="subtype_es_US">Spanyol (amerikai)</string>

@@ -141,7 +141,6 @@ object Defaults {
     const val PREF_KEYPRESS_SOUND = "android" // KeypressSounds
     const val PREF_KEY_LONGPRESS_TIMEOUT = 300
     const val PREF_GESTURE_PREVIEW_TRAIL = true
-    const val PREF_GESTURE_SPACE_AWARE = false
     const val PREF_GESTURE_CAPS_SWIPE = true // swiping up above the keyboard capitalizes the letter left from (own gesture decoder)
     const val PREF_GESTURE_APOSTROPHE_VIA_PERIOD = false // off = the apostrophe is skipped (swipe im for I'm); on = swiped through the period key (own gesture decoder)
     const val PREF_GESTURE_CAPS_HEIGHT = 75 // percent of a key height the swipe must rise above the keyboard to capitalize (own gesture decoder)
@@ -163,7 +162,7 @@ object Defaults {
     const val PREF_SHOW_SETUP_WIZARD_ICON = true
     const val PREF_USE_CONTACTS = false
     const val PREF_USE_APPS = false
-    const val PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD = false
+    const val PREF_LONG_PRESS_SYMBOL_ACTION = "none"
     const val PREF_ONE_HANDED_MODE = false
     @SuppressLint("RtlHardcoded")
     const val PREF_ONE_HANDED_GRAVITY = Gravity.LEFT

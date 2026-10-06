@@ -85,7 +85,7 @@ public final class AndroidSpellCheckerService extends SpellCheckerService
         onSharedPreferenceChanged(prefs, Settings.PREF_USE_CONTACTS);
         onSharedPreferenceChanged(prefs, Settings.PREF_USE_APPS);
         final boolean blockOffensive = prefs.getBoolean(Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE, Defaults.PREF_BLOCK_POTENTIALLY_OFFENSIVE);
-        mSettingsValuesForSuggestion = new SettingsValuesForSuggestion(blockOffensive, false);
+        mSettingsValuesForSuggestion = new SettingsValuesForSuggestion(blockOffensive);
     }
 
     public float getRecommendedThreshold() {
@@ -105,7 +105,7 @@ public final class AndroidSpellCheckerService extends SpellCheckerService
         }
         case Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE -> {
             final boolean blockOffensive = prefs.getBoolean(Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE, Defaults.PREF_BLOCK_POTENTIALLY_OFFENSIVE);
-            mSettingsValuesForSuggestion = new SettingsValuesForSuggestion(blockOffensive, false);
+            mSettingsValuesForSuggestion = new SettingsValuesForSuggestion(blockOffensive);
         }}
     }
 

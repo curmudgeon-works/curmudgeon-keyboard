@@ -54,8 +54,19 @@ object GestureCorpusRecorder {
 
     fun isEnabled(): Boolean = Settings.getValues().mRecordGestureCorpus && file != null
 
-    /** The swiped word is followed to its outcome for the corpus and/or the swipe results log. */
-    fun isFollowing(): Boolean = isEnabled() || SwipeMetrics.isEnabled()
+    /** The swiped word is followed to its outcome: always (a word typed after a deleted swipe is learned as corrected by
+     *  hand), and for the corpus and the swipe results log. */
+    fun isFollowing(): Boolean = true
+
+    // when the last swipe was deleted right away, 0 once a word stuck since
+    @Volatile private var deletedAt = 0L
+    private const val RETYPE_WINDOW_MS = 30_000L
+
+    /** A word is being typed where a swipe was just deleted: the swipe didn't offer it (learned as corrected by hand). */
+    fun isRetypeAfterDeletedSwipe(): Boolean = deletedAt > 0L && System.currentTimeMillis() - deletedAt <= RETYPE_WINDOW_MS
+
+    /** A typed word was committed: whatever swipe was deleted before it is settled. */
+    fun onTypedWordCommitted() { deletedAt = 0L }
 
     fun corpusFile(): File? = file
 
@@ -72,8 +83,9 @@ object GestureCorpusRecorder {
         val ts = pointers.times.copyOf(size)
         // the native decoder reports the same word once per dictionary it was found in; keep the best-ranked
         val cands = candidates.distinctBy { it.mWord }.take(MAX_CANDIDATES).map { it.mWord to it.mScore }
-        if (cands.isEmpty()) { // nothing to follow: a decode failure, logged as such so "never offered" stays honest
-            SwipeMetrics.onOutcome(counter.incrementAndGet(), "", SwipeMetrics.OUTCOME_NONE, -1, null,
+        if (cands.isEmpty()) { // nothing to follow: a dead swipe or a decode failure, logged so "never offered" stays honest
+            val outcome = if (OwnGestureDecoder.lastVocabularyMissing) SwipeMetrics.OUTCOME_NO_VOCABULARY else SwipeMetrics.OUTCOME_NONE
+            SwipeMetrics.onOutcome(counter.incrementAndGet(), "", outcome, -1, null,
                 OwnGestureDecoder.lastDecodeMs, OwnGestureDecoder.lastSpeedKeysPerSecond, OwnGestureDecoder.currentTuning.key)
             return
         }
@@ -144,6 +156,7 @@ object GestureCorpusRecorder {
         val id = pendingId
         if (id < 0) return
         pendingId = -1L
+        deletedAt = if (outcome == SwipeMetrics.OUTCOME_DELETED) System.currentTimeMillis() else 0L
         SwipeMetrics.onOutcome(id, lastWord, outcome, rank, word, lastDecodeMs, lastSpeed, lastTuning)
         when (outcome) {
             SwipeMetrics.OUTCOME_PICKED -> if (rank != 0) correction(id, "pick", word)

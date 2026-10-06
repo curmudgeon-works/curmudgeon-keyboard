@@ -43,8 +43,6 @@
     <string name="gesture_input_summary">Набирайте текст, проводя по буквам и не отрывая палец от экрана</string>
     <string name="gesture_preview_trail">Показывать траекторию жеста</string>
     <string name="gesture_floating_preview_text">Динамический плавающий предпросмотр</string>
-    <string name="gesture_space_aware">Непрерывный ввод фраз</string>
-    <string name="gesture_space_aware_summary">Вводите несколько слов, проводя пальцем через пробел</string>
     <string name="subtype_en_GB">Английский (Великобритания)</string>
     <string name="subtype_en_US">Английский (США)</string>
     <string name="subtype_es_US">Испанский (США)</string>

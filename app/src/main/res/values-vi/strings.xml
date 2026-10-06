@@ -42,8 +42,6 @@
     <string name="gesture_input_summary">"Nhập từ bằng cách trượt qua các chữ cái"</string>
     <string name="gesture_preview_trail">"Hiển thị vệt cử chỉ"</string>
     <string name="gesture_floating_preview_text">"Xem trước nổi động"</string>
-    <string name="gesture_space_aware">"Cử chỉ nhập cụm từ"</string>
-    <string name="gesture_space_aware_summary">"Nhập dấu cách khi thực hiện cử chỉ bằng cách trượt tới phím cách"</string>
     <string name="subtype_en_GB">"Tiếng Anh (Anh)"</string>
     <string name="subtype_en_US">"Tiếng Anh (Mỹ)"</string>
     <string name="subtype_es_US">"Tiếng Tây Ban Nha (Mỹ)"</string>

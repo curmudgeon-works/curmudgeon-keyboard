@@ -81,14 +81,15 @@ object FrequentLongWords {
         Thread({
             try {
                 val history = PersonalizationHelper.getUserHistoryDictionary(context, script, pool)
-                // the dump gives up after 100 ms and answers with nothing, which a big store misses on the first tries
-                var props = history.wordPropertiesForSyncing
+                // the whole store, waited for (the old read gave up after 100 ms and answered with nothing, which a
+                // store of ~11k words always missed); empty only while the store is still loading after a start
+                var props = history.allWordPropertiesBlocking
                 var attempts = 0
-                while (props.isEmpty() && attempts++ < READ_ATTEMPTS) {
+                while ((props == null || props.isEmpty()) && attempts++ < READ_ATTEMPTS) {
                     Thread.sleep(READ_RETRY_DELAY_MS)
-                    props = history.wordPropertiesForSyncing
+                    props = history.allWordPropertiesBlocking
                 }
-                if (props.isEmpty()) {
+                if (props == null || props.isEmpty()) {
                     Log.i(TAG, "user history for $key still empty after $attempts attempts, will retry later")
                     return@Thread
                 }

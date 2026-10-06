@@ -115,6 +115,21 @@ private fun curmudgeonUpgrades(prefs: SharedPreferences, freshInstall: Boolean) 
             putBoolean("trail_thickness_migrated", true)
         }
     }
+    // 0.3.006: the app-wide key gaps still on the old defaults (0.5 / 0.75 %) take the new ones (1 / 2 %); other
+    // values, and each keyboard's own (p1/ …) gaps, stay as they are
+    if (!prefs.getBoolean("key_gap_defaults_migrated", false)) {
+        prefs.edit {
+            if (!freshInstall) {
+                if (prefs.contains(Settings.PREF_KEY_HORIZONTAL_GAP)
+                        && kotlin.math.abs(prefs.getFloat(Settings.PREF_KEY_HORIZONTAL_GAP, 0f) - 0.5f) < 0.01f)
+                    putFloat(Settings.PREF_KEY_HORIZONTAL_GAP, Defaults.PREF_KEY_HORIZONTAL_GAP)
+                if (prefs.contains(Settings.PREF_KEY_VERTICAL_GAP)
+                        && kotlin.math.abs(prefs.getFloat(Settings.PREF_KEY_VERTICAL_GAP, 0f) - 0.75f) < 0.01f)
+                    putFloat(Settings.PREF_KEY_VERTICAL_GAP, Defaults.PREF_KEY_VERTICAL_GAP)
+            }
+            putBoolean("key_gap_defaults_migrated", true)
+        }
+    }
     // 0.1.004: toolbar mode → Toolbar visibility + Show suggestions (the only suggestions switch)
     if (!prefs.contains(Settings.PREF_TOOLBAR_VISIBILITY) && prefs.contains(Settings.PREF_TOOLBAR_MODE)) {
         val old = prefs.getString(Settings.PREF_TOOLBAR_MODE, null)

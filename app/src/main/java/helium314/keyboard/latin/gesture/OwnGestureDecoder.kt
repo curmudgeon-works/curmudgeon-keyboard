@@ -24,7 +24,6 @@ import helium314.keyboard.latin.dictionary.Dictionary
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsValuesForSuggestion
-import helium314.keyboard.latin.utils.LanguagePriority
 import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.SuggestionResults
 import helium314.keyboard.latin.utils.prefs
@@ -98,6 +97,8 @@ object OwnGestureDecoder {
         private set
     /** How long the last decode took on this phone, for the swipe statistics. */
     @Volatile var lastDecodeMs: Long = 0
+    /** The last swipe found no vocabulary at all (still building after a start): a dead swipe, logged as such. */
+    @Volatile var lastVocabularyMissing = false
         private set
     /** The last swipe's speed as the decoder measured it (key widths per second), for the swipe results log. */
     @Volatile var lastSpeedKeysPerSecond: Float = 0f
@@ -161,10 +162,11 @@ object OwnGestureDecoder {
         currentTuning = tuning
         GestureDecoderVocabulary.historyBoost = tuning.historyBoost
         GestureDecoderVocabulary.includeLearned = Settings.getValues()?.mUsePersonalizedDicts != false
-        val specs = locales.map {
-            GestureDecoderVocabulary.LocaleSpec(it, prefs?.let { p -> LanguagePriority.factor(p, it) } ?: 1f)
-        }
+        val context = Settings.getCurrentContext()
+        val specs = if (context != null) GestureDecoderVocabulary.specsFor(context, locales)
+                    else locales.map { GestureDecoderVocabulary.LocaleSpec(it, 1f) }
         val vocabulary = GestureDecoderVocabulary.getOrBuildAsync(specs)
+        lastVocabularyMissing = vocabulary == null
         if (vocabulary == null) {
             Log.d(TAG, "vocabulary for $locales not ready yet, no gesture results")
             return results

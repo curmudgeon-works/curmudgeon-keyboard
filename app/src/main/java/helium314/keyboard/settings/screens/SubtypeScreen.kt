@@ -464,9 +464,13 @@ fun SubtypeScreen(
                                 if (it in dependentInputItems) Box(Modifier.padding(start = 16.dp)) { SettingsActivity.settingsContainer[it]?.Preference() }
                                 else SettingsActivity.settingsContainer[it]?.Preference()
                             }
-                            if (it in previewDialogItems) CompositionLocalProvider(LocalKeepKeyboard provides true,
-                                LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) { row() }
-                            else row()
+                            val shown: @Composable () -> Unit = {
+                                if (it in previewDialogItems) CompositionLocalProvider(LocalKeepKeyboard provides true,
+                                    LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) { row() }
+                                else row()
+                            }
+                            // backspace's long press delay: advanced only, right below the long press delay
+                            if (it == Settings.PREF_BACKSPACE_LONGPRESS_DELAY) AdvancedBlock(advanced) { shown() } else shown()
                             }
                         }
                     }
@@ -743,7 +747,7 @@ private fun SwitchRow(title: String, checked: Boolean, summary: String? = null, 
 /** The Input items shown only in advanced mode, last in the group (see [AdvancedBlock]). */
 /** Settings whose dialogs keep the preview keyboard up: to hear the key sound or feel the vibration while choosing it, to try the long-press delay. */
 private val previewDialogItems = setOf(Settings.PREF_KEYPRESS_SOUND, Settings.PREF_KEYPRESS_SOUND_VOLUME, Settings.PREF_VIBRATION_DURATION_SETTINGS,
-    Settings.PREF_KEY_LONGPRESS_TIMEOUT)
+    Settings.PREF_KEY_LONGPRESS_TIMEOUT, Settings.PREF_BACKSPACE_LONGPRESS_DELAY)
 
 /** Switches that bring the preview keyboard up for a moment when flipped: their effect is seen (or felt, or heard) on a key press. */
 private val previewedSwitches = listOf(
@@ -752,10 +756,10 @@ private val previewedSwitches = listOf(
     Settings.PREF_SHOW_EMOJI_KEY, Settings.PREF_SHOW_VOICE_KEY,
     Settings.PREF_POPUP_ON, Settings.PREF_VIBRATE_ON, Settings.PREF_SOUND_ON,
     Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS, Settings.PREF_BACKSPACE_SPEED_UP, Settings.PREF_DELETE_SWIPE,
-    Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, Settings.PREF_REMOVE_REDUNDANT_POPUPS,
+    Settings.PREF_LONG_PRESS_SYMBOL_ACTION, Settings.PREF_REMOVE_REDUNDANT_POPUPS,
 )
 
-private val advancedInputItems = listOf(Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD, SettingsWithoutKey.ABC_AFTER) // (emoji descriptions: Appearance, Emoji group)
+private val advancedInputItems = listOf(Settings.PREF_LONG_PRESS_SYMBOL_ACTION, SettingsWithoutKey.ABC_AFTER) // (emoji descriptions: Appearance, Emoji group)
 
 /** Advanced items on a slightly different background, so toggling the mode shows what it adds (last in the Input
  *  group, in place elsewhere). */

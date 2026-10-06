@@ -42,8 +42,6 @@
     <string name="gesture_input_summary">"Ievadiet vārdu, velkot ar pirkstu pa burtiem."</string>
     <string name="gesture_preview_trail">"Rādīt žesta pēdas"</string>
     <string name="gesture_floating_preview_text">"Dinamisk. peldošais priekšsk."</string>
-    <string name="gesture_space_aware">"Frāzes žests"</string>
-    <string name="gesture_space_aware_summary">"Lai ievietotu atstarpi, velciet uz atstarpes taustiņu."</string>
     <string name="subtype_en_GB">"Angļu valoda (Lielbritānija)"</string>
     <string name="subtype_en_US">"Angļu valoda (ASV)"</string>
     <string name="subtype_es_US">"Spāņu (ASV)"</string>

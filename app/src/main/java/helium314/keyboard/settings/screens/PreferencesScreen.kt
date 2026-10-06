@@ -90,7 +90,6 @@ fun preferencesInputItems(prefs: SharedPreferences, ctx: Context): List<Any?> {
     val soundRows = prefs.getBoolean(Settings.PREF_SOUND_ON, Defaults.PREF_SOUND_ON) && SystemFeedback.soundBlocker(ctx) == null
     return listOf(
         R.string.settings_category_input,
-        Settings.PREF_KEY_LONGPRESS_TIMEOUT, // (from Advanced)
         Settings.PREF_POPUP_ON,
         if (AudioAndHapticFeedbackManager.getInstance().hasVibrator())
             Settings.PREF_VIBRATE_ON else null,
@@ -101,6 +100,9 @@ fun preferencesInputItems(prefs: SharedPreferences, ctx: Context): List<Any?> {
         Settings.PREF_SOUND_ON,
         if (soundRows) Settings.PREF_KEYPRESS_SOUND else null,
         if (soundRows) Settings.PREF_KEYPRESS_SOUND_VOLUME else null,
+        // the two long press delays, below the sound rows
+        Settings.PREF_KEY_LONGPRESS_TIMEOUT, // (from Advanced)
+        Settings.PREF_BACKSPACE_LONGPRESS_DELAY, // advanced only, right below the long press delay
         // (keyboard per app: on Advanced, with the other settings shared by all keyboards)
     )
 }

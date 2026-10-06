@@ -84,6 +84,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_AUTOCORRECT_SHORTCUTS = "autocorrect_shortcuts";
     public static final String PREF_BACKSPACE_REVERTS_AUTOCORRECT = "backspace_reverts_autocorrect";
     public static final String PREF_BACKSPACE_HOLD_DELETES_WORDS = "backspace_hold_deletes_words";
+    public static final String PREF_BACKSPACE_LONGPRESS_DELAY = "backspace_longpress_delay"; // ms before a held backspace starts deleting; unset = the key long press delay
     public static final String PREF_BACKSPACE_DELETES_SWIPED_WORD = "backspace_deletes_swiped_word";
     public static final String PREF_AUTOCORRECT_WITH_DIGITS = "autocorrect_with_digits";
     public static final String PREF_KEY_TEXT_BOLD = "key_text_bold";
@@ -167,7 +168,6 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_KEYPRESS_SOUND = "keypress_sound";
     public static final String PREF_KEY_LONGPRESS_TIMEOUT = "key_longpress_timeout";
     public static final String PREF_GESTURE_PREVIEW_TRAIL = "gesture_preview_trail";
-    public static final String PREF_GESTURE_SPACE_AWARE = "gesture_space_aware";
     public static final String PREF_GESTURE_CAPS_HEIGHT = "gesture_caps_height";
     public static final String PREF_GESTURE_CAPS_SWIPE = "gesture_caps_swipe";
     public static final String PREF_GESTURE_APOSTROPHE_VIA_PERIOD = "gesture_apostrophe_via_period";
@@ -185,7 +185,8 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_SHOW_SETUP_WIZARD_ICON = "show_setup_wizard_icon";
     public static final String PREF_USE_CONTACTS = "use_contacts";
     public static final String PREF_USE_APPS = "use_apps";
-    public static final String PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD = "long_press_symbols_for_numpad";
+    public static final String PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD = "long_press_symbols_for_numpad"; // old on/off switch, read once for migration
+    public static final String PREF_LONG_PRESS_SYMBOL_ACTION = "long_press_symbol_action"; // none, numpad, settings or emoji
 
     public static final String PREF_ONE_HANDED_MODE_PREFIX = "one_handed_mode_enabled";
     public static final String PREF_ONE_HANDED_GRAVITY_PREFIX = "one_handed_mode_gravity";

@@ -11,7 +11,7 @@ public class NativeSuggestOptions {
     private static final int IS_GESTURE = 0;
     private static final int USE_FULL_EDIT_DISTANCE = 1;
     private static final int BLOCK_OFFENSIVE_WORDS = 2;
-    private static final int SPACE_AWARE_GESTURE_ENABLED = 3;
+    // option 3 (space-aware gesture) is unused: it only served Google's removed swipe library
     private static final int WEIGHT_FOR_LOCALE_IN_THOUSANDS = 4;
     private static final int OPTIONS_SIZE = 5;
 
@@ -25,9 +25,6 @@ public class NativeSuggestOptions {
         setBooleanOption(IS_GESTURE, value);
     }
 
-    public void setIsSpaceAwareGesture(final boolean value) {
-        setBooleanOption(SPACE_AWARE_GESTURE_ENABLED, value);
-    }
 
     public void setUseFullEditDistance(final boolean value) {
         setBooleanOption(USE_FULL_EDIT_DISTANCE, value);

@@ -147,7 +147,7 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
     }
 }
 
-/** The entries shown only in advanced mode, the same for every keyboard: "Advanced learning and swiping" and the app's
+/** The entries shown only in advanced mode, the same for every keyboard: "Refine swipe and learning" and the app's
  *  own settings (App settings, once named Advanced). */
 @Composable
 fun AdvancedEntry(onEnter: () -> Unit = {}) {
