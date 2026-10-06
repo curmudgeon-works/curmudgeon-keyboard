@@ -48,6 +48,7 @@ import kotlin.math.roundToInt
 internal val swipeTuningKeys = listOf(
     Settings.PREF_GESTURE_TURN_WEIGHT, Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Settings.PREF_GESTURE_KUSHLER_WEIGHT,
     Settings.PREF_GESTURE_HISTORY_BOOST, Settings.PREF_GESTURE_FAST_COMMON_WORDS, Settings.PREF_GESTURE_CORNER_MISS,
+    Settings.PREF_GESTURE_FAST_SPEED,
 )
 
 /**
@@ -111,13 +112,16 @@ fun LearningSwipingScreen(onClickBack: () -> Unit) {
                 Text(stringResource(R.string.swipe_tuning_subtext), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 22.dp, end = 16.dp, bottom = 4.dp))
-                WeightSlider(draft.pending, Settings.PREF_GESTURE_TURN_WEIGHT, Defaults.PREF_GESTURE_TURN_WEIGHT, R.string.swipe_tuning_turns, 0f..1.5f,
-                    R.string.swipe_tuning_turns_summary)
-                WeightSlider(draft.pending, Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Defaults.PREF_GESTURE_SLOWDOWN_WEIGHT, R.string.swipe_tuning_slowdowns, 0f..1f,
-                    R.string.swipe_tuning_slowdowns_summary)
+                // every slider shows 0 to 1 over its own range (2026-10-06); the stored values, defaults and the statistics
+                // keys stay in the decoder's units. Turns and slowdowns need no subtext: their names say it
+                WeightSlider(draft.pending, Settings.PREF_GESTURE_TURN_WEIGHT, Defaults.PREF_GESTURE_TURN_WEIGHT, R.string.swipe_tuning_turns, 0f..1.5f)
+                WeightSlider(draft.pending, Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Defaults.PREF_GESTURE_SLOWDOWN_WEIGHT, R.string.swipe_tuning_slowdowns, 0f..1f)
                 WeightSlider(draft.pending, Settings.PREF_GESTURE_KUSHLER_WEIGHT, Defaults.PREF_GESTURE_KUSHLER_WEIGHT, R.string.swipe_tuning_blend, 0f..1f,
                     R.string.swipe_tuning_blend_summary)
                 BoostSlider(draft.pending)
+                // what counts as a fast swipe: the two sliders after it start at this speed (2026-10-06)
+                WeightSlider(draft.pending, Settings.PREF_GESTURE_FAST_SPEED, Defaults.PREF_GESTURE_FAST_SPEED, R.string.swipe_tuning_fast_speed,
+                    0f..OwnGestureDecoder.Tuning.RANGES[4], R.string.swipe_tuning_fast_speed_summary)
                 WeightSlider(draft.pending, Settings.PREF_GESTURE_FAST_COMMON_WORDS, Defaults.PREF_GESTURE_FAST_COMMON_WORDS, R.string.swipe_tuning_fast_common,
                     0f..0.2f, R.string.swipe_tuning_fast_common_summary, decimals = 2)
                 WeightSlider(draft.pending, Settings.PREF_GESTURE_CORNER_MISS, Defaults.PREF_GESTURE_CORNER_MISS, R.string.swipe_tuning_corner_miss,
@@ -133,7 +137,7 @@ fun LearningSwipingScreen(onClickBack: () -> Unit) {
                 val isCurrent = key == current.key
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(key, Modifier.weight(1f), fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal)
+                        Text(shownKey(key), Modifier.weight(1f), fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal)
                         if (isCurrent)
                             Text(stringResource(R.string.swipe_tuning_current), style = MaterialTheme.typography.labelMedium)
                         if (key == recommended) {
@@ -161,7 +165,7 @@ fun LearningSwipingScreen(onClickBack: () -> Unit) {
                 val row = saved.row
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(saved.tuningKey, Modifier.weight(1f))
+                        Text(shownKey(saved.tuningKey), Modifier.weight(1f))
                         Text(statsDates(row), style = MaterialTheme.typography.labelMedium)
                     }
                     fun pct(n: Int) = if (row.swipes == 0) 0 else (100f * n / row.swipes).roundToInt()
@@ -217,14 +221,23 @@ private fun statsDates(row: GestureStats.Row): String {
     return if (from == to) from else "$from – $to"
 }
 
-/** The learned-word boost: whole numbers, shown as the summary explains. */
+/** A statistics row's tuning as the sliders show it (0 to 1 each); a key that isn't a tuning as it is. */
+@Composable
+private fun shownKey(key: String): String {
+    val v = OwnGestureDecoder.Tuning.parse(key)?.shown ?: return key
+    val f = v.map { String.format(java.util.Locale.ROOT, "%.2f", it) }
+    return stringResource(R.string.swipe_tuning_key_shown, f[0], f[1], f[2], f[3], f[4], f[5], f[6])
+}
+
+/** The learned-word boost: whole numbers stored, shown 0 to 1. */
 @Composable
 private fun BoostSlider(pending: Set<String>) = androidx.compose.runtime.CompositionLocalProvider(
     helium314.keyboard.settings.preferences.LocalPendingChange provides (Settings.PREF_GESTURE_HISTORY_BOOST in pending)) {
     SliderPreference(
         name = stringResource(R.string.swipe_tuning_history_boost),
         key = Settings.PREF_GESTURE_HISTORY_BOOST,
-        description = { value: Int -> "$value" },
+        // shown 0 to 1 over 0..128 (added to a word weight of 0..255); stored as the number added
+        description = { value: Int -> String.format(java.util.Locale.ROOT, "%.2f", value / 128f) },
         default = Defaults.PREF_GESTURE_HISTORY_BOOST,
         range = 0f..128f,
         stepSize = 8,
@@ -233,7 +246,8 @@ private fun BoostSlider(pending: Set<String>) = androidx.compose.runtime.Composi
     )
 }
 
-/** A weight with one decimal (or [decimals]); the stored value is rounded so the statistics key stays readable. */
+/** A weight with one decimal (or [decimals]); the stored value is rounded so the statistics key stays readable. Shown
+ *  0 to 1 over [range] (the value divided by the range's top). */
 @Composable
 private fun WeightSlider(pending: Set<String>, key: String, default: Float, title: Int, range: ClosedFloatingPointRange<Float>,
                          summary: Int? = null, decimals: Int = 1) = androidx.compose.runtime.CompositionLocalProvider(
@@ -243,7 +257,7 @@ private fun WeightSlider(pending: Set<String>, key: String, default: Float, titl
     SliderPreference(
         name = stringResource(title),
         key = key,
-        description = { value: Float -> String.format(java.util.Locale.ROOT, "%.${decimals}f", value) },
+        description = { value: Float -> String.format(java.util.Locale.ROOT, "%.2f", value / range.endInclusive) },
         default = default,
         range = range,
         onConfirmed = { value: Float -> prefs.edit { putFloat(key, (value * scale).roundToInt() / scale) } },

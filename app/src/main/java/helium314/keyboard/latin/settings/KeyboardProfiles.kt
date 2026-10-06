@@ -131,7 +131,7 @@ object KeyboardProfiles {
     /** "Refine swipe and learning" (2026-10-04): shared by all keyboards unless its group is per keyboard ([Group.REFINE]). */
     private val learningSwipingKeys: Set<String> get() = setOf(
         Settings.PREF_GESTURE_TURN_WEIGHT, Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Settings.PREF_GESTURE_KUSHLER_WEIGHT,
-        Settings.PREF_GESTURE_HISTORY_BOOST, Settings.PREF_GESTURE_FAST_COMMON_WORDS, Settings.PREF_GESTURE_CORNER_MISS,
+        Settings.PREF_GESTURE_HISTORY_BOOST, Settings.PREF_GESTURE_FAST_COMMON_WORDS, Settings.PREF_GESTURE_CORNER_MISS, Settings.PREF_GESTURE_FAST_SPEED,
         Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, Settings.PREF_TRUST_TYPED_COUNT,
     )
     // ("share_user_history_": the retired per-language share switch, kept global so old keys stay where they are)

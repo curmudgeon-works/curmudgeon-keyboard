@@ -152,6 +152,7 @@ object Defaults {
     // more in the ranking / the corner match costs are divided down by this much (replay 2026-10-01: 0.05 each)
     const val PREF_GESTURE_FAST_COMMON_WORDS = 0.05f
     const val PREF_GESTURE_CORNER_MISS = 0.05f
+    const val PREF_GESTURE_FAST_SPEED = 12f // key widths per second: above it a swipe counts as fast
     const val PREF_GESTURE_HISTORY_BOOST = 64 // added to a learned word's frequency (0..255 scale) in the swipe vocabulary
     const val PREF_GESTURE_FAST_TYPING_COOLDOWN = 500
     const val PREF_GESTURE_TRAIL_FADEOUT_DURATION = 800

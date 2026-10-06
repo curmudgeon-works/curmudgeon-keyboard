@@ -344,20 +344,24 @@
     <string name="space_swipe_move_cursor">Swipe spacebar to move cursor</string>
     <string name="space_swipe_move_cursor_summary">Slide left or right along the spacebar to move the cursor</string>
     <string name="swipe_tuning_summary">How much the decoder trusts the points where your finger turns, stops or slows down, and how much of a word\'s score comes from those points rather than from the overall shape. Try a setting for a while: the results below show how each one did for you.</string>
-    <string name="swipe_tuning_turns">Turns</string>
-    <string name="swipe_tuning_slowdowns">Slowdowns</string>
-    <string name="swipe_tuning_blend">Inflections vs. whole path</string>
+    <string name="swipe_tuning_turns">Inflection 1: Turns</string>
+    <string name="swipe_tuning_slowdowns">Inflection 2: Slowdowns</string>
+    <string name="swipe_tuning_blend">Inflections vs whole path</string>
     <string name="swipe_tuning_turns_summary">How much the points where your finger turns count (0 to 1.5)</string>
     <string name="swipe_tuning_slowdowns_summary">How much slowing over a key favours its letter (0 to 1)</string>
-    <string name="swipe_tuning_blend_summary">0 to 1: 1 = only the turns and slowdowns count, 0 = only where the whole path runs</string>
+    <string name="swipe_tuning_blend_summary">1 = only turns and slowdowns count, 0 = only the whole path</string>
     <string name="swipe_other">Other swipes</string>
     <string name="swipe_logging">Swipe logging</string>
-    <string name="swipe_tuning_fast_common">Fast swipes overweight common words</string>
-    <string name="swipe_tuning_fast_common_summary">For every key width per second faster than 12, how much more a word\'s commonness counts (0 to 0.2)</string>
-    <string name="swipe_tuning_corner_miss">Corner miss allowance</string>
-    <string name="swipe_tuning_corner_miss_summary">For every key width per second faster than 12, how much more a corner may miss its key (0 to 0.2)</string>
-    <string name="swipe_tuning_history_boost">Learned-word boost</string>
-    <string name="swipe_tuning_history_boost_summary">How much a word you have typed before is favoured over dictionary words of the same shape (0 to 128, added to a word frequency of 0 to 255)</string>
+    <string name="swipe_tuning_fast_common">Fast swipes prioritize common words</string>
+    <string name="swipe_tuning_fast_common_summary">The faster you swipe, the more common words win</string>
+    <string name="swipe_tuning_fast_speed">Fast swipe threshold</string>
+    <string name="swipe_tuning_fast_speed_summary">Above this speed, the two sliders below kick in</string>
+    <!-- A row of the statistics: the seven sliders' values as shown (0 to 1), in slider order -->
+    <string name="swipe_tuning_key_shown">Turns %1$s · Slowdowns %2$s · Inflections vs path %3$s · Boost %4$s · Fast at %5$s · Common words %6$s · Corners %7$s</string>
+    <string name="swipe_tuning_corner_miss">Fast swipes forgive missed corners</string>
+    <string name="swipe_tuning_corner_miss_summary">The faster you swipe, the further a corner may land from its key</string>
+    <string name="swipe_tuning_history_boost">Learned word boost</string>
+    <string name="swipe_tuning_history_boost_summary">1 = adds up to half the full word weight to words you\'ve used</string>
     <string name="swipe_tuning_stats">Results per setting</string>
     <string name="swipe_tuning_no_stats">No swipes counted yet</string>
     <!-- %1$d swipes, then percentages -->
