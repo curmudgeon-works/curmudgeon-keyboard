@@ -298,7 +298,7 @@
     <!-- One line under the heading: what the six sliders below are -->
     <string name="swipe_tuning_subtext">Six dials that decide which word your swipe means</string>
     <!-- The per-keyboard screen with the swipe settings and the swipe tuning -->
-    <string name="swipe_screen">Swiping</string>
+    <string name="swipe_screen">Swipe</string>
     <string name="swipe_settings">Swipe settings</string>
     <!-- On the Layout screen: the files of every secondary layout (add, load, edit, delete) -->
     <string name="layout_files">Full customization with JSON</string>
@@ -393,8 +393,11 @@
     <!-- Customize suggestions (Others): how many suggestions, and a rule per position from the 2nd on -->
     <string name="customize_suggestions">Customize suggestions</string>
     <!-- The row under the "Customize suggestions" heading of Refine suggestions & learning (2026-10-06) -->
-    <string name="customize_suggestions_row">Number and order of suggestions</string>
+    <string name="customize_suggestions_row">Order of suggestions</string>
     <string name="suggestion_count_title">Number of suggestions: %s</string>
+    <!-- The "Number of suggestions" tile (2026-10-06): its title, the stepper's short word for automatic, the typing hint -->
+    <string name="suggestion_count">Number of suggestions</string>
+    <string name="suggestion_count_auto_short">Auto</string>
     <string name="suggestion_count_auto">Automatic (fills the strip)</string>
     <string name="suggestion_count_n">%s suggestions</string>
     <string name="suggestion_rules_set">%s positions set</string>
@@ -434,11 +437,10 @@
     <string name="swipe_metrics_range_tuning">Since tuning changed</string>
     <string name="swipe_metrics_range_restart">Since restart</string>
     <string name="swipe_metrics_chart_no_restart">Tracking hasn\'t been restarted yet. Restart it below the summary to follow the results from a moment you choose.</string>
-    <string name="swipe_metrics_chart_span">%1$s to now · %2$d swipes</string>
+    <string name="swipe_metrics_chart_span">Swipes since %1$s (%2$d in all) · each point averages the last 50</string>
     <string name="swipe_metrics_chart_first">First choice right</string>
     <string name="swipe_metrics_chart_never">Never offered</string>
     <string name="swipe_metrics_chart_decode">Decode time (right axis)</string>
-    <string name="swipe_metrics_chart_now">now</string>
     <string name="learning_log">Log corrections</string>
     <string name="learning_log_summary">Keep a local log of what each correction does to the learned words. Nothing leaves the phone.</string>
     <string name="learning_log_none">No corrections logged yet</string>

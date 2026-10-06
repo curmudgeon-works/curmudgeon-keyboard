@@ -109,6 +109,7 @@ fun LearningSwipingScreen(onClickBack: () -> Unit) {
             GroupTitle(R.string.customize_suggestions)
             androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.preferences.LocalPendingChange provides
                     (Settings.PREF_SUGGESTION_RULES in draft.pending || Settings.PREF_SUGGESTION_COUNT in draft.pending)) {
+                SettingsActivity.settingsContainer[Settings.PREF_SUGGESTION_COUNT]?.Preference() // the first tile: − n +
                 SettingsActivity.settingsContainer[Settings.PREF_SUGGESTION_RULES]?.Preference()
             }
             // ---- swiping: how the decoder weighs a swipe (only while swiping is on), and how each weighting did

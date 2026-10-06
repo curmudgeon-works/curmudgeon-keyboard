@@ -132,34 +132,31 @@ object SwipeMetrics {
         }
     }
 
-    /** One point of the chart: [swipes] swipes up to [time]. */
-    class Point(val time: Long, val swipes: Int, val firstChoicePct: Float, val neverOfferedPct: Float, val decodeMs: Float)
+    /** One point of the chart: the [swipes] swipes up to swipe number [index] of the range (counted from 1). */
+    class Point(val index: Int, val swipes: Int, val firstChoicePct: Float, val neverOfferedPct: Float, val decodeMs: Float)
 
-    /** At least this many swipes per point: a bucket with fewer is merged into the next (the last into the one before). */
-    private const val MIN_SWIPES_PER_POINT = 10
+    /** Each point averages this many swipes (fewer at the start of a range) … */
+    const val ROLLING_WINDOW = 50
+    /** … and comes every this many swipes, more for a long range so the chart keeps at most [MAX_POINTS] points. */
+    private const val POINT_EVERY = 10
+    private const val MAX_POINTS = 300
 
     /**
-     * The chart's points from [from] to now: one per hour while the range is under 2 days, per day under 60 days, per
-     * week beyond.
+     * The chart's points from [from] on, by swipe (2026-10-06): a rolling average of the last [ROLLING_WINDOW] swipes
+     * every [POINT_EVERY] swipes (a step of 10 alone swung ±14 points by chance; 50 swings about ±6). The first point
+     * comes at the 10th swipe, averaging what there is; the last is always the latest swipe.
      */
-    fun points(log: Results, from: Long, now: Long = System.currentTimeMillis()): List<Point> {
-        val span = now - from
-        val bucket = when {
-            span < 2 * 86_400_000L -> 3_600_000L
-            span < 60 * 86_400_000L -> 86_400_000L
-            else -> 7 * 86_400_000L
-        }
-        val groups = log.outcomes.filter { it.time >= from }.groupBy { (it.time - from) / bucket }.toSortedMap().values
-        val merged = ArrayList<MutableList<Outcome>>()
-        var carry = ArrayList<Outcome>()
-        for (g in groups) {
-            carry.addAll(g)
-            if (carry.size >= MIN_SWIPES_PER_POINT) { merged.add(carry); carry = ArrayList() }
-        }
-        if (carry.isNotEmpty()) { if (merged.isEmpty()) merged.add(carry) else merged.last().addAll(carry) }
-        return merged.map { g ->
+    fun points(log: Results, from: Long): List<Point> {
+        val o = log.outcomes.filter { it.time >= from }
+        if (o.isEmpty()) return emptyList()
+        var step = POINT_EVERY
+        while (o.size / step > MAX_POINTS) step *= 2
+        val ends = (step..o.size step step).toMutableList()
+        if (ends.isEmpty() || ends.last() != o.size) ends.add(o.size)
+        return ends.map { end ->
+            val g = o.subList(maxOf(0, end - ROLLING_WINDOW), end)
             val ms = g.mapNotNull { it.decodeMs }
-            Point(g.last().time, g.size, 100f * g.count { it.firstChoice } / g.size, 100f * g.count { it.neverOffered } / g.size,
+            Point(end, g.size, 100f * g.count { it.firstChoice } / g.size, 100f * g.count { it.neverOffered } / g.size,
                 if (ms.isEmpty()) 0f else ms.average().toFloat())
         }
     }

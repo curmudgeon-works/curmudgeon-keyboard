@@ -257,7 +257,10 @@ fun createAdvancedSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_UNDO_UNIT, R.string.undo_unit) {
         UnitChoiceRow(it, Defaults.PREF_UNDO_UNIT)
     },
-    // how many suggestions the strip shows, and rules for the 2nd one on (SuggestionRules)
+    // how many suggestions the strip shows (its own tile, 2026-10-06), and rules for the 2nd one on (SuggestionRules)
+    Setting(context, Settings.PREF_SUGGESTION_COUNT, R.string.suggestion_count) {
+        helium314.keyboard.settings.preferences.SuggestionCountPreference(it)
+    },
     Setting(context, Settings.PREF_SUGGESTION_RULES, R.string.customize_suggestions_row) {
         CustomizeSuggestionsPreference(it)
     },

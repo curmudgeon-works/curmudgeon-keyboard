@@ -3,6 +3,9 @@ package helium314.keyboard.settings.preferences
 
 import android.content.Context
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,7 +16,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -45,7 +47,6 @@ import helium314.keyboard.settings.Setting
 import helium314.keyboard.settings.dialogs.ListPickerDialog
 import helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog
 import java.util.Locale
-import kotlin.math.roundToInt
 
 /**
  * "Customize suggestions" (Others): how many suggestions the strip shows, and a rule for each position from the 2nd
@@ -59,40 +60,32 @@ fun CustomizeSuggestionsPreference(setting: Setting) {
     val count = prefs.getInt(Settings.PREF_SUGGESTION_COUNT, Defaults.PREF_SUGGESTION_COUNT)
     val rules = SuggestionRules.parse(prefs.getString(Settings.PREF_SUGGESTION_RULES, Defaults.PREF_SUGGESTION_RULES))
     val set = rules.count { it.kind != Kind.DEFAULT }
+    // (the number of suggestions has its own tile since 2026-10-06, SuggestionCountPreference; this row is the order)
     Preference(
         name = setting.title,
         onClick = { showDialog = true },
-        description = countLabel(count) + if (set == 0) "" else " · " + stringResource(R.string.suggestion_rules_set, set.toString())
+        description = if (set == 0) stringResource(R.string.suggestion_rule_default)
+            else stringResource(R.string.suggestion_rules_set, set.toString())
     )
     if (!showDialog) return
     // the keyboard's languages in the order the rules number them: the main one, then the others
     val languages = remember(ctx) { keyboardLanguages(ctx) }
-    var newCount by rememberSaveable { mutableIntStateOf(count) }
     // the listed positions, defaults included (unlike the stored form, which drops trailing ones)
     var listedText by rememberSaveable { mutableStateOf(listText(rules)) }
     val listed = SuggestionRules.parse(listedText)
     fun setListed(list: List<Rule>) { listedText = listText(list) }
     var picking by rememberSaveable { mutableIntStateOf(-1) }
-    val maxPositions = if (newCount > 0) newCount else SuggestedWords.MAX_SUGGESTIONS
+    val maxPositions = if (count > 0) count else SuggestedWords.MAX_SUGGESTIONS
 
     ThreeButtonAlertDialog(
         onDismissRequest = { showDialog = false },
         onConfirmed = {
-            prefs.edit {
-                putInt(Settings.PREF_SUGGESTION_COUNT, newCount)
-                putString(Settings.PREF_SUGGESTION_RULES, SuggestionRules.encode(listed.take(maxPositions - 1)))
-            }
+            prefs.edit { putString(Settings.PREF_SUGGESTION_RULES, SuggestionRules.encode(listed.take(maxPositions - 1))) }
         },
         title = { Text(setting.title) },
         content = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                Text(stringResource(R.string.suggestion_count_title, countLabel(newCount)))
-                Slider(
-                    value = newCount.toFloat(),
-                    onValueChange = { newCount = it.roundToInt() },
-                    valueRange = 0f..SuggestedWords.MAX_SUGGESTIONS.toFloat(),
-                )
-                Text(stringResource(R.string.suggestion_rules_intro), Modifier.padding(top = 8.dp),
+                Text(stringResource(R.string.suggestion_rules_intro),
                     style = MaterialTheme.typography.bodyMedium)
                 listed.forEachIndexed { i, rule ->
                     Row(
@@ -115,7 +108,7 @@ fun CustomizeSuggestionsPreference(setting: Setting) {
         },
         neutralButtonText = stringResource(R.string.button_default),
         onNeutral = {
-            prefs.edit { remove(Settings.PREF_SUGGESTION_COUNT); remove(Settings.PREF_SUGGESTION_RULES) }
+            prefs.edit { remove(Settings.PREF_SUGGESTION_RULES) }
             showDialog = false
         },
     )
@@ -139,12 +132,66 @@ fun CustomizeSuggestionsPreference(setting: Setting) {
     }
 }
 
+/**
+ * "Number of suggestions" (its own tile, 2026-10-06): − and + step from Automatic (0, fills the strip) to
+ * [SuggestedWords.MAX_SUGGESTIONS]; tapping the number turns it into a box in place to type it (Done or leaving the
+ * box saves; empty = Automatic; out of range is clamped).
+ */
+@Composable
+fun SuggestionCountPreference(setting: Setting) {
+    val prefs = LocalContext.current.prefs()
+    var count by remember { mutableIntStateOf(prefs.getInt(Settings.PREF_SUGGESTION_COUNT, Defaults.PREF_SUGGESTION_COUNT)) }
+    var editing by remember { mutableStateOf(false) }
+    fun set(n: Int) {
+        count = n.coerceIn(0, SuggestedWords.MAX_SUGGESTIONS)
+        prefs.edit { putInt(Settings.PREF_SUGGESTION_COUNT, count) }
+    }
+    Preference(
+        name = setting.title,
+        onClick = { editing = true },
+        description = if (count == 0) stringResource(R.string.suggestion_count_auto) else null,
+    ) {
+        TextButton(onClick = { set(count - 1) }, enabled = count > 0) { Text("−", style = MaterialTheme.typography.titleLarge) }
+        if (editing) {
+            val state = androidx.compose.foundation.text.input.rememberTextFieldState(
+                if (count == 0) "" else count.toString(), androidx.compose.ui.text.TextRange(0, if (count == 0) 0 else count.toString().length))
+            val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+            var hadFocus by remember { mutableStateOf(false) }
+            fun commit() {
+                if (!editing) return
+                set(state.text.toString().trim().toIntOrNull() ?: 0)
+                editing = false
+            }
+            androidx.compose.foundation.text.BasicTextField(
+                state = state,
+                modifier = Modifier.width(56.dp)
+                    .border(1.dp, MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
+                    .padding(horizontal = 6.dp, vertical = 4.dp)
+                    .focusRequester(focus)
+                    .onFocusChanged { if (it.isFocused) hadFocus = true else if (hadFocus) commit() },
+                textStyle = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number,
+                    imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+                onKeyboardAction = { commit() },
+                lineLimits = androidx.compose.foundation.text.input.TextFieldLineLimits.SingleLine,
+                inputTransformation = { if (!asCharSequence().all { it.isDigit() } || length > 3) revertAllChanges() },
+            )
+            androidx.compose.runtime.LaunchedEffect(Unit) { focus.requestFocus() }
+        } else TextButton(onClick = { editing = true }) {
+            Text(if (count == 0) stringResource(R.string.suggestion_count_auto_short) else count.toString(),
+                style = MaterialTheme.typography.titleMedium)
+        }
+        TextButton(onClick = { set(count + 1) }, enabled = count < SuggestedWords.MAX_SUGGESTIONS) {
+            Text("+", style = MaterialTheme.typography.titleLarge)
+        }
+    }
+}
+
 private fun listText(rules: List<Rule>) =
     rules.joinToString(",") { if (it.kind.hasLanguage) "${it.kind.code}${it.language}" else "${it.kind.code}" }
-
-@Composable
-private fun countLabel(count: Int) =
-    if (count == 0) stringResource(R.string.suggestion_count_auto) else stringResource(R.string.suggestion_count_n, count.toString())
 
 @Composable
 private fun ruleName(rule: Rule, languages: List<String>): String {

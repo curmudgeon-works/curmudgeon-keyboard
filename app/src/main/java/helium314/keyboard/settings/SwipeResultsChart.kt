@@ -43,8 +43,8 @@ import helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog
 import kotlin.math.ceil
 
 /**
- * The swipe results over time: % first choice right and % never offered (left axis), the average decode time (right
- * axis), from the start of the chosen range to now. The ranges: all of the log, since the swipe tuning last changed,
+ * The swipe results swipe by swipe: % first choice right and % never offered (left axis), the average decode time
+ * (right axis), each point the average of the last 50 swipes, from the start of the chosen range to the latest swipe. The ranges: all of the log, since the swipe tuning last changed,
  * since the tracking was last restarted.
  */
 @Composable
@@ -80,11 +80,12 @@ fun SwipeResultsChartDialog(onDismissRequest: () -> Unit) {
                             Text(stringResource(R.string.swipe_metrics_chart_no_restart), style = MaterialTheme.typography.bodySmall)
                         points.isEmpty() -> Text(stringResource(R.string.swipe_metrics_none), style = MaterialTheme.typography.bodySmall)
                         else -> Column {
-                            SwipeResultsChart(points, from!!)
+                            val start = from!! // (points come only with a start)
+                            SwipeResultsChart(points)
                             val ctx = LocalContext.current
-                            val inRange = log.outcomes.filter { it.time >= from }
+                            val inRange = log.outcomes.filter { it.time >= start }
                             Text(stringResource(R.string.swipe_metrics_chart_span,
-                                DateUtils.formatDateTime(ctx, from, DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_ABBREV_MONTH),
+                                DateUtils.formatDateTime(ctx, start, DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_ABBREV_MONTH),
                                 inRange.size), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 4.dp))
                             val s = SwipeMetrics.summaryOf(inRange)
                             Text(stringResource(R.string.swipe_metrics_line, s.swipes, s.pct(s.firstChoice), s.pct(s.fromStrip),
@@ -102,7 +103,7 @@ fun SwipeResultsChartDialog(onDismissRequest: () -> Unit) {
 }
 
 @Composable
-private fun SwipeResultsChart(points: List<SwipeMetrics.Point>, from: Long) {
+private fun SwipeResultsChart(points: List<SwipeMetrics.Point>) {
     val firstColor = MaterialTheme.colorScheme.primary
     val neverColor = MaterialTheme.colorScheme.error
     val decodeColor = MaterialTheme.colorScheme.tertiary
@@ -110,8 +111,9 @@ private fun SwipeResultsChart(points: List<SwipeMetrics.Point>, from: Long) {
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
     val measurer = rememberTextMeasurer()
     val labelStyle = MaterialTheme.typography.labelSmall.copy(color = labelColor)
-    val now = remember { System.currentTimeMillis() }
-    val nowLabel = stringResource(R.string.swipe_metrics_chart_now)
+    // the x axis counts swipes from the start of the range, ticks at round numbers (about 4 to 6 of them)
+    val total = points.last().index.coerceAtLeast(1)
+    val tick = listOf(10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000).firstOrNull { total / it <= 6 } ?: 100000
     // the decode axis runs to a round number above the slowest point
     val maxMs = points.maxOf { it.decodeMs }.coerceAtLeast(1f)
     val msTop = (ceil(maxMs / 10f) * 10f).coerceAtLeast(10f)
@@ -121,7 +123,7 @@ private fun SwipeResultsChart(points: List<SwipeMetrics.Point>, from: Long) {
             val right = size.width - 40.dp.toPx()
             val top = 8.dp.toPx()
             val bottom = size.height - 20.dp.toPx()
-            fun x(t: Long) = left + (right - left) * ((t - from).toFloat() / (now - from).coerceAtLeast(1L))
+            fun x(i: Int) = left + (right - left) * (i.toFloat() / total)
             fun yPct(v: Float) = bottom - (bottom - top) * v / 100f
             fun yMs(v: Float) = bottom - (bottom - top) * v / msTop
             for (pct in listOf(0f, 50f, 100f)) {
@@ -129,12 +131,13 @@ private fun SwipeResultsChart(points: List<SwipeMetrics.Point>, from: Long) {
                 label(measurer, "${pct.toInt()}%", labelStyle, Offset(0f, yPct(pct)), alignRight = false)
                 label(measurer, "${(msTop * pct / 100f).toInt()} ms", labelStyle, Offset(right + 4.dp.toPx(), yPct(pct)), alignRight = false)
             }
-            label(measurer, DateUtils.getRelativeTimeSpanString(from, now, DateUtils.MINUTE_IN_MILLIS).toString(), labelStyle,
-                Offset(left, bottom + 10.dp.toPx()), alignRight = false)
-            label(measurer, nowLabel, labelStyle, Offset(right, bottom + 10.dp.toPx()), alignRight = true)
-            line(points.map { Offset(x(it.time), yPct(it.firstChoicePct)) }, firstColor, null)
-            line(points.map { Offset(x(it.time), yPct(it.neverOfferedPct)) }, neverColor, null)
-            line(points.map { Offset(x(it.time), yMs(it.decodeMs)) }, decodeColor, PathEffect.dashPathEffect(floatArrayOf(6f, 6f)))
+            for (t in 0..total step tick) {
+                drawLine(axisColor, Offset(x(t), bottom), Offset(x(t), bottom + 3.dp.toPx()), strokeWidth = 1.dp.toPx())
+                label(measurer, "$t", labelStyle, Offset(x(t) - 4.dp.toPx(), bottom + 10.dp.toPx()), alignRight = false)
+            }
+            line(points.map { Offset(x(it.index), yPct(it.firstChoicePct)) }, firstColor, null)
+            line(points.map { Offset(x(it.index), yPct(it.neverOfferedPct)) }, neverColor, null)
+            line(points.map { Offset(x(it.index), yMs(it.decodeMs)) }, decodeColor, PathEffect.dashPathEffect(floatArrayOf(6f, 6f)))
         }
         val last = points.last()
         Legend(firstColor, stringResource(R.string.swipe_metrics_chart_first), "${last.firstChoicePct.toInt()}%")
