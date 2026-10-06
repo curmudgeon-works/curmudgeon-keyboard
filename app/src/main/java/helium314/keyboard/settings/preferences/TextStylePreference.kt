@@ -482,7 +482,9 @@ fun SuggestionColorRow(reload: () -> Unit) {
         parentHidden?.value = showPicker
         onDispose { parentHidden?.value = false }
     }
-    val color = prefs.getInt(Settings.PREF_SUGGESTION_TEXT_COLOR, Defaults.PREF_SUGGESTION_TEXT_COLOR)
+    // what the strip shows: the colour picked, else the theme's swipe trail colour (since 0.3.008)
+    val color = helium314.keyboard.latin.utils.suggestionTextColor(prefs,
+        remember { helium314.keyboard.keyboard.KeyboardTheme.getColorsForCurrentTheme(ctx) })
     Row(verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().clickable { showPicker = true }.padding(vertical = 6.dp)) {
         Text(stringResource(R.string.suggestion_text_color), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)

@@ -157,7 +157,9 @@ object Defaults {
     const val PREF_GESTURE_FAST_TYPING_COOLDOWN = 500
     const val PREF_GESTURE_TRAIL_FADEOUT_DURATION = 800
     const val PREF_GESTURE_TRAIL_THICKNESS = 100
-    const val PREF_SUGGESTION_TEXT_COLOR = 0xFFFF8C00.toInt() // the fork's orange (was fixed)
+    // the suggestion strip's words: not set = the theme's swipe trail colour (0.3.008, see suggestionTextColor); this
+    // orange only where no theme colours can be had
+    const val PREF_SUGGESTION_TEXT_COLOR = 0xFFFF8C00.toInt()
     const val PREF_GESTURE_TRAIL_WHOLE = false
     const val PREF_GESTURE_TRAIL_WHOLE_LINGER = 1000
     const val PREF_SHOW_SETUP_WIZARD_ICON = true
@@ -179,13 +181,15 @@ object Defaults {
     const val PREF_SHOW_TLD_POPUP_KEYS = true
     const val PREF_ADVANCED_SETTINGS = false // simple settings menu by default; switch at the top of the main screen
     // letter followed by its popup symbols, entries separated by whitespace; only used when the number row is on
-    const val PREF_SYMBOL_POPUP_MAP = "q~` w× e÷ r{ t} y[ u] i| o_ p- a@ s+ d—– f… g: h; j' k\" l/ z= x\\ c< v> b, n! m?"
+    // none by default since 0.3.008 (HeliBoard's popups); the Curmudgeon map is the "Standard" popup preset
+    const val PREF_SYMBOL_POPUP_MAP = ""
+    const val CURMUDGEON_SYMBOL_POPUP_MAP = "q~` w× e÷ r{ t} y[ u] i| o_ p- a@ s+ d—– f… g: h; j' k\" l/ z= x\\ c< v> b, n! m?"
     const val PREF_RECORD_GESTURE_CORPUS = false
     const val PREF_SWIPE_METRICS = false
     const val PREF_LEARNING_LOG = false
     const val PREF_SHARE_LEARNED_WORDS = true
     const val PREF_AUTO_PREVIEW_KEYBOARD = true // settings bring the preview keyboard up by themselves
-    const val PREF_MORE_POPUP_KEYS = "all" // matches the Standard popup preset (upstream: "main")
+    const val PREF_MORE_POPUP_KEYS = "main" // HeliBoard's popups since 0.3.008 (the Standard preset is "all")
     const val PREF_SPACE_TO_CHANGE_LANG = true
     const val PREF_LANGUAGE_SWIPE_DISTANCE = 5
     const val PREF_TOUCHPAD_SENSITIVITY = 50

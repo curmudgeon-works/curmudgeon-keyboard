@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 class SymbolPopupMapTest {
     @Test fun defaultMapMatchesFormerHardCodedOverlay() {
-        val map = KeyboardParser.parseSymbolPopupMap(Defaults.PREF_SYMBOL_POPUP_MAP)
+        val map = KeyboardParser.parseSymbolPopupMap(Defaults.CURMUDGEON_SYMBOL_POPUP_MAP)
         assertEquals(listOf("~", "`"), map["q"])
         assertEquals(listOf("×"), map["w"]); assertEquals(listOf("÷"), map["e"])
         assertEquals(listOf("_"), map["o"]); assertEquals(listOf("-"), map["p"])
@@ -18,7 +18,7 @@ class SymbolPopupMapTest {
         assertEquals(listOf("'"), map["j"]); assertEquals(listOf("\""), map["k"]); assertEquals(listOf("/"), map["l"])
         assertEquals(listOf("="), map["z"]); assertEquals(listOf("\\"), map["x"]); assertEquals(listOf("?"), map["m"])
         assertEquals(26, map.size)
-        assertTrue(KeyboardParser.isValidSymbolPopupMap(Defaults.PREF_SYMBOL_POPUP_MAP))
+        assertTrue(KeyboardParser.isValidSymbolPopupMap(Defaults.CURMUDGEON_SYMBOL_POPUP_MAP))
     }
 
     @Test fun parserSkipsMalformedEntriesAndKeepsFirstDuplicate() {

@@ -43,6 +43,7 @@ import helium314.keyboard.latin.common.ColorType;
 import helium314.keyboard.latin.common.Colors;
 import helium314.keyboard.latin.settings.Defaults;
 import helium314.keyboard.latin.settings.Settings;
+import helium314.keyboard.latin.utils.SuggestionColors;
 import helium314.keyboard.latin.utils.KtxKt;
 import helium314.keyboard.latin.utils.ResourceUtils;
 
@@ -319,8 +320,8 @@ final class SuggestionStripLayoutHelper {
         int indexInSuggestedWords;
         // looked up once, not per word: finding the preferences is the slow part
         final SharedPreferences prefs = KtxKt.prefs(mWordViews.get(0).getContext());
-        // the theme's suggestion colour (orange unless chosen, see Appearance → Fonts)
-        final int suggestionColor = prefs.getInt(Settings.PREF_SUGGESTION_TEXT_COLOR, Defaults.PREF_SUGGESTION_TEXT_COLOR);
+        // the colour picked in Appearance → Fonts, else the theme's swipe trail colour (since 0.3.008)
+        final int suggestionColor = SuggestionColors.suggestionTextColor(prefs, Settings.getValues().mColors);
         for (indexInSuggestedWords = 0; indexInSuggestedWords < suggestedWords.size()
                 && positionInStrip < maxSuggestionInStrip; indexInSuggestedWords++) {
             final TextView wordView = mWordViews.get(positionInStrip);

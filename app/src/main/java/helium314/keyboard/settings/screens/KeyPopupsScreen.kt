@@ -135,10 +135,10 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
         val presets = listOf(
             // each built-in preset is a whole recipe: accents level, symbols page, symbol map, popup order (nothing is
             // kept from the one before; 2026-10-03)
-            // the Curmudgeon default: every variant a key has, plus the symbol map (owner's call 2026-09-26: "a lot richer")
-            Preset(R.string.key_popups_preset_standard, POPUP_KEYS_ALL, null, symbolMap = Defaults.PREF_SYMBOL_POPUP_MAP,
+            // Curmudgeon's own: every variant a key has, plus the symbol map (the default 2026-09-26 to 0.3.007)
+            Preset(R.string.key_popups_preset_standard, POPUP_KEYS_ALL, null, symbolMap = Defaults.CURMUDGEON_SYMBOL_POPUP_MAP,
                 popupOrder = POPUP_KEYS_ORDER_DEFAULT),
-            // HeliBoard's own: its accents level, no symbol map, and its popup order (as HeliBoard ships it, checked
+            // HeliBoard's own, the default since 0.3.008: its accents level, no symbol map, and its popup order (as HeliBoard ships it, checked
             // against upstream 415c45f1 of 2026-09-30); the hint is the first popup entry, as everywhere here
             Preset(R.string.key_popups_preset_heliboard, POPUP_KEYS_MAIN, null, symbolMap = "", popupOrder = HELIBOARD_POPUP_ORDER),
             // (no "Main accented letters": with no map it's exactly HeliBoard's default)
