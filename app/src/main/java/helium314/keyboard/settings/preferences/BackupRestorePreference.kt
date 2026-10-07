@@ -713,13 +713,16 @@ private const val PREFS_FILE_NAME = "preferences.json"
 private const val PROTECTED_PREFS_FILE_NAME = "protected_preferences.json"
 private const val PERSONAL_DICT_FILE_NAME = "personal_dictionary.json"
 
-private val backupFilePatterns by lazy { listOf(
+internal val backupFilePatterns by lazy { listOf(
     "blacklists${File.separator}.*\\.txt".toRegex(),
     "layouts${File.separator}.*${LayoutUtilsCustom.CUSTOM_LAYOUT_PREFIX}+\\..{0,4}".toRegex(), // can't expect a period at the end, as this would break restoring older backups
     "dicts${File.separator}.*${File.separator}.*user\\.dict".toRegex(),
     "UserHistoryDictionary.*${File.separator}UserHistoryDictionary.*\\.(body|header)".toRegex(),
     "custom_background_image.*".toRegex(),
     "pictures${File.separator}[^${File.separator}]+".toRegex(), // the picture list shared by all keyboards
+    // the saved themes' background pictures, a folder per theme (review 2026-10-06: they were left out, and applying
+    // such a theme after a restore deleted the background)
+    "looks${File.separator}[^${File.separator}]+${File.separator}[^${File.separator}]+".toRegex(),
     "custom_font".toRegex(), // the text style fonts of before; restored ones move into the list (FontLibrary)
     "fonts${File.separator}[^${File.separator}]+".toRegex(),
     "custom_emoji_font.*".toRegex(), // (one per keyboard with separate settings: custom_emoji_font_p<id>)

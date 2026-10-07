@@ -831,10 +831,18 @@ public class LatinIME extends InputMethodService implements
 
         mSubtypeState.onSubtypeChanged(oldSubtype, subtype);
         StatsUtils.onSubtypeChanged(oldSubtype, subtype);
-        mRichImm.onSubtypeChanged(subtype);
+        final int settingsSetBefore = helium314.keyboard.latin.settings.KeyboardProfiles.INSTANCE.getImeId();
+        mRichImm.onSubtypeChanged(subtype); // (switches to the new keyboard's own settings, if it has any)
         mInputLogic.onSubtypeChanged(SubtypeLocaleUtils.getCombiningRulesExtraValue(subtype),
                 mSettings.getCurrent());
         loadKeyboard();
+        // another keyboard's own look (Appearance per keyboard): the theme is reloaded, as a settings change does
+        // (review 2026-10-06: the key colours, strip and background kept the old keyboard's, e.g. black text on black
+        // keys, as only the key style was compared); no reload when the look is shared
+        if (helium314.keyboard.latin.settings.KeyboardProfiles.INSTANCE.getImeId() != settingsSetBefore
+                && !helium314.keyboard.latin.settings.KeyboardProfiles.INSTANCE.isShared(
+                        KtxKt.realPrefs(this), helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE))
+            mKeyboardSwitcher.setThemeNeedsReload();
         if (hasSuggestionStripView()) {
             mSuggestionStripView.setRtl(mRichImm.getCurrentSubtype().isRtlSubtype());
         }

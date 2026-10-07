@@ -147,9 +147,7 @@ object GestureDecoderVocabulary {
         if (specs.size == 1 && specs[0].factor == 1f) return getOrBuildAsync(specs[0].locale)
         val key = specs.joinToString("|") { it.key }
         merged[key]?.let { return it }
-        var allReady = true
-        for (spec in specs) if (getOrBuildAsync(spec.locale) == null) allReady = false
-        if (!allReady) { wanted[key] = specs; return null }
+        if (!mergeable(specs, ::getOrBuildAsync) { it in noDictionary }) { wanted[key] = specs; return null }
         // one merge at a time: the keyboard's warm-up and the first swipe may both get here; the second waits for the
         // first's result instead of doing the same work at the same time (review 2026-10-06). One lock for all lists:
         // merges are rare and two of different lists at once are rarer, and a lock per list name piled up (2026-10-06)
@@ -159,6 +157,18 @@ object GestureDecoderVocabulary {
         }
     }
     private val mergeLock = Any()
+
+    /**
+     * Whether a merged list can be made from [specs]: each language's list is there ([listFor], which also starts the
+     * builds of those that aren't), or the language has no dictionary at all ([hasNoDictionary]: nothing to wait for;
+     * merge() skips it). Review 2026-10-06: one language without a dictionary left every swipe of the keyboard empty.
+     */
+    internal fun mergeable(specs: List<LocaleSpec>, listFor: (Locale) -> Vocabulary?, hasNoDictionary: (String) -> Boolean): Boolean {
+        var ready = true
+        for (spec in specs) // (no early stop: every language's build is started)
+            if (listFor(spec.locale) == null && !hasNoDictionary(spec.locale.toLanguageTag())) ready = false
+        return ready
+    }
 
     // counts the clears of [merged]: a merge that was running across one (a language rebuilt with learned words that
     // came in late) serves its own swipe but isn't kept, so the waiting rebuild makes a fresh one (review 2026-10-06:
@@ -366,7 +376,10 @@ object GestureDecoderVocabulary {
             Log.w(TAG, "no main dictionary file found for $locale")
         }
         if (words.isEmpty()) { // keep whatever the disk cache provided
-            if (mainDictFile == null && disk == null) noDictionary.add(key)
+            if (mainDictFile == null && disk == null) {
+                noDictionary.add(key)
+                mergeWanted(key) // the keyboards waiting for it don't have to any more
+            }
             return
         }
         val top = words.entries.sortedByDescending { it.value }.take(MAX_WORDS).map { it.key to it.value }
@@ -391,10 +404,15 @@ object GestureDecoderVocabulary {
             clearMerged() // multilingual vocabularies containing this locale are rebuilt below or on the next swipe
             // the keyboards that asked for this language's merged vocabulary before it was ready get it now, on this
             // build thread, instead of at their first swipe
-            for ((mergedKey, specs) in wanted)
-                if (specs.any { it.locale.toLanguageTag() == key } && getOrBuildAsync(specs) != null) wanted.remove(mergedKey)
+            mergeWanted(key)
         }
         return history.size
+    }
+
+    /** The merged lists asked for before language [key] was there (built, or found to have no dictionary), made now. */
+    private fun mergeWanted(key: String) {
+        for ((mergedKey, specs) in wanted)
+            if (specs.any { it.locale.toLanguageTag() == key } && getOrBuildAsync(specs) != null) wanted.remove(mergedKey)
     }
 
     // the languages of a script share one learned-words store: the store is read once per build round, by whichever

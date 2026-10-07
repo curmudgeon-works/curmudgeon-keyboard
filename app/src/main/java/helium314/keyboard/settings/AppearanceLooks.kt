@@ -103,10 +103,12 @@ object AppearanceLooks {
     }
 
     /** The look's pictures become the background ones (a built-in look: none); a look saved before pictures were
-     *  part of looks leaves them as they are. */
+     *  part of looks, or whose picture folder is missing (restored from a backup without it), leaves them as they are. */
     fun applyPictures(ctx: Context, look: Look) {
         val id = look.values[PICTURES] as? String ?: return
         val dir = if (id == NO_PICTURES) null else picturesDir(ctx, id)
+        // its pictures aren't there: the background stays (review 2026-10-06: it was deleted)
+        if (dir != null && !dir.isDirectory) { reload(ctx); return }
         for (live in livePictures(ctx)) {
             val saved = dir?.let { java.io.File(it, live.name) }
             if (saved?.exists() == true) saved.copyTo(live, overwrite = true) else live.delete()

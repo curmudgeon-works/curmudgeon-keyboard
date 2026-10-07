@@ -74,15 +74,22 @@ data class PictureFraming(val stretch: Boolean = false, val zoom: Float = 1f, va
                 o.optDouble("cx", 0.5).toFloat(), o.optDouble("cy", 0.5).toFloat())
         }.getOrDefault(PictureFraming())
 
+        /** The power of two to shrink a picture of [longSide] pixels by so it's at most [maxSide] (review 2026-10-06: the
+         *  loop stopped a step early, up to twice [maxSide], and a 50 MP photo loaded at full size and ran out of memory). */
+        internal fun sampleSize(longSide: Int, maxSide: Int): Int {
+            var sample = 1
+            while (longSide / sample > maxSide) sample *= 2
+            return sample
+        }
+
         /** The picture upright (camera pictures carry their rotation separately) and at most [maxSide] pixels on its
          *  long side (a 50 MP photo would be 200 MB in memory and too big for the screen to draw); null if unreadable. */
         fun decode(file: File, maxSide: Int = 4096): Bitmap? {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(file.absolutePath, bounds)
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-            var sample = 1
-            while (max(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxSide) sample *= 2
-            val bitmap = BitmapFactory.decodeFile(file.absolutePath, BitmapFactory.Options().apply { inSampleSize = sample })
+            val bitmap = BitmapFactory.decodeFile(file.absolutePath,
+                BitmapFactory.Options().apply { inSampleSize = sampleSize(max(bounds.outWidth, bounds.outHeight), maxSide) })
                 ?: return null
             val rotation = runCatching {
                 when (ExifInterface(file.absolutePath).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
