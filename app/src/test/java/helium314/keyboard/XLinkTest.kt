@@ -18,7 +18,7 @@ import kotlin.test.assertEquals
 class XLinkTest { // Without the X, SubtypeTests fail with ClassCastException. WTF?
     // every test here goes online (Codeberg, GitHub…): not on every local run (2026-10-07: Codeberg rate-limited us
     // after a night of full runs), only when asked for, once a day or so:
-    //   CHECK_DICT_LINKS=1 ./gradlew :app:testPlayDebugUnitTest --tests '*XLinkTest*'
+    //   CHECK_DICT_LINKS=1 ./gradlew :app:testPlayDebugUnitTest --tests '*XLinkTest*' --rerun
     @org.junit.Before fun onlyWhenAskedFor() {
         org.junit.Assume.assumeTrue("link checks run with CHECK_DICT_LINKS=1 only", System.getenv("CHECK_DICT_LINKS") == "1")
     }

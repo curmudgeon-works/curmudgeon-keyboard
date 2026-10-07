@@ -15,3 +15,6 @@ tools/*.txt
 *.patch
 *.diff
 *.sh
+# JVM crash dumps from a test run
+hs_err_pid*.log
+replay_pid*.log

@@ -140,6 +140,15 @@ android {
             isIncludeAndroidResources = true
         }
     }
+}
+
+// the link checks (XLinkTest) run only with CHECK_DICT_LINKS=1: an input, so a run with it set isn't "up to date" from
+// a run without it
+tasks.withType<Test>().configureEach {
+    inputs.property("checkDictLinks", System.getenv("CHECK_DICT_LINKS") ?: "")
+}
+
+android {
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
