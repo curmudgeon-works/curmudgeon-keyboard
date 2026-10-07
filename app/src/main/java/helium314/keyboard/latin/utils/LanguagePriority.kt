@@ -23,7 +23,8 @@ object LanguagePriority {
     private const val PREF_SHARE_HISTORY_PREFIX = "share_user_history_"
     const val PREF_ADDED_PREFIX = "language_added_"
 
-    /** The preference keys holding a language's priority and adding time (global keys, one per language). */
+    /** The preference keys holding a language's priority (the keyboard's own with separate settings, 2026-10-07) and
+     *  adding time (app-wide), one per language. */
     fun keys(locale: Locale): List<String> =
         listOf(PREF_PRIORITY_PREFIX + locale.toLanguageTag(), PREF_ADDED_PREFIX + locale.toLanguageTag())
 

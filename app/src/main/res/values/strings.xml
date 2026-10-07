@@ -1012,6 +1012,10 @@ language, hence "No language". -->
     <string name="background_picture_gallery">From gallery</string>
     <string name="background_picture_forget">Remove this picture from the list? Keyboards that use it keep it.</string>
     <string name="background_picture_remove">Remove</string>
+    <plurals name="background_picture_forget_themes">
+        <item quantity="one">%d saved theme uses it and will leave the background as it is.</item>
+        <item quantity="other">%d saved themes use it and will leave the background as it is.</item>
+    </plurals>
     <!-- Title for customizing background image in landscape mode -->
     <string name="customize_background_image_landscape">Set background image (landscape)</string>
     <!-- Description for customize_background_image_landscape -->

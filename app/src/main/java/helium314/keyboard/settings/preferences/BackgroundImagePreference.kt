@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -217,10 +218,12 @@ private fun PicturePickerDialog(onDismiss: () -> Unit, onGallery: () -> Unit, on
         },
     )
     toForget?.let { picture ->
+        val themes = helium314.keyboard.settings.AppearanceLooks.looksUsingPicture(ctx.prefs(), picture.name)
         ConfirmationDialog(
             onDismissRequest = { toForget = null },
             onConfirmed = { PictureLibrary.remove(picture); toForget = null; generation++ },
-            content = { Text(stringResource(R.string.background_picture_forget)) },
+            content = { Text(stringResource(R.string.background_picture_forget) +
+                if (themes > 0) " " + pluralStringResource(R.plurals.background_picture_forget_themes, themes, themes) else "") },
         )
     }
 }

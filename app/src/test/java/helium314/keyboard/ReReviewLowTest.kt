@@ -32,6 +32,21 @@ class ReReviewLowTest {
     @Before fun setUp() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
     @After fun tearDown() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
 
+    // language priority is the keyboard's (decision 2026-10-07)
+    @Test fun `a keyboard's own set holds its own language priorities`() {
+        val lp = helium314.keyboard.latin.utils.LanguagePriority
+        val hi = java.util.Locale.forLanguageTag("hi")
+        real.edit().putBoolean("separate_settings_per_keyboard", true).commit()
+        val own = helium314.keyboard.latin.settings.ProfilePreferences(real) { 2 }
+        lp.set(real, hi, lp.LOW)
+        assertEquals(lp.LOW, lp.get(own, hi)) // nothing of its own: the shared value
+        lp.set(own, hi, lp.HIGH)
+        assertEquals(lp.HIGH, lp.get(own, hi))
+        assertEquals(lp.LOW, lp.get(real, hi)) // the shared one unchanged
+        assertTrue(real.contains("p2/language_priority_hi"))
+        assertFalse(KeyboardProfiles.isGlobal("language_priority_hi"))
+    }
+
     // S1
     @Test fun `a build that found nothing in a dictionary file isn't tried again for a minute`() {
         assertTrue(GestureDecoderVocabulary.buildAllowed("xx-broken", now = 1000))

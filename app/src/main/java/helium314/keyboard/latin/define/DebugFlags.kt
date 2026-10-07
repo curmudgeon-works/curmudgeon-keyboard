@@ -58,7 +58,8 @@ $stackTrace
 Last log:
 ${Log.getLog(100).joinToString("\n")}
 """)
-        defaultUncaughtExceptionHandler!!.uncaughtException(t, e)
+        // (no handler before ours, as in unit tests: the exception itself is logged, not a NullPointerException from here)
+        defaultUncaughtExceptionHandler?.uncaughtException(t, e) ?: Log.e("CrashReport", "uncaught exception in thread ${t.name}", e)
     }
 
     private fun writeCrashReportToFile(text: String) {

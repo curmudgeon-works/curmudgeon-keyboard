@@ -36,29 +36,49 @@ class ThemePicturesBackupTest {
         assertFalse(live().exists())
     }
 
-    @Test fun `a theme saved with a picture still keeps a copy`() {
+    @Test fun `a theme saved with a picture names it in the library and puts it back`() {
         live().apply { parentFile?.mkdirs(); writeText("picture") }
+        helium314.keyboard.latin.common.PictureFraming.fileFor(live()).writeText("framing-text")
         val id = AppearanceLooks.savePictures(ctx)
-        assertTrue(id.isNotEmpty())
-        assertEquals("picture", File(looksDir, id + File.separator + live().name).readText())
+        assertTrue(id.startsWith("lib:"), id)
+        assertTrue(looksDir.listFiles().isNullOrEmpty(), "no folder of copies")
+        val libName = org.json.JSONObject(id.removePrefix("lib:")).getJSONObject(live().name).getString("p")
+        assertEquals("picture", helium314.keyboard.latin.common.PictureLibrary.file(ctx, libName).readText())
+        val look = AppearanceLooks.Look("Photo", mapOf(AppearanceLooks.PICTURES to id))
+        assertFalse(AppearanceLooks.isTweaked(ctx, look))
+        // the live picture replaced, the theme puts its own back with its framing
+        live().writeText("other"); helium314.keyboard.latin.common.PictureFraming.fileFor(live()).delete()
+        assertTrue(AppearanceLooks.isTweaked(ctx, look))
+        AppearanceLooks.applyPictures(ctx, look)
+        assertEquals("picture", live().readText())
+        assertEquals("framing-text", helium314.keyboard.latin.common.PictureFraming.fileFor(live()).readText())
+        AppearanceLooks.save(ctx.prefs(), listOf(look))
+        assertEquals(1, AppearanceLooks.looksUsingPicture(ctx.prefs(), libName))
+        // the picture forgotten from the library: applying the theme leaves the slot as it is
+        helium314.keyboard.latin.common.PictureLibrary.file(ctx, libName).delete()
+        live().writeText("kept")
+        AppearanceLooks.applyPictures(ctx, look)
+        assertEquals("kept", live().readText())
     }
 
-    @Test fun `themes saved before with an empty folder are cleaned up at app start`() {
+    @Test fun `themes saved before with a folder of copies are moved to the library at app start`() {
         val prefs = ctx.prefs()
         val empty = File(looksDir, "empty-uuid").apply { mkdirs() }
-        val full = File(looksDir, "full-uuid").apply { mkdirs(); File(this, "custom_background_image").writeText("p") }
+        val full = File(looksDir, "full-uuid").apply { mkdirs(); File(this, "custom_background_image").writeText("p"); File(this, "custom_background_image.framing").writeText("fr") }
         AppearanceLooks.save(prefs, listOf(
             AppearanceLooks.Look("Plain", mapOf(AppearanceLooks.PICTURES to "empty-uuid")),
             AppearanceLooks.Look("Photo", mapOf(AppearanceLooks.PICTURES to "full-uuid")),
             AppearanceLooks.Look("Old", mapOf(Settings.PREF_THEME_STYLE to "Holo")), // from before pictures were in themes
+            AppearanceLooks.Look("Lost", mapOf(AppearanceLooks.PICTURES to "no-such-folder")), // restored without its folder
         ))
-        AppearanceLooks.dropEmptyPictureFolders(ctx, prefs)
-        val looks = AppearanceLooks.load(prefs).associate { it.name to it.values[AppearanceLooks.PICTURES] }
+        AppearanceLooks.migratePictureFolders(ctx, prefs)
+        val looks = AppearanceLooks.load(prefs).associate { it.name to it.values[AppearanceLooks.PICTURES] as? String }
         assertEquals("", looks["Plain"])
-        assertEquals("full-uuid", looks["Photo"])
-        assertFalse(looks.containsKey("Old") && looks["Old"] != null)
-        assertFalse(empty.exists())
-        assertTrue(full.isDirectory)
+        assertTrue(looks["Photo"]!!.startsWith("lib:"), looks["Photo"])
+        assertEquals("fr", org.json.JSONObject(looks["Photo"]!!.removePrefix("lib:")).getJSONObject("custom_background_image").getString("f"))
+        assertEquals(null, looks["Old"])
+        assertEquals("no-such-folder", looks["Lost"])
+        assertFalse(empty.exists()); assertFalse(full.exists())
     }
 
     @Test fun `a restore of every keyboard with its settings takes the themes' pictures`() {

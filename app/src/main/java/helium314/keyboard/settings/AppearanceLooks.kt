@@ -11,6 +11,7 @@ import androidx.core.content.edit
 import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.keyboard.internal.KeyboardIconsSet
 import helium314.keyboard.latin.common.PictureFraming
+import helium314.keyboard.latin.common.PictureLibrary
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.getActivity
@@ -94,39 +95,76 @@ object AppearanceLooks {
         Settings.getCustomBackgroundFile(ctx, night, land).let { listOf(it, PictureFraming.fileFor(it)) } } }
     private fun picturesDir(ctx: Context, id: String) = java.io.File(ctx.filesDir, "looks" + java.io.File.separator + id)
 
-    /** Copies the background pictures there are now into a new folder; returns its id, to store in the look. No
-     *  pictures: [NO_PICTURES], never an empty folder (re-review 2026-10-07: a backup drops an empty folder, and a
-     *  look whose folder is missing leaves the background alone instead of clearing it). */
+    // since 2026-10-07 a look names its pictures in the picture library (one copy of each picture in the app, shared by
+    // keyboards and themes: "lib:" + JSON {slot: {"p": library file name, "f": framing text or absent}}); before, a
+    // folder of copies per look (its uuid), converted at app start by [migratePictureFolders]
+    private const val LIB = "lib:"
+
+    /** The background pictures there are now, as a look stores them: their library names (each added to the library
+     *  if it isn't there) with their framing; [NO_PICTURES] when there are none. */
     fun savePictures(ctx: Context): String {
-        val pictures = livePictures(ctx).filter { it.exists() }
-        if (pictures.isEmpty()) return NO_PICTURES
-        val id = java.util.UUID.randomUUID().toString()
-        val dir = picturesDir(ctx, id).apply { mkdirs() }
-        pictures.forEach { it.copyTo(java.io.File(dir, it.name), overwrite = true) }
-        return id
+        val o = JSONObject()
+        for (live in livePictures(ctx)) {
+            if (live.name.endsWith(".framing") || !live.exists()) continue
+            val name = PictureLibrary.nameOf(ctx, live) ?: continue
+            val slot = JSONObject().put("p", name)
+            PictureFraming.fileFor(live).takeIf { it.isFile }?.let { slot.put("f", it.readText()) }
+            o.put(live.name, slot)
+        }
+        return if (o.length() == 0) NO_PICTURES else LIB + o.toString()
     }
 
-    /** Looks saved before [savePictures] stopped making empty folders say [NO_PICTURES] instead, and the folder goes;
-     *  at app start (cheap, nothing to do once done), so a backup made since carries the right thing. */
-    fun dropEmptyPictureFolders(ctx: Context, prefs: SharedPreferences) {
+    private fun refsOf(id: String): JSONObject? = if (id.startsWith(LIB)) runCatching { JSONObject(id.removePrefix(LIB)) }.getOrNull() else null
+
+    /** Looks saved before 2026-10-07 kept a folder of picture copies: each becomes library names (the copies join the
+     *  library, the folder goes); a look with an empty folder says [NO_PICTURES]. At app start, cheap once done. */
+    fun migratePictureFolders(ctx: Context, prefs: SharedPreferences) {
         val looks = load(prefs)
         var changed = false
-        val cleaned = looks.map { look ->
+        val converted = looks.map { look ->
             val id = look.values[PICTURES] as? String ?: return@map look
-            if (id == NO_PICTURES) return@map look
+            if (id == NO_PICTURES || id.startsWith(LIB)) return@map look
             val dir = picturesDir(ctx, id)
-            if (!dir.isDirectory || !dir.listFiles().isNullOrEmpty()) return@map look
-            dir.delete()
+            if (!dir.isDirectory) return@map look // (restored from a backup without it: left as it is, "leave the background alone")
+            val o = JSONObject()
+            for (file in dir.listFiles().orEmpty()) {
+                if (file.name.endsWith(".framing")) continue
+                val name = PictureLibrary.nameOf(ctx, file) ?: continue
+                val slot = JSONObject().put("p", name)
+                java.io.File(dir, file.name + ".framing").takeIf { it.isFile }?.let { slot.put("f", it.readText()) }
+                o.put(file.name, slot)
+            }
+            dir.deleteRecursively()
             changed = true
-            Look(look.name, look.values + (PICTURES to NO_PICTURES))
+            Look(look.name, look.values + (PICTURES to if (o.length() == 0) NO_PICTURES else LIB + o.toString()))
         }
-        if (changed) save(prefs, cleaned)
+        if (changed) save(prefs, converted)
+    }
+
+    /** How many saved looks name library picture [name]: the library's "forget" warns with it. */
+    fun looksUsingPicture(prefs: SharedPreferences, name: String): Int = load(prefs).count { look ->
+        (look.values[PICTURES] as? String)?.let { refsOf(it) }?.let { o -> o.keys().asSequence().any { o.getJSONObject(it).optString("p") == name } } == true
     }
 
     /** The look's pictures become the background ones (a built-in look: none); a look saved before pictures were
      *  part of looks, or whose picture folder is missing (restored from a backup without it), leaves them as they are. */
     fun applyPictures(ctx: Context, look: Look) {
         val id = look.values[PICTURES] as? String ?: return
+        val refs = refsOf(id)
+        if (refs != null) {
+            for (live in livePictures(ctx)) {
+                if (live.name.endsWith(".framing")) continue
+                val slot = refs.optJSONObject(live.name)
+                val framing = PictureFraming.fileFor(live)
+                if (slot == null) { live.delete(); framing.delete(); continue }
+                val source = PictureLibrary.file(ctx, slot.optString("p"))
+                if (!source.isFile) continue // forgotten from the library: this slot stays as it is
+                source.copyTo(live, overwrite = true)
+                if (slot.has("f")) framing.writeText(slot.getString("f")) else framing.delete()
+            }
+            reload(ctx)
+            return
+        }
         val dir = if (id == NO_PICTURES) null else picturesDir(ctx, id)
         // its pictures aren't there: the background stays (review 2026-10-06: it was deleted)
         if (dir != null && !dir.isDirectory) { reload(ctx); return }
@@ -144,13 +182,23 @@ object AppearanceLooks {
         val id = look.values[PICTURES] as? String ?: return false // saved before pictures were in themes: not compared
         // a picture by its size, a framing (a few bytes of the same length whatever it says) by its content
         fun sig(f: java.io.File): Any = if (f.name.endsWith(".framing")) f.readText() else f.length()
-        val saved = if (id == NO_PICTURES) emptyMap() else picturesDir(ctx, id).listFiles()?.associate { it.name to sig(it) } ?: emptyMap()
         val live = livePictures(ctx).filter { it.exists() }.associate { it.name to sig(it) }
+        refsOf(id)?.let { refs ->
+            val saved = HashMap<String, Any>()
+            for (slot in refs.keys()) {
+                val o = refs.getJSONObject(slot)
+                val lib = PictureLibrary.file(ctx, o.optString("p"))
+                saved[slot] = if (lib.isFile) lib.length() else -1L
+                if (o.has("f")) saved["$slot.framing"] = o.getString("f")
+            }
+            return saved != live
+        }
+        val saved = if (id == NO_PICTURES) emptyMap() else picturesDir(ctx, id).listFiles()?.associate { it.name to sig(it) } ?: emptyMap()
         return saved != live
     }
 
     fun deletePictures(ctx: Context, look: Look) {
-        (look.values[PICTURES] as? String)?.takeIf { it != NO_PICTURES }?.let { picturesDir(ctx, it).deleteRecursively() }
+        (look.values[PICTURES] as? String)?.takeIf { it != NO_PICTURES && !it.startsWith(LIB) }?.let { picturesDir(ctx, it).deleteRecursively() }
     }
 
     /** The pictures as they are now, as a look of their own (for putting them back on Cancel). */

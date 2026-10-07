@@ -136,7 +136,9 @@ object KeyboardProfiles {
         Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, Settings.PREF_TRUST_TYPED_COUNT,
     )
     // ("share_user_history_": the retired per-language share switch, kept global so old keys stay where they are)
-    private val globalPrefixes = listOf(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX, "language_priority_", "share_user_history_", LanguagePriority.PREF_ADDED_PREFIX, "debug_", "gesture_stats")
+    // (language priorities are the keyboard's since 2026-10-07: a keyboard's own set holds its own when settings are
+    // separate; the plain value is what the shared set, and every keyboard without its own, reads)
+    private val globalPrefixes = listOf(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX, "share_user_history_", LanguagePriority.PREF_ADDED_PREFIX, "debug_", "gesture_stats")
 
     /** A key of the app itself (never a keyboard's), whatever the menus' sharing: the keyboard list, the saved themes and
      *  Layouts, the logs' switches… (re-review 2026-10-07: what a shared menu holds for all keyboards is not app-wide,
@@ -408,6 +410,7 @@ object KeyboardProfiles {
         helium314.keyboard.latin.personalization.LearnedStores.refresh(real)
         val old = imeId
         imeId = if (isSeparate(real)) idFor(real, selectedKeyboard(real)) else SHARED
+        if (imeId != old) helium314.keyboard.latin.utils.LanguagePriority.clearCache() // (priorities are per keyboard)
         // another keyboard's background picture and emoji font (see profileFile)
         if (imeId != old) {
             Settings.clearCachedBackgroundImages()

@@ -30,6 +30,21 @@ object PictureLibrary {
 
     fun remove(picture: File) { picture.delete() }
 
+    /** The library's copy of [picture] (added if no picture with the same content is there), by name; null if it couldn't
+     *  be added. Saved themes name their pictures this way (2026-10-07), instead of keeping copies. */
+    fun nameOf(ctx: Context, picture: File): String? {
+        if (!picture.isFile) return null
+        return runCatching {
+            val dir = dir(ctx).apply { mkdirs() }
+            val bytes = picture.readBytes()
+            val same = dir.listFiles()?.firstOrNull { it.isFile && it.length() == picture.length() && it.readBytes().contentEquals(bytes) }
+            if (same != null) { same.setLastModified(System.currentTimeMillis()); same.name }
+            else File(dir, "picture_${System.currentTimeMillis()}").also { picture.copyTo(it) }.name
+        }.getOrNull()
+    }
+
+    fun file(ctx: Context, name: String): File = File(dir(ctx), name)
+
     /** Once: the pictures the keyboards had before the list existed join it. */
     fun migrate(ctx: Context, done: Boolean, setDone: () -> Unit) {
         if (done) return
