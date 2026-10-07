@@ -338,8 +338,11 @@ private fun SwitchWithDialogPreference(
     var showDialog by rememberSaveable { mutableStateOf(false) }
     // the row tapped while off: the dialog, and the switch on only with OK (reviewer 2026-10-07: it turned on at the
     // tap and Cancel left it on); the switch itself turns on at once, and Cancel turns it off again
+    // (the dialog's OK runs onConfirmed and then onDismissRequest: the close must know whether OK came first,
+    // reviewer 2026-10-07, OK turned the switch off again)
     var wasOn by rememberSaveable { mutableStateOf(on) }
-    fun open() { wasOn = on; onOpen(); showDialog = true }
+    var confirmed by rememberSaveable { mutableStateOf(false) }
+    fun open() { wasOn = on; confirmed = false; onOpen(); showDialog = true }
     Preference(name = setting.title, onClick = { open() }) {
         Switch(checked = on, onCheckedChange = { turnOn ->
             prefs.edit { putBoolean(key, turnOn) }
@@ -347,11 +350,11 @@ private fun SwitchWithDialogPreference(
         })
     }
     if (showDialog) ThreeButtonAlertDialog(
-        onDismissRequest = { if (!wasOn) prefs.edit { putBoolean(key, false) }; showDialog = false },
+        onDismissRequest = { switchAfterDialogClose(wasOn, confirmed)?.let { value -> prefs.edit { putBoolean(key, value) } }; showDialog = false },
         title = { Text(setting.title) },
         neutralButtonText = onDefault?.let { stringResource(R.string.button_default) },
         onNeutral = { onDefault?.invoke() },
-        onConfirmed = { if (!on) prefs.edit { putBoolean(key, true) }; save() },
+        onConfirmed = { confirmed = true; if (!on) prefs.edit { putBoolean(key, true) }; save() },
         content = { dialogContent() },
     )
 }
@@ -403,3 +406,7 @@ internal fun DeleteSwipePreference(setting: Setting) {
         onOpen = { speed = prefs.getFloat(Settings.PREF_DELETE_SWIPE_SPEED, Defaults.PREF_DELETE_SWIPE_SPEED) },
     )
 }
+
+/** What a switch-with-dialog stores when its dialog closes: nothing (null) after OK or when it was on already, off
+ *  when it was off and the dialog was cancelled (it had been turned on for the dialog). */
+internal fun switchAfterDialogClose(wasOn: Boolean, confirmed: Boolean): Boolean? = if (!wasOn && !confirmed) false else null

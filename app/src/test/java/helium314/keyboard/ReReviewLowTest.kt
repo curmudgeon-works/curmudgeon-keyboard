@@ -12,6 +12,7 @@ import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.settings.AppearanceLooks
 import helium314.keyboard.settings.SettingDefaults
 import helium314.keyboard.settings.keepBrokenAside
+import helium314.keyboard.settings.screens.switchAfterDialogClose
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -70,6 +71,14 @@ class ReReviewLowTest {
         GestureStats.onSwipe("t2", 5)
         GestureStats.flush(real)
         assertFalse(real.getString(GestureStats.PREF_KEY, "")!!.contains("\"t1\""))
+    }
+
+    // reviewer 2026-10-07: the dialog's OK runs confirm then dismiss; the close mustn't turn a just-confirmed switch off
+    @Test fun `a switch with a dialog stays on after OK and goes off after Cancel when it was off`() {
+        val f = ::switchAfterDialogClose
+        assertNull(f(true, true)); assertNull(f(true, false)) // on before: the close changes nothing
+        assertNull(f(false, true)) // off before, OK: stays on
+        assertEquals(false, f(false, false)) // off before, Cancel: off again
     }
 
     // T2 (+ T3: the steps take the stored settings)
