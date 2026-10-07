@@ -1,8 +1,8 @@
 Swipe typing done right. Highly customizable, no tracking, no AI claptrap.
 
-Curmudgeon is fed up with silly old one-size-fits-all keyboards, keyboards that couldn't swipe correctly if their life depended on it.
+We are fed up with silly old one-size-fits-all keyboards, keyboards that couldn't swipe correctly if their life depended on it.
 
-Curmudgeon understands that your keyboard should do exactly what you want it to. No more and no less. It wants you to swipe blazingly fast (ideally without even looking down at the keyboard). It knows it can get things wrong so it gives you dozens of suggestions. It doesn't keep second-guessing and third-guessing you, prioritizing your words even if it doesn't understand them. And if you still want more you can go under the hood and tinker with the swiping algorithm itself.
+We believe your keyboard should do exactly what you want it to. No more and no less. We want you to swipe blazingly fast (ideally without even looking down at the keyboard). We know we can get things wrong, so we give you dozens of suggestions. We don't keep second-guessing and third-guessing you; we prioritize your words even if we don't understand them. And if you still want more, you can go under the hood and tinker with the swiping algorithm itself.
 
 You can customize everything: swiping behavior, suggestions, layouts and fonts, undo/redo lengths, clipboard memory.
 
