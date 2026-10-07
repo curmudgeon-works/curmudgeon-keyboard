@@ -45,6 +45,9 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
     val prefs = ctx.prefs()
     var generation by remember { mutableIntStateOf(0) }
     val presets = remember(generation) { LayoutPresets.load(prefs) }
+    // the built-in Layouts first (Curmudgeon, the default; HeliBoard; HeliBoard Extra), then the user's
+    val builtIn = remember { LayoutPresets.builtIn(ctx) }
+    val all = builtIn + presets
     var showList by remember { mutableStateOf(false) }
     // what was set when the list opened, for Cancel: the settings and the keyboard (its keys)
     val initial = remember(showList) { LayoutPresets.current(prefs) }
@@ -55,10 +58,11 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
     var toRename: LayoutPresets.Preset? by remember { mutableStateOf(null) }
     var toDelete: LayoutPresets.Preset? by remember { mutableStateOf(null) }
     fun store(list: List<LayoutPresets.Preset>) { LayoutPresets.save(prefs, list); generation++ }
-    val chosen = prefs.getString(LayoutPresets.PREF_SELECTED, null)?.let { name -> presets.firstOrNull { it.name == name } }
-    val tweaked = chosen != null && LayoutPresets.isTweaked(ctx, keyboard, chosen)
-    val summary = chosen?.let { if (tweaked) it.name + " (" + stringResource(R.string.theme_tweaked) + ")" else it.name }
-        ?: stringResource(R.string.layout_presets_summary)
+    // none chosen: the default, Curmudgeon ("tweaked" if anything differs from it)
+    val chosen = prefs.getString(LayoutPresets.PREF_SELECTED, null)?.let { name -> all.firstOrNull { it.name == name } }
+        ?: builtIn.first()
+    val tweaked = LayoutPresets.isTweaked(ctx, keyboard, chosen)
+    val summary = if (tweaked) chosen.name + " (" + stringResource(R.string.theme_tweaked) + ")" else chosen.name
     Preference(name = stringResource(R.string.layout_presets), description = summary, onClick = { showList = true }) { NextScreenIcon() }
     // while the list is open nothing of the keyboard's is cleaned up (its unsaved layout must survive a preview
     // for Cancel); afterwards what no keyboard uses goes
@@ -87,7 +91,7 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
                 showList = false
             },
             title = { Text(stringResource(R.string.layout_presets)) },
-            items = presets,
+            items = all,
             selectedItem = chosen, // the chosen Layout marked when the list opens (2026-10-06)
             getItemName = { it.name },
             confirmImmediately = false,
@@ -100,15 +104,16 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
             onItemSelected = { tapped ->
                 confirmed = true
                 // (the list's own copy: renamed since, it's found again by content; deleted, nothing is on the keyboard)
-                val it = presets.firstOrNull { p -> p == tapped } ?: return@ListPickerDialog
+                val it = all.firstOrNull { p -> p == tapped } ?: return@ListPickerDialog
                 if (helium314.keyboard.latin.utils.LayoutUtilsCustom.dropsUnsaved(initialKeyboard, keyboard))
                     askLoss = Triple(it, initial, initialKeyboard)
                 else keep(it, initialKeyboard)
             },
-            trailing = { preset ->
+            // the built-in Layouts can't be changed; the user's own are renamed and deleted here
+            trailing = { preset -> if (!preset.builtIn) {
                 IconButton({ toRename = preset }) { Icon(painterResource(R.drawable.ic_edit), stringResource(R.string.layout_preset_rename)) }
                 DeleteButton { toDelete = preset }
-            },
+            } },
             footer = {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxWidth().clickable { saveAs = true }
@@ -123,7 +128,7 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
             onDismissRequest = { saveAs = false },
             title = { Text(stringResource(R.string.layout_preset_save)) },
             initialText = stringResource(R.string.layout_preset_default_name, presets.size + 1),
-            checkTextValid = { name -> name.isNotBlank() && presets.none { it.name == name } },
+            checkTextValid = { name -> name.isNotBlank() && all.none { it.name == name } },
             onConfirmed = { name ->
                 // what is on the keyboard now, a previewed Layout included
                 store(presets + LayoutPresets.Preset(name, LayoutPresets.snapshot(ctx, keyboard)))
@@ -136,7 +141,7 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
             onDismissRequest = { toRename = null },
             title = { Text(stringResource(R.string.layout_preset_rename)) },
             initialText = preset.name,
-            checkTextValid = { name -> name.isNotBlank() && presets.none { it !== preset && it.name == name } },
+            checkTextValid = { name -> name.isNotBlank() && all.none { it !== preset && it.name == name } },
             onConfirmed = { name ->
                 store(presets.map { if (it === preset) LayoutPresets.Preset(name, it.values) else it })
                 if (prefs.getString(LayoutPresets.PREF_SELECTED, null) == preset.name) prefs.edit { putString(LayoutPresets.PREF_SELECTED, name) }

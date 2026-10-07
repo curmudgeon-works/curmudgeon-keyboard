@@ -16,6 +16,7 @@ import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.latin.utils.KeyPopupOverrides
 import helium314.keyboard.latin.utils.ScriptUtils.script
 import helium314.keyboard.latin.settings.Defaults
+import helium314.keyboard.latin.R
 import helium314.keyboard.latin.common.Constants.Subtype.ExtraValue
 import org.json.JSONArray
 import org.json.JSONObject
@@ -40,8 +41,9 @@ object LayoutPresets {
     private val popupKeys = setOf(Settings.PREF_SHOW_TLD_POPUP_KEYS, Settings.PREF_REMOVE_REDUNDANT_POPUPS,
         Settings.PREF_SYMBOL_POPUP_MAP, KeyPopupOverrides.PREF, KeyPopupOverrides.PREF_SELECTED_SET)
 
-    /** Equal by content, not name: the list's tapped one is still found after a rename (or a reload of the list). */
-    class Preset(val name: String, val values: Map<String, Any?>) {
+    /** Equal by content, not name: the list's tapped one is still found after a rename (or a reload of the list).
+     *  [builtIn]: one that ships with the app ([builtIn]), not the user's. */
+    class Preset(val name: String, val values: Map<String, Any?>, val builtIn: Boolean = false) {
         override fun equals(other: Any?) = other is Preset && other.values == values
         override fun hashCode() = values.hashCode()
     }
@@ -53,6 +55,32 @@ object LayoutPresets {
 
     fun inScope(key: String) = !KeyboardProfiles.isGlobal(key) && key !in notInPresets && !key.startsWith(KeyboardProfiles.TOMBSTONE)
         && (key in LayoutDraft.keys || prefixes.any { key.startsWith(it) })
+
+    /**
+     * The Layouts that ship with the app (2026-10-06), like the built-in themes: each sets the whole Layout & Typing
+     * screen, what it doesn't name back to its default ([complete]); not the keys' arrangement (QWERTY, Dvorak…: the
+     * language's), the keyboards, or the saved popup sets. Curmudgeon is the default (everything at its default, so it
+     * follows them); HeliBoard is upstream HeliBoard's; HeliBoard Extra is HeliBoard's with every accent and the number row.
+     */
+    fun builtIn(ctx: Context): List<Preset> {
+        // HeliBoard's own typing: ?123 long-press does nothing, holding backspace deletes letters, 50 ms apart
+        val heliBoardTyping = mapOf(Settings.PREF_LONG_PRESS_SYMBOL_ACTION to "none",
+            Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS to false, Settings.PREF_BACKSPACE_REPEAT_INTERVAL to 50)
+        val fullBottomRow = sizeKeys.keys.filter { it.startsWith(Settings.PREF_BOTTOM_ROW_SCALE_PREFIX) }.associateWith { 1f }
+        return listOf(
+            Preset(ctx.getString(R.string.layout_preset_curmudgeon), complete(emptyMap()), builtIn = true),
+            Preset(ctx.getString(R.string.layout_preset_heliboard), complete(heliBoardTyping + fullBottomRow + mapOf(
+                Settings.PREF_SHOW_NUMBER_ROW to false, MORE_POPUPS to "main",
+                // (HeliBoard has no undo history length: the Curmudgeon one before 2026-10-06; no emoji key, as upstream)
+                Settings.PREF_UNDO_HISTORY_LENGTH to 20, Settings.PREF_SHOW_EMOJI_KEY to false)), builtIn = true),
+            Preset(ctx.getString(R.string.layout_preset_heliboard_extra), complete(heliBoardTyping + mapOf(
+                MORE_POPUPS to "all")), builtIn = true), // (number row, 110% bottom row, undo 50, emoji key: the defaults)
+        )
+    }
+
+    /** A built-in Layout: [values], and every other Layout & Typing setting at its default (null: not set). */
+    private fun complete(values: Map<String, Any?>): Map<String, Any?> =
+        LayoutDraft.keys.filter { inScope(it) }.associateWith { null } + sizeKeys + values
 
     /** The settings part as it is now (plain keys, the edited keyboard's set). */
     fun current(prefs: SharedPreferences): Map<String, Any?> = prefs.all.filterKeys { inScope(it) }
@@ -80,6 +108,13 @@ object LayoutPresets {
      *  come back as the keyboard's own unnamed copy. */
     fun keyboardWith(ctx: Context, keyboard: SettingsSubtype, preset: Preset): SettingsSubtype {
         var kb = keyboard
+        // a built-in sets the keyboard's accents level (none: the general one) and its popup order back to the default;
+        // its keys stay as they are
+        if (preset.builtIn) {
+            val more = preset.values[MORE_POPUPS] as? String
+            kb = if (more == null) kb.without(ExtraValue.MORE_POPUPS) else kb.with(ExtraValue.MORE_POPUPS, more)
+            return kb.without(ExtraValue.POPUP_ORDER)
+        }
         if (popupsFit(kb, preset)) {
             val more = preset.values[MORE_POPUPS] as? String
             kb = if (more == null) kb.without(ExtraValue.MORE_POPUPS) else kb.with(ExtraValue.MORE_POPUPS, more)
@@ -106,7 +141,7 @@ object LayoutPresets {
     }
 
     /** Whether [preset]'s popups go on [keyboard]: saved with popups, from a keyboard of the same script. */
-    private fun popupsFit(keyboard: SettingsSubtype, preset: Preset) = preset.values[SCRIPT] == keyboard.locale.script()
+    private fun popupsFit(keyboard: SettingsSubtype, preset: Preset) = preset.builtIn || preset.values[SCRIPT] == keyboard.locale.script()
 
     /** The settings [preset] puts on [keyboard] (its popups only when they fit, see [popupsFit]). */
     fun settingsFor(keyboard: SettingsSubtype, preset: Preset): Map<String, Any?> =
@@ -150,6 +185,7 @@ object LayoutPresets {
     fun isTweaked(ctx: Context, keyboard: SettingsSubtype, preset: Preset): Boolean {
         val now = ctx.prefs().all
         if (preset.values.any { (key, value) -> inScope(key) && !KnownDefaults.same(key, now[key], value) }) return true
+        if (preset.builtIn) return false // (its keys are the language's: not compared)
         // the keys by name only (this runs on every redraw: no layout file is read)
         return LayoutType.entries.mapNotNull { type -> keyboard.layoutName(type)?.let { LAYOUT + type.name to it } }.toMap() !=
             preset.values.filterKeys { it.startsWith(LAYOUT) && !it.startsWith(LAYOUT_TEXT) }

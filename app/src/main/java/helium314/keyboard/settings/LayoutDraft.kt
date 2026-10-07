@@ -152,6 +152,8 @@ class LayoutDraft private constructor(
             Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE,
             Settings.PREF_SHOW_EMOJI_KEY, Settings.PREF_SHOW_VOICE_KEY, Settings.PREF_SHOW_TLD_POPUP_KEYS, Settings.PREF_REMOVE_REDUNDANT_POPUPS,
             Settings.PREF_SYMBOL_POPUP_MAP, "key_popups", "key_popup_set_selected", "key_popup_sets",
+            // the accents level and popup order every keyboard without its own follows (2026-10-06: Layouts set them too)
+            Settings.PREF_MORE_POPUP_KEYS, Settings.PREF_POPUP_KEYS_ORDER,
             // the keyboards themselves (a layout choice changes the keyboard's definition)
             Settings.PREF_ADDITIONAL_SUBTYPES, Settings.PREF_ENABLED_SUBTYPES, Settings.PREF_SELECTED_SUBTYPE,
             "keyboard_profile_ids",

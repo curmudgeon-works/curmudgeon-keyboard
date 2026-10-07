@@ -81,7 +81,10 @@ private val liveDefaultsBefore3008: Map<String, Any> = mapOf(
     Settings.PREF_THEME_DAY_NIGHT to false, // dark mode follows the phone now
     Settings.PREF_VIBRATE_ON to true, // off now, as in HeliBoard
     Settings.PREF_SOUND_ON to true,
-)
+    // the Curmudgeon Layout's (the default one): undo 50 steps, the emoji key, a 110% bottom row
+    Settings.PREF_UNDO_HISTORY_LENGTH to 20,
+    Settings.PREF_SHOW_EMOJI_KEY to false,
+) + (0 until 4).associate { createPrefKeyForBooleanSettings(Settings.PREF_BOTTOM_ROW_SCALE_PREFIX, it, 2) to 1f }
 
 /** Whether a stored [value] of [key] is at its default: the default now, or the one before 0.3.008 (in the [live]
  *  settings, also those of [liveDefaultsBefore3008]). Long-press ?123 not while the old numpad switch is on

@@ -140,7 +140,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
             // HeliBoard's own, the default since 0.3.008: its accents level, no symbol map, and its popup order (as HeliBoard ships it, checked
             // against upstream 415c45f1 of 2026-09-30); the hint is the first popup entry, as everywhere here
             Preset(R.string.key_popups_preset_heliboard, POPUP_KEYS_MAIN, null, symbolMap = "", popupOrder = POPUP_KEYS_ORDER_DEFAULT),
-            // HeliBoard extra popups: HeliBoard's with every variant a key has (2026-10-06: "More accented letters" dropped; that
+            // HeliBoard Extra: HeliBoard's with every variant a key has (2026-10-06: "More accented letters" dropped; that
             // level stays in the accents setting)
             Preset(R.string.key_popups_preset_heliboard_packed, POPUP_KEYS_ALL, null, symbolMap = "", popupOrder = POPUP_KEYS_ORDER_DEFAULT),
         ).let { builtIn ->

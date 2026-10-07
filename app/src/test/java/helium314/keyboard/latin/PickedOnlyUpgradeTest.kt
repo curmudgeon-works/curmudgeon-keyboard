@@ -153,6 +153,13 @@ class PickedOnlyUpgradeTest {
         assertEquals(true, LayoutPresets.load(prefs).single().values[Settings.PREF_VIBRATE_ON])
     }
 
+    @Test fun `undo 20, no emoji key and a 100 percent bottom row follow the Curmudgeon Layout's defaults`() {
+        val bottom = helium314.keyboard.latin.settings.createPrefKeyForBooleanSettings(Settings.PREF_BOTTOM_ROW_SCALE_PREFIX, 0, 2)
+        prefs.edit { putInt(Settings.PREF_UNDO_HISTORY_LENGTH, 20); putBoolean(Settings.PREF_SHOW_EMOJI_KEY, false); putFloat(bottom, 1f) }
+        pickedOnlyUpgrade(prefs, freshInstall = false)
+        for (key in listOf(Settings.PREF_UNDO_HISTORY_LENGTH, Settings.PREF_SHOW_EMOJI_KEY, bottom)) assertFalse(prefs.contains(key), key)
+    }
+
     @Test fun `a theme saves what isn't picked as not set`() {
         val values = AppearanceLooks.snapshot(prefs)
         assertTrue(values.containsKey(Settings.PREF_THEME_KEY_BORDERS))

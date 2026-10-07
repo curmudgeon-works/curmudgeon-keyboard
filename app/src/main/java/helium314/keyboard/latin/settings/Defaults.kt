@@ -91,7 +91,7 @@ object Defaults {
     const val PREF_BLOCK_POTENTIALLY_OFFENSIVE = true
     const val PREF_SHOW_LANGUAGE_SWITCH_KEY = false
     const val PREF_LANGUAGE_SWITCH_KEY = "internal"
-    const val PREF_SHOW_EMOJI_KEY = false
+    const val PREF_SHOW_EMOJI_KEY = true // (the Curmudgeon Layout's; off before 2026-10-06, as in HeliBoard)
     const val PREF_SHOW_VOICE_KEY = false
     const val PREF_ADDITIONAL_SUBTYPES = "de${Separators.SET}${ExtraValue.KEYBOARD_LAYOUT_SET}=MAIN:qwerty${Separators.SETS}" +
             "fr${Separators.SET}${ExtraValue.KEYBOARD_LAYOUT_SET}=MAIN:qwertz${Separators.SETS}" +
@@ -102,7 +102,7 @@ object Defaults {
     @JvmField
     val PREF_KEYBOARD_HEIGHT_SCALE = Array(4) { DEFAULT_SIZE_SCALE }
     @JvmField
-    val PREF_BOTTOM_ROW_SCALE = Array(4) { DEFAULT_SIZE_SCALE }
+    val PREF_BOTTOM_ROW_SCALE = Array(4) { 1.1f } // 110%, the Curmudgeon Layout's (2026-10-06; 100% before)
     @JvmField
     // DEFAULT_SIZE_SCALE for portrait, 0 for landscape (normal and folded)
     val PREF_BOTTOM_PADDING_SCALE = arrayOf(DEFAULT_SIZE_SCALE, 0f, DEFAULT_SIZE_SCALE, 0f)
@@ -219,7 +219,7 @@ object Defaults {
     const val PREF_ABC_AFTER_NUMPAD_SPACE = false
     const val PREF_REMOVE_REDUNDANT_POPUPS = false
     const val PREF_SPACE_BAR_TEXT = ""
-    const val PREF_UNDO_HISTORY_LENGTH = 20 // steps the keyboard's own undo reaches back (see EditHistory)
+    const val PREF_UNDO_HISTORY_LENGTH = 50 // steps the keyboard's own undo reaches back (see EditHistory; the Curmudgeon Layout's, 20 before 2026-10-06)
     const val PREF_UNDO_UNIT = "word" // undo takes back a whole step ("word") or one "character" per press
     const val PREF_REDO_UNIT = "word" // the same for redo
     const val PREF_SUGGESTION_COUNT = 0 // suggestions in the strip, up to 100; 0 = as many as fill it twice over
