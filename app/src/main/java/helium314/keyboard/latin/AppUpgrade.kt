@@ -73,7 +73,7 @@ private val defaultsBefore3008: Map<String, Any> = mapOf(
     Settings.PREF_LONG_PRESS_SYMBOL_ACTION to "none",
 )
 
-/** More defaults 0.3.008 changed (Rahul 2026-10-06: upgraders follow these too), for the live settings only: a saved
+/** More defaults 0.3.008 changed (decided 2026-10-06: upgraders follow these too), for the live settings only: a saved
  *  theme or Layout is a look someone kept, it keeps its colours, light / dark and key sounds. */
 private val liveDefaultsBefore3008: Map<String, Any> = mapOf(
     Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_BLACK, // the Midnight look; Dynamic now
