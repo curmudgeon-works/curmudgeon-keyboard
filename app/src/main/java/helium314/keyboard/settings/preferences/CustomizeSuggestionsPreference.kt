@@ -140,7 +140,9 @@ fun CustomizeSuggestionsPreference(setting: Setting) {
 @Composable
 fun SuggestionCountPreference(setting: Setting) {
     val prefs = LocalContext.current.prefs()
-    var count by remember { mutableIntStateOf(prefs.getInt(Settings.PREF_SUGGESTION_COUNT, Defaults.PREF_SUGGESTION_COUNT)) }
+    // (re-read when the stored value changes under it: review 2026-10-06, the tile kept a value the cross had discarded)
+    val stored = prefs.getInt(Settings.PREF_SUGGESTION_COUNT, Defaults.PREF_SUGGESTION_COUNT)
+    var count by remember(stored) { mutableIntStateOf(stored) }
     var editing by remember { mutableStateOf(false) }
     fun set(n: Int) {
         count = n.coerceIn(0, SuggestedWords.MAX_SUGGESTIONS)

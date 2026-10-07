@@ -156,7 +156,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
         val current = presets.firstOrNull { it.userName != null && it.userName == selectedUserSet?.name }
             ?: presets.firstOrNull { it.userName == null && it.morePopups == accentsValue && it.symbolsLayout == symbolsLayout
                 && (it.symbolMap == null || it.symbolMap == symbolMap) && (it.popupOrder == null || it.popupOrder == popupOrder) }
-            ?: presets[0]
+            // none: an arrangement no preset describes (e.g. accents "more" with the symbol map; review 2026-10-06: it said "Curmudgeon")
         // every arrangement belongs to a set of the user's own: into the selected one, or into a new one to be named
         fun storeInSet(name: String, all: Map<String, List<String>>) {
             storePopupSet(ctx, keyboard, name, accentsValue, symbolsLayout, all)
@@ -209,7 +209,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                     pendingChange = null
                 },
                 title = { Text(stringResource(if (pendingChange != null) R.string.key_popups_save_change_title else R.string.key_popups_save_as_new)) },
-                initialText = if (current.userName != null) "" else stringResource(R.string.key_popups_my_set),
+                initialText = if (current?.userName != null) "" else stringResource(R.string.key_popups_my_set),
                 checkTextValid = { KeyPopupOverrides.isNewSetName(userSets, it) },
             )
         // a tap shows the preset on the preview and the list stays (like Themes); OK keeps it, Cancel puts back what
@@ -284,7 +284,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                 modifier = Modifier.fillMaxWidth().clickable { showAccentsDialog = true }.heightIn(min = ROW_HEIGHT).padding(vertical = 4.dp).padding(start = 10.dp)) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.key_popups_presets), style = MaterialTheme.typography.bodyLarge)
-                    Text(presetName(current), style = MaterialTheme.typography.bodySmall,
+                    Text(current?.let { presetName(it) } ?: stringResource(R.string.key_popups_custom), style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 NextScreenIcon()

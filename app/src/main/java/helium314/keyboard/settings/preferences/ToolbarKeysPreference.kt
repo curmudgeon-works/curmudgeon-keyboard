@@ -125,7 +125,8 @@ fun ToolbarKeysPreference(setting: Setting) {
         },
         title = { Text(setting.title) },
         neutralButtonText = stringResource(R.string.button_default),
-        onNeutral = { confirmed = true; prefs.edit { toolbars.forEach { remove(it) } }; KeyboardSwitcher.getInstance().setThemeNeedsReload() },
+        // (and closes: review 2026-10-06, OK after it wrote the lists as they were)
+        onNeutral = { confirmed = true; prefs.edit { toolbars.forEach { remove(it) } }; KeyboardSwitcher.getInstance().setThemeNeedsReload(); showDialog = false },
         onConfirmed = { confirmed = true; write() },
         content = {
             Column {

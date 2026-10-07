@@ -628,7 +628,9 @@ private fun SavedLooksPreference(setting: Setting) {
     // a tap shows the theme on the live keyboard; OK keeps it, Cancel puts back what was set when the list opened
     val initial = remember(showList) { AppearanceLooks.current(prefs) }
     // the background pictures when the list opened, to put back on Cancel (a copy, made only while the list is open)
-    val initialPictures = remember(showList) { if (showList) AppearanceLooks.currentPictures(ctx) else null }
+    // (saved across rotation: review 2026-10-06, each rotation made another copy and the first was never deleted)
+    val initialPicturesId = androidx.compose.runtime.saveable.rememberSaveable(showList) { if (showList) AppearanceLooks.savePictures(ctx) else NO_COPY }
+    val initialPictures = initialPicturesId.takeIf { it != NO_COPY }?.let { AppearanceLooks.Look("", mapOf(AppearanceLooks.PICTURES to it)) }
     var confirmed by remember(showList) { mutableStateOf(false) }
     var previewed: AppearanceLooks.Look? by remember(showList) { mutableStateOf(null) } // the one tapped, on the keyboard now
     var saveAs by remember { mutableStateOf(false) }
@@ -867,3 +869,5 @@ private fun Modifier.tuckedUnder(): Modifier = layout { measurable, constraints 
     val pull = 8.dp.roundToPx()
     layout(placeable.width, (placeable.height - pull).coerceAtLeast(0)) { placeable.place(0, -pull) }
 }
+
+private const val NO_COPY = "-" // (the Themes list is closed: no copy of the pictures held)

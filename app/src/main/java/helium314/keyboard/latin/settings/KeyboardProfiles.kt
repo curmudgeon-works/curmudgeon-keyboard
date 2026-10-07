@@ -379,7 +379,7 @@ object KeyboardProfiles {
         fun look(id: Int): Map<String, Any?> = ProfilePreferences(real) { id }.all.filterKeys { helium314.keyboard.settings.AppearanceLooks.onScreen(it) }
         if (look(a) != look(b)) return true
         val dir = filesDir ?: return false
-        fun pictures(id: Int) = profileFileNames.map { name -> java.io.File(dir, name + suffix(id)).let { if (it.isFile) it.length() else -1L } }
+        fun pictures(id: Int) = profileFileNames.map { name -> java.io.File(dir, name + suffix(id)).let { if (it.isFile) it.length() to it.lastModified() else null } }
         return pictures(a) != pictures(b)
     }
 

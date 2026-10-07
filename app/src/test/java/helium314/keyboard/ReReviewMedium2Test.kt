@@ -66,9 +66,10 @@ class ReReviewMedium2Test {
     @Test fun `a strike during the migration neither waits nor blocks other work`() {
         val latch = CountDownLatch(1)
         LearnedStoreMigration.holdForTest(latch)
-        val list = RemovedWords.forFile(File(ctx.filesDir, "strike_test_${System.nanoTime()}.txt"))
+        val file = File(ctx.filesDir, "strike_test_${System.nanoTime()}.txt").apply { writeText("teh\t2\n") }
+        val list = RemovedWords.forFile(file)
         val t0 = System.currentTimeMillis()
-        assertEquals(1, list.strike("teh")) // returns at once
+        assertEquals(1, list.strike("teh")) // returns at once (the file's strikes aren't known yet)
         assertTrue(System.currentTimeMillis() - t0 < 2000, "strike waited for the migration")
         // a read is waiting for the migration in the background: taking the lock meanwhile mustn't block
         list.reloadAsync()
@@ -80,7 +81,7 @@ class ReReviewMedium2Test {
         assertEquals(false, confirmed[0])
         latch.countDown()
         Thread.sleep(300)
-        assertEquals(1, list.entries()["teh"]?.strikes) // the strike survived the read that caught up
+        assertEquals(3, list.entries()["teh"]?.strikes) // the file's 2 plus the strike made meanwhile (reviewer: not written over)
     }
 
     // 3
@@ -121,6 +122,14 @@ class ReReviewMedium2Test {
         real.edit().putBoolean(KeyboardProfiles.Group.APPEARANCE.prefKey, true).commit()
         KeyboardProfiles.loadGroups(real)
         assertFalse(KeyboardProfiles.looksDiffer(real, 1, 2)) // Appearance shared: one look for all
+    }
+
+    // A
+    @Test fun `the toolbar visibility row shows what applies without changing the stored value`() {
+        assertEquals(Settings.TOOLBAR_FROM_KEY, helium314.keyboard.settings.screens.toolbarVisibilityShown(Settings.TOOLBAR_ABOVE, suggestions = false))
+        assertEquals(Settings.TOOLBAR_ABOVE, helium314.keyboard.settings.screens.toolbarVisibilityShown(Settings.TOOLBAR_FROM_KEY, suggestions = true))
+        assertEquals(Settings.TOOLBAR_HIDDEN, helium314.keyboard.settings.screens.toolbarVisibilityShown(Settings.TOOLBAR_HIDDEN, suggestions = false))
+        assertEquals(Settings.TOOLBAR_ALWAYS, helium314.keyboard.settings.screens.toolbarVisibilityShown(Settings.TOOLBAR_ALWAYS, suggestions = true))
     }
 
     // 7

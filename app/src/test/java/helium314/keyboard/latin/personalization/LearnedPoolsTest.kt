@@ -61,6 +61,23 @@ class LearnedPoolsTest {
         assertEquals(9 to 100, FakeLearnedStoreIo.read(store("Latn", 0))["hai"])
     }
 
+    // reviewer 2026-10-07: a pool with files but no marker (a copy the process died in) is copied again; pools from before
+    // the markers are marked once at start
+    @Test fun `a half-copied pool is copied again, pools from before the markers count as seeded`() {
+        FakeLearnedStoreIo.store(store("Latn", 4), word("partial", 1, 1))
+        assertFalse(LearnedPools.isSeeded(dir, 4))
+        assertTrue(LearnedPools.seedIfNew(dir, io, 4))
+        assertTrue(LearnedPools.isSeeded(dir, 4))
+        assertEquals(FakeLearnedStoreIo.read(store("Latn", 0)), FakeLearnedStoreIo.read(store("Latn", 4)))
+        FakeLearnedStoreIo.store(store("Latn", 5), word("mine", 1, 1))
+        val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
+        real.edit().remove("learned_pools_marked").commit()
+        LearnedPools.markExistingPools(dir, real)
+        assertTrue(LearnedPools.isSeeded(dir, 5))
+        assertEquals(mapOf("mine" to (1 to 1)), FakeLearnedStoreIo.read(store("Latn", 5)))
+        real.edit().remove("learned_pools_marked").commit()
+    }
+
     @Test fun `on again - the keyboards' words put together by the highest count, not the sum, then emptied`() {
         LearnedPools.separate(dir, io, listOf(1, 2))
         // learned on since: keyboard 1 typed "hai" twice more, keyboard 2 learned "yaar" and removed "teh" once more

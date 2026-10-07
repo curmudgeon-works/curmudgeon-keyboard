@@ -208,7 +208,7 @@ private fun AddColorRow(onDismissRequest: () -> Unit, userColors: Collection<Str
                 onDismissRequest()
                 prefs.edit { putString(prefKey, name) }
                 KeyboardTheme.writeUserMoreColors(prefs, name, Defaults.PREF_USER_MORE_COLORS) // write sth so theme is stored
-                SettingsDestination.navigateTo(targetScreen + name)
+                SettingsDestination.navigateTo(targetScreen + android.net.Uri.encode(name)) // (Navigation decodes the route: a name with % or ? broke it)
                 KeyboardSwitcher.getInstance().setThemeNeedsReload()
             },
         )
@@ -246,7 +246,7 @@ private fun ColorItemRow(onDismissRequest: () -> Unit, item: String, isSelected:
             DeleteButton { showDialog = true }
             EditButton {
                 onDismissRequest()
-                SettingsDestination.navigateTo(targetScreen + item)
+                SettingsDestination.navigateTo(targetScreen + android.net.Uri.encode(item))
             }
             if (showDialog)
                 ConfirmationDialog(

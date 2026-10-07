@@ -35,6 +35,9 @@ class App : Application() {
         // the keyboards that had their own set before that
         helium314.keyboard.latin.settings.KeyboardProfiles.filesDir = helium314.keyboard.latin.utils.DeviceProtectedUtils.getFilesDir(this)
         helium314.keyboard.latin.settings.KeyboardProfiles.editingStore = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this)
+        // the keyboards' own learned-word pools from before the seeded markers count as seeded
+        helium314.keyboard.latin.personalization.LearnedPools.markExistingPools(helium314.keyboard.latin.utils.DeviceProtectedUtils.getFilesDir(this),
+            helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
         helium314.keyboard.latin.settings.KeyboardProfiles.loadGroups(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
         helium314.keyboard.latin.settings.KeyboardProfiles.migrateFiles(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
         helium314.keyboard.latin.settings.KeyboardProfiles.settingsMoves(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))

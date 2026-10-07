@@ -129,6 +129,9 @@ object RemovedWords {
         private val byWord = ConcurrentHashMap<String, Entry>()
         // changed in memory, not written yet (null: taken off): a re-read meanwhile must not undo them
         private val pending = HashMap<String, Entry?>()
+        // strikes made before the file was read (a Remove during the one-time migration): added to the file's count
+        // when the read catches up, not written over it (re-review 2026-10-07)
+        private val strikesWhileLoading = HashMap<String, Int>()
         @Volatile private var loaded = false
         private val lock = Any()
 
@@ -178,6 +181,8 @@ object RemovedWords {
             }
             val result = HashMap(read)
             for ((word, entry) in pending) if (entry == null) result.remove(word) else result[word] = entry
+            for ((word, n) in strikesWhileLoading) { val entry = Entry((read[word]?.strikes ?: 0) + n); result[word] = entry; pending[word] = entry }
+            strikesWhileLoading.clear()
             byWord.putAll(result)
             byWord.keys.retainAll(result.keys)
             loaded = true
@@ -209,7 +214,10 @@ object RemovedWords {
             // one-time migration still runs, no wait on the main thread (re-review 2026-10-07: up to 3 min holding the
             // lock): the strike counts from what's in memory and the read catches up in the background
             if (!loaded) { if (LearnedStoreMigration.isRunning) reloadAsync() else read() }
-            return synchronized(lock) { strikeNow(word) }
+            return synchronized(lock) {
+                if (!loaded) strikesWhileLoading[word] = (strikesWhileLoading[word] ?: 0) + 1
+                strikeNow(word)
+            }
         }
 
         private fun strikeNow(word: String): Int {

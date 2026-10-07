@@ -57,7 +57,7 @@ object LearnedStores {
     private fun needsSeeding(pool: Int): Boolean {
         if (pool == SHARED || pool == seedingFailed) return false
         val dir = KeyboardProfiles.filesDir ?: return false
-        return pool !in keyboardPoolsOnDisk(dir)
+        return !LearnedPools.isSeeded(dir, pool)
     }
 
     @Volatile private var seeding: Int? = null // the pool being filled now (one at a time; a repeat call doesn't start another)
@@ -83,6 +83,7 @@ object LearnedStores {
     // changes; registered by them, so this file doesn't reach into the keyboard
     private val listeners = java.util.concurrent.CopyOnWriteArrayList<() -> Unit>()
     fun onPoolChanged(listener: () -> Unit) { listeners.add(listener) }
+    fun removeOnPoolChanged(listener: () -> Unit) { listeners.remove(listener) }
 
     /** The script whose store [word] is learned in, blacklisted in and read from; [fallback] for a word without letters. */
     @JvmStatic

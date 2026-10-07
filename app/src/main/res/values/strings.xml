@@ -534,6 +534,7 @@
     <string name="key_popups_presets">Preset popups</string>
     <string name="key_popups_full">Customize popup for each key</string>
     <string name="key_popups_full_summary">Every key\'s long-press popups, a tab per group of keys</string>
+    <string name="key_popups_custom">Custom</string>
     <string name="key_popups_save_as_new">Save current popup layout</string>
     <string name="key_popups_save_change_title">Save this change to a set of your own</string>
     <string name="key_popups_my_set">My popups</string>

@@ -24,12 +24,13 @@ fun <T: Any> ListPreference(
     live: Boolean = false, // a tap applies the value at once (the live keyboard shows it); OK keeps it, Cancel puts the old one back
     itemTrailing: (@Composable (Pair<String, T>) -> Unit)? = null, // shown at the end of each row, e.g. a preview of the choice
     previewKeyboard: Boolean = true, // off: the rows preview the choice themselves, the keyboard needn't come up
+    shown: T? = null, // the value to show as chosen instead of the stored one (what applies now); nothing is written for it
     onChanged: (T) -> Unit = { }
 ) {
     var showDialog by rememberSaveable { mutableStateOf(false) }
     val prefs = LocalContext.current.prefs()
     helium314.keyboard.settings.KnownDefaults.note(setting.key, default)
-    val selected = items.firstOrNull { it.second == getPrefOfType(prefs, setting.key, default) }
+    val selected = items.firstOrNull { it.second == (shown ?: getPrefOfType(prefs, setting.key, default)) }
     // what was set when the dialog opened, for Cancel in live mode (unset stays unset)
     val snapshot = rememberPrefSnapshot(prefs, listOf(setting.key), showDialog)
     var confirmed by remember(showDialog) { mutableStateOf(false) }

@@ -41,9 +41,21 @@ object LearnedPools {
      *  learned words and blacklists, like the keyboards there were when it went off (re-review 2026-10-07: it started
      *  empty). A pool with files, even emptied ones, is left as it is. */
     fun seedIfNew(filesDir: File, io: LearnedStoreIo, pool: Int): Boolean {
-        if (pool == LearnedStores.SHARED || pool in LearnedStores.keyboardPoolsOnDisk(filesDir)) return true
+        if (isSeeded(filesDir, pool)) return true
         Log.i(TAG, "keyboard $pool: its own learned words start as a copy of the shared ones")
         return separate(filesDir, io, listOf(pool))
+    }
+
+    // a pool is seeded when its marker is there, written after its files (re-review 2026-10-07: a process killed
+    // mid-copy left files that counted as a seeded pool)
+    private fun marker(filesDir: File, pool: Int) = File(filesDir, "learned_seeded_k$pool")
+    fun isSeeded(filesDir: File, pool: Int) = pool == LearnedStores.SHARED || marker(filesDir, pool).isFile
+    private fun markSeeded(filesDir: File, pool: Int) { runCatching { marker(filesDir, pool).writeText("") } }
+    /** Once: the pools that have files from before the markers existed are seeded ones. */
+    fun markExistingPools(filesDir: File, real: SharedPreferences) {
+        if (real.getBoolean("learned_pools_marked", false)) return
+        for (pool in LearnedStores.keyboardPoolsOnDisk(filesDir)) markSeeded(filesDir, pool)
+        real.edit().putBoolean("learned_pools_marked", true).apply()
     }
 
     /** The pools of the keyboards in the list. */
@@ -64,6 +76,7 @@ object LearnedPools {
         }
         // (a script only a keyboard's own pool had, from before: not part of the copy)
         for (pool in pools) for (script in LearnedStores.scriptsOnDisk(filesDir, pool) - scripts) empty(filesDir, io, script, pool)
+        for (pool in pools) markSeeded(filesDir, pool)
         return true
     }
 

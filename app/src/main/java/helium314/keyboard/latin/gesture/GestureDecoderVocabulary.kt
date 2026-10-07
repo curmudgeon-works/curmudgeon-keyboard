@@ -374,6 +374,10 @@ object GestureDecoderVocabulary {
                 publishNow(key, locale, context, emptyList())
                 if (cache[key] == null) noDictionary.add(key)
                 mergeWanted(key) // the keyboards waiting for it don't have to any more
+                if (cache[key] == null) { // nothing learned yet (or its store still opening): one more look later, as with a dictionary
+                    retryHistoryLater(key, locale, context, emptyList())
+                    if (cache[key] != null) { noDictionary.remove(key); mergeWanted(key) }
+                }
             }
             return
         }
