@@ -34,12 +34,10 @@ class App : Application() {
         // the background pictures and emoji font are per keyboard with separate settings: where they are, and a copy for
         // the keyboards that had their own set before that
         helium314.keyboard.latin.settings.KeyboardProfiles.filesDir = helium314.keyboard.latin.utils.DeviceProtectedUtils.getFilesDir(this)
+        helium314.keyboard.latin.settings.KeyboardProfiles.editingStore = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this)
         helium314.keyboard.latin.settings.KeyboardProfiles.loadGroups(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
         helium314.keyboard.latin.settings.KeyboardProfiles.migrateFiles(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
-        helium314.keyboard.latin.settings.KeyboardProfiles.migrateLearningSwiping(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
-        helium314.keyboard.latin.settings.KeyboardProfiles.migrateSuggestionsToRefine(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
-        helium314.keyboard.latin.settings.KeyboardProfiles.removeMovedMarkers(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
-        helium314.keyboard.latin.settings.KeyboardProfiles.forgetSetting(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this), "gesture_space_aware")
+        helium314.keyboard.latin.settings.KeyboardProfiles.settingsMoves(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
         // every picture loaded so far joins the picture list all keyboards choose from
         helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this).let { real ->
             helium314.keyboard.latin.common.PictureLibrary.migrate(this, real.getBoolean("picture_library_migrated", false)) {

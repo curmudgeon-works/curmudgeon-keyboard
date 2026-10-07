@@ -161,15 +161,20 @@ object RemovedWords {
         /** Re-reads the file in the background (the keyboard does it when its dictionaries are set up, e.g. after a restore). */
         fun reloadAsync() = io.execute { read() }
 
-        private fun read() = synchronized(lock) {
-            // (while the per-language lists of before are merged into per-script ones, see LearnedStoreMigration)
+        private fun read() {
+            // (while the per-language lists of before are merged into per-script ones, see LearnedStoreMigration;
+            // outside the lock, so a waiting read doesn't block a strike or a write: re-review 2026-10-07)
             LearnedStoreMigration.awaitDone()
+            synchronized(lock) { readNow() }
+        }
+
+        private fun readNow() {
             val read = try {
                 if (file.isDirectory) file.delete() // this apparently was an issue in some versions
                 if (file.isFile) parseAll(file.readLines()) else emptyMap()
             } catch (e: IOException) {
                 Log.e(TAG, "Exception while trying to read word list ${file.name}", e)
-                return@synchronized
+                return
             }
             val result = HashMap(read)
             for ((word, entry) in pending) if (entry == null) result.remove(word) else result[word] = entry
@@ -199,11 +204,18 @@ object RemovedWords {
         }
 
         /** One more Remove of [word]: one more strike, and a brought-back word is out again. @return its strikes now */
-        fun strike(word: String): Int = synchronized(lock) {
-            ensureLoaded() // the strikes so far are in the file (usually read already, when the dictionaries were set up)
+        fun strike(word: String): Int {
+            // the strikes so far are in the file (usually read already, when the dictionaries were set up); while the
+            // one-time migration still runs, no wait on the main thread (re-review 2026-10-07: up to 3 min holding the
+            // lock): the strike counts from what's in memory and the read catches up in the background
+            if (!loaded) { if (LearnedStoreMigration.isRunning) reloadAsync() else read() }
+            return synchronized(lock) { strikeNow(word) }
+        }
+
+        private fun strikeNow(word: String): Int {
             val strikes = (byWord[word]?.strikes ?: 0) + 1
             set(word, Entry(strikes))
-            strikes
+            return strikes
         }
 
         /** [word] (3rd strike, typed often enough) brought back with the strip's "+". @return false if it wasn't waiting */

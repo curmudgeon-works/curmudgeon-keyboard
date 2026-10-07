@@ -376,7 +376,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         mEmojiPalettesView.stopEmojiPalettes();
         mEmojiTabStripView.setVisibility(View.GONE);
         mClipboardStripScrollView.setVisibility(View.GONE);
-        if (mSuggestionStripView.isToolbarOnly()) mSuggestionStripView.setToolbarOnly(false, mEmojiTabStripView);
+        mSuggestionStripView.leaveToolbarOnly(mEmojiTabStripView);
         mSuggestionStripView.setVisibility(stripVisibility);
         mClipboardHistoryView.setVisibility(View.GONE);
         mClipboardHistoryView.stopClipboardHistory();
@@ -393,6 +393,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         // @see #getVisibleKeyboardView() and
         // @see LatinIME#onComputeInset(android.inputmethodservice.InputMethodService.Insets)
         mKeyboardView.setVisibility(View.GONE);
+        mSuggestionStripView.leaveToolbarOnly(mEmojiTabStripView); // (the emoji key on its own toolbar lands here again)
         mSuggestionStripView.setVisibility(View.GONE);
         mStripContainer.setVisibility(getSecondaryStripVisibility());
         mClipboardStripScrollView.setVisibility(View.GONE);

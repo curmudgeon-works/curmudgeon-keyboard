@@ -139,6 +139,14 @@ object GestureCorpusRecorder {
         }
     }
 
+    /** The word Suggest put first on the strip for the pending swipe, which is what gets inserted: the decoder's first
+     *  word was noted at the swipe, but Suggest drops removed words and reorders (re-review 2026-10-07: a kept word was
+     *  logged as edited into itself). */
+    fun onShown(word: String?) {
+        if (pendingId < 0 || word.isNullOrEmpty()) return
+        lastWord = word
+    }
+
     /** The user replaced the pending swiped word with [word] via the suggestion strip; [rank] 0-based (0 = the word itself). */
     fun onSuggestionPicked(word: String, rank: Int) = finish(SwipeMetrics.OUTCOME_PICKED, rank, word)
 

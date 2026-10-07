@@ -357,9 +357,15 @@ private fun copyKeyboard(ctx: Context, source: SettingsSubtype, withOwnSettings:
     val copy = LayoutUtilsCustom.withOwnPrivateLayouts(nextNumbered(source), ctx) // (its own unnamed keys, not the source's file)
     SubtypeUtilsAdditional.changeAdditionalSubtype(copy, copy, ctx) // registers it
     SubtypeSettings.addEnabledSubtype(ctx.prefs(), copy.toAdditionalSubtype())
-    KeyboardProfiles.copy(real, if (withOwnSettings) KeyboardProfiles.idFor(real, source) else KeyboardProfiles.SHARED,
-        KeyboardProfiles.idFor(real, copy))
+    ownSetSourceFor(real, source, withOwnSettings)?.let { KeyboardProfiles.copy(real, it, KeyboardProfiles.idFor(real, copy)) }
 }
+
+/** The set a copied keyboard's own set starts from: the source's or the shared one; null with one set of settings for
+ *  all keyboards (re-review 2026-10-07: a copy got a frozen own set then, which came alive, stale, once settings were
+ *  made separate). */
+internal fun ownSetSourceFor(real: android.content.SharedPreferences, source: SettingsSubtype, withOwnSettings: Boolean): Int? =
+    if (!KeyboardProfiles.isSeparate(real)) null
+    else if (withOwnSettings) KeyboardProfiles.idFor(real, source) else KeyboardProfiles.SHARED
 
 private const val DEFAULTS_ONLY = "defaults only" // (a marker, never a keyboard)
 

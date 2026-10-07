@@ -185,19 +185,11 @@ object GestureDecoderVocabulary {
         // all sit at 248+, English's "the" is 222), so every further language is put on the first language's scale
         // by rank before its priority factor applies; otherwise the factor fights the scale instead of expressing priority
         val reference = specs.firstNotNullOfOrNull { mainEntries[it.locale.toLanguageTag()] }?.map { it.second }
-        val scriptsDone = HashSet<String>()
-        for (spec in specs) {
-            val entries = mainEntries[spec.locale.toLanguageTag()] ?: continue
-            val normalized = if (reference == null || entries.map { it.second } == reference) entries
-                else entries.mapIndexed { i, (word, _) -> word to reference[i.coerceAtMost(reference.lastIndex)] }
-            for ((word, freq) in withoutExcluded(context, spec.locale, normalized, learned = false))
-                vocab.add(word, (freq * spec.factor).toInt().coerceAtLeast(MIN_PROBABILITY))
-            // the languages of a script share their learned words: once for all of them
-            if (scriptsDone.add(spec.locale.script()))
-                for ((word, weight) in learnedOf(context, spec.locale)) vocab.addLearned(word, weight)
-        }
+        mergeInto(vocab, specs, reference, { mainEntries[it] }, { locale, entries -> withoutExcluded(context, locale, entries, learned = false) },
+            { learnedOf(context, it) })
         if (vocab.size == 0) return null
         Log.d(TAG, "merged vocabulary for $key: ${vocab.size} words")
+        val scriptsDone = specs.map { it.locale.script() }.toSet()
         logVocab("swipe vocabulary for $key: ${vocab.size} words, learned ${scriptsDone.sumOf { learned[storeKey(it, LearnedStores.currentPool)]?.size ?: 0 }}, " +
                 "merged in ${SystemClock.elapsedRealtime() - mergeStart} ms on ${Thread.currentThread().name}")
         if (mergeGeneration.get() == generation) {
@@ -377,7 +369,10 @@ object GestureDecoderVocabulary {
         }
         if (words.isEmpty()) { // keep whatever the disk cache provided
             if (mainDictFile == null && disk == null) {
-                noDictionary.add(key)
+                // no dictionary: the learned words alone, if there are any (re-review 2026-10-07: a keyboard of such a
+                // language couldn't swipe its own words), else nothing to wait for
+                publishNow(key, locale, context, emptyList())
+                if (cache[key] == null) noDictionary.add(key)
                 mergeWanted(key) // the keyboards waiting for it don't have to any more
             }
             return
@@ -388,6 +383,26 @@ object GestureDecoderVocabulary {
         Log.d(TAG, "built vocabulary for $key: ${top.size} words (of ${words.size} collected) " +
                 "in ${SystemClock.elapsedRealtime() - start} ms")
         if (merged == 0) retryHistoryLater(key, locale, context, top)
+    }
+
+    /** The merge itself: each language's dictionary words on the first language's scale, then each script's learned
+     *  words once. A language without a dictionary ([entriesFor] null) still brings its script's learned words
+     *  (re-review 2026-10-07: they were skipped with it, so a Hinglish keyboard couldn't swipe its own words). */
+    internal fun mergeInto(vocab: Vocabulary, specs: List<LocaleSpec>, reference: List<Int>?, entriesFor: (String) -> List<Pair<String, Int>>?,
+                           withoutExcluded: (Locale, List<Pair<String, Int>>) -> List<Pair<String, Int>>, learnedFor: (Locale) -> List<Pair<String, Int>>) {
+        val scriptsDone = HashSet<String>()
+        for (spec in specs) {
+            val entries = entriesFor(spec.locale.toLanguageTag())
+            if (entries != null) {
+                val normalized = if (reference == null || entries.map { it.second } == reference) entries
+                    else entries.mapIndexed { i, (word, _) -> word to reference[i.coerceAtMost(reference.lastIndex)] }
+                for ((word, freq) in withoutExcluded(spec.locale, normalized))
+                    vocab.add(word, (freq * spec.factor).toInt().coerceAtLeast(MIN_PROBABILITY))
+            }
+            // the languages of a script share their learned words: once for all of them
+            if (scriptsDone.add(spec.locale.script()))
+                for ((word, weight) in learnedFor(spec.locale)) vocab.addLearned(word, weight)
+        }
     }
 
     /** Build the trie from the main-dict entries, merge live user history, publish it. Returns merged count. */

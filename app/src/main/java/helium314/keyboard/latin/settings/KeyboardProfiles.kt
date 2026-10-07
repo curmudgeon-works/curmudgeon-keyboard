@@ -35,7 +35,7 @@ object KeyboardProfiles {
         Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_SWIPE_METRICS, Settings.PREF_AUTO_PREVIEW_KEYBOARD, // logs of the user's swiping: one file, one switch
         Settings.PREF_LEARNING_LOG, // and of what corrections do to the learned words
         Settings.PREF_SHARE_LEARNED_WORDS, // it says whether the keyboards have their own learned words: app-wide
-        PREF_SEPARATE, PREF_IDS, PREF_NEXT_ID,
+        PREF_SEPARATE, PREF_IDS, PREF_NEXT_ID, PREF_EDITING,
         "key_popup_sets", // saved popup sets are meant to be reused across keyboards
         "appearance_looks", // saved looks too
         "layout_presets", // and saved Layouts
@@ -360,8 +360,28 @@ object KeyboardProfiles {
     /** Profile of the keyboard in use (the IME's view). Refreshed on every keyboard switch. */
     @Volatile var imeId: Int = SHARED
         private set
-    /** Profile the settings screens edit: a keyboard's id, or [SHARED]. */
+    /** Profile the settings screens edit: a keyboard's id, or [SHARED]. Kept in the settings too, so a settings screen
+     *  restored after the process died edits the same keyboard (re-review 2026-10-07: it edited the shared set). */
     @Volatile var editingId: Int = SHARED
+        set(value) { field = value; editingStore?.edit()?.putInt(PREF_EDITING, value)?.apply() }
+    private const val PREF_EDITING = "keyboard_profile_editing"
+    /** Where [editingId] is kept, set at app start. */
+    @Volatile var editingStore: SharedPreferences? = null
+    /** After the process died with a settings screen open: the keyboard it was editing. */
+    fun restoreEditingId(real: SharedPreferences) { editingId = real.getInt(PREF_EDITING, SHARED) }
+    internal fun forgetEditingInMemory() { editingStore.let { store -> editingStore = null; editingId = SHARED; editingStore = store } }
+
+    /** Whether the look (Appearance settings and background pictures) of set [a] differs from set [b]'s: a keyboard
+     *  switch reloads the theme only then (re-review 2026-10-07: it reloaded, with a blink, on every switch). Shared
+     *  Appearance: never. */
+    fun looksDiffer(real: SharedPreferences, a: Int, b: Int): Boolean {
+        if (a == b || !isSeparate(real) || Group.APPEARANCE in sharedGroups) return false
+        fun look(id: Int): Map<String, Any?> = ProfilePreferences(real) { id }.all.filterKeys { helium314.keyboard.settings.AppearanceLooks.onScreen(it) }
+        if (look(a) != look(b)) return true
+        val dir = filesDir ?: return false
+        fun pictures(id: Int) = profileFileNames.map { name -> java.io.File(dir, name + suffix(id)).let { if (it.isFile) it.length() else -1L } }
+        return pictures(a) != pictures(b)
+    }
 
     fun refreshImeId(real: SharedPreferences) {
         loadGroups(real) // (a restore can bring other group choices)
@@ -466,6 +486,15 @@ object KeyboardProfiles {
 
     /** Once: the "reset to default" markers the two moves above left behind on phones that ran them before they removed
      *  markers too (0.3.006 / 0.3.007; review 2026-10-06): harmless now, wrong if those menus are made per keyboard. */
+    /** The one-time settings moves (each checks its own flag): at app start, and right after a restore, whose backup may
+     *  be from before them (re-review 2026-10-07: they ran at the next start and overwrote changes made in between). */
+    fun settingsMoves(real: SharedPreferences) {
+        migrateLearningSwiping(real)
+        migrateSuggestionsToRefine(real)
+        removeMovedMarkers(real)
+        forgetSetting(real, "gesture_space_aware")
+    }
+
     fun removeMovedMarkers(real: SharedPreferences) {
         if (real.getBoolean("moved_markers_removed", false)) return
         val all = real.all

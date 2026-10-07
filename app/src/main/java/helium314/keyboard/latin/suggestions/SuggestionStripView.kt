@@ -130,6 +130,9 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     private val toolbarContainer: View = findViewById(R.id.toolbar_container)
     // the expanded toolbar replaces the suggestions in their row instead of opening a row above them
     private val toolbarInRow = Settings.getValues().mToolbarInRow
+    // the toolbar's band (the strip's height): with the toolbar in the suggestions' row its layout params say "match
+    // parent" (-1), which put the emoji tabs under it (re-review 2026-10-07)
+    private val toolbarBandHeight = resources.getDimensionPixelSize(R.dimen.config_suggestions_strip_height)
     // the emoji view shows the toolbar alone (see setToolbarOnly)
     private var toolbarOnlyShown = false
     private val pinnedKeys: ViewGroup = findViewById(R.id.pinned_keys)
@@ -301,12 +304,12 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             if (show) isVisible = true
             toolbarExpandKey.isVisible = !show
             setToolbarVisibility(show)
-            params?.topMargin = if (show) toolbarContainer.layoutParams.height else 0
+            params?.topMargin = if (show) toolbarBandHeight else 0
         } else if (show) {
             isVisible = true
             wrapper.isVisible = false
             setToolbarVisibility(true)
-            params?.topMargin = toolbarContainer.layoutParams.height
+            params?.topMargin = toolbarBandHeight
         } else {
             wrapper.isVisible = true
             params?.topMargin = 0
@@ -318,6 +321,11 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
 
     /** True while [setToolbarOnly] shows the toolbar alone. */
     val isToolbarOnly: Boolean get() = isVisible && toolbarOnlyShown
+
+    /** The toolbar-alone state off, whatever the strip's visibility: on every switch between the keyboard views
+     *  (re-review 2026-10-07: the emoji key on the emoji view's toolbar hid the strip and left the state on, so the
+     *  suggestions stayed hidden until a theme reload). */
+    fun leaveToolbarOnly(tabStrip: View?) { if (toolbarOnlyShown) setToolbarOnly(false, tabStrip) }
 
     /** A key for the start of the emoji tab strip that opens the toolbar there, drawn like the strip's own expand key. */
     fun createEmojiToolbarKey(onClick: () -> Unit): ImageButton {

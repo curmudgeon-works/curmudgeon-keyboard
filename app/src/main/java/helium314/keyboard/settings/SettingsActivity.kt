@@ -42,6 +42,7 @@ import helium314.keyboard.latin.InputAttributes
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.common.FileUtils
 import helium314.keyboard.latin.define.DebugFlags
+import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.BackButton
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
@@ -105,6 +106,8 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // recreated after the process died with a screen open: that screen edits the keyboard it did (re-review 2026-10-07)
+        if (savedInstanceState != null) KeyboardProfiles.restoreEditingId(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
         if (Settings.getValues() == null) {
             val inputAttributes = InputAttributes(EditorInfo(), false, packageName)
             Settings.getInstance().loadSettings(this, resources.configuration.locale(), inputAttributes)

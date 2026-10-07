@@ -326,7 +326,7 @@ private fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: Int
         }
     }
     wait.await()
-    checkVersionUpgrade(ctx)
+    restoreFollowUp(ctx)
     transferOldPinnedClips(ctx)
     LearnedStores.refresh(ctx.realPrefs()) // (the keyboards' own learned words, or the shared ones, as restored)
     Settings.getInstance().startListener()
@@ -592,6 +592,13 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
 internal fun isSettingsFile(path: String) = path.startsWith("layouts${File.separator}") || path.startsWith("custom_")
     || path.startsWith("fonts${File.separator}") || path.startsWith("pictures${File.separator}")
     || path.startsWith("looks${File.separator}")
+
+/** What app start does to older settings, run right after a restore too, so an older backup's settings are moved now
+ *  and not at the next start, over changes made in between (re-review 2026-10-07). */
+internal fun restoreFollowUp(ctx: Context) {
+    checkVersionUpgrade(ctx)
+    KeyboardProfiles.settingsMoves(ctx.realPrefs())
+}
 
 /** Reads the preferences entry of a backup, the keyboards listed in it and the names of all its entries. */
 private fun readBackup(file: File): PendingRestore {

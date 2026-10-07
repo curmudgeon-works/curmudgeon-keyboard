@@ -420,6 +420,8 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
                     Dictionary.DICTIONARY_USER_TYPED, SuggestedWordInfo.NOT_AN_INDEX, SuggestedWordInfo.NOT_A_CONFIDENCE)
             )
         }
+        // the recorder follows what's put first (inserted), not the decoder's raw first word
+        if (inputStyle == SuggestedWords.INPUT_STYLE_TAIL_BATCH) GestureCorpusRecorder.onShown(suggestionsContainer.firstOrNull()?.mWord)
 
         useDefaultEmojiSkinTone(suggestionsContainer)
 

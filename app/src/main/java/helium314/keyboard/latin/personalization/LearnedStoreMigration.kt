@@ -35,6 +35,9 @@ object LearnedStoreMigration {
     private const val ASIDE = "aside"
 
     @Volatile private var running: CountDownLatch? = null
+    val isRunning: Boolean get() = running != null
+    /** Tests: a migration "running" until [latch] counts down (null: none). */
+    internal fun holdForTest(latch: CountDownLatch?) { running = latch }
 
     /** Waits while the migration runs (never longer than a few minutes: a hung migration mustn't hang the keyboard). */
     @JvmStatic
