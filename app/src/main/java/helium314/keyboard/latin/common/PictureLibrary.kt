@@ -39,7 +39,13 @@ object PictureLibrary {
             val bytes = picture.readBytes()
             val same = dir.listFiles()?.firstOrNull { it.isFile && it.length() == picture.length() && it.readBytes().contentEquals(bytes) }
             if (same != null) { same.setLastModified(System.currentTimeMillis()); same.name }
-            else File(dir, "picture_${System.currentTimeMillis()}").also { picture.copyTo(it) }.name
+            else {
+                // a free name (two pictures in the same millisecond collided: review session 2026-10-07)
+                var n = System.currentTimeMillis()
+                var target = File(dir, "picture_$n")
+                while (target.exists()) target = File(dir, "picture_${++n}")
+                picture.copyTo(target).name
+            }
         }.getOrNull()
     }
 

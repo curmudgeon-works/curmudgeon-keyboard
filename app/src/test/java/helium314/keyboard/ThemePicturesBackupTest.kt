@@ -81,6 +81,26 @@ class ThemePicturesBackupTest {
         assertFalse(empty.exists()); assertFalse(full.exists())
     }
 
+    @Test fun `library names never collide, and a folder whose picture couldn't be copied is kept`() {
+        val a = File(ctx.cacheDir, "a.jpg").apply { writeText("aaa") }
+        val b = File(ctx.cacheDir, "b.jpg").apply { writeText("bbb") }
+        val na = helium314.keyboard.latin.common.PictureLibrary.nameOf(ctx, a)!!
+        val nb = helium314.keyboard.latin.common.PictureLibrary.nameOf(ctx, b)!!
+        assertTrue(na != nb, "two pictures in the same millisecond: $na $nb")
+        assertEquals(na, helium314.keyboard.latin.common.PictureLibrary.nameOf(ctx, a)) // the same content: the same name
+        // the library can't take the picture (its folder is a file): the look keeps its folder for the next start
+        val prefs = ctx.prefs()
+        val full = File(looksDir, "stuck-uuid").apply { mkdirs(); File(this, "custom_background_image").writeText("p") }
+        AppearanceLooks.save(prefs, listOf(AppearanceLooks.Look("Stuck", mapOf(AppearanceLooks.PICTURES to "stuck-uuid"))))
+        val libDir = helium314.keyboard.latin.common.PictureLibrary.dir(ctx)
+        libDir.deleteRecursively(); libDir.writeText("not a folder")
+        try {
+            AppearanceLooks.migratePictureFolders(ctx, prefs)
+            assertEquals("stuck-uuid", AppearanceLooks.load(prefs).single().values[AppearanceLooks.PICTURES])
+            assertTrue(File(full, "custom_background_image").isFile)
+        } finally { libDir.delete() }
+    }
+
     @Test fun `a restore of every keyboard with its settings takes the themes' pictures`() {
         val sep = File.separator
         assertTrue(isSettingsFile("looks${sep}0f2c4e5a-uuid${sep}custom_background_image"))

@@ -127,13 +127,17 @@ object AppearanceLooks {
             val dir = picturesDir(ctx, id)
             if (!dir.isDirectory) return@map look // (restored from a backup without it: left as it is, "leave the background alone")
             val o = JSONObject()
+            var complete = true
             for (file in dir.listFiles().orEmpty()) {
                 if (file.name.endsWith(".framing")) continue
-                val name = PictureLibrary.nameOf(ctx, file) ?: continue
+                val name = PictureLibrary.nameOf(ctx, file)
+                if (name == null) { complete = false; continue } // (couldn't be copied: the folder stays for the next start)
                 val slot = JSONObject().put("p", name)
                 java.io.File(dir, file.name + ".framing").takeIf { it.isFile }?.let { slot.put("f", it.readText()) }
                 o.put(file.name, slot)
             }
+            // the folder goes only once every picture is in the library (review session 2026-10-07: a failed copy lost it)
+            if (!complete) return@map look
             dir.deleteRecursively()
             changed = true
             Look(look.name, look.values + (PICTURES to if (o.length() == 0) NO_PICTURES else LIB + o.toString()))

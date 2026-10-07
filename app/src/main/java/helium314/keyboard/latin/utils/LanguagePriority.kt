@@ -28,6 +28,8 @@ object LanguagePriority {
     fun keys(locale: Locale): List<String> =
         listOf(PREF_PRIORITY_PREFIX + locale.toLanguageTag(), PREF_ADDED_PREFIX + locale.toLanguageTag())
 
+    fun isPriorityKey(key: String) = key.startsWith(PREF_PRIORITY_PREFIX)
+
     /** Whether [key] is one of the per-language keys (priority, adding time; the retired share switch). */
     fun isLanguageKey(key: String) =
         key.startsWith(PREF_PRIORITY_PREFIX) || key.startsWith(PREF_SHARE_HISTORY_PREFIX) || key.startsWith(PREF_ADDED_PREFIX)

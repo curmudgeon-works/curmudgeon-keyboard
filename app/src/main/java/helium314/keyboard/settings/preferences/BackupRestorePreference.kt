@@ -535,11 +535,11 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
     }
 
     if (withSettings) {
-        // the languages' priorities are per language, not per keyboard
+        // the languages' adding times are app-wide (the priorities are the keyboard's: written with its set below)
         val editor = real.edit()
         for (keyboard in chosen)
             for (locale in listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues))
-                for (key in LanguagePriority.keys(locale)) backup[key]?.let { KeyboardProfiles.put(editor, key, it) }
+                for (key in LanguagePriority.keys(locale)) if (!LanguagePriority.isPriorityKey(key)) backup[key]?.let { KeyboardProfiles.put(editor, key, it) }
         editor.apply()
     }
 
@@ -579,6 +579,16 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
             // exactly that set: a setting the backup leaves at its default gets a default mark, so it doesn't read
             // the phone's shared value instead
             KeyboardProfiles.write(real, id, settings.getValue(keyboard), markDefaults = true)
+            // its languages' priorities, into its own set (not the shared one, which every other keyboard reads: review
+            // session 2026-10-07): the backup's own copy for this keyboard first, else the backup's shared value
+            val backupId = KeyboardProfiles.idIn(backup, keyboard)
+            real.edit {
+                for (locale in listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues))
+                    for (key in LanguagePriority.keys(locale).filter { LanguagePriority.isPriorityKey(it) }) {
+                        val value = (backupId?.let { backup[KeyboardProfiles.ownKey(it, key)] } ?: backup[key]) as? Int ?: continue
+                        putInt(KeyboardProfiles.prefixedKey(id, key), value)
+                    }
+            }
             // its own pictures in the backup, or the backup's shared ones when it had no set of its own
             KeyboardProfiles.restoreFiles(pictureFiles, KeyboardProfiles.idIn(backup, keyboard) ?: KeyboardProfiles.SHARED, id,
                 perKeyboardBackup = backup["profile_files_migrated"] == true)
