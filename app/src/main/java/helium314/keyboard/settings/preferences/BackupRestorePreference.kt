@@ -424,10 +424,6 @@ private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: Restore
     }
     fun isDictionary(path: String) = path.endsWith(DictionaryInfoUtils.USER_DICTIONARY_SUFFIX)
         && tags.any { path.startsWith("dicts${File.separator}$it${File.separator}") }
-    // the files behind the settings: custom layouts (a keyboard's layout must exist for it), font and background
-    fun isSettingsFile(path: String) = path.startsWith("layouts${File.separator}") || path.startsWith("custom_")
-        || path.startsWith("fonts${File.separator}") // the loaded fonts (FontLibrary)
-        || path.startsWith("pictures${File.separator}") // the loaded pictures (PictureLibrary)
     val restoredDb = ctx.getDatabasePath(Database.NAME + "_restored")
     ZipInputStream(FileInputStream(pending.file)).use { zip ->
         var entry: ZipEntry? = zip.nextEntry
@@ -589,6 +585,13 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
     }
     if (withSettings) { Settings.clearCachedBackgroundImages(); helium314.keyboard.keyboard.KeyboardTypeface.clearCache() }
 }
+
+/** The files behind the settings (restored with all of them): custom layouts (a keyboard's layout must exist for it),
+ *  the background pictures, the loaded fonts (FontLibrary) and pictures (PictureLibrary), and the saved themes'
+ *  pictures (re-review 2026-10-07: themes came back without them). */
+internal fun isSettingsFile(path: String) = path.startsWith("layouts${File.separator}") || path.startsWith("custom_")
+    || path.startsWith("fonts${File.separator}") || path.startsWith("pictures${File.separator}")
+    || path.startsWith("looks${File.separator}")
 
 /** Reads the preferences entry of a backup, the keyboards listed in it and the names of all its entries. */
 private fun readBackup(file: File): PendingRestore {

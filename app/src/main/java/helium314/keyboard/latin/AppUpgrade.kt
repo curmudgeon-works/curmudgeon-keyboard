@@ -58,6 +58,8 @@ fun checkVersionUpgrade(context: Context) {
     if (oldVersion != BuildConfig.MIGRATION_VERSION)
         AppUpgrade.onUpgrade(context)
     curmudgeonUpgrades(prefs, freshInstall = oldVersion == 0)
+    // saved themes without a picture say so (not an empty folder, which a backup drops): re-review 2026-10-07
+    helium314.keyboard.settings.AppearanceLooks.dropEmptyPictureFolders(context, prefs)
     pickedOnlyUpgrade(context.realPrefs(), freshInstall = oldVersion == 0)
     ownSetUpgrades(context.realPrefs(), freshInstall = oldVersion == 0)
 }

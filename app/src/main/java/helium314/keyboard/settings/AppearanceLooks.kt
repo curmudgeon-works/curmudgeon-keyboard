@@ -94,12 +94,33 @@ object AppearanceLooks {
         Settings.getCustomBackgroundFile(ctx, night, land).let { listOf(it, PictureFraming.fileFor(it)) } } }
     private fun picturesDir(ctx: Context, id: String) = java.io.File(ctx.filesDir, "looks" + java.io.File.separator + id)
 
-    /** Copies the background pictures there are now into a new folder; returns its id, to store in the look. */
+    /** Copies the background pictures there are now into a new folder; returns its id, to store in the look. No
+     *  pictures: [NO_PICTURES], never an empty folder (re-review 2026-10-07: a backup drops an empty folder, and a
+     *  look whose folder is missing leaves the background alone instead of clearing it). */
     fun savePictures(ctx: Context): String {
+        val pictures = livePictures(ctx).filter { it.exists() }
+        if (pictures.isEmpty()) return NO_PICTURES
         val id = java.util.UUID.randomUUID().toString()
         val dir = picturesDir(ctx, id).apply { mkdirs() }
-        livePictures(ctx).filter { it.exists() }.forEach { it.copyTo(java.io.File(dir, it.name), overwrite = true) }
+        pictures.forEach { it.copyTo(java.io.File(dir, it.name), overwrite = true) }
         return id
+    }
+
+    /** Looks saved before [savePictures] stopped making empty folders say [NO_PICTURES] instead, and the folder goes;
+     *  at app start (cheap, nothing to do once done), so a backup made since carries the right thing. */
+    fun dropEmptyPictureFolders(ctx: Context, prefs: SharedPreferences) {
+        val looks = load(prefs)
+        var changed = false
+        val cleaned = looks.map { look ->
+            val id = look.values[PICTURES] as? String ?: return@map look
+            if (id == NO_PICTURES) return@map look
+            val dir = picturesDir(ctx, id)
+            if (!dir.isDirectory || !dir.listFiles().isNullOrEmpty()) return@map look
+            dir.delete()
+            changed = true
+            Look(look.name, look.values + (PICTURES to NO_PICTURES))
+        }
+        if (changed) save(prefs, cleaned)
     }
 
     /** The look's pictures become the background ones (a built-in look: none); a look saved before pictures were
