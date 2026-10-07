@@ -41,8 +41,13 @@ object SwipeMetrics {
         file = File(context.getExternalFilesDir(null) ?: context.filesDir, FILE_NAME)
     }
 
-    // never while typing privately: incognito, a private tab or an app asking for no learning, a password (review 2026-10-06)
-    fun isEnabled(): Boolean = Settings.getValues().let { it.mSwipeMetrics && !it.mIncognitoModeEnabled } && file != null
+    // (what the settings say, replaceable by tests)
+    internal var metricsOn: () -> Boolean = { Settings.getValues()?.mSwipeMetrics == true }
+    /** Typing privately now: incognito, a private tab or an app asking for no learning, a password (review 2026-10-06). */
+    internal var privateNow: () -> Boolean = { Settings.getValues()?.mIncognitoModeEnabled == true }
+
+    // (whether a swipe is private is decided when it's made, by GestureCorpusRecorder, not here when it's written)
+    fun isEnabled(): Boolean = metricsOn() && file != null
 
     /** A swipe ended: [outcome] is one of the OUTCOME_ constants, [rank] the 0-based strip rank of a pick (else -1). */
     fun onOutcome(id: Long, swiped: String, outcome: String, rank: Int, finalWord: String?, decodeMs: Long, keysPerSecond: Float, tuningKey: String) {

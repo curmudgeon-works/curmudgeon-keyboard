@@ -52,8 +52,12 @@ object GestureCorpusRecorder {
         file = File(context.getExternalFilesDir(null) ?: context.filesDir, FILE_NAME)
     }
 
-    // never while typing privately: incognito, a private tab or an app asking for no learning, a password (review 2026-10-06)
-    fun isEnabled(): Boolean = Settings.getValues().let { it.mRecordGestureCorpus && !it.mIncognitoModeEnabled } && file != null
+    internal var corpusOn: () -> Boolean = { Settings.getValues()?.mRecordGestureCorpus == true } // (replaceable by tests)
+    // whether the last swipe was made while typing privately (incognito, a private tab, an app asking for no learning, a
+    // password): decided when the swipe is made, so its outcome isn't logged later in a normal field either (re-review
+    // 2026-10-06: the check at writing time let that through)
+    @Volatile private var lastPrivate = false
+    fun isEnabled(): Boolean = corpusOn() && !lastPrivate && file != null
 
     /** The swiped word is followed to its outcome: always (a word typed after a deleted swipe is learned as corrected by
      *  hand), and for the corpus and the swipe results log. */
@@ -79,11 +83,12 @@ object GestureCorpusRecorder {
         if (size < 2) return
         // a swipe still open when the next one comes was kept as it came
         if (pendingId >= 0) finish(SwipeMetrics.OUTCOME_KEPT, -1, null)
+        lastPrivate = SwipeMetrics.privateNow()
         // the native decoder reports the same word once per dictionary it was found in; keep the best-ranked
         val cands = candidates.distinctBy { it.mWord }.take(MAX_CANDIDATES).map { it.mWord to it.mScore }
         if (cands.isEmpty()) { // nothing to follow: a dead swipe or a decode failure, logged so "never offered" stays honest
             val outcome = if (OwnGestureDecoder.lastVocabularyMissing) SwipeMetrics.OUTCOME_NO_VOCABULARY else SwipeMetrics.OUTCOME_NONE
-            SwipeMetrics.onOutcome(counter.incrementAndGet(), "", outcome, -1, null,
+            if (!lastPrivate) SwipeMetrics.onOutcome(counter.incrementAndGet(), "", outcome, -1, null,
                 OwnGestureDecoder.lastDecodeMs, OwnGestureDecoder.lastSpeedKeysPerSecond, OwnGestureDecoder.currentTuning.key)
             return
         }
@@ -159,6 +164,7 @@ object GestureCorpusRecorder {
         if (id < 0) return
         pendingId = -1L
         deletedAt = if (outcome == SwipeMetrics.OUTCOME_DELETED) System.currentTimeMillis() else 0L
+        if (lastPrivate) return // (made while typing privately: nothing of it is written)
         SwipeMetrics.onOutcome(id, lastWord, outcome, rank, word, lastDecodeMs, lastSpeed, lastTuning)
         when (outcome) {
             SwipeMetrics.OUTCOME_PICKED -> if (rank != 0) correction(id, "pick", word)

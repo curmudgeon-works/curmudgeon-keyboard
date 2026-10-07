@@ -34,6 +34,8 @@ class PreUploadFixes2Test {
         for (name in listOf("data_extraction_rules.xml", "backup_rules.xml")) {
             val rules = File("src/main/res/xml/$name").readText()
             assertTrue("domain=\"external\" path=\".\"" in rules, name)
+            // the app's files are device-protected (defaultToDeviceProtectedStorage): that's where the logs fall back to
+            assertTrue("domain=\"device_file\"" in rules, "$name: device_file")
             for (log in listOf("gesture_corpus.jsonl", "swipe_results.tsv", "learning_events.tsv", "settings_events.log"))
                 assertTrue(log in rules, "$name: $log")
         }

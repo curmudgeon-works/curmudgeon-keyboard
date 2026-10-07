@@ -46,10 +46,6 @@ import helium314.keyboard.settings.Setting
 import helium314.keyboard.settings.SettingsActivity
 import helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog
 import java.io.File
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * Factory reset: every setting back to its default, and optionally the keyboards and languages, the learned words,
@@ -65,18 +61,12 @@ fun FactoryResetPreference(setting: Setting) {
     var learnedWords by rememberSaveable { mutableStateOf(false) }
     var clipboard by rememberSaveable { mutableStateOf(false) }
     var custom by rememberSaveable { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
     ThreeButtonAlertDialog(
         onDismissRequest = { showDialog = false },
         onConfirmed = {
-            scope.launch {
-                // keyboards with their own learned words: those go back to one shared set (the setting's default, which
-                // the reset brings back), put together first so nothing is lost on the way; off the screen thread, it
-                // reads every store (review 2026-10-06: the app could freeze)
-                if (!LearnedStores.isShared(ctx.realPrefs()))
-                    withContext(Dispatchers.IO) { ctx.filesDir?.let { LearnedPools.share(it, LearnedStoreIo.Native) } }
-                factoryReset(ctx, keyboards, learnedWords, clipboard, custom)
-                Toast.makeText(ctx, R.string.factory_reset_done, Toast.LENGTH_LONG).show()
+            val app = ctx.applicationContext
+            startFactoryReset(ctx, keyboards, learnedWords, clipboard, custom) {
+                Toast.makeText(app, R.string.factory_reset_done, Toast.LENGTH_LONG).show()
             }
         },
         title = { Text(stringResource(R.string.factory_reset)) },
@@ -100,6 +90,25 @@ fun FactoryResetPreference(setting: Setting) {
             }
         },
     )
+}
+
+/**
+ * The reset, started from the dialog: keyboards with their own learned words go back to one shared set (the setting's
+ * default, which the reset brings back), put together first so nothing is lost on the way. That reads every store, so it
+ * runs on the app's background executor (review 2026-10-06: it froze the screen), which outlives the dialog (re-review:
+ * a task started in the dialog's scope was cancelled when the dialog closed, and nothing was reset); the reset itself
+ * then runs on the main thread, and [onDone] after it.
+ */
+internal fun startFactoryReset(ctx: Context, keyboards: Boolean, learnedWords: Boolean, clipboard: Boolean, custom: Boolean, onDone: () -> Unit) {
+    val real = ctx.realPrefs()
+    val filesDir = ctx.filesDir
+    helium314.keyboard.latin.utils.ExecutorUtils.getBackgroundExecutor(helium314.keyboard.latin.utils.ExecutorUtils.KEYBOARD).execute {
+        if (!LearnedStores.isShared(real) && filesDir != null) LearnedPools.share(filesDir, LearnedStoreIo.Native)
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            factoryReset(ctx, keyboards, learnedWords, clipboard, custom)
+            onDone()
+        }
+    }
 }
 
 /**

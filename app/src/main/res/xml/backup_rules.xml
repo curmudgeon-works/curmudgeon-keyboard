@@ -3,9 +3,15 @@
 <full-backup-content>
     <exclude domain="external" path="." />
     <exclude domain="file" path="gesture_corpus.jsonl" />
+    <exclude domain="device_file" path="gesture_corpus.jsonl" />
     <exclude domain="file" path="swipe_results.tsv" />
+    <exclude domain="device_file" path="swipe_results.tsv" />
     <exclude domain="file" path="swipe_vocab.log" />
+    <exclude domain="device_file" path="swipe_vocab.log" />
     <exclude domain="file" path="learning_events.tsv" />
+    <exclude domain="device_file" path="learning_events.tsv" />
     <exclude domain="file" path="settings_events.log" />
+    <exclude domain="device_file" path="settings_events.log" />
     <exclude domain="file" path="swipes.jsonl" />
+    <exclude domain="device_file" path="swipes.jsonl" />
 </full-backup-content>
