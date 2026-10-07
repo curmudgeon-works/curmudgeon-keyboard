@@ -57,6 +57,8 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
         const val THEME_DARKER = "darker"
         const val THEME_BLACK = "black"
         const val THEME_DYNAMIC = "dynamic"
+        // Black's colours with Curmudgeon's orange swipe trail (the suggestions follow the trail) (2026-10-06)
+        const val THEME_CURMUDGEON = "curmudgeon"
         const val THEME_BLUE_GRAY = "blue_gray"
         const val THEME_BROWN = "brown"
         const val THEME_CHOCOLATE = "chocolate"
@@ -75,6 +77,7 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             THEME_HOLO_LIGHT,
             THEME_DARKER,
             THEME_BLACK,
+            THEME_CURMUDGEON,
             THEME_BLUE_GRAY,
             THEME_BROWN,
             THEME_CHOCOLATE,
@@ -166,7 +169,7 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                 else colors
         }
 
-        private fun getThemeColors(themeName: String, themeStyle: String, context: Context, prefs: SharedPreferences, isNight: Boolean): Colors {
+        internal fun getThemeColors(themeName: String, themeStyle: String, context: Context, prefs: SharedPreferences, isNight: Boolean): Colors {
             val hasBorders = prefs.getBoolean(Settings.PREF_THEME_KEY_BORDERS, Defaults.PREF_THEME_KEY_BORDERS)
             val backgroundImage = Settings.readUserBackgroundImage(context, isNight)
             val holo = themeStyle == STYLE_HOLO
@@ -246,6 +249,18 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                     themeStyle,
                     hasBorders,
                     ContextCompat.getColor(context, R.color.gesture_trail_color_lxx_dark),
+                    ContextCompat.getColor(context, R.color.background_amoled_black),
+                    ContextCompat.getColor(context, R.color.background_amoled_dark),
+                    ContextCompat.getColor(context, R.color.background_amoled_dark),
+                    ContextCompat.getColor(context, R.color.background_amoled_dark),
+                    ContextCompat.getColor(context, R.color.key_text_color_lxx_dark),
+                    ContextCompat.getColor(context, R.color.key_hint_letter_color_lxx_dark),
+                    keyboardBackground = backgroundImage
+                )
+                THEME_CURMUDGEON -> DefaultColors(
+                    themeStyle,
+                    hasBorders,
+                    Defaults.PREF_SUGGESTION_TEXT_COLOR, // the orange, for the trail (and so the suggestions)
                     ContextCompat.getColor(context, R.color.background_amoled_black),
                     ContextCompat.getColor(context, R.color.background_amoled_dark),
                     ContextCompat.getColor(context, R.color.background_amoled_dark),

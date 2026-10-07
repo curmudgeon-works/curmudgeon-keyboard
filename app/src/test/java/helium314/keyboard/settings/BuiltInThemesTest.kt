@@ -36,6 +36,17 @@ class BuiltInThemesTest {
         assertEquals(null, dynamic.values[Settings.PREF_KEY_HORIZONTAL_GAP]) // the default gaps
     }
 
+    @Test fun `the Curmudgeon theme is black with the orange trail and suggestions, close together`() {
+        val curmudgeon = AppearanceLooks.builtIn(ctx).single { it.name == ctx.getString(R.string.theme_preset_curmudgeon) }
+        assertEquals(KeyboardTheme.THEME_CURMUDGEON, curmudgeon.values[Settings.PREF_THEME_COLORS])
+        assertEquals(5, curmudgeon.values[Settings.PREF_SUGGESTION_WORD_PADDING])
+        assertEquals(null, curmudgeon.values[Settings.PREF_SUGGESTION_TEXT_COLOR]) // the suggestions follow the trail
+        val prefs = ctx.getSharedPreferences("curmudgeon_colors_test", Context.MODE_PRIVATE)
+        val colors = KeyboardTheme.getThemeColors(KeyboardTheme.THEME_CURMUDGEON, KeyboardTheme.STYLE_MATERIAL, ctx, prefs, false)
+        assertEquals(Defaults.PREF_SUGGESTION_TEXT_COLOR, colors.get(helium314.keyboard.latin.common.ColorType.GESTURE_TRAIL))
+        assertEquals(Defaults.PREF_SUGGESTION_TEXT_COLOR, helium314.keyboard.latin.utils.suggestionTextColor(prefs, colors))
+    }
+
     @Test fun `Holo classic keeps its own gaps and bold keys`() {
         val holo = AppearanceLooks.builtIn(ctx).single { it.name == ctx.getString(R.string.theme_preset_holo) }
         assertEquals(0.5f, holo.values[Settings.PREF_KEY_HORIZONTAL_GAP])

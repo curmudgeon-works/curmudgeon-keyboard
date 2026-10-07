@@ -697,6 +697,7 @@
     <string name="appearance_look_delete">Delete the theme \"%s\"?</string>
     <!-- the four built-in themes -->
     <string name="theme_preset_dynamic">Dynamic</string>
+    <string name="theme_preset_curmudgeon">Curmudgeon</string>
     <string name="theme_preset_midnight">Midnight</string>
     <string name="theme_preset_daylight">Daylight</string>
     <string name="theme_preset_paper">Paper</string>
@@ -1195,6 +1196,7 @@ New dictionary:
     <string name="theme_name_darker" tools:keep="@string/theme_name_darker">Darker</string>
     <!-- Theme name for black theme (based on old amoled black) -->
     <string name="theme_name_black" tools:keep="@string/theme_name_black">Black</string>
+    <string name="theme_name_curmudgeon" tools:keep="@string/theme_name_curmudgeon">Black with orange</string>
     <!-- Theme name for dynamic colors light theme -->
     <string name="theme_name_dynamic" tools:keep="@string/theme_name_dynamic">Dynamic colors</string>
     <!-- Theme name for blue-gray theme -->

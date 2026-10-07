@@ -146,6 +146,12 @@ object AppearanceLooks {
                 Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_DYNAMIC, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_DYNAMIC,
                 Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to true)))
         else null,
+        // Curmudgeon's own: black, the orange swipe trail and suggestions, the suggestions close together (2026-10-06)
+        Look(ctx.getString(R.string.theme_preset_curmudgeon), complete(mapOf(PICTURES to NO_PICTURES,
+            Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
+            Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_CURMUDGEON, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_CURMUDGEON,
+            Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to false,
+            Settings.PREF_SUGGESTION_WORD_PADDING to 5))),
         Look(ctx.getString(R.string.theme_preset_midnight), complete(mapOf(PICTURES to NO_PICTURES,
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
             // one colour set, always (the light / dark switch off)
