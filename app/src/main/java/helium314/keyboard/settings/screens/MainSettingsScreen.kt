@@ -115,14 +115,14 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
     if (showLanguages) Preference(
         name = stringResource(R.string.languages_title),
         description = keyboardName(keyboard, ctx),
-        onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Languages + keyboard.toPref()) },
+        onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.withKeyboard(SettingsDestination.Languages, keyboard)) },
         icon = R.drawable.ic_settings_languages
     ) { NextScreenIcon() }
     // the keyboard's input settings, popups, number row and hints, layout (on the main screen: the keyboard in use);
     // named Preferences since the Preferences screen's groups moved in
     if (shows(helium314.keyboard.latin.settings.KeyboardProfiles.Group.LAYOUT)) Preference(
         name = stringResource(R.string.settings_screen_preferences),
-        onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.Subtype + keyboard.toPref()) },
+        onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.withKeyboard(SettingsDestination.Subtype, keyboard)) },
         icon = R.drawable.ic_settings_preferences
     ) { NextScreenIcon() }
     // (no Preferences: its input and clipboard history groups are on the Layout screen)
@@ -134,7 +134,7 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
     // gesture typing, the swipe extras and the tuning in one screen
     if (shows(helium314.keyboard.latin.settings.KeyboardProfiles.Group.SWIPE)) Preference(
             name = stringResource(R.string.swipe_screen),
-            onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.SwipeTuning + keyboard.toPref()) },
+            onClick = { onEnter(); SettingsDestination.navigateTo(SettingsDestination.withKeyboard(SettingsDestination.SwipeTuning, keyboard)) },
             icon = R.drawable.ic_settings_gesture
         ) { NextScreenIcon() }
     // (the toolbar is a group on Layout & Typing)

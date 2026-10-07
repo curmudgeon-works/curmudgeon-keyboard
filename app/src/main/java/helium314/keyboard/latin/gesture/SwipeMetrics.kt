@@ -41,7 +41,8 @@ object SwipeMetrics {
         file = File(context.getExternalFilesDir(null) ?: context.filesDir, FILE_NAME)
     }
 
-    fun isEnabled(): Boolean = Settings.getValues().mSwipeMetrics && file != null
+    // never while typing privately: incognito, a private tab or an app asking for no learning, a password (review 2026-10-06)
+    fun isEnabled(): Boolean = Settings.getValues().let { it.mSwipeMetrics && !it.mIncognitoModeEnabled } && file != null
 
     /** A swipe ended: [outcome] is one of the OUTCOME_ constants, [rank] the 0-based strip rank of a pick (else -1). */
     fun onOutcome(id: Long, swiped: String, outcome: String, rank: Int, finalWord: String?, decodeMs: Long, keysPerSecond: Float, tuningKey: String) {

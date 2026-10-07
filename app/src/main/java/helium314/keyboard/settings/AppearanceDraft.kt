@@ -89,6 +89,10 @@ class AppearanceDraft private constructor(
         /** The running draft, or a fresh snapshot: the preference values in scope and a copy of every custom file. */
         fun of(ctx: Context): AppearanceDraft = active ?: start(ctx).also { active = it }
 
+        /** The running draft (the Appearance screen open), without starting one: what only shows "unsaved" mustn't open
+         *  a draft (review 2026-10-06: the Themes row in search results did, and leaving the app undid the theme). */
+        fun activeOrNull(): AppearanceDraft? = active
+
         /** The screen is left with nothing changed: the snapshot goes (the next visit starts from what is there then). */
         fun close() { active?.discard() }
 

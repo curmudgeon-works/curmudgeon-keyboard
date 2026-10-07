@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What Android's own backup takes (Android 12+). Not the logs of how you type (swipes, corrections, settings
+     changes): they stay on the phone, also out of Google's cloud backup (review 2026-10-06). They live in the external
+     files folder, or in the app's own folder where there is none. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="external" path="." />
+        <exclude domain="file" path="gesture_corpus.jsonl" />
+        <exclude domain="file" path="swipe_results.tsv" />
+        <exclude domain="file" path="swipe_vocab.log" />
+        <exclude domain="file" path="learning_events.tsv" />
+        <exclude domain="file" path="settings_events.log" />
+        <exclude domain="file" path="swipes.jsonl" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="external" path="." />
+        <exclude domain="file" path="gesture_corpus.jsonl" />
+        <exclude domain="file" path="swipe_results.tsv" />
+        <exclude domain="file" path="swipe_vocab.log" />
+        <exclude domain="file" path="learning_events.tsv" />
+        <exclude domain="file" path="settings_events.log" />
+        <exclude domain="file" path="swipes.jsonl" />
+    </device-transfer>
+</data-extraction-rules>

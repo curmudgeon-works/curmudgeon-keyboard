@@ -90,7 +90,7 @@ private fun SubtypeRow(subtype: InputMethodSubtype, isEnabled: Boolean) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable {
-                SettingsDestination.navigateTo(SettingsDestination.Subtype + subtype.toSettingsSubtype().toPref())
+                SettingsDestination.navigateTo(SettingsDestination.withKeyboard(SettingsDestination.Subtype, subtype.toSettingsSubtype()))
             }
             .padding(vertical = 6.dp, horizontal = 16.dp)
     ) {

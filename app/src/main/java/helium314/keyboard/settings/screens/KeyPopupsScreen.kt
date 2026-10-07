@@ -290,7 +290,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                 NextScreenIcon()
             }
             NavRow(stringResource(R.string.key_popups_full)) {
-                SettingsDestination.navigateTo(SettingsDestination.CustomizePopups + keyboard.toPref())
+                SettingsDestination.navigateTo(SettingsDestination.withKeyboard(SettingsDestination.CustomizePopups, keyboard))
             }
             LayoutFilesRow(keyboard)
         }
@@ -707,5 +707,5 @@ private fun reloadPreview() {
 /** The row opening the Layout files editor: every secondary layout in one editor (a tab each), one file. */
 @Composable
 fun LayoutFilesRow(keyboard: SettingsSubtype) = NavRow(stringResource(R.string.layout_files)) {
-    SettingsDestination.navigateTo(SettingsDestination.LayoutFiles + keyboard.toPref())
+    SettingsDestination.navigateTo(SettingsDestination.withKeyboard(SettingsDestination.LayoutFiles, keyboard))
 }

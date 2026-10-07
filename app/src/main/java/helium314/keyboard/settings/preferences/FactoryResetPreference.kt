@@ -46,6 +46,10 @@ import helium314.keyboard.settings.Setting
 import helium314.keyboard.settings.SettingsActivity
 import helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog
 import java.io.File
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Factory reset: every setting back to its default, and optionally the keyboards and languages, the learned words,
@@ -61,11 +65,19 @@ fun FactoryResetPreference(setting: Setting) {
     var learnedWords by rememberSaveable { mutableStateOf(false) }
     var clipboard by rememberSaveable { mutableStateOf(false) }
     var custom by rememberSaveable { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     ThreeButtonAlertDialog(
         onDismissRequest = { showDialog = false },
         onConfirmed = {
-            factoryReset(ctx, keyboards, learnedWords, clipboard, custom)
-            Toast.makeText(ctx, R.string.factory_reset_done, Toast.LENGTH_LONG).show()
+            scope.launch {
+                // keyboards with their own learned words: those go back to one shared set (the setting's default, which
+                // the reset brings back), put together first so nothing is lost on the way; off the screen thread, it
+                // reads every store (review 2026-10-06: the app could freeze)
+                if (!LearnedStores.isShared(ctx.realPrefs()))
+                    withContext(Dispatchers.IO) { ctx.filesDir?.let { LearnedPools.share(it, LearnedStoreIo.Native) } }
+                factoryReset(ctx, keyboards, learnedWords, clipboard, custom)
+                Toast.makeText(ctx, R.string.factory_reset_done, Toast.LENGTH_LONG).show()
+            }
         },
         title = { Text(stringResource(R.string.factory_reset)) },
         confirmFirst = true,
@@ -90,20 +102,24 @@ fun FactoryResetPreference(setting: Setting) {
     )
 }
 
-private fun factoryReset(ctx: Context, keyboards: Boolean, learnedWords: Boolean, clipboard: Boolean, custom: Boolean) {
-    val prefs = ctx.realPrefs()
-    // what survives the settings reset: the version (else every upgrade step runs again), and what isn't being reset
-    // (the defaults flag too: after a reset the defaults apply, the upgrade mustn't turn sound / vibration off again)
-    fun keep(key: String): Boolean = key == Settings.PREF_VERSION_CODE || key == "defaults_feedback_on_done"
+/**
+ * What survives the settings reset: the version and every one-time step's flag (else they run again on a reset phone:
+ * review 2026-10-06, the 0.3.002 step brought back the 0.5% / 0.75% gaps), and what isn't being reset: the keyboards
+ * ([keyboards] unticked), your own layouts, popup sets and saved themes and Layouts ([custom] unticked).
+ */
+internal fun keptOnReset(key: String, keyboards: Boolean, custom: Boolean): Boolean =
+    key == Settings.PREF_VERSION_CODE || KeyboardProfiles.isOneTimeFlag(key)
         || (!keyboards && (key == Settings.PREF_ENABLED_SUBTYPES || key == Settings.PREF_ADDITIONAL_SUBTYPES
             || key == Settings.PREF_SELECTED_SUBTYPE || LanguagePriority.isLanguageKey(key)))
         || (!custom && (key == KeyPopupOverrides.PREF || key == KeyPopupOverrides.PREF_SETS
-            || key == KeyPopupOverrides.PREF_SELECTED_SET || key.startsWith(Settings.PREF_LAYOUT_PREFIX)))
-    // keyboards with their own learned words: those go back to one shared set (the setting's default, which the reset
-    // brings back), put together first so nothing is lost on the way (LearnedPools.share)
-    if (!LearnedStores.isShared(prefs)) ctx.filesDir?.let { LearnedPools.share(it, LearnedStoreIo.Native) }
+            || key == KeyPopupOverrides.PREF_SELECTED_SET || key.startsWith(Settings.PREF_LAYOUT_PREFIX)
+            || key == helium314.keyboard.settings.AppearanceLooks.PREF || key == helium314.keyboard.settings.LayoutPresets.PREF))
+
+private fun factoryReset(ctx: Context, keyboards: Boolean, learnedWords: Boolean, clipboard: Boolean, custom: Boolean) {
+    val prefs = ctx.realPrefs()
+    // (the keyboards' own learned words were put together before, see the dialog)
     Settings.getInstance().stopListener()
-    prefs.edit { prefs.all.keys.filterNot(::keep).forEach { remove(it) } }
+    prefs.edit { prefs.all.keys.filterNot { keptOnReset(it, keyboards, custom) }.forEach { remove(it) } }
     LearnedStores.refresh(prefs)
     KeyboardProfiles.editingId = KeyboardProfiles.SHARED
     // the background pictures belong to the settings (every keyboard's: the set ids start again after a reset, and a
@@ -113,6 +129,8 @@ private fun factoryReset(ctx: Context, keyboards: Boolean, learnedWords: Boolean
     if (learnedWords) PersonalizationHelper.removeAllUserHistoryDictionaries(ctx)
     if (clipboard) ClipboardDao.getInstance(ctx)?.clear()
     if (custom) {
+        // the saved themes' background pictures (the themes themselves were settings)
+        File(ctx.filesDir, "looks").deleteRecursively()
         val filesDir = DeviceProtectedUtils.getFilesDir(ctx)
         for (type in LayoutType.entries) File(filesDir, type.folder).deleteRecursively()
         // the loaded fonts and pictures, offered to every keyboard

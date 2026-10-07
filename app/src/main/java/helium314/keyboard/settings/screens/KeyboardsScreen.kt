@@ -150,7 +150,7 @@ fun KeyboardsScreen(
                             if (folding) { if (isExpanded) expanded.remove(keyboard) else expanded.add(keyboard) }
                             else {
                                 if (separate) KeyboardProfiles.editingId = KeyboardProfiles.idFor(real, keyboard)
-                                SettingsDestination.navigateTo(SettingsDestination.Languages + keyboard.toPref())
+                                SettingsDestination.navigateTo(SettingsDestination.withKeyboard(SettingsDestination.Languages, keyboard))
                             }
                         },
                         icon = R.drawable.ic_settings_layout, // a keyboard (the globe is for its languages)

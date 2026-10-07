@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What Android's own backup takes (Android 11 and older): see data_extraction_rules.xml. -->
+<full-backup-content>
+    <exclude domain="external" path="." />
+    <exclude domain="file" path="gesture_corpus.jsonl" />
+    <exclude domain="file" path="swipe_results.tsv" />
+    <exclude domain="file" path="swipe_vocab.log" />
+    <exclude domain="file" path="learning_events.tsv" />
+    <exclude domain="file" path="settings_events.log" />
+    <exclude domain="file" path="swipes.jsonl" />
+</full-backup-content>

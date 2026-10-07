@@ -52,7 +52,8 @@ object GestureCorpusRecorder {
         file = File(context.getExternalFilesDir(null) ?: context.filesDir, FILE_NAME)
     }
 
-    fun isEnabled(): Boolean = Settings.getValues().mRecordGestureCorpus && file != null
+    // never while typing privately: incognito, a private tab or an app asking for no learning, a password (review 2026-10-06)
+    fun isEnabled(): Boolean = Settings.getValues().let { it.mRecordGestureCorpus && !it.mIncognitoModeEnabled } && file != null
 
     /** The swiped word is followed to its outcome: always (a word typed after a deleted swipe is learned as corrected by
      *  hand), and for the corpus and the swipe results log. */

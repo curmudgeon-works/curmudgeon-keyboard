@@ -309,7 +309,7 @@
     <string name="factory_reset_keyboards">Keyboards and languages</string>
     <string name="factory_reset_learned_words">Learned words</string>
     <string name="factory_reset_clipboard">Clipboard history</string>
-    <string name="factory_reset_custom">Your own layouts, popup layouts, added dictionaries, and loaded fonts and pictures</string>
+    <string name="factory_reset_custom">Your own layouts, popup layouts, saved themes and Layouts, added dictionaries, and loaded fonts and pictures</string>
     <string name="factory_reset_backup_hint">To be able to go back, make a backup first (Backup and restore, above).</string>
     <string name="factory_reset_done">Reset done</string>
     <string name="backspace_settings">Backspace</string>

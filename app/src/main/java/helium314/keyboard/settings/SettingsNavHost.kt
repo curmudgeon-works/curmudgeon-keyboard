@@ -188,6 +188,11 @@ object SettingsDestination {
     val navTarget = MutableStateFlow(Keyboards)
 
     private val navScope = CoroutineScope(Dispatchers.Default)
+    /** [route] for [keyboard]: its settings string encoded, as Navigation decodes the route's arguments (review
+     *  2026-10-06: a renamed keyboard's name is stored encoded, and decoded once more it named no keyboard). */
+    fun withKeyboard(route: String, keyboard: helium314.keyboard.latin.settings.SettingsSubtype): String =
+        route + android.net.Uri.encode(keyboard.toPref())
+
     fun navigateTo(target: String) {
         if (navTarget.value == target) {
             // triggers recompose twice, but that's ok as it's a rare event

@@ -258,6 +258,11 @@ object KeyboardProfiles {
 
     // one-time upgrade flags ("fonts_follow_migrated", "defaults_feedback_on_done"): bookkeeping, never marked
     private val upgradeFlag = Regex(".*(_migrated|_done)")
+    private val oneTimeFlags = setOf("learning_swiping_global", "suggestions_refine_moved", "moved_markers_removed")
+
+    /** A one-time step's flag (an upgrade or a settings move, done once): bookkeeping, not a setting; a keyboard's own
+     *  copy (p<id>/…) doesn't count. */
+    fun isOneTimeFlag(key: String) = splitOwnKey(key) == null && (upgradeFlag.matches(key) || key in oneTimeFlags)
 
     /** Write [settings] (plain keys) as the own set of profile [id], replacing what was there; [markDefaults]: every
      *  shared setting not in [settings] reads its default in that set (a mark), not the shared value. */
