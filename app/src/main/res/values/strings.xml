@@ -692,6 +692,7 @@
     <!-- %s: the look's name -->
     <string name="appearance_look_delete">Delete the theme \"%s\"?</string>
     <!-- the four built-in themes -->
+    <string name="theme_preset_dynamic">Dynamic</string>
     <string name="theme_preset_midnight">Midnight</string>
     <string name="theme_preset_daylight">Daylight</string>
     <string name="theme_preset_paper">Paper</string>

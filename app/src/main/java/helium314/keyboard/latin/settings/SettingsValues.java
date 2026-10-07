@@ -277,7 +277,9 @@ public class SettingsValues {
         mBackspaceDeletesSwipedWord = prefs.getBoolean(Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD, Defaults.PREF_BACKSPACE_DELETES_SWIPED_WORD);
         mAutoCorrectWithDigits = prefs.getBoolean(Settings.PREF_AUTOCORRECT_WITH_DIGITS, Defaults.PREF_AUTOCORRECT_WITH_DIGITS);
         mKeyTextBold = prefs.getBoolean(Settings.PREF_KEY_TEXT_BOLD, Defaults.PREF_KEY_TEXT_BOLD);
-        mKeyTextBoldSet = prefs.contains(Settings.PREF_KEY_TEXT_BOLD);
+        // not set means the default (not bold), as the Fonts dialog shows it; until 2026-10-06 the key style decided
+        // (Holo drew bold): the Holo classic theme sets bold itself now
+        mKeyTextBoldSet = true;
         mFontFollowsKeyText = prefs.getBoolean(Settings.PREF_FONT_FOLLOWS_KEY_TEXT, Defaults.PREF_FONT_FOLLOWS_KEY_TEXT);
         mKeyTextItalic = prefs.getBoolean(Settings.PREF_KEY_TEXT_ITALIC, Defaults.PREF_KEY_TEXT_ITALIC);
         mKeyTextUnderline = prefs.getBoolean(Settings.PREF_KEY_TEXT_UNDERLINE, Defaults.PREF_KEY_TEXT_UNDERLINE);

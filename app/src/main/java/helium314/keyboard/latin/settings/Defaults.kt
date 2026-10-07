@@ -42,17 +42,18 @@ object Defaults {
     private const val DEFAULT_SIZE_SCALE = 1.0f // 100%
     const val PREF_THEME_STYLE = KeyboardTheme.STYLE_MATERIAL
     const val PREF_ICON_STYLE = KeyboardTheme.STYLE_MATERIAL
-    const val PREF_THEME_COLORS = KeyboardTheme.THEME_BLACK
-    const val PREF_THEME_COLORS_NIGHT = KeyboardTheme.THEME_BLACK
+    // the Dynamic theme's colours (the phone's wallpaper colours, light and dark by themselves; Android 12+, Light before)
+    const val PREF_THEME_COLORS = KeyboardTheme.THEME_DYNAMIC // (2026-10-06; Black before)
+    const val PREF_THEME_COLORS_NIGHT = KeyboardTheme.THEME_DYNAMIC
     const val PREF_THEME_KEY_BORDERS = true
     // the default look is the Midnight theme: black, one colour set (2026-10-03; before: following the system on Android 10+)
     @JvmField
     val PREF_THEME_DAY_NIGHT = false
     const val PREF_CUSTOM_ICON_NAMES = ""
     const val PREF_AUTO_CAP = true
-    const val PREF_VIBRATE_ON = true // fresh installs; older installs keep "off" (curmudgeonUpgrades)
+    const val PREF_VIBRATE_ON = false // HeliBoard's (2026-10-06; on from 0.1.004 to 0.3.008)
     const val PREF_VIBRATE_IN_DND_MODE = false
-    const val PREF_SOUND_ON = true // fresh installs; older installs keep "off" (curmudgeonUpgrades)
+    const val PREF_SOUND_ON = false // HeliBoard's (2026-10-06; on from 0.1.004 to 0.3.008)
     const val PREF_SUGGEST_EMOJIS = true
     const val PREF_INLINE_EMOJI_SEARCH = true
     const val PREF_SHOW_EMOJI_DESCRIPTIONS = true
@@ -66,7 +67,7 @@ object Defaults {
     const val PREF_BACKSPACE_HOLD_DELETES_WORDS = true // holding backspace deletes a word per repeat, not a character
     const val PREF_BACKSPACE_DELETES_SWIPED_WORD = true // a tap right after a swipe deletes the swiped word
     const val PREF_AUTOCORRECT_WITH_DIGITS = false // a word with a digit is suggested, not replaced
-    const val PREF_KEY_TEXT_BOLD = false // until set, the key style decides (Holo draws bold)
+    const val PREF_KEY_TEXT_BOLD = false // (until 2026-10-06 not set let the key style decide: Holo drew bold)
     const val PREF_TOOLBAR_VISIBILITY = "above" // Settings.TOOLBAR_*
     const val PREF_TOOLBAR_IN_STRIP_ROW = false // the expanded toolbar opens in a row of its own above the suggestions
     const val PREF_DELETE_SWIPE_SPEED = 1f // characters per finger step of swiping left from backspace, times this

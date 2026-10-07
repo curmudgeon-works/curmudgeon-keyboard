@@ -290,16 +290,11 @@ class KeyboardParser(private val params: KeyboardParams, private val context: Co
             numberRowCopy.forEachIndexed { index, keyData -> keyData.popup.symbol = baseKeys[0].getOrNull(index)?.label }
             baseKeys[0] = numberRowCopy
         } else if (!params.mId.mNumberRowEnabled && params.mId.isAlphabetKeyboard && !hasBuiltInNumbers()) {
-            if (baseKeys[0].any { it.popup.main != null || !it.popup.relevant.isNullOrEmpty() } // first row of baseKeys has any layout popup key
-                && params.mPopupKeyLabelSources.let {
-                    val layout = it.indexOf(POPUP_KEYS_LAYOUT)
-                    val number = it.indexOf(POPUP_KEYS_NUMBER)
-                    layout != -1 && layout < number // layout before number label
-                }
-            ) {
-                // remove number from labels, to avoid awkward mix of numbers and others caused by layout popup keys
-                params.mPopupKeyLabelSources.remove(POPUP_KEYS_NUMBER)
-            }
+            // no number row: the digits are on the first row's long-press, so its keys show them as their hint before
+            // anything else (2026-10-06: an accent or symbol could take the hint, and the digits went unlabelled; upstream
+            // dropped the number labels instead when layout popups came first). Other rows have no number: their hints stay.
+            if (params.mPopupKeyLabelSources.remove(POPUP_KEYS_NUMBER))
+                params.mPopupKeyLabelSources.add(0, POPUP_KEYS_NUMBER)
             // add number to the first first row
             baseKeys.first().forEachIndexed { index, keyData -> keyData.popup.numberLabel = numberRow.getOrNull(index)?.label }
         }

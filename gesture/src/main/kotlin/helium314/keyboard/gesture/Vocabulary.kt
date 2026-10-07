@@ -8,14 +8,42 @@ package helium314.keyboard.gesture
 
 import java.util.concurrent.ConcurrentHashMap
 
-/** Trie of (word, frequency). Frequencies must be positive. */
+/**
+ * Trie of words, each with its dictionary frequency and its learned weight (the user's own use, 0..255) kept apart: the
+ * learned-word boost and "suggest learned words" are settings, applied when a swipe is scored ([Node.weight]), not when
+ * the list is built, so changing them needs no rebuild and a list built before a swipe (the keyboard's warm-up) can't
+ * have the wrong ones (2026-10-06: settings are applied at scoring time; the list holds facts about words).
+ */
 class Vocabulary(entries: Iterable<Pair<String, Int>>) {
 
     class Node {
+        /** The word here (null: none), as the dictionary spells it, else as it was learned. */
         @Volatile var word: String? = null
             internal set
+        /** Its dictionary frequency (0: a learned word only). */
         @Volatile var frequency: Int = 0
             internal set
+        /** Its learned weight without the boost (0: not learned), and the spelling it was learned with. */
+        @Volatile var learned: Int = 0
+            internal set
+        @Volatile var learnedWord: String? = null
+            internal set
+
+        private fun boosted(boost: Int, learnedOn: Boolean) =
+            if (learnedOn && learned > 0) (learned + boost).coerceIn(1, 255) else 0
+
+        /** The weight a swipe scores it with: the higher of its dictionary frequency and, with learned words on
+         *  ([learnedOn]), its learned weight + [boost] (what was baked into the list until 2026-10-06). 0: not a word
+         *  with these settings (learned only, learned words off). */
+        fun weight(boost: Int, learnedOn: Boolean): Int = maxOf(frequency, boosted(boost, learnedOn))
+
+        /** The spelling of the source that weighs more with these settings (a learned "iPhone" over the dictionary's
+         *  "iphone" when the boost lifts it above), as the spelling of the highest-weighted variant was kept before. */
+        fun wordFor(boost: Int, learnedOn: Boolean): String? {
+            val learnedSpelling = learnedWord
+            return if (learnedSpelling != null && learnedOn && boosted(boost, learnedOn) >= frequency) learnedSpelling
+                else if (frequency > 0) word else null
+        }
         // chars and nodes in one immutable holder, replaced in a single write: a learned word can be added while a
         // swipe is being decoded on another thread, and a reader never sees chars and nodes of different sizes
         // (children are only ever appended, so an index read from an older holder stays valid in a newer one)
@@ -47,8 +75,15 @@ class Vocabulary(entries: Iterable<Pair<String, Int>>) {
     }
 
     val root = Node()
+    /** The highest dictionary frequency, and the highest learned weight (without the boost). */
     @Volatile var maxFrequency: Int = 1
         private set
+    @Volatile var maxLearned: Int = 0
+        private set
+
+    /** The highest [Node.weight] with these settings: what a swipe weighs every word against (at least 1). */
+    fun maxWeight(boost: Int, learnedOn: Boolean): Int =
+        maxOf(maxFrequency, if (learnedOn && maxLearned > 0) (maxLearned + boost).coerceIn(1, 255) else 0, 1)
     @Volatile var size: Int = 0
         private set
 
@@ -94,10 +129,37 @@ class Vocabulary(entries: Iterable<Pair<String, Int>>) {
             lists.keys.map { (it and 0xFFFF).toChar() }.distinct().toCharArray()).also { ends = it }
     }
 
-    /** Adds a word or raises its frequency. Safe while other threads read the trie; callers must not add concurrently. */
+    /** Adds a dictionary word or raises its frequency. Safe while other threads read the trie; callers must not add
+     *  concurrently. */
     @Synchronized
     fun add(word: String, frequency: Int) {
         if (word.isEmpty() || frequency <= 0) return
+        val node = nodeFor(word)
+        // keep the casing of the highest-frequency variant (trie keys are lowercased,
+        // stored words keep original casing so e.g. proper nouns display correctly)
+        if (frequency >= node.frequency) {
+            node.frequency = frequency
+            node.word = word // last: a reader that sees the word sees its frequency
+        }
+        if (frequency > maxFrequency) maxFrequency = frequency
+    }
+
+    /** Adds a learned word or raises its learned [weight] (0..255, without the boost). The word keeps the dictionary's
+     *  spelling if it has one; the learned spelling shows where the learned weight wins ([Node.wordFor]). */
+    @Synchronized
+    fun addLearned(word: String, weight: Int) {
+        if (word.isEmpty() || weight <= 0) return
+        val node = nodeFor(word)
+        if (weight >= node.learned) {
+            node.learned = weight
+            node.learnedWord = word
+        }
+        if (node.word == null) node.word = word // last: a reader that sees the word sees its weight
+        if (weight > maxLearned) maxLearned = weight
+    }
+
+    /** The node for [word]; a new word is counted and put into the first/last letter index. */
+    private fun nodeFor(word: String): Node {
         var node = root
         for (c in word) node = node.getOrPut(c.lowercaseChar())
         if (node.word == null) {
@@ -111,13 +173,7 @@ class Vocabulary(entries: Iterable<Pair<String, Int>>) {
                 if (last !in e.lastChars) e.lastChars += last
             }
         }
-        // keep the casing of the highest-frequency variant (trie keys are lowercased,
-        // stored words keep original casing so e.g. proper nouns display correctly)
-        if (frequency >= node.frequency) {
-            node.frequency = frequency
-            node.word = word // last: a reader that sees the word sees its frequency
-        }
-        if (frequency > maxFrequency) maxFrequency = frequency
+        return node
     }
 
     /**
@@ -130,6 +186,8 @@ class Vocabulary(entries: Iterable<Pair<String, Int>>) {
         if (node.word == null) return false
         node.word = null // first: a reader that sees no word skips the node
         node.frequency = 0
+        node.learned = 0
+        node.learnedWord = null
         size--
         ends?.let { e ->
             val k = endsKey(word.first().lowercaseChar(), word.last().lowercaseChar())

@@ -22,8 +22,9 @@ import org.json.JSONObject
  * A "look" (theme) is the keyboard's styling saved under a name: colours, background pictures, key borders and gaps,
  * key and icon style, icons, fonts. Saved looks are one JSON list in the preferences, shared by all keyboards; a
  * look's background pictures are copies in their own folder (see [PICTURES]); also the symbols on the keys (the
- * hide-symbols switches) and the space bar text (since 2026-10-02: a theme saved before keeps the current ones). Not in
- * looks: the emoji settings (on Appearance but kept by its Save / Discard only, see [onScreen]).
+ * hide-symbols switches) and the space bar text (since 2026-10-02: a theme saved before keeps the current ones), and the
+ * emoji settings. A theme sets all of the Theme and Emoji groups: what it doesn't name goes back to its default
+ * (2026-10-06: the built-in themes named a few settings and left the rest as they were).
  */
 object AppearanceLooks {
     const val PREF = "appearance_looks"
@@ -35,7 +36,7 @@ object AppearanceLooks {
         override fun hashCode() = values.hashCode()
     }
 
-    private val keys = setOf(
+    internal val keys = setOf(
         Settings.PREF_THEME_STYLE, Settings.PREF_ICON_STYLE, Settings.PREF_CUSTOM_ICON_NAMES, Settings.PREF_THEME_COLORS,
         Settings.PREF_THEME_KEY_BORDERS, Settings.PREF_THEME_DAY_NIGHT, Settings.PREF_THEME_COLORS_NIGHT,
         Settings.PREF_BACKGROUND_WHOLE_PICTURE,
@@ -51,10 +52,11 @@ object AppearanceLooks {
         // is about what the phone's font can draw
         Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT, Settings.PREF_EMOJI_FONT, Settings.PREF_EMOJI_SKIN_TONE,
         Settings.PREF_SHOW_EMOJI_DESCRIPTIONS,
+        // and the emoji version, which the Emoji group shows too (2026-10-06; its default is what the phone can draw)
+        Settings.PREF_EMOJI_MAX_SDK,
     )
-    /** The emoji settings at their defaults: the built-in themes put them back (a theme sets the whole look). */
-    private val emojiDefaults: Map<String, Any?> = listOf(Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT,
-        Settings.PREF_EMOJI_FONT, Settings.PREF_EMOJI_SKIN_TONE, Settings.PREF_SHOW_EMOJI_DESCRIPTIONS).associateWith { null }
+    /** A built-in theme: [values], and every other theme setting at its default (null: not set). */
+    private fun complete(values: Map<String, Any?>): Map<String, Any?> = keys.associateWith { null } + values
     // the scales have a key per orientation / fold state, the custom colors one per theme
     private val prefixes = listOf(
         // (keyboard height, split, numbers row, bottom row size and side padding are Layout & Typing's: not in themes)
@@ -65,7 +67,6 @@ object AppearanceLooks {
 
     // on the Appearance screen but not in looks: its Save / Discard (AppearanceDraft) keeps them too
     private val screenOnlyKeys = setOf(
-        Settings.PREF_EMOJI_MAX_SDK,
         PREF_SELECTED, // Discard puts the chosen theme back too
         "day_night_paired_from", // (which of Midnight / Daylight the light / dark switch paired from)
     )
@@ -132,34 +133,42 @@ object AppearanceLooks {
     /** The pictures as they are now, as a look of their own (for putting them back on Cancel). */
     fun currentPictures(ctx: Context): Look = Look("", mapOf(PICTURES to savePictures(ctx)))
 
-    /** The themes that ship with the app: Midnight and Daylight one colour set each, the others a light and a dark one
-     *  following the system. */
-    fun builtIn(ctx: Context): List<Look> = listOf(
-        Look(ctx.getString(R.string.theme_preset_midnight), emojiDefaults + mapOf(PICTURES to NO_PICTURES,
-            Settings.PREF_KEY_HORIZONTAL_GAP to null, Settings.PREF_KEY_VERTICAL_GAP to null, // the default gaps (1% / 2%)
+    /** The themes that ship with the app, each setting the whole Theme and Emoji groups ([complete]): Dynamic (the
+     *  default, Android 12+) first; Midnight and Daylight one colour set each; the others a light and a dark one
+     *  following the system. Gaps not named are the default 1% / 2%. */
+    fun builtIn(ctx: Context): List<Look> = listOfNotNull(
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S)
+            Look(ctx.getString(R.string.theme_preset_dynamic), complete(mapOf(PICTURES to NO_PICTURES,
+                Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
+                // the phone's colours, light and dark by themselves (the light / dark switch not needed)
+                Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_DYNAMIC, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_DYNAMIC,
+                Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to false)))
+        else null,
+        Look(ctx.getString(R.string.theme_preset_midnight), complete(mapOf(PICTURES to NO_PICTURES,
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
             // one colour set, always (the light / dark switch off)
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_BLACK, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_BLACK,
-            Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to false)),
-        Look(ctx.getString(R.string.theme_preset_daylight), emojiDefaults + mapOf(PICTURES to NO_PICTURES,
-            Settings.PREF_KEY_HORIZONTAL_GAP to null, Settings.PREF_KEY_VERTICAL_GAP to null, // the default gaps (1% / 2%)
+            Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to false))),
+        Look(ctx.getString(R.string.theme_preset_daylight), complete(mapOf(PICTURES to NO_PICTURES,
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
             // one colour set, always (the light / dark switch off)
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_LIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_LIGHT,
-            Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to false)),
-        Look(ctx.getString(R.string.theme_preset_holo), emojiDefaults + mapOf(PICTURES to NO_PICTURES,
+            Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to false))),
+        Look(ctx.getString(R.string.theme_preset_holo), complete(mapOf(PICTURES to NO_PICTURES,
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_HOLO, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_HOLO,
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_HOLO_LIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_HOLO_WHITE,
-            Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to true)),
-        Look(ctx.getString(R.string.theme_preset_paper), emojiDefaults + mapOf(PICTURES to NO_PICTURES,
+            Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to true,
+            // the classic look: Holo's own gaps and bold key text (what the Holo style drew when they weren't set)
+            Settings.PREF_KEY_HORIZONTAL_GAP to 0f, Settings.PREF_KEY_VERTICAL_GAP to 0.75f, Settings.PREF_KEY_TEXT_BOLD to true))),
+        Look(ctx.getString(R.string.theme_preset_paper), complete(mapOf(PICTURES to NO_PICTURES,
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_LIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_DARK,
-            Settings.PREF_THEME_KEY_BORDERS to false, Settings.PREF_THEME_DAY_NIGHT to true)),
-        Look(ctx.getString(R.string.theme_preset_ocean), emojiDefaults + mapOf(PICTURES to NO_PICTURES,
+            Settings.PREF_THEME_KEY_BORDERS to false, Settings.PREF_THEME_DAY_NIGHT to true))),
+        Look(ctx.getString(R.string.theme_preset_ocean), complete(mapOf(PICTURES to NO_PICTURES,
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_ROUNDED, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_ROUNDED,
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_OCEAN_LIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_OCEAN,
             Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_KEY_HORIZONTAL_GAP to 1.0f, Settings.PREF_KEY_VERTICAL_GAP to 1.5f,
-            Settings.PREF_THEME_DAY_NIGHT to true)),
+            Settings.PREF_THEME_DAY_NIGHT to true))),
     )
 
     /** The appearance values as they are now (plain keys, the current keyboard's set). */

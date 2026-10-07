@@ -76,11 +76,12 @@ class ProfilePreferencesTest {
         assertEquals(false, set(KeyboardProfiles.SHARED).getBoolean("auto_correction", true)) // the shared set untouched
     }
 
-    @Test fun backupWritesDefaultsOut() {
+    @Test fun defaultsTable() {
         val defaults = SettingDefaults.all
         assert(defaults.size > 100) { "only ${defaults.size} defaults found" }
         assertEquals(helium314.keyboard.latin.settings.Defaults.PREF_AUTO_CORRECTION, defaults[helium314.keyboard.latin.settings.Settings.PREF_AUTO_CORRECTION])
-        assertFalse(defaults.containsKey(helium314.keyboard.latin.settings.Settings.PREF_KEY_TEXT_BOLD)) // its absence means something
+        assertFalse(defaults.containsKey(helium314.keyboard.latin.settings.Settings.PREF_SUGGESTION_TEXT_COLOR)) // its absence means something (the trail colour)
+        assertEquals(false, defaults[helium314.keyboard.latin.settings.Settings.PREF_KEY_TEXT_BOLD]) // not set = not bold (2026-10-06)
         // the sizes, one key per screen state, are written out too (saved Layouts and themes use the same table)
         val D = helium314.keyboard.latin.settings.Defaults
         for (i in 0 until 4) assertEquals(D.PREF_KEYBOARD_HEIGHT_SCALE[i],

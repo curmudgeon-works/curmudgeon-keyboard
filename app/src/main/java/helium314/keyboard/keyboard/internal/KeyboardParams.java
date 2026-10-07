@@ -289,18 +289,12 @@ public class KeyboardParams {
                 //  rows are determined based on the entire keyboard height including top and bottom
                 //  paddings.
             }
-            // User-pref overrides (custom): if the user has explicitly set the slider, honor
-            // that value over the theme/narrow defaults. The pref stores percentage (0–6%);
-            // convert to a fraction.
+            // the gap settings (percentages, 0–6%) always decide: not set means their default, as the settings show it
+            // (until 2026-10-06 only a set value counted, and not set fell back to the key style's own gaps, 0% / 0.75%,
+            // while the settings said 1% / 2%)
             final SharedPreferences keyGapPrefs = KtxKt.prefs(context);
-            if (keyGapPrefs.contains(Settings.PREF_KEY_HORIZONTAL_GAP)) {
-                mRelativeHorizontalGap = keyGapPrefs.getFloat(
-                        Settings.PREF_KEY_HORIZONTAL_GAP, Defaults.PREF_KEY_HORIZONTAL_GAP) / 100f;
-            }
-            if (keyGapPrefs.contains(Settings.PREF_KEY_VERTICAL_GAP)) {
-                mRelativeVerticalGap = keyGapPrefs.getFloat(
-                        Settings.PREF_KEY_VERTICAL_GAP, Defaults.PREF_KEY_VERTICAL_GAP) / 100f;
-            }
+            mRelativeHorizontalGap = keyGapPrefs.getFloat(Settings.PREF_KEY_HORIZONTAL_GAP, Defaults.PREF_KEY_HORIZONTAL_GAP) / 100f;
+            mRelativeVerticalGap = keyGapPrefs.getFloat(Settings.PREF_KEY_VERTICAL_GAP, Defaults.PREF_KEY_VERTICAL_GAP) / 100f;
             mHorizontalGap = (int) (mRelativeHorizontalGap * width);
             mVerticalGap = (int) (mRelativeVerticalGap * height);
 

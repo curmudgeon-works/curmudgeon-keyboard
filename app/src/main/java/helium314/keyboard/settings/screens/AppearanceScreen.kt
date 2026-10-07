@@ -637,9 +637,9 @@ private fun SavedLooksPreference(setting: Setting) {
     fun store(list: List<AppearanceLooks.Look>) { AppearanceLooks.save(prefs, list); generation++ }
     // the chosen theme's name; "tweaked" when a value it sets (or its pictures) differs now, "unsaved" while the
     // theme's part of the screen has changes not saved yet
-    // (a new install's look is Midnight: named so until another theme is chosen)
+    // (none chosen: the default look, Dynamic, named until another theme is chosen; "tweaked" if anything differs from it)
     val chosenName = prefs.getString(AppearanceLooks.PREF_SELECTED, null)
-        ?: ctx.getString(R.string.theme_preset_midnight).takeIf { prefs.getBoolean("look_default_midnight", false) }
+        ?: ctx.getString(R.string.theme_preset_dynamic).takeIf { android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S }
     val chosen = chosenName?.let { name -> (builtIn + looks).firstOrNull { it.name == name } }
     val tweaked = chosen != null && AppearanceLooks.isTweaked(ctx, chosen)
     val draft = AppearanceDraft.of(ctx)
@@ -662,6 +662,8 @@ private fun SavedLooksPreference(setting: Setting) {
             },
             title = { Text(setting.title) },
             items = builtIn + looks,
+            // the chosen theme marked when the list opens (2026-10-06: none was, even right after choosing one)
+            selectedItem = chosen,
             getItemName = { it.name },
             confirmImmediately = false,
             // a theme only changes what it lists: the rest stays as it was when the list opened (height, fonts, switches…);

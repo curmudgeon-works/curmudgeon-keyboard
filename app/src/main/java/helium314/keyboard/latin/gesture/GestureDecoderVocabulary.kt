@@ -26,7 +26,8 @@ import java.util.concurrent.ConcurrentHashMap
  * Built from the ACTUAL dictionaries of the locale: the top [MAX_WORDS] words by
  * probability from the main binary dictionary (the same cached/extracted .dict file
  * the facilitator loads — opened read-only via our own [BinaryDictionary]), merged
- * with user-history words at boosted weight.
+ * with the user-history words at their own weight (the learned-word boost and "suggest learned words" are applied
+ * when a swipe is scored: [Vocabulary.Node.weight]).
  *
  * The main-dict extraction is the expensive part (a full getNextWordProperty walk
  * over JNI, ~16 s at 10k words), so its result is persisted to
@@ -43,29 +44,18 @@ object GestureDecoderVocabulary {
     private const val TAG = "GestureDecoderVocab"
     private const val MAX_WORDS = 50_000
     private const val MIN_PROBABILITY = 1 // dictionary probabilities are 0..255, log-ish
-    /** Added to a learned word's probability (0..255) so personal words beat similar dictionary words; a user setting. */
-    @Volatile var historyBoost: Int = 64
-        set(value) {
-            if (value == field) return
-            field = value
-            rebuildWithLearned()
-        }
-    /** "Suggest learned & personal words": off, learned words aren't swiped either (they're still learned). */
-    @Volatile var includeLearned: Boolean = true
-        set(value) {
-            if (value == field) return
-            field = value
-            rebuildWithLearned()
-        }
+    // (the learned-word boost and "suggest learned words" are no longer kept here: they were baked into every vocabulary,
+    // so a change rebuilt all of them and the keyboard's warm-up built with whatever the last swipe had set; they are
+    // settings the decoder applies at scoring time now, see DecoderConfig.learnedBoost; 2026-10-06)
 
     init {
         // another keyboard's own learned words (or all keyboards' again): the vocabularies carry the old ones
         LearnedStores.onPoolChanged { rebuildWithLearned() }
     }
 
-    // learned words are merged into every cached vocabulary with the boost baked in: rebuild them in the
-    // background while the current ones keep serving swipes (clearing them emptied every swipe until the rebuild,
-    // e.g. right after switching to a keyboard with its own boost)
+    // learned words are merged into every cached vocabulary: when they change as a whole (another keyboard's own learned
+    // words) or a removed word comes back, rebuild them in the background while the current ones keep serving swipes
+    // (clearing them emptied every swipe until the rebuild)
     private fun rebuildWithLearned() {
         val context = Settings.getCurrentContext() ?: run { cache.clear(); clearMerged(); learned.clear(); return }
         val entries = mainEntries.toMap()
@@ -138,7 +128,7 @@ object GestureDecoderVocabulary {
 
     /** One language of a multilingual keyboard: its score factor from the priority setting. */
     class LocaleSpec(val locale: Locale, val factor: Float) {
-        val key get() = "${locale.toLanguageTag()}*$factor*$historyBoost"
+        val key get() = "${locale.toLanguageTag()}*$factor"
     }
 
     /**
@@ -160,14 +150,15 @@ object GestureDecoderVocabulary {
         var allReady = true
         for (spec in specs) if (getOrBuildAsync(spec.locale) == null) allReady = false
         if (!allReady) { wanted[key] = specs; return null }
-        // one merge per list: the keyboard's warm-up and the first swipe may both get here; the second waits for the
-        // first's result instead of doing the same work at the same time (review 2026-10-06)
-        synchronized(mergeLocks.getOrPut(key) { Any() }) {
+        // one merge at a time: the keyboard's warm-up and the first swipe may both get here; the second waits for the
+        // first's result instead of doing the same work at the same time (review 2026-10-06). One lock for all lists:
+        // merges are rare and two of different lists at once are rarer, and a lock per list name piled up (2026-10-06)
+        synchronized(mergeLock) {
             merged[key]?.let { return it }
             return merge(key, specs)
         }
     }
-    private val mergeLocks = ConcurrentHashMap<String, Any>()
+    private val mergeLock = Any()
 
     // counts the clears of [merged]: a merge that was running across one (a language rebuilt with learned words that
     // came in late) serves its own swipe but isn't kept, so the waiting rebuild makes a fresh one (review 2026-10-06:
@@ -193,7 +184,7 @@ object GestureDecoderVocabulary {
                 vocab.add(word, (freq * spec.factor).toInt().coerceAtLeast(MIN_PROBABILITY))
             // the languages of a script share their learned words: once for all of them
             if (scriptsDone.add(spec.locale.script()))
-                for ((word, freq) in learnedOf(context, spec.locale)) vocab.add(word, freq)
+                for ((word, weight) in learnedOf(context, spec.locale)) vocab.addLearned(word, weight)
         }
         if (vocab.size == 0) return null
         Log.d(TAG, "merged vocabulary for $key: ${vocab.size} words")
@@ -292,7 +283,7 @@ object GestureDecoderVocabulary {
      * be swiped until the next rebuild).
      */
     fun onWordLearned(context: Context, script: String, word: String) {
-        if (!isDecodableWord(word) || !includeLearned) return
+        if (!isDecodableWord(word)) return
         val pool = LearnedStores.currentPool
         learnExecutor.schedule({
             try {
@@ -300,12 +291,11 @@ object GestureDecoderVocabulary {
                 if (isExcluded(context, locale, word, learned = true)) return@schedule
                 val probability = PersonalizationHelper.getUserHistoryDictionary(context, script, pool).getFrequency(word)
                 if (probability <= 0) return@schedule
-                val freq = boosted(probability)
-                learned[storeKey(script, pool)]?.put(word, probability) // (raw: the boost is added where it's used)
-                for ((tag, vocab) in cache) if (tag.constructLocale().script() == script) vocab.add(word, freq)
+                learned[storeKey(script, pool)]?.put(word, probability)
+                for ((tag, vocab) in cache) if (tag.constructLocale().script() == script) vocab.addLearned(word, probability)
                 // (at full weight, as when the vocabulary was built)
                 for ((key, vocab) in merged)
-                    if (mergedSpecs[key]?.any { it.locale.script() == script } == true) vocab.add(word, freq)
+                    if (mergedSpecs[key]?.any { it.locale.script() == script } == true) vocab.addLearned(word, probability)
             } catch (t: Throwable) {
                 Log.w(TAG, "could not add learned word to the gesture vocabulary", t)
             }
@@ -360,6 +350,7 @@ object GestureDecoderVocabulary {
             if (disk.header == expectedHeader) {
                 Log.d(TAG, "loaded vocabulary for $key from disk cache in $loaded ms")
                 if (merged == 0) retryHistoryLater(key, locale, context, disk.entries)
+                logDictionarySizeOnce(cacheFile, key) { mainDictFile?.let { addWordsFromDict(it, locale, blockOffensive, HashMap()) } }
                 return
             }
             Log.d(TAG, "disk cache for $key is stale (serving it anyway), rebuilding: " +
@@ -369,7 +360,8 @@ object GestureDecoderVocabulary {
         // full rebuild: the expensive JNI walk over the main dictionary
         val words = HashMap<String, Int>(MAX_WORDS * 2)
         if (mainDictFile != null) {
-            addWordsFromDict(mainDictFile, locale, blockOffensive, words)
+            val counts = addWordsFromDict(mainDictFile, locale, blockOffensive, words)
+            logDictionarySizeOnce(cacheFile, key) { counts }
         } else {
             Log.w(TAG, "no main dictionary file found for $locale")
         }
@@ -390,7 +382,7 @@ object GestureDecoderVocabulary {
         // removed words' dictionary copies stay out (mainEntries keeps them: the merged vocabularies filter alike)
         val vocab = Vocabulary(withoutExcluded(context, locale, mainEntries, learned = false))
         val history = learnedOnce(context, locale, HISTORY_RETRIES)
-        for ((word, freq) in history) vocab.add(word, freq)
+        for ((word, weight) in history) vocab.addLearned(word, weight)
         if (vocab.size > 0) {
             cache[key] = vocab
             this.mainEntries[key] = mainEntries
@@ -410,10 +402,9 @@ object GestureDecoderVocabulary {
     // at the same time, and the lock on the walk made each read take twice as long)
     private val readLocks = ConcurrentHashMap<String, Any>()
     private fun learnedOnce(context: Context, locale: Locale, retries: Int): List<Pair<String, Int>> {
-        if (!includeLearned) return emptyList()
         val k = storeKey(locale.script(), LearnedStores.currentPool)
         synchronized(readLocks.getOrPut(k) { Any() }) {
-            learned[k]?.takeIf { it.isNotEmpty() }?.let { m -> return m.map { it.key to boosted(it.value) } }
+            learned[k]?.takeIf { it.isNotEmpty() }?.let { m -> return m.map { it.key to it.value } }
             return historyEntries(context, locale, retries)
         }
     }
@@ -452,10 +443,9 @@ object GestureDecoderVocabulary {
     }
 
     /**
-     * Merge user-history words at boosted weight (these are words the user actually
-     * types). Added AFTER the [MAX_WORDS] cap on main-dict words, so personal words
-     * are never evicted by the cap. [Vocabulary.add] keeps the higher frequency, so
-     * this is a max-merge.
+     * The user-history words with their own weight (these are words the user actually types; the boost is added at
+     * scoring). Added AFTER the [MAX_WORDS] cap on main-dict words, so personal words are never evicted by the cap;
+     * [Vocabulary.addLearned] keeps them apart from the dictionary frequency.
      *
      * The whole store is read and waited for (2026-10-05): the old read gave up after 100 ms and a store of tens of
      * thousands of words often took longer, so after a restart the swiped words ran at their dictionary weight or were
@@ -463,7 +453,6 @@ object GestureDecoderVocabulary {
      * build thread; the multilingual vocabularies take the list kept here ([learnedOf]).
      */
     private fun historyEntries(context: Context, locale: Locale, retries: Int): List<Pair<String, Int>> {
-        if (!includeLearned) return emptyList()
         try {
             val script = locale.script()
             val pool = LearnedStores.currentPool
@@ -485,7 +474,7 @@ object GestureDecoderVocabulary {
                 // onWordLearned leaves it out
                 if (wp.probability <= 0) { notCounted++; continue }
                 raw[word] = wp.probability
-                entries.add(word to boosted(wp.probability))
+                entries.add(word to wp.probability)
             }
             learned[storeKey(script, pool)] = raw
             val ms = SystemClock.elapsedRealtime() - start
@@ -499,19 +488,16 @@ object GestureDecoderVocabulary {
         }
     }
 
-    // the learned words of each store (script and pool) with their own weight (0..255, WITHOUT the boost: a boost
-    // changed later must apply to them too; review 2026-10-06), so a multilingual vocabulary can be put together
+    // the learned words of each store (script and pool) with their own weight (0..255; the boost is added at scoring),
+    // so a multilingual vocabulary can be put together
     // without reading the store again; kept up to date by onWordLearned / onWordRemoved
     private val learned = ConcurrentHashMap<String, ConcurrentHashMap<String, Int>>()
 
-    /** A learned word's weight in the swipe vocabularies: its own plus the current [historyBoost]. */
-    private fun boosted(probability: Int) = (probability + historyBoost).coerceIn(1, 255)
     private fun storeKey(script: String, pool: Int) = "$script/$pool"
 
     /** [locale]'s learned words for a multilingual vocabulary: the list read by its own build, else read now. */
     private fun learnedOf(context: Context, locale: Locale): List<Pair<String, Int>> {
-        if (!includeLearned) return emptyList()
-        learned[storeKey(locale.script(), LearnedStores.currentPool)]?.let { m -> return m.map { it.key to boosted(it.value) } }
+        learned[storeKey(locale.script(), LearnedStores.currentPool)]?.let { m -> return m.map { it.key to it.value } }
         return historyEntries(context, locale, retries = 0)
     }
 
@@ -610,15 +596,36 @@ object GestureDecoderVocabulary {
         return DictionaryInfoUtils.extractAssetsDictionary(match, locale, context)
     }
 
-    private fun addWordsFromDict(file: File, locale: Locale, blockOffensive: Boolean, words: MutableMap<String, Int>) {
+    /** How many words a dictionary has ([total]) and how many of them a swipe could use ([usable]). */
+    private class DictCounts(val total: Int, val usable: Int)
+
+    /**
+     * Once per language (2026-10-06): the full dictionary's size next to the [MAX_WORDS] the swipe list keeps, in the
+     * logs, kept in "<key>.size" next to the cache so it's counted only once. Not on every start: [count] may walk the
+     * whole dictionary, which only a rebuild does otherwise. Runs on the language's build thread after its list is
+     * served, so no swipe waits for it.
+     */
+    private fun logDictionarySizeOnce(cacheFile: File, key: String, count: () -> DictCounts?) {
+        val marker = File(cacheFile.parentFile, "$key.size")
+        if (marker.exists()) return
+        val counts = try { count() } catch (t: Throwable) { Log.w(TAG, "could not count the dictionary for $key", t); null } ?: return
+        val line = "full dictionary for $key: ${counts.total} words, ${counts.usable} usable for swiping; the swipe list keeps the top $MAX_WORDS"
+        Log.i(TAG, line)
+        logVocab(line)
+        try { marker.writeText("${counts.total}\t${counts.usable}\n") } catch (t: Throwable) { Log.w(TAG, "could not note the dictionary size", t) }
+    }
+
+    private fun addWordsFromDict(file: File, locale: Locale, blockOffensive: Boolean, words: MutableMap<String, Int>): DictCounts? {
         val dict = BinaryDictionary(file.absolutePath, 0, file.length(), false, locale, Dictionary.TYPE_MAIN, false)
+        var total = 0
         try {
-            if (!dict.isValidDictionary) return
+            if (!dict.isValidDictionary) return null
             var token = 0
             do {
                 val result = dict.getNextWordProperty(token)
                 val wp = result.mWordProperty ?: break
                 val word = wp.mWord
+                if (word != null) total++
                 if (word != null && !wp.mIsNotAWord
                     && wp.probability >= MIN_PROBABILITY
                     && !(wp.mIsPossiblyOffensive && blockOffensive)
@@ -631,6 +638,7 @@ object GestureDecoderVocabulary {
         } finally {
             dict.close()
         }
+        return DictCounts(total, words.size)
     }
 
     /**

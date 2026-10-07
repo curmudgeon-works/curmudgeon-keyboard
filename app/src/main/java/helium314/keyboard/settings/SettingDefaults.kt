@@ -16,8 +16,7 @@ object SettingDefaults {
     /** Settings whose absence the code reads ("never set": e.g. the key text bold follows the key style until touched). */
     private val presenceMatters = setOf(
         Settings.PREF_PUNCTUATION_SUGGESTIONS, Settings.PREF_SHOW_SETUP_WIZARD_ICON, Settings.PREF_ADDITIONAL_SUBTYPES,
-        Settings.PREF_FONT_FOLLOWS_KEY_TEXT, Settings.PREF_KEY_HORIZONTAL_GAP, Settings.PREF_KEY_TEXT_BOLD,
-        Settings.PREF_KEY_VERTICAL_GAP, Settings.PREF_LANGUAGE_SWITCH_KEY, Settings.PREF_SOUND_ON,
+        Settings.PREF_FONT_FOLLOWS_KEY_TEXT, Settings.PREF_LANGUAGE_SWITCH_KEY, Settings.PREF_SOUND_ON,
         Settings.PREF_SPACE_HORIZONTAL_SWIPE, Settings.PREF_SPACE_VERTICAL_SWIPE, Settings.PREF_TOOLBAR_MODE,
         Settings.PREF_TOOLBAR_VISIBILITY, Settings.PREF_VIBRATE_ON,
         // not set = the swipe trail's colour (0.3.008): a theme or a backup must not write the fallback orange down

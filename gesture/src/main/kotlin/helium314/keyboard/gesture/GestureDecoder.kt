@@ -38,6 +38,13 @@ class DecoderConfig(
      */
     val maxCandidates: Int = 4096,
     /**
+     * Added to a learned word's own weight (0..255) when a swipe is scored, so the user's words beat similar dictionary
+     * words; and whether learned words count at all ("suggest learned words"). Settings, applied here rather than baked
+     * into the vocabulary ([Vocabulary.Node.weight]; 2026-10-06). The app passes its own; these are its defaults.
+     */
+    val learnedBoost: Int = 64,
+    val learnedWords: Boolean = true,
+    /**
      * Graded cost for the ends: per key width that a word's first / last letter lies from pen-down / pen-up beyond
      * [endpointFreeKeyWidths], the rank is multiplied by (1 + this). Starts and ends are where people land where they
      * mean to, so a word ending on the neighbouring key should lose to one ending under the finger. 0 = off.
@@ -139,7 +146,7 @@ class GestureDecoder(
         // Applied once per candidate, shared by all scorers (post-scoring display form).
         val displayWords = candidates.map { if (config.capsExcursions) applyExcursionCaps(it, gesture, geometry) else it.sokgraph.word }
 
-        val maxFreq = vocabulary.maxFrequency.toFloat()
+        val maxFreq = vocabulary.maxWeight(config.learnedBoost, config.learnedWords).toFloat()
         val frequencyWeight = 1f + config.frequencyEmphasisPerKeyPerSecond * (keysPerSecond - config.frequencyEmphasisFromKeysPerSecond).coerceAtLeast(0f)
         for (s in scorers) {
             val scored = ArrayList<ScoredWord>(candidates.size)
@@ -287,12 +294,13 @@ class GestureDecoder(
         val out = ArrayList<Candidate>()
         for (f in firsts) for (l in lasts) for (node in vocabulary.wordsByEnds(f, l)) {
             if (out.size >= config.maxCandidates) return out
-            val word = node.word ?: continue
+            val word = node.wordFor(config.learnedBoost, config.learnedWords) ?: continue // (learned only, learned words off)
+            val weight = node.weight(config.learnedBoost, config.learnedWords)
             if (word.length < minLetters) continue
             val arcs = matchAlongPath(word) ?: continue
             // prune 2: sokgraph length within ratio band of drawn length
             val sok = SokgraphBuilder.build(word, geometry) ?: continue
-            if (lengthBandOk(sok, drawnLength, kw)) out.add(Candidate(sok, node.frequency, arcs))
+            if (lengthBandOk(sok, drawnLength, kw)) out.add(Candidate(sok, weight, arcs))
         }
         return out
     }

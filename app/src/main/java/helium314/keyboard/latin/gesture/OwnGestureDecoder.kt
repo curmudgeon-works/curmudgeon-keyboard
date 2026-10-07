@@ -125,23 +125,26 @@ object OwnGestureDecoder {
     private var decoderCapsHeight = Float.NaN
     private var decoderCapsSwipe = true
     private var decoderTuning: Tuning? = null
+    private var decoderLearnedWords = true
     private var decoder = GestureDecoder(HybridScorer()) // ctor scorer unused by decodeWithScorers
 
     @Synchronized
-    private fun decoderFor(capsHeight: Float, capsSwipe: Boolean, tuning: Tuning): GestureDecoder {
-        if (capsHeight != decoderCapsHeight || capsSwipe != decoderCapsSwipe || tuning != decoderTuning) {
+    private fun decoderFor(capsHeight: Float, capsSwipe: Boolean, tuning: Tuning, learnedWords: Boolean): GestureDecoder {
+        if (capsHeight != decoderCapsHeight || capsSwipe != decoderCapsSwipe || tuning != decoderTuning || learnedWords != decoderLearnedWords) {
             val kushler = KushlerScorer(KushlerConfig(slowEmphasis = tuning.slowdown, matchRelaxPerKeyPerSecond = tuning.cornerMiss,
                 speedFromKeysPerSecond = tuning.fastFrom))
             val location = LocationScorer()
             val hybrid = HybridScorer(kushler, location, kushlerWeight = tuning.kushler, locationWeight = 1f - tuning.kushler)
             scorers = listOf(hybrid, kushler, location)
+            // (the learned-word boost and "suggest learned words" are applied at scoring, like the other settings here)
             decoder = GestureDecoder(hybrid, DecoderConfig(capsExcursions = capsSwipe, frequencyEmphasisPerKeyPerSecond = tuning.fastCommon,
-                frequencyEmphasisFromKeysPerSecond = tuning.fastFrom),
+                frequencyEmphasisFromKeysPerSecond = tuning.fastFrom, learnedBoost = tuning.historyBoost, learnedWords = learnedWords),
                 preprocessor = GesturePreprocessor(PreprocessorConfig(excursionMinHeightKeyHeights = capsHeight,
                     turnConfidenceScale = tuning.turn, stopDtFactor = 2.5f)))
             decoderCapsHeight = capsHeight
             decoderCapsSwipe = capsSwipe
             decoderTuning = tuning
+            decoderLearnedWords = learnedWords
         }
         return decoder
     }
@@ -183,8 +186,7 @@ object OwnGestureDecoder {
         val geometry = geometryFor(keyboard, apostropheViaPeriod) ?: return results
         val tuning = prefs?.let { Tuning.read(it) } ?: Tuning.DEFAULT
         currentTuning = tuning
-        GestureDecoderVocabulary.historyBoost = tuning.historyBoost
-        GestureDecoderVocabulary.includeLearned = Settings.getValues()?.mUsePersonalizedDicts != false
+        val learnedWords = Settings.getValues()?.mUsePersonalizedDicts != false
         val context = Settings.getCurrentContext()
         val specs = if (context != null) GestureDecoderVocabulary.specsFor(context, locales)
                     else locales.map { GestureDecoderVocabulary.LocaleSpec(it, 1f) }
@@ -196,7 +198,7 @@ object OwnGestureDecoder {
         }
 
         val start = SystemClock.elapsedRealtime()
-        val decoder = decoderFor(capsHeight, capsSwipe, tuning)
+        val decoder = decoderFor(capsHeight, capsSwipe, tuning, learnedWords)
         val all = decoder.decodeWithScorers(points, geometry, vocabulary, scorers, wanted.coerceIn(MAX_RESULTS, 40))
         val elapsed = SystemClock.elapsedRealtime() - start
         lastSpeedKeysPerSecond = decoder.lastSpeedKeysPerSecond

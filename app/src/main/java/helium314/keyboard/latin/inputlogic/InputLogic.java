@@ -2206,9 +2206,12 @@ public final class InputLogic {
 
     /** A word picked from the suggestions counts as this many more uses: it jumps up the ranking, more with each pick. */
     private static final int PICKED_SUGGESTION_EXTRA_USES = 3;
-    /** A word corrected by hand counts as this many more uses: more than a pick, it took more effort (2026-10-05:
-     *  "I obviously made an effort on that word"). */
+    /** An accepted word changed by hand (going back into it) counts as this many more uses: more than a pick, it took
+     *  more effort (2026-10-05: "I obviously made an effort on that word"). */
     private static final int EDITED_WORD_EXTRA_USES = 5;
+    /** A swipe corrected (the swiped word changed before it was committed, or typed again after the swipe was deleted)
+     *  counts as this many more uses: like a pick (2026-10-06; was the edited amount). */
+    private static final int CORRECTED_SWIPE_EXTRA_USES = 3;
 
     /** Learns [suggestion] (1 + [extraUses] uses), kept with the step being typed for undo / redo ([origin]: how it
      *  got there, for the corrections log). */
@@ -3261,23 +3264,23 @@ public final class InputLogic {
             mDictionaryFacilitator.unlearnOneUse(resumedFrom);
             recordLearning(resumedFrom, -1, LearningEventLog.EDIT, false, NgramContext.EMPTY_PREV_WORDS_INFO);
         }
-        // corrected by hand: an accepted word changed, a swiped word changed before it was committed, or a word typed
-        // where a swipe was just deleted (the swipe didn't offer it). That last one only as typed (not an
-        // auto-correction) and only a known word (a dictionary's, or learned before): a fresh typo typed after a deleted
-        // swipe gets the usual single use (review 2026-10-06: "teh" would have become a trusted word). "As typed" is the
-        // word itself, not the commit type: with auto-correct on, space commits even an unchanged word as decided
+        // a swipe corrected: a swiped word changed before it was committed, or a word typed where a swipe was just
+        // deleted (the swipe didn't offer it). That last one only as typed (not an auto-correction) and only a known word
+        // (a dictionary's, or learned before): a fresh typo typed after a deleted swipe gets the usual single use (review
+        // 2026-10-06: "teh" would have become a trusted word). "As typed" is the word itself, not the commit type: with
+        // auto-correct on, space commits even an unchanged word as decided
         final boolean retypedAfterDeletedSwipe = swipedWord == null && !mWordComposer.isBatchMode()
                 && chosenWord.equals(mWordComposer.getTypedWord())
                 && GestureCorpusRecorder.INSTANCE.isRetypeAfterDeletedSwipe()
                 && (mDictionaryFacilitator.isMainDictionaryWord(chosenWord) || mDictionaryFacilitator.getLearnedCount(chosenWord) > 0);
-        final boolean editedByHand = editedAccepted
-                || (swipedWord != null && !mWordComposer.isBatchMode() && !swipedWord.equalsIgnoreCase(chosenWord))
+        final boolean correctedSwipe = (swipedWord != null && !mWordComposer.isBatchMode() && !swipedWord.equalsIgnoreCase(chosenWord))
                 || retypedAfterDeletedSwipe;
-        // Add the word to the user history dictionary
+        // Add the word to the user history dictionary: extra uses for an accepted word changed by hand (the most
+        // deliberate), then a corrected swipe or a strip pick; the same whether it ends with space or a tap on the strip
         if (!reAccepted && !afterDigit)
             performAdditionToUserHistoryDictionary(settingsValues, chosenWord, ngramContext,
-                    // corrected by hand, or picked from the strip: deliberate, extra uses
-                    editedByHand ? EDITED_WORD_EXTRA_USES
+                    editedAccepted ? EDITED_WORD_EXTRA_USES
+                            : correctedSwipe ? CORRECTED_SWIPE_EXTRA_USES
                             : commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK ? PICKED_SUGGESTION_EXTRA_USES : 0,
                     origin);
         if (DebugFlags.DEBUG_ENABLED) {

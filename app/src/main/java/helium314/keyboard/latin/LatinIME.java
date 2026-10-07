@@ -574,6 +574,25 @@ public class LatinIME extends InputMethodService implements
         registerReceiver(mRestartAfterDeviceUnlockReceiver, restartAfterUnlockFilter);
 
         StatsUtils.onCreate(mSettings.getCurrent(), mRichImm);
+        // the keyboard's process usually starts well before a text field is tapped: warming now gives the swipe word
+        // lists a head start (2026-10-06: a two-language merge takes ~175 ms on a fast phone, more on slower ones)
+        warmGestureVocabulary();
+    }
+
+    /**
+     * Warms the gesture vocabulary of the keyboard's languages in the background, at the keyboard's start and whenever
+     * it opens, instead of on the first swipe, so the disk-cache load (or the one-time build) and the merge overlap with
+     * typing. All of the keyboard's languages, as the first swipe will ask for them: until 2026-10-05 only the main one
+     * was warmed, so on a two-language keyboard the second language and the merged vocabulary were built at the first
+     * swipe, and that swipe wrote nothing. A list already built is kept: warming it again costs nothing.
+     */
+    private void warmGestureVocabulary() {
+        final SettingsValues sv = mSettings.getCurrent();
+        final java.util.List<Locale> locales = mDictionaryFacilitator.getLocales();
+        if (sv != null && sv.mGestureInputEnabled && !locales.isEmpty()) {
+            final helium314.keyboard.latin.gesture.GestureDecoderVocabulary v = helium314.keyboard.latin.gesture.GestureDecoderVocabulary.INSTANCE;
+            v.prewarm(v.specsFor(this, locales)); // (in the background: review 2026-10-06)
+        }
     }
 
     private void loadSettings() {
@@ -845,16 +864,7 @@ public class LatinIME extends InputMethodService implements
         super.onStartInputView(editorInfo, restarting);
 
         mDictionaryFacilitator.onStartInput();
-        // warm the gesture vocabulary when the keyboard opens instead of on the first swipe, so the disk-cache load
-        // (or the one-time build) overlaps with typing. All of the keyboard's languages, as the first swipe will ask
-        // for them: until 2026-10-05 only the main one was warmed, so on a two-language keyboard the second language
-        // and the merged vocabulary were built at the first swipe, and that swipe wrote nothing.
-        final SettingsValues sv = mSettings.getCurrent();
-        final java.util.List<Locale> locales = mDictionaryFacilitator.getLocales();
-        if (sv != null && sv.mGestureInputEnabled && !locales.isEmpty()) {
-            final helium314.keyboard.latin.gesture.GestureDecoderVocabulary v = helium314.keyboard.latin.gesture.GestureDecoderVocabulary.INSTANCE;
-            v.prewarm(v.specsFor(this, locales)); // (in the background: review 2026-10-06)
-        }
+        warmGestureVocabulary();
         // Switch to the null consumer to handle cases leading to early exit below, for which we
         // also wouldn't be consuming gesture data.
         mGestureConsumer = GestureConsumer.NULL_GESTURE_CONSUMER;

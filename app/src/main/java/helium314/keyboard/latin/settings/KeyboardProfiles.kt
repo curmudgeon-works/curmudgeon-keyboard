@@ -460,7 +460,7 @@ object KeyboardProfiles {
     fun removeMovedMarkers(real: SharedPreferences) {
         if (real.getBoolean("moved_markers_removed", false)) return
         val all = real.all
-        val keys = learningSwipingKeys + listOf(Settings.PREF_SUGGESTION_COUNT, Settings.PREF_SUGGESTION_RULES)
+        val keys = learningSwipingKeys + movedToRefine
         real.edit().apply {
             for (key in keys) for (stored in all.keys)
                 if (stored.startsWith(PREFIX) && stored.endsWith("$SEPARATOR$TOMBSTONE$key")) remove(stored)
@@ -488,12 +488,16 @@ object KeyboardProfiles {
      * learning (shared by default). The keyboard in use keeps what it had: its own count and rules, if it has its own
      * settings, become the shared ones; every keyboard's own copy is removed.
      */
+    /** The settings that moved from Text correction to Refine suggestions & learning (2026-10-06): number of suggestions
+     *  and their order rules. */
+    private val movedToRefine = listOf(Settings.PREF_SUGGESTION_COUNT, Settings.PREF_SUGGESTION_RULES)
+
     fun migrateSuggestionsToRefine(real: SharedPreferences) {
         if (real.getBoolean("suggestions_refine_moved", false)) return
         val inUse = if (isSeparate(real)) idFor(real, selectedKeyboard(real)) else SHARED
         val all = real.all
         real.edit().apply {
-            for (key in listOf(Settings.PREF_SUGGESTION_COUNT, Settings.PREF_SUGGESTION_RULES)) {
+            for (key in movedToRefine) {
                 takeOwn(all, inUse, key)
                 // every keyboard's own copy (and reset marker) goes, as in migrateLearningSwiping: stale values must not
                 // come back if the menu is made per keyboard later
