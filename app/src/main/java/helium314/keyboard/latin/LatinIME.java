@@ -126,6 +126,7 @@ public class LatinIME extends InputMethodService implements
 
     // UIHandler is needed when creating InputLogic
     public final UIHandler mHandler = new UIHandler(this);
+    private boolean mDestroyed = false; // (the learned-words pool listener registered in onCreate outlives the service)
     private final DictionaryFacilitator mDictionaryFacilitator = DictionaryFacilitatorProvider.getDictionaryFacilitator(false);
     final InputLogic mInputLogic = new InputLogic(this, this, mDictionaryFacilitator);
 
@@ -540,6 +541,12 @@ public class LatinIME extends InputMethodService implements
         mDisplayContext = KtxKt.getDisplayContext(this);
         KeyboardSwitcher.init(this);
         super.onCreate();
+        // the learned words pool can change after a keyboard switch (a new keyboard's own words copied in the background,
+        // LearnedStores.refresh): the dictionaries then follow it
+        helium314.keyboard.latin.personalization.LearnedStores.INSTANCE.onPoolChanged(() -> {
+            if (!mDestroyed) mHandler.post(this::resetDictionaryFacilitatorIfNecessary);
+            return kotlin.Unit.INSTANCE;
+        });
 
         loadSettings();
         mClipboardHistoryManager.onCreate();
@@ -704,6 +711,7 @@ public class LatinIME extends InputMethodService implements
 
     @Override
     public void onDestroy() {
+        mDestroyed = true;
         mClipboardHistoryManager.onDestroy();
         mDictionaryFacilitator.closeDictionaries();
         mSettings.onDestroy();

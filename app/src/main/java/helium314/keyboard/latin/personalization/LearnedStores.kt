@@ -41,15 +41,42 @@ object LearnedStores {
     fun poolFor(real: SharedPreferences): Int =
         if (isShared(real)) SHARED else KeyboardProfiles.idFor(real, KeyboardProfiles.selectedKeyboard(real))
 
-    /** Re-reads which pool is in use (on every keyboard switch, and after the setting changed). */
+    /** Re-reads which pool is in use (on every keyboard switch, and after the setting changed). A keyboard's own pool
+     *  with nothing on disk yet (added since sharing went off) is first filled with a copy of the shared words, in the
+     *  background (re-review 2026-10-07: on the main thread it froze the switch); the keyboard keeps the pool it had
+     *  until the copy is done, then this runs again and switches. */
     fun refresh(real: SharedPreferences) {
         val pool = try { poolFor(real) } catch (e: Exception) { Log.w(TAG, "could not read the pool", e); SHARED }
         if (pool == currentPool) return
-        // a keyboard added since sharing went off: its own pool starts as a copy of the shared one
-        if (pool != SHARED) KeyboardProfiles.filesDir?.let { LearnedPools.seedIfNew(it, LearnedStoreIo.Native, pool) }
+        if (needsSeeding(pool)) { seedInBackground(pool) { refresh(real) }; return }
         currentPool = pool
         Log.i(TAG, "learned words pool now $pool")
         listeners.forEach { it() }
+    }
+
+    private fun needsSeeding(pool: Int): Boolean {
+        if (pool == SHARED || pool == seedingFailed) return false
+        val dir = KeyboardProfiles.filesDir ?: return false
+        return pool !in keyboardPoolsOnDisk(dir)
+    }
+
+    @Volatile private var seeding: Int? = null // the pool being filled now (one at a time; a repeat call doesn't start another)
+    @Volatile private var seedingFailed: Int? = null // a pool whose copy failed: used empty rather than never
+    /** Fills [pool] off the main thread, then calls back on it with whether the copy was made (replaceable by tests). */
+    internal var seedRunner: (pool: Int, done: (Boolean) -> Unit) -> Unit = { pool, done ->
+        helium314.keyboard.latin.utils.ExecutorUtils.getBackgroundExecutor(helium314.keyboard.latin.utils.ExecutorUtils.KEYBOARD).execute {
+            val ok = KeyboardProfiles.filesDir?.let { LearnedPools.seedIfNew(it, LearnedStoreIo.Native, pool) } ?: false
+            android.os.Handler(android.os.Looper.getMainLooper()).post { done(ok) }
+        }
+    }
+    private fun seedInBackground(pool: Int, then: () -> Unit) {
+        if (seeding == pool) return
+        seeding = pool
+        seedRunner(pool) { ok ->
+            seeding = null
+            if (!ok) { Log.w(TAG, "keyboard $pool: its learned words couldn't be copied, starting empty"); seedingFailed = pool }
+            then()
+        }
     }
 
     // things built from the learned words of the pool in use (swipe vocabularies, frequent long words): rebuilt when it
