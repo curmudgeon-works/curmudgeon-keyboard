@@ -35,7 +35,14 @@ object KeyPopupOverrides {
     // ---- user-saved sets: name -> base (accent level, symbols layout) + the per-key arrangement ----
     const val PREF_SETS = "key_popup_sets"
 
-    class UserSet(val name: String, val morePopups: String, val symbolsLayout: String?, val overrides: Map<String, List<String>>)
+    /** A set of the user's: the accents level, the symbols page, the per-key arrangement, and (since 2026-10-07) the
+     *  letter-to-symbol map and the popup order it was saved with (null in a set saved before: left as they are). */
+    class UserSet(val name: String, val morePopups: String, val symbolsLayout: String?, val overrides: Map<String, List<String>>,
+                  val symbolMap: String? = null, val popupOrder: String? = null)
+
+    /** Whether [text] can name a new set: not blank, and no set of the user's has it (re-review 2026-10-07: "Save as
+     *  new set" replaced a same-named set without a word). */
+    fun isNewSetName(sets: List<UserSet>, text: String): Boolean = text.isNotBlank() && sets.none { it.name == text.trim() }
 
     fun loadSets(prefs: SharedPreferences): List<UserSet> {
         val json = prefs.getString(PREF_SETS, null) ?: return emptyList()
@@ -45,7 +52,8 @@ object KeyPopupOverrides {
                 val o = arr.getJSONObject(i)
                 val ov = o.getJSONObject("overrides")
                 UserSet(o.getString("name"), o.getString("morePopups"), o.optString("symbolsLayout").ifEmpty { null },
-                    ov.keys().asSequence().associateWith { k -> val a = ov.getJSONArray(k); List(a.length()) { a.getString(it) } })
+                    ov.keys().asSequence().associateWith { k -> val a = ov.getJSONArray(k); List(a.length()) { a.getString(it) } },
+                    if (o.has("symbolMap")) o.getString("symbolMap") else null, if (o.has("popupOrder")) o.getString("popupOrder") else null)
             }
         } catch (e: Exception) { emptyList() }
     }
@@ -54,6 +62,7 @@ object KeyPopupOverrides {
         val arr = JSONArray()
         for (set in sets) arr.put(JSONObject().apply {
             put("name", set.name); put("morePopups", set.morePopups); put("symbolsLayout", set.symbolsLayout ?: "")
+            set.symbolMap?.let { put("symbolMap", it) }; set.popupOrder?.let { put("popupOrder", it) }
             put("overrides", JSONObject().also { o -> set.overrides.forEach { (k, v) -> o.put(k, JSONArray(v)) } })
         })
         prefs.edit().putString(PREF_SETS, arr.toString()).apply()

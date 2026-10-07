@@ -34,6 +34,21 @@ class BuiltInLayoutsTest {
         }
     }
 
+    // re-review 2026-10-07 (M5): with the Layout menu shared by all keyboards, a saved Layout still carries its settings
+    @Test fun `a Layout covers the screen's settings when the Layout menu is shared`() {
+        val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
+        real.edit().putBoolean(helium314.keyboard.latin.settings.KeyboardProfiles.Group.LAYOUT.prefKey, true).apply()
+        helium314.keyboard.latin.settings.KeyboardProfiles.loadGroups(real)
+        try {
+            assertTrue(LayoutPresets.inScope(Settings.PREF_SHOW_NUMBER_ROW))
+            assertTrue(LayoutPresets.inScope(Settings.PREF_LONG_PRESS_SYMBOL_ACTION))
+            assertTrue(named(R.string.layout_preset_heliboard).values.containsKey(Settings.PREF_SHOW_NUMBER_ROW))
+        } finally {
+            real.edit().remove(helium314.keyboard.latin.settings.KeyboardProfiles.Group.LAYOUT.prefKey).apply()
+            helium314.keyboard.latin.settings.KeyboardProfiles.loadGroups(real)
+        }
+    }
+
     @Test fun `Curmudgeon is everything at its default, and the defaults are its values`() {
         assertTrue(named(R.string.layout_preset_curmudgeon).values.values.all { it == null })
         assertEquals(true, Defaults.PREF_SHOW_NUMBER_ROW)

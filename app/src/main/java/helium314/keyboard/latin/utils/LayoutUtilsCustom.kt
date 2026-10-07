@@ -169,6 +169,17 @@ object LayoutUtilsCustom {
     fun makePrivateCopy(layoutName: String, layoutType: LayoutType, context: Context): String =
         makePrivateLayout(getLayoutFile(layoutName, layoutType, context).readText(), layoutType, scopeOf(layoutName, layoutType), context)
 
+    /** [keyboard] with its own copies of the private (unnamed) layouts it names: for a copy of a keyboard, so editing one
+     *  keyboard's keys doesn't change the other's (re-review 2026-10-07: copies shared the source's file). */
+    fun withOwnPrivateLayouts(keyboard: helium314.keyboard.latin.settings.SettingsSubtype, context: Context): helium314.keyboard.latin.settings.SettingsSubtype {
+        var kb = keyboard
+        for (type in LayoutType.entries) {
+            val name = kb.layoutName(type) ?: continue
+            if (isPrivateLayout(name) && getLayoutFile(name, type, context).isFile) kb = kb.withLayout(type, makePrivateCopy(name, type, context))
+        }
+        return kb
+    }
+
     /** For a main layout: what its name is scoped to ("latn" for latin-script languages, else the language tag). */
     fun scopeOf(layoutName: String, layoutType: LayoutType) =
         if (layoutType == LayoutType.MAIN) layoutName.removePrefix(CUSTOM_LAYOUT_PREFIX).substringBefore(".") else ""

@@ -37,6 +37,7 @@ import helium314.keyboard.latin.R
 import helium314.keyboard.latin.common.LocaleUtils.localizedDisplayName
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.latin.utils.SubtypeSettings
+import helium314.keyboard.latin.utils.LayoutUtilsCustom
 import helium314.keyboard.latin.utils.SubtypeUtilsAdditional
 import helium314.keyboard.latin.utils.getStringResourceOrName
 import helium314.keyboard.latin.utils.mainLayoutName
@@ -326,7 +327,8 @@ fun KeyboardsScreen(
                 content = { Text(stringResource(R.string.copy_keyboard_message)) },
                 confirmButtonText = stringResource(R.string.copy_keyboard_with_settings),
                 neutralButtonText = stringResource(R.string.copy_keyboard_common_settings),
-                onNeutral = { copyKeyboard(ctx, source, withOwnSettings = false); generation++ },
+                // (the neutral button doesn't close the dialog by itself: re-review 2026-10-07, every tap added a copy)
+                onNeutral = { copyKeyboard(ctx, source, withOwnSettings = false); generation++; keyboardToCopy = null },
                 confirmFirst = true,
             )
         }
@@ -352,7 +354,7 @@ private fun nextNumbered(source: SettingsSubtype): SettingsSubtype {
 
 private fun copyKeyboard(ctx: Context, source: SettingsSubtype, withOwnSettings: Boolean) {
     val real = ctx.realPrefs()
-    val copy = nextNumbered(source)
+    val copy = LayoutUtilsCustom.withOwnPrivateLayouts(nextNumbered(source), ctx) // (its own unnamed keys, not the source's file)
     SubtypeUtilsAdditional.changeAdditionalSubtype(copy, copy, ctx) // registers it
     SubtypeSettings.addEnabledSubtype(ctx.prefs(), copy.toAdditionalSubtype())
     KeyboardProfiles.copy(real, if (withOwnSettings) KeyboardProfiles.idFor(real, source) else KeyboardProfiles.SHARED,

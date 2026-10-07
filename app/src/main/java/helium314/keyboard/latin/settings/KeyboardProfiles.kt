@@ -138,8 +138,12 @@ object KeyboardProfiles {
     // ("share_user_history_": the retired per-language share switch, kept global so old keys stay where they are)
     private val globalPrefixes = listOf(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX, "language_priority_", "share_user_history_", LanguagePriority.PREF_ADDED_PREFIX, "debug_", "gesture_stats")
 
-    fun isGlobal(key: String) = key in globalKeys || globalPrefixes.any { key.startsWith(it) } || (key.startsWith(PREFIX) && key.contains(SEPARATOR)) ||
-        sharedByGroups(key)
+    /** A key of the app itself (never a keyboard's), whatever the menus' sharing: the keyboard list, the saved themes and
+     *  Layouts, the logs' switches… (re-review 2026-10-07: what a shared menu holds for all keyboards is not app-wide,
+     *  a saved Layout still carries it). */
+    fun isAppWide(key: String) = key in globalKeys || globalPrefixes.any { key.startsWith(it) } || (key.startsWith(PREFIX) && key.contains(SEPARATOR))
+    /** Stored once for all keyboards: [isAppWide], or on menus that are all shared. */
+    fun isGlobal(key: String) = isAppWide(key) || sharedByGroups(key)
 
     fun isSeparate(real: SharedPreferences) = real.getBoolean(PREF_SEPARATE, false)
 

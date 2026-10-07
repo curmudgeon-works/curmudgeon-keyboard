@@ -147,7 +147,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
             // the Arabic-script symbols page only makes sense for keyboards of that script
             if (keyboard.locale.script() == ScriptUtils.SCRIPT_ARABIC) builtIn + Preset(R.string.key_popups_preset_arabic, POPUP_KEYS_NORMAL, "symbols_arabic", symbolMap = "", popupOrder = POPUP_KEYS_ORDER_DEFAULT)
             else builtIn
-        } + userSets.map { Preset(0, it.morePopups, it.symbolsLayout, it.name, it.overrides) }
+        } + userSets.map { Preset(0, it.morePopups, it.symbolsLayout, it.name, it.overrides, symbolMap = it.symbolMap, popupOrder = it.popupOrder) }
         val accentsValue = keyboard.getExtraValueOf(ExtraValue.MORE_POPUPS)
             ?: prefs.getString(Settings.PREF_MORE_POPUP_KEYS, Defaults.PREF_MORE_POPUP_KEYS)!!
         val symbolsLayout = keyboard.layoutName(LayoutType.SYMBOLS)
@@ -159,7 +159,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
             ?: presets[0]
         // every arrangement belongs to a set of the user's own: into the selected one, or into a new one to be named
         fun storeInSet(name: String, all: Map<String, List<String>>) {
-            storePopupSet(ctx, name, accentsValue, symbolsLayout, all)
+            storePopupSet(ctx, keyboard, name, accentsValue, symbolsLayout, all)
             generation++
         }
         @Composable fun presetName(p: Preset) = p.userName ?: stringResource(p.name)
@@ -180,7 +180,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                 onConfirmed = { newName ->
                     val name = newName.trim()
                     KeyPopupOverrides.saveSets(ctx.realPrefs(), userSets.map {
-                        if (it.name == oldName) KeyPopupOverrides.UserSet(name, it.morePopups, it.symbolsLayout, it.overrides) else it
+                        if (it.name == oldName) KeyPopupOverrides.UserSet(name, it.morePopups, it.symbolsLayout, it.overrides, it.symbolMap, it.popupOrder) else it
                     })
                     if (selectedUserSet?.name == oldName) prefs.edit().putString(KeyPopupOverrides.PREF_SELECTED_SET, name).apply()
                     setToRename = null
@@ -210,7 +210,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                 },
                 title = { Text(stringResource(if (pendingChange != null) R.string.key_popups_save_change_title else R.string.key_popups_save_as_new)) },
                 initialText = if (current.userName != null) "" else stringResource(R.string.key_popups_my_set),
-                checkTextValid = { it.isNotBlank() },
+                checkTextValid = { KeyPopupOverrides.isNewSetName(userSets, it) },
             )
         // a tap shows the preset on the preview and the list stays (like Themes); OK keeps it, Cancel puts back what
         // was there when the list opened (the keyboard's accents and symbols page, the arrangement, the set, the map)
@@ -299,9 +299,13 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
 }
 
 /** Every arrangement belongs to a set of the user's own: stores [all] as set [name] and selects it. */
-private fun storePopupSet(ctx: Context, name: String, accentsValue: String, symbolsLayout: String?, all: Map<String, List<String>>) {
+private fun storePopupSet(ctx: Context, keyboard: SettingsSubtype, name: String, accentsValue: String, symbolsLayout: String?, all: Map<String, List<String>>) {
     val prefs = ctx.prefs()
-    val set = KeyPopupOverrides.UserSet(name, accentsValue, symbolsLayout, all)
+    // with the letter-to-symbol map and the popup order as they are (re-review 2026-10-07: a set without them took the
+    // last tapped built-in's)
+    val symbolMap = prefs.getString(Settings.PREF_SYMBOL_POPUP_MAP, Defaults.PREF_SYMBOL_POPUP_MAP)!!
+    val popupOrder = keyboard.getExtraValueOf(ExtraValue.POPUP_ORDER) ?: prefs.getString(Settings.PREF_POPUP_KEYS_ORDER, Defaults.PREF_POPUP_KEYS_ORDER)!!
+    val set = KeyPopupOverrides.UserSet(name, accentsValue, symbolsLayout, all, symbolMap, popupOrder)
     KeyPopupOverrides.saveSets(ctx.realPrefs(), KeyPopupOverrides.loadSets(ctx.realPrefs()).filter { it.name != name } + set)
     KeyPopupOverrides.save(prefs, all)
     prefs.edit().putString(KeyPopupOverrides.PREF_SELECTED_SET, name).apply()
@@ -347,7 +351,7 @@ fun CustomizePopupsScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     var pendingChange: Pair<String, List<String>?>? by remember { mutableStateOf(null) }
     fun applyChange(overrideKey: String, labels: List<String>?) {
         val all = overrides.toMutableMap().also { if (labels == null) it.remove(overrideKey) else it[overrideKey] = labels }
-        if (selectedUserSet != null) { storePopupSet(ctx, selectedUserSet.name, accentsValue, symbolsLayout, all); generation++ }
+        if (selectedUserSet != null) { storePopupSet(ctx, keyboard, selectedUserSet.name, accentsValue, symbolsLayout, all); generation++ }
         else pendingChange = overrideKey to labels
     }
     val tryIt = remember { TryItState() }
@@ -431,13 +435,13 @@ fun CustomizePopupsScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
             onConfirmed = { name ->
                 val all = overrides.toMutableMap()
                 change.second.let { if (it == null) all.remove(change.first) else all[change.first] = it }
-                storePopupSet(ctx, name.trim(), accentsValue, symbolsLayout, all)
+                storePopupSet(ctx, keyboard, name.trim(), accentsValue, symbolsLayout, all)
                 pendingChange = null
                 generation++
             },
             title = { Text(stringResource(R.string.key_popups_save_change_title)) },
             initialText = stringResource(R.string.key_popups_my_set),
-            checkTextValid = { it.isNotBlank() },
+            checkTextValid = { KeyPopupOverrides.isNewSetName(KeyPopupOverrides.loadSets(real), it) },
         )
     }
 }

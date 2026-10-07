@@ -31,7 +31,8 @@ class SettingsContainer(context: Context) {
     //  don't show disabled settings -> users confused
     //  show as disabled (i.e. no interaction possible) -> users confused
     //  show, but change will not do anything because another setting needs to be enabled first -> probably best
-    fun filter(searchTerm: String): List<Setting> = SettingsSearch.search(searchTerm, list)
+    // (but not what no screen shows: hiddenFromSearch)
+    fun filter(searchTerm: String): List<Setting> = SettingsSearch.search(searchTerm, list.filter { !hiddenFromSearch(it.key) })
 }
 
 @Immutable

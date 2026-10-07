@@ -1418,7 +1418,6 @@ public final class InputLogic {
         final int codePoint = event.getCodePoint();
         final SettingsValues settingsValues = inputTransaction.getSettingsValues();
         if (isWebEndingAfterAddedSpace()) collapseRun(settingsValues, true);
-        if (Character.isWhitespace(codePoint)) resetRun();
         final boolean wasComposingWord = mWordComposer.isComposingWord();
         // We avoid sending spaces in languages without spaces if we were composing.
         final boolean shouldAvoidSendingCode = Constants.CODE_SPACE == codePoint
@@ -1444,6 +1443,9 @@ public final class InputLogic {
                 commitTyped(settingsValues, StringUtils.newSingleCodePointString(codePoint));
             }
         }
+        // a space the user typed ends the run: after the commit, which noted the word just learned for the run
+        // (re-review 2026-10-07: reset before it, "Hi john.smith@" took "Hi" back at the "@")
+        if (Character.isWhitespace(codePoint)) resetRun();
 
         final boolean swapWeakSpace = tryStripSpaceAndReturnWhetherShouldSwapInstead(event, inputTransaction);
 

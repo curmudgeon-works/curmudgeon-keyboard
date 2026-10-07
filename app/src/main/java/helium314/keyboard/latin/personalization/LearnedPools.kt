@@ -37,6 +37,15 @@ object LearnedPools {
         return true
     }
 
+    /** A keyboard whose own pool has nothing on disk yet (added after sharing went off) starts as a copy of the shared
+     *  learned words and blacklists, like the keyboards there were when it went off (re-review 2026-10-07: it started
+     *  empty). A pool with files, even emptied ones, is left as it is. */
+    fun seedIfNew(filesDir: File, io: LearnedStoreIo, pool: Int): Boolean {
+        if (pool == LearnedStores.SHARED || pool in LearnedStores.keyboardPoolsOnDisk(filesDir)) return true
+        Log.i(TAG, "keyboard $pool: its own learned words start as a copy of the shared ones")
+        return separate(filesDir, io, listOf(pool))
+    }
+
     /** The pools of the keyboards in the list. */
     fun keyboardPools(real: SharedPreferences): List<Int> =
         SubtypeSettings.getEnabledSubtypes(true).map { KeyboardProfiles.idFor(real, it.toSettingsSubtype()) }.distinct()

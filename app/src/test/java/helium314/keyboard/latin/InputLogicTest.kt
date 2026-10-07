@@ -45,6 +45,7 @@ import kotlin.streams.asSequence
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 
 @RunWith(RobolectricTestRunner::class)
 @Config(shadows = [
@@ -418,6 +419,18 @@ class InputLogicTest {
         chainInput("gmail.com ")
         assertEquals("sender.first.last@gmail.com ", text)
         assertEquals("sender.first.last@gmail.com", lastAddedWord)
+    }
+
+    // re-review 2026-10-07 (M1): the word before an address keeps its uses ("Hi" was unlearned at the "@")
+    @Test fun `an address after a space doesn't unlearn the word before it`() {
+        reset()
+        autospaceOn()
+        unlearnedWords.clear()
+        chainInput("Hi john.smith")
+        assertEquals("Hi john. smith", text)
+        inputRewriting('@')
+        assertEquals("Hi john.smith@", text)
+        assertFalse(unlearnedWords.any { it.equals("hi", ignoreCase = true) }, "unlearned: $unlearnedWords")
     }
 
     @Test fun `full stop auto-space is taken back after a web ending`() {

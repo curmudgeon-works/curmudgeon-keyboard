@@ -53,7 +53,7 @@ object LayoutPresets {
         Settings.PREF_ADDITIONAL_SUBTYPES, Settings.PREF_ENABLED_SUBTYPES, Settings.PREF_SELECTED_SUBTYPE, "keyboard_profile_ids")
     private val prefixes = LayoutDraft.prefixes.filter { it != Settings.PREF_SAVED_APP_SUBTYPE_PREFIX }
 
-    fun inScope(key: String) = !KeyboardProfiles.isGlobal(key) && key !in notInPresets && !key.startsWith(KeyboardProfiles.TOMBSTONE)
+    fun inScope(key: String) = !KeyboardProfiles.isAppWide(key) && key !in notInPresets && !key.startsWith(KeyboardProfiles.TOMBSTONE)
         && (key in LayoutDraft.keys || prefixes.any { key.startsWith(it) })
 
     /**
@@ -160,7 +160,8 @@ object LayoutPresets {
                 val a = o.getJSONArray(k); List(a.length()) { a.getString(it) } } } }.getOrNull() } ?: emptyMap()
         KeyPopupOverrides.saveSets(real, sets + KeyPopupOverrides.UserSet(name,
             preset.values[MORE_POPUPS] as? String ?: ctx.prefs().getString(Settings.PREF_MORE_POPUP_KEYS, Defaults.PREF_MORE_POPUP_KEYS)!!,
-            preset.values[LAYOUT + LayoutType.SYMBOLS.name] as? String, overrides))
+            preset.values[LAYOUT + LayoutType.SYMBOLS.name] as? String, overrides,
+            preset.values[Settings.PREF_SYMBOL_POPUP_MAP] as? String, preset.values[Settings.PREF_POPUP_KEYS_ORDER] as? String))
     }
 
     /** [values] (settings part) replace the current ones: null and missing keys go back to their default. */

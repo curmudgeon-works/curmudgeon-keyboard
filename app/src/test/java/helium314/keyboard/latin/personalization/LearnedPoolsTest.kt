@@ -47,6 +47,20 @@ class LearnedPoolsTest {
         assertEquals(9 to 100, FakeLearnedStoreIo.read(store("Latn", 0))["hai"])
     }
 
+    // re-review 2026-10-07 (M2): a keyboard added after sharing went off started with nothing
+    @Test fun `a keyboard added after sharing went off starts with a copy of the shared words`() {
+        assertTrue(LearnedPools.seedIfNew(dir, io, 3))
+        assertEquals(FakeLearnedStoreIo.read(store("Latn", 0)), FakeLearnedStoreIo.read(store("Latn", 3)))
+        assertEquals(FakeLearnedStoreIo.read(store("Deva", 0)), FakeLearnedStoreIo.read(store("Deva", 3)))
+        assertEquals(mapOf("teh" to Entry(2)), entries("Latn", 3))
+        // a pool with files of its own is left as it is; the shared pool is never seeded
+        FakeLearnedStoreIo.store(store("Latn", 3), word("yaar", 1, 300))
+        assertTrue(LearnedPools.seedIfNew(dir, io, 3))
+        assertEquals(mapOf("yaar" to (1 to 300)), FakeLearnedStoreIo.read(store("Latn", 3)))
+        assertTrue(LearnedPools.seedIfNew(dir, io, LearnedStores.SHARED))
+        assertEquals(9 to 100, FakeLearnedStoreIo.read(store("Latn", 0))["hai"])
+    }
+
     @Test fun `on again - the keyboards' words put together by the highest count, not the sum, then emptied`() {
         LearnedPools.separate(dir, io, listOf(1, 2))
         // learned on since: keyboard 1 typed "hai" twice more, keyboard 2 learned "yaar" and removed "teh" once more

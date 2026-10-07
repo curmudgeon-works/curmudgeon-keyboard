@@ -45,6 +45,8 @@ object LearnedStores {
     fun refresh(real: SharedPreferences) {
         val pool = try { poolFor(real) } catch (e: Exception) { Log.w(TAG, "could not read the pool", e); SHARED }
         if (pool == currentPool) return
+        // a keyboard added since sharing went off: its own pool starts as a copy of the shared one
+        if (pool != SHARED) KeyboardProfiles.filesDir?.let { LearnedPools.seedIfNew(it, LearnedStoreIo.Native, pool) }
         currentPool = pool
         Log.i(TAG, "learned words pool now $pool")
         listeners.forEach { it() }
