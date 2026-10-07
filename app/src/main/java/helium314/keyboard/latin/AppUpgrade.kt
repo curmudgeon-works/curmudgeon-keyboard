@@ -73,14 +73,25 @@ private val defaultsBefore3008: Map<String, Any> = mapOf(
     Settings.PREF_LONG_PRESS_SYMBOL_ACTION to "none",
 )
 
-/** Whether a stored [value] of [key] is at its default: the default now, or the one before 0.3.008. Long-press ?123 not
- *  while the old numpad switch is on ([numpadOn]): not set, it reads the numpad there. */
-private fun atDefault(key: String, value: Any?, numpadOn: Boolean): Boolean {
+/** More defaults 0.3.008 changed (Rahul 2026-10-06: upgraders follow these too), for the live settings only: a saved
+ *  theme or Layout is a look someone kept, it keeps its colours, light / dark and key sounds. */
+private val liveDefaultsBefore3008: Map<String, Any> = mapOf(
+    Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_BLACK, // the Midnight look; Dynamic now
+    Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_BLACK,
+    Settings.PREF_THEME_DAY_NIGHT to false, // dark mode follows the phone now
+    Settings.PREF_VIBRATE_ON to true, // off now, as in HeliBoard
+    Settings.PREF_SOUND_ON to true,
+)
+
+/** Whether a stored [value] of [key] is at its default: the default now, or the one before 0.3.008 (in the [live]
+ *  settings, also those of [liveDefaultsBefore3008]). Long-press ?123 not while the old numpad switch is on
+ *  ([numpadOn]): not set, it reads the numpad there. */
+private fun atDefault(key: String, value: Any?, numpadOn: Boolean, live: Boolean = true): Boolean {
     if (value == null) return false
     if (key == Settings.PREF_LONG_PRESS_SYMBOL_ACTION && numpadOn) return false
     val now = helium314.keyboard.settings.SettingDefaults.of(key)
     if (now != null && helium314.keyboard.settings.KnownDefaults.same(key, value, now)) return true
-    return defaultsBefore3008[key] == value
+    return defaultsBefore3008[key] == value || (live && liveDefaultsBefore3008[key] == value)
 }
 
 /** [values] (plain keys, e.g. a keyboard's settings in a backup from before 0.3.008) without the ones at their default. */
@@ -105,23 +116,35 @@ internal fun pickedOnlyUpgrade(real: SharedPreferences, freshInstall: Boolean) {
         val sharedNumpad = all[numpad] == true
         fun numpadOn(id: Int) = all[KeyboardProfiles.ownKey(id, numpad)] as? Boolean
             ?: (!all.containsKey(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + numpad)) && sharedNumpad)
+        // the sets whose colours went back to the default (null: the shared one): the theme they named (Midnight)
+        // isn't what they show any more, so they name none (the Themes row then shows the default, Dynamic)
+        val colorsCleared = HashSet<Int?>()
         real.edit {
             for ((stored, value) in all) {
                 val own = KeyboardProfiles.splitOwnKey(stored)
                 if (own == null) {
-                    if (atDefault(stored, value, sharedNumpad)) remove(stored)
+                    if (!atDefault(stored, value, sharedNumpad)) continue
+                    remove(stored)
+                    if (stored == Settings.PREF_THEME_COLORS) colorsCleared.add(null)
                     continue
                 }
                 val (id, key) = own
                 if (key.startsWith(KeyboardProfiles.TOMBSTONE) || !atDefault(key, value, numpadOn(id))) continue
                 remove(stored)
                 putBoolean(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + key), true)
+                if (key == Settings.PREF_THEME_COLORS) colorsCleared.add(id)
+            }
+            for (id in colorsCleared) {
+                if (id == null) { remove(AppearanceLooks.PREF_SELECTED); continue }
+                remove(KeyboardProfiles.ownKey(id, AppearanceLooks.PREF_SELECTED))
+                putBoolean(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + AppearanceLooks.PREF_SELECTED), true)
             }
         }
         AppearanceLooks.save(real, AppearanceLooks.load(real).map { look -> AppearanceLooks.Look(look.name,
-            look.values.mapValues { (key, value) -> if (atDefault(key, value, sharedNumpad)) null else value }) })
+            look.values.mapValues { (key, value) -> if (atDefault(key, value, sharedNumpad, live = false)) null else value }) })
         LayoutPresets.save(real, LayoutPresets.load(real).map { preset -> LayoutPresets.Preset(preset.name,
-            preset.values.mapValues { (key, value) -> if (atDefault(key, value, preset.values[numpad] as? Boolean ?: sharedNumpad)) null else value }) })
+            preset.values.mapValues { (key, value) ->
+                if (atDefault(key, value, preset.values[numpad] as? Boolean ?: sharedNumpad, live = false)) null else value }) })
     }
     real.edit { putBoolean(PICKED_ONLY_DONE, true) }
 }

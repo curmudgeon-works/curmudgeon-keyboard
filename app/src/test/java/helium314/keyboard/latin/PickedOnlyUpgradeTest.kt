@@ -128,6 +128,31 @@ class PickedOnlyUpgradeTest {
         assertEquals(mapOf<String, Any?>(numpad to true, symbolAction to "none"), withoutDefaults(mapOf(numpad to true, symbolAction to "none")))
     }
 
+    @Test fun `the older look and key sounds follow the new defaults too, saved themes and Layouts keep theirs`() {
+        val black = helium314.keyboard.keyboard.KeyboardTheme.THEME_BLACK
+        prefs.edit {
+            putString("keyboard_profile_ids", """{"en_US:":1}""")
+            putString(Settings.PREF_THEME_COLORS, black); putString(Settings.PREF_THEME_COLORS_NIGHT, black)
+            putBoolean(Settings.PREF_THEME_DAY_NIGHT, false)
+            putBoolean(Settings.PREF_VIBRATE_ON, true); putBoolean(Settings.PREF_SOUND_ON, false) // sound off: a pick (not the old default)
+            putString(AppearanceLooks.PREF_SELECTED, "Midnight")
+            putString(own(1, Settings.PREF_THEME_COLORS), black)
+            putString(own(1, AppearanceLooks.PREF_SELECTED), "Midnight")
+        }
+        AppearanceLooks.save(prefs, listOf(AppearanceLooks.Look("Mine", mapOf(Settings.PREF_THEME_COLORS to black))))
+        LayoutPresets.save(prefs, listOf(LayoutPresets.Preset("Mine", mapOf(Settings.PREF_VIBRATE_ON to true))))
+        pickedOnlyUpgrade(prefs, freshInstall = false)
+        for (key in listOf(Settings.PREF_THEME_COLORS, Settings.PREF_THEME_COLORS_NIGHT, Settings.PREF_THEME_DAY_NIGHT,
+                Settings.PREF_VIBRATE_ON, AppearanceLooks.PREF_SELECTED)) assertFalse(prefs.contains(key), key)
+        assertEquals(false, prefs.getBoolean(Settings.PREF_SOUND_ON, true))
+        assertFalse(prefs.contains(own(1, Settings.PREF_THEME_COLORS)))
+        assertTrue(prefs.getBoolean(mark(1, Settings.PREF_THEME_COLORS), false))
+        assertFalse(prefs.contains(own(1, AppearanceLooks.PREF_SELECTED)))
+        assertTrue(prefs.getBoolean(mark(1, AppearanceLooks.PREF_SELECTED), false))
+        assertEquals(black, AppearanceLooks.load(prefs).single().values[Settings.PREF_THEME_COLORS])
+        assertEquals(true, LayoutPresets.load(prefs).single().values[Settings.PREF_VIBRATE_ON])
+    }
+
     @Test fun `a theme saves what isn't picked as not set`() {
         val values = AppearanceLooks.snapshot(prefs)
         assertTrue(values.containsKey(Settings.PREF_THEME_KEY_BORDERS))
