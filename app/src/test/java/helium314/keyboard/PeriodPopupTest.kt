@@ -23,6 +23,12 @@ class PeriodPopupTest {
         assertEquals(all.sorted(), swapped.sorted())
     }
 
+    @Test fun `without a comma key the comma stays first, the apostrophe right next to it`() {
+        val default = listOf("!autoColumnOrder!8", "\\,", "?", "!", "#", ")", "(", "/", ";", "'", "@", ":")
+        assertEquals(listOf("!autoColumnOrder!8", "\\,", "'", "?", "!", "#", ")", "(", "/", ";", "@", ":"),
+            KeyData.apostropheFirst(default, hasCommaKey = false))
+    }
+
     @Test fun `a list without an apostrophe or not starting with the comma stays`() {
         val bengali = "!autoColumnOrder!8 \\, ॥ ? ! # @ ( ) / ; : - + \\%".split(" ")
         assertEquals(bengali, KeyData.apostropheFirst(bengali))

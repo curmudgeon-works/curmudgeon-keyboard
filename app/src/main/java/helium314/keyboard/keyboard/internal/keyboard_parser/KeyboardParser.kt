@@ -126,6 +126,10 @@ class KeyboardParser(private val params: KeyboardParams, private val context: Co
 
         val allFunctionalKeys = LayoutParser.parseLayout(LayoutType.FUNCTIONAL, params, context)
         adjustBottomFunctionalRowAndBaseKeys(allFunctionalKeys, baseKeys)
+        // whether a key types a comma (none in an email or web address field, where its place has @ or /, or in a layout
+        // with its own keys there): without one, the period's long-press starts with the comma (2026-10-06)
+        params.mHasCommaKey = (baseKeys + allFunctionalKeys).any { row ->
+            row.any { key -> key.compute(params)?.label.let { it == KeyLabel.COMMA || it == "," } } }
 
         if (allFunctionalKeys.none { it.singleOrNull()?.isKeyPlaceholder() == true })
             // add a placeholder so splitAt does what we really want

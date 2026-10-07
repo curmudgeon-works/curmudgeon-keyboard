@@ -111,13 +111,19 @@ sealed interface KeyData : AbstractKeyData {
             return keys
         }
 
-        /** The period key's popups with the apostrophe where the comma was first (what press and hold types), and the
-         *  comma where the apostrophe was: the comma has its own key (2026-10-06). Lists without both stay as they are. */
-        internal fun apostropheFirst(popupKeys: Collection<String>): List<String> {
+        /**
+         * The period key's popups (2026-10-06), when they start with the comma and have an apostrophe: with a comma key
+         * ([hasCommaKey]) the apostrophe first (what press and hold types) and the comma in its place; without one (an
+         * email or web address field, a layout with its own keys there) the comma stays first and the apostrophe comes
+         * right next to it. Lists without both stay as they are.
+         */
+        internal fun apostropheFirst(popupKeys: Collection<String>, hasCommaKey: Boolean = true): List<String> {
             val keys = popupKeys.toMutableList()
             val first = keys.indexOfFirst { !it.startsWith(Key.POPUP_KEYS_AUTO_COLUMN_ORDER) && !it.startsWith(Key.POPUP_KEYS_FIXED_COLUMN_ORDER) }
             val apostrophe = keys.indexOf("'")
-            if (first >= 0 && keys[first] == "\\," && apostrophe >= 0) { keys[first] = "'"; keys[apostrophe] = "\\," }
+            if (first < 0 || keys[first] != "\\," || apostrophe < 0) return keys
+            if (hasCommaKey) { keys[first] = "'"; keys[apostrophe] = "\\," }
+            else { keys.removeAt(apostrophe); keys.add(first + 1, "'") }
             return keys
         }
 
@@ -126,7 +132,7 @@ sealed interface KeyData : AbstractKeyData {
                 return listOf("…")
             if (params.mId.isNumberLayout)
                 return listOf(":", "…", ";", "∞", "π", "√", "°", "^")
-            val popupKeys = apostropheFirst(params.mLocaleKeyboardInfos.getPopupKeys("punctuation")!!).toMutableList()
+            val popupKeys = apostropheFirst(params.mLocaleKeyboardInfos.getPopupKeys("punctuation")!!, params.mHasCommaKey).toMutableList()
             if (params.mId.mSubtype.isRtlSubtype) {
                 for (i in popupKeys.indices)
                     popupKeys[i] = popupKeys[i].rtlLabel(params) // for parentheses

@@ -94,6 +94,8 @@ public class KeyboardParams {
     @NonNull
     private final UniqueKeysCache mUniqueKeysCache;
     public boolean mAllowRedundantPopupKeys;
+    // a key types a comma (set by KeyboardParser once the keys are known); without one the period's long-press offers it
+    public boolean mHasCommaKey = true;
     @NonNull
     public LocaleKeyboardInfos mLocaleKeyboardInfos;
     public boolean setTabletExtraKeys;
