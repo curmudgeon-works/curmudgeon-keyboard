@@ -56,6 +56,7 @@ fun SwitchPreference(
     allowCheckedChange: (Boolean) -> Boolean = { true }, // true means ok, usually for showing some dialog
     inverted: Boolean = false,
     dimmed: Boolean = false,
+    shownOff: Boolean = false, // shown off whatever is stored (what applies now); nothing is written for it
     onCheckedChange: (Boolean) -> Unit = { },
 ) {
     val ctx = LocalContext.current
@@ -64,7 +65,7 @@ fun SwitchPreference(
     val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
     if ((b?.value ?: 0) < 0)
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
-    var value = prefs.getBoolean(key, default) xor inverted
+    var value = (prefs.getBoolean(key, default) xor inverted) && !shownOff
     fun switched(newValue: Boolean) {
         if (!allowCheckedChange(newValue)) {
             value = !newValue
@@ -93,11 +94,11 @@ fun SwitchPreferenceWithEmojiDictWarning(setting: Setting, default: Boolean) {
     val context = LocalContext.current
     var showWarningDialog by rememberSaveable { mutableStateOf(false) }
     val hasEmojiDict = DictionaryInfoUtils.getLocalesWithEmojiDicts(context).isNotEmpty()
-    // without an emoji dictionary there is nothing to show: the switch stays off (a stored "on" is reset) and
-    // turning it on only explains where to get the dictionary
-    if (!hasEmojiDict && context.prefs().getBoolean(setting.key, false))
-        context.prefs().edit { putBoolean(setting.key, false) }
-    SwitchPreference(setting, default && hasEmojiDict,
+    // without an emoji dictionary there is nothing to show: the switch shows off (a stored "on" stays stored: review
+    // 2026-10-06, writing it off while drawing made Text correction open as "changed") and turning it on only explains
+    // where to get the dictionary
+    SwitchPreference(setting.title, key = setting.key, default = default && hasEmojiDict, description = setting.description,
+        shownOff = !hasEmojiDict,
         allowCheckedChange = { on -> if (on && !hasEmojiDict) { showWarningDialog = true; false } else true })
     if (showWarningDialog) {
         // emoji_dictionary_required contains "%s" since we didn't supply a formatArg

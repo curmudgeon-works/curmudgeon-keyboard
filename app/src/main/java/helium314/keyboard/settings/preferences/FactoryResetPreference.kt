@@ -129,6 +129,7 @@ private fun factoryReset(ctx: Context, keyboards: Boolean, learnedWords: Boolean
     // (the keyboards' own learned words were put together before, see the dialog)
     Settings.getInstance().stopListener()
     prefs.edit { prefs.all.keys.filterNot { keptOnReset(it, keyboards, custom) }.forEach { remove(it) } }
+    helium314.keyboard.latin.gesture.GestureStats.reload() // (its cached rows would come back over the reset)
     LearnedStores.refresh(prefs)
     KeyboardProfiles.editingId = KeyboardProfiles.SHARED
     // the background pictures belong to the settings (every keyboard's: the set ids start again after a reset, and a

@@ -326,6 +326,7 @@ private fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: Int
         }
     }
     wait.await()
+    helium314.keyboard.latin.gesture.GestureStats.reload() // (its cached rows would come back over the restored ones)
     restoreFollowUp(ctx)
     transferOldPinnedClips(ctx)
     LearnedStores.refresh(ctx.realPrefs()) // (the keyboards' own learned words, or the shared ones, as restored)

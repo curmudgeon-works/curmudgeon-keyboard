@@ -59,6 +59,19 @@ class ReReviewLowTest {
         } finally { real.unregisterOnSharedPreferenceChangeListener(listener) }
     }
 
+    // S3, reviewer: the cached rows must not come back over a reset or a restore
+    @Test fun `swipe statistics read again after the stored ones were replaced`() {
+        GestureStats.prefsProvider = { real }
+        GestureStats.onSwipe("t1", 5); GestureStats.onPicked(0)
+        GestureStats.flush(real)
+        real.edit().remove(GestureStats.PREF_KEY).commit() // (a factory reset)
+        GestureStats.reload()
+        assertNull(GestureStats.read(real)["t1"])
+        GestureStats.onSwipe("t2", 5)
+        GestureStats.flush(real)
+        assertFalse(real.getString(GestureStats.PREF_KEY, "")!!.contains("\"t1\""))
+    }
+
     // T2 (+ T3: the steps take the stored settings)
     @Test fun `a fresh install stores no defaults for the retired font and trail switches`() {
         curmudgeonUpgrades(real, freshInstall = true)

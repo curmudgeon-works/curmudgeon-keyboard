@@ -394,7 +394,9 @@ object GestureDecoderVocabulary {
             if (mainDictFile == null && disk == null) {
                 // no dictionary: the learned words alone, if there are any (re-review 2026-10-07: a keyboard of such a
                 // language couldn't swipe its own words), else nothing to wait for
+                val before = cache[key] // (a list kept from before a clear: its dictionary is gone now)
                 publishNow(key, locale, context, emptyList())
+                if (cache[key] === before && before != null) { cache.remove(key); stale.remove(key) } // (reviewer 2026-10-07: it was rebuilt on every call)
                 if (cache[key] == null) noDictionary.add(key)
                 mergeWanted(key) // the keyboards waiting for it don't have to any more
                 if (cache[key] == null) { // nothing learned yet (or its store still opening): one more look later, as with a dictionary

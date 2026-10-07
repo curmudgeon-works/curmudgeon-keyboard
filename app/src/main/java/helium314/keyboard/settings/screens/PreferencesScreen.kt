@@ -336,19 +336,22 @@ private fun SwitchWithDialogPreference(
     helium314.keyboard.settings.KnownDefaults.note(key, default)
     val on = prefs.getBoolean(key, default)
     var showDialog by rememberSaveable { mutableStateOf(false) }
-    fun open() { onOpen(); showDialog = true }
-    Preference(name = setting.title, onClick = { if (!on) prefs.edit { putBoolean(key, true) }; open() }) {
+    // the row tapped while off: the dialog, and the switch on only with OK (reviewer 2026-10-07: it turned on at the
+    // tap and Cancel left it on); the switch itself turns on at once, and Cancel turns it off again
+    var wasOn by rememberSaveable { mutableStateOf(on) }
+    fun open() { wasOn = on; onOpen(); showDialog = true }
+    Preference(name = setting.title, onClick = { open() }) {
         Switch(checked = on, onCheckedChange = { turnOn ->
             prefs.edit { putBoolean(key, turnOn) }
             if (turnOn) open()
         })
     }
     if (showDialog) ThreeButtonAlertDialog(
-        onDismissRequest = { showDialog = false },
+        onDismissRequest = { if (!wasOn) prefs.edit { putBoolean(key, false) }; showDialog = false },
         title = { Text(setting.title) },
         neutralButtonText = onDefault?.let { stringResource(R.string.button_default) },
         onNeutral = { onDefault?.invoke() },
-        onConfirmed = save,
+        onConfirmed = { if (!on) prefs.edit { putBoolean(key, true) }; save() },
         content = { dialogContent() },
     )
 }

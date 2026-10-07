@@ -57,6 +57,10 @@ object GestureStats {
         writer.schedule({ flush(prefs) }, WRITE_DELAY_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
     }
 
+    /** The stored rows changed under the cached ones (a factory reset, a restore): read again at the next use, and a
+     *  write already scheduled writes nothing (reviewer 2026-10-07: the old rows came back over the new ones). */
+    @Synchronized fun reload() { live = null }
+
     /** Writes what changed now (tests, and the scheduled write). */
     @Synchronized fun flush(prefs: SharedPreferences) {
         writePending = false

@@ -229,7 +229,8 @@ fun SearchSettingsScreen(
             }
         },
         filteredItems = { SettingsActivity.settingsContainer.filter(it) },
-        itemContent = { it.Preference() }
+        // (under no menu: a result hidden on the menu search was opened from is still a setting, review 2026-10-06)
+        itemContent = { CompositionLocalProvider(LocalSettingsMenu provides null) { it.Preference() } }
     )
 }
 
