@@ -642,7 +642,7 @@ private fun SavedLooksPreference(setting: Setting) {
         ?: ctx.getString(R.string.theme_preset_dynamic).takeIf { android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S }
     val chosen = chosenName?.let { name -> (builtIn + looks).firstOrNull { it.name == name } }
     val tweaked = chosen != null && AppearanceLooks.isTweaked(ctx, chosen)
-    val draft = AppearanceDraft.of(ctx)
+    val draft = AppearanceDraft.version.intValue.let { AppearanceDraft.of(ctx) } // (redrawn when the draft is saved or dropped)
     val unsaved = draft.changedKeys(ctx).any { AppearanceLooks.inScope(it) || it == AppearanceLooks.PREF_SELECTED }
         || draft.changedFiles().any { it.startsWith("custom_background") }
     val state = listOfNotNull(stringResource(R.string.theme_tweaked).takeIf { tweaked }, stringResource(R.string.theme_unsaved).takeIf { unsaved })

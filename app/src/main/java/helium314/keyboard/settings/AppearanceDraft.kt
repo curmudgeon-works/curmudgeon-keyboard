@@ -64,9 +64,14 @@ class AppearanceDraft private constructor(
     private fun discard() {
         dir.deleteRecursively()
         if (active === this) active = null
+        version.intValue++
     }
 
     companion object {
+        /** Bumped when the snapshot goes (accept, reject, leaving): what shows "unsaved" reads it, so it's drawn again
+         *  when that ends without any setting changing (2026-10-06: the Themes row kept "(unsaved)" after the tick). */
+        val version = androidx.compose.runtime.mutableIntStateOf(0)
+
         private fun currentPrefs(ctx: Context): Map<String, Any?> = AppearanceLooks.screenValues(ctx.prefs())
 
         private fun liveFiles(ctx: Context) = listOf(
