@@ -18,6 +18,9 @@ import kotlin.test.assertEquals
 class XLinkTest { // Without the X, SubtypeTests fail with ClassCastException. WTF?
     @Test fun knownDictionaries() {
         if (BuildConfig.BUILD_TYPE == "runTests") return // don't spam requests to Codeberg on every PR update
+        // and not on every local run either (2026-10-07: Codeberg rate-limited us after a night of full runs): once a day
+        // or so, with CHECK_DICT_LINKS=1 ./gradlew :app:testPlayDebugUnitTest --tests '*XLinkTest*'
+        if (System.getenv("CHECK_DICT_LINKS") != "1") return
         val context = ApplicationProvider.getApplicationContext<App>()
         val urls = mutableSetOf<String>()
         context.assets.open("dictionaries_in_dict_repo.csv").reader().readLines().forEach { line ->

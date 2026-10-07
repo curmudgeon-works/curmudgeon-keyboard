@@ -98,7 +98,7 @@ fun createToolbarSettings(context: Context) = listOf(
         val stored = Settings.readToolbarVisibility(prefs)
         // (shown, not written: review 2026-10-06, drawing the screen with suggestions off turned a stored "in place"
         // into "from the key" for good)
-        ListPreference(it, items, stored, live = true, shown = toolbarVisibilityShown(stored, suggestions)) { // a tap previews on the keyboard, OK keeps, Cancel restores
+        ListPreference(it, items, Defaults.PREF_TOOLBAR_VISIBILITY, live = true, shown = toolbarVisibilityShown(stored, suggestions)) { // a tap previews on the keyboard, OK keeps, Cancel restores
             KeyboardLayoutSet.onSystemLocaleChanged() // (the top-left key's popup comes and goes)
             KeyboardSwitcher.getInstance().setThemeNeedsReload()
         }

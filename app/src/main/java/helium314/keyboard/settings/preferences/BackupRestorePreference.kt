@@ -598,6 +598,9 @@ internal fun isSettingsFile(path: String) = path.startsWith("layouts${File.separ
 internal fun restoreFollowUp(ctx: Context) {
     checkVersionUpgrade(ctx)
     KeyboardProfiles.settingsMoves(ctx.realPrefs())
+    // the keyboards' own learned words that came out of the backup are whole: never to be copied over by the pool
+    // refresh that follows (reviewer 2026-10-07: a restored pool without its marker got the shared words instead)
+    ctx.filesDir?.let { LearnedPools.markPoolsOnDisk(it) }
 }
 
 /** Reads the preferences entry of a backup, the keyboards listed in it and the names of all its entries. */
@@ -725,6 +728,7 @@ private const val PERSONAL_DICT_FILE_NAME = "personal_dictionary.json"
 
 internal val backupFilePatterns by lazy { listOf(
     "blacklists${File.separator}.*\\.txt".toRegex(),
+    "learned_seeded_k[0-9]+".toRegex(), // a keyboard's own learned words are complete (LearnedPools.isSeeded)
     "layouts${File.separator}.*${LayoutUtilsCustom.CUSTOM_LAYOUT_PREFIX}+\\..{0,4}".toRegex(), // can't expect a period at the end, as this would break restoring older backups
     "dicts${File.separator}.*${File.separator}.*user\\.dict".toRegex(),
     "UserHistoryDictionary.*${File.separator}UserHistoryDictionary.*\\.(body|header)".toRegex(),

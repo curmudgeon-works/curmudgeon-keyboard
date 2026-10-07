@@ -51,10 +51,13 @@ object LearnedPools {
     private fun marker(filesDir: File, pool: Int) = File(filesDir, "learned_seeded_k$pool")
     fun isSeeded(filesDir: File, pool: Int) = pool == LearnedStores.SHARED || marker(filesDir, pool).isFile
     private fun markSeeded(filesDir: File, pool: Int) { runCatching { marker(filesDir, pool).writeText("") } }
+    /** Every pool with files on disk is a seeded one: after a restore (they came whole from the backup; reviewer
+     *  2026-10-07: without this the pool refresh copied the shared words over a restored pool). */
+    fun markPoolsOnDisk(filesDir: File) { for (pool in LearnedStores.keyboardPoolsOnDisk(filesDir)) markSeeded(filesDir, pool) }
     /** Once: the pools that have files from before the markers existed are seeded ones. */
     fun markExistingPools(filesDir: File, real: SharedPreferences) {
         if (real.getBoolean("learned_pools_marked", false)) return
-        for (pool in LearnedStores.keyboardPoolsOnDisk(filesDir)) markSeeded(filesDir, pool)
+        markPoolsOnDisk(filesDir)
         real.edit().putBoolean("learned_pools_marked", true).apply()
     }
 
