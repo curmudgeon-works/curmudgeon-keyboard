@@ -333,14 +333,18 @@ class SwipeTrainerActivity : Activity() {
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_SUBJECT, "Swipe Trainer session")
-            putExtra(Intent.EXTRA_TEXT, summary + "\n\nJSONL (${sessionJsonLines.size} lines):\n"
-                    + sessionJsonLines.joinToString("\n"))
+            // (an intent carries ~1 MB at most: a long session shares the summary and names the file, which has it all)
+            val jsonl = sessionJsonLines.joinToString("\n")
+            putExtra(Intent.EXTRA_TEXT, if (jsonl.length > MAX_SHARED_CHARS)
+                summary + "\n\nJSONL: ${sessionJsonLines.size} lines, too long to share here; the file has them: ${logFile().absolutePath}"
+                else summary + "\n\nJSONL (${sessionJsonLines.size} lines):\n" + jsonl)
         }
         startActivity(Intent.createChooser(intent, "Share session"))
         Toast.makeText(this, logFile().absolutePath, Toast.LENGTH_LONG).show()
     }
 
     companion object {
+        private const val MAX_SHARED_CHARS = 400_000
         // categories from the M1 accuracy harness: short, double-letter, adjacent-key pairs, long
         private val DEFAULT_WORDS = listOf(
             "is", "in", "on", "it", "at",

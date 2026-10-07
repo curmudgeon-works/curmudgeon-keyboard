@@ -206,6 +206,7 @@ object LayoutPresets {
     }
 
     fun save(prefs: SharedPreferences, presets: List<Preset>) {
+        keepBrokenAside(prefs, PREF)
         val arr = JSONArray()
         for (preset in presets) arr.put(JSONObject().apply {
             put("name", preset.name)

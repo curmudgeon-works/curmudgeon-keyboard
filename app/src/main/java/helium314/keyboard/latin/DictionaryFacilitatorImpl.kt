@@ -556,6 +556,8 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         }
         // a word taken back to 0 is no word any more, unless a dictionary has it
         putWordIntoValidSpellingWordCache("unlearnOneUse", word.lowercase(Locale.getDefault()))
+        // a removed word brought back by that use is removed again: out of the swipe lists too (review 2026-10-06 Low)
+        if (isRemovedWord(word)) for (group in dictionaryGroups) GestureDecoderVocabulary.onWordRemoved(group.locale, word)
     }
 
     override fun getLearnedCount(word: String): Int {

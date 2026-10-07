@@ -29,7 +29,7 @@ object SettingDefaults {
         for (field in Settings::class.java.fields) {
             if (!field.name.startsWith("PREF_") || field.name.endsWith("_PREFIX") || field.type != String::class.java) continue
             val key = runCatching { field.get(null) as? String }.getOrNull() ?: continue
-            if (key in presenceMatters || KeyboardProfiles.isGlobal(key)) continue
+            if (!includedInDefaults(key)) continue
             val default = runCatching {
                 val d = Defaults::class.java.getField(field.name)
                 if (java.lang.reflect.Modifier.isStatic(d.modifiers)) d.get(null) else null
@@ -53,5 +53,9 @@ object SettingDefaults {
     /** What a saved Layout or theme stores for [key] at its default: the fixed default, or null (unset again when
      *  applied) for one whose absence means something or whose default isn't fixed. */
     fun of(key: String): Any? = all[key]
+
+    /** A setting with a default here: not the app's own keys ([KeyboardProfiles.isAppWide]; a key on a shared menu is
+     *  still a setting with a default: review 2026-10-06 Low, isGlobal left those out) and not the presence-matters ones. */
+    internal fun includedInDefaults(key: String) = key !in presenceMatters && !KeyboardProfiles.isAppWide(key)
 
 }

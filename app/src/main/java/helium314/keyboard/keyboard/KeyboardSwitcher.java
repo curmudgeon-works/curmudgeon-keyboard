@@ -408,7 +408,13 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     /** The toolbar is reachable in the emoji view too: an expand key at the start of the tab strip opens it above the tabs. */
     private void addEmojiToolbarKey() {
         if (!(mEmojiTabStripView instanceof LinearLayout strip) || strip.getChildCount() == 0) return;
-        if (strip.getChildAt(0).getTag() == EMOJI_TOOLBAR_KEY_TAG) return;
+        final boolean present = strip.getChildAt(0).getTag() == EMOJI_TOOLBAR_KEY_TAG;
+        // the toolbar hidden (Toolbar visibility): no key for it (review 2026-10-06 Low: the arrow showed anyway)
+        if (Settings.getValues().mToolbarMode == ToolbarMode.HIDDEN) {
+            if (present) strip.removeViewAt(0);
+            return;
+        }
+        if (present) return;
         final View key = mSuggestionStripView.createEmojiToolbarKey(() -> {
             mSuggestionStripView.setToolbarOnly(!mSuggestionStripView.isToolbarOnly(), mEmojiTabStripView);
             return kotlin.Unit.INSTANCE;

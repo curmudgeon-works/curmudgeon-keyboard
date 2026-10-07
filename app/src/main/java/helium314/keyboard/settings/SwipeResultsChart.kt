@@ -49,7 +49,11 @@ import kotlin.math.ceil
  */
 @Composable
 fun SwipeResultsChartDialog(onDismissRequest: () -> Unit) {
-    val log = remember { SwipeMetrics.read() }
+    // (read off the screen thread: the log can be long)
+    val loaded by androidx.compose.runtime.produceState<SwipeMetrics.Results?>(null) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { SwipeMetrics.read() }
+    }
+    val log = loaded ?: return
     var range by rememberSaveable { mutableStateOf(SwipeMetrics.Range.ALL) }
     ThreeButtonAlertDialog(
         onDismissRequest = onDismissRequest,

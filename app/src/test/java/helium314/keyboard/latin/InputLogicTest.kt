@@ -1102,6 +1102,18 @@ class InputLogicTest {
         helium314.keyboard.latin.ShadowFacilitator2.addedUses.clear()
     }
 
+    // review 2026-10-06 Low (L1): a redo gave the word pair again on every pass, an undo took back the word only
+    @Test fun `redo learns the word alone, not its pair with the word before again`() {
+        reset()
+        chainInput("hello world ")
+        helium314.keyboard.latin.ShadowFacilitator2.addedContexts.clear()
+        functionalKeyPress(KeyCode.UNDO)
+        functionalKeyPress(KeyCode.REDO)
+        val redone = helium314.keyboard.latin.ShadowFacilitator2.addedContexts.filter { it.first == "world" }
+        assertEquals(1, redone.size)
+        assertEquals(NgramContext.EMPTY_PREV_WORDS_INFO, redone[0].second)
+    }
+
     @Test fun `undo takes back a typed word's use, redo gives it again, back and forth nets zero`() {
         reset()
         chainInput("hello world ")
@@ -1947,6 +1959,7 @@ class ShadowFacilitator2 {
         lastAddedExtraUses = 0
         addedWords.add(suggestion)
         addedUses.add(suggestion to 1)
+        addedContexts.add(suggestion to ngramContext)
     }
     // a picked suggestion is learned with extra uses
     @Implementation
@@ -1968,5 +1981,6 @@ class ShadowFacilitator2 {
         val unlearnedWords = mutableListOf<String>()
         val addedWords = mutableListOf<String>() // every word learned, in order
         val addedUses = mutableListOf<Pair<String, Int>>() // every word learned, with the uses it got
+        val addedContexts = mutableListOf<Pair<String, NgramContext>>() // every word learned, with the words before it
     }
 }

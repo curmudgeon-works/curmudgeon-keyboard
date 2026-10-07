@@ -864,6 +864,7 @@ public class LatinIME extends InputMethodService implements
 
     private void onStartInputInternal(final EditorInfo editorInfo, final boolean restarting) {
         super.onStartInput(editorInfo, restarting);
+        if (!restarting) helium314.keyboard.latin.gesture.GestureCorpusRecorder.INSTANCE.onFieldChanged();
 
         final RichInputMethodSubtype subtypeForApp = editorInfo == null
             ? null :

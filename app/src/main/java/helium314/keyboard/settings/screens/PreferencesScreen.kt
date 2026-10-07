@@ -327,6 +327,7 @@ private fun Preview() {
 private fun SwitchWithDialogPreference(
     setting: Setting, key: String, default: Boolean,
     dialogContent: @Composable () -> Unit, save: () -> Unit, onDefault: (() -> Unit)? = null,
+    onOpen: () -> Unit = {}, // the dialog's values from what's stored (review 2026-10-06 Low: a cancelled value came back)
 ) {
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
@@ -335,10 +336,11 @@ private fun SwitchWithDialogPreference(
     helium314.keyboard.settings.KnownDefaults.note(key, default)
     val on = prefs.getBoolean(key, default)
     var showDialog by rememberSaveable { mutableStateOf(false) }
-    Preference(name = setting.title, onClick = { if (on) showDialog = true else { prefs.edit { putBoolean(key, true) }; showDialog = true } }) {
+    fun open() { onOpen(); showDialog = true }
+    Preference(name = setting.title, onClick = { if (!on) prefs.edit { putBoolean(key, true) }; open() }) {
         Switch(checked = on, onCheckedChange = { turnOn ->
             prefs.edit { putBoolean(key, turnOn) }
-            if (turnOn) showDialog = true
+            if (turnOn) open()
         })
     }
     if (showDialog) ThreeButtonAlertDialog(
@@ -374,6 +376,10 @@ private fun BackspaceSpeedUpPreference(setting: Setting) {
         save = { prefs.edit {
             putInt(Settings.PREF_BACKSPACE_SPEED_UP_AFTER, newAfter.toInt()); putInt(Settings.PREF_BACKSPACE_TOP_INTERVAL, newTop.toInt()) } },
         onDefault = { newAfter = Defaults.PREF_BACKSPACE_SPEED_UP_AFTER.toFloat(); newTop = Defaults.PREF_BACKSPACE_TOP_INTERVAL.toFloat() },
+        onOpen = {
+            newAfter = prefs.getInt(Settings.PREF_BACKSPACE_SPEED_UP_AFTER, Defaults.PREF_BACKSPACE_SPEED_UP_AFTER).toFloat()
+            newTop = prefs.getInt(Settings.PREF_BACKSPACE_TOP_INTERVAL, Defaults.PREF_BACKSPACE_TOP_INTERVAL).toFloat()
+        },
     )
 }
 
@@ -391,5 +397,6 @@ internal fun DeleteSwipePreference(setting: Setting) {
         } },
         save = { prefs.edit { putFloat(Settings.PREF_DELETE_SWIPE_SPEED, speed) } },
         onDefault = { speed = Defaults.PREF_DELETE_SWIPE_SPEED },
+        onOpen = { speed = prefs.getFloat(Settings.PREF_DELETE_SWIPE_SPEED, Defaults.PREF_DELETE_SWIPE_SPEED) },
     )
 }

@@ -91,6 +91,9 @@ object LearnedStoreMigration {
         if (journal.exists()) {
             Log.i(TAG, "finishing a migration that was interrupted")
             finish(filesDir, io, journal)
+            // still there: an old file couldn't be set aside; preparing again would merge it a second time (review
+            // 2026-10-06 Low: counts added twice at every start), so the next start tries the set-aside again instead
+            if (journal.exists()) return false
         }
         if (!prepare(filesDir, io)) return false
         if (journal.exists()) finish(filesDir, io, journal)
@@ -181,24 +184,30 @@ object LearnedStoreMigration {
     }
 
     /** [name] (a path in [filesDir]) moved to [PREMERGE_DIR] as it is, unless it's gone already. */
-    private fun setAside(filesDir: File, name: String) {
+    private fun setAside(filesDir: File, name: String): Boolean {
         val file = File(filesDir, name)
-        if (!file.exists()) return
+        if (!file.exists()) return true
         val premerge = File(filesDir, PREMERGE_DIR)
         var target = File(premerge, name)
         var n = 1
         while (target.exists()) target = File(premerge, "$name.${n++}") // (set aside before: kept as well)
         target.parentFile?.mkdirs()
-        if (!file.renameTo(target)) Log.e(TAG, "could not set aside ${file.name}")
+        if (file.renameTo(target)) return true
+        // (a rename across something it can't cross: copied and deleted instead)
+        val copied = runCatching { if (file.isDirectory) file.copyRecursively(target, overwrite = true) else file.copyTo(target, overwrite = true); true }.getOrDefault(false)
+        if (copied && file.deleteRecursively()) return true
+        Log.e(TAG, "could not set aside ${file.name}")
+        return false
     }
 
     /** The moves the journal lists, each skipped if it's done already; then the journal goes. */
     private fun finish(filesDir: File, io: LearnedStoreIo, journal: File) {
         val work = File(filesDir, LearnedStoreFiles.WORK_DIR)
+        var allAside = true
         for (line in journal.readLines()) {
             val (kind, name) = line.split('\t').takeIf { it.size == 2 } ?: continue
             when (kind) {
-                ASIDE -> setAside(filesDir, name)
+                ASIDE -> if (!setAside(filesDir, name)) allAside = false
                 STORE -> {
                     val written = File(work, LearnedStores.storeFile(filesDir, name, LearnedStores.SHARED).name)
                     if (written.exists() && !LearnedStoreFiles.install(io, filesDir, name, LearnedStores.SHARED, written))
@@ -215,6 +224,7 @@ object LearnedStoreMigration {
                 }
             }
         }
+        if (!allAside) { Log.w(TAG, "an old file is still in place: the journal stays, the next start tries again"); return }
         journal.delete()
         work.deleteRecursively()
         Log.i(TAG, "learned words and blacklists are per script now; the old files are in $PREMERGE_DIR")

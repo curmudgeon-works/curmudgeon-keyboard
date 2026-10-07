@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.screens
 
+import helium314.keyboard.latin.settings.KeyboardProfiles
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.PaddingValues
@@ -182,7 +183,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                     KeyPopupOverrides.saveSets(ctx.realPrefs(), userSets.map {
                         if (it.name == oldName) KeyPopupOverrides.UserSet(name, it.morePopups, it.symbolsLayout, it.overrides, it.symbolMap, it.popupOrder) else it
                     })
-                    if (selectedUserSet?.name == oldName) prefs.edit().putString(KeyPopupOverrides.PREF_SELECTED_SET, name).apply()
+                    KeyboardProfiles.replaceValueEverywhere(ctx.realPrefs(), KeyPopupOverrides.PREF_SELECTED_SET, oldName, name)
                     setToRename = null
                     generation++
                 },

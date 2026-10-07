@@ -176,6 +176,25 @@ object KeyboardProfiles {
     private fun ids(real: SharedPreferences): JSONObject =
         try { JSONObject(real.getString(PREF_IDS, "{}")!!) } catch (e: Exception) { JSONObject() }
 
+    /** Every stored copy of [key] (the shared one and each keyboard's own) that reads [old] becomes [new] (null: removed):
+     *  a saved theme, Layout or popup set renamed or deleted is followed by every keyboard that chose it, not only the
+     *  one being edited (review 2026-10-06 Low). */
+    fun replaceValueEverywhere(real: SharedPreferences, key: String, old: String, new: String?) {
+        val editor = real.edit()
+        for ((stored, value) in real.all) {
+            if (value != old) continue
+            if (stored != key && unprefixedKey(stored, key) == null) continue
+            if (new == null) editor.remove(stored) else editor.putString(stored, new)
+        }
+        editor.apply()
+    }
+    // [stored] is "p<id>/[key]" for some id (or [key] itself)
+    private fun unprefixedKey(stored: String, key: String): String? =
+        if (stored.startsWith(PREFIX) && stored.endsWith("$SEPARATOR$key") && stored.substring(PREFIX.length, stored.length - key.length - SEPARATOR.length).toIntOrNull() != null) key else null
+
+    /** Whether set [id] has anything stored of its own (a value or a mark). */
+    fun hasOwnEntries(real: SharedPreferences, id: Int): Boolean = real.all.keys.any { it.startsWith("$PREFIX$id$SEPARATOR") }
+
     /** Profile id of a keyboard, created on first use. */
     @Synchronized
     fun idFor(real: SharedPreferences, keyboard: SettingsSubtype): Int {
@@ -497,6 +516,8 @@ object KeyboardProfiles {
 
     fun removeMovedMarkers(real: SharedPreferences) {
         if (real.getBoolean("moved_markers_removed", false)) return
+        // with Refine per keyboard the marks are genuine resets, not leftovers (review 2026-10-06 Low): left as they are
+        if (!isShared(real, Group.REFINE)) return
         val all = real.all
         val keys = learningSwipingKeys + movedToRefine
         real.edit().apply {

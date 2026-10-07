@@ -454,6 +454,25 @@ f""", // no newline at the end
         assertEquals(10, keys2[2].size)
     }
 
+    // review 2026-10-06 Low (K2): on QWERTZ the ö key sits after o in the spiral, so o kept ö as a popup
+    @Test fun `a popup that is a key of the layout is dropped wherever that key sits`() {
+        val editorInfo = EditorInfo()
+        val subtype = SubtypeUtilsAdditional.createEmojiCapableAdditionalSubtype(Locale.GERMANY, "qwertz+", true)
+        // (the dedupe is a setting, off by default)
+        val prefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(latinIME)
+        prefs.edit().putBoolean(helium314.keyboard.latin.settings.Settings.PREF_REMOVE_REDUNDANT_POPUPS, true).commit()
+        helium314.keyboard.latin.settings.Settings.getInstance().loadSettings(latinIME)
+        val (kb, _) = try { buildKeyboard(editorInfo, subtype, KeyboardId.ELEMENT_ALPHABET) } finally {
+            prefs.edit().remove(helium314.keyboard.latin.settings.Settings.PREF_REMOVE_REDUNDANT_POPUPS).commit()
+            helium314.keyboard.latin.settings.Settings.getInstance().loadSettings(latinIME)
+        }
+        val codes = kb.sortedKeys.map { it.code }.toSet()
+        assertTrue('ö'.code in codes, "the layout has an ö key")
+        val o = kb.sortedKeys.first { it.code == 'o'.code }
+        val oPopups = o.popupKeys?.mapNotNull { it.mLabel }.orEmpty()
+        assertTrue("ö" !in oPopups, "o's popups: $oPopups")
+    }
+
     @Test fun `popup key count does not depend on shift for (for simple layout)`() {
         val editorInfo = EditorInfo()
         val subtype = SubtypeUtilsAdditional.createEmojiCapableAdditionalSubtype(Locale.ENGLISH, "qwerty", true)

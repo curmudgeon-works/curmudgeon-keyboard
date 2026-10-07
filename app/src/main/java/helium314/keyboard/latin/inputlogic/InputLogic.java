@@ -1961,10 +1961,12 @@ public final class InputLogic {
             if (uses < 0) {
                 for (int i = 0; i < -uses; i++) mDictionaryFacilitator.unlearnOneUse(word);
             } else if (uses == 1) {
-                mDictionaryFacilitator.addToUserHistory(word, l.getAutoCapitalized(), l.getContext(),
+                // the word alone: its pair with the word before was counted when it was typed and an undo takes back
+                // the word's use only, so giving the pair again on every redo grew it (review 2026-10-06 Low)
+                mDictionaryFacilitator.addToUserHistory(word, l.getAutoCapitalized(), NgramContext.EMPTY_PREV_WORDS_INFO,
                         timeStampInSeconds, settingsValues.mBlockPotentiallyOffensive);
             } else {
-                mDictionaryFacilitator.addToUserHistory(word, l.getAutoCapitalized(), l.getContext(),
+                mDictionaryFacilitator.addToUserHistory(word, l.getAutoCapitalized(), NgramContext.EMPTY_PREV_WORDS_INFO,
                         timeStampInSeconds, settingsValues.mBlockPotentiallyOffensive, uses - 1);
             }
         }

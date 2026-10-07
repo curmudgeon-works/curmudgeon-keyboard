@@ -250,6 +250,7 @@ object AppearanceLooks {
     }
 
     fun save(prefs: SharedPreferences, looks: List<Look>) {
+        keepBrokenAside(prefs, PREF)
         val arr = JSONArray()
         for (look in looks) arr.put(JSONObject().apply {
             put("name", look.name)
@@ -279,4 +280,12 @@ object AppearanceLooks {
         o.has("ss") -> o.getJSONArray("ss").let { a -> (0 until a.length()).map { a.getString(it) }.toSet() }
         else -> null
     }
+}
+
+/** The stored list under [key] can't be read (so it loaded as empty): a copy is kept under "[key]_broken_<time>" before
+ *  anything is written over it (review 2026-10-06 Low: a load failure turned into an empty save). */
+internal fun keepBrokenAside(prefs: SharedPreferences, key: String) {
+    val stored = prefs.getString(key, null)?.takeIf { it.isNotBlank() } ?: return
+    if (runCatching { JSONArray(stored) }.isSuccess) return
+    prefs.edit { putString("${key}_broken_${System.currentTimeMillis()}", stored) }
 }

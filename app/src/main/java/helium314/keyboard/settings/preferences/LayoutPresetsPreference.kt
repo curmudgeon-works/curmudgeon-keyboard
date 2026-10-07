@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.preferences
 
+import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.latin.utils.realPrefs
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -144,7 +146,7 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
             checkTextValid = { name -> name.isNotBlank() && all.none { it !== preset && it.name == name } },
             onConfirmed = { name ->
                 store(presets.map { if (it === preset) LayoutPresets.Preset(name, it.values) else it })
-                if (prefs.getString(LayoutPresets.PREF_SELECTED, null) == preset.name) prefs.edit { putString(LayoutPresets.PREF_SELECTED, name) }
+                KeyboardProfiles.replaceValueEverywhere(ctx.realPrefs(), LayoutPresets.PREF_SELECTED, preset.name, name)
             },
         )
     }

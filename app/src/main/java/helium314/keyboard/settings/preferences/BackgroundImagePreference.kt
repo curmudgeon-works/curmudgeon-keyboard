@@ -241,7 +241,9 @@ private fun PictureFramingDialog(
 ) {
     val ctx = LocalContext.current
     val framingFile = PictureFraming.fileFor(picture)
-    val before = remember(picture) { framingFile.takeIf { it.exists() }?.readText() }
+    // (saved across rotation: review 2026-10-06 Low, Cancel after a rotation put back the framing of that moment)
+    val beforeSaved = rememberSaveable(picture) { framingFile.takeIf { it.exists() }?.readText() ?: NO_FRAMING }
+    val before = beforeSaved.takeIf { it != NO_FRAMING }
     val initial = remember(picture) { PictureFraming.read(picture) }
     var framing by remember(picture) { mutableStateOf(initial) }
     val image = remember(picture) { PictureFraming.decode(picture, 2048)?.asImageBitmap() }
@@ -363,3 +365,5 @@ private fun setBackgroundImage(ctx: Context, uri: Uri, isNight: Boolean, isLands
     Settings.clearCachedBackgroundImages()
     return true
 }
+
+private const val NO_FRAMING = "-" // (no framing file when the dialog opened)

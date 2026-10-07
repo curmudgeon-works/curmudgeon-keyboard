@@ -174,7 +174,7 @@ object GestureDecoderVocabulary {
     // came in late) serves its own swipe but isn't kept, so the waiting rebuild makes a fresh one (review 2026-10-06:
     // with the lock, the rebuild took the stale list and the late learned words were missing again, as before 0.3.007)
     private val mergeGeneration = java.util.concurrent.atomic.AtomicInteger()
-    private fun clearMerged() { mergeGeneration.incrementAndGet(); merged.clear() }
+    private fun clearMerged() = synchronized(mergeLock) { mergeGeneration.incrementAndGet(); merged.clear() } // (a merge runs under the lock: a clear waits for its store)
 
     private fun merge(key: String, specs: List<LocaleSpec>): Vocabulary? {
         val generation = mergeGeneration.get()
@@ -242,11 +242,28 @@ object GestureDecoderVocabulary {
         return byStart.mapValues { (_, words) -> words.sortedByDescending { it.second }.take(MAX_CONTRACTIONS).map { it.first } }
     }
 
+    // a build that found a dictionary file but no words in it (a broken file): not tried again for a while (review
+    // 2026-10-06 Low: a thread per keystroke)
+    private val buildFailedAt = ConcurrentHashMap<String, Long>()
+    private const val BUILD_RETRY_MS = 60_000L
+    internal fun buildAllowed(key: String, now: Long = SystemClock.elapsedRealtime()): Boolean =
+        buildFailedAt[key]?.let { now - it < BUILD_RETRY_MS } != true
+    internal fun noteBuildFailed(key: String, now: Long = SystemClock.elapsedRealtime()) { buildFailedAt[key] = now }
+    // lists dropped by clear() but still served until their rebuild publishes (review 2026-10-06 Low: a clear during a
+    // build left no swipes until it finished)
+    private val stale = ConcurrentHashMap.newKeySet<String>()
+
     /** Cached vocabulary for [locale], or null (and an async build is kicked off). */
     fun getOrBuildAsync(locale: Locale): Vocabulary? {
         val key = locale.toLanguageTag()
-        cache[key]?.let { return it }
+        cache[key]?.let { if (key in stale) startBuild(locale, key); return it }
         if (key in noDictionary) return null
+        startBuild(locale, key)
+        return null
+    }
+
+    private fun startBuild(locale: Locale, key: String) {
+        if (!buildAllowed(key)) return
         if (building.add(key)) {
             Thread({
                 try {
@@ -258,7 +275,6 @@ object GestureDecoderVocabulary {
                 }
             }, "GestureVocabBuild-$key").start()
         }
-        return null
     }
 
     /**
@@ -269,14 +285,17 @@ object GestureDecoderVocabulary {
      * without a dead-swipe window.
      */
     fun clear() {
-        cache.clear()
+        stale.addAll(cache.keys) // (kept and served until each rebuild publishes its list)
         common.clear()
         contractions.clear()
         noDictionary.clear()
+        buildFailedAt.clear()
+        // the merged lists asked for so far are wanted again once their languages are rebuilt (review 2026-10-06 Low:
+        // only the lists waiting for a language came back)
+        for ((key, specs) in mergedSpecs) wanted[key] = specs
         clearMerged()
         mergedSpecs.clear()
         learned.clear()
-        wanted.clear()
     }
 
     /**
@@ -294,6 +313,9 @@ object GestureDecoderVocabulary {
                 val probability = PersonalizationHelper.getUserHistoryDictionary(context, script, pool).getFrequency(word)
                 if (probability <= 0) return@schedule
                 learned[storeKey(script, pool)]?.put(word, probability)
+                // a language of this script without a dictionary and, so far, without learned words: its list can be
+                // built now (reviewer 2026-10-07: it stayed without swipe until a restart)
+                noDictionary.removeIf { it.constructLocale().script() == script }
                 for ((tag, vocab) in cache) if (tag.constructLocale().script() == script) vocab.addLearned(word, probability)
                 // (at full weight, as when the vocabulary was built)
                 for ((key, vocab) in merged)
@@ -368,6 +390,7 @@ object GestureDecoderVocabulary {
             Log.w(TAG, "no main dictionary file found for $locale")
         }
         if (words.isEmpty()) { // keep whatever the disk cache provided
+            if (mainDictFile != null && disk == null) noteBuildFailed(key) // (a dictionary file with nothing in it)
             if (mainDictFile == null && disk == null) {
                 // no dictionary: the learned words alone, if there are any (re-review 2026-10-07: a keyboard of such a
                 // language couldn't swipe its own words), else nothing to wait for
@@ -417,6 +440,7 @@ object GestureDecoderVocabulary {
         for ((word, weight) in history) vocab.addLearned(word, weight)
         if (vocab.size > 0) {
             cache[key] = vocab
+            stale.remove(key)
             this.mainEntries[key] = mainEntries
             common.remove(key)
             contractions.remove(key)

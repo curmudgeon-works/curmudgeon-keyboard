@@ -73,6 +73,9 @@ object GestureCorpusRecorder {
     /** A typed word was committed: whatever swipe was deleted before it is settled. */
     fun onTypedWordCommitted() { deletedAt = 0L }
 
+    /** Another field: a swipe deleted in the last one says nothing about what's typed here (review 2026-10-06 Low). */
+    fun onFieldChanged() { deletedAt = 0L }
+
     fun corpusFile(): File? = file
 
     /** Called with the final (tail) batch-input decode; [candidates] are the decoder's ranked results. */

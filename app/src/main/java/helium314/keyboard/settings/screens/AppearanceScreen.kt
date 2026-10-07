@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.screens
 
+import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.latin.utils.realPrefs
 import androidx.compose.ui.layout.layout
 import helium314.keyboard.settings.dialogs.UnsavedChangesDialog
 import helium314.keyboard.settings.dialogs.SaveChangesDialog
@@ -714,7 +716,7 @@ private fun SavedLooksPreference(setting: Setting) {
             checkTextValid = { name -> name.isNotBlank() && looks.none { it !== look && it.name == name } },
             onConfirmed = { name ->
                 store(looks.map { if (it === look) AppearanceLooks.Look(name, it.values) else it })
-                if (prefs.getString(AppearanceLooks.PREF_SELECTED, null) == look.name) prefs.edit { putString(AppearanceLooks.PREF_SELECTED, name) }
+                KeyboardProfiles.replaceValueEverywhere(ctx.realPrefs(), AppearanceLooks.PREF_SELECTED, look.name, name)
             },
         )
     }
@@ -726,7 +728,7 @@ private fun SavedLooksPreference(setting: Setting) {
             onConfirmed = {
                 if (look == previewed) { putBack(); previewed = null } // its preview goes with it
                 AppearanceLooks.deletePictures(ctx, look); store(looks.filter { it !== look })
-                if (prefs.getString(AppearanceLooks.PREF_SELECTED, null) == look.name) prefs.edit { remove(AppearanceLooks.PREF_SELECTED) }
+                KeyboardProfiles.replaceValueEverywhere(ctx.realPrefs(), AppearanceLooks.PREF_SELECTED, look.name, null)
             },
         )
     }

@@ -349,12 +349,14 @@ fun createAdvancedSettings(context: Context) = listOf(
         Column {
             SwitchPreference(def, Defaults.PREF_SWIPE_METRICS) { on = it }
             if (on) {
-                val week = remember(generation) { SwipeMetrics.summary(7) }
-                val all = remember(generation) { SwipeMetrics.summary(0) }
+                // (read off the screen thread: the log can be long)
+                val summaries by androidx.compose.runtime.produceState<Pair<SwipeMetrics.Summary, SwipeMetrics.Summary>?>(null, generation) {
+                    value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { SwipeMetrics.summary(7) to SwipeMetrics.summary(0) }
+                }
                 Column(Modifier.padding(start = 22.dp, end = 16.dp, bottom = 8.dp)) {
-                    for ((label, s) in listOf(R.string.swipe_metrics_week to week, R.string.swipe_metrics_all to all)) {
+                    for ((label, s) in listOf(R.string.swipe_metrics_week to summaries?.first, R.string.swipe_metrics_all to summaries?.second)) {
                         Text(stringResource(label), style = MaterialTheme.typography.labelMedium)
-                        Text(if (s.swipes == 0) stringResource(R.string.swipe_metrics_none)
+                        Text(if (s == null) "…" else if (s.swipes == 0) stringResource(R.string.swipe_metrics_none)
                             else stringResource(R.string.swipe_metrics_line, s.swipes, s.pct(s.firstChoice), s.pct(s.fromStrip),
                                 s.pct(s.neverOffered), s.decodeAverage, s.decodeWorst),
                             style = MaterialTheme.typography.bodySmall)

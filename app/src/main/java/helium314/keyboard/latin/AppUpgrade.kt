@@ -53,7 +53,8 @@ import kotlin.collections.component2
 import kotlin.collections.set
 
 fun checkVersionUpgrade(context: Context) {
-    val prefs = context.prefs()
+    // the settings as stored (review 2026-10-06 Low: through context.prefs() the steps saw one keyboard's view)
+    val prefs = context.realPrefs()
     val oldVersion = prefs.getInt(Settings.PREF_VERSION_CODE, 0)
     if (oldVersion != BuildConfig.MIGRATION_VERSION)
         AppUpgrade.onUpgrade(context)
@@ -164,6 +165,9 @@ private fun ownSetUpgrades(real: SharedPreferences, freshInstall: Boolean) {
     for (name in ids.keys()) {
         val id = ids.optInt(name, KeyboardProfiles.SHARED)
         if (id == KeyboardProfiles.SHARED) continue
+        // an id with no set of its own (learned words only, or settings never separate): nothing to move, and
+        // nothing written (review 2026-10-06 Low: a partial set that came alive once settings were made separate)
+        if (!KeyboardProfiles.hasOwnEntries(real, id)) continue
         fun k(key: String) = KeyboardProfiles.prefixedKey(id, key)
         if (!real.getBoolean(k("fonts_follow_migrated"), false)) real.edit {
             // its own "same font as the keys" (on unless this set turned it off) and key font (else the shared one)
@@ -173,12 +177,12 @@ private fun ownSetUpgrades(real: SharedPreferences, freshInstall: Boolean) {
                 putString(k(Settings.PREF_HINT_FONT), keyFont)
                 putString(k(Settings.PREF_SUGGESTION_FONT), keyFont)
             }
-            putBoolean(k(Settings.PREF_FONT_FOLLOWS_KEY_TEXT), false)
+            remove(k(Settings.PREF_FONT_FOLLOWS_KEY_TEXT)) // (its default now; stored = picked)
             putBoolean(k("fonts_follow_migrated"), true)
         }
         if (!real.getBoolean(k("trail_thickness_migrated"), false)) real.edit {
             if (real.all[k(Settings.PREF_GESTURE_PREVIEW_TRAIL)] == false) putInt(k(Settings.PREF_GESTURE_TRAIL_THICKNESS), 0)
-            putBoolean(k(Settings.PREF_GESTURE_PREVIEW_TRAIL), true)
+            remove(k(Settings.PREF_GESTURE_PREVIEW_TRAIL)) // (its default now; stored = picked)
             putBoolean(k("trail_thickness_migrated"), true)
         }
     }
@@ -186,7 +190,7 @@ private fun ownSetUpgrades(real: SharedPreferences, freshInstall: Boolean) {
 
 /** Our own settings changes: each checks its own state, so running them on every start is cheap and safe
  *  (MIGRATION_VERSION stays at upstream's, so onUpgrade doesn't run for them). */
-private fun curmudgeonUpgrades(prefs: SharedPreferences, freshInstall: Boolean) {
+internal fun curmudgeonUpgrades(prefs: SharedPreferences, freshInstall: Boolean) {
     // 0.3.001: the "same font as the keys" switch is gone (one Fonts dialog, each text its own font): where it was on
     // (its old default), symbols and suggestions take the key font as their own, so nothing changes on screen
     if (!prefs.getBoolean("fonts_follow_migrated", false)) {
@@ -198,7 +202,7 @@ private fun curmudgeonUpgrades(prefs: SharedPreferences, freshInstall: Boolean) 
                     putString(Settings.PREF_SUGGESTION_FONT, keyFont)
                 }
             }
-            putBoolean(Settings.PREF_FONT_FOLLOWS_KEY_TEXT, false)
+            remove(Settings.PREF_FONT_FOLLOWS_KEY_TEXT) // (its default now; stored = picked: fresh installs wrote it)
             putBoolean("fonts_follow_migrated", true)
         }
     }
@@ -206,7 +210,7 @@ private fun curmudgeonUpgrades(prefs: SharedPreferences, freshInstall: Boolean) 
     if (!prefs.getBoolean("trail_thickness_migrated", false)) {
         prefs.edit {
             if (!prefs.getBoolean(Settings.PREF_GESTURE_PREVIEW_TRAIL, true)) putInt(Settings.PREF_GESTURE_TRAIL_THICKNESS, 0)
-            putBoolean(Settings.PREF_GESTURE_PREVIEW_TRAIL, true)
+            remove(Settings.PREF_GESTURE_PREVIEW_TRAIL) // (its default now; stored = picked)
             putBoolean("trail_thickness_migrated", true)
         }
     }

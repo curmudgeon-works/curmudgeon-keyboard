@@ -164,6 +164,9 @@ public class KeyboardParams {
         // only letter and number keys make up the rows, so the bottom letter row is the first one walked
         final ArrayList<Key> letterKeys = new ArrayList<>();
         for (final Key key : allKeys) if (Character.isLetterOrDigit(key.getCode())) letterKeys.add(key);
+        // every key of the layout counts as seen from the start: a popup that is a key elsewhere is redundant whether
+        // that key comes earlier or later in the spiral (review 2026-10-06 Low: o kept ö on QWERTZ)
+        for (final Key key : letterKeys) seen.addCode(key.getCode());
         for (final Key key : spiralOrder(letterKeys)) {
             final Key filteredKey = Key.removeRedundantPopupKeys(key, seen);
             filtered.put(key, filteredKey);
