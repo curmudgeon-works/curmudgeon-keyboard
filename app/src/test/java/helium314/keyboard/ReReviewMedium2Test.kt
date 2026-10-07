@@ -48,7 +48,7 @@ class ReReviewMedium2Test {
     @After fun tearDown() {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
         LearnedStoreMigration.holdForTest(null)
-        KeyboardProfiles.editingStore = null; KeyboardProfiles.editingId = KeyboardProfiles.SHARED
+        KeyboardProfiles.editingId = KeyboardProfiles.SHARED
     }
 
     // 1
@@ -176,14 +176,13 @@ class ReReviewMedium2Test {
         }
     }
 
-    // 8
-    @Test fun `the edited keyboard is kept across a process death`() {
-        KeyboardProfiles.editingStore = real
+    // 8 (and review session 2026-10-07: a copy in the settings fired the screens' listener and reset it)
+    @Test fun `the edited keyboard is kept by the activity's state, not written to the settings`() {
         KeyboardProfiles.editingId = 7
-        KeyboardProfiles.forgetEditingInMemory() // (the process died)
-        assertEquals(KeyboardProfiles.SHARED, KeyboardProfiles.editingId)
-        KeyboardProfiles.restoreEditingId(real)
+        assertFalse(real.all.keys.any { it.contains("editing") }, "editingId must not touch the settings: ${real.all.keys}")
+        val state = android.os.Bundle().apply { putInt("editing_keyboard_id", KeyboardProfiles.editingId) } // (what the activity saves)
+        KeyboardProfiles.editingId = KeyboardProfiles.SHARED // (the process died)
+        KeyboardProfiles.editingId = state.getInt("editing_keyboard_id", KeyboardProfiles.SHARED) // (and was recreated)
         assertEquals(7, KeyboardProfiles.editingId)
-        assertNotEquals(KeyboardProfiles.SHARED, real.getInt("keyboard_profile_editing", 0))
     }
 }

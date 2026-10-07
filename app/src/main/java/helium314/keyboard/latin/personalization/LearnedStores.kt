@@ -60,7 +60,7 @@ object LearnedStores {
         return !LearnedPools.isSeeded(dir, pool)
     }
 
-    @Volatile private var seeding: Int? = null // the pool being filled now (one at a time; a repeat call doesn't start another)
+    private val seeding = java.util.concurrent.ConcurrentHashMap.newKeySet<Int>() // the pools being filled now (a repeat call doesn't start another)
     @Volatile private var seedingFailed: Int? = null // a pool whose copy failed: used empty rather than never
     /** Fills [pool] off the main thread, then calls back on it with whether the copy was made (replaceable by tests). */
     internal var seedRunner: (pool: Int, done: (Boolean) -> Unit) -> Unit = { pool, done ->
@@ -70,10 +70,9 @@ object LearnedStores {
         }
     }
     private fun seedInBackground(pool: Int, then: () -> Unit) {
-        if (seeding == pool) return
-        seeding = pool
+        if (!seeding.add(pool)) return
         seedRunner(pool) { ok ->
-            seeding = null
+            seeding.remove(pool)
             if (!ok) { Log.w(TAG, "keyboard $pool: its learned words couldn't be copied, starting empty"); seedingFailed = pool }
             then()
         }

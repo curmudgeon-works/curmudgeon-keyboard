@@ -96,8 +96,14 @@ object LearnedPools {
             Log.i(TAG, "$script: ${pools.size} keyboards put together, ${countsOf(merged)}, ${lists.size} blacklisted")
         }
         for (pool in pools) for (script in LearnedStores.scriptsOnDisk(filesDir, pool)) empty(filesDir, io, script, pool)
+        // and their markers: an emptied pool isn't a seeded one (review session 2026-10-07: a keyboard reusing the id
+        // after a reset would have started empty)
+        for (pool in pools) marker(filesDir, pool).delete()
         return true
     }
+
+    /** Every pool's marker gone (a factory reset of the keyboards: their ids start again). */
+    fun forgetSeeded(filesDir: File) { filesDir.listFiles { f -> f.name.startsWith("learned_seeded_k") }?.forEach { it.delete() } }
 
     /** A pool's store and list of [script] gone (a store the keyboard has open is emptied instead: it would save its
      *  words again when it's closed). */

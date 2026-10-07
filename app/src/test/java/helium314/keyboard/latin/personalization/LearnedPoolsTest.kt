@@ -76,6 +76,12 @@ class LearnedPoolsTest {
         assertTrue(LearnedPools.isSeeded(dir, 5))
         assertEquals(mapOf("mine" to (1 to 1)), FakeLearnedStoreIo.read(store("Latn", 5)))
         real.edit().remove("learned_pools_marked").commit()
+        // sharing on again empties the pools and their markers go with them; a reset of the keyboards forgets them all
+        assertTrue(LearnedPools.share(dir, io))
+        assertFalse(LearnedPools.isSeeded(dir, 4))
+        FakeLearnedStoreIo.store(store("Latn", 6), word("x", 1, 1)); assertTrue(LearnedPools.seedIfNew(dir, io, 6)); assertTrue(LearnedPools.isSeeded(dir, 6))
+        LearnedPools.forgetSeeded(dir)
+        assertFalse(LearnedPools.isSeeded(dir, 6))
     }
 
     @Test fun `on again - the keyboards' words put together by the highest count, not the sum, then emptied`() {

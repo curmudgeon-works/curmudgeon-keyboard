@@ -103,11 +103,16 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
         return true
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt(STATE_EDITING_ID, KeyboardProfiles.editingId) // (the keyboard the open screen edits)
+    }
+
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // recreated after the process died with a screen open: that screen edits the keyboard it did (re-review 2026-10-07)
-        if (savedInstanceState != null) KeyboardProfiles.restoreEditingId(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
+        if (savedInstanceState != null) KeyboardProfiles.editingId = savedInstanceState.getInt(STATE_EDITING_ID, KeyboardProfiles.SHARED)
         if (Settings.getValues() == null) {
             val inputAttributes = InputAttributes(EditorInfo(), false, packageName)
             Settings.getInstance().loadSettings(this, resources.configuration.locale(), inputAttributes)
@@ -321,3 +326,5 @@ private fun NotSelectedBar(onSwitch: () -> Unit) {
         }
     }
 }
+
+private const val STATE_EDITING_ID = "editing_keyboard_id"

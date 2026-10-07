@@ -35,7 +35,7 @@ object KeyboardProfiles {
         Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_SWIPE_METRICS, Settings.PREF_AUTO_PREVIEW_KEYBOARD, // logs of the user's swiping: one file, one switch
         Settings.PREF_LEARNING_LOG, // and of what corrections do to the learned words
         Settings.PREF_SHARE_LEARNED_WORDS, // it says whether the keyboards have their own learned words: app-wide
-        PREF_SEPARATE, PREF_IDS, PREF_NEXT_ID, PREF_EDITING,
+        PREF_SEPARATE, PREF_IDS, PREF_NEXT_ID,
         "key_popup_sets", // saved popup sets are meant to be reused across keyboards
         "appearance_looks", // saved looks too
         "layout_presets", // and saved Layouts
@@ -381,16 +381,11 @@ object KeyboardProfiles {
     /** Profile of the keyboard in use (the IME's view). Refreshed on every keyboard switch. */
     @Volatile var imeId: Int = SHARED
         private set
-    /** Profile the settings screens edit: a keyboard's id, or [SHARED]. Kept in the settings too, so a settings screen
-     *  restored after the process died edits the same keyboard (re-review 2026-10-07: it edited the shared set). */
+    /** Profile the settings screens edit: a keyboard's id, or [SHARED]. The settings activity keeps it in its saved
+     *  instance state, so a screen restored after the process died edits the same keyboard (re-review 2026-10-07; a
+     *  copy in the settings themselves fired the screens' listener and the keyboards screen reset it on every redraw:
+     *  review session 2026-10-07). */
     @Volatile var editingId: Int = SHARED
-        set(value) { field = value; editingStore?.edit()?.putInt(PREF_EDITING, value)?.apply() }
-    private const val PREF_EDITING = "keyboard_profile_editing"
-    /** Where [editingId] is kept, set at app start. */
-    @Volatile var editingStore: SharedPreferences? = null
-    /** After the process died with a settings screen open: the keyboard it was editing. */
-    fun restoreEditingId(real: SharedPreferences) { editingId = real.getInt(PREF_EDITING, SHARED) }
-    internal fun forgetEditingInMemory() { editingStore.let { store -> editingStore = null; editingId = SHARED; editingStore = store } }
 
     /** Whether the look (Appearance settings and background pictures) of set [a] differs from set [b]'s: a keyboard
      *  switch reloads the theme only then (re-review 2026-10-07: it reloaded, with a blink, on every switch). Shared
