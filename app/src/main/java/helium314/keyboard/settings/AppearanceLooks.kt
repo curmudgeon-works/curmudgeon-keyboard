@@ -158,8 +158,9 @@ object AppearanceLooks {
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_HOLO, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_HOLO,
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_HOLO_LIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_HOLO_WHITE,
             Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to true,
-            // the classic look: Holo's own gaps and bold key text (what the Holo style drew when they weren't set)
-            Settings.PREF_KEY_HORIZONTAL_GAP to 0f, Settings.PREF_KEY_VERTICAL_GAP to 0.75f, Settings.PREF_KEY_TEXT_BOLD to true))),
+            // the classic look: the keyboard's own gaps (config_key_*_gap_holo: 0.5% / 0.75%) and bold key text, what the
+            // Holo style drew when they weren't set (2026-10-06: 0% was the long-press panels' gap, not the keyboard's)
+            Settings.PREF_KEY_HORIZONTAL_GAP to 0.5f, Settings.PREF_KEY_VERTICAL_GAP to 0.75f, Settings.PREF_KEY_TEXT_BOLD to true))),
         Look(ctx.getString(R.string.theme_preset_paper), complete(mapOf(PICTURES to NO_PICTURES,
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_LIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_DARK,

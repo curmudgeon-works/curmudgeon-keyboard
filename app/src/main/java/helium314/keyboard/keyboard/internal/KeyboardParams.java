@@ -290,8 +290,8 @@ public class KeyboardParams {
                 //  paddings.
             }
             // the gap settings (percentages, 0–6%) always decide: not set means their default, as the settings show it
-            // (until 2026-10-06 only a set value counted, and not set fell back to the key style's own gaps, 0% / 0.75%,
-            // while the settings said 1% / 2%)
+            // (until 2026-10-06 only a set value counted, and not set fell back to the keyboard style's own gaps,
+            // 0.5% / 0.75%, while the settings said 1% / 2%)
             final SharedPreferences keyGapPrefs = KtxKt.prefs(context);
             mRelativeHorizontalGap = keyGapPrefs.getFloat(Settings.PREF_KEY_HORIZONTAL_GAP, Defaults.PREF_KEY_HORIZONTAL_GAP) / 100f;
             mRelativeVerticalGap = keyGapPrefs.getFloat(Settings.PREF_KEY_VERTICAL_GAP, Defaults.PREF_KEY_VERTICAL_GAP) / 100f;

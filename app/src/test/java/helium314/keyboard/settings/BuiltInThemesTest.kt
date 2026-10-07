@@ -38,7 +38,7 @@ class BuiltInThemesTest {
 
     @Test fun `Holo classic keeps its own gaps and bold keys`() {
         val holo = AppearanceLooks.builtIn(ctx).single { it.name == ctx.getString(R.string.theme_preset_holo) }
-        assertEquals(0f, holo.values[Settings.PREF_KEY_HORIZONTAL_GAP])
+        assertEquals(0.5f, holo.values[Settings.PREF_KEY_HORIZONTAL_GAP])
         assertEquals(0.75f, holo.values[Settings.PREF_KEY_VERTICAL_GAP])
         assertEquals(true, holo.values[Settings.PREF_KEY_TEXT_BOLD])
     }
