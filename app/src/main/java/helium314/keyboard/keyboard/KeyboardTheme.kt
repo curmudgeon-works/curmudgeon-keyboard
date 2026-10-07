@@ -135,11 +135,24 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             return if (themeId == THEME_ID_LXX_BASE || themeId == THEME_ID_ROUNDED_BASE) Key.LABEL_FLAGS_KEEP_BACKGROUND_ASPECT_RATIO else 0
         }
 
+        /** Whether the keyboard follows the phone's dark mode ("Dark mode follows phone"). */
+        @JvmStatic
+        fun followsPhone(prefs: SharedPreferences) = prefs.getBoolean(Settings.PREF_THEME_DAY_NIGHT, Defaults.PREF_THEME_DAY_NIGHT)
+
+        /** Dark or light: the phone's mode ([phoneNight]) when the keyboard follows it, else light (2026-10-06: one rule for
+         *  every theme, the Dynamic colours too). */
+        @JvmStatic
+        fun nightFor(phoneNight: Boolean, prefs: SharedPreferences) = followsPhone(prefs) && phoneNight
+
+        /** Whether the keyboard is dark now: a preview from the settings ([SettingsActivity.forceNight]) over [nightFor]. */
+        @JvmStatic
+        fun isNight(context: Context, prefs: SharedPreferences = context.prefs()) =
+            SettingsActivity.forceNight ?: nightFor(ResourceUtils.isNight(context.resources), prefs)
+
         @JvmStatic
         fun getColorsForCurrentTheme(context: Context): Colors {
             val prefs = context.prefs()
-            val isNight = SettingsActivity.forceNight
-                ?: (ResourceUtils.isNight(context.resources) && prefs.getBoolean(Settings.PREF_THEME_DAY_NIGHT, Defaults.PREF_THEME_DAY_NIGHT))
+            val isNight = isNight(context, prefs)
             val themeName = SettingsActivity.forceTheme ?: if (isNight)
                 prefs.getString(Settings.PREF_THEME_COLORS_NIGHT, Defaults.PREF_THEME_COLORS_NIGHT)
             else
@@ -162,7 +175,7 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                 "midnight" -> getThemeColors(THEME_BLACK, themeStyle, context, prefs, isNight) // was black under another name
                 "classic" -> getThemeColors(THEME_HOLO_WHITE, themeStyle, context, prefs, isNight)
                 THEME_DYNAMIC -> {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) DynamicColors(context, themeStyle, hasBorders, backgroundImage)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) DynamicColors(context, themeStyle, hasBorders, isNight, backgroundImage)
                     else getThemeColors(THEME_LIGHT, themeStyle, context, prefs, isNight)
                 }
                 THEME_LIGHT -> DefaultColors(

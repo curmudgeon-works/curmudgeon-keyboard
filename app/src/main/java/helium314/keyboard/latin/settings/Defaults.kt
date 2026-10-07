@@ -46,9 +46,10 @@ object Defaults {
     const val PREF_THEME_COLORS = KeyboardTheme.THEME_DYNAMIC // (2026-10-06; Black before)
     const val PREF_THEME_COLORS_NIGHT = KeyboardTheme.THEME_DYNAMIC
     const val PREF_THEME_KEY_BORDERS = true
-    // the default look is the Midnight theme: black, one colour set (2026-10-03; before: following the system on Android 10+)
+    // dark mode follows the phone (Android 10+), as with the default Dynamic theme (2026-10-06; off from 2026-10-03, the
+    // Midnight look; on before)
     @JvmField
-    val PREF_THEME_DAY_NIGHT = false
+    val PREF_THEME_DAY_NIGHT = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q
     const val PREF_CUSTOM_ICON_NAMES = ""
     const val PREF_AUTO_CAP = true
     const val PREF_VIBRATE_ON = false // HeliBoard's (2026-10-06; on from 0.1.004 to 0.3.008)
