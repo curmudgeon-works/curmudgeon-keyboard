@@ -674,7 +674,7 @@ private fun SavedLooksPreference(setting: Setting) {
             title = { Text(setting.title) },
             items = builtIn + looks,
             // the chosen theme marked when the list opens (2026-10-06: none was, even right after choosing one)
-            selectedItem = chosen,
+            selectedItem = if (tweaked) null else chosen, // none marked while the look differs from the chosen theme (2026-10-07)
             getItemName = { it.name },
             confirmImmediately = false,
             // a theme only changes what it lists: the rest stays as it was when the list opened (height, fonts, switches…);

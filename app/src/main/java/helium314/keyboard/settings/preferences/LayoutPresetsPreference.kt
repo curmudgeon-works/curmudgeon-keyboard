@@ -99,7 +99,9 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
             },
             title = { Text(stringResource(R.string.layout_presets)) },
             items = all,
-            selectedItem = chosen, // the chosen Layout marked when the list opens (2026-10-06)
+            // the chosen Layout marked when the list opens (2026-10-06), none while the settings differ from it ("unsaved":
+            // it marked Curmudgeon then, 2026-10-07)
+            selectedItem = if (tweaked) null else chosen,
             getItemName = { it.name },
             confirmImmediately = false,
             // each tap starts from what was there when the list opened, so one previewed Layout never leaks into the next
