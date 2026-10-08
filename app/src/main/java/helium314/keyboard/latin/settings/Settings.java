@@ -95,6 +95,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     // the emoji font: "font:<name>" from the font list (FontLibrary), "default" for the system's, "auto" = the file of before
     public static final String PREF_EMOJI_FONT = "emoji_font";
     public static final String PREF_SUGGESTION_TEXT_COLOR = "suggestion_text_color"; // the suggestion strip's words (themes)
+    public static final String PREF_GESTURE_TRAIL_COLOR = "gesture_trail_color"; // the swipe trail (themes); not set = the theme's
     public static final String PREF_HINT_FONT = "hint_font";
     public static final String PREF_SUGGESTION_FONT = "suggestion_font";
     public static final String PREF_FONT_FOLLOWS_KEY_TEXT = "font_follows_key_text";
@@ -280,6 +281,11 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
         add(PREF_DONT_SHOW_MISSING_DICTIONARY_DIALOG);
         add(PREF_SELECTED_SUBTYPE);
     }};
+
+    /** The settings file read for the current keyboard (the keyboard's own set). */
+    public SharedPreferences getPrefs() {
+        return mPrefs;
+    }
 
     public static Settings getInstance() {
         return sInstance;

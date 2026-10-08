@@ -9,7 +9,6 @@ package helium314.keyboard.keyboard.internal;
 import android.content.res.TypedArray;
 
 import helium314.keyboard.latin.R;
-import helium314.keyboard.latin.common.ColorType;
 import helium314.keyboard.latin.settings.Settings;
 
 /**
@@ -43,7 +42,9 @@ final class GestureTrailDrawingParams {
     private static final int UNTIL_NEXT_TOUCH = 1_000_000_000; // millisecond, ~11 days
 
     public GestureTrailDrawingParams(final TypedArray mainKeyboardViewAttr) {
-        mTrailColor = Settings.getValues().mColors.get(ColorType.GESTURE_TRAIL);
+        // the colour picked for this keyboard (Appearance), else the theme's
+        mTrailColor = helium314.keyboard.latin.utils.SuggestionColors.gestureTrailColor(
+                Settings.getInstance().getPrefs(), Settings.getValues().mColors);
         mThemeStartWidth = mainKeyboardViewAttr.getDimension(
                 R.styleable.MainKeyboardView_gestureTrailStartWidth, 0.0f);
         mThemeEndWidth = mainKeyboardViewAttr.getDimension(

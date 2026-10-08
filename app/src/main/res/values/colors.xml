@@ -55,6 +55,9 @@
 
     <!-- Color resources for setup wizard, tutorial and settings -->
     <color name="accent">@color/highlight_color_lxx_light</color>
+    <!-- the settings app's own accent (2026-10-07): Curmudgeon's orange, as the swipe trail's fallback; the keyboard's
+         themes keep "accent" above for a user theme's automatic accent -->
+    <color name="app_accent">#FFFF8C00</color>
     <color name="setup_background">#FFFAFAFA</color>
     <color name="setup_step_background">#FFD1E3FA</color>
     <color name="setup_text_title">#FF1767CF</color>

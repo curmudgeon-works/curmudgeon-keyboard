@@ -162,6 +162,8 @@ object Defaults {
     // the suggestion strip's words: not set = the theme's swipe trail colour (0.3.008, see suggestionTextColor); this
     // orange only where no theme colours can be had
     const val PREF_SUGGESTION_TEXT_COLOR = 0xFFFF8C00.toInt()
+    // the swipe trail: not set = the theme's (see gestureTrailColor); the orange only where no theme colours can be had
+    const val PREF_GESTURE_TRAIL_COLOR = 0xFFFF8C00.toInt()
     const val PREF_GESTURE_TRAIL_WHOLE = false
     const val PREF_GESTURE_TRAIL_WHOLE_LINGER = 1000
     const val PREF_SHOW_SETUP_WIZARD_ICON = true

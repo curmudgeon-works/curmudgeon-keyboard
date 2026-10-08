@@ -15,7 +15,6 @@ import androidx.annotation.NonNull;
 
 import helium314.keyboard.keyboard.PointerTracker;
 import helium314.keyboard.latin.R;
-import helium314.keyboard.latin.common.ColorType;
 import helium314.keyboard.latin.common.CoordinateUtils;
 import helium314.keyboard.latin.settings.Settings;
 
@@ -32,7 +31,8 @@ public final class SlidingKeyInputDrawingPreview extends AbstractDrawingPreview 
     private final Paint mPaint = new Paint();
 
     public SlidingKeyInputDrawingPreview(final TypedArray mainKeyboardViewAttr) {
-        final int previewColor = Settings.getValues().mColors.get(ColorType.GESTURE_TRAIL);
+        final int previewColor = helium314.keyboard.latin.utils.SuggestionColors.gestureTrailColor(
+                Settings.getInstance().getPrefs(), Settings.getValues().mColors);
         final float previewRadius = mainKeyboardViewAttr.getDimension(
                 R.styleable.MainKeyboardView_slidingKeyInputPreviewWidth, 0) / 2.0f;
         final int PERCENTAGE_INT = 100;

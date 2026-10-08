@@ -21,6 +21,8 @@ object SettingDefaults {
         Settings.PREF_TOOLBAR_VISIBILITY, Settings.PREF_VIBRATE_ON,
         // not set = the swipe trail's colour (0.3.008): a theme or a backup must not write the fallback orange down
         Settings.PREF_SUGGESTION_TEXT_COLOR,
+        // not set = the theme's swipe trail colour (2026-10-07), the same way
+        Settings.PREF_GESTURE_TRAIL_COLOR,
     )
 
     /** Key -> fixed default, for the settings that are per keyboard (or shared) and whose absence means nothing. */

@@ -9,7 +9,7 @@
     <!-- Some items are duplicated from the original platform-theme file to ensure that the
          "android/system_accent_*" or "android/system_neutral_*" colors are used. -->
 
-        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:colorAccent">@color/app_accent</item>
 
         <item name="android:statusBarColor">@color/action_bar_color</item>
         <item name="android:navigationBarColor">@color/setup_background</item>
@@ -26,7 +26,7 @@
     </style>
 
     <style name="AlertDialogTheme" parent="@android:style/Theme.Material.Dialog.Alert">
-        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:colorAccent">@color/app_accent</item>
         <item name="android:background">@color/action_bar_color</item>
         <item name="android:textColor">@color/foreground</item>
         <item name="android:textColorAlertDialogListItem">@color/foreground</item>

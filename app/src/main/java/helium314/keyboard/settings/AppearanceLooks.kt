@@ -48,7 +48,7 @@ object AppearanceLooks {
         Settings.PREF_KEY_TEXT_BOLD, Settings.PREF_KEY_TEXT_ITALIC, Settings.PREF_KEY_TEXT_UNDERLINE, Settings.PREF_HINT_FONT_SCALE,
         Settings.PREF_KEY_FONT, Settings.PREF_HINT_FONT, Settings.PREF_SUGGESTION_FONT, Settings.PREF_FONT_FOLLOWS_KEY_TEXT, Settings.PREF_HINT_TEXT_BOLD, Settings.PREF_HINT_TEXT_ITALIC, Settings.PREF_HINT_TEXT_UNDERLINE,
         Settings.PREF_SPACE_BAR_TEXT, Settings.PREF_SHOW_NUMBER_ROW_HINTS, Settings.PREF_SHOW_HINTS, Settings.PREF_SHOW_POPUP_HINTS,
-        Settings.PREF_SUGGESTION_TEXT_COLOR,
+        Settings.PREF_SUGGESTION_TEXT_COLOR, Settings.PREF_GESTURE_TRAIL_COLOR,
         // the emoji look (since 2026-10-03; a theme saved before leaves them as they are): not the emoji version, which
         // is about what the phone's font can draw
         Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT, Settings.PREF_EMOJI_FONT, Settings.PREF_EMOJI_SKIN_TONE,

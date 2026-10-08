@@ -245,6 +245,8 @@
     <string name="gesture_fast_typing_cooldown_instant">Always start instantly</string>
     <!-- Title of the setting to adjust the gesture trail fadeout duration-->
     <string name="gesture_trail_thickness">Swipe trail thickness</string>
+    <!-- Appearance: the swipe trail's colour for this keyboard (not set: the theme's) -->
+    <string name="gesture_trail_color">Swipe trail colour</string>
     <string name="gesture_trail_off">Off</string>
     <string name="gesture_trail_whole">Show the whole swipe trail</string>
     <string name="gesture_trail_whole_linger">Trail vanishes at next touch or after</string>

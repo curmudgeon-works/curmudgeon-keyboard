@@ -7,7 +7,7 @@
 
 <resources xmlns:android="http://schemas.android.com/apk/res/android">
     <style name="platformActivityTheme" parent="@android:style/Theme.Material.NoActionBar">
-        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:colorAccent">@color/app_accent</item>
 
         <item name="android:statusBarColor">@color/action_bar_color</item>
         <item name="android:navigationBarColor">@color/navigation_bar_color</item>
@@ -17,7 +17,7 @@
     </style>
 
     <style name="AlertDialogTheme" parent="@android:style/Theme.Material.Dialog.Alert">
-        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:colorAccent">@color/app_accent</item>
         <item name="android:background">@color/action_bar_color</item>
         <item name="android:textColor">@color/foreground</item>
         <item name="android:textColorPrimary">@color/foreground</item>
