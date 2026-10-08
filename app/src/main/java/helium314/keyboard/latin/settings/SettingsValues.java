@@ -204,6 +204,11 @@ public class SettingsValues {
     public final Colors mColors;
 
     // creation of Colors and SpacingAndPunctuations are the slowest parts in here, but still ok
+    /** The backspace's long press delay from what is [stored]: a "follow" value means the key long press delay. */
+    static int backspaceDelay(final int stored, final int keyLongpressTimeout) {
+        return stored < 0 ? keyLongpressTimeout : stored;
+    }
+
     public SettingsValues(final Context context, final SharedPreferences prefs, final Resources res,
                           @NonNull final InputAttributes inputAttributes) {
         mLocale = ConfigurationCompatKt.locale(res.getConfiguration());
@@ -310,8 +315,9 @@ public class SettingsValues {
 
         // Compute other readable settings
         mKeyLongpressTimeout = prefs.getInt(Settings.PREF_KEY_LONGPRESS_TIMEOUT, Defaults.PREF_KEY_LONGPRESS_TIMEOUT);
-        // backspace's own delay; until it is set it follows the key long press delay, so nothing changes on upgrade
-        mBackspaceLongpressDelay = prefs.getInt(Settings.PREF_BACKSPACE_LONGPRESS_DELAY, Defaults.PREF_BACKSPACE_LONGPRESS_DELAY);
+        // backspace's own delay (200 ms unless set), or the key long press delay where it is set to follow it (the HeliBoard Layouts)
+        final int backspaceDelay = prefs.getInt(Settings.PREF_BACKSPACE_LONGPRESS_DELAY, Defaults.PREF_BACKSPACE_LONGPRESS_DELAY);
+        mBackspaceLongpressDelay = backspaceDelay(backspaceDelay, mKeyLongpressTimeout);
         mKeypressVibrationDuration = prefs.getInt(Settings.PREF_VIBRATION_DURATION_SETTINGS, Defaults.PREF_VIBRATION_DURATION_SETTINGS);
         mKeypressSoundVolume = prefs.getFloat(Settings.PREF_KEYPRESS_SOUND_VOLUME, Defaults.PREF_KEYPRESS_SOUND_VOLUME);
         mKeypressSound = prefs.getString(Settings.PREF_KEYPRESS_SOUND, Defaults.PREF_KEYPRESS_SOUND);

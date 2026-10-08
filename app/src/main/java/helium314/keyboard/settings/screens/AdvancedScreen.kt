@@ -154,7 +154,11 @@ fun createAdvancedSettings(context: Context) = listOf(
             key = setting.key,
             default = Defaults.PREF_BACKSPACE_LONGPRESS_DELAY,
             range = 100f..700f,
-            description = { stringResource(R.string.abbreviation_unit_milliseconds, it.toString()) }
+            // "same as the long press" (the HeliBoard Layouts): a checkbox in the dialog
+            offLabel = stringResource(R.string.backspace_delay_follows),
+            offValue = Defaults.BACKSPACE_DELAY_FOLLOWS,
+            description = { if (it < 0) stringResource(R.string.backspace_delay_follows)
+                else stringResource(R.string.abbreviation_unit_milliseconds, it.toString()) }
         )
     },
     Setting(context, Settings.PREF_SPACE_HORIZONTAL_SWIPE, R.string.show_horizontal_space_swipe) {

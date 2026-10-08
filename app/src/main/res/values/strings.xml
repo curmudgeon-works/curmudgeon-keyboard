@@ -247,6 +247,8 @@
     <string name="gesture_trail_thickness">Swipe trail thickness</string>
     <!-- Appearance (advanced, under Colors): this keyboard's accent color over the theme's (not set: the theme's) -->
     <string name="gesture_trail_color">Accent color</string>
+    <!-- the backspace long press delay set to follow the key long press delay -->
+    <string name="backspace_delay_follows">Same as long press</string>
     <string name="gesture_trail_color_summary">Swipe trail, suggestions and the enter key</string>
     <string name="gesture_trail_off">Off</string>
     <string name="gesture_trail_whole">Show the whole swipe trail</string>

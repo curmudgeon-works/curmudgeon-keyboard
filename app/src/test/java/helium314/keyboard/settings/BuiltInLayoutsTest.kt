@@ -74,7 +74,7 @@ class BuiltInLayoutsTest {
         // row, the Curmudgeon popups) stays as HeliBoard has it in both
         for (preset in listOf(heli, extra)) {
             assertEquals(300, preset[Settings.PREF_KEY_LONGPRESS_TIMEOUT])
-            assertEquals(300, preset[Settings.PREF_BACKSPACE_LONGPRESS_DELAY])
+            assertEquals(Defaults.BACKSPACE_DELAY_FOLLOWS, preset[Settings.PREF_BACKSPACE_LONGPRESS_DELAY]) // as the long press
             assertEquals(false, preset[Settings.PREF_BACKSPACE_SPEED_UP])
             assertEquals("", preset[Settings.PREF_SYMBOL_POPUP_MAP])
             assertEquals(listOf(1f, 0f, 1f, 0f), (0 until 4).map { // portrait, landscape, folded portrait, folded landscape

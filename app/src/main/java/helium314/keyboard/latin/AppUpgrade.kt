@@ -62,7 +62,52 @@ fun checkVersionUpgrade(context: Context) {
     // saved themes name their pictures in the picture library (2026-10-07): older themes' copies join it
     helium314.keyboard.settings.AppearanceLooks.migratePictureFolders(context, prefs)
     pickedOnlyUpgrade(context.realPrefs(), freshInstall = oldVersion == 0)
+    heliBoardLayoutPins(context, context.realPrefs(), freshInstall = oldVersion == 0)
     ownSetUpgrades(context.realPrefs(), freshInstall = oldVersion == 0)
+}
+
+/** Set once [heliBoardLayoutPins] ran (a backup from before carries none: its restore runs it again). */
+const val HELIBOARD_LAYOUT_PINS_DONE = "heliboard_layout_pins_done"
+
+/** The HeliBoard Layouts' values for what the defaults changed to the Curmudgeon Layout's on 2026-10-07. */
+internal fun heliBoardPins(): Map<String, Any> = mapOf(
+    Settings.PREF_KEY_LONGPRESS_TIMEOUT to 300, Settings.PREF_BACKSPACE_LONGPRESS_DELAY to Defaults.BACKSPACE_DELAY_FOLLOWS,
+    Settings.PREF_BACKSPACE_SPEED_UP to false, Settings.PREF_SYMBOL_POPUP_MAP to "",
+) + listOf(1f, 0f, 1f, 0f).mapIndexed { i, scale -> createPrefKeyForBooleanSettings(Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX, i, 2) to scale }
+
+/**
+ * A keyboard that picked the HeliBoard or HeliBoard extra Layout in 0.3.008 stored only what that Layout named; the rest
+ * read the defaults of then, which the Curmudgeon Layout's values replaced on 2026-10-07. Each such set (the shared one
+ * and every keyboard's own, in use or not) gets HeliBoard's values for those where it reads no value of its own: the
+ * Layout was picked, so this is the pick written down, not a default (re-review 2026-10-07). The Layout renamed the same
+ * day ("HeliBoard Extra" to "HeliBoard extra") keeps being the chosen one.
+ */
+internal fun heliBoardLayoutPins(context: Context, real: SharedPreferences, freshInstall: Boolean) {
+    if (real.getBoolean(HELIBOARD_LAYOUT_PINS_DONE, false)) return
+    if (!freshInstall) {
+        val heli = context.getString(R.string.layout_preset_heliboard)
+        val extra = context.getString(R.string.layout_preset_heliboard_extra)
+        val oldExtra = "HeliBoard Extra"
+        val ids = runCatching { org.json.JSONObject(real.getString("keyboard_profile_ids", "{}")!!) }.getOrNull()
+            ?.let { o -> o.keys().asSequence().map { o.optInt(it, KeyboardProfiles.SHARED) }.toSet() }.orEmpty()
+        val all = real.all
+        real.edit {
+            for (id in setOf(KeyboardProfiles.SHARED) + ids) {
+                fun own(key: String) = KeyboardProfiles.prefixedKey(id, key)
+                fun marked(key: String) = id != KeyboardProfiles.SHARED && all.containsKey(own(KeyboardProfiles.TOMBSTONE + key))
+                // what the set reads: its own value, else (not marked "at the default") the shared one
+                fun reads(key: String): Any? = all[own(key)] ?: if (marked(key)) null else all[key]
+                val selected = reads(helium314.keyboard.settings.LayoutPresets.PREF_SELECTED) as? String ?: continue
+                if (selected == oldExtra) putString(own(helium314.keyboard.settings.LayoutPresets.PREF_SELECTED), extra)
+                if (selected != heli && selected != extra && selected != oldExtra) continue
+                for ((key, value) in heliBoardPins()) if (reads(key) == null) {
+                    KeyboardProfiles.put(this, own(key), value)
+                    if (marked(key)) remove(own(KeyboardProfiles.TOMBSTONE + key))
+                }
+            }
+        }
+    }
+    real.edit { putBoolean(HELIBOARD_LAYOUT_PINS_DONE, true) }
 }
 
 /** Set once [pickedOnlyUpgrade] ran; a backup made since carries it, one from before doesn't (its restore runs it again). */

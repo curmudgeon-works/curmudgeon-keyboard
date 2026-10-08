@@ -166,9 +166,9 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             val themeStyle = prefs.getString(Settings.PREF_THEME_STYLE, Defaults.PREF_THEME_STYLE)
 
             val themeColors = getThemeColors(themeName!!, themeStyle!!, context, prefs, isNight)
-            // the accent colour picked for the keyboard over the theme's (not while a palette is being edited: the
-            // editor shows the palette's own)
-            val colors = if (SettingsActivity.forceTheme == null && prefs.contains(Settings.PREF_GESTURE_TRAIL_COLOR))
+            // the accent colour picked for the keyboard over the theme's, in the palette editor too (decided 2026-10-07: what
+            // the keyboard will show; the trail always read the picked colour)
+            val colors = if (prefs.contains(Settings.PREF_GESTURE_TRAIL_COLOR))
                 helium314.keyboard.latin.common.AccentOverride(themeColors,
                     prefs.getInt(Settings.PREF_GESTURE_TRAIL_COLOR, Defaults.PREF_GESTURE_TRAIL_COLOR))
                 else themeColors

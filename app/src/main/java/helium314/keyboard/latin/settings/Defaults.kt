@@ -144,6 +144,8 @@ object Defaults {
     // a held backspace starts deleting after this (the Curmudgeon Layout's, 2026-10-07; before, unset meant the key long press
     // delay, which went to 150 ms the same day)
     const val PREF_BACKSPACE_LONGPRESS_DELAY = 200
+    /** Stored as the backspace delay: the key long press delay, whatever it is (the HeliBoard Layouts, as before 2026-10-07). */
+    const val BACKSPACE_DELAY_FOLLOWS = -1
     const val PREF_KEY_LONGPRESS_TIMEOUT = 150 // the Curmudgeon Layout's (2026-10-07; 300 before, as HeliBoard)
     const val PREF_GESTURE_PREVIEW_TRAIL = true
     const val PREF_GESTURE_CAPS_SWIPE = true // swiping up above the keyboard capitalizes the letter left from (own gesture decoder)

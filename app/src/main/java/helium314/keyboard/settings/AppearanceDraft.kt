@@ -18,7 +18,7 @@ import java.io.File
  * (SettingsActivity.onStop) and, after a crash, when the app starts again ([recoverAfterCrash]).
  */
 class AppearanceDraft private constructor(
-    private val prefs: MutableMap<String, Any?>,
+    private val prefs: Map<String, Any?>,
     private val files: Map<File, Saved?>, // the live file -> its saved copy, null when it didn't exist
     private val dir: File,
     private val setId: Int = KeyboardProfiles.SHARED, // the set the screen edited (see PrefsDraft)
@@ -104,7 +104,7 @@ class AppearanceDraft private constructor(
             val files = liveFiles(ctx).associateWith { live ->
                 if (live.exists()) Saved(live.copyTo(File(dir, live.name), overwrite = true), live.length(), live.lastModified()) else null
             }
-            val prefs = HashMap(currentPrefs(ctx))
+            val prefs = currentPrefs(ctx)
             val setId = PrefsDraft.currentSetId(ctx)
             writeSnapshot(dir, setId, prefs, files)
             return AppearanceDraft(prefs, files, dir, setId)
@@ -127,7 +127,7 @@ class AppearanceDraft private constructor(
             if (json == null) { dir.deleteRecursively(); return }
             runCatching {
                 val p = json.getJSONObject("prefs")
-                val prefs = HashMap(p.keys().asSequence().associateWith { AppearanceLooks.fromJson(p.getJSONObject(it)) })
+                val prefs = p.keys().asSequence().associateWith { AppearanceLooks.fromJson(p.getJSONObject(it)) }
                 val f = json.getJSONObject("files")
                 val files = f.keys().asSequence().associate { path ->
                     val live = File(path)
