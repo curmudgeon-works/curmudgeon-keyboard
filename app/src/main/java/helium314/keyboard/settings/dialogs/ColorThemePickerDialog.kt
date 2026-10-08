@@ -205,7 +205,7 @@ private fun AddColorRow(onDismissRequest: () -> Unit, targetScreen: String, pref
     ) {
         // (18 dp, like the Keys row's plus: the full 24 looked too big next to the text)
         Icon(painterResource(R.drawable.ic_plus), stringResource(R.string.add), Modifier.size(18.dp))
-        Text(stringResource(R.string.add_color_theme, defaultName), Modifier.padding(start = 8.dp))
+        Text(stringResource(R.string.add_color_theme), Modifier.padding(start = 8.dp))
     }
 }
 

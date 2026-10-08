@@ -58,16 +58,6 @@ class AppearanceDraft private constructor(
         discard()
     }
 
-    /** A palette deleted while the screen is open stays deleted: Discard leaves it out, and a colours choice that
-     *  named it goes back to the default (2026-10-07: Discard, or leaving the app, brought a deleted palette back). */
-    private fun forgetPalette(name: String) {
-        val keys = listOf(Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
-            .map { it + name } + listOf(Settings.PREF_THEME_COLORS, Settings.PREF_THEME_COLORS_NIGHT).filter { prefs[it] == name }
-        if (keys.none { it in prefs }) return
-        keys.forEach { prefs.remove(it) }
-        if (dir.isDirectory) writeSnapshot(dir, setId, prefs, files) // (what a crash puts back too)
-    }
-
     /** Keeps what is on the phone now; only the snapshot goes. */
     fun accept() = discard()
 
@@ -105,9 +95,6 @@ class AppearanceDraft private constructor(
 
         /** The screen is left with nothing changed: the snapshot goes (the next visit starts from what is there then). */
         fun close() { active?.discard() }
-
-        /** Palette [name] was deleted: the open screen's Discard doesn't bring it back ([forgetPalette]). */
-        fun forgetPalette(name: String) { active?.forgetPalette(name) }
 
         /** The app is left (or the screen goes to the background) with the screen open: changes not accepted are undone. */
         fun rejectOpen(ctx: Context) { active?.reject(ctx) }

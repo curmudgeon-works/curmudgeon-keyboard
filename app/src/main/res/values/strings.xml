@@ -720,7 +720,7 @@
     <string name="appearance_keep">Keep</string>
     <string name="appearance_discard">Discard</string>
     <!-- %s: the name the new colour theme gets unless renamed -->
-    <string name="add_color_theme">Add your own (%s)</string>
+    <string name="add_color_theme">Add your own</string>
     <string name="voice" tools:keep="@string/voice">Voice input</string>
     <string name="numpad" tools:keep="@string/numpad" translatable="false">@string/layout_numpad</string>
     <string name="settings" tools:keep="@string/settings">Settings</string>

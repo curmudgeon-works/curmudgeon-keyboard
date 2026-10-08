@@ -41,17 +41,34 @@ class Batch1007Test {
 
     // ---- palettes ----
 
-    @Test fun `a deleted palette stays deleted when the Appearance screen's changes are discarded`() {
+    private fun palette(name: String) = ctx.prefs().all.keys.filter { it.startsWith("user_") && it.endsWith(name) }
+
+    // decided 2026-10-07: a delete takes the palette away at once; the screen's cross or Discard brings it back, the tick keeps it gone
+    @Test fun `a deleted palette goes at once and comes back with the cross`() {
         val prefs = ctx.prefs()
         val name = "Mine"
         KeyboardTheme.writeUserColors(prefs, name, KeyboardTheme.seedUserColors(ctx, prefs, KeyboardTheme.THEME_CURMUDGEON, false))
         prefs.edit { putString(Settings.PREF_THEME_COLORS, name); putString(Settings.PREF_THEME_COLORS_NIGHT, name) }
         AppearanceDraft.of(ctx) // the Appearance screen opens: its snapshot holds the palette
         KeyboardTheme.deleteUserColors(ctx, prefs, name)
-        AppearanceDraft.rejectOpen(ctx) // Discard, the cross, or leaving the app with the screen open
-        assertFalse(prefs.all.keys.any { it.endsWith(name) && it.startsWith("user_") }, "the palette came back: ${prefs.all.keys}")
+        assertTrue(palette(name).isEmpty(), "still there after the delete: ${palette(name)}")
         assertNotEquals(name, prefs.getString(Settings.PREF_THEME_COLORS, null))
         assertNotEquals(name, prefs.getString(Settings.PREF_THEME_COLORS_NIGHT, null), "the dark colours still named it")
+        AppearanceDraft.rejectOpen(ctx) // the cross, or Discard and exit
+        assertTrue(palette(name).isNotEmpty(), "the cross didn't bring it back")
+        assertEquals(name, prefs.getString(Settings.PREF_THEME_COLORS, null))
+        assertEquals(name, prefs.getString(Settings.PREF_THEME_COLORS_NIGHT, null))
+    }
+
+    @Test fun `a deleted palette stays gone after the tick`() {
+        val prefs = ctx.prefs()
+        val name = "Mine"
+        KeyboardTheme.writeUserColors(prefs, name, KeyboardTheme.seedUserColors(ctx, prefs, KeyboardTheme.THEME_CURMUDGEON, false))
+        AppearanceDraft.of(ctx).let { draft ->
+            KeyboardTheme.deleteUserColors(ctx, prefs, name)
+            draft.accept() // the tick
+        }
+        assertTrue(palette(name).isEmpty())
     }
 
     @Test fun `a new palette starts from the colours of the scheme selected`() {

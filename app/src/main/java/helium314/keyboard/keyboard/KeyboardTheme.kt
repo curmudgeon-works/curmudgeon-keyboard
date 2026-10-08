@@ -535,7 +535,8 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
 
         /**
          * Deletes palette [name]: its colours, and the light or dark colours choice where it names it (back to the
-         * default). The open Appearance screen's Discard doesn't bring it back (2026-10-07: "delete not working").
+         * default). It goes from the list at once; the open Appearance screen's cross or Discard brings it back, as
+         * every other change there (decided 2026-10-07).
          */
         fun deleteUserColors(context: Context, prefs: SharedPreferences, name: String) {
             prefs.edit {
@@ -545,7 +546,6 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                 if (prefs.getString(Settings.PREF_THEME_COLORS, null) == name) remove(Settings.PREF_THEME_COLORS)
                 if (prefs.getString(Settings.PREF_THEME_COLORS_NIGHT, null) == name) remove(Settings.PREF_THEME_COLORS_NIGHT)
             }
-            helium314.keyboard.settings.AppearanceDraft.forgetPalette(name)
             KeyboardSwitcher.getInstance().setThemeNeedsReload()
         }
 
