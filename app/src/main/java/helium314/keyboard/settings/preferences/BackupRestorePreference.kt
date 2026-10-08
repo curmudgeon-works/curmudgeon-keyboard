@@ -607,6 +607,9 @@ internal fun isSettingsFile(path: String) = path.startsWith("layouts${File.separ
 /** What app start does to older settings, run right after a restore too, so an older backup's settings are moved now
  *  and not at the next start, over changes made in between (re-review 2026-10-07). */
 internal fun restoreFollowUp(ctx: Context) {
+    // the restored file's menu sharing first: the upgrade steps find each keyboard's own keys by it (re-review
+    // 2026-10-07: they ran with the phone's, and a backup's HeliBoard keyboards missed their pins)
+    KeyboardProfiles.loadGroups(ctx.realPrefs())
     checkVersionUpgrade(ctx)
     KeyboardProfiles.settingsMoves(ctx.realPrefs())
     // the keyboards' own learned words that came out of the backup are whole: never to be copied over by the pool

@@ -67,4 +67,15 @@ class HeliBoardPinsTest {
         heliBoardLayoutPins(ctx, real, freshInstall = false) // already done
         assertNull(real.all[Settings.PREF_KEY_LONGPRESS_TIMEOUT])
     }
+
+    // re-review of 806882c75: a restore ran the step with the phone's menu sharing, not the backup's
+    @Test fun `a restored backup's HeliBoard keyboard is pinned under the backup's own menu sharing`() {
+        real.edit { putBoolean(KeyboardProfiles.Group.LAYOUT.prefKey, true) }
+        KeyboardProfiles.loadGroups(real) // the phone shares Layout & Typing
+        // the restored file: Layout & Typing per keyboard, keyboard 2 on HeliBoard, the step not run yet
+        real.edit().clear().putInt(Settings.PREF_VERSION_CODE, 3008).putString("keyboard_profile_ids", """{"en_US:":2}""")
+            .putString("p2/$sel", ctx.getString(R.string.layout_preset_heliboard)).commit()
+        helium314.keyboard.settings.preferences.restoreFollowUp(ctx)
+        assertEquals(false, real.all["p2/${Settings.PREF_BACKSPACE_SPEED_UP}"], "keyboard 2 missed its pins: ${real.all.keys}")
+    }
 }
