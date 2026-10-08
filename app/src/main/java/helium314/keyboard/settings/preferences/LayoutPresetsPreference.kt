@@ -47,7 +47,7 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
     val prefs = ctx.prefs()
     var generation by remember { mutableIntStateOf(0) }
     val presets = remember(generation) { LayoutPresets.load(prefs) }
-    // the built-in Layouts first (Curmudgeon, the default; HeliBoard; HeliBoard Extra), then the user's
+    // the built-in Layouts first (Curmudgeon, the default; HeliBoard; HeliBoard extra), then the user's
     val builtIn = remember { LayoutPresets.builtIn(ctx) }
     val all = builtIn + presets
     var showList by remember { mutableStateOf(false) }

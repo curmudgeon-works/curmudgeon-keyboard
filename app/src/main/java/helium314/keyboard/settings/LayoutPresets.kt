@@ -60,7 +60,7 @@ object LayoutPresets {
      * The Layouts that ship with the app (2026-10-06), like the built-in themes: each sets the whole Layout & Typing
      * screen, what it doesn't name back to its default ([complete]); not the keys' arrangement (QWERTY, Dvorak…: the
      * language's), the keyboards, or the saved popup sets. Curmudgeon is the default (everything at its default, so it
-     * follows them); HeliBoard is upstream HeliBoard's; HeliBoard Extra is HeliBoard's with every accent and the number row.
+     * follows them); HeliBoard is upstream HeliBoard's; HeliBoard extra is HeliBoard's with every accent and the number row.
      */
     fun builtIn(ctx: Context): List<Preset> {
         // HeliBoard's own typing: ?123 long-press does nothing, holding backspace deletes letters, 50 ms apart

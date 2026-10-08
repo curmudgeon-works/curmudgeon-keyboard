@@ -17,7 +17,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** The Layouts that ship with the app (2026-10-06): Curmudgeon (the default), HeliBoard, HeliBoard Extra. */
+/** The Layouts that ship with the app (2026-10-06): Curmudgeon (the default), HeliBoard, HeliBoard extra. */
 @RunWith(RobolectricTestRunner::class)
 class BuiltInLayoutsTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
@@ -57,7 +57,7 @@ class BuiltInLayoutsTest {
         assertEquals(true, Defaults.PREF_SHOW_EMOJI_KEY)
     }
 
-    @Test fun `HeliBoard is upstream's, HeliBoard Extra adds every accent and the number row`() {
+    @Test fun `HeliBoard is upstream's, HeliBoard extra adds every accent and the number row`() {
         val heli = named(R.string.layout_preset_heliboard).values
         assertEquals(false, heli[Settings.PREF_SHOW_NUMBER_ROW])
         assertEquals("none", heli[Settings.PREF_LONG_PRESS_SYMBOL_ACTION])

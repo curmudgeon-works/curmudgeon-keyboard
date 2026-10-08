@@ -72,7 +72,7 @@ const val PICKED_ONLY_DONE = "settings_picked_only_done"
 private val defaultsBefore3008: Map<String, Any> = mapOf(
     Settings.PREF_MORE_POPUP_KEYS to "all",
     Settings.PREF_SYMBOL_POPUP_MAP to Defaults.CURMUDGEON_SYMBOL_POPUP_MAP,
-    Settings.PREF_SUGGESTION_TEXT_COLOR to Defaults.PREF_SUGGESTION_TEXT_COLOR,
+    Settings.PREF_SUGGESTION_TEXT_COLOR to 0xFFFF8C00.toInt(), // the fixed orange before 0.3.008 (the constant moved on since)
     Settings.PREF_LONG_PRESS_SYMBOL_ACTION to "none",
 )
 

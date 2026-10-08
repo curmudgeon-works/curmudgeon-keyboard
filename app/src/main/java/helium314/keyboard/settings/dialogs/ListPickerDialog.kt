@@ -42,7 +42,7 @@ fun <T: Any> ListPickerDialog(
     showRadioButtons: Boolean = true,
     /** Shown at the end of an item's row, e.g. a delete button for the user's own entries. */
     trailing: (@Composable (T) -> Unit)? = null,
-    /** Shown after the items, e.g. an entry that adds one. */
+    /** Shown under the list, fixed (not scrolling with it), e.g. an entry that adds one. */
     footer: (@Composable () -> Unit)? = null,
     /** Without [confirmImmediately]: called on every tap, so the choice can show before OK. */
     onItemHighlighted: ((T) -> Unit)? = null,
@@ -67,7 +67,9 @@ fun <T: Any> ListPickerDialog(
             CompositionLocalProvider(
                 LocalTextStyle provides MaterialTheme.typography.bodyLarge
             ) {
-                LazyColumn(state = state) {
+                // the footer stays in view however long the list (2026-10-07)
+                androidx.compose.foundation.layout.Column {
+                LazyColumn(state = state, modifier = Modifier.weight(1f, fill = false)) {
                     items(items) { item ->
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -101,7 +103,8 @@ fun <T: Any> ListPickerDialog(
                             trailing?.invoke(item)
                         }
                     }
-                    if (footer != null) item { footer() }
+                }
+                footer?.invoke()
                 }
             }
         },

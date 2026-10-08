@@ -549,8 +549,8 @@
     <!-- The Layouts that ship with the app (Layout & Typing > Layouts) -->
     <string name="layout_preset_curmudgeon">Curmudgeon</string>
     <string name="layout_preset_heliboard">HeliBoard</string>
-    <string name="layout_preset_heliboard_extra">HeliBoard Extra</string>
-    <string name="key_popups_preset_heliboard_packed">HeliBoard Extra</string>
+    <string name="layout_preset_heliboard_extra">HeliBoard extra</string>
+    <string name="key_popups_preset_heliboard_packed">HeliBoard extra</string>
     <string name="key_popups_preset_arabic">Arabic-script symbols</string>
     <string name="key_popups_add">Add your own</string>
     <string name="key_popups_add_button">Add</string>

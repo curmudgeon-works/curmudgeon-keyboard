@@ -263,7 +263,7 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                 THEME_CURMUDGEON -> DefaultColors(
                     themeStyle,
                     hasBorders,
-                    Defaults.PREF_SUGGESTION_TEXT_COLOR, // the orange, for the trail (and so the suggestions)
+                    Defaults.CURMUDGEON_ORANGE, // the orange: accent and trail (and so the suggestions)
                     ContextCompat.getColor(context, R.color.background_amoled_black),
                     ContextCompat.getColor(context, R.color.background_amoled_dark),
                     ContextCompat.getColor(context, R.color.background_amoled_dark),

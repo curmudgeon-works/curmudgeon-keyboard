@@ -49,7 +49,7 @@ class PickedOnlyUpgradeTest {
         prefs.edit {
             putString(popups, "all") // the default before 0.3.008
             putString(map, Defaults.CURMUDGEON_SYMBOL_POPUP_MAP)
-            putInt(color, Defaults.PREF_SUGGESTION_TEXT_COLOR) // orange
+            putInt(color, 0xFFFF8C00.toInt()) // the fixed orange of 0.3.007 (the constant itself moved on 2026-10-07)
             putString(symbolAction, "none")
             putBoolean(Settings.PREF_SHOW_NUMBER_ROW, SettingDefaults.of(Settings.PREF_SHOW_NUMBER_ROW) as Boolean) // the default now
         }

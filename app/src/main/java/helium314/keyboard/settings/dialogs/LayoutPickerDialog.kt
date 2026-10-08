@@ -68,7 +68,7 @@ fun LayoutPickerDialog(
     val currentLayout = Settings.readDefaultLayoutName(layoutType, prefs)
     val internalLayouts = LayoutUtils.getAvailableLayouts(layoutType, ctx)
     val customLayouts = LayoutUtilsCustom.listedLayoutNames(layoutType, ctx).sorted() // (keyboards' unnamed copies are theirs)
-    val layouts = internalLayouts + customLayouts + ""
+    val layouts = internalLayouts + customLayouts // (the Add row sits under the list, fixed: 2026-10-07)
 
     val state = rememberLazyListState()
     LaunchedEffect(currentLayout) {
@@ -88,11 +88,10 @@ fun LayoutPickerDialog(
             CompositionLocalProvider(
                 LocalTextStyle provides MaterialTheme.typography.bodyLarge
             ) {
-                LazyColumn(state = state) {
+                androidx.compose.foundation.layout.Column {
+                LazyColumn(state = state, modifier = androidx.compose.ui.Modifier.weight(1f, fill = false)) {
                     items(layouts) { item ->
-                        if (item == "") {
-                            AddLayoutRow({ newLayoutDialog = it to "" }, layoutType, customLayouts)
-                        } else {
+                        run {
                             LayoutItemRow(
                                 onDismissRequest = onDismissRequest,
                                 onClickEdit = { newLayoutDialog = it },
@@ -106,6 +105,9 @@ fun LayoutPickerDialog(
                             )
                         }
                     }
+                }
+                // the Add row last, in view however far the list is scrolled
+                AddLayoutRow({ newLayoutDialog = it to "" }, layoutType, customLayouts)
                 }
             }
         },

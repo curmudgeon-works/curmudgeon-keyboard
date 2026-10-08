@@ -99,11 +99,11 @@ fun ColorThemePickerDialog(
     if (selectedColor !in defaultColors)
         userColors.add(selectedColor) // there are cases where we have no settings for a user theme
 
-    val colors = listOf("") + userColors + defaultColors
+    val colors = userColors.toList() + defaultColors // (the Add row sits above the list, fixed: 2026-10-07)
     val state = rememberLazyListState()
     LaunchedEffect(selectedColor) {
         val index = colors.indexOf(selectedColor)
-        if (index >= 5) state.animateScrollToItem(index, -state.layoutInfo.viewportSize.height / 3)
+        if (index >= 4) state.animateScrollToItem(index, -state.layoutInfo.viewportSize.height / 3)
     }
     var showLoadDialog by remember { mutableStateOf(false) }
     val targetScreen = if (isNight) SettingsDestination.ColorsNight else SettingsDestination.Colors
@@ -131,12 +131,12 @@ fun ColorThemePickerDialog(
             CompositionLocalProvider(
                 LocalTextStyle provides MaterialTheme.typography.bodyLarge
             ) {
-                // a short list that scrolls inside, so the dialog stays clear of the keyboard
-                LazyColumn(state = state, modifier = androidx.compose.ui.Modifier.heightIn(max = 300.dp).scrollbar(state)) {
-                    items(colors) { item ->
-                        if (item == "") {
-                            AddColorRow(close, userColors, targetScreen, setting.key)
-                        } else {
+                androidx.compose.foundation.layout.Column {
+                    // the Add row first, in view however far the list is scrolled
+                    AddColorRow(close, userColors, targetScreen, setting.key)
+                    // a short list that scrolls inside, so the dialog stays clear of the keyboard
+                    LazyColumn(state = state, modifier = androidx.compose.ui.Modifier.heightIn(max = 300.dp).scrollbar(state)) {
+                        items(colors) { item ->
                             ColorItemRow(close, item, item == selectedColor, item in userColors, targetScreen, setting.key)
                         }
                     }

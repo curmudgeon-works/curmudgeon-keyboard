@@ -214,10 +214,12 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
     override fun onStart() {
         super.onStart()
         prefs.registerOnSharedPreferenceChangeListener(this)
+        KeyboardProfiles.editingChanged = { prefChanged() } // (the app's look follows the opened keyboard's theme)
     }
 
     override fun onStop() {
         prefs.unregisterOnSharedPreferenceChangeListener(this)
+        KeyboardProfiles.editingChanged = null
         // leaving the app with Appearance open undoes its changes that weren't kept; a file picker we opened
         // (background image, font) and rotating don't count
         if (!isChangingConfigurations && !awaitingResult) { AppearanceDraft.rejectOpen(this); LayoutDraft.rejectOpen(this); PrefsDraft.rejectOpen(this) }

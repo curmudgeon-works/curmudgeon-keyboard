@@ -159,11 +159,14 @@ object Defaults {
     const val PREF_GESTURE_FAST_TYPING_COOLDOWN = 500
     const val PREF_GESTURE_TRAIL_FADEOUT_DURATION = 800
     const val PREF_GESTURE_TRAIL_THICKNESS = 100
-    // the suggestion strip's words: not set = the theme's swipe trail colour (0.3.008, see suggestionTextColor); this
+    /** Curmudgeon's orange (2026-10-07, "B", a little softer than the #FF8C00 of 0.3.008): the Black with orange
+     *  theme's trail, strip and accent, and the settings app under that theme (AppLook). */
+    const val CURMUDGEON_ORANGE = 0xFFF5963A.toInt()
+    // the suggestion strip's words: not set = the theme's swipe trail colour (0.3.008, see suggestionTextColor); the
     // orange only where no theme colours can be had
-    const val PREF_SUGGESTION_TEXT_COLOR = 0xFFFF8C00.toInt()
+    const val PREF_SUGGESTION_TEXT_COLOR = CURMUDGEON_ORANGE
     // the swipe trail: not set = the theme's (see gestureTrailColor); the orange only where no theme colours can be had
-    const val PREF_GESTURE_TRAIL_COLOR = 0xFFFF8C00.toInt()
+    const val PREF_GESTURE_TRAIL_COLOR = CURMUDGEON_ORANGE
     const val PREF_GESTURE_TRAIL_WHOLE = false
     const val PREF_GESTURE_TRAIL_WHOLE_LINGER = 1000
     const val PREF_SHOW_SETUP_WIZARD_ICON = true
