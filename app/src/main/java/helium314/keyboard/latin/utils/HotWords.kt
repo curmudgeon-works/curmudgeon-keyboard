@@ -15,7 +15,14 @@ object HotWords {
     private const val HOT_COUNT = 3
     const val MAX_IN_STRIP = 2
 
-    private val recent = ArrayDeque<String>(WINDOW)
+    // one window per learned-words pool (review 2026-10-07: one for all, so a word hot on one keyboard was hot on a
+    // keyboard with learned words of its own); the pool in use is set by LearnedStores
+    private val windows = HashMap<Int, ArrayDeque<String>>()
+    private var recent = ArrayDeque<String>(WINDOW).also { windows[helium314.keyboard.latin.settings.KeyboardProfiles.SHARED] = it }
+
+    /** The learned-words pool now in use: its own recent words count from here on. */
+    @Synchronized
+    fun usePool(pool: Int) { recent = windows.getOrPut(pool) { ArrayDeque(WINDOW) } }
 
     /** Called for every word the user committed (typed or picked), as committed: counted case-insensitively, but the
      *  capitals are kept (a name, "iPhone"). */
@@ -64,9 +71,9 @@ object HotWords {
     }
 
     @Synchronized
-    fun clear() = recent.clear()
+    fun clear() = windows.values.forEach { it.clear() }
 
     /** The word was removed (long-press): its recent uses no longer count; typed again, it starts over. */
     @Synchronized
-    fun forget(word: String) { recent.removeAll { it.equals(word, ignoreCase = true) } }
+    fun forget(word: String) { windows.values.forEach { w -> w.removeAll { it.equals(word, ignoreCase = true) } } }
 }

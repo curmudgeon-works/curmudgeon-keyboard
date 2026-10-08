@@ -290,7 +290,9 @@ object SubtypeSettings {
     }
 
     /** @return whether pref was changed */
-    private fun removeEnabledSubtype(prefs: SharedPreferences, subtype: SettingsSubtype): Boolean {
+    private fun removeEnabledSubtype(prefs: SharedPreferences, subtype: SettingsSubtype): Boolean = removeEnabledSubtypeFromPrefs(prefs, subtype)
+
+    internal fun removeEnabledSubtypeFromPrefs(prefs: SharedPreferences, subtype: SettingsSubtype): Boolean {
         val oldSubtypes = createSettingsSubtypes(prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!)
         val newSubtypes = oldSubtypes - subtype
         if (oldSubtypes == newSubtypes)
@@ -305,6 +307,10 @@ object SubtypeSettings {
                 else
                     KeyboardSwitcher.getInstance().switchToSubtype(nextSubtype)
             } catch (_: Exception) { } // do nothing if RichInputMethodManager isn't initialized
+            // the keyboard not running, the switch did nothing: the next keyboard is the one in use (review 2026-10-07:
+            // the deleted one stayed selected, and the keyboard came up on a new, empty settings set for it)
+            if (subtype == prefs.getString(Settings.PREF_SELECTED_SUBTYPE, Defaults.PREF_SELECTED_SUBTYPE)!!.toSettingsSubtype())
+                newSubtypes.firstOrNull()?.let { next -> prefs.edit { putString(Settings.PREF_SELECTED_SUBTYPE, next.toPref()) } }
         }
         return true
     }

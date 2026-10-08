@@ -230,6 +230,9 @@ object KeyboardProfiles {
     fun onKeyboardDeleted(real: SharedPreferences, keyboard: SettingsSubtype) {
         val map = ids(real)
         val pref = keyboard.toPref()
+        // apps that remembered it remember nothing now (review 2026-10-07: the entry stayed, naming a deleted keyboard)
+        real.all.filter { (k, v) -> k.startsWith(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX) && v.toString().toSettingsSubtype() == keyboard }
+            .keys.takeIf { it.isNotEmpty() }?.let { gone -> real.edit().apply { gone.forEach { remove(it) } }.apply() }
         if (!map.has(pref)) return
         val id = map.getInt(pref)
         map.remove(pref)

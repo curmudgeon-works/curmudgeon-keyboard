@@ -305,6 +305,7 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
     }
 
     override fun onSharedPreferenceChanged(prefereces: SharedPreferences?, key: String?) {
+        if (key == null || key == Settings.PREF_ADVANCED_SETTINGS) SettingsMode.sync(this) // (null: the file was cleared)
         prefChanged()
     }
 }

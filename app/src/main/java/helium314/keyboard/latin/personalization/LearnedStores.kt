@@ -50,6 +50,7 @@ object LearnedStores {
         if (pool == currentPool) return
         if (needsSeeding(pool)) { seedInBackground(pool) { refresh(real) }; return }
         currentPool = pool
+        helium314.keyboard.latin.utils.HotWords.usePool(pool) // (its recent words with it)
         Log.i(TAG, "learned words pool now $pool")
         listeners.forEach { it() }
     }

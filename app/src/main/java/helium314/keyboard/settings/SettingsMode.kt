@@ -20,6 +20,13 @@ object SettingsMode {
 
     fun isAdvanced(context: Context) = state(context).value
 
+    /** The stored value changed underneath (a restore, a factory reset): the switch follows it (review 2026-10-07:
+     *  it showed the old position until the app restarted). */
+    fun sync(context: Context) {
+        val stored = context.prefs().getBoolean(Settings.PREF_ADVANCED_SETTINGS, Defaults.PREF_ADVANCED_SETTINGS)
+        state?.let { if (it.value != stored) it.value = stored }
+    }
+
     fun set(context: Context, advanced: Boolean) {
         state(context).value = advanced
         context.prefs().edit { putBoolean(Settings.PREF_ADVANCED_SETTINGS, advanced) }

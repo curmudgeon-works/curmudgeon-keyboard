@@ -84,6 +84,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
+import helium314.keyboard.latin.utils.getActivity
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -289,7 +291,8 @@ fun <T: Any?> SearchScreen(
                         // with separate settings per keyboard: the keyboard these settings belong to, under the title
                         title = {
                             val ctx = androidx.compose.ui.platform.LocalContext.current
-                            val keyboard = remember { helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(
+                            val changed = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
+                            val keyboard = remember(changed?.value) { helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(
                                 helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)) }
                             if (keyboard == null || !showKeyboardName) title()
                             else Column {
