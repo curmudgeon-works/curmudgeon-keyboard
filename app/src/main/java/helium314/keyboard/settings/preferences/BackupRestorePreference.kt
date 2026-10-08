@@ -501,6 +501,16 @@ private fun restoreAllSettings(ctx: Context, pending: PendingRestore) {
  * are. The keyboard's settings need a set of its own, so separate settings per keyboard get switched on if they
  * aren't; the existing keyboards keep the shared set they behave by now.
  */
+/** What [keyboard] gets when restored on its own from [backup]: what it read there, left at the defaults where the
+ *  backup only wrote defaults down, and with the HeliBoard Layouts' values a backup from before 2026-10-07 lacks. */
+internal fun restoredSettings(ctx: Context, backup: Map<String, Any?>, keyboard: SettingsSubtype): Map<String, Any?> {
+    val values = KeyboardProfiles.effectiveSettingsIn(backup, keyboard)
+        .let { values -> if (backup[helium314.keyboard.latin.PICKED_ONLY_DONE] == true) values else helium314.keyboard.latin.withoutDefaults(values) }
+    // (after the defaults went: the HeliBoard values include 300 ms, which was the default then)
+    return if (backup[helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE] == true) values
+        else helium314.keyboard.latin.withHeliBoardPins(ctx, values)
+}
+
 private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List<SettingsSubtype>, withSettings: Boolean) {
     val real = ctx.realPrefs()
     val prefs = ctx.prefs()
@@ -509,8 +519,7 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
     // (the backup's shared set with the keyboard's own on top: what it read on the old phone)
     // (a backup from before 0.3.008 wrote every setting at its default down: those are left out, so they follow the
     // defaults here; see pickedOnlyUpgrade)
-    val settings = chosen.associateWith { KeyboardProfiles.effectiveSettingsIn(backup, it)
-        .let { values -> if (backup[helium314.keyboard.latin.PICKED_ONLY_DONE] == true) values else helium314.keyboard.latin.withoutDefaults(values) } }
+    val settings = chosen.associateWith { restoredSettings(ctx, backup, it) }
     if (withSettings && !KeyboardProfiles.isSeparate(real))
         KeyboardProfiles.enable(real, SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }, keepExisting = true)
 

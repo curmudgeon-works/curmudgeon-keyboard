@@ -110,6 +110,22 @@ internal fun heliBoardLayoutPins(context: Context, real: SharedPreferences, fres
     real.edit { putBoolean(HELIBOARD_LAYOUT_PINS_DONE, true) }
 }
 
+/**
+ * One keyboard's settings read from a backup made before [heliBoardLayoutPins] existed, as that step would leave them
+ * (restoring just some keyboards runs no upgrade step; 2026-10-07: "the backup should apply backup's values"): on the
+ * HeliBoard or HeliBoard extra Layout, HeliBoard's values where it has none of its own, and the old name carried over.
+ */
+internal fun withHeliBoardPins(context: Context, values: Map<String, Any?>): Map<String, Any?> {
+    val sel = helium314.keyboard.settings.LayoutPresets.PREF_SELECTED
+    val extra = context.getString(R.string.layout_preset_heliboard_extra)
+    val selected = values[sel] as? String ?: return values
+    if (selected != context.getString(R.string.layout_preset_heliboard) && selected != extra && selected != "HeliBoard Extra") return values
+    val out = HashMap(values)
+    out[sel] = if (selected == "HeliBoard Extra") extra else selected
+    for ((key, value) in heliBoardPins()) if (out[key] == null) out[key] = value
+    return out
+}
+
 /** Set once [pickedOnlyUpgrade] ran; a backup made since carries it, one from before doesn't (its restore runs it again). */
 const val PICKED_ONLY_DONE = "settings_picked_only_done"
 

@@ -78,4 +78,21 @@ class HeliBoardPinsTest {
         helium314.keyboard.settings.preferences.restoreFollowUp(ctx)
         assertEquals(false, real.all["p2/${Settings.PREF_BACKSPACE_SPEED_UP}"], "keyboard 2 missed its pins: ${real.all.keys}")
     }
+
+    // 2026-10-07: "On restoring a single keyboard from 3008 backup -- the backup should apply backup's values."
+    @Test fun `a keyboard restored on its own from a 0_3_008 backup gets HeliBoard's values`() {
+        val keyboard = SettingsSubtype(java.util.Locale.US, "")
+        val heliName = ctx.getString(R.string.layout_preset_heliboard)
+        val backup = mapOf<String, Any?>(helium314.keyboard.latin.PICKED_ONLY_DONE to true, sel to heliName,
+            Settings.PREF_BACKSPACE_SPEED_UP to true) // (a pick of its own stays)
+        val restored = helium314.keyboard.settings.preferences.restoredSettings(ctx, backup, keyboard)
+        assertEquals(300, restored[Settings.PREF_KEY_LONGPRESS_TIMEOUT])
+        assertEquals(helium314.keyboard.latin.settings.Defaults.BACKSPACE_DELAY_FOLLOWS, restored[Settings.PREF_BACKSPACE_LONGPRESS_DELAY])
+        assertEquals(true, restored[Settings.PREF_BACKSPACE_SPEED_UP])
+        // a backup made since has its values as they are, and a keyboard on another Layout gets none
+        val since = backup + (helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true)
+        assertEquals(null, helium314.keyboard.settings.preferences.restoredSettings(ctx, since, keyboard)[Settings.PREF_KEY_LONGPRESS_TIMEOUT])
+        val curmudgeon = backup + (sel to ctx.getString(R.string.layout_preset_curmudgeon))
+        assertEquals(null, helium314.keyboard.settings.preferences.restoredSettings(ctx, curmudgeon, keyboard)[Settings.PREF_KEY_LONGPRESS_TIMEOUT])
+    }
 }
