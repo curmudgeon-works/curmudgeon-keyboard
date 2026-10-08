@@ -18,7 +18,7 @@ import java.io.File
  * (SettingsActivity.onStop) and, after a crash, when the app starts again ([recoverAfterCrash]).
  */
 class AppearanceDraft private constructor(
-    private val prefs: Map<String, Any?>,
+    private val prefs: MutableMap<String, Any?>,
     private val files: Map<File, Saved?>, // the live file -> its saved copy, null when it didn't exist
     private val dir: File,
     private val setId: Int = KeyboardProfiles.SHARED, // the set the screen edited (see PrefsDraft)
@@ -56,6 +56,16 @@ class AppearanceDraft private constructor(
         AppearanceLooks.applyScreen(ctx, prefs,
             ProfilePreferences(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)) { setId })
         discard()
+    }
+
+    /** A palette deleted while the screen is open stays deleted: Discard leaves it out, and a colours choice that
+     *  named it goes back to the default (2026-10-07: Discard, or leaving the app, brought a deleted palette back). */
+    private fun forgetPalette(name: String) {
+        val keys = listOf(Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
+            .map { it + name } + listOf(Settings.PREF_THEME_COLORS, Settings.PREF_THEME_COLORS_NIGHT).filter { prefs[it] == name }
+        if (keys.none { it in prefs }) return
+        keys.forEach { prefs.remove(it) }
+        if (dir.isDirectory) writeSnapshot(dir, setId, prefs, files) // (what a crash puts back too)
     }
 
     /** Keeps what is on the phone now; only the snapshot goes. */
@@ -96,6 +106,9 @@ class AppearanceDraft private constructor(
         /** The screen is left with nothing changed: the snapshot goes (the next visit starts from what is there then). */
         fun close() { active?.discard() }
 
+        /** Palette [name] was deleted: the open screen's Discard doesn't bring it back ([forgetPalette]). */
+        fun forgetPalette(name: String) { active?.forgetPalette(name) }
+
         /** The app is left (or the screen goes to the background) with the screen open: changes not accepted are undone. */
         fun rejectOpen(ctx: Context) { active?.reject(ctx) }
 
@@ -104,15 +117,19 @@ class AppearanceDraft private constructor(
             val files = liveFiles(ctx).associateWith { live ->
                 if (live.exists()) Saved(live.copyTo(File(dir, live.name), overwrite = true), live.length(), live.lastModified()) else null
             }
-            val prefs = currentPrefs(ctx)
+            val prefs = HashMap(currentPrefs(ctx))
             val setId = PrefsDraft.currentSetId(ctx)
+            writeSnapshot(dir, setId, prefs, files)
+            return AppearanceDraft(prefs, files, dir, setId)
+        }
+
+        private fun writeSnapshot(dir: File, setId: Int, prefs: Map<String, Any?>, files: Map<File, Saved?>) {
             val json = JSONObject().put("set", setId)
             json.put("prefs", JSONObject().also { o -> prefs.forEach { (k, v) -> AppearanceLooks.toJson(v)?.let { o.put(k, it) } } })
             json.put("files", JSONObject().also { o -> files.forEach { (live, saved) ->
                 o.put(live.path, saved?.let { JSONObject().put("length", it.length).put("modified", it.modified) } ?: JSONObject.NULL)
             } })
             File(dir, PREFS_FILE).writeText(json.toString())
-            return AppearanceDraft(prefs, files, dir, setId)
         }
 
         /** A snapshot left on disk by a process that died with Appearance open: put it back. Called at app start. */
@@ -123,7 +140,7 @@ class AppearanceDraft private constructor(
             if (json == null) { dir.deleteRecursively(); return }
             runCatching {
                 val p = json.getJSONObject("prefs")
-                val prefs = p.keys().asSequence().associateWith { AppearanceLooks.fromJson(p.getJSONObject(it)) }
+                val prefs = HashMap(p.keys().asSequence().associateWith { AppearanceLooks.fromJson(p.getJSONObject(it)) })
                 val f = json.getJSONObject("files")
                 val files = f.keys().asSequence().associate { path ->
                     val live = File(path)

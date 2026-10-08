@@ -8,6 +8,7 @@ import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
+import helium314.keyboard.latin.settings.createPrefKeyForBooleanSettings
 import helium314.keyboard.latin.utils.LayoutType
 import helium314.keyboard.latin.utils.LayoutUtils
 import helium314.keyboard.latin.utils.LayoutUtilsCustom
@@ -63,9 +64,15 @@ object LayoutPresets {
      * follows them); HeliBoard is upstream HeliBoard's; HeliBoard extra is HeliBoard's with every accent and the number row.
      */
     fun builtIn(ctx: Context): List<Preset> {
-        // HeliBoard's own typing: ?123 long-press does nothing, holding backspace deletes letters, 50 ms apart
+        // HeliBoard's own typing: ?123 long-press does nothing, holding backspace deletes letters, 50 ms apart, no
+        // speed-up, a 300 ms long press, 100% under the bottom row in portrait, no symbol map (what the Curmudgeon Layout,
+        // the defaults, changed on 2026-10-07 stays HeliBoard's here)
         val heliBoardTyping = mapOf(Settings.PREF_LONG_PRESS_SYMBOL_ACTION to "none",
-            Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS to false, Settings.PREF_BACKSPACE_REPEAT_INTERVAL to 50)
+            Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS to false, Settings.PREF_BACKSPACE_REPEAT_INTERVAL to 50,
+            Settings.PREF_BACKSPACE_SPEED_UP to false, Settings.PREF_KEY_LONGPRESS_TIMEOUT to 300,
+            Settings.PREF_BACKSPACE_LONGPRESS_DELAY to 300, // (HeliBoard's backspace waits as long as any key)
+            Settings.PREF_SYMBOL_POPUP_MAP to "") + listOf(1f, 0f, 1f, 0f).mapIndexed { i, scale ->
+                createPrefKeyForBooleanSettings(Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX, i, 2) to scale }
         val fullBottomRow = sizeKeys.keys.filter { it.startsWith(Settings.PREF_BOTTOM_ROW_SCALE_PREFIX) }.associateWith { 1f }
         return listOf(
             Preset(ctx.getString(R.string.layout_preset_curmudgeon), complete(emptyMap()), builtIn = true),

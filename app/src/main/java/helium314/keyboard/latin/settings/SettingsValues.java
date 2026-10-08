@@ -311,7 +311,7 @@ public class SettingsValues {
         // Compute other readable settings
         mKeyLongpressTimeout = prefs.getInt(Settings.PREF_KEY_LONGPRESS_TIMEOUT, Defaults.PREF_KEY_LONGPRESS_TIMEOUT);
         // backspace's own delay; until it is set it follows the key long press delay, so nothing changes on upgrade
-        mBackspaceLongpressDelay = prefs.getInt(Settings.PREF_BACKSPACE_LONGPRESS_DELAY, mKeyLongpressTimeout);
+        mBackspaceLongpressDelay = prefs.getInt(Settings.PREF_BACKSPACE_LONGPRESS_DELAY, Defaults.PREF_BACKSPACE_LONGPRESS_DELAY);
         mKeypressVibrationDuration = prefs.getInt(Settings.PREF_VIBRATION_DURATION_SETTINGS, Defaults.PREF_VIBRATION_DURATION_SETTINGS);
         mKeypressSoundVolume = prefs.getFloat(Settings.PREF_KEYPRESS_SOUND_VOLUME, Defaults.PREF_KEYPRESS_SOUND_VOLUME);
         mKeypressSound = prefs.getString(Settings.PREF_KEYPRESS_SOUND, Defaults.PREF_KEYPRESS_SOUND);

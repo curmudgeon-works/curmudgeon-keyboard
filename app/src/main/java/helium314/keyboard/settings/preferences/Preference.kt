@@ -74,6 +74,8 @@ fun Preference(
     description: String? = null,
     @DrawableRes icon: Int? = null,
     onLongClick: (() -> Unit)? = null,
+    /** The description in italics: a state, not a name ("unsaved" on the Layouts row). */
+    descriptionItalic: Boolean = false,
     value: @Composable (RowScope.() -> Unit)? = null,
 ) {
     Row(
@@ -98,6 +100,7 @@ fun Preference(
                 ) {
                     Text(
                         text = description,
+                        fontStyle = if (descriptionItalic) FontStyle.Italic else null,
                         modifier = Modifier.padding(top = 2.dp)
                     )
                 }

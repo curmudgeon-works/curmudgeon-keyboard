@@ -79,7 +79,7 @@ object Defaults {
     const val PREF_HINT_FONT_SCALE = 1.0f // the symbols on the keys, relative to their usual size
     const val PREF_HINT_TEXT_BOLD = true // symbols were always drawn bold
     const val PREF_BACKSPACE_REPEAT_INTERVAL = 200 // ms between deletions while backspace is held
-    const val PREF_BACKSPACE_SPEED_UP = false // held long enough, backspace ramps to the top speed
+    const val PREF_BACKSPACE_SPEED_UP = true // held long enough, backspace ramps to the top speed (the Curmudgeon Layout's, 2026-10-07)
     const val PREF_BACKSPACE_SPEED_UP_AFTER = 2000 // ms of holding before the speed-up starts
     const val PREF_BACKSPACE_TOP_INTERVAL = 50 // ms between deletions at the top speed
     const val PREF_CENTER_SUGGESTION_TEXT_TO_ENTER = false
@@ -104,8 +104,8 @@ object Defaults {
     @JvmField
     val PREF_BOTTOM_ROW_SCALE = Array(4) { 1.1f } // 110%, the Curmudgeon Layout's (2026-10-06; 100% before)
     @JvmField
-    // DEFAULT_SIZE_SCALE for portrait, 0 for landscape (normal and folded)
-    val PREF_BOTTOM_PADDING_SCALE = arrayOf(DEFAULT_SIZE_SCALE, 0f, DEFAULT_SIZE_SCALE, 0f)
+    // nothing under the bottom row (the Curmudgeon Layout's, 2026-10-07; before: 100% in portrait, 0 in landscape)
+    val PREF_BOTTOM_PADDING_SCALE = arrayOf(0f, 0f, 0f, 0f)
     @JvmField
     val PREF_SIDE_PADDING_SCALE = Array(8) { 0f }
     const val PREF_FONT_SCALE = DEFAULT_SIZE_SCALE
@@ -141,7 +141,10 @@ object Defaults {
     const val PREF_VIBRATION_DURATION_SETTINGS = -1
     const val PREF_KEYPRESS_SOUND_VOLUME = -0.01f
     const val PREF_KEYPRESS_SOUND = "android" // KeypressSounds
-    const val PREF_KEY_LONGPRESS_TIMEOUT = 300
+    // a held backspace starts deleting after this (the Curmudgeon Layout's, 2026-10-07; before, unset meant the key long press
+    // delay, which went to 150 ms the same day)
+    const val PREF_BACKSPACE_LONGPRESS_DELAY = 200
+    const val PREF_KEY_LONGPRESS_TIMEOUT = 150 // the Curmudgeon Layout's (2026-10-07; 300 before, as HeliBoard)
     const val PREF_GESTURE_PREVIEW_TRAIL = true
     const val PREF_GESTURE_CAPS_SWIPE = true // swiping up above the keyboard capitalizes the letter left from (own gesture decoder)
     const val PREF_GESTURE_APOSTROPHE_VIA_PERIOD = false // off = the apostrophe is skipped (swipe im for I'm); on = swiped through the period key (own gesture decoder)
@@ -188,15 +191,15 @@ object Defaults {
     const val PREF_SHOW_TLD_POPUP_KEYS = true
     const val PREF_ADVANCED_SETTINGS = false // simple settings menu by default; switch at the top of the main screen
     // letter followed by its popup symbols, entries separated by whitespace; only used when the number row is on
-    // none by default since 0.3.008 (HeliBoard's popups); the Curmudgeon map is the "Curmudgeon" popup preset
-    const val PREF_SYMBOL_POPUP_MAP = ""
+    // the default again since 2026-10-07 (none in 0.3.008, HeliBoard's popups); also the "Curmudgeon" popup preset
     const val CURMUDGEON_SYMBOL_POPUP_MAP = "q~` w× e÷ r{ t} y[ u] i| o_ p- a@ s+ d—– f… g: h; j' k\" l/ z= x\\ c< v> b, n! m?"
+    const val PREF_SYMBOL_POPUP_MAP = CURMUDGEON_SYMBOL_POPUP_MAP // the Curmudgeon popups (2026-10-07; HeliBoard's "" in 0.3.008)
     const val PREF_RECORD_GESTURE_CORPUS = false
     const val PREF_SWIPE_METRICS = false
     const val PREF_LEARNING_LOG = false
     const val PREF_SHARE_LEARNED_WORDS = true
     const val PREF_AUTO_PREVIEW_KEYBOARD = true // settings bring the preview keyboard up by themselves
-    const val PREF_MORE_POPUP_KEYS = "main" // HeliBoard's popups since 0.3.008 (the Curmudgeon preset is "all")
+    const val PREF_MORE_POPUP_KEYS = "all" // the Curmudgeon popups, the Curmudgeon Layout's (2026-10-07; HeliBoard's "main" in 0.3.008)
     const val PREF_SPACE_TO_CHANGE_LANG = true
     const val PREF_LANGUAGE_SWIPE_DISTANCE = 5
     const val PREF_TOUCHPAD_SENSITIVITY = 50

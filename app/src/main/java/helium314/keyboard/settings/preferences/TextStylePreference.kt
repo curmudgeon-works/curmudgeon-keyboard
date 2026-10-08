@@ -498,11 +498,12 @@ fun SuggestionColorRow(reload: () -> Unit) {
     }
     if (showPicker) {
         // previewed live on the keyboard while picking; Cancel puts back what was set
-        val before = remember { prefs.all[Settings.PREF_SUGGESTION_TEXT_COLOR] as? Int }
+        // what this keyboard's own set held (not the shared value it may follow: review 2026-10-07)
+        val before = helium314.keyboard.settings.rememberRawPrefSnapshot(ctx, listOf(Settings.PREF_SUGGESTION_TEXT_COLOR))
         var confirmed by remember { mutableStateOf(false) }
         helium314.keyboard.settings.dialogs.ColorPickerDialog(
             onDismissRequest = {
-                if (!confirmed) prefs.edit { if (before == null) remove(Settings.PREF_SUGGESTION_TEXT_COLOR) else putInt(Settings.PREF_SUGGESTION_TEXT_COLOR, before) }
+                if (!confirmed) before.restore()
                 reload()
                 showPicker = false
             },

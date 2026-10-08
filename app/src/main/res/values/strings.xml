@@ -245,8 +245,9 @@
     <string name="gesture_fast_typing_cooldown_instant">Always start instantly</string>
     <!-- Title of the setting to adjust the gesture trail fadeout duration-->
     <string name="gesture_trail_thickness">Swipe trail thickness</string>
-    <!-- Appearance: the swipe trail's colour for this keyboard (not set: the theme's) -->
-    <string name="gesture_trail_color">Swipe trail colour</string>
+    <!-- Appearance (advanced, under Colors): this keyboard's accent color over the theme's (not set: the theme's) -->
+    <string name="gesture_trail_color">Accent color</string>
+    <string name="gesture_trail_color_summary">Swipe trail, suggestions and the enter key</string>
     <string name="gesture_trail_off">Off</string>
     <string name="gesture_trail_whole">Show the whole swipe trail</string>
     <string name="gesture_trail_whole_linger">Trail vanishes at next touch or after</string>
@@ -819,7 +820,7 @@
     <string name="text_style_keys">Keys</string>
     <string name="fonts_same_as_keys">Use the same font as the keys</string>
     <string name="text_style_symbols">Symbols</string>
-    <string name="suggestion_text_color">Colour</string>
+    <string name="suggestion_text_color">Color</string>
     <string name="text_style_suggestions">Suggestions</string>
     <string name="text_style_symbols_size">Symbols size: %s</string>
     <string name="text_style_suggestions_size">Suggestions size: %s</string>
@@ -1006,7 +1007,7 @@ language, hence "No language". -->
     <!-- Title for customizing background image -->
     <string name="customize_background_image">Set background image</string>
     <!-- The background picture dialog: the picture in a keyboard-shaped frame -->
-    <string name="background_picture_hint">Pinch to zoom, drag to move. Zoomed out, the rest is the background colour.</string>
+    <string name="background_picture_hint">Pinch to zoom, drag to move. Zoomed out, the rest is the background color.</string>
     <string name="background_picture_stretched_hint">The whole picture, squeezed to the keyboard\'s shape.</string>
     <string name="background_picture_stretch">Stretch to fit</string>
     <string name="background_picture_other">Other picture</string>

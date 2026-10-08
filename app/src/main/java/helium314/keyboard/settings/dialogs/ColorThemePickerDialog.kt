@@ -133,7 +133,7 @@ fun ColorThemePickerDialog(
             ) {
                 androidx.compose.foundation.layout.Column {
                     // the Add row first, in view however far the list is scrolled
-                    AddColorRow(close, userColors, targetScreen, setting.key)
+                    AddColorRow(close, targetScreen, setting.key, isNight)
                     // a short list that scrolls inside, so the dialog stays clear of the keyboard
                     LazyColumn(state = state, modifier = androidx.compose.ui.Modifier.heightIn(max = 300.dp).scrollbar(state)) {
                         items(colors) { item ->
@@ -185,33 +185,28 @@ fun ColorThemePickerDialog(
 }
 
 @Composable
-private fun AddColorRow(onDismissRequest: () -> Unit, userColors: Collection<String>, targetScreen: String, prefKey: String) {
-    val prefs = LocalContext.current.prefs()
+private fun AddColorRow(onDismissRequest: () -> Unit, targetScreen: String, prefKey: String, isNight: Boolean) {
+    val ctx = LocalContext.current
+    val prefs = ctx.prefs()
     val defaultName = KeyboardTheme.getUnusedThemeName(stringResource(R.string.theme_name_user), prefs)
-    // the name is asked in its own dialog: this list keeps the keyboard up as a preview, so it can't take typing
-    var askName by remember { mutableStateOf(false) }
+    // straight into the editor (2026-10-07; the name can be changed there), starting from the colours selected now: a
+    // tap in this list selects at once, so that is the one last tapped
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().clickable { askName = true }.padding(start = 10.dp, top = 12.dp, bottom = 12.dp)
+        modifier = Modifier.fillMaxWidth().clickable {
+            val from = prefs.getString(prefKey, if (isNight) Defaults.PREF_THEME_COLORS_NIGHT else Defaults.PREF_THEME_COLORS)!!
+            KeyboardTheme.writeUserColors(prefs, defaultName, KeyboardTheme.seedUserColors(ctx, prefs, from, isNight))
+            KeyboardTheme.writeUserMoreColors(prefs, defaultName, Defaults.PREF_USER_MORE_COLORS)
+            prefs.edit { putString(prefKey, defaultName) }
+            onDismissRequest()
+            SettingsDestination.navigateTo(targetScreen + android.net.Uri.encode(defaultName)) // (Navigation decodes the route: a name with % or ? broke it)
+            KeyboardSwitcher.getInstance().setThemeNeedsReload()
+        }.padding(start = 10.dp, top = 12.dp, bottom = 12.dp)
     ) {
         // (18 dp, like the Keys row's plus: the full 24 looked too big next to the text)
         Icon(painterResource(R.drawable.ic_plus), stringResource(R.string.add), Modifier.size(18.dp))
         Text(stringResource(R.string.add_color_theme, defaultName), Modifier.padding(start = 8.dp))
     }
-    if (askName)
-        TextInputDialog(
-            onDismissRequest = { askName = false },
-            initialText = defaultName,
-            title = { Text(stringResource(R.string.add)) },
-            checkTextValid = { it.isNotBlank() && it !in userColors },
-            onConfirmed = { name ->
-                onDismissRequest()
-                prefs.edit { putString(prefKey, name) }
-                KeyboardTheme.writeUserMoreColors(prefs, name, Defaults.PREF_USER_MORE_COLORS) // write sth so theme is stored
-                SettingsDestination.navigateTo(targetScreen + android.net.Uri.encode(name)) // (Navigation decodes the route: a name with % or ? broke it)
-                KeyboardSwitcher.getInstance().setThemeNeedsReload()
-            },
-        )
 }
 
 @Composable
@@ -254,13 +249,8 @@ private fun ColorItemRow(onDismissRequest: () -> Unit, item: String, isSelected:
                     content = { Text(stringResource(R.string.delete_confirmation, item)) },
                     onConfirmed = {
                         showDialog = false
-                        prefs.edit {
-                            remove(Settings.PREF_USER_COLORS_PREFIX + item)
-                            remove(Settings.PREF_USER_ALL_COLORS_PREFIX + item)
-                            remove(Settings.PREF_USER_MORE_COLORS_PREFIX + item)
-                            if (isSelected) remove(prefKey)
-                        }
-                        KeyboardSwitcher.getInstance().setThemeNeedsReload()
+                        // (also where the other mode's colours name it, and not undone by the screen's Discard)
+                        KeyboardTheme.deleteUserColors(ctx, prefs, item)
                     }
                 )
         }

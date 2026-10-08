@@ -10,9 +10,10 @@ import kotlin.test.assertTrue
 
 /** The defaults of the first production release (0.3.008): HeliBoard's popups, long-press ?123 opens the settings. */
 class LaunchDefaultsTest {
-    @Test fun popupsAreHeliBoards() {
-        assertEquals("main", Defaults.PREF_MORE_POPUP_KEYS)
-        assertEquals("", Defaults.PREF_SYMBOL_POPUP_MAP)
+    // HeliBoard's in 0.3.008; the Curmudgeon popups again since 2026-10-07, with the Curmudgeon Layout = the defaults
+    @Test fun popupsAreCurmudgeons() {
+        assertEquals("all", Defaults.PREF_MORE_POPUP_KEYS)
+        assertEquals(Defaults.CURMUDGEON_SYMBOL_POPUP_MAP, Defaults.PREF_SYMBOL_POPUP_MAP)
         assertEquals(POPUP_KEYS_ORDER_DEFAULT, Defaults.PREF_POPUP_KEYS_ORDER)
     }
 

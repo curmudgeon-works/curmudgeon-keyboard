@@ -71,6 +71,7 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
     private val prefs by lazy { this.prefs() }
     val prefChanged = MutableStateFlow(0) // simple counter, as the only relevant information is that something changed
     fun prefChanged() = prefChanged.value++
+    private val editingListener: () -> Unit = { prefChanged() }
     private val dictUriFlow = MutableStateFlow<Uri?>(null)
     private val cachedDictionaryFile by lazy { File(this.cacheDir.path + File.separator + "temp_dict") }
     private val crashReportFiles = MutableStateFlow<List<File>>(emptyList())
@@ -214,12 +215,12 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
     override fun onStart() {
         super.onStart()
         prefs.registerOnSharedPreferenceChangeListener(this)
-        KeyboardProfiles.editingChanged = { prefChanged() } // (the app's look follows the opened keyboard's theme)
+        KeyboardProfiles.addEditingListener(editingListener) // (the app's look follows the opened keyboard's theme)
     }
 
     override fun onStop() {
         prefs.unregisterOnSharedPreferenceChangeListener(this)
-        KeyboardProfiles.editingChanged = null
+        KeyboardProfiles.removeEditingListener(editingListener)
         // leaving the app with Appearance open undoes its changes that weren't kept; a file picker we opened
         // (background image, font) and rotating don't count
         if (!isChangingConfigurations && !awaitingResult) { AppearanceDraft.rejectOpen(this); LayoutDraft.rejectOpen(this); PrefsDraft.rejectOpen(this) }

@@ -14,6 +14,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import helium314.keyboard.latin.utils.getActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -60,12 +62,15 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
     var toRename: LayoutPresets.Preset? by remember { mutableStateOf(null) }
     var toDelete: LayoutPresets.Preset? by remember { mutableStateOf(null) }
     fun store(list: List<LayoutPresets.Preset>) { LayoutPresets.save(prefs, list); generation++ }
-    // none chosen: the default, Curmudgeon ("tweaked" if anything differs from it)
+    // none chosen: the default, Curmudgeon; "unsaved" in italics the moment anything differs from the chosen one (2026-10-07:
+    // it said "Curmudgeon (tweaked)", and only once the row was drawn again): read again on every settings change
+    val changed = (ctx.getActivity() as? helium314.keyboard.settings.SettingsActivity)?.prefChanged?.collectAsState()
     val chosen = prefs.getString(LayoutPresets.PREF_SELECTED, null)?.let { name -> all.firstOrNull { it.name == name } }
         ?: builtIn.first()
-    val tweaked = LayoutPresets.isTweaked(ctx, keyboard, chosen)
-    val summary = if (tweaked) chosen.name + " (" + stringResource(R.string.theme_tweaked) + ")" else chosen.name
-    Preference(name = stringResource(R.string.layout_presets), description = summary, onClick = { showList = true }) { NextScreenIcon() }
+    val tweaked = remember(changed?.value, keyboard, chosen, generation) { LayoutPresets.isTweaked(ctx, keyboard, chosen) }
+    Preference(name = stringResource(R.string.layout_presets),
+        description = if (tweaked) stringResource(R.string.theme_unsaved) else chosen.name, descriptionItalic = tweaked,
+        onClick = { showList = true }) { NextScreenIcon() }
     // while the list is open nothing of the keyboard's is cleaned up (its unsaved layout must survive a preview
     // for Cancel); afterwards what no keyboard uses goes
     // OK would drop the keyboard's unsaved layout: asked first (the preset, and what was there for a "no")

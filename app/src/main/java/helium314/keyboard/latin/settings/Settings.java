@@ -84,7 +84,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_AUTOCORRECT_SHORTCUTS = "autocorrect_shortcuts";
     public static final String PREF_BACKSPACE_REVERTS_AUTOCORRECT = "backspace_reverts_autocorrect";
     public static final String PREF_BACKSPACE_HOLD_DELETES_WORDS = "backspace_hold_deletes_words";
-    public static final String PREF_BACKSPACE_LONGPRESS_DELAY = "backspace_longpress_delay"; // ms before a held backspace starts deleting; unset = the key long press delay
+    public static final String PREF_BACKSPACE_LONGPRESS_DELAY = "backspace_longpress_delay"; // ms before a held backspace starts deleting (its own default since 2026-10-07; it followed the key long press delay)
     public static final String PREF_BACKSPACE_DELETES_SWIPED_WORD = "backspace_deletes_swiped_word";
     public static final String PREF_AUTOCORRECT_WITH_DIGITS = "autocorrect_with_digits";
     public static final String PREF_KEY_TEXT_BOLD = "key_text_bold";

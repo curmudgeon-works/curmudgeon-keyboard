@@ -27,12 +27,13 @@ import helium314.keyboard.settings.SettingsActivity
 import helium314.keyboard.settings.dialogs.ColorPickerDialog
 
 /**
- * The swipe trail's colour for this keyboard (Appearance, 2026-10-07): a row with the colour in use as a swatch; the
- * picker shows each colour on the preview keyboard as it's picked, Cancel puts back what was set, Default = the
- * theme's colour (the key removed, as with the suggestions' colour: not set means the theme's, so no fixed default).
+ * The keyboard's accent color (Appearance, advanced, under Colors; 2026-10-07): the swipe trail, the suggestion words
+ * (unless theirs is picked) and the enter key, over the theme's. A row with the colour in use as a swatch; the picker
+ * shows each colour on the preview keyboard as it's picked, Cancel puts back what was stored, Default = the theme's
+ * (the key removed: not set means the theme's, so no fixed default).
  */
 @Composable
-fun TrailColorPreference(setting: Setting) {
+fun AccentColorPreference(setting: Setting) {
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
     var showPicker by remember { mutableStateOf(false) }
@@ -43,15 +44,17 @@ fun TrailColorPreference(setting: Setting) {
     fun reload() = KeyboardSwitcher.getInstance().setThemeNeedsReload()
     Preference(
         name = setting.title,
+        description = setting.description,
         onClick = { showPicker = true },
         value = { Box(Modifier.size(28.dp).background(Color(color), CircleShape)) },
     )
     if (showPicker) {
-        val before = remember { prefs.all[Settings.PREF_GESTURE_TRAIL_COLOR] as? Int }
+        // what this keyboard's own set held (not the shared value it may follow: review 2026-10-07)
+        val before = helium314.keyboard.settings.rememberRawPrefSnapshot(ctx, listOf(Settings.PREF_GESTURE_TRAIL_COLOR))
         var confirmed by remember { mutableStateOf(false) }
         ColorPickerDialog(
             onDismissRequest = {
-                if (!confirmed) prefs.edit { if (before == null) remove(Settings.PREF_GESTURE_TRAIL_COLOR) else putInt(Settings.PREF_GESTURE_TRAIL_COLOR, before) }
+                if (!confirmed) before.restore()
                 reload()
                 showPicker = false
             },

@@ -686,3 +686,35 @@ class SeeThroughKeys(private val base: Colors) : Colors by base {
     override fun selectAndColorDrawable(attr: TypedArray, color: ColorType): Drawable =
         base.selectAndColorDrawable(attr, color).also { if (color in keyTypes) clear(it, color) }
 }
+
+/**
+ * The accent colour picked for the keyboard (Appearance, "Accent color", 2026-10-07) over the theme's: the swipe trail,
+ * the enter / send key (the suggestion words follow the trail where their own colour isn't picked). Everything else
+ * is the theme's. Holo keeps its own enter key (it isn't drawn in the accent there).
+ */
+class AccentOverride(private val base: Colors, @ColorInt private val accent: Int) : Colors by base {
+    private val holo = base.themeStyle == STYLE_HOLO
+    private val keyTypes = if (holo) emptySet() else setOf(ACTION_KEY_BACKGROUND, ACTION_KEY_POPUP_KEYS_BACKGROUND)
+    // the icon on it: dark on a bright accent (as the themes do it), else white
+    private val iconColor = if (isBrightColor(accent)) Color.DKGRAY else Color.WHITE
+
+    override fun get(color: ColorType): Int = when {
+        color == GESTURE_TRAIL -> accent
+        color in keyTypes -> accent
+        color == ACTION_KEY_ICON && !holo -> iconColor
+        else -> base.get(color)
+    }
+
+    override fun setColor(drawable: Drawable, color: ColorType) = when {
+        color in keyTypes -> {
+            DrawableCompat.setTintMode(drawable, PorterDuff.Mode.MULTIPLY)
+            DrawableCompat.setTintList(drawable, pressedStateList(darken(darken(accent)), accent))
+        }
+        color == ACTION_KEY_ICON && !holo ->
+            drawable.colorFilter = if (iconColor == Color.WHITE) null else colorFilter(iconColor)
+        else -> base.setColor(drawable, color)
+    }
+
+    override fun selectAndColorDrawable(attr: TypedArray, color: ColorType): Drawable =
+        base.selectAndColorDrawable(attr, color).also { if (color in keyTypes) setColor(it, color) }
+}

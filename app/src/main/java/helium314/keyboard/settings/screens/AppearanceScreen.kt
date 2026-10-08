@@ -160,9 +160,10 @@ fun AppearanceScreen(
             Settings.PREF_THEME_DAY_NIGHT else null,
         Settings.PREF_THEME_COLORS,
         if (dayNightMode) Settings.PREF_THEME_COLORS_NIGHT else null,
+        // the keyboard's accent over the theme's: trail, suggestions, enter key (advanced, under the colours; 2026-10-07)
+        Settings.PREF_GESTURE_TRAIL_COLOR,
         Settings.PREF_SUGGESTION_WORD_PADDING, // spacing between suggestions (advanced; saved with a theme)
         SettingsWithoutKey.FONTS, // keys, symbols, suggestions: one dialog
-        Settings.PREF_GESTURE_TRAIL_COLOR, // the swipe trail's colour (the suggestions follow it unless theirs is picked)
         Settings.PREF_THEME_STYLE,
         Settings.PREF_ICON_STYLE,
         Settings.PREF_CUSTOM_ICON_NAMES,
@@ -250,7 +251,7 @@ fun AppearanceScreen(
         settings = items,
         simpleModeKeys = setOf(
             SettingsWithoutKey.DIVIDER, SettingsWithoutKey.APPEARANCE_LOOKS, Settings.PREF_THEME_STYLE, Settings.PREF_THEME_COLORS, Settings.PREF_THEME_KEY_BORDERS, Settings.PREF_THEME_DAY_NIGHT,
-            Settings.PREF_THEME_COLORS_NIGHT, SettingsWithoutKey.FONTS, Settings.PREF_GESTURE_TRAIL_COLOR,
+            Settings.PREF_THEME_COLORS_NIGHT, SettingsWithoutKey.FONTS,
             SettingsWithoutKey.HIDE_ALL_SYMBOLS,
             // the emoji size (with its fit) and skin tone (the emoji font from a file: advanced)
             Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT, Settings.PREF_EMOJI_SKIN_TONE,
@@ -309,8 +310,8 @@ fun createAppearanceSettings(context: Context) = listOf(
                 extra = { reload -> helium314.keyboard.settings.preferences.SuggestionColorRow(reload) }),
         ))
     },
-    Setting(context, Settings.PREF_GESTURE_TRAIL_COLOR, R.string.gesture_trail_color) {
-        helium314.keyboard.settings.preferences.TrailColorPreference(it)
+    Setting(context, Settings.PREF_GESTURE_TRAIL_COLOR, R.string.gesture_trail_color, R.string.gesture_trail_color_summary) {
+        helium314.keyboard.settings.preferences.AccentColorPreference(it)
     },
     Setting(context, SettingsWithoutKey.HIDE_ALL_SYMBOLS, R.string.hide_all_symbols) {
         HideAllSymbolsPreference(it)

@@ -70,7 +70,7 @@ class PickedOnlyUpgradeTest {
             putBoolean("separate_settings_per_keyboard", false) // the sets are kept in the background
             putString(popups, "more") // the shared set: a pick
             putString(own(1, popups), "all") // keyboard 1: at the old default
-            putString(own(2, popups), "main") // keyboard 2: at the default now
+            putString(own(2, popups), Defaults.PREF_MORE_POPUP_KEYS) // keyboard 2: at the default now ("all" since 2026-10-07; "main" is a pick again)
             putString(own(2, map), "q~") // a pick
             putBoolean(mark(2, color), true) // already reads the default
         }

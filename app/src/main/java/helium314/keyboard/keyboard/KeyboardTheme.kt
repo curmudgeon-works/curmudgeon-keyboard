@@ -165,7 +165,13 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                 prefs.getString(Settings.PREF_THEME_COLORS, Defaults.PREF_THEME_COLORS)
             val themeStyle = prefs.getString(Settings.PREF_THEME_STYLE, Defaults.PREF_THEME_STYLE)
 
-            val colors = getThemeColors(themeName!!, themeStyle!!, context, prefs, isNight)
+            val themeColors = getThemeColors(themeName!!, themeStyle!!, context, prefs, isNight)
+            // the accent colour picked for the keyboard over the theme's (not while a palette is being edited: the
+            // editor shows the palette's own)
+            val colors = if (SettingsActivity.forceTheme == null && prefs.contains(Settings.PREF_GESTURE_TRAIL_COLOR))
+                helium314.keyboard.latin.common.AccentOverride(themeColors,
+                    prefs.getInt(Settings.PREF_GESTURE_TRAIL_COLOR, Defaults.PREF_GESTURE_TRAIL_COLOR))
+                else themeColors
             // a background picture shown whole: the keys are clear on it
             return if (prefs.getBoolean(Settings.PREF_BACKGROUND_WHOLE_PICTURE, Defaults.PREF_BACKGROUND_WHOLE_PICTURE)
                     && Settings.readUserBackgroundImage(context, isNight) != null) SeeThroughKeys(colors)
@@ -505,6 +511,43 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                     else -> null
                 }
             }.toSortedSet()
+
+        /**
+         * A new palette's colours (the Colors list's "Add your own", 2026-10-07): those of the scheme [fromTheme] as the
+         * keyboard shows it, each set (not "auto"), so the editor opens on a copy of what is selected.
+         */
+        fun seedUserColors(context: Context, prefs: SharedPreferences, fromTheme: String, isNight: Boolean): List<ColorSetting> {
+            val style = prefs.getString(Settings.PREF_THEME_STYLE, Defaults.PREF_THEME_STYLE)!!
+            val c = getThemeColors(fromTheme, style, context, prefs, isNight)
+            return listOf(
+                COLOR_BACKGROUND to c.get(ColorType.MAIN_BACKGROUND),
+                COLOR_KEYS to c.get(ColorType.KEY_BACKGROUND),
+                COLOR_FUNCTIONAL_KEYS to c.get(ColorType.FUNCTIONAL_KEY_BACKGROUND),
+                COLOR_SPACEBAR to c.get(ColorType.SPACE_BAR_BACKGROUND),
+                COLOR_TEXT to c.get(ColorType.KEY_TEXT),
+                COLOR_HINT_TEXT to c.get(ColorType.KEY_HINT_TEXT),
+                COLOR_SUGGESTION_TEXT to c.get(ColorType.KEY_TEXT), // (as its automatic value: the key text's)
+                COLOR_SPACEBAR_TEXT to c.get(ColorType.SPACE_BAR_TEXT),
+                COLOR_ACCENT to c.get(ColorType.ACTION_KEY_BACKGROUND),
+                COLOR_GESTURE to c.get(ColorType.GESTURE_TRAIL),
+            ).map { (name, color) -> ColorSetting(name, false, color) }
+        }
+
+        /**
+         * Deletes palette [name]: its colours, and the light or dark colours choice where it names it (back to the
+         * default). The open Appearance screen's Discard doesn't bring it back (2026-10-07: "delete not working").
+         */
+        fun deleteUserColors(context: Context, prefs: SharedPreferences, name: String) {
+            prefs.edit {
+                remove(Settings.PREF_USER_COLORS_PREFIX + name)
+                remove(Settings.PREF_USER_ALL_COLORS_PREFIX + name)
+                remove(Settings.PREF_USER_MORE_COLORS_PREFIX + name)
+                if (prefs.getString(Settings.PREF_THEME_COLORS, null) == name) remove(Settings.PREF_THEME_COLORS)
+                if (prefs.getString(Settings.PREF_THEME_COLORS_NIGHT, null) == name) remove(Settings.PREF_THEME_COLORS_NIGHT)
+            }
+            helium314.keyboard.settings.AppearanceDraft.forgetPalette(name)
+            KeyboardSwitcher.getInstance().setThemeNeedsReload()
+        }
 
         // returns false if not renamed due to invalid name or collision
         fun renameUserColors(from: String, to: String, prefs: SharedPreferences): Boolean {

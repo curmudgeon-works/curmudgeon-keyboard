@@ -70,6 +70,19 @@ class BuiltInLayoutsTest {
         assertEquals("none", extra[Settings.PREF_LONG_PRESS_SYMBOL_ACTION])
         assertNull(extra[Settings.PREF_SHOW_NUMBER_ROW]) // the default: on
         assertNull(extra[Settings.PREF_UNDO_HISTORY_LENGTH]) // the default: 50
+        // what the Curmudgeon Layout changed on 2026-10-07 (long-press 150 ms, faster backspace, nothing under the bottom
+        // row, the Curmudgeon popups) stays as HeliBoard has it in both
+        for (preset in listOf(heli, extra)) {
+            assertEquals(300, preset[Settings.PREF_KEY_LONGPRESS_TIMEOUT])
+            assertEquals(300, preset[Settings.PREF_BACKSPACE_LONGPRESS_DELAY])
+            assertEquals(false, preset[Settings.PREF_BACKSPACE_SPEED_UP])
+            assertEquals("", preset[Settings.PREF_SYMBOL_POPUP_MAP])
+            assertEquals(listOf(1f, 0f, 1f, 0f), (0 until 4).map { // portrait, landscape, folded portrait, folded landscape
+                preset[helium314.keyboard.latin.settings.createPrefKeyForBooleanSettings(Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX, it, 2)] })
+        }
+        val curmudgeon = named(R.string.layout_preset_curmudgeon).values
+        assertNull(curmudgeon[Settings.PREF_KEY_LONGPRESS_TIMEOUT]) // the defaults
+        assertNull(curmudgeon[Settings.PREF_SYMBOL_POPUP_MAP])
     }
 
     @Test fun `a built-in leaves the keys' arrangement, sets the accents and the popup order back`() {

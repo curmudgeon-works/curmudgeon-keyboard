@@ -386,9 +386,12 @@ object KeyboardProfiles {
      *  copy in the settings themselves fired the screens' listener and the keyboards screen reset it on every redraw:
      *  review session 2026-10-07). */
     @Volatile var editingId: Int = SHARED
-        set(value) { field = value; editingChanged?.invoke() }
-    /** Told when [editingId] changes: the settings activity, so the app's look follows the opened keyboard's theme. */
-    @Volatile var editingChanged: (() -> Unit)? = null
+        set(value) { field = value; editingListeners.forEach { it() } }
+    /** Told when [editingId] changes: each settings activity while started, so the app's look follows the opened
+     *  keyboard's theme (one slot before: a second activity stopping took the first one's away, review 2026-10-07). */
+    private val editingListeners = java.util.concurrent.CopyOnWriteArraySet<() -> Unit>()
+    fun addEditingListener(listener: () -> Unit) { editingListeners.add(listener) }
+    fun removeEditingListener(listener: () -> Unit) { editingListeners.remove(listener) }
 
     /** Whether the look (Appearance settings and background pictures) of set [a] differs from set [b]'s: a keyboard
      *  switch reloads the theme only then (re-review 2026-10-07: it reloaded, with a blink, on every switch). Shared

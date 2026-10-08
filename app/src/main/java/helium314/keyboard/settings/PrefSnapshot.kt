@@ -38,3 +38,32 @@ fun rememberPrefSnapshot(prefs: SharedPreferences, keys: Collection<String>, key
         save = { it.saved() },
         restore = { @Suppress("UNCHECKED_CAST") PrefSnapshot(prefs, it as Map<String, Any?>) },
     )) { PrefSnapshot(prefs, keys) }
+
+/**
+ * Like [PrefSnapshot], but of what is stored for the set [setId] itself: its own value, its "at the default" mark, or
+ * neither (it follows the shared value). Cancel then leaves a keyboard that followed the shared value following it;
+ * reading the values through the keyboard's view gave the shared value, and putting that back made it the keyboard's
+ * own (review 2026-10-07, finding 10).
+ */
+class RawPrefSnapshot(private val real: SharedPreferences, private val setId: Int, keys: Collection<String>) {
+    private val stored: Map<String, Any?> = keys.flatMap { rawKeys(it) }.associateWith { real.all[it] }
+
+    private fun rawKeys(key: String): List<String> {
+        val own = KeyboardProfiles.prefixedKey(setId, key)
+        return if (own == key) listOf(key) else listOf(own, KeyboardProfiles.prefixedKey(setId, KeyboardProfiles.TOMBSTONE + key))
+    }
+
+    /** Puts back what was stored; true when anything had changed, so the caller reloads. */
+    fun restore(): Boolean {
+        val now = real.all
+        if (stored.all { (k, v) -> now[k] == v }) return false
+        real.edit { stored.forEach { (k, v) -> if (v == null) remove(k) else KeyboardProfiles.put(this, k, v) } }
+        return true
+    }
+}
+
+/** A [RawPrefSnapshot] of the set the settings screens edit now, taken when the dialog first composes. */
+@Composable
+fun rememberRawPrefSnapshot(ctx: android.content.Context, keys: Collection<String>): RawPrefSnapshot = remember {
+    RawPrefSnapshot(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx), PrefsDraft.currentSetId(ctx), keys)
+}
