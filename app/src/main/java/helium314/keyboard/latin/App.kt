@@ -21,12 +21,6 @@ import kotlinx.coroutines.launch
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
-        // where the learned words are (the stores' folder, credential-encrypted on Android 7+), for the copy a keyboard's
-        // own start with; first: the settings below may switch the pool. Not there before the first unlock (once
-        // unlocked, it stays so for the process)
-        var unlocked = false
-        helium314.keyboard.latin.personalization.LearnedStores.learnedDir =
-            { if (unlocked || androidx.core.os.UserManagerCompat.isUserUnlocked(this).also { unlocked = it }) filesDir else null }
         // first, before anything opens learned words or blacklists: the per-language files of before become per-script
         // ones, in the background (the stores wait for it before they read their files)
         helium314.keyboard.latin.personalization.LearnedStoreMigration.startIfNeeded(this)
@@ -41,8 +35,9 @@ class App : Application() {
         // that had their own set before that (the emoji font is one shared file in the font list, see FontLibrary: each
         // keyboard only stores its choice)
         helium314.keyboard.latin.settings.KeyboardProfiles.filesDir = helium314.keyboard.latin.utils.DeviceProtectedUtils.getFilesDir(this)
-        // (the keyboards' own learned-word pools from before the seeded markers are marked before the first copy, in the
-        // background: LearnedPools.seedIfNew)
+        // the keyboards' own learned-word pools from before the seeded markers count as seeded
+        helium314.keyboard.latin.personalization.LearnedPools.markExistingPools(helium314.keyboard.latin.utils.DeviceProtectedUtils.getFilesDir(this),
+            helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
         helium314.keyboard.latin.settings.KeyboardProfiles.loadGroups(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
         helium314.keyboard.latin.settings.KeyboardProfiles.migrateFiles(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
         helium314.keyboard.latin.settings.KeyboardProfiles.settingsMoves(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))

@@ -391,9 +391,6 @@ private fun restoreEverything(ctx: Context, file: File) {
     // per-language files, merged per script now as at app start
     PersonalizationHelper.reloadAllFromFiles()
     LearnedStoreMigration.runNow(ctx)
-    // the keyboards' own learned words that came out of the backup are whole: marked before the first copy (where the
-    // backup has no markers), never copied over (reviewer 2026-10-07)
-    ctx.realPrefs().edit().remove(LearnedPools.POOLS_MARKED).commit()
 }
 
 /**
@@ -499,7 +496,7 @@ private fun restoreAllSettings(ctx: Context, pending: PendingRestore, io: Learne
     // switched (LearnedPools), the keyboards' own put together first, then copied to each keyboard if the backup says so
     // (by the backup's keyboard ids, which replace the phone's)
     val filesDir = ctx.filesDir
-    val pooled = filesDir == null || LearnedStores.isShared(ctx.realPrefs()) || LearnedPools.share(filesDir, io)
+    if (filesDir != null && !LearnedStores.isShared(ctx.realPrefs())) LearnedPools.share(filesDir, io)
     Settings.getInstance().stopListener()
     // the backup's set ids replace the phone's: pictures of the phone's sets would turn up on the backup's keyboards
     KeyboardProfiles.deleteAllFiles()
@@ -507,9 +504,6 @@ private fun restoreAllSettings(ctx: Context, pending: PendingRestore, io: Learne
     ctx.realPrefs().edit {
         clear()
         for ((key, value) in pending.prefs) KeyboardProfiles.put(this, key, value)
-        // no keyboard's own pool holds words now (the backup's keyboards are marked as they get their copy below): none
-        // is to be marked as one before a copy, whatever the backup says
-        if (pooled) putBoolean(LearnedPools.POOLS_MARKED, true) else remove(LearnedPools.POOLS_MARKED)
     }
     KeyboardProfiles.editingId = KeyboardProfiles.SHARED
     val real = ctx.realPrefs()
@@ -650,9 +644,9 @@ internal fun restoreFollowUp(ctx: Context) {
     KeyboardProfiles.loadGroups(ctx.realPrefs())
     checkVersionUpgrade(ctx)
     KeyboardProfiles.settingsMoves(ctx.realPrefs())
-    // (the keyboards' own learned words a restore brings are marked by the restore itself, before any copy can run:
-    // restoreLearnedWords, restoreAllSettings; a whole old backup's at the first copy, see restoreEverything. Marking
-    // every pool with files here also marked emptied ones, and a keyboard on such an id started empty: 3010 #2)
+    // the keyboards' own learned words that came out of the backup are whole: never to be copied over by the pool
+    // refresh that follows (reviewer 2026-10-07: a restored pool without its marker got the shared words instead)
+    ctx.filesDir?.let { LearnedPools.markPoolsOnDisk(it) }
 }
 
 /** Reads the preferences entry of a backup, the keyboards listed in it and the names of all its entries. */
@@ -842,11 +836,6 @@ private fun restoreLearnedWords(ctx: Context, backup: Map<String, Any?>, keyboar
                 toAdd.getOrPut(pool to wordScript) { mutableListOf() }.add(part)
         }
     }
-    // the keyboards' own pools that get words: marked first, so the copy of the shared words a new keyboard starts with
-    // never goes over them (one running now ends first, and its copy is added to); a keyboard new to the phone gets the
-    // backup's words only
-    val ownPools = toAdd.keys.map { it.first } + lists.filter { (_, files) -> files.any { it.isFile } }.keys.map { it.first }
-    for (pool in ownPools.toSet()) LearnedPools.keep(filesDir, pool)
     for ((target, parts) in toAdd) {
         val (pool, script) = target
         val phone = LearnedStoreFiles.read(io, filesDir, script, pool) ?: continue

@@ -58,20 +58,11 @@ class RestoreLearnedPoolsTest {
         real.edit().clear().commit()
     }
 
-    // (no copies in the background here: the pool refresh only notes the copies it asks for; the pictures' folder is
-    // another one than the learned words', as on the phones)
-    private val runnerBefore = LearnedStores.seedRunner
-    private val de = File(ctx.cacheDir.parentFile, "restore_pools_de")
-    private val asked = mutableListOf<(Boolean) -> Unit>()
-    @Before fun setUp() {
-        cleanUp(); KeyboardProfiles.filesDir = de.apply { mkdirs() }
-        LearnedStores.seedRunner = { _, _, done -> asked.add(done) }
-    }
+    // (no copies in the background here: the pool refresh finds no folder to copy in)
+    @Before fun setUp() { cleanUp(); KeyboardProfiles.filesDir = null }
     @After fun tearDown() {
-        cleanUp(); KeyboardProfiles.filesDir = filesDirBefore; zip.delete(); de.deleteRecursively()
-        asked.forEach { it(true) } // (ended: a pool still being copied isn't asked for again)
+        cleanUp(); KeyboardProfiles.filesDir = filesDirBefore; zip.delete()
         SubtypeSettings.reloadEnabledSubtypes(ctx); LearnedStores.refresh(real) // (back to the shared pool)
-        LearnedStores.seedRunner = runnerBefore
     }
 
     private fun available(language: String) =

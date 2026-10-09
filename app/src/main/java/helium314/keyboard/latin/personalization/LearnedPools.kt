@@ -37,51 +37,35 @@ object LearnedPools {
         return true
     }
 
-    /** A keyboard whose own pool has no marker (added after sharing went off) starts as a copy of the shared learned
-     *  words and blacklists, like the keyboards there were when it went off (re-review 2026-10-07: it started empty).
-     *  [filesDir]: the learned words' folder (ctx.filesDir: not the pictures' one, see LearnedStores.learnedDir).
-     *  Off the main thread only: it holds the lock (a restore putting words into the pool waits for the copy, [keep]). */
-    @Synchronized
-    fun seedIfNew(filesDir: File, io: LearnedStoreIo, pool: Int, real: SharedPreferences): Boolean {
-        if (isSeeded(filesDir, pool)) return true
-        if (!markPoolsOnce(filesDir, real)) return false
+    /** A keyboard whose own pool has nothing on disk yet (added after sharing went off) starts as a copy of the shared
+     *  learned words and blacklists, like the keyboards there were when it went off (re-review 2026-10-07: it started
+     *  empty). A pool with files, even emptied ones, is left as it is. */
+    fun seedIfNew(filesDir: File, io: LearnedStoreIo, pool: Int): Boolean {
         if (isSeeded(filesDir, pool)) return true
         Log.i(TAG, "keyboard $pool: its own learned words start as a copy of the shared ones")
         return separate(filesDir, io, listOf(pool))
     }
 
-    /** [pool] gets words of its own now (a restore): marked first, so no copy of the shared words goes over them; a copy
-     *  already running ends first (the words are then added to it). Off the main thread only. */
-    @Synchronized
-    fun keep(filesDir: File, pool: Int) { if (pool != LearnedStores.SHARED) markSeeded(filesDir, pool) }
-
     // a pool is seeded when its marker is there, written after its files (re-review 2026-10-07: a process killed
     // mid-copy left files that counted as a seeded pool)
     private fun marker(filesDir: File, pool: Int) = File(filesDir, "learned_seeded_k$pool")
     fun isSeeded(filesDir: File, pool: Int) = pool == LearnedStores.SHARED || marker(filesDir, pool).isFile
-    private fun markSeeded(filesDir: File, pool: Int) = runCatching { marker(filesDir, pool).writeText("") }.isSuccess
-
-    /** Set once every keyboard's own pool with files has its marker. Ends in _done: kept through a factory reset. */
-    const val POOLS_MARKED = "learned_pools_seeded_marked_done"
-    /** Once, before the first copy: the pools with files and no marker hold words of their own (from before the markers,
-     *  0.3.007/0.3.008, or learned into since without one: the markers were looked for in the pictures' folder until
-     *  0.3.010), so they're marked and never copied over. Only names are read. false if a marker couldn't be written. */
-    private fun markPoolsOnce(filesDir: File, real: SharedPreferences): Boolean {
-        if (real.getBoolean(POOLS_MARKED, false)) return true
-        val pools = LearnedStores.keyboardPoolsOnDisk(filesDir)
-        if (!pools.all { markSeeded(filesDir, it) }) return false
-        Log.i(TAG, "pools with words of their own marked: $pools")
-        real.edit().putBoolean(POOLS_MARKED, true).commit()
-        return true
+    private fun markSeeded(filesDir: File, pool: Int) { runCatching { marker(filesDir, pool).writeText("") } }
+    /** Every pool with files on disk is a seeded one: after a restore (they came whole from the backup; reviewer
+     *  2026-10-07: without this the pool refresh copied the shared words over a restored pool). */
+    fun markPoolsOnDisk(filesDir: File) { for (pool in LearnedStores.keyboardPoolsOnDisk(filesDir)) markSeeded(filesDir, pool) }
+    /** Once: the pools that have files from before the markers existed are seeded ones. */
+    fun markExistingPools(filesDir: File, real: SharedPreferences) {
+        if (real.getBoolean("learned_pools_marked", false)) return
+        markPoolsOnDisk(filesDir)
+        real.edit().putBoolean("learned_pools_marked", true).apply()
     }
 
     /** The pools of the keyboards in the list. */
     fun keyboardPools(real: SharedPreferences): List<Int> =
         SubtypeSettings.getEnabledSubtypes(true).map { KeyboardProfiles.idFor(real, it.toSettingsSubtype()) }.distinct()
 
-    /** Each of [pools] gets a copy of the shared learned words and blacklists (what it had of its own before is replaced).
-     *  Off the main thread only (the lock, as [share]). */
-    @Synchronized
+    /** Each of [pools] gets a copy of the shared learned words and blacklists (what it had of its own before is replaced). */
     fun separate(filesDir: File, io: LearnedStoreIo, pools: Collection<Int>): Boolean {
         val scripts = LearnedStores.scriptsOnDisk(filesDir, LearnedStores.SHARED)
         for (script in scripts) {
@@ -99,9 +83,7 @@ object LearnedPools {
         return true
     }
 
-    /** The keyboards' own learned words and blacklists (all on disk) put together into the shared ones, then emptied.
-     *  Off the main thread only: it holds the lock, so no copy for a new keyboard runs meanwhile. */
-    @Synchronized
+    /** The keyboards' own learned words and blacklists (all on disk) put together into the shared ones, then emptied. */
     fun share(filesDir: File, io: LearnedStoreIo): Boolean {
         val pools = LearnedStores.keyboardPoolsOnDisk(filesDir)
         val scripts = pools.flatMap { LearnedStores.scriptsOnDisk(filesDir, it) }.toSet()
@@ -114,9 +96,9 @@ object LearnedPools {
             Log.i(TAG, "$script: ${pools.size} keyboards put together, ${countsOf(merged)}, ${lists.size} blacklisted")
         }
         for (pool in pools) for (script in LearnedStores.scriptsOnDisk(filesDir, pool)) empty(filesDir, io, script, pool)
-        // and every marker: no pool holds words of its own now, and an emptied pool isn't a seeded one (review session
-        // 2026-10-07: a keyboard reusing the id after a reset would have started empty; a marked pool without files too)
-        forgetSeeded(filesDir)
+        // and their markers: an emptied pool isn't a seeded one (review session 2026-10-07: a keyboard reusing the id
+        // after a reset would have started empty)
+        for (pool in pools) marker(filesDir, pool).delete()
         return true
     }
 

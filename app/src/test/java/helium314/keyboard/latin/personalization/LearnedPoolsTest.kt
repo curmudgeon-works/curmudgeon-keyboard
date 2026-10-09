@@ -20,7 +20,6 @@ class LearnedPoolsTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private lateinit var dir: File
     private val io = FakeLearnedStoreIo()
-    private val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
 
     private fun store(script: String, pool: Int) = LearnedStores.storeFile(dir, script, pool)
     private fun list(script: String, pool: Int) = LearnedStores.blacklistFile(dir, script, pool)
@@ -32,7 +31,6 @@ class LearnedPoolsTest {
         FakeLearnedStoreIo.store(store("Latn", 0), word("hai", 9, 100), after("ok", word = "hai", count = 4, time = 100), word("ok", 5, 90))
         FakeLearnedStoreIo.store(store("Deva", 0), word("नमस्ते", 2, 50))
         list("Latn", 0).apply { parentFile!!.mkdirs() }.writeText("teh\t2\n")
-        real.edit().putBoolean(LearnedPools.POOLS_MARKED, true).commit() // (the pools of before were marked)
     }
 
     @Test fun `off - each keyboard starts with a copy of the shared words and lists`() {
@@ -51,36 +49,37 @@ class LearnedPoolsTest {
 
     // re-review 2026-10-07 (M2): a keyboard added after sharing went off started with nothing
     @Test fun `a keyboard added after sharing went off starts with a copy of the shared words`() {
-        assertTrue(LearnedPools.seedIfNew(dir, io, 3, real))
+        assertTrue(LearnedPools.seedIfNew(dir, io, 3))
         assertEquals(FakeLearnedStoreIo.read(store("Latn", 0)), FakeLearnedStoreIo.read(store("Latn", 3)))
         assertEquals(FakeLearnedStoreIo.read(store("Deva", 0)), FakeLearnedStoreIo.read(store("Deva", 3)))
         assertEquals(mapOf("teh" to Entry(2)), entries("Latn", 3))
         // a pool with files of its own is left as it is; the shared pool is never seeded
         FakeLearnedStoreIo.store(store("Latn", 3), word("yaar", 1, 300))
-        assertTrue(LearnedPools.seedIfNew(dir, io, 3, real))
+        assertTrue(LearnedPools.seedIfNew(dir, io, 3))
         assertEquals(mapOf("yaar" to (1 to 300)), FakeLearnedStoreIo.read(store("Latn", 3)))
-        assertTrue(LearnedPools.seedIfNew(dir, io, LearnedStores.SHARED, real))
+        assertTrue(LearnedPools.seedIfNew(dir, io, LearnedStores.SHARED))
         assertEquals(9 to 100, FakeLearnedStoreIo.read(store("Latn", 0))["hai"])
     }
 
     // reviewer 2026-10-07: a pool with files but no marker (a copy the process died in) is copied again; pools from before
-    // the markers are marked once, before the first copy
+    // the markers are marked once at start
     @Test fun `a half-copied pool is copied again, pools from before the markers count as seeded`() {
         FakeLearnedStoreIo.store(store("Latn", 4), word("partial", 1, 1))
         assertFalse(LearnedPools.isSeeded(dir, 4))
-        assertTrue(LearnedPools.seedIfNew(dir, io, 4, real))
+        assertTrue(LearnedPools.seedIfNew(dir, io, 4))
         assertTrue(LearnedPools.isSeeded(dir, 4))
         assertEquals(FakeLearnedStoreIo.read(store("Latn", 0)), FakeLearnedStoreIo.read(store("Latn", 4)))
         FakeLearnedStoreIo.store(store("Latn", 5), word("mine", 1, 1))
-        real.edit().remove(LearnedPools.POOLS_MARKED).commit()
-        assertTrue(LearnedPools.seedIfNew(dir, io, 5, real))
+        val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
+        real.edit().remove("learned_pools_marked").commit()
+        LearnedPools.markExistingPools(dir, real)
         assertTrue(LearnedPools.isSeeded(dir, 5))
-        assertTrue(real.getBoolean(LearnedPools.POOLS_MARKED, false))
         assertEquals(mapOf("mine" to (1 to 1)), FakeLearnedStoreIo.read(store("Latn", 5)))
+        real.edit().remove("learned_pools_marked").commit()
         // sharing on again empties the pools and their markers go with them; a reset of the keyboards forgets them all
         assertTrue(LearnedPools.share(dir, io))
         assertFalse(LearnedPools.isSeeded(dir, 4))
-        FakeLearnedStoreIo.store(store("Latn", 6), word("x", 1, 1)); assertTrue(LearnedPools.seedIfNew(dir, io, 6, real)); assertTrue(LearnedPools.isSeeded(dir, 6))
+        FakeLearnedStoreIo.store(store("Latn", 6), word("x", 1, 1)); assertTrue(LearnedPools.seedIfNew(dir, io, 6)); assertTrue(LearnedPools.isSeeded(dir, 6))
         LearnedPools.forgetSeeded(dir)
         assertFalse(LearnedPools.isSeeded(dir, 6))
     }

@@ -21,20 +21,15 @@ import kotlin.test.assertNotEquals
 class LearnedStoresSeedingTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
-    private val dir get() = ctx.filesDir // the learned words' folder (as the app sets it up)
-    private lateinit var de: File // the pictures' folder (KeyboardProfiles.filesDir): a different one, as on the phones
+    private lateinit var dir: File
     private var filesDirBefore: File? = null
     private val runs = mutableListOf<Pair<Int, (Boolean) -> Unit>>() // the seeds asked for, with their callbacks
 
-    private fun cleanUp() = dir.listFiles()?.filter { it.name.startsWith("UserHistoryDictionary") || it.name.startsWith("learned_") }
-        ?.forEach { it.deleteRecursively() }
-
     @Before fun setUp() {
-        cleanUp()
-        de = File(ctx.cacheDir.parentFile, "seed_test_de_${System.nanoTime()}").apply { mkdirs() }
+        dir = File(ctx.filesDir, "seed_test_${System.nanoTime()}").apply { mkdirs() }
         FakeLearnedStoreIo.store(LearnedStores.storeFile(dir, "Latn", 0), word("hai", 9, 100))
         filesDirBefore = KeyboardProfiles.filesDir
-        KeyboardProfiles.filesDir = de
+        KeyboardProfiles.filesDir = dir
         LearnedStores.seedRunner = { _, pool, done -> runs.add(pool to done) }
         real.edit().putBoolean(Settings.PREF_SHARE_LEARNED_WORDS, true).apply()
         LearnedStores.refresh(real)
@@ -43,10 +38,8 @@ class LearnedStoresSeedingTest {
 
     @After fun tearDown() {
         real.edit().putBoolean(Settings.PREF_SHARE_LEARNED_WORDS, true).apply()
-        runs.forEach { it.second(true) } // (a pool still being copied isn't asked for again)
         LearnedStores.refresh(real)
         KeyboardProfiles.filesDir = filesDirBefore
-        cleanUp(); de.deleteRecursively()
     }
 
     @Test fun `the switch waits for the copy, which runs elsewhere`() {
