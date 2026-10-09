@@ -86,26 +86,28 @@ class LayoutDraft private constructor(
         helium314.keyboard.latin.utils.SettingsEventLog.log("Layout & Typing draft put back (snapshot of $subtype)")
         val real = ctx.realPrefs()
         val now = scoped(ctx)
+        // the keyboard in use stays as it is (the preview switched it, not a setting), unless the undo takes its
+        // definition away: then the one it had when the screen opened. Same for each app's remembered keyboard (a
+        // changed keyboard took the apps with it). Worked out against the snapshot's list before anything is written,
+        // and written in the same edit: a listener reloading between two edits (Settings, on the UI thread) found the
+        // changed keyboard in use but not in the restored list, and gave it a new empty set that stayed (review
+        // 2026-10-07: a stray keyboard entry, and the same change made again and kept opened on that empty set)
+        val enabled = SubtypeSettings.createSettingsSubtypes(prefs[Settings.PREF_ENABLED_SUBTYPES] as? String ?: "")
+        val selected = real.getString(Settings.PREF_SELECTED_SUBTYPE, null)?.toSettingsSubtype()
+        val selectedBefore = if (selected != null && selected !in enabled) prefs[Settings.PREF_SELECTED_SUBTYPE] as? String else null
+        val apps = real.all.filterKeys { it.startsWith(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX) }
+            .filterValues { it.toString().toSettingsSubtype() !in enabled }
+            .mapValues { (key, _) -> (prefs[key] as? String)?.takeIf { it.toSettingsSubtype() in enabled } }
         real.edit {
             for (key in now.keys) if (key !in prefs && !switchState(key)) remove(key)
             for ((key, value) in prefs) if (now[key] != value && !switchState(key)) {
                 if (value == null) remove(key) else KeyboardProfiles.put(this, key, value)
             }
+            selectedBefore?.let { putString(Settings.PREF_SELECTED_SUBTYPE, it) }
+            apps.forEach { (key, before) -> if (before != null) putString(key, before) else remove(key) }
         }
-        // the keyboard in use stays as it is (the preview switched it, not a setting), unless the undo took its
-        // definition away: then the one it had when the screen opened
-        val selected = real.getString(Settings.PREF_SELECTED_SUBTYPE, null)?.toSettingsSubtype()
-        val enabled = SubtypeSettings.createSettingsSubtypes(real.getString(Settings.PREF_ENABLED_SUBTYPES, "") ?: "")
-        if (selected != null && selected !in enabled) (prefs[Settings.PREF_SELECTED_SUBTYPE] as? String)?.let {
-            real.edit { putString(Settings.PREF_SELECTED_SUBTYPE, it) } }
-        // same for each app's remembered keyboard (a changed keyboard took the apps with it)
-        real.edit {
-            real.all.filterKeys { it.startsWith(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX) }.forEach { (key, value) ->
-                if (value.toString().toSettingsSubtype() in enabled) return@forEach
-                val before = prefs[key] as? String
-                if (before != null && before.toSettingsSubtype() in enabled) putString(key, before) else remove(key)
-            }
-        }
+        // (no listener runs when the keyboard isn't loaded yet, e.g. at app start)
+        KeyboardProfiles.refreshImeId(real)
         val live = layoutsDir(ctx)
         live.deleteRecursively()
         layoutsCopy?.copyRecursively(live, overwrite = true)
