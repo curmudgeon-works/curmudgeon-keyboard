@@ -242,6 +242,7 @@ fun KeyboardsScreen(
                 items = listOfNotNull(rename, delete.takeIf { enabledNow.size > 1 }), // (the last keyboard can't go)
                 getItemName = { it },
                 showRadioButtons = false,
+                itemsAreActions = true, // Rename / Delete look like the buttons they are (white under Black with orange before)
             )
         }
         keyboardToRename?.let { keyboard ->

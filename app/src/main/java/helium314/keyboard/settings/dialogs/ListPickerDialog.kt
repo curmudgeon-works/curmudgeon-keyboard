@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -46,6 +47,8 @@ fun <T: Any> ListPickerDialog(
     footer: (@Composable () -> Unit)? = null,
     /** Without [confirmImmediately]: called on every tap, so the choice can show before OK. */
     onItemHighlighted: ((T) -> Unit)? = null,
+    /** The items are things to do (e.g. Rename, Delete), not choices: drawn in the action colour, like buttons. */
+    itemsAreActions: Boolean = false,
     summonKeyboard: Boolean = true, // see ThreeButtonAlertDialog
 ) {
     var selected by remember { mutableStateOf(selectedItem) }
@@ -99,6 +102,7 @@ fun <T: Any> ListPickerDialog(
                             Text(
                                 text = getItemName(item),
                                 modifier = Modifier.weight(1f),
+                                color = if (itemsAreActions) MaterialTheme.colorScheme.primary else Color.Unspecified,
                             )
                             trailing?.invoke(item)
                         }

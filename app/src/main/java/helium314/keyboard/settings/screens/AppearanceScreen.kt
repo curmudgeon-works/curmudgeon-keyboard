@@ -695,7 +695,7 @@ private fun SavedLooksPreference(setting: Setting) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxWidth().clickable { saveAs = true }
                         .padding(horizontal = 8.dp).heightIn(min = 48.dp)) {
-                    Icon(painterResource(R.drawable.ic_plus), null, Modifier.padding(horizontal = 12.dp))
+                    Icon(painterResource(R.drawable.ic_plus), null, Modifier.padding(horizontal = 12.dp), tint = MaterialTheme.colorScheme.primary)
                     Text(stringResource(R.string.appearance_look_save), color = MaterialTheme.colorScheme.primary)
                 }
             },

@@ -204,8 +204,9 @@ private fun AddColorRow(onDismissRequest: () -> Unit, targetScreen: String, pref
         }.padding(start = 10.dp, top = 12.dp, bottom = 12.dp)
     ) {
         // (18 dp, like the Keys row's plus: the full 24 looked too big next to the text)
-        Icon(painterResource(R.drawable.ic_plus), stringResource(R.string.add), Modifier.size(18.dp))
-        Text(stringResource(R.string.add_color_theme), Modifier.padding(start = 8.dp))
+        // (in the action colour, like the other "+ save / add" rows)
+        Icon(painterResource(R.drawable.ic_plus), stringResource(R.string.add), Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+        Text(stringResource(R.string.add_color_theme), Modifier.padding(start = 8.dp), color = MaterialTheme.colorScheme.primary)
     }
 }
 

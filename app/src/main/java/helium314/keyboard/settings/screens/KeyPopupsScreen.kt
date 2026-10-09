@@ -249,7 +249,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                         // (saving keeps what's on the keyboard now, a previewed preset included: that's what gets saved)
                         modifier = Modifier.fillMaxWidth().clickable { confirmed = true; showAccentsDialog = false; pendingChange = null; showSaveAsDialog = true }
                             .padding(horizontal = 8.dp).heightIn(min = 48.dp)) {
-                        Icon(painterResource(R.drawable.ic_plus), null, Modifier.padding(horizontal = 12.dp))
+                        Icon(painterResource(R.drawable.ic_plus), null, Modifier.padding(horizontal = 12.dp), tint = MaterialTheme.colorScheme.primary)
                         Text(stringResource(R.string.key_popups_save_as_new), color = MaterialTheme.colorScheme.primary)
                     }
                 },
