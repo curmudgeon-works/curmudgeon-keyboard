@@ -104,10 +104,9 @@ internal fun startFactoryReset(ctx: Context, keyboards: Boolean, learnedWords: B
     val real = ctx.realPrefs()
     val filesDir = ctx.filesDir
     helium314.keyboard.latin.utils.ExecutorUtils.getBackgroundExecutor(helium314.keyboard.latin.utils.ExecutorUtils.KEYBOARD).execute {
-        val pooled = LearnedStores.isShared(real) || (filesDir != null && LearnedPools.share(filesDir, io))
-        // no keyboard's own pool holds words now: none is to be marked as one before a copy (kept through the reset; else
-        // an emptied pool counted as filled, and a keyboard on a reused id started empty)
-        if (pooled) real.edit().putBoolean(LearnedPools.POOLS_MARKED, true).commit()
+        // (share notes that no pool is left to mark before a copy, kept through the reset: else an emptied pool counted
+        // as filled, and a keyboard on a reused id started empty)
+        if (!LearnedStores.isShared(real) && filesDir != null) LearnedPools.share(filesDir, io, real)
         android.os.Handler(android.os.Looper.getMainLooper()).post {
             factoryReset(ctx, keyboards, learnedWords, clipboard, custom)
             onDone()
