@@ -30,7 +30,7 @@ class LearnedStoresSeedingTest {
         FakeLearnedStoreIo.store(LearnedStores.storeFile(dir, "Latn", 0), word("hai", 9, 100))
         filesDirBefore = KeyboardProfiles.filesDir
         KeyboardProfiles.filesDir = dir
-        LearnedStores.seedRunner = { pool, done -> runs.add(pool to done) }
+        LearnedStores.seedRunner = { _, pool, done -> runs.add(pool to done) }
         real.edit().putBoolean(Settings.PREF_SHARE_LEARNED_WORDS, true).apply()
         LearnedStores.refresh(real)
         assertEquals(LearnedStores.SHARED, LearnedStores.currentPool)

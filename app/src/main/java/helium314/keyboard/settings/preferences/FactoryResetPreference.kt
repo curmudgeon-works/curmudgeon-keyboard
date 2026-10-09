@@ -99,11 +99,12 @@ fun FactoryResetPreference(setting: Setting) {
  * a task started in the dialog's scope was cancelled when the dialog closed, and nothing was reset); the reset itself
  * then runs on the main thread, and [onDone] after it.
  */
-internal fun startFactoryReset(ctx: Context, keyboards: Boolean, learnedWords: Boolean, clipboard: Boolean, custom: Boolean, onDone: () -> Unit) {
+internal fun startFactoryReset(ctx: Context, keyboards: Boolean, learnedWords: Boolean, clipboard: Boolean, custom: Boolean,
+                               io: LearnedStoreIo = LearnedStoreIo.Native, onDone: () -> Unit) {
     val real = ctx.realPrefs()
     val filesDir = ctx.filesDir
     helium314.keyboard.latin.utils.ExecutorUtils.getBackgroundExecutor(helium314.keyboard.latin.utils.ExecutorUtils.KEYBOARD).execute {
-        if (!LearnedStores.isShared(real) && filesDir != null) LearnedPools.share(filesDir, LearnedStoreIo.Native)
+        if (!LearnedStores.isShared(real) && filesDir != null) LearnedPools.share(filesDir, io)
         android.os.Handler(android.os.Looper.getMainLooper()).post {
             factoryReset(ctx, keyboards, learnedWords, clipboard, custom)
             onDone()

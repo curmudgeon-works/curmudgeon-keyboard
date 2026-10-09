@@ -48,7 +48,7 @@ object LearnedStores {
     fun refresh(real: SharedPreferences) {
         val pool = try { poolFor(real) } catch (e: Exception) { Log.w(TAG, "could not read the pool", e); SHARED }
         if (pool == currentPool) return
-        if (needsSeeding(pool)) { seedInBackground(pool) { refresh(real) }; return }
+        if (needsSeeding(pool)) { seedInBackground(real, pool) { refresh(real) }; return }
         currentPool = pool
         helium314.keyboard.latin.utils.HotWords.usePool(pool) // (its recent words with it)
         Log.i(TAG, "learned words pool now $pool")
@@ -64,15 +64,20 @@ object LearnedStores {
     private val seeding = java.util.concurrent.ConcurrentHashMap.newKeySet<Int>() // the pools being filled now (a repeat call doesn't start another)
     @Volatile private var seedingFailed: Int? = null // a pool whose copy failed: used empty rather than never
     /** Fills [pool] off the main thread, then calls back on it with whether the copy was made (replaceable by tests). */
-    internal var seedRunner: (pool: Int, done: (Boolean) -> Unit) -> Unit = { pool, done ->
+    internal var seedRunner: (real: SharedPreferences, pool: Int, done: (Boolean) -> Unit) -> Unit = { real, pool, done ->
         helium314.keyboard.latin.utils.ExecutorUtils.getBackgroundExecutor(helium314.keyboard.latin.utils.ExecutorUtils.KEYBOARD).execute {
-            val ok = KeyboardProfiles.filesDir?.let { LearnedPools.seedIfNew(it, LearnedStoreIo.Native, pool) } ?: false
+            val ok = seedNow(real, pool)
             android.os.Handler(android.os.Looper.getMainLooper()).post { done(ok) }
         }
     }
-    private fun seedInBackground(pool: Int, then: () -> Unit) {
+    /** The stores the copy reads and writes (tests: without the native library). */
+    internal var seedIo: LearnedStoreIo = LearnedStoreIo.Native
+    /** The copy itself, on the thread it's called on (never the main one): whether it was made. */
+    internal fun seedNow(real: SharedPreferences, pool: Int): Boolean =
+        KeyboardProfiles.filesDir?.let { LearnedPools.seedIfNew(it, seedIo, pool) } ?: false
+    private fun seedInBackground(real: SharedPreferences, pool: Int, then: () -> Unit) {
         if (!seeding.add(pool)) return
-        seedRunner(pool) { ok ->
+        seedRunner(real, pool) { ok ->
             seeding.remove(pool)
             if (!ok) { Log.w(TAG, "keyboard $pool: its learned words couldn't be copied, starting empty"); seedingFailed = pool }
             then()
