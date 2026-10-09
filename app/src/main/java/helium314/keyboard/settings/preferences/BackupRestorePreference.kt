@@ -394,17 +394,22 @@ private fun restoreEverything(ctx: Context, file: File) {
     LearnedStoreMigration.runNow(ctx)
 }
 
+/** Restores from the backup [file] as the restore dialog does, the learned words through [io] (tests). */
+internal fun restoreChosenFrom(ctx: Context, file: File, keyboards: List<SettingsSubtype>, settings: Boolean, learnedWords: Boolean,
+                               io: LearnedStoreIo) =
+    restoreChosen(ctx, readBackup(file), RestoreChoice(keyboards, settings, learnedWords, false, false, false), io)
+
 /**
  * Brings what [choice] asks for out of the backup and leaves the rest of the phone as it is. With every keyboard
  * of the backup chosen together with the settings, the backup's whole preference set (shared or separate, as it
  * was) replaces the phone's; a subset is restored keyboard by keyboard, see [restoreKeyboards]. Learned words and
  * added dictionaries follow the chosen keyboards' languages.
  */
-private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: RestoreChoice) {
+private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: RestoreChoice, io: LearnedStoreIo = LearnedStoreIo.Native) {
     val everyKeyboard = choice.keyboards.toSet() == pending.keyboards.toSet()
     val allSettings = choice.settings && choice.keyboards.isNotEmpty() && everyKeyboard
     if (choice.keyboards.isNotEmpty()) {
-        if (allSettings) restoreAllSettings(ctx, pending)
+        if (allSettings) restoreAllSettings(ctx, pending, io)
         else restoreKeyboards(ctx, pending, choice.keyboards, choice.settings)
     }
     val tags = choice.keyboards.flatMap { listOf(it.locale) + getSecondaryLocales(it.extraValues) }.map { it.toLanguageTag() }.toSet()
@@ -460,7 +465,7 @@ private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: Restore
     }
     if (choice.clipboard) Database.copyFromDb(restoredDb, ctx)
     if (choice.learnedWords) {
-        restoreLearnedWords(ctx, pending.prefs, choice.keyboards, learnedDir)
+        restoreLearnedWords(ctx, pending.prefs, choice.keyboards, learnedDir, io)
         learnedDir.deleteRecursively()
     }
     if (allSettings) {
@@ -475,12 +480,12 @@ private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: Restore
 }
 
 /** The backup's preferences replace the phone's, every keyboard's set included. */
-private fun restoreAllSettings(ctx: Context, pending: PendingRestore) {
+private fun restoreAllSettings(ctx: Context, pending: PendingRestore, io: LearnedStoreIo) {
     // "Share learned & blacklisted words across keyboards" comes from the backup too: the words move as when it's
     // switched (LearnedPools), the keyboards' own put together first, then copied to each keyboard if the backup says so
     // (by the backup's keyboard ids, which replace the phone's)
     val filesDir = ctx.filesDir
-    if (filesDir != null && !LearnedStores.isShared(ctx.realPrefs())) LearnedPools.share(filesDir, LearnedStoreIo.Native)
+    if (filesDir != null && !LearnedStores.isShared(ctx.realPrefs())) LearnedPools.share(filesDir, io)
     Settings.getInstance().stopListener()
     // the backup's set ids replace the phone's: pictures of the phone's sets would turn up on the backup's keyboards
     KeyboardProfiles.deleteAllFiles()
@@ -491,7 +496,10 @@ private fun restoreAllSettings(ctx: Context, pending: PendingRestore) {
     }
     KeyboardProfiles.editingId = KeyboardProfiles.SHARED
     val real = ctx.realPrefs()
-    if (filesDir != null && !LearnedStores.isShared(real)) LearnedPools.separate(filesDir, LearnedStoreIo.Native, LearnedPools.keyboardPools(real))
+    // the backup's keyboards (review 2026-10-07: the phone's list, not reloaded yet, gave the phone's old keyboards ids
+    // and copies, and the backup's keyboards new to the phone none)
+    if (filesDir != null && !LearnedStores.isShared(real))
+        LearnedPools.separate(filesDir, io, pending.keyboards.map { KeyboardProfiles.idFor(real, it) }.distinct())
     LearnedStores.refresh(real)
 }
 
@@ -779,7 +787,8 @@ internal val backupFilePatterns by lazy { listOf(
  * languages, each word into its script's). Counts add up, the latest last use is kept (mergeAdding); blacklists keep the
  * most strikes. A backup store is put into one phone store once, however many chosen keyboards lead there.
  */
-private fun restoreLearnedWords(ctx: Context, backup: Map<String, Any?>, keyboards: List<SettingsSubtype>, learnedDir: File) {
+private fun restoreLearnedWords(ctx: Context, backup: Map<String, Any?>, keyboards: List<SettingsSubtype>, learnedDir: File,
+                                io: LearnedStoreIo) {
     val filesDir = ctx.filesDir ?: return
     val real = ctx.realPrefs()
     val phoneShared = LearnedStores.isShared(real)
@@ -802,7 +811,6 @@ private fun restoreLearnedWords(ctx: Context, backup: Map<String, Any?>, keyboar
         }
     }
     // the backup's entries for each phone store
-    val io = LearnedStoreIo.Native
     val toAdd = LinkedHashMap<Pair<Int, String>, MutableList<List<LearnedEntry>>>()
     for ((target, files) in stores) for (file in files) {
         if (!file.exists()) continue
