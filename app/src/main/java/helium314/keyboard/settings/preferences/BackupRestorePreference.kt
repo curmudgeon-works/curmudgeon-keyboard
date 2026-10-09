@@ -774,7 +774,7 @@ internal val backupFilePatterns by lazy { listOf(
     "looks${File.separator}[^${File.separator}]+${File.separator}[^${File.separator}]+".toRegex(),
     "custom_font".toRegex(), // the text style fonts of before; restored ones move into the list (FontLibrary)
     "fonts${File.separator}[^${File.separator}]+".toRegex(),
-    "custom_emoji_font.*".toRegex(), // (one per keyboard with separate settings: custom_emoji_font_p<id>)
+    "custom_emoji_font.*".toRegex(), // the emoji font of before, one for every keyboard; restored, it moves into the list (FontLibrary)
     "custom_hint_font".toRegex(),
     "custom_suggestion_font".toRegex(),
 ) }

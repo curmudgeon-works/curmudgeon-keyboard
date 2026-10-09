@@ -430,7 +430,8 @@ object KeyboardProfiles {
         val old = imeId
         imeId = if (isSeparate(real)) idFor(real, selectedKeyboard(real)) else SHARED
         if (imeId != old) helium314.keyboard.latin.utils.LanguagePriority.clearCache() // (priorities are per keyboard)
-        // another keyboard's background picture and emoji font (see profileFile)
+        // another keyboard's background picture (see profileFile) and emoji font choice (emoji_font: the fonts are shared,
+        // FontLibrary, but each keyboard picks its own)
         if (imeId != old) {
             Settings.clearCachedBackgroundImages()
             runCatching { helium314.keyboard.keyboard.KeyboardTypeface.clearCache() }

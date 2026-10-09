@@ -31,8 +31,9 @@ class App : Application() {
         // the keyboard list first: the Layout & Typing recovery below reloads it, and the other way round the list
         // was loaded twice and showed every keyboard twice until the next start (the "second keyboard", 2026-10-01)
         SubtypeSettings.init(this)
-        // the background pictures and emoji font are per keyboard with separate settings: where they are, and a copy for
-        // the keyboards that had their own set before that
+        // the background pictures are per keyboard with separate settings: where they are, and a copy for the keyboards
+        // that had their own set before that (the emoji font is one shared file in the font list, see FontLibrary: each
+        // keyboard only stores its choice)
         helium314.keyboard.latin.settings.KeyboardProfiles.filesDir = helium314.keyboard.latin.utils.DeviceProtectedUtils.getFilesDir(this)
         // the keyboards' own learned-word pools from before the seeded markers count as seeded
         helium314.keyboard.latin.personalization.LearnedPools.markExistingPools(helium314.keyboard.latin.utils.DeviceProtectedUtils.getFilesDir(this),
