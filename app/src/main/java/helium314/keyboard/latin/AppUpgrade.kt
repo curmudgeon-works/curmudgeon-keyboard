@@ -59,6 +59,7 @@ fun checkVersionUpgrade(context: Context) {
     if (oldVersion != BuildConfig.MIGRATION_VERSION)
         AppUpgrade.onUpgrade(context)
     curmudgeonUpgrades(prefs, freshInstall = oldVersion == 0)
+    ownSetRenames(prefs) // (before pickedOnlyUpgrade: it compares the sets' colours with the old defaults)
     // saved themes name their pictures in the picture library (2026-10-07): older themes' copies join it
     helium314.keyboard.settings.AppearanceLooks.migratePictureFolders(context, prefs)
     pickedOnlyUpgrade(context.realPrefs(), freshInstall = oldVersion == 0)
@@ -245,6 +246,36 @@ private fun ownSetUpgrades(real: SharedPreferences, freshInstall: Boolean) {
             if (real.all[k(Settings.PREF_GESTURE_PREVIEW_TRAIL)] == false) putInt(k(Settings.PREF_GESTURE_TRAIL_THICKNESS), 0)
             remove(k(Settings.PREF_GESTURE_PREVIEW_TRAIL)) // (its default now; stored = picked)
             putBoolean(k("trail_thickness_migrated"), true)
+        }
+    }
+}
+
+/**
+ * The steps of [curmudgeonUpgrades] that rename or move a stored value, for every keyboard's own set ("p<id>/…", in use
+ * or not, hidden by shared menus too): they ran on the plain keys only, and a keyboard's own value of before stayed.
+ * Each checks its own state, like the plain steps.
+ */
+internal fun ownSetRenames(real: SharedPreferences) {
+    val all = real.all
+    real.edit {
+        for ((stored, value) in all) {
+            val (id, key) = KeyboardProfiles.splitOwnKey(stored) ?: continue
+            fun own(plain: String) = KeyboardProfiles.ownKey(id, plain)
+            // "midnight" became black (the colour list showed nothing chosen, and the old default's reset missed it)
+            if ((key == Settings.PREF_THEME_COLORS || key == Settings.PREF_THEME_COLORS_NIGHT) && value == "midnight")
+                putString(stored, KeyboardTheme.THEME_BLACK)
+            // toolbar mode → Toolbar visibility + Show suggestions, from the set's own mode (reading through the set
+            // found the shared visibility first); a set marked "at the default" visibility reads its own mode already
+            if (key == Settings.PREF_TOOLBAR_MODE && value is String && !all.containsKey(own(Settings.PREF_TOOLBAR_VISIBILITY))
+                    && !all.containsKey(own(KeyboardProfiles.TOMBSTONE + Settings.PREF_TOOLBAR_VISIBILITY))) {
+                // what the set reads: its own value, else (not marked "at the default") the shared one
+                val inStripRow = all[own(Settings.PREF_TOOLBAR_IN_STRIP_ROW)] as? Boolean
+                    ?: if (all.containsKey(own(KeyboardProfiles.TOMBSTONE + Settings.PREF_TOOLBAR_IN_STRIP_ROW))) false
+                    else all[Settings.PREF_TOOLBAR_IN_STRIP_ROW] as? Boolean ?: false
+                putString(own(Settings.PREF_TOOLBAR_VISIBILITY), Settings.toolbarVisibilityOfMode(value, inStripRow))
+                // these showed no suggestions: they stay without them
+                if (value == "TOOLBAR_KEYS" || value == "HIDDEN") putBoolean(own(Settings.PREF_SHOW_SUGGESTIONS), false)
+            }
         }
     }
 }

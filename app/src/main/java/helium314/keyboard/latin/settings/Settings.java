@@ -422,10 +422,16 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static String readToolbarVisibility(final SharedPreferences prefs) {
         final String v = prefs.getString(PREF_TOOLBAR_VISIBILITY, null);
         if (v != null) return v;
-        return switch (prefs.getString(PREF_TOOLBAR_MODE, Defaults.PREF_TOOLBAR_MODE)) {
+        return toolbarVisibilityOfMode(prefs.getString(PREF_TOOLBAR_MODE, Defaults.PREF_TOOLBAR_MODE),
+                prefs.getBoolean(PREF_TOOLBAR_IN_STRIP_ROW, false));
+    }
+
+    /** Toolbar visibility of the old toolbar mode (and "toolbar in the strip's row"). */
+    public static String toolbarVisibilityOfMode(final String mode, final boolean inStripRow) {
+        return switch (mode) {
             case "TOOLBAR_KEYS" -> TOOLBAR_ALWAYS;
             case "SUGGESTION_STRIP", "HIDDEN" -> TOOLBAR_HIDDEN;
-            default -> prefs.getBoolean(PREF_TOOLBAR_IN_STRIP_ROW, false) ? TOOLBAR_IN_PLACE : TOOLBAR_ABOVE;
+            default -> inStripRow ? TOOLBAR_IN_PLACE : TOOLBAR_ABOVE;
         };
     }
 
