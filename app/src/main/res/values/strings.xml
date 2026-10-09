@@ -714,8 +714,8 @@
     <string name="appearance_look_delete">Delete the theme \"%s\"?</string>
     <!-- %s = the names of the keyboards using the theme, one per line -->
     <plurals name="delete_keeps_theme">
-        <item quantity="one">This keyboard keeps its colors and look, shown as unsaved:\n%s</item>
-        <item quantity="other">These keyboards keep its colors and look, shown as unsaved:\n%s</item>
+        <item quantity="one">This keyboard keeps its colors and look:\n%s</item>
+        <item quantity="other">These keyboards keep its colors and look:\n%s</item>
     </plurals>
     <!-- the four built-in themes -->
     <string name="theme_preset_dynamic">Dynamic</string>

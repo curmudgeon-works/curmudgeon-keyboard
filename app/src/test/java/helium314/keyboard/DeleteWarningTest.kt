@@ -122,7 +122,7 @@ class DeleteWarningTest {
         assertNull(keepersText(ctx, R.plurals.delete_keeps_layout, emptyList()))
         assertEquals("This keyboard keeps its settings, shown as unsaved:\nWork",
             keepersText(ctx, R.plurals.delete_keeps_layout, listOf(a)))
-        assertEquals("These keyboards keep its colors and look, shown as unsaved:\nWork\n$bName",
+        assertEquals("These keyboards keep its colors and look:\nWork\n$bName",
             keepersText(ctx, R.plurals.delete_keeps_theme, listOf(a, b)))
     }
 
