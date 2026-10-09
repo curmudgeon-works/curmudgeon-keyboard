@@ -132,7 +132,6 @@ private fun factoryReset(ctx: Context, keyboards: Boolean, learnedWords: Boolean
     helium314.keyboard.latin.gesture.GestureStats.reload() // (its cached rows would come back over the reset)
     if (keyboards) ctx.filesDir?.let { LearnedPools.forgetSeeded(it) } // (the keyboards' ids start again)
     LearnedStores.refresh(prefs)
-    KeyboardProfiles.editingId = KeyboardProfiles.SHARED
     // the background pictures belong to the settings (every keyboard's: the set ids start again after a reset, and a
     // new keyboard mustn't find an old one's picture)
     KeyboardProfiles.deleteAllFiles()

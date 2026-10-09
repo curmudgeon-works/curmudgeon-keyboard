@@ -80,7 +80,7 @@ fun LearnedWordsScriptsScreen(onClickBack: () -> Unit) {
     // shared: one list of scripts; else a heading per keyboard with the scripts of its languages
     val sections = remember { scriptSections(ctx) }
     fun open(row: ScriptRowData, list: String) =
-        SettingsDestination.navigateTo("${SettingsDestination.LearnedWordsOfScript}${row.script}/$list/${row.pool}")
+        SettingsDestination.navigateTo("${SettingsDestination.LearnedWordsOfScript}${row.script}/$list/${row.pool}", ctx)
     @Composable
     fun ScriptRow(row: ScriptRowData) {
         Preference(
@@ -112,7 +112,7 @@ fun LearnedWordsScriptsScreen(onClickBack: () -> Unit) {
         if (advanced) Preference(
             name = stringResource(R.string.edit_personal_dictionary),
             description = stringResource(R.string.learned_words_personal_dictionary_summary),
-            onClick = { SettingsDestination.navigateTo(SettingsDestination.PersonalDictionaries) },
+            onClick = { SettingsDestination.navigateTo(SettingsDestination.PersonalDictionaries, ctx) },
         ) { NextScreenIcon() }
     }
 }

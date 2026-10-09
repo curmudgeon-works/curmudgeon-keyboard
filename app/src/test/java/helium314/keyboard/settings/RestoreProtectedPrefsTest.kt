@@ -50,11 +50,11 @@ class RestoreProtectedPrefsTest {
 
     // (the cached preferences, clipboard and database of an earlier test would be another sandbox's files)
     private fun resetCaches() {
-        for (name in listOf("prefs", "imePrefs", "editingPrefs"))
+        for (name in listOf("prefs", "imePrefs", "mainPrefs"))
             DeviceProtectedUtils::class.java.getDeclaredField(name).apply { isAccessible = true }.set(null, null)
+        (DeviceProtectedUtils::class.java.getDeclaredField("keyboardPrefs").apply { isAccessible = true }.get(null) as MutableMap<*, *>).clear()
         ClipboardDao::class.java.getDeclaredField("instance").apply { isAccessible = true }.set(null, null)
         Database::class.java.getDeclaredField("instance").apply { isAccessible = true }.set(null, null)
-        KeyboardProfiles.editingId = KeyboardProfiles.SHARED
     }
 
     @Before fun setUp() {

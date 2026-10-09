@@ -5,16 +5,24 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavGraphBuilder
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import androidx.navigation.compose.rememberNavController
 import helium314.keyboard.latin.common.LocaleUtils.constructLocale
+import helium314.keyboard.latin.settings.KeyboardScopeContext
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.latin.settings.getTransitionAnimationScale
 import helium314.keyboard.settings.screens.AboutScreen
@@ -48,8 +56,8 @@ import kotlinx.coroutines.launch
 fun SettingsNavHost(
     onClickBack: () -> Unit,
     startDestination: String? = null,
+    navController: NavHostController = rememberNavController(),
 ) {
-    val navController = rememberNavController()
     val dir = if (LocalLayoutDirection.current == LayoutDirection.Ltr) 1 else -1
     val target = SettingsDestination.navTarget.collectAsState()
 
@@ -69,91 +77,91 @@ fun SettingsNavHost(
         popEnterTransition = { slideInHorizontally(initialOffsetX = { -it * dir }, animationSpec = animation) },
         popExitTransition = { slideOutHorizontally(targetOffsetX = { +it * dir }, animationSpec = animation) }
     ) {
-        composable(SettingsDestination.Keyboards) {
+        composable(SettingsDestination.Keyboards) { // (no keyboard of its own: the main choice)
             KeyboardsScreen(onClickBack = ::goBack)
         }
-        composable(SettingsDestination.Languages + "{keyboard}") {
+        screen(SettingsDestination.Languages + "{keyboard}") {
             LanguageListScreen(initialKeyboard = it.arguments?.getString("keyboard")!!.toSettingsSubtype(), onClickBack = ::goBack)
         }
-        composable(SettingsDestination.Settings + "{keyboard}") {
+        screen(SettingsDestination.Settings + "{keyboard}") {
             MainSettingsScreen(
                 keyboard = it.arguments?.getString("keyboard")!!.toSettingsSubtype(),
                 onClickBack = ::goBack,
             )
         }
-        composable(SettingsDestination.About) {
+        screen(SettingsDestination.About) {
             AboutScreen(onClickBack = ::goBack)
         }
-        composable(SettingsDestination.TextCorrection) {
+        screen(SettingsDestination.TextCorrection) {
             androidx.compose.runtime.CompositionLocalProvider(LocalSettingsMenu provides helium314.keyboard.latin.settings.KeyboardProfiles.Group.TEXT_CORRECTION) { TextCorrectionScreen(onClickBack = ::goBack) }
         }
-        composable(SettingsDestination.Preferences) {
+        screen(SettingsDestination.Preferences) {
             PreferencesScreen(onClickBack = ::goBack)
         }
-        composable(SettingsDestination.Toolbar) {
+        screen(SettingsDestination.Toolbar) {
             androidx.compose.runtime.CompositionLocalProvider(LocalSettingsMenu provides helium314.keyboard.latin.settings.KeyboardProfiles.Group.LAYOUT) { ToolbarScreen(onClickBack = ::goBack) }
         }
 /*      will be added as part of passive data gathering
         composable(SettingsDestination.DataReview) {
             ReviewScreen(onClickBack = ::goBack)
         }*/
-        composable(SettingsDestination.Advanced) {
+        screen(SettingsDestination.Advanced) {
             AdvancedSettingsScreen(onClickBack = ::goBack)
         }
-        composable(SettingsDestination.LearningSwiping) {
+        screen(SettingsDestination.LearningSwiping) {
             androidx.compose.runtime.CompositionLocalProvider(LocalSettingsMenu provides helium314.keyboard.latin.settings.KeyboardProfiles.Group.REFINE) { helium314.keyboard.settings.screens.LearningSwipingScreen(onClickBack = ::goBack) }
         }
-        composable(SettingsDestination.Debug) {
+        screen(SettingsDestination.Debug) {
             DebugScreen(onClickBack = ::goBack)
         }
-        composable(SettingsDestination.Appearance) {
+        screen(SettingsDestination.Appearance) {
             androidx.compose.runtime.CompositionLocalProvider(LocalSettingsMenu provides helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE) { AppearanceScreen(onClickBack = ::goBack) }
         }
-        composable(SettingsDestination.PersonalDictionary + "{locale}") {
+        screen(SettingsDestination.PersonalDictionary + "{locale}") {
             val locale = it.arguments?.getString("locale")?.takeIf { loc -> loc.isNotBlank() }?.constructLocale()
             PersonalDictionaryScreen(
                 onClickBack = ::goBack,
                 locale = locale
             )
         }
-        composable(SettingsDestination.PersonalDictionaries) {
+        screen(SettingsDestination.PersonalDictionaries) {
             PersonalDictionariesScreen(onClickBack = ::goBack)
         }
-        composable(SettingsDestination.LearnedWords) {
+        screen(SettingsDestination.LearnedWords) {
             helium314.keyboard.settings.screens.LearnedWordsScriptsScreen(onClickBack = ::goBack)
         }
-        composable(SettingsDestination.LearnedWordsOfScript + "{script}/{list}/{pool}") {
+        screen(SettingsDestination.LearnedWordsOfScript + "{script}/{list}/{pool}") {
             helium314.keyboard.settings.screens.LearnedWordsScreen(onClickBack = ::goBack, script = it.arguments?.getString("script") ?: "",
                 blacklisted = it.arguments?.getString("list") == helium314.keyboard.settings.screens.LIST_BLACKLISTED,
                 // the keyboard whose own learned words these are, 0: shared by all (see LearnedStores)
                 pool = it.arguments?.getString("pool")?.toIntOrNull() ?: 0)
         }
-        composable(SettingsDestination.AllKeyboards) {
+        screen(SettingsDestination.AllKeyboards) {
             // the list of all keyboards incl. disabled ones; the keyboards screen shows the enabled ones as entries
             LanguageScreen(onClickBack = ::goBack)
         }
-        composable(SettingsDestination.Dictionaries) {
+        screen(SettingsDestination.Dictionaries) {
             DictionaryScreen(onClickBack = ::goBack)
         }
-        composable(SettingsDestination.Layouts) {
+        screen(SettingsDestination.Layouts) {
             SecondaryLayoutScreen(onClickBack = ::goBack)
         }
-        composable(SettingsDestination.CustomizePopups + "{subtype}") {
+        screen(SettingsDestination.CustomizePopups + "{subtype}") {
             CustomizePopupsScreen(keyboard = it.arguments?.getString("subtype")!!.toSettingsSubtype(), onClickBack = ::goBack)
         }
-        composable(SettingsDestination.LayoutFiles + "{subtype}") {
+        screen(SettingsDestination.LayoutFiles + "{subtype}") {
             LayoutFilesScreen(keyboard = it.arguments?.getString("subtype")!!.toSettingsSubtype(), onClickBack = ::goBack)
         }
-        composable(SettingsDestination.Colors + "{theme}") {
+        screen(SettingsDestination.Colors + "{theme}") {
             ColorsScreen(isNight = false, theme = it.arguments?.getString("theme"), onClickBack = ::goBack)
         }
-        composable(SettingsDestination.ColorsNight + "{theme}") {
+        screen(SettingsDestination.ColorsNight + "{theme}") {
             ColorsScreen(isNight = true, theme = it.arguments?.getString("theme"), onClickBack = ::goBack)
         }
-        composable(SettingsDestination.Subtype + "{subtype}") {
+        screen(SettingsDestination.Subtype + "{subtype}") {
             androidx.compose.runtime.CompositionLocalProvider(LocalSettingsMenu provides helium314.keyboard.latin.settings.KeyboardProfiles.Group.LAYOUT) { SubtypeScreen(initialSubtype = it.arguments?.getString("subtype")!!.toSettingsSubtype(), onClickBack = ::goBack) }
         }
-        composable(SettingsDestination.SwipeTuning + "{subtype}") {
+        screen(SettingsDestination.SwipeTuning + "{subtype}") {
             androidx.compose.runtime.CompositionLocalProvider(LocalSettingsMenu provides helium314.keyboard.latin.settings.KeyboardProfiles.Group.SWIPE) { SwipeTuningScreen(keyboard = it.arguments?.getString("subtype")!!.toSettingsSubtype(), onClickBack = ::goBack) }
         }
     }
@@ -163,6 +171,24 @@ fun SettingsNavHost(
     LaunchedEffect(route) {
         if (route != SettingsDestination.Keyboards) navController.navigate(route = route)
     }
+}
+
+/** A destination that can be one keyboard's: opened with [SettingsDestination.SET] in its route, its content edits that
+ *  keyboard's set ([KeyboardScopeContext] as its context), however long it stays composed (a slide, a dialog's work). */
+private fun NavGraphBuilder.screen(route: String, content: @Composable (NavBackStackEntry) -> Unit) =
+    composable("$route?${SettingsDestination.SET}={${SettingsDestination.SET}}",
+        arguments = listOf(navArgument(SettingsDestination.SET) { type = NavType.IntType; defaultValue = SettingsDestination.NO_SET })
+    ) { entry ->
+        KeyboardScope(SettingsDestination.setIdOf(entry)) { content(entry) }
+    }
+
+/** [content] edits keyboard set [keyboardId] (null: as it is): the context it gets is a [KeyboardScopeContext]. */
+@Composable
+fun KeyboardScope(keyboardId: Int?, content: @Composable () -> Unit) {
+    if (keyboardId == null) return content()
+    val base = LocalContext.current
+    val scoped = remember(base, keyboardId) { KeyboardScopeContext(base, keyboardId) }
+    CompositionLocalProvider(LocalContext provides scoped, content)
 }
 
 object SettingsDestination {
@@ -191,6 +217,17 @@ object SettingsDestination {
     const val CustomizePopups = "customize_popups/"
     const val Dictionaries = "dictionaries"
     val navTarget = MutableStateFlow(Keyboards)
+
+    /** The route argument with the keyboard set a screen edits (a keyboard's own menus; absent: the main choice). */
+    const val SET = "set"
+    internal const val NO_SET = -1
+    /** [route] for the screens of keyboard set [setId] (null: no keyboard's own). */
+    fun inSet(route: String, setId: Int?): String = if (setId == null) route else "$route?$SET=$setId"
+    /** The keyboard set of a back stack entry, or null. */
+    fun setIdOf(entry: NavBackStackEntry?): Int? = entry?.arguments?.getInt(SET, NO_SET)?.takeIf { it != NO_SET }
+    /** [target] opened from a screen with context [from]: it edits the same keyboard (Colors from that keyboard's
+     *  Appearance, Learned words from its Text correction). */
+    fun navigateTo(target: String, from: android.content.Context) = navigateTo(inSet(target, KeyboardScopeContext.idOf(from)))
 
     private val navScope = CoroutineScope(Dispatchers.Default)
     /** [route] for [keyboard]: its settings string encoded, as Navigation decodes the route's arguments (review

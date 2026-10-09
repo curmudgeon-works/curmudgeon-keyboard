@@ -106,13 +106,11 @@ class DeleteWarningTest {
         val previewed = a.withLayout(helium314.keyboard.latin.utils.LayoutType.MAIN, "dvorak")
         assertEquals(3, KeyboardProfiles.idFor(real, previewed)) // the old entry
         enable(previewed, b)
-        KeyboardProfiles.editingId = 1
-        try {
-            real.edit { putString("p1/$layout", "X") }
-            assertEquals("This keyboard keeps its settings, shown as unsaved:\nWork",
-                deleteKeepersText(ctx, R.plurals.delete_keeps_layout, layout, "X", edited = previewed))
-            assertNull(deleteKeepersText(ctx, R.plurals.delete_keeps_layout, layout, "X")) // no keyboard edited: the map
-        } finally { KeyboardProfiles.editingId = KeyboardProfiles.SHARED }
+        val screenOfSet1 = helium314.keyboard.latin.settings.KeyboardScopeContext(ctx, 1) // (the screen editing set 1)
+        real.edit { putString("p1/$layout", "X") }
+        assertEquals("This keyboard keeps its settings, shown as unsaved:\nWork",
+            deleteKeepersText(screenOfSet1, R.plurals.delete_keeps_layout, layout, "X", edited = previewed))
+        assertNull(deleteKeepersText(screenOfSet1, R.plurals.delete_keeps_layout, layout, "X")) // no keyboard edited: the map
     }
 
     @Test fun `the text names each keyboard - its name, or its languages`() {

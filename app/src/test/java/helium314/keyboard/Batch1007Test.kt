@@ -36,7 +36,6 @@ class Batch1007Test {
     @After fun tearDown() {
         AppearanceDraft.close()
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
-        KeyboardProfiles.editingId = KeyboardProfiles.SHARED
     }
 
     // ---- palettes ----
@@ -120,18 +119,8 @@ class Batch1007Test {
         assertFalse(real.contains("p1/${KeyboardProfiles.TOMBSTONE}$key"))
     }
 
-    // ---- review finding 11: one slot for the keyboard-switch callback ----
-
-    @Test fun `every open settings screen hears that another keyboard is edited`() {
-        var a = 0; var b = 0
-        val la: () -> Unit = { a++ }; val lb: () -> Unit = { b++ }
-        KeyboardProfiles.addEditingListener(la); KeyboardProfiles.addEditingListener(lb)
-        KeyboardProfiles.editingId = 2
-        KeyboardProfiles.removeEditingListener(la) // the first activity stops
-        KeyboardProfiles.editingId = 3
-        KeyboardProfiles.removeEditingListener(lb)
-        assertEquals(1, a); assertEquals(2, b)
-    }
+    // (review finding 11, one slot for the editing callback: the callback and the global it watched are gone, 2026-10-09;
+    // two activities stay apart by construction, EditingKeyboardTest)
 
     // ---- the Curmudgeon Layout = the defaults ----
 

@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import helium314.keyboard.keyboard.KeyboardTheme
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.settings.Defaults
+import helium314.keyboard.latin.settings.KeyboardScopeContext
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.settings.SettingsActivity
 
@@ -27,15 +28,16 @@ import helium314.keyboard.settings.SettingsActivity
  * The settings app's colours: the phone's own (the wallpaper's Material You colours on Android 12+, a fixed accent
  * below) — unless the keyboard's colours in use are Black with orange, when the whole app is black and orange too
  * (decided 2026-10-07: that theme carries its look everywhere). Read again when a setting changes, so picking the
- * theme recolours the app at once.
+ * theme recolours the app at once. [keyboardId]: the keyboard set of the screen on top (null: the main choice, see
+ * KeyboardProfiles.mainEditingId), so opening a keyboard's menu shows that keyboard's look.
  */
 @Composable
-fun Theme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+fun Theme(dark: Boolean = isSystemInDarkTheme(), keyboardId: Int? = null, content: @Composable () -> Unit) {
     val ctx = LocalContext.current
     val changed = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
-    // read again on a settings change, which opening another keyboard for editing counts as (its own theme counts)
-    val curmudgeon = remember(changed?.value, dark) {
-        runCatching { AppLook.usesCurmudgeon(ctx.prefs(), dark) }.getOrDefault(false) }
+    val curmudgeon = remember(changed?.value, dark, keyboardId) {
+        val prefs = if (keyboardId == null) ctx.prefs() else KeyboardScopeContext(ctx, keyboardId).prefs()
+        runCatching { AppLook.usesCurmudgeon(prefs, dark) }.getOrDefault(false) }
     val material3 = Typography()
     val colorScheme = when {
         curmudgeon -> AppLook.curmudgeonScheme

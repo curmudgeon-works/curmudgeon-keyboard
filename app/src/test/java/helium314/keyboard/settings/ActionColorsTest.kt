@@ -43,7 +43,6 @@ class ActionColorsTest {
 
     @Before fun setUp() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
     @After fun tearDown() {
-        KeyboardProfiles.editingId = KeyboardProfiles.SHARED // (the screen sets it; it outlives a test)
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
         SubtypeSettings.reloadEnabledSubtypes(ctx)
     }

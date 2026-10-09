@@ -292,8 +292,9 @@ fun <T: Any?> SearchScreen(
                         title = {
                             val ctx = androidx.compose.ui.platform.LocalContext.current
                             val changed = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
-                            val keyboard = remember(changed?.value) { helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(
-                                helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)) }
+                            val keyboard = remember(changed?.value, ctx) { helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(
+                                helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx),
+                                helium314.keyboard.latin.settings.KeyboardProfiles.editingId(ctx)) }
                             if (keyboard == null || !showKeyboardName) title()
                             else Column {
                                 title()

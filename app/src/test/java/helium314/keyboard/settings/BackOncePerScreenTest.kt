@@ -55,7 +55,6 @@ class BackOncePerScreenTest {
         ExecutorUtils.getBackgroundExecutor(ExecutorUtils.KEYBOARD).submit {}.get()
         shadowOf(Looper.getMainLooper()).idle()
         SettingsDestination.navTarget.value = SettingsDestination.Keyboards
-        KeyboardProfiles.editingId = KeyboardProfiles.SHARED // (the main screen sets it; it outlives a test)
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
         SubtypeSettings.reloadEnabledSubtypes(ctx)
     }

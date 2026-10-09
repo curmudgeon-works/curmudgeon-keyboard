@@ -139,7 +139,8 @@ fun ColorsScreen(
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     val preview = remember { PreviewKeyboard(tryIt, scope, showIme = { softKeyboard?.show() }, reveal = { }) {
         focusManager.clearFocus(force = true); softKeyboard?.hide() } }
-    val previewKeyboard = helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(ctx.realPrefs())
+    val previewKeyboard = helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(ctx.realPrefs(),
+        helium314.keyboard.latin.settings.KeyboardProfiles.editingId(ctx))
         ?: helium314.keyboard.latin.utils.SubtypeSettings.getSelectedSubtype(prefs).toSettingsSubtype()
     androidx.compose.material3.Scaffold(
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0),

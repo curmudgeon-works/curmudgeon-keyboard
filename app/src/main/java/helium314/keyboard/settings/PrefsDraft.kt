@@ -73,9 +73,9 @@ class PrefsDraft private constructor(private val name: String, private val value
         private const val PREFIX = "prefs_draft_"
         private val active = HashMap<String, PrefsDraft>()
 
-        /** The set the settings screens edit now. */
+        /** The set the settings screen of [ctx] edits (its own keyboard's, see KeyboardScopeContext). */
         fun currentSetId(ctx: Context): Int = if (KeyboardProfiles.isSeparate(
-            helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx))) KeyboardProfiles.editingId else KeyboardProfiles.SHARED
+            helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx))) KeyboardProfiles.editingId(ctx) else KeyboardProfiles.SHARED
 
         private fun file(ctx: Context, name: String) = File(ctx.filesDir, "$PREFIX$name.json")
 

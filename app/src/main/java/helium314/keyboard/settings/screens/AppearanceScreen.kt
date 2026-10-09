@@ -202,7 +202,8 @@ fun AppearanceScreen(
     var askAccept by remember { mutableStateOf(false) }
     val tryIt = remember { TryItState() }
     // the keyboard being edited (its own settings), else the one in use: the preview switches to it
-    val keyboard = helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)) ?: SubtypeSettings.getSelectedSubtype(prefs).toSettingsSubtype()
+    val keyboard = helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx),
+        helium314.keyboard.latin.settings.KeyboardProfiles.editingId(ctx)) ?: SubtypeSettings.getSelectedSubtype(prefs).toSettingsSubtype()
     val focusManager = LocalFocusManager.current
     val softKeyboard = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()

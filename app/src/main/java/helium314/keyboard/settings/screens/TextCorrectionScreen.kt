@@ -126,7 +126,8 @@ fun TextCorrectionScreen(
         if (helium314.keyboard.settings.REFINE_MENU_SHOWN) correctionKeys else correctionKeys + Settings.PREF_SUGGESTION_COUNT, onClickBack)
     val tryIt = remember { TryItState() }
     // the keyboard being edited (its own settings), else the one in use: the preview switches to it
-    val keyboard = helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(LocalContext.current))
+    val keyboard = LocalContext.current.let { helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(
+        helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(it), helium314.keyboard.latin.settings.KeyboardProfiles.editingId(it)) }
         ?: helium314.keyboard.latin.utils.SubtypeSettings.getSelectedSubtype(prefs).toSettingsSubtype()
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     val softKeyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
@@ -202,22 +203,24 @@ internal val correctionKeys = listOf(
 fun createCorrectionSettings(context: Context) = listOf(
     Setting(context, SettingsWithoutKey.LEARNED_WORDS, R.string.learned_words) {
         // a line above it too, like under the headings
+        val ctx = LocalContext.current // (this screen's: what opens from it edits the same keyboard)
         androidx.compose.foundation.layout.Column {
             androidx.compose.material3.HorizontalDivider()
             Preference(
                 name = stringResource(R.string.learned_words),
-                onClick = { SettingsDestination.navigateTo(SettingsDestination.LearnedWords) },
+                onClick = { SettingsDestination.navigateTo(SettingsDestination.LearnedWords, ctx) },
             ) { NextScreenIcon() }
         }
     },
     // (no longer on the screen: reached from Learned & blacklisted words, and by searching)
     Setting(context, SettingsWithoutKey.EDIT_PERSONAL_DICTIONARY, R.string.edit_personal_dictionary) {
         // a line above it too, like under the headings
+        val ctx = LocalContext.current // (this screen's: what opens from it edits the same keyboard)
         androidx.compose.foundation.layout.Column {
             androidx.compose.material3.HorizontalDivider()
             Preference(
                 name = stringResource(R.string.edit_personal_dictionary),
-                onClick = { SettingsDestination.navigateTo(SettingsDestination.PersonalDictionaries) },
+                onClick = { SettingsDestination.navigateTo(SettingsDestination.PersonalDictionaries, ctx) },
             ) { NextScreenIcon() }
         }
     },

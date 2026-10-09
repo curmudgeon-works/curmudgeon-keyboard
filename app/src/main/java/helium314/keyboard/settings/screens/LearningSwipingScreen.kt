@@ -74,8 +74,10 @@ fun LearningSwipingScreen(onClickBack: () -> Unit) {
     val current = OwnGestureDecoder.Tuning.read(prefs)
     val recommended = GestureStats.recommended(rows)
     val gestureOn = prefs.getBoolean(Settings.PREF_GESTURE_INPUT, Defaults.PREF_GESTURE_INPUT)
-    // a try-it bar to swipe in while tuning (the keyboard in use), and the dialogs keep the keyboard up
-    val keyboard = remember { SubtypeSettings.getSelectedSubtype(prefs).toSettingsSubtype() }
+    // a try-it bar to swipe in while tuning (the keyboard whose menu this is; the keyboard in use where it is shared),
+    // and the dialogs keep the keyboard up
+    val keyboard = remember { helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(ctx.realPrefs(),
+        helium314.keyboard.latin.settings.KeyboardProfiles.editingId(ctx)) ?: SubtypeSettings.getSelectedSubtype(prefs).toSettingsSubtype() }
     val tryIt = remember { TryItState() }
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     val softKeyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current

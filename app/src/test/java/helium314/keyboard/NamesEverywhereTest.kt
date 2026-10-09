@@ -44,14 +44,12 @@ class NamesEverywhereTest {
     @Before fun setUp() {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
         real.edit().putBoolean("separate_settings_per_keyboard", true).commit()
-        KeyboardProfiles.editingId = 1
         // (the test's context is no activity: its prefs() is the keyboard in use's, the first set made: 1)
         KeyboardProfiles.refreshImeId(real)
         assertEquals(1, KeyboardProfiles.imeId)
     }
     @After fun tearDown() {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
-        KeyboardProfiles.editingId = KeyboardProfiles.SHARED
         KeyboardProfiles.refreshImeId(real)
     }
 

@@ -107,6 +107,8 @@ fun ThreeButtonAlertDialog(
     // the preview keyboard is used while its dialog is open (typing, emoji tabs): a tap on it mustn't close the
     // dialog. The platform's outside-tap closing is off; the dialog closes itself on a tap on the settings screen
     // (see below), while the keyboard, drawn above the dialog, gets its own taps and never reaches it
+    // a dialog is its own window, whose context is not the screen's: it edits the screen's keyboard all the same
+    val keyboardId = helium314.keyboard.latin.settings.KeyboardScopeContext.idOf(LocalContext.current)
     Dialog(
         onDismissRequest = onDismissRequest,
         properties = if (!keepKeyboard) properties else DialogProperties(
@@ -114,7 +116,7 @@ fun ThreeButtonAlertDialog(
             dismissOnClickOutside = false,
             usePlatformDefaultWidth = properties.usePlatformDefaultWidth,
         )
-    ) {
+    ) { helium314.keyboard.settings.KeyboardScope(keyboardId) {
         if (keepKeyboard) {
             val preview = if (summonKeyboard) LocalPreviewKeyboard.current else null
             val emoji = LocalPreviewEmoji.current
@@ -234,7 +236,7 @@ fun ThreeButtonAlertDialog(
                 }
             }
         }
-    }
+    } }
 }
 
 @Preview

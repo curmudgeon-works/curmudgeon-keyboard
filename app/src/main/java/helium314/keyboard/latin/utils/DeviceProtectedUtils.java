@@ -10,24 +10,37 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import helium314.keyboard.latin.settings.KeyboardProfiles;
+import helium314.keyboard.latin.settings.KeyboardScopeContext;
 import helium314.keyboard.latin.settings.ProfilePreferences;
 import android.os.Build;
 
 import java.io.File;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class DeviceProtectedUtils {
 
     static final String TAG = DeviceProtectedUtils.class.getSimpleName();
     private static SharedPreferences prefs;
-    // views on the same file: the keyboard in use (IME) and the keyboard being edited (settings activity)
+    // views on the same file: the keyboard in use (IME), a keyboard's settings screens (one per keyboard, see
+    // KeyboardScopeContext), and the other settings screens (the main choice, worked out on every read)
     private static SharedPreferences imePrefs;
-    private static SharedPreferences editingPrefs;
+    private static SharedPreferences mainPrefs;
+    private static final ConcurrentHashMap<Integer, SharedPreferences> keyboardPrefs = new ConcurrentHashMap<>();
 
     public static SharedPreferences getSharedPreferences(final Context context) {
         final SharedPreferences real = getRealSharedPreferences(context);
+        final Integer keyboardId = KeyboardScopeContext.idOf(context);
+        if (keyboardId != null) {
+            final int id = keyboardId;
+            final SharedPreferences cached = keyboardPrefs.get(id);
+            if (cached != null) return cached;
+            final SharedPreferences made = new ProfilePreferences(real, () -> KeyboardProfiles.INSTANCE.scopedId(real, id));
+            final SharedPreferences raced = keyboardPrefs.putIfAbsent(id, made);
+            return raced != null ? raced : made;
+        }
         if (KtxKt.getActivity(context) != null) {
-            if (editingPrefs == null) editingPrefs = new ProfilePreferences(real, KeyboardProfiles.INSTANCE::getEditingId);
-            return editingPrefs;
+            if (mainPrefs == null) mainPrefs = new ProfilePreferences(real, () -> KeyboardProfiles.INSTANCE.mainEditingId(real));
+            return mainPrefs;
         }
         if (imePrefs == null) imePrefs = new ProfilePreferences(real, KeyboardProfiles.INSTANCE::getImeId);
         return imePrefs;

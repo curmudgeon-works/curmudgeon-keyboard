@@ -505,7 +505,6 @@ private fun restoreAllSettings(ctx: Context, pending: PendingRestore, io: Learne
         clear()
         for ((key, value) in pending.prefs) KeyboardProfiles.put(this, key, value)
     }
-    KeyboardProfiles.editingId = KeyboardProfiles.SHARED
     val real = ctx.realPrefs()
     // the backup's keyboards (review 2026-10-07: the phone's list, not reloaded yet, gave the phone's old keyboards ids
     // and copies, and the backup's keyboards new to the phone none)

@@ -426,17 +426,43 @@ object KeyboardProfiles {
     /** Profile of the keyboard in use (the IME's view). Refreshed on every keyboard switch. */
     @Volatile var imeId: Int = SHARED
         private set
-    /** Profile the settings screens edit: a keyboard's id, or [SHARED]. The settings activity keeps it in its saved
-     *  instance state, so a screen restored after the process died edits the same keyboard (re-review 2026-10-07; a
-     *  copy in the settings themselves fired the screens' listener and the keyboards screen reset it on every redraw:
-     *  review session 2026-10-07). */
-    @Volatile var editingId: Int = SHARED
-        set(value) { field = value; editingListeners.forEach { it() } }
-    /** Told when [editingId] changes: each settings activity while started, so the app's look follows the opened
-     *  keyboard's theme (one slot before: a second activity stopping took the first one's away, review 2026-10-07). */
-    private val editingListeners = java.util.concurrent.CopyOnWriteArraySet<() -> Unit>()
-    fun addEditingListener(listener: () -> Unit) { editingListeners.add(listener) }
-    fun removeEditingListener(listener: () -> Unit) { editingListeners.remove(listener) }
+    /** The set the settings screen of [context] edits: the keyboard of the screen's own navigation entry
+     *  ([KeyboardScopeContext]), else [mainEditingId]. No global that screens set (2026-10-09: "who drew last wins" left
+     *  a screen editing another keyboard during a slide). Navigation keeps the entry's keyboard over process death. */
+    fun editingId(context: android.content.Context): Int {
+        val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(context)
+        return KeyboardScopeContext.idOf(context)?.let { scopedId(real, it) } ?: mainEditingId(real)
+    }
+
+    /** Where no keyboard's own screen is (the main screen, App settings, their search): the keyboard in use when settings
+     *  are separate, else the shared set. Worked out on every call, never stored. */
+    fun mainEditingId(real: SharedPreferences): Int {
+        if (!isSeparate(real)) return SHARED
+        val selected = real.getString(Settings.PREF_SELECTED_SUBTYPE, Defaults.PREF_SELECTED_SUBTYPE)!!
+        val idsNow = real.getString(PREF_IDS, null)
+        mainMemo?.let { if (it.selected == selected && it.ids == idsNow) return it.id }
+        val id = idFor(real, selected.toSettingsSubtype())
+        mainMemo = MainMemo(selected, real.getString(PREF_IDS, null), id) // (idFor may have added it)
+        return id
+    }
+    // (every preference read asks: the ids aren't parsed again while neither changed)
+    private class MainMemo(val selected: String, val ids: String?, val id: Int)
+    @Volatile private var mainMemo: MainMemo? = null
+
+    /** Set [id] of a keyboard's screen while a keyboard has it; one that is gone (the keyboard deleted, a factory reset or
+     *  a restore) gives [mainEditingId], so nothing is written under an id no keyboard has. */
+    fun scopedId(real: SharedPreferences, id: Int): Int {
+        if (!isSeparate(real)) return SHARED
+        val idsNow = real.getString(PREF_IDS, null)
+        val known = knownMemo?.takeIf { it.first == idsNow }?.second
+            ?: ids(real).let { map -> map.keys().asSequence().map { map.optInt(it, SHARED) }.toHashSet() }
+                .also { knownMemo = idsNow to it }
+        if (id in known) return id
+        if (goneLogged.add(id)) Log.i("KeyboardProfiles", "set $id is gone: its screens edit the main set")
+        return mainEditingId(real)
+    }
+    @Volatile private var knownMemo: Pair<String?, Set<Int>>? = null
+    private val goneLogged: MutableSet<Int> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
     /** Whether the look (Appearance settings and background pictures) of set [a] differs from set [b]'s: a keyboard
      *  switch reloads the theme only then (re-review 2026-10-07: it reloaded, with a blink, on every switch). Shared
@@ -485,7 +511,7 @@ object KeyboardProfiles {
         val dir = helium314.keyboard.latin.utils.DeviceProtectedUtils.getFilesDir(context)
         val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(context)
         val id = if (!isSeparate(real) || Group.APPEARANCE in sharedGroups) SHARED
-            else if (context.getActivity() != null) editingId else imeId
+            else if (context.getActivity() != null || KeyboardScopeContext.idOf(context) != null) editingId(context) else imeId
         return java.io.File(dir, name + suffix(id))
     }
 
@@ -640,9 +666,8 @@ object KeyboardProfiles {
         real.edit().putBoolean("profile_files_migrated", true).apply()
     }
 
-    /** The keyboard whose settings the screens edit (separate settings on), or null (shared settings). */
-    fun editingKeyboard(real: SharedPreferences): SettingsSubtype? {
-        val id = editingId
+    /** The keyboard whose settings set [id] holds (separate settings on), or null (shared settings). */
+    fun editingKeyboard(real: SharedPreferences, id: Int): SettingsSubtype? {
         if (id == SHARED || !isSeparate(real)) return null
         val map = ids(real)
         return map.keys().asSequence().firstOrNull { map.optInt(it, -1) == id }?.toSettingsSubtype()

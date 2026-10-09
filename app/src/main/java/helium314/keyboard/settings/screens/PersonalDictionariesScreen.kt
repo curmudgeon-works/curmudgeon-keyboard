@@ -55,7 +55,7 @@ fun PersonalDictionariesScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
-                        SettingsDestination.navigateTo(SettingsDestination.PersonalDictionary + (it?.toLanguageTag() ?: ""))
+                        SettingsDestination.navigateTo(SettingsDestination.PersonalDictionary + (it?.toLanguageTag() ?: ""), ctx)
                     }
                     .heightIn(min = 44.dp)
                     .padding(12.dp),

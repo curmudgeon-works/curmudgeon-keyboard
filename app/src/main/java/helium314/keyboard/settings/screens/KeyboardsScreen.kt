@@ -97,10 +97,10 @@ fun KeyboardsScreen(
     // the menus all keyboards share (separate settings): shown once below the keyboards, not under each
     fun sharedMenu(group: KeyboardProfiles.Group) = KeyboardProfiles.isShared(real, group)
     val expanded = remember { mutableStateListOf<SettingsSubtype>() } // several keyboards can be unfolded at once
-    // the settings screens edit the shared set unless a keyboard's own section was entered; with separate settings
-    // this screen's search edits the keyboard in use (the shared set is read by no keyboard then)
-    KeyboardProfiles.editingId = if (KeyboardProfiles.isSeparate(real))
-        KeyboardProfiles.idFor(real, SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype()) else KeyboardProfiles.SHARED
+    // the screens of a keyboard's own section get its set in their route (KeyboardScopeContext); this screen, its search
+    // and what opens from it without one edit the main choice (KeyboardProfiles.mainEditingId): the keyboard in use with
+    // separate settings, else the shared set. Nothing is set here (2026-10-09: setting a global while drawing made
+    // every frame redraw, and a Back or tap during a slide edited the other keyboard)
     var generation by remember { mutableIntStateOf(0) } // re-read the keyboards after a delete
     SearchSettingsScreen(
         onClickBack = onClickBack,
@@ -150,8 +150,8 @@ fun KeyboardsScreen(
                         onClick = {
                             if (folding) { if (isExpanded) expanded.remove(keyboard) else expanded.add(keyboard) }
                             else {
-                                if (separate) KeyboardProfiles.editingId = KeyboardProfiles.idFor(real, keyboard)
-                                SettingsDestination.navigateTo(SettingsDestination.withKeyboard(SettingsDestination.Languages, keyboard))
+                                SettingsDestination.navigateTo(SettingsDestination.inSet(SettingsDestination.withKeyboard(
+                                    SettingsDestination.Languages, keyboard), if (separate) KeyboardProfiles.idFor(real, keyboard) else null))
                             }
                         },
                         icon = R.drawable.ic_settings_layout, // a keyboard (the globe is for its languages)
@@ -191,7 +191,7 @@ fun KeyboardsScreen(
                     }
                     if (isExpanded)
                         KeyboardSettingsEntries(keyboard, Modifier.padding(start = 24.dp), showAdvanced = false,
-                            onEnter = { KeyboardProfiles.editingId = KeyboardProfiles.idFor(real, keyboard) },
+                            setId = { KeyboardProfiles.idFor(real, keyboard) },
                             // with separate settings only the menus each keyboard keeps to itself
                             groups = if (separate) { g -> !sharedMenu(g) } else null,
                             showRefine = separate && !sharedMenu(KeyboardProfiles.Group.REFINE))
@@ -208,7 +208,7 @@ fun KeyboardsScreen(
                     KeyboardSettingsEntries(SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype(), showLanguages = false)
                 else if (enabled.size == 1)
                     KeyboardSettingsEntries(enabled[0].toSettingsSubtype(), showLanguages = false, showAdvanced = false,
-                        onEnter = { KeyboardProfiles.editingId = KeyboardProfiles.idFor(real, enabled[0].toSettingsSubtype()) })
+                        setId = { KeyboardProfiles.idFor(real, enabled[0].toSettingsSubtype()) })
                 else
                     Text(
                         stringResource(R.string.separate_settings_hint),
@@ -221,7 +221,7 @@ fun KeyboardsScreen(
                     // the menus every keyboard shares, once (they edit one set for all)
                     val inUse = SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype()
                     KeyboardSettingsEntries(inUse, showLanguages = false, showAdvanced = false,
-                        onEnter = { KeyboardProfiles.editingId = KeyboardProfiles.idFor(real, inUse) },
+                        setId = { KeyboardProfiles.idFor(real, inUse) },
                         groups = { g -> sharedMenu(g) })
                 }
                 if (separate) AdvancedEntry(showRefine = sharedMenu(KeyboardProfiles.Group.REFINE))

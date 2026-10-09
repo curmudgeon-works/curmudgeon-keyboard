@@ -34,6 +34,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.res.stringResource
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import helium314.keyboard.compat.locale
 import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.keyboard.internal.KeyboardIconsSet
@@ -42,7 +44,6 @@ import helium314.keyboard.latin.InputAttributes
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.common.FileUtils
 import helium314.keyboard.latin.define.DebugFlags
-import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.BackButton
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
@@ -51,7 +52,6 @@ import helium314.keyboard.latin.utils.JniUtils
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.latin.utils.UncachedInputMethodManagerUtils
 import helium314.keyboard.latin.utils.cleanUnusedMainDicts
-import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.settings.dialogs.ConfirmationDialog
 import helium314.keyboard.settings.dialogs.NewDictionaryDialog
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,10 +68,10 @@ import java.util.zip.ZipOutputStream
 //  https://developer.android.com/topic/performance/baselineprofiles/overview
 // todo: consider viewModel, at least for LanguageScreen and ColorsScreen it might help making them less awkward and complicated
 open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceChangeListener {
-    private val prefs by lazy { this.prefs() }
+    // the whole file: a keyboard's screens write its own set (p<id>/ keys), which the main view's listener doesn't hear
+    private val prefs by lazy { DeviceProtectedUtils.getRealSharedPreferences(this) }
     val prefChanged = MutableStateFlow(0) // simple counter, as the only relevant information is that something changed
     fun prefChanged() = prefChanged.value++
-    private val editingListener: () -> Unit = { prefChanged() }
     private val dictUriFlow = MutableStateFlow<Uri?>(null)
     private val cachedDictionaryFile by lazy { File(this.cacheDir.path + File.separator + "temp_dict") }
     private val crashReportFiles = MutableStateFlow<List<File>>(emptyList())
@@ -104,16 +104,9 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
         return true
     }
 
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        outState.putInt(STATE_EDITING_ID, KeyboardProfiles.editingId) // (the keyboard the open screen edits)
-    }
-
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // recreated after the process died with a screen open: that screen edits the keyboard it did (re-review 2026-10-07)
-        if (savedInstanceState != null) KeyboardProfiles.editingId = savedInstanceState.getInt(STATE_EDITING_ID, KeyboardProfiles.SHARED)
         if (Settings.getValues() == null) {
             val inputAttributes = InputAttributes(EditorInfo(), false, packageName)
             Settings.getInstance().loadSettings(this, resources.configuration.locale(), inputAttributes)
@@ -131,7 +124,12 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
         val cv = ComposeView(context = this)
         setContentView(cv)
         cv.setContent {
-            Theme {
+            // the app's look is the keyboard of the screen on top (its route's set; none: the main choice), read again
+            // once per navigation, not on every frame (2026-10-09: a listener on a global the screens set redrew all of
+            // the settings on every frame, 62481bb1f / ab8bc3b5e)
+            val navController = rememberNavController()
+            val top by navController.currentBackStackEntryAsState()
+            Theme(keyboardId = SettingsDestination.setIdOf(top)) {
                 Surface {
                     val dictUri by dictUriFlow.collectAsState()
                     val crashReports by crashReportFiles.collectAsState()
@@ -166,7 +164,7 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
                                 .then(if (!selected && !showWelcomeWizard) androidx.compose.ui.Modifier.consumeWindowInsets(
                                     androidx.compose.foundation.layout.WindowInsets.statusBars) else androidx.compose.ui.Modifier),
                                 propagateMinConstraints = true) {
-                                SettingsNavHost(onClickBack = { this@SettingsActivity.finish() })
+                                SettingsNavHost(onClickBack = { this@SettingsActivity.finish() }, navController = navController)
                             }
                         }
                         if (showWelcomeWizard) {
@@ -215,12 +213,10 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
     override fun onStart() {
         super.onStart()
         prefs.registerOnSharedPreferenceChangeListener(this)
-        KeyboardProfiles.addEditingListener(editingListener) // (the app's look follows the opened keyboard's theme)
     }
 
     override fun onStop() {
         prefs.unregisterOnSharedPreferenceChangeListener(this)
-        KeyboardProfiles.removeEditingListener(editingListener)
         // leaving the app with Appearance open undoes its changes that weren't kept; a file picker we opened
         // (background image, font) and rotating don't count
         if (!isChangingConfigurations && !awaitingResult) { AppearanceDraft.rejectOpen(this); LayoutDraft.rejectOpen(this); PrefsDraft.rejectOpen(this) }
@@ -330,5 +326,3 @@ private fun NotSelectedBar(onSwitch: () -> Unit) {
         }
     }
 }
-
-private const val STATE_EDITING_ID = "editing_keyboard_id"
