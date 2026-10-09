@@ -499,10 +499,7 @@ private fun restoreAllSettings(ctx: Context, pending: PendingRestore, io: Learne
     // switched (LearnedPools), the keyboards' own put together first, then copied to each keyboard if the backup says so
     // (by the backup's keyboard ids, which replace the phone's)
     val filesDir = ctx.filesDir
-    val pooled = filesDir == null || LearnedStores.isShared(ctx.realPrefs()) || LearnedPools.share(filesDir, io, ctx.realPrefs())
-    // (the phone's note that no pool is left to mark before a copy, set by share() under its lock: kept through the
-    // replacement below, in the same edit, so it's never missing in between; whatever the backup says)
-    val marked = pooled && ctx.realPrefs().getBoolean(LearnedPools.POOLS_MARKED, false)
+    val pooled = filesDir == null || LearnedStores.isShared(ctx.realPrefs()) || LearnedPools.share(filesDir, io)
     Settings.getInstance().stopListener()
     // the backup's set ids replace the phone's: pictures of the phone's sets would turn up on the backup's keyboards
     KeyboardProfiles.deleteAllFiles()
@@ -510,7 +507,9 @@ private fun restoreAllSettings(ctx: Context, pending: PendingRestore, io: Learne
     ctx.realPrefs().edit {
         clear()
         for ((key, value) in pending.prefs) KeyboardProfiles.put(this, key, value)
-        if (marked) putBoolean(LearnedPools.POOLS_MARKED, true) else remove(LearnedPools.POOLS_MARKED)
+        // no keyboard's own pool holds words now (the backup's keyboards are marked as they get their copy below): none
+        // is to be marked as one before a copy, whatever the backup says
+        if (pooled) putBoolean(LearnedPools.POOLS_MARKED, true) else remove(LearnedPools.POOLS_MARKED)
     }
     KeyboardProfiles.editingId = KeyboardProfiles.SHARED
     val real = ctx.realPrefs()

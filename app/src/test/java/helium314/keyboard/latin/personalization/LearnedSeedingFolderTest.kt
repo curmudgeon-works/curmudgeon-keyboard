@@ -54,13 +54,13 @@ class LearnedSeedingFolderTest {
     private inner class Io : LearnedStoreIo {
         val live = HashSet<Pair<String, Int>>()
         @Volatile var beforeWrite: (File) -> Unit = {}
-        @Volatile var failWrites = false
+        var failWrites = false
         private fun file(dir: File) = File(dir, dir.name + ".body")
         override fun readFile(dir: File, locale: Locale): List<LearnedEntry>? =
             file(dir).takeIf { it.isFile }?.readLines()?.filter { it.isNotEmpty() }?.map { FakeLearnedStoreIo.parse(it) }
         override fun writeFile(dir: File, locale: Locale, entries: List<LearnedEntry>): Boolean {
-            if (dir.name.contains(".k")) beforeWrite(dir)
             if (failWrites) return false
+            if (dir.name.contains(".k")) beforeWrite(dir)
             dir.mkdirs()
             file(dir).writeText(entries.joinToString("") { FakeLearnedStoreIo.format(it) + "\n" })
             return true
@@ -249,48 +249,20 @@ class LearnedSeedingFolderTest {
         assertTrue(marked(ce, 4))
     }
 
-    // 7: a copy cut short (the process died) leaves no marker: done again; the one-time marking isn't repeated
+    // 7: a copy cut short leaves no marker: done again; the one-time marking isn't repeated
     @Test fun `a copy that didn't finish is made again`() {
         put(ce, LearnedStores.SHARED, "x")
         real.edit().putBoolean(Settings.PREF_SHARE_LEARNED_WORDS, false).remove(MARKED_FLAG).commit()
-        io.beforeWrite = { throw IllegalStateException("killed") }
-        assertTrue(runCatching { LearnedStores.seedNow(real, 4) }.isFailure)
+        io.failWrites = true
+        assertFalse(LearnedStores.seedNow(real, 4))
         assertFalse(marked(ce, 4))
         assertTrue(real.getBoolean(MARKED_FLAG, false))
-        io.beforeWrite = {}
+        io.failWrites = false
         assertTrue(LearnedStores.seedNow(real, 4))
         assertEquals(setOf("x"), words(ce, 4))
         assertTrue(marked(ce, 4))
         assertTrue(LearnedStores.seedNow(real, 4))
         assertEquals(setOf("x"), words(ce, 4))
-    }
-
-    // review 2026-10-08 (1): a copy that failed part-way is used as it is (LearnedStores): marked, so what the keyboard
-    // learns there isn't copied over at the next start
-    @Test fun `a copy that failed part-way is marked and never copied over`() {
-        put(ce, LearnedStores.SHARED, "x")
-        io.writeFile(LearnedStores.storeFile(ce, "Deva", LearnedStores.SHARED), Locale.ROOT, listOf(word("नमस्ते", 1, 100)))
-        real.edit().putBoolean(Settings.PREF_SHARE_LEARNED_WORDS, false).putBoolean(MARKED_FLAG, true).commit()
-        io.beforeWrite = { dir -> if (dir.name.contains("Deva")) io.failWrites = true }
-        assertFalse(LearnedStores.seedNow(real, 4))
-        assertTrue(marked(ce, 4))
-        io.beforeWrite = {}; io.failWrites = false
-        put(ce, 4, "learned") // (learned into since, in another process)
-        assertTrue(LearnedStores.seedNow(real, 4))
-        assertEquals(setOf("learned"), words(ce, 4))
-    }
-
-    // review 2026-10-08 (2): a copy right after sharing went on (a reset, a restore: before they go on) didn't find the
-    // one-time marking done, and marked the pools share() had just emptied
-    @Test fun `a copy right after the pools were put together doesn't mark the emptied ones`() {
-        put(ce, LearnedStores.SHARED, "x"); put(ce, 5, "x", "mine")
-        io.live.add("Latn" to 5) // (open: emptied, not deleted)
-        File(ce, "learned_seeded_k5").writeText("")
-        real.edit().putBoolean(Settings.PREF_SHARE_LEARNED_WORDS, false).remove(MARKED_FLAG).commit()
-        assertTrue(LearnedPools.share(ce, io, real))
-        // a keyboard switch to keyboard 5, sharing still off
-        assertTrue(LearnedStores.seedNow(real, 5))
-        assertEquals(setOf("x", "mine"), words(ce, 5))
     }
 
     /** The phone for a partial restore: keyboard A (5, seeded), sharing off; the backup: C (1, with its own words) and D.

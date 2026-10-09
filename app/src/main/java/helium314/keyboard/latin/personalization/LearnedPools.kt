@@ -28,7 +28,7 @@ object LearnedPools {
     fun setShared(context: Context, real: SharedPreferences, shared: Boolean): Boolean {
         if (LearnedStores.isShared(real) == shared) return true
         val filesDir = context.filesDir ?: return false
-        val ok = if (shared) share(filesDir, LearnedStoreIo.Native, real)
+        val ok = if (shared) share(filesDir, LearnedStoreIo.Native)
             else separate(filesDir, LearnedStoreIo.Native, keyboardPools(real))
         if (!ok) return false
         real.edit().putBoolean(Settings.PREF_SHARE_LEARNED_WORDS, shared).apply()
@@ -47,12 +47,7 @@ object LearnedPools {
         if (!markPoolsOnce(filesDir, real)) return false
         if (isSeeded(filesDir, pool)) return true
         Log.i(TAG, "keyboard $pool: its own learned words start as a copy of the shared ones")
-        if (separate(filesDir, io, listOf(pool))) return true
-        // a copy that failed part-way: the keyboard uses the pool as it is (LearnedStores), so it's marked, and what it
-        // learns there is never copied over at a later start (review 2026-10-08)
-        Log.w(TAG, "keyboard $pool: the copy failed, its learned words start from what was copied")
-        markSeeded(filesDir, pool)
-        return false
+        return separate(filesDir, io, listOf(pool))
     }
 
     /** [pool] gets words of its own now (a restore): marked first, so no copy of the shared words goes over them; a copy
@@ -105,10 +100,9 @@ object LearnedPools {
     }
 
     /** The keyboards' own learned words and blacklists (all on disk) put together into the shared ones, then emptied.
-     *  Off the main thread only: it holds the lock, so no copy for a new keyboard runs meanwhile. [real]: where it notes
-     *  that no pool is left to mark before a copy ([POOLS_MARKED]). */
+     *  Off the main thread only: it holds the lock, so no copy for a new keyboard runs meanwhile. */
     @Synchronized
-    fun share(filesDir: File, io: LearnedStoreIo, real: SharedPreferences): Boolean {
+    fun share(filesDir: File, io: LearnedStoreIo): Boolean {
         val pools = LearnedStores.keyboardPoolsOnDisk(filesDir)
         val scripts = pools.flatMap { LearnedStores.scriptsOnDisk(filesDir, it) }.toSet()
         for (script in scripts) {
@@ -123,9 +117,6 @@ object LearnedPools {
         // and every marker: no pool holds words of its own now, and an emptied pool isn't a seeded one (review session
         // 2026-10-07: a keyboard reusing the id after a reset would have started empty; a marked pool without files too)
         forgetSeeded(filesDir)
-        // and no pool holds words of its own to mark before a copy: noted before the lock is released (review 2026-10-08:
-        // set after it, a copy in between marked the pools just emptied, and a keyboard on such an id started empty)
-        real.edit().putBoolean(POOLS_MARKED, true).commit()
         return true
     }
 

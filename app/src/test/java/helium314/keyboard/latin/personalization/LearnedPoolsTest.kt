@@ -78,7 +78,7 @@ class LearnedPoolsTest {
         assertTrue(real.getBoolean(LearnedPools.POOLS_MARKED, false))
         assertEquals(mapOf("mine" to (1 to 1)), FakeLearnedStoreIo.read(store("Latn", 5)))
         // sharing on again empties the pools and their markers go with them; a reset of the keyboards forgets them all
-        assertTrue(LearnedPools.share(dir, io, real))
+        assertTrue(LearnedPools.share(dir, io))
         assertFalse(LearnedPools.isSeeded(dir, 4))
         FakeLearnedStoreIo.store(store("Latn", 6), word("x", 1, 1)); assertTrue(LearnedPools.seedIfNew(dir, io, 6, real)); assertTrue(LearnedPools.isSeeded(dir, 6))
         LearnedPools.forgetSeeded(dir)
@@ -94,7 +94,7 @@ class LearnedPoolsTest {
         RemovedWords.forFile(list("Latn", 2)).strike("teh")
         RemovedWords.forFile(list("Latn", 2)).strike("bad")
 
-        assertTrue(LearnedPools.share(dir, io, real))
+        assertTrue(LearnedPools.share(dir, io))
         assertEquals(mapOf("hai" to (11 to 200), "ok hai" to (4 to 100), "ok" to (5 to 90), "yaar" to (1 to 300)),
             FakeLearnedStoreIo.read(store("Latn", 0)))
         assertEquals(mapOf("नमस्ते" to (2 to 50)), FakeLearnedStoreIo.read(store("Deva", 0)))
@@ -107,7 +107,7 @@ class LearnedPoolsTest {
 
     @Test fun `on again - a deleted keyboard's words are kept too`() {
         FakeLearnedStoreIo.store(store("Latn", 7), word("orphan", 3, 400))
-        assertTrue(LearnedPools.share(dir, io, real))
+        assertTrue(LearnedPools.share(dir, io))
         assertEquals(3 to 400, FakeLearnedStoreIo.read(store("Latn", 0))["orphan"])
     }
 
