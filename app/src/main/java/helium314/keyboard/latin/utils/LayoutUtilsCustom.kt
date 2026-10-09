@@ -253,11 +253,16 @@ object LayoutUtilsCustom {
             Log.w(TAG, message)
             SubtypeSettings.onRenameLayout(type, name, null, context)
         }
+        // the default for each type in every set (shared, each keyboard's own, hidden ones too), not only this view's
+        val real = context.realPrefs()
         LayoutType.entries.forEach { type ->
-            val name = Settings.readDefaultLayoutName(type, prefs)
-            if (!isCustomLayout(name) || getLayoutFiles(type, context).any { it.name.startsWith(name) })
-                return@forEach
-            remove(type, name)
+            val key = Settings.PREF_LAYOUT_PREFIX + type.name
+            real.all.filter { (stored, _) -> stored == key || helium314.keyboard.latin.settings.KeyboardProfiles.splitOwnKey(stored)?.second == key }
+                .values.filterIsInstance<String>().distinct().forEach { name ->
+                    if (!isCustomLayout(name) || getLayoutFiles(type, context).any { it.name.startsWith(name) })
+                        return@forEach
+                    remove(type, name)
+                }
         }
         prefs.getString(Settings.PREF_ADDITIONAL_SUBTYPES, Defaults.PREF_ADDITIONAL_SUBTYPES)!!
             .split(Separators.SETS).forEach outer@{

@@ -9,6 +9,9 @@ import helium314.keyboard.latin.settings.ProfilePreferences
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.KeyPopupOverrides
+import helium314.keyboard.latin.utils.LayoutType
+import helium314.keyboard.latin.utils.LayoutUtilsCustom
+import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.settings.AppearanceLooks
 import helium314.keyboard.settings.LayoutPresets
 import helium314.keyboard.settings.screens.deletePopupSet
@@ -106,5 +109,50 @@ class NamesEverywhereTest {
         KeyboardProfiles.forgetValueEverywhere(real, key, "Mine")
         assertNull(set(2).getString(key, null))
         assertEquals("Other", set(3).getString(key, null))
+    }
+
+    // ---- #5: renaming or deleting a custom key layout (the default for its type) ----
+
+    private val numberRow = Settings.PREF_LAYOUT_PREFIX + LayoutType.NUMBER_ROW.name
+    private fun custom(name: String) = LayoutUtilsCustom.getLayoutName(name, LayoutType.NUMBER_ROW)
+    private fun file(name: String) = LayoutUtilsCustom.getLayoutFile(name, LayoutType.NUMBER_ROW, ctx)
+    private fun hasFile(name: String) = LayoutUtilsCustom.getLayoutFiles(LayoutType.NUMBER_ROW, ctx).any { it.name.startsWith(name) }
+
+    @After fun removeLayoutFiles() { file("x").parentFile?.deleteRecursively(); LayoutUtilsCustom.onLayoutFileChanged() }
+
+    @Test fun `a custom key layout renamed from one keyboard is renamed in every keyboard's set`() {
+        val x = custom("x"); val y = custom("y")
+        file(x).writeText("1 2 3"); LayoutUtilsCustom.onLayoutFileChanged()
+        real.edit().putString("p1/$numberRow", x).putString("p2/$numberRow", x).commit()
+        // as the layout editor renames it (from A): the old file goes, the names follow, the new file is written
+        file(x).delete()
+        SubtypeSettings.onRenameLayout(LayoutType.NUMBER_ROW, x, y, ctx)
+        file(y).writeText("1 2 3"); LayoutUtilsCustom.onLayoutFileChanged()
+        assertEquals(y, Settings.readDefaultLayoutName(LayoutType.NUMBER_ROW, set(1)))
+        assertEquals(y, Settings.readDefaultLayoutName(LayoutType.NUMBER_ROW, set(2)), "B lost the renamed layout")
+        assertTrue(hasFile(Settings.readDefaultLayoutName(LayoutType.NUMBER_ROW, set(2))))
+    }
+
+    @Test fun `a custom key layout without its file is forgotten in every keyboard's set`() {
+        val x = custom("x")
+        real.edit().putString(numberRow, x).putString("p2/$numberRow", x).putString("p3/$numberRow", "number_row").commit()
+        LayoutUtilsCustom.removeMissingLayouts(ctx) // (A, set 1, reads the shared x)
+        assertFalse(real.contains(numberRow))
+        assertFalse(real.contains("p2/$numberRow"))
+        assertTrue(real.getBoolean(mark(2, numberRow), false))
+        val builtIn = Settings.readDefaultLayoutName(LayoutType.NUMBER_ROW, ProfilePreferences(real) { 9 })
+        assertEquals(builtIn, Settings.readDefaultLayoutName(LayoutType.NUMBER_ROW, set(2)))
+        assertEquals(builtIn, Settings.readDefaultLayoutName(LayoutType.NUMBER_ROW, set(1)))
+        assertEquals("number_row", real.getString("p3/$numberRow", null))
+        file(x).writeText("4 5 6"); LayoutUtilsCustom.onLayoutFileChanged() // a layout saved later under that name
+        assertEquals(builtIn, Settings.readDefaultLayoutName(LayoutType.NUMBER_ROW, set(2)))
+    }
+
+    @Test fun `a custom key layout only another keyboard names is found missing too`() {
+        val x = custom("x")
+        real.edit().putString("p2/$numberRow", x).commit()
+        LayoutUtilsCustom.removeMissingLayouts(ctx) // A (set 1) names none: before, only A's own was checked
+        assertFalse(real.contains("p2/$numberRow"), "B still names a layout without a file")
+        assertTrue(real.getBoolean(mark(2, numberRow), false))
     }
 }
