@@ -233,6 +233,39 @@ class EditingKeyboardTest {
         assertFalse(real.contains(own(idA)))
     }
 
+    // ---- 6: a factory reset or a restore with B's screen open ----
+
+    @Test fun `a factory reset with B's screen open goes back to the main screen`() = launch { _, activity ->
+        openCorrectionOfB()
+        frames(1000)
+        var done = false
+        activity.runOnUiThread { helium314.keyboard.settings.preferences.startFactoryReset(activity, keyboards = false,
+            learnedWords = false, clipboard = false, custom = false) { done = true } }
+        val until = System.currentTimeMillis() + 5000
+        while (!done && System.currentTimeMillis() < until) { idle(); Thread.sleep(20) }
+        assertTrue(done, "the reset didn't run")
+        frames(1000)
+        assertEquals(1, shown(mainTitle), "still on B's screen after the reset")
+        assertEquals(0, shown(autoCap))
+        assertFalse(real.all.keys.any { it.startsWith("p$idB/") || it.startsWith("p$idA/") }, "${real.all.keys}")
+    }
+
+    @Test fun `a restore with B's screen open goes back to the main screen`() = launch { _, activity ->
+        openCorrectionOfB()
+        frames(1000)
+        // the backup's ids replace the phone's: B's old id is A's now
+        activity.runOnUiThread { helium314.keyboard.settings.preferences.runRestore(activity, {}, R.string.backup_restored) {
+            real.edit().clear().putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(b, a)))
+                .putString(Settings.PREF_SELECTED_SUBTYPE, a.toPref()).commit()
+            KeyboardProfiles.enable(real, listOf(b, a), keepExisting = false)
+        } }
+        frames(1000)
+        assertEquals(idB, KeyboardProfiles.idFor(real, a), "(the restore didn't swap the ids)")
+        assertEquals(1, shown(mainTitle), "still on B's screen after the restore")
+        assertEquals(0, shown(autoCap))
+        assertFalse(real.all.keys.any { it.endsWith("/$key") }, "${real.all.keys}")
+    }
+
     // ---- 7: work started on B's screen that finishes after Back ----
 
     @Test fun `work started on B's screen and finished after Back writes B`() = launch { _, activity ->

@@ -158,5 +158,7 @@ private fun factoryReset(ctx: Context, keyboards: Boolean, learnedWords: Boolean
     LayoutUtilsCustom.removeMissingLayouts(ctx)
     GestureDecoderVocabulary.clear()
     (ctx.getActivity() as? SettingsActivity)?.prefChanged()
+    // the keyboards' sets start again: no screen stays open on a set id that is gone or now another keyboard's
+    (ctx.getActivity() as? SettingsActivity)?.backToMain()
     KeyboardSwitcher.getInstance().setThemeNeedsReload()
 }

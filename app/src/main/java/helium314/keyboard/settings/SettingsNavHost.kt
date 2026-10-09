@@ -25,6 +25,7 @@ import helium314.keyboard.latin.common.LocaleUtils.constructLocale
 import helium314.keyboard.latin.settings.KeyboardScopeContext
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.latin.settings.getTransitionAnimationScale
+import helium314.keyboard.latin.utils.getActivity
 import helium314.keyboard.settings.screens.AboutScreen
 import helium314.keyboard.settings.screens.AdvancedSettingsScreen
 import helium314.keyboard.settings.screens.AppearanceScreen
@@ -164,6 +165,13 @@ fun SettingsNavHost(
         screen(SettingsDestination.SwipeTuning + "{subtype}") {
             androidx.compose.runtime.CompositionLocalProvider(LocalSettingsMenu provides helium314.keyboard.latin.settings.KeyboardProfiles.Group.SWIPE) { SwipeTuningScreen(keyboard = it.arguments?.getString("subtype")!!.toSettingsSubtype(), onClickBack = ::goBack) }
         }
+    }
+    // after a factory reset or a restore: the main screen, as the keyboards' set ids the screens above it name are gone or
+    // belong to other keyboards now (their reads already fall back to the main choice, KeyboardProfiles.scopedId)
+    val toMain = (LocalContext.current.getActivity() as? SettingsActivity)?.backToMain?.collectAsState()
+    val toMainCount = toMain?.value ?: 0
+    LaunchedEffect(toMainCount) {
+        if (toMainCount > 0) navController.popBackStack(SettingsDestination.Keyboards, inclusive = false)
     }
     // once per new target, not on every redraw: the target stays set for 50 ms (navigateTo), and each redraw in that
     // time added one more copy of the screen, so Back needed a press per copy (2026-10-08, up to 6 on a 120 Hz phone)

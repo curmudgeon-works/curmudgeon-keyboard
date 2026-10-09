@@ -72,6 +72,9 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
     private val prefs by lazy { DeviceProtectedUtils.getRealSharedPreferences(this) }
     val prefChanged = MutableStateFlow(0) // simple counter, as the only relevant information is that something changed
     fun prefChanged() = prefChanged.value++
+    /** Counts the times the settings were asked back to the main screen (a factory reset, a restore: see SettingsNavHost). */
+    val backToMain = MutableStateFlow(0)
+    fun backToMain() = backToMain.value++
     private val dictUriFlow = MutableStateFlow<Uri?>(null)
     private val cachedDictionaryFile by lazy { File(this.cacheDir.path + File.separator + "temp_dict") }
     private val crashReportFiles = MutableStateFlow<List<File>>(emptyList())

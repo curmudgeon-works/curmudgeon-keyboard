@@ -312,7 +312,7 @@ private fun RestoreChoiceDialog(pending: PendingRestore, onDismiss: () -> Unit, 
 }
 
 /** Runs [work] on the keyboard executor, waits for it, then refreshes everything that may have changed. */
-private fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: Int, work: () -> Unit) {
+internal fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: Int, work: () -> Unit) {
     val wait = CountDownLatch(1)
     ExecutorUtils.getBackgroundExecutor(ExecutorUtils.KEYBOARD).execute {
         try {
@@ -338,6 +338,8 @@ private fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: Int
     LayoutUtilsCustom.onLayoutFileChanged()
     LayoutUtilsCustom.removeMissingLayouts(ctx)
     (ctx.getActivity() as? SettingsActivity)?.prefChanged()
+    // the backup's set ids replace the phone's: no screen stays open on an id that is gone or now another keyboard's
+    (ctx.getActivity() as? SettingsActivity)?.backToMain()
     SupportedEmojis.load(ctx)
     GestureDecoderVocabulary.clear()
     KeyboardSwitcher.getInstance().setThemeNeedsReload()
