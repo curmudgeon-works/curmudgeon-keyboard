@@ -126,4 +126,17 @@ class HeliBoardPinsTest {
                 heli().values.filter { (k, v) -> !helium314.keyboard.settings.KnownDefaults.same(k, now[k], v) }.keys)
         } finally { real.edit().clear().commit(); KeyboardProfiles.refreshImeId(real); zip.delete() }
     }
+
+    // review 2026-10-07: a backup from before 0.3.008 (defaults written down, stripped first) and the old Layout name
+    @Test fun `a keyboard from a backup older than 0_3_008, or on HeliBoard Extra, gets HeliBoard's values`() {
+        val keyboard = SettingsSubtype(Locale.US, "")
+        val old = mapOf<String, Any?>(sel to ctx.getString(R.string.layout_preset_heliboard), Settings.PREF_MORE_POPUP_KEYS to "all")
+        val restored = helium314.keyboard.settings.preferences.restoredSettings(ctx, old, keyboard)
+        assertNull(restored[Settings.PREF_MORE_POPUP_KEYS]) // a default written down: left out
+        for ((key, value) in heliBoardPins()) assertEquals(value, restored[key], key)
+        val extra = helium314.keyboard.settings.preferences.restoredSettings(ctx,
+            mapOf(helium314.keyboard.latin.PICKED_ONLY_DONE to true, sel to "HeliBoard Extra"), keyboard)
+        assertEquals(ctx.getString(R.string.layout_preset_heliboard_extra), extra[sel])
+        assertEquals(300, extra[Settings.PREF_KEY_LONGPRESS_TIMEOUT])
+    }
 }

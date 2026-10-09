@@ -495,18 +495,12 @@ private fun restoreAllSettings(ctx: Context, pending: PendingRestore) {
     LearnedStores.refresh(real)
 }
 
-/**
- * Only [chosen] keyboards come out of the backup: each is added (or replaced) with its custom layout files and,
- * [withSettings], its settings and the priorities of its languages. Other keyboards stay as they
- * are. The keyboard's settings need a set of its own, so separate settings per keyboard get switched on if they
- * aren't; the existing keyboards keep the shared set they behave by now.
- */
 /** What [keyboard] gets when restored on its own from [backup]: what it read there, left at the defaults where the
  *  backup only wrote defaults down, and with the HeliBoard Layouts' values a backup from before 2026-10-07 lacks. */
 internal fun restoredSettings(ctx: Context, backup: Map<String, Any?>, keyboard: SettingsSubtype): Map<String, Any?> {
     val values = KeyboardProfiles.effectiveSettingsIn(backup, keyboard)
         .let { values -> if (backup[helium314.keyboard.latin.PICKED_ONLY_DONE] == true) values else helium314.keyboard.latin.withoutDefaults(values) }
-    // (after the defaults went: the HeliBoard values include 300 ms, which was the default then)
+    // (after the defaults went, so a HeliBoard value that equals a default is never stripped as one)
     return if (backup[helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE] == true) values
         else helium314.keyboard.latin.withHeliBoardPins(ctx, values)
 }
@@ -515,6 +509,12 @@ internal fun restoredSettings(ctx: Context, backup: Map<String, Any?>, keyboard:
 internal fun restoreKeyboardsFrom(ctx: Context, file: File, keyboards: List<SettingsSubtype>, withSettings: Boolean) =
     restoreKeyboards(ctx, readBackup(file), keyboards, withSettings)
 
+/**
+ * Only [chosen] keyboards come out of the backup: each is added (or replaced) with its custom layout files and,
+ * [withSettings], its settings and the priorities of its languages. Other keyboards stay as they
+ * are. The keyboard's settings need a set of its own, so separate settings per keyboard get switched on if they
+ * aren't; the existing keyboards keep the shared set they behave by now.
+ */
 private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List<SettingsSubtype>, withSettings: Boolean) {
     val real = ctx.realPrefs()
     val prefs = ctx.prefs()
