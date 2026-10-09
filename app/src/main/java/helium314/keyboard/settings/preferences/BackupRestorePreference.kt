@@ -5,6 +5,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.os.Build
 import android.provider.UserDictionary
 import android.os.Looper
 import android.widget.Toast
@@ -372,9 +373,7 @@ private fun restoreEverything(ctx: Context, file: File) {
                 readJsonLinesToSettings(prefLines, prefs)
             } else if (entry.name == PROTECTED_PREFS_FILE_NAME) {
                 val prefLines = String(zip.readBytes()).split("\n")
-                val protectedPrefs = ctx.protectedPrefs()
-                protectedPrefs.edit { clear() }
-                readJsonLinesToSettings(prefLines, protectedPrefs)
+                restoreProtectedPrefs(ctx, prefLines)
             } else if (entry.name == PERSONAL_DICT_FILE_NAME) {
                 // fork: merge backed-up personal dictionary into the system one (never fail the whole restore over it)
                 try {
@@ -393,6 +392,21 @@ private fun restoreEverything(ctx: Context, file: File) {
     PersonalizationHelper.reloadAllFromFiles()
     LearnedStoreMigration.runNow(ctx)
 }
+
+/**
+ * The backup's protected preferences (pinned clips of an upstream HeliBoard backup, moved into the clipboard database
+ * by [transferOldPinnedClips] afterwards). Before Android 7 they are the settings file itself (DeviceProtectedUtils
+ * uses device protected storage only from N): clearing it there would wipe the settings just restored, so the entry's
+ * keys are only added to it.
+ */
+private fun restoreProtectedPrefs(ctx: Context, lines: List<String>) {
+    val protectedPrefs = ctx.protectedPrefs()
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) protectedPrefs.edit { clear() }
+    readJsonLinesToSettings(lines, protectedPrefs)
+}
+
+/** Restores the whole backup [file] as the restore dialog does for a backup without a keyboard list (tests). */
+internal fun restoreEverythingFrom(ctx: Context, file: File) = restoreEverything(ctx, file)
 
 /** Restores from the backup [file] as the restore dialog does, the learned words through [io] (tests). */
 internal fun restoreChosenFrom(ctx: Context, file: File, keyboards: List<SettingsSubtype>, settings: Boolean, learnedWords: Boolean,
@@ -441,11 +455,8 @@ private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: Restore
             when {
                 !backupFilePatterns.any { path.matches(it) } -> when {
                     name == Database.NAME && choice.clipboard -> FileUtils.copyStreamToNewFile(zip, restoredDb)
-                    name == PROTECTED_PREFS_FILE_NAME && allSettings -> {
-                        val protectedPrefs = ctx.protectedPrefs()
-                        protectedPrefs.edit { clear() }
-                        readJsonLinesToSettings(String(zip.readBytes()).split("\n"), protectedPrefs)
-                    }
+                    name == PROTECTED_PREFS_FILE_NAME && allSettings ->
+                        restoreProtectedPrefs(ctx, String(zip.readBytes()).split("\n"))
                     name == PERSONAL_DICT_FILE_NAME && choice.customWords -> try {
                         restorePersonalDictionary(ctx, String(zip.readBytes())) // never fail the whole restore over it
                     } catch (t: Throwable) {
