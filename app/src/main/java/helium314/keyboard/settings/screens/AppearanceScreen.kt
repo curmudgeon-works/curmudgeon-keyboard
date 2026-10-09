@@ -726,9 +726,12 @@ private fun SavedLooksPreference(setting: Setting) {
         )
     }
     toDelete?.let { look ->
+        // the keyboards using it keep its colors and look: named (2026-10-08)
+        val keepers = remember(look) { deleteKeepersText(ctx, R.plurals.delete_keeps_theme, AppearanceLooks.PREF_SELECTED, look.name) }
         ConfirmationDialog(
             onDismissRequest = { toDelete = null },
             title = { Text(stringResource(R.string.appearance_look_delete, look.name)) },
+            content = keepers?.let { { Text(it) } },
             confirmButtonText = stringResource(R.string.delete),
             onConfirmed = {
                 if (look == previewed) { putBack(); previewed = null } // its preview goes with it

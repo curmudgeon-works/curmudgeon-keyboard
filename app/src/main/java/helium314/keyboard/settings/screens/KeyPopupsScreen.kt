@@ -172,10 +172,13 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
             )
         }
         setToDelete?.let { name ->
+            // the keyboards using it keep its popups: named (2026-10-08)
+            val keepers = remember(name) { deleteKeepersText(ctx, R.plurals.delete_keeps_popup_set, KeyPopupOverrides.PREF_SELECTED_SET, name) }
             ConfirmationDialog(
                 onDismissRequest = { setToDelete = null },
                 onConfirmed = { deleteSet(name); setToDelete = null },
                 title = { Text(stringResource(R.string.key_popups_delete_set_title, name)) },
+                content = keepers?.let { { Text(it) } },
                 confirmButtonText = stringResource(R.string.delete),
             )
         }

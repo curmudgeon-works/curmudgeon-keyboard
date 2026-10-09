@@ -205,6 +205,30 @@ object KeyboardProfiles {
         }
         editor.apply()
     }
+
+    /** The keyboards (in [keyboards]' order) that use a saved item through [keys], for the delete warnings (2026-10-08):
+     *  what each reads now (separate settings off or the menu shared: the shared value; a mark: nothing chosen), or what
+     *  its own set keeps, hidden or not (a mark there: nothing chosen). [matches] gets the plain key and the value (null:
+     *  nothing chosen). Reads only: no keyboard gets an id here. */
+    fun keyboardsUsing(real: SharedPreferences, keyboards: List<SettingsSubtype>, keys: Collection<String>,
+                       matches: (key: String, value: String?) -> Boolean): List<SettingsSubtype> {
+        val all = real.all
+        return keyboards.filter { keyboard ->
+            val id = anyIdIn(all, keyboard) ?: SHARED
+            val now = ProfilePreferences(real) { id }
+            keys.any { key ->
+                if (matches(key, now.getString(key, null))) return@any true
+                if (id == SHARED) return@any false
+                val own = ownKey(id, key)
+                when {
+                    real.contains(own) -> matches(key, real.getString(own, null))
+                    real.contains(ownKey(id, TOMBSTONE + key)) -> matches(key, null)
+                    else -> false
+                }
+            }
+        }
+    }
+
     // [stored] is "p<id>/[key]" for some id (or [key] itself)
     private fun unprefixedKey(stored: String, key: String): String? =
         if (stored.startsWith(PREFIX) && stored.endsWith("$SEPARATOR$key") && stored.substring(PREFIX.length, stored.length - key.length - SEPARATOR.length).toIntOrNull() != null) key else null

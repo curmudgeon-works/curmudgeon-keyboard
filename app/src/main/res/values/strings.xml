@@ -547,6 +547,11 @@
     <string name="key_popups_delete_set">Delete this set</string>
     <!-- Confirmation title for deleting a popup set of the user's own; %s is its name -->
     <string name="key_popups_delete_set_title">Delete the popup set \"%s\"?</string>
+    <!-- %s = the names of the keyboards using the set, one per line -->
+    <plurals name="delete_keeps_popup_set">
+        <item quantity="one">This keyboard keeps its popups, shown as Custom:\n%s</item>
+        <item quantity="other">These keyboards keep its popups, shown as Custom:\n%s</item>
+    </plurals>
     <string name="key_popups_preset_standard">Curmudgeon</string>
     <string name="key_popups_preset_heliboard">HeliBoard</string>
     <!-- The Layouts that ship with the app (Layout & Typing > Layouts) -->
@@ -692,6 +697,12 @@
     <string name="layout_preset_default_name">My layout %d</string>
     <string name="layout_preset_rename">Rename layout</string>
     <string name="layout_preset_delete">Delete the layout \"%s\"?</string>
+    <!-- under a delete question: the keyboards that use the item keep it (they are named, never "all keyboards");
+         %s = their names, one per line -->
+    <plurals name="delete_keeps_layout">
+        <item quantity="one">This keyboard keeps its settings, shown as unsaved:\n%s</item>
+        <item quantity="other">These keyboards keep its settings, shown as unsaved:\n%s</item>
+    </plurals>
     <!-- Layout & Typing: the key arrangement (QWERTY, AZERTY, your own) -->
     <string name="layout_keys">Keys</string>
     <string name="appearance_looks_summary">Built-in themes, and your own: save how the keyboard looks under a name</string>
@@ -701,6 +712,11 @@
     <string name="appearance_look_rename">Rename theme</string>
     <!-- %s: the look's name -->
     <string name="appearance_look_delete">Delete the theme \"%s\"?</string>
+    <!-- %s = the names of the keyboards using the theme, one per line -->
+    <plurals name="delete_keeps_theme">
+        <item quantity="one">This keyboard keeps its colors and look, shown as unsaved:\n%s</item>
+        <item quantity="other">These keyboards keep its colors and look, shown as unsaved:\n%s</item>
+    </plurals>
     <!-- the four built-in themes -->
     <string name="theme_preset_dynamic">Dynamic</string>
     <string name="theme_preset_curmudgeon">Curmudgeon</string>

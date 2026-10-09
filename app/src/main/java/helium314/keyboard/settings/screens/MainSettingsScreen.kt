@@ -101,6 +101,22 @@ fun keyboardName(keyboard: SettingsSubtype, ctx: Context): String =
     customKeyboardName(keyboard) ?: (listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)).joinToString(" + ") { it.localizedDisplayName(ctx.resources) } +
         (keyboard.getExtraValueOf(helium314.keyboard.latin.common.Constants.Subtype.ExtraValue.KEYBOARD_COPY)?.let { " ($it)" } ?: "")
 
+/** The enabled keyboards, in the Keyboards screen's order, that use a saved item (a Layout, theme, popup set or font)
+ *  through [keys] ([helium314.keyboard.latin.settings.KeyboardProfiles.keyboardsUsing]): the ones its delete warning names. */
+fun keyboardsUsing(ctx: Context, keys: Collection<String>, matches: (key: String, value: String?) -> Boolean): List<SettingsSubtype> =
+    helium314.keyboard.latin.settings.KeyboardProfiles.keyboardsUsing(ctx.realPrefs(),
+        SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }, keys, matches)
+
+/** A delete warning's line: plural [id] with the keyboards' names one per line (never "all keyboards", 2026-10-08);
+ *  null when no keyboard uses the item (the title alone). */
+fun keepersText(ctx: Context, @androidx.annotation.PluralsRes id: Int, keyboards: List<SettingsSubtype>): String? =
+    if (keyboards.isEmpty()) null
+    else ctx.resources.getQuantityString(id, keyboards.size, keyboards.joinToString("\n") { keyboardName(it, ctx) })
+
+/** The delete warning of a saved item chosen by name under [key] (Layout, theme, popup set). */
+fun deleteKeepersText(ctx: Context, @androidx.annotation.PluralsRes id: Int, key: String, name: String): String? =
+    keepersText(ctx, id, keyboardsUsing(ctx, listOf(key)) { _, value -> value == name })
+
 /** The sections of one keyboard's settings, as menu entries. Used by the keyboard's own screen and inline under the keyboards list. */
 @Composable
 fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modifier, showLanguages: Boolean = true,
