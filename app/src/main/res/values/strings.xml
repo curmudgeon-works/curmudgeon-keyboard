@@ -953,6 +953,16 @@ language, hence "No language". -->
     <string name="delete_layout">Really delete custom layout %s?</string>
     <!-- Message when layout to be deleted is in use -->
     <string name="layout_in_use">Keyboards using it keep its keys, as an unsaved layout of their own.</string>
+    <!-- deleting a custom key layout: the keyboards that picked it; %s = their names, one per line -->
+    <plurals name="layout_delete_keeps_keys">
+        <item quantity="one">This keyboard keeps its keys, as an unsaved layout of its own:\n%s</item>
+        <item quantity="other">These keyboards keep its keys, each as an unsaved layout of its own:\n%s</item>
+    </plurals>
+    <!-- deleting a custom key layout: the keyboards that only had it as their default for its type; %s = their names, one per line -->
+    <plurals name="layout_delete_back_to_default">
+        <item quantity="one">This keyboard goes back to the default keys:\n%s</item>
+        <item quantity="other">These keyboards go back to the default keys:\n%s</item>
+    </plurals>
     <!-- a keyboard's own copy of a deleted custom layout (no name; edit it to save it under a name) -->
     <string name="unsaved_layout">Unsaved layout</string>
     <!-- saving a named layout other keyboards use -->

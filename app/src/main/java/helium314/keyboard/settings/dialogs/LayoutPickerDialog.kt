@@ -34,14 +34,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.latin.R
-import helium314.keyboard.latin.common.Constants.Subtype.ExtraValue
 import helium314.keyboard.latin.settings.Defaults.default
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.LayoutType
 import helium314.keyboard.latin.utils.LayoutUtils
 import helium314.keyboard.latin.utils.LayoutUtilsCustom
 import helium314.keyboard.latin.utils.Log
-import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.getActivity
 import helium314.keyboard.latin.utils.getStringResourceOrName
 import helium314.keyboard.latin.utils.prefs
@@ -51,6 +49,7 @@ import helium314.keyboard.settings.Setting
 import helium314.keyboard.settings.SettingsActivity
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.settings.contentTextDirectionStyle
+import helium314.keyboard.settings.screens.keyboardName
 import helium314.keyboard.latin.utils.previewDark
 
 @Composable
@@ -188,14 +187,13 @@ private fun LayoutItemRow(
             var showDeleteDialog by remember { mutableStateOf(false) }
             DeleteButton { showDeleteDialog = true }
             if (showDeleteDialog) {
-                val inUse = SubtypeSettings.getAdditionalSubtypes().any { st ->
-                    val map = LayoutType.getLayoutMap(st.getExtraValueOf(ExtraValue.KEYBOARD_LAYOUT_SET))
-                    map[layoutType] == layoutName
-                }
+                // who keeps its keys and who goes back to the default, by name
+                val effects = remember(layoutName) { LayoutUtilsCustom.deleteEffects(layoutName, layoutType, ctx).let { (keeps, back) ->
+                    LayoutUtilsCustom.deleteEffectsText(ctx, keeps.map { keyboardName(it, ctx) }, back.map { keyboardName(it, ctx) }) } }
                 ConfirmationDialog(
                     onDismissRequest = { showDeleteDialog = false },
                     title = { Text(stringResource(R.string.delete_layout, LayoutUtilsCustom.getDisplayName(layoutName))) },
-                    content = { if (inUse) Text(stringResource(R.string.layout_in_use)) },
+                    content = { if (effects != null) Text(effects) },
                     confirmButtonText = stringResource(R.string.delete),
                     onConfirmed = {
                         showDeleteDialog = false

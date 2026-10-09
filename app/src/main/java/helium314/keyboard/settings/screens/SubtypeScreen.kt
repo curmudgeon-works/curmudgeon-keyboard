@@ -625,13 +625,14 @@ private fun MainLayoutRow(
                 }
             }
             if (showLayoutDeleteDialog) {
-                val others = SubtypeSettings.getAdditionalSubtypes().filter { st -> st.mainLayoutName() == it }
-                    .any() // (this one included: every keyboard using it keeps the keys)
+                // who keeps its keys and who goes back to the default, by name (this one included)
+                val effects = remember(it) { LayoutUtilsCustom.deleteEffects(it, LayoutType.MAIN, ctx).let { (keeps, back) ->
+                    LayoutUtilsCustom.deleteEffectsText(ctx, keeps.map { kb -> keyboardName(kb, ctx) }, back.map { kb -> keyboardName(kb, ctx) }) } }
                 ConfirmationDialog(
                     onDismissRequest = { showLayoutDeleteDialog = false },
                     confirmButtonText = stringResource(R.string.delete),
                     title = { Text(stringResource(R.string.delete_layout, LayoutUtilsCustom.getDisplayName(it))) },
-                    content = { if (others) Text(stringResource(R.string.layout_in_use)) },
+                    content = { if (effects != null) Text(effects) },
                     onConfirmed = {
                         // this keyboard keeps the keys as its own unnamed copy (the others too, in deleteLayout)
                         if (it == currentSubtype.mainLayoutName())

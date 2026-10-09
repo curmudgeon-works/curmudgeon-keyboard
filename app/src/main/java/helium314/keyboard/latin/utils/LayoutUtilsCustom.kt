@@ -16,8 +16,12 @@ import helium314.keyboard.latin.common.Constants.Subtype.ExtraValue.KEYBOARD_LAY
 import helium314.keyboard.latin.common.decodeBase36
 import helium314.keyboard.latin.common.encodeBase36
 import helium314.keyboard.latin.define.DebugFlags
+import helium314.keyboard.latin.R
 import helium314.keyboard.latin.settings.Defaults
+import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.latin.settings.ProfilePreferences
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.latin.utils.LayoutType.Companion.folder
 import helium314.keyboard.latin.utils.ScriptUtils.script
@@ -132,6 +136,37 @@ object LayoutUtilsCustom {
         onLayoutFileChanged()
         SubtypeSettings.onRenameLayout(layoutType, layoutName, null, context)
         KeyboardSwitcher.getInstance().setThemeNeedsReload()
+    }
+
+    /**
+     * What [deleteLayout] does to the enabled keyboards, in the Keyboards screen's order, for the delete warning:
+     * first the ones whose own pick it is (they keep its keys as an unsaved layout of their own), second the ones
+     * without a pick of their own for [layoutType] that have it as their default: what they read now (the shared value
+     * with separate settings off or the Layout menu shared) or what their own set keeps, hidden too (they go back to the
+     * default keys). A keyboard that picks another layout is in neither: it uses none of this one.
+     */
+    fun deleteEffects(layoutName: String, layoutType: LayoutType, context: Context): Pair<List<SettingsSubtype>, List<SettingsSubtype>> {
+        val real = context.realPrefs()
+        val all = real.all
+        val key = Settings.PREF_LAYOUT_PREFIX + layoutType.name
+        val keyboards = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.distinct()
+        val keeps = keyboards.filter { it.layoutName(layoutType) == layoutName }
+        val backToDefault = keyboards.filter { keyboard ->
+            if (keyboard.layoutName(layoutType) != null) return@filter false
+            val id = KeyboardProfiles.anyIdIn(all, keyboard) // (never idFor: that writes an id)
+            ProfilePreferences(real) { id ?: KeyboardProfiles.SHARED }.getString(key, null) == layoutName
+                || id != null && all[KeyboardProfiles.ownKey(id, key)] == layoutName
+        }
+        return keeps to backToDefault
+    }
+
+    /** The delete warning's text for [keeps] and [backToDefault] (keyboard names, see [deleteEffects]); null: none. */
+    fun deleteEffectsText(context: Context, keeps: List<String>, backToDefault: List<String>): String? {
+        val res = context.resources
+        return listOfNotNull(
+            keeps.takeIf { it.isNotEmpty() }?.let { res.getQuantityString(R.plurals.layout_delete_keeps_keys, it.size, it.joinToString("\n")) },
+            backToDefault.takeIf { it.isNotEmpty() }?.let { res.getQuantityString(R.plurals.layout_delete_back_to_default, it.size, it.joinToString("\n")) }
+        ).takeIf { it.isNotEmpty() }?.joinToString("\n\n")
     }
 
     fun getDisplayName(layoutName: String) =
