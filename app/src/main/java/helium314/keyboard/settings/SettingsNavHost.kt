@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -156,8 +157,12 @@ fun SettingsNavHost(
             androidx.compose.runtime.CompositionLocalProvider(LocalSettingsMenu provides helium314.keyboard.latin.settings.KeyboardProfiles.Group.SWIPE) { SwipeTuningScreen(keyboard = it.arguments?.getString("subtype")!!.toSettingsSubtype(), onClickBack = ::goBack) }
         }
     }
-    if (target.value != SettingsDestination.Keyboards/* && target.value != navController.currentBackStackEntry?.destination?.route*/)
-        navController.navigate(route = target.value)
+    // once per new target, not on every redraw: the target stays set for 50 ms (navigateTo), and each redraw in that
+    // time added one more copy of the screen, so Back needed a press per copy (2026-10-08, up to 6 on a 120 Hz phone)
+    val route = target.value
+    LaunchedEffect(route) {
+        if (route != SettingsDestination.Keyboards) navController.navigate(route = route)
+    }
 }
 
 object SettingsDestination {
