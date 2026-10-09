@@ -4,9 +4,11 @@ package helium314.keyboard.keyboard
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.prefs
+import helium314.keyboard.latin.utils.realPrefs
 import java.io.File
 
 /**
@@ -85,11 +87,13 @@ object FontLibrary {
 
     fun discardPending(ctx: Context) { pendingDir(ctx).deleteRecursively() }
 
-    /** Removes a font from the list; text styles that used it go back to the default. */
+    /** Removes a font from the list; text styles that used it go back to the default, in every keyboard's set (2026-10-07:
+     *  only the keyboard being edited did; the others kept the name and took a font loaded later under it). "default"
+     *  is written, not the choice removed: nothing chosen ("auto") reads a loaded font of before ([fileFor]). */
     fun delete(ctx: Context, name: String) {
         File(dir(ctx), name).delete()
-        val prefs = ctx.prefs()
-        prefs.edit { fontPrefs.forEach { if (prefs.getString(it, null) == PREFIX + name) putString(it, "default") } }
+        val real = ctx.realPrefs()
+        fontPrefs.forEach { KeyboardProfiles.replaceValueEverywhere(real, it, PREFIX + name, "default") }
     }
 
     private fun sameContent(a: File, b: File) = a.length() == b.length() && a.readBytes().contentEquals(b.readBytes())

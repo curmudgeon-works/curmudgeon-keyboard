@@ -733,7 +733,7 @@ private fun SavedLooksPreference(setting: Setting) {
             onConfirmed = {
                 if (look == previewed) { putBack(); previewed = null } // its preview goes with it
                 AppearanceLooks.deletePictures(ctx, look); store(looks.filter { it !== look })
-                KeyboardProfiles.replaceValueEverywhere(ctx.realPrefs(), AppearanceLooks.PREF_SELECTED, look.name, null)
+                KeyboardProfiles.forgetValueEverywhere(ctx.realPrefs(), AppearanceLooks.PREF_SELECTED, look.name)
             },
         )
     }

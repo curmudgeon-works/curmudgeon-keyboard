@@ -190,6 +190,21 @@ object KeyboardProfiles {
         }
         editor.apply()
     }
+
+    /** Every stored copy of [key] that reads [old] goes, in every set (hidden ones too): the shared one is removed, a
+     *  keyboard's own is removed and marked "at its default" ([TOMBSTONE]), so that keyboard reads nothing chosen, not
+     *  the shared choice (another theme, Layout or popup set) nor one saved later under [old] (2026-10-07: a delete
+     *  cleared it only in the keyboard being edited; [replaceValueEverywhere] with null leaves no mark). */
+    fun forgetValueEverywhere(real: SharedPreferences, key: String, old: String) {
+        val editor = real.edit()
+        for ((stored, value) in real.all) {
+            if (value != old) continue
+            if (stored == key) editor.remove(stored)
+            else if (unprefixedKey(stored, key) != null)
+                editor.remove(stored).putBoolean(stored.dropLast(key.length) + TOMBSTONE + key, true)
+        }
+        editor.apply()
+    }
     // [stored] is "p<id>/[key]" for some id (or [key] itself)
     private fun unprefixedKey(stored: String, key: String): String? =
         if (stored.startsWith(PREFIX) && stored.endsWith("$SEPARATOR$key") && stored.substring(PREFIX.length, stored.length - key.length - SEPARATOR.length).toIntOrNull() != null) key else null

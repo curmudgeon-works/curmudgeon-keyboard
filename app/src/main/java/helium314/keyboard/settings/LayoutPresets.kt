@@ -210,6 +210,13 @@ object LayoutPresets {
         }.getOrDefault(emptyList())
     }
 
+    /** Saved Layout [name] goes from the list, and every keyboard that had it chosen has none chosen (2026-10-07: only
+     *  the keyboard being edited forgot it; the others kept the name, and took a Layout saved later under it). */
+    fun delete(real: SharedPreferences, name: String) {
+        save(real, load(real).filter { it.name != name })
+        KeyboardProfiles.forgetValueEverywhere(real, PREF_SELECTED, name)
+    }
+
     fun save(prefs: SharedPreferences, presets: List<Preset>) {
         keepBrokenAside(prefs, PREF)
         val arr = JSONArray()

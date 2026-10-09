@@ -165,12 +165,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
         }
         @Composable fun presetName(p: Preset) = p.userName ?: stringResource(p.name)
         fun deleteSet(name: String) {
-            KeyPopupOverrides.saveSets(ctx.realPrefs(), userSets.filter { it.name != name })
-            if (name == selectedUserSet?.name) { // the keyboard falls back to the built-in arrangement
-                KeyPopupOverrides.save(prefs, emptyMap())
-                prefs.edit().remove(KeyPopupOverrides.PREF_SELECTED_SET).apply()
-                reloadPreview()
-            }
+            if (deletePopupSet(ctx, name)) reloadPreview()
             generation++
         }
         var setToDelete: String? by remember { mutableStateOf(null) }
@@ -311,6 +306,19 @@ private fun storePopupSet(ctx: Context, keyboard: SettingsSubtype, name: String,
     KeyPopupOverrides.save(prefs, all)
     prefs.edit().putString(KeyPopupOverrides.PREF_SELECTED_SET, name).apply()
     reloadPreview()
+}
+
+/** Deletes the user's popup set [name]: every keyboard that had it chosen has none chosen (2026-10-07: only the keyboard
+ *  being edited forgot it), and the keyboard being edited, if it had it, falls back to the built-in arrangement.
+ *  Returns whether it had it. */
+internal fun deletePopupSet(ctx: Context, name: String): Boolean {
+    val prefs = ctx.prefs()
+    val real = ctx.realPrefs()
+    KeyPopupOverrides.saveSets(real, KeyPopupOverrides.loadSets(real).filter { it.name != name })
+    val chosenHere = prefs.getString(KeyPopupOverrides.PREF_SELECTED_SET, null) == name
+    if (chosenHere) KeyPopupOverrides.save(prefs, emptyMap())
+    KeyboardProfiles.forgetValueEverywhere(real, KeyPopupOverrides.PREF_SELECTED_SET, name)
+    return chosenHere
 }
 
 /** A row that opens another screen: title, summary, arrow; the Preferences screen's row style. */

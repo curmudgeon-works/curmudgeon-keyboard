@@ -176,8 +176,7 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
             confirmButtonText = stringResource(R.string.delete),
             onConfirmed = {
                 if (preset == previewed) { putBack(); previewed = null } // its preview goes with it
-                store(presets.filter { it !== preset })
-                if (prefs.getString(LayoutPresets.PREF_SELECTED, null) == preset.name) prefs.edit { remove(LayoutPresets.PREF_SELECTED) }
+                LayoutPresets.delete(ctx.realPrefs(), preset.name); generation++
             },
         )
     }
