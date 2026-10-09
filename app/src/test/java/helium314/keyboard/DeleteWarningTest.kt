@@ -43,7 +43,7 @@ class DeleteWarningTest {
 
     private fun enable(vararg keyboards: SettingsSubtype) {
         real.edit {
-            putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a)))
+            putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes((listOf(a) + keyboards).filter { it != b }))
             putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(keyboards.toList()))
         }
         SubtypeSettings.reloadEnabledSubtypes(ctx)
@@ -98,6 +98,21 @@ class DeleteWarningTest {
         real.edit { putString(layout, "X") }
         assertEquals(listOf(c), using(listOf(c), layout, "X"))
         assertEquals(ids, real.getString("keyboard_profile_ids", null))
+    }
+
+    // review A4: while a Layout is previewed the edited keyboard has the previewed identity; an old entry for that
+    // identity in the ids map names another set, so the keyboard was left out
+    @Test fun `a previewed keyboard with an old ids entry is still named, through the set being edited`() {
+        val previewed = a.withLayout(helium314.keyboard.latin.utils.LayoutType.MAIN, "dvorak")
+        assertEquals(3, KeyboardProfiles.idFor(real, previewed)) // the old entry
+        enable(previewed, b)
+        KeyboardProfiles.editingId = 1
+        try {
+            real.edit { putString("p1/$layout", "X") }
+            assertEquals("This keyboard keeps its settings, shown as unsaved:\nWork",
+                deleteKeepersText(ctx, R.plurals.delete_keeps_layout, layout, "X", edited = previewed))
+            assertNull(deleteKeepersText(ctx, R.plurals.delete_keeps_layout, layout, "X")) // no keyboard edited: the map
+        } finally { KeyboardProfiles.editingId = KeyboardProfiles.SHARED }
     }
 
     @Test fun `the text names each keyboard - its name, or its languages`() {

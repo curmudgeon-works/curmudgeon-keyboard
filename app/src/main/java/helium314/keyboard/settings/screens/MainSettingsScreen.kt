@@ -103,9 +103,14 @@ fun keyboardName(keyboard: SettingsSubtype, ctx: Context): String =
 
 /** The enabled keyboards, in the Keyboards screen's order, that use a saved item (a Layout, theme, popup set or font)
  *  through [keys] ([helium314.keyboard.latin.settings.KeyboardProfiles.keyboardsUsing]): the ones its delete warning names. */
-fun keyboardsUsing(ctx: Context, keys: Collection<String>, matches: (key: String, value: String?) -> Boolean): List<SettingsSubtype> =
-    helium314.keyboard.latin.settings.KeyboardProfiles.keyboardsUsing(ctx.realPrefs(),
-        SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }, keys, matches)
+fun keyboardsUsing(ctx: Context, keys: Collection<String>, edited: SettingsSubtype? = null,
+                   matches: (key: String, value: String?) -> Boolean): List<SettingsSubtype> {
+    // [edited]: the keyboard the screen edits, which reads the set being edited whatever identity it has now
+    val editingId = helium314.keyboard.latin.settings.KeyboardProfiles.editingId
+    return helium314.keyboard.latin.settings.KeyboardProfiles.keyboardsUsing(ctx.realPrefs(),
+        SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }, keys,
+        edited?.takeIf { editingId != helium314.keyboard.latin.settings.KeyboardProfiles.SHARED }?.let { it to editingId }, matches)
+}
 
 /** A delete warning's line: plural [id] with the keyboards' names one per line (never "all keyboards", 2026-10-08);
  *  null when no keyboard uses the item (the title alone). */
@@ -114,8 +119,9 @@ fun keepersText(ctx: Context, @androidx.annotation.PluralsRes id: Int, keyboards
     else ctx.resources.getQuantityString(id, keyboards.size, keyboards.joinToString("\n") { keyboardName(it, ctx) })
 
 /** The delete warning of a saved item chosen by name under [key] (Layout, theme, popup set). */
-fun deleteKeepersText(ctx: Context, @androidx.annotation.PluralsRes id: Int, key: String, name: String): String? =
-    keepersText(ctx, id, keyboardsUsing(ctx, listOf(key)) { _, value -> value == name })
+fun deleteKeepersText(ctx: Context, @androidx.annotation.PluralsRes id: Int, key: String, name: String,
+                      edited: SettingsSubtype? = null): String? =
+    keepersText(ctx, id, keyboardsUsing(ctx, listOf(key), edited) { _, value -> value == name })
 
 /** The sections of one keyboard's settings, as menu entries. Used by the keyboard's own screen and inline under the keyboards list. */
 @Composable

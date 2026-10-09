@@ -172,7 +172,7 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
     toDelete?.let { preset ->
         // the keyboards using it keep its settings: named (2026-10-08)
         val keepers = remember(preset) { helium314.keyboard.settings.screens.deleteKeepersText(ctx,
-            R.plurals.delete_keeps_layout, LayoutPresets.PREF_SELECTED, preset.name) }
+            R.plurals.delete_keeps_layout, LayoutPresets.PREF_SELECTED, preset.name, keyboard) } // (maybe previewed keys)
         ConfirmationDialog(
             onDismissRequest = { toDelete = null },
             title = { Text(stringResource(R.string.layout_preset_delete, preset.name)) },

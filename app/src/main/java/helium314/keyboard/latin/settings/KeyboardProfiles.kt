@@ -209,12 +209,15 @@ object KeyboardProfiles {
     /** The keyboards (in [keyboards]' order) that use a saved item through [keys], for the delete warnings (2026-10-08):
      *  what each reads now (separate settings off or the menu shared: the shared value; a mark: nothing chosen), or what
      *  its own set keeps, hidden or not (a mark there: nothing chosen). [matches] gets the plain key and the value (null:
-     *  nothing chosen). Reads only: no keyboard gets an id here. */
+     *  nothing chosen). Reads only: no keyboard gets an id here. [edited]: the keyboard a settings screen edits and the
+     *  set it edits ([editingId]), which wins over the ids map: while a Layout is previewed the keyboard has the
+     *  previewed identity, and an old entry for that identity names another set ([onKeyboardChanged] moves nothing). */
     fun keyboardsUsing(real: SharedPreferences, keyboards: List<SettingsSubtype>, keys: Collection<String>,
+                       edited: Pair<SettingsSubtype, Int>? = null,
                        matches: (key: String, value: String?) -> Boolean): List<SettingsSubtype> {
         val all = real.all
         return keyboards.filter { keyboard ->
-            val id = anyIdIn(all, keyboard) ?: SHARED
+            val id = edited?.takeIf { it.first == keyboard }?.second ?: anyIdIn(all, keyboard) ?: SHARED
             val now = ProfilePreferences(real) { id }
             keys.any { key ->
                 if (matches(key, now.getString(key, null))) return@any true
