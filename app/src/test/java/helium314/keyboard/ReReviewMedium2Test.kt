@@ -145,34 +145,47 @@ class ReReviewMedium2Test {
         assertTrue(vocab.contains("नमस्ते"), "the dictionary-less language's learned words")
     }
 
-    // reviewer 2026-10-07: a restored keyboard's own learned words must not be copied over by the pool refresh
+    // reviewer 2026-10-07: a restored keyboard's own learned words must not be copied over by the pool refresh (3010 #2: in
+    // the learned words' folder, ctx.filesDir, which isn't the pictures' one, KeyboardProfiles.filesDir)
     @Test fun `a restored pool of learned words is kept, not seeded over`() {
-        val dir = File(ctx.filesDir, "restore_pool_${System.nanoTime()}").apply { mkdirs() }
+        val dir = ctx.filesDir
+        val de = File(ctx.cacheDir.parentFile, "restore_pool_de_${System.nanoTime()}").apply { mkdirs() }
         val before = KeyboardProfiles.filesDir
         val runnerBefore = helium314.keyboard.latin.personalization.LearnedStores.seedRunner
+        val ioBefore = helium314.keyboard.latin.personalization.LearnedStores.seedIo
+        val asked = mutableListOf<Pair<Int, (Boolean) -> Unit>>()
         try {
-            KeyboardProfiles.filesDir = dir
-            real.edit().putBoolean(Settings.PREF_SHARE_LEARNED_WORDS, false).commit()
+            KeyboardProfiles.filesDir = de
+            real.edit().putBoolean(Settings.PREF_SHARE_LEARNED_WORDS, false).putInt("keyboard_profile_next_id", 61).commit()
             val own = KeyboardProfiles.idFor(real, KeyboardProfiles.selectedKeyboard(real))
-            // what a restore leaves: the shared store and the keyboard's own, no marker (older backup, or a new phone)
+            // what a restore of a whole older backup leaves: the shared store and the keyboard's own, no marker, the
+            // one-time marking to do again (restoreEverything)
             helium314.keyboard.latin.personalization.FakeLearnedStoreIo.store(
                 helium314.keyboard.latin.personalization.LearnedStores.storeFile(dir, "Latn", 0), helium314.keyboard.latin.personalization.word("shared", 9, 100))
             helium314.keyboard.latin.personalization.FakeLearnedStoreIo.store(
                 helium314.keyboard.latin.personalization.LearnedStores.storeFile(dir, "Latn", own), helium314.keyboard.latin.personalization.word("mine", 3, 50))
-            var seeded = false
-            helium314.keyboard.latin.personalization.LearnedStores.seedRunner = { _, _, _ -> seeded = true }
-            helium314.keyboard.latin.personalization.LearnedPools.markPoolsOnDisk(dir) // (what restoreFollowUp does)
+            real.edit().remove(helium314.keyboard.latin.personalization.LearnedPools.POOLS_MARKED).commit()
+            helium314.keyboard.latin.personalization.LearnedStores.seedRunner = { _, pool, done -> asked.add(pool to done) }
+            helium314.keyboard.latin.personalization.LearnedStores.seedIo = helium314.keyboard.latin.personalization.FakeLearnedStoreIo()
+            restoreFollowUp(ctx)
             helium314.keyboard.latin.personalization.LearnedStores.refresh(real)
-            assertFalse(seeded, "the restored pool was about to be copied over")
+            // the copy that runs marks the restored pool first, and leaves it as it is
+            assertTrue(helium314.keyboard.latin.personalization.LearnedStores.seedNow(real, asked.single().first))
+            asked.single().second(true)
             assertEquals(own, helium314.keyboard.latin.personalization.LearnedStores.currentPool)
             assertEquals(mapOf("mine" to (3 to 50)), helium314.keyboard.latin.personalization.FakeLearnedStoreIo.read(
                 helium314.keyboard.latin.personalization.LearnedStores.storeFile(dir, "Latn", own)))
+            assertTrue(File(dir, "learned_seeded_k$own").isFile)
             assertTrue(helium314.keyboard.settings.preferences.backupFilePatterns.any { "learned_seeded_k$own".matches(it) })
         } finally {
             real.edit().putBoolean(Settings.PREF_SHARE_LEARNED_WORDS, true).commit()
+            asked.forEach { it.second(true) }
             helium314.keyboard.latin.personalization.LearnedStores.refresh(real)
             helium314.keyboard.latin.personalization.LearnedStores.seedRunner = runnerBefore
+            helium314.keyboard.latin.personalization.LearnedStores.seedIo = ioBefore
             KeyboardProfiles.filesDir = before
+            dir.listFiles()?.filter { it.name.startsWith("UserHistoryDictionary") || it.name.startsWith("learned_") }?.forEach { it.deleteRecursively() }
+            de.deleteRecursively()
         }
     }
 

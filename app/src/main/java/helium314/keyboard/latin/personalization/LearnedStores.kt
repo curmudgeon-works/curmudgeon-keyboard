@@ -44,10 +44,15 @@ object LearnedStores {
     /** Re-reads which pool is in use (on every keyboard switch, and after the setting changed). A keyboard's own pool
      *  with nothing on disk yet (added since sharing went off) is first filled with a copy of the shared words, in the
      *  background (re-review 2026-10-07: on the main thread it froze the switch); the keyboard keeps the pool it had
-     *  until the copy is done, then this runs again and switches. */
+     *  until the copy is done, then this runs again and switches. Before the first unlock a keyboard's own pool can't be
+     *  read or copied: the keyboard stays on the pool it has (the shared one) until a refresh after the unlock. */
     fun refresh(real: SharedPreferences) {
         val pool = try { poolFor(real) } catch (e: Exception) { Log.w(TAG, "could not read the pool", e); SHARED }
         if (pool == currentPool) return
+        if (pool != SHARED && learnedDir() == null) {
+            if (!toldLocked) { toldLocked = true; Log.i(TAG, "learned words pool stays $currentPool until the phone is unlocked") }
+            return
+        }
         if (needsSeeding(pool)) { seedInBackground(real, pool) { refresh(real) }; return }
         currentPool = pool
         helium314.keyboard.latin.utils.HotWords.usePool(pool) // (its recent words with it)
@@ -55,9 +60,17 @@ object LearnedStores {
         listeners.forEach { it() }
     }
 
+    /**
+     * The folder of the learned words and their markers: the app's filesDir, as the stores and blacklists use it (on
+     * Android 7+ the credential-encrypted one, NOT KeyboardProfiles.filesDir, the device-protected pictures' folder:
+     * 3010 #2, the copy looked there and found nothing). null before the first unlock, when it can't be read. Set by App.
+     */
+    @Volatile internal var learnedDir: () -> File? = { null }
+    @Volatile private var toldLocked = false
+
     private fun needsSeeding(pool: Int): Boolean {
         if (pool == SHARED || pool == seedingFailed) return false
-        val dir = KeyboardProfiles.filesDir ?: return false
+        val dir = learnedDir() ?: return false
         return !LearnedPools.isSeeded(dir, pool)
     }
 
@@ -74,7 +87,7 @@ object LearnedStores {
     internal var seedIo: LearnedStoreIo = LearnedStoreIo.Native
     /** The copy itself, on the thread it's called on (never the main one): whether it was made. */
     internal fun seedNow(real: SharedPreferences, pool: Int): Boolean =
-        KeyboardProfiles.filesDir?.let { LearnedPools.seedIfNew(it, seedIo, pool) } ?: false
+        learnedDir()?.let { LearnedPools.seedIfNew(it, seedIo, pool, real) } ?: false
     private fun seedInBackground(real: SharedPreferences, pool: Int, then: () -> Unit) {
         if (!seeding.add(pool)) return
         seedRunner(real, pool) { ok ->
