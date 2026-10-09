@@ -88,6 +88,8 @@ import helium314.keyboard.latin.utils.ResourceUtils
 import helium314.keyboard.latin.utils.ScriptUtils
 import helium314.keyboard.latin.utils.ScriptUtils.script
 import helium314.keyboard.latin.utils.prefs
+import helium314.keyboard.latin.utils.getActivity
+import androidx.compose.runtime.collectAsState
 import helium314.keyboard.keyboard.internal.keyboard_parser.morePopupKeysResId
 import helium314.keyboard.keyboard.internal.keyboard_parser.POPUP_KEYS_ALL
 import helium314.keyboard.keyboard.internal.keyboard_parser.POPUP_KEYS_MAIN
@@ -125,10 +127,13 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
     var generation by remember { mutableIntStateOf(0) }
     var showAccentsDialog by remember { mutableStateOf(false) }
     val preview = helium314.keyboard.settings.dialogs.LocalPreviewKeyboard.current
-    val overrides = remember(generation) { KeyPopupOverrides.load(prefs) }
+    // read again on every settings change too: a Layout applied from the Layouts row on this screen writes the popups and
+    // the set (and may bring a set back) without this section knowing (review 2026-10-08: the row stayed "Custom")
+    val changed = (ctx.getActivity() as? helium314.keyboard.settings.SettingsActivity)?.prefChanged?.collectAsState()
+    val overrides = remember(generation, changed?.value) { KeyPopupOverrides.load(prefs) }
     Column {
         // presets: the generated defaults for every key at once (the user's own per-key edits stay on top)
-        val userSets = remember(generation) { KeyPopupOverrides.loadSets(ctx.realPrefs()) }
+        val userSets = remember(generation, changed?.value) { KeyPopupOverrides.loadSets(ctx.realPrefs()) }
         // a change made while a built-in set is selected is held here until the user names a set for it
         var pendingChange: Pair<String, List<String>?>? by remember { mutableStateOf(null) }
         var showSaveAsDialog by remember { mutableStateOf(false) }
@@ -178,7 +183,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
             TextInputDialog(
                 onDismissRequest = { showSaveAsDialog = false; pendingChange = null }, // cancel = the change is dropped
                 onConfirmed = { name ->
-                    val all = overrides.toMutableMap()
+                    val all = KeyPopupOverrides.load(prefs).toMutableMap() // (the keyboard's popups now, not as last drawn)
                     pendingChange?.let { (k, v) -> if (v == null) all.remove(k) else all[k] = v }
                     storeInSet(name.trim(), all)
                     pendingChange = null
