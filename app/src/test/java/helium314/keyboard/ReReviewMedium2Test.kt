@@ -160,7 +160,7 @@ class ReReviewMedium2Test {
             helium314.keyboard.latin.personalization.FakeLearnedStoreIo.store(
                 helium314.keyboard.latin.personalization.LearnedStores.storeFile(dir, "Latn", own), helium314.keyboard.latin.personalization.word("mine", 3, 50))
             var seeded = false
-            helium314.keyboard.latin.personalization.LearnedStores.seedRunner = { _, _, _ -> seeded = true }
+            helium314.keyboard.latin.personalization.LearnedStores.seedRunner = { _, _ -> seeded = true }
             helium314.keyboard.latin.personalization.LearnedPools.markPoolsOnDisk(dir) // (what restoreFollowUp does)
             helium314.keyboard.latin.personalization.LearnedStores.refresh(real)
             assertFalse(seeded, "the restored pool was about to be copied over")
