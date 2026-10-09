@@ -113,6 +113,10 @@ class LayoutDraft private constructor(
         layoutsCopy?.copyRecursively(live, overwrite = true)
         LayoutUtilsCustom.onLayoutFileChanged()
         SubtypeSettings.reloadEnabledSubtypes(ctx)
+        // the settings values the edit's listeners built read the keyboard list before that reload (still with the
+        // changed keyboard): a built-in keyboard in use wasn't found, and the first keyboard's values were taken (its
+        // second languages, popup keys, number row; re-review 2026-10-07). Built again when loaded (not at app start)
+        Settings.getValues()?.let { Settings.getInstance().loadSettings(Settings.getCurrentContext(), it.mLocale, it.mInputAttributes) }
         KeyboardLayoutSet.onSystemLocaleChanged()
         runCatching { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
         rejectedSubtype = subtype

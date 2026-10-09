@@ -8,6 +8,7 @@ import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.utils.LayoutType
 import helium314.keyboard.latin.utils.SubtypeUtilsAdditional
+import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.latin.utils.realPrefs
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -75,6 +76,41 @@ class LayoutDraftTest {
             assertEquals(333, real.getInt(KeyboardProfiles.prefixedKey(KeyboardProfiles.idFor(real, changed), Settings.PREF_KEY_LONGPRESS_TIMEOUT), -1))
         } finally {
             real.edit().clear().commit()
+            KeyboardProfiles.refreshImeId(real)
+        }
+    }
+
+    // re-review 2026-10-07: the settings values built by the listeners during Discard's edit read the keyboard list
+    // before it was reloaded (still with the changed keyboard): a plain built-in keyboard in use wasn't in it, and the
+    // values were the first keyboard's (its second languages, popup keys, number row) until the next text field
+    @Test fun settingsValuesAfterDiscardAreTheKeyboardInUse() {
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        val real = ctx.realPrefs()
+        real.edit().clear().commit()
+        val first = SettingsSubtype(java.util.Locale.GERMANY, "")
+            .with(helium314.keyboard.latin.common.Constants.Subtype.ExtraValue.SECONDARY_LOCALES, "fr")
+        val a = helium314.keyboard.latin.utils.SubtypeSettings.getResourceSubtypesForLocale(java.util.Locale.US).first()
+            .toSettingsSubtype() // a plain built-in keyboard
+        val changed = a.withLayout(LayoutType.MAIN, "dvorak")
+        try {
+            real.edit().putBoolean("separate_settings_per_keyboard", true)
+                .putString(Settings.PREF_ADDITIONAL_SUBTYPES, first.toPref())
+                .putString(Settings.PREF_ENABLED_SUBTYPES, helium314.keyboard.latin.utils.SubtypeSettings.createPrefSubtypes(listOf(first, a)))
+                .putString(Settings.PREF_SELECTED_SUBTYPE, a.toPref()).commit()
+            helium314.keyboard.latin.utils.SubtypeSettings.reloadEnabledSubtypes(ctx)
+            Settings.init(ctx)
+            Settings.getInstance().loadSettings(ctx, java.util.Locale.US,
+                helium314.keyboard.latin.InputAttributes(android.view.inputmethod.EditorInfo(), false, ctx.packageName))
+            assertTrue(Settings.getValues().mSecondaryLocales.isEmpty())
+
+            val draft = LayoutDraft.of(ctx, a.toPref())
+            SubtypeUtilsAdditional.changeAdditionalSubtype(a, changed, ctx) // (the preview is on it: it's the one in use)
+            draft.reject(ctx) // Discard
+            assertEquals(a.toPref(), real.getString(Settings.PREF_SELECTED_SUBTYPE, null))
+            assertEquals("the first keyboard's second languages", emptyList<java.util.Locale>(), Settings.getValues().mSecondaryLocales)
+        } finally {
+            real.edit().clear().commit()
+            helium314.keyboard.latin.utils.SubtypeSettings.reloadEnabledSubtypes(ctx)
             KeyboardProfiles.refreshImeId(real)
         }
     }
