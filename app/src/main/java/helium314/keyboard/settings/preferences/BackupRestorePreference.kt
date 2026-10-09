@@ -511,6 +511,10 @@ internal fun restoredSettings(ctx: Context, backup: Map<String, Any?>, keyboard:
         else helium314.keyboard.latin.withHeliBoardPins(ctx, values)
 }
 
+/** Restores [keyboards] from the backup [file] as the restore dialog does when not every keyboard is chosen (tests). */
+internal fun restoreKeyboardsFrom(ctx: Context, file: File, keyboards: List<SettingsSubtype>, withSettings: Boolean) =
+    restoreKeyboards(ctx, readBackup(file), keyboards, withSettings)
+
 private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List<SettingsSubtype>, withSettings: Boolean) {
     val real = ctx.realPrefs()
     val prefs = ctx.prefs()
@@ -660,7 +664,7 @@ private fun readJsonLinesToMap(list: List<String>): Map<String, Any?> {
     return map
 }
 
-private fun settingsToJsonStream(settings: Map<String?, Any?>, out: OutputStream) {
+internal fun settingsToJsonStream(settings: Map<String?, Any?>, out: OutputStream) {
     val booleans = settings.filter { it.key is String && it.value is Boolean } as Map<String, Boolean>
     val ints = settings.filter { it.key is String && it.value is Int } as Map<String, Int>
     val longs = settings.filter { it.key is String && it.value is Long } as Map<String, Long>

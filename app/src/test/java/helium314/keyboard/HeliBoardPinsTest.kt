@@ -11,6 +11,7 @@ import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
+import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.settings.LayoutPresets
 import org.junit.After
 import org.junit.Before
@@ -94,5 +95,35 @@ class HeliBoardPinsTest {
         assertEquals(null, helium314.keyboard.settings.preferences.restoredSettings(ctx, since, keyboard)[Settings.PREF_KEY_LONGPRESS_TIMEOUT])
         val curmudgeon = backup + (sel to ctx.getString(R.string.layout_preset_curmudgeon))
         assertEquals(null, helium314.keyboard.settings.preferences.restoredSettings(ctx, curmudgeon, keyboard)[Settings.PREF_KEY_LONGPRESS_TIMEOUT])
+    }
+
+    // the same through the restore itself, onto a phone with separate settings off (the restore turns them on), down
+    // to what the Layouts row shows
+    @Test fun `a 0_3_008 HeliBoard keyboard restored on its own reads HeliBoard's values and its Layouts row is not unsaved`() {
+        val keyboard = SettingsSubtype(Locale.US, "")
+        val heliName = ctx.getString(R.string.layout_preset_heliboard)
+        val zip = java.io.File(ctx.cacheDir, "backup-3008.zip")
+        java.util.zip.ZipOutputStream(zip.outputStream()).use { z ->
+            z.putNextEntry(java.util.zip.ZipEntry("preferences.json"))
+            // what 0.3.008 stored for it: the HeliBoard Layout's named keys (the five later-pinned ones not at all)
+            val stored: Map<String?, Any?> = (heli().values - heliBoardPins().keys) + mapOf(sel to heliName,
+                helium314.keyboard.latin.PICKED_ONLY_DONE to true, Settings.PREF_VERSION_CODE to 3008,
+                Settings.PREF_ENABLED_SUBTYPES to keyboard.toPref())
+            helium314.keyboard.settings.preferences.settingsToJsonStream(stored, z)
+            z.closeEntry()
+        }
+        assertFalse(KeyboardProfiles.isSeparate(real))
+        helium314.keyboard.settings.preferences.restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true)
+        val id = KeyboardProfiles.idFor(real, keyboard)
+        assertEquals(300, real.all[KeyboardProfiles.prefixedKey(id, Settings.PREF_KEY_LONGPRESS_TIMEOUT)], "${real.all}")
+        // (outside an activity the view reads the keyboard in use: this one)
+        real.edit { putString(Settings.PREF_SELECTED_SUBTYPE, keyboard.toPref()) }
+        KeyboardProfiles.refreshImeId(real)
+        try {
+            assertEquals(300, ctx.prefs().getInt(Settings.PREF_KEY_LONGPRESS_TIMEOUT, -1))
+            val now = ctx.prefs().all
+            assertFalse(LayoutPresets.isTweaked(ctx, keyboard, heli()), "the Layouts row would say unsaved: " +
+                heli().values.filter { (k, v) -> !helium314.keyboard.settings.KnownDefaults.same(k, now[k], v) }.keys)
+        } finally { real.edit().clear().commit(); KeyboardProfiles.refreshImeId(real); zip.delete() }
     }
 }
