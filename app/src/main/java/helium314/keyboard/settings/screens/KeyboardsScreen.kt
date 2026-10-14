@@ -299,7 +299,9 @@ fun KeyboardsScreen(
                 },
                 title = { Text(stringResource(R.string.add_keyboard)) },
                 // copies of the keyboards first, then a new keyboard for any language
-                items = enabledNow.map { CopyOf(it) } + SubtypeSettings.getAvailableSubtypeLocales().sortedBy { it.localizedDisplayName(ctx.resources) },
+                // (without advanced only languages with a dictionary, built in, added or to download; 2026-10-10)
+                items = enabledNow.map { CopyOf(it) } + SubtypeSettings.getAvailableSubtypeLocales()
+                    .filter { advanced || dictionaryAvailable(ctx, it) }.sortedBy { it.localizedDisplayName(ctx.resources) },
                 getItemName = { if (it is CopyOf) stringResource(R.string.copy_of_keyboard, keyboardName(it.keyboard, ctx)) else (it as Locale).localizedDisplayName(ctx.resources) },
                 showRadioButtons = false,
             )

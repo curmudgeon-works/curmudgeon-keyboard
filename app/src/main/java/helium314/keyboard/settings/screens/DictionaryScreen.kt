@@ -134,6 +134,12 @@ fun DictionaryScreen(
 }
 
 /** @return list of user dictionary files and whether an internal dictionary exists */
+/** Whether [locale] has a dictionary here (built in or added) or one to download ([OnDemandDictionaries]). */
+fun dictionaryAvailable(context: Context, locale: Locale): Boolean {
+    val (dicts, hasInternal) = getUserAndInternalDictionaries(context, locale)
+    return hasInternal || dicts.isNotEmpty() || helium314.keyboard.latin.utils.OnDemandDictionaries.forLocale(context, locale) != null
+}
+
 fun getUserAndInternalDictionaries(context: Context, locale: Locale): Pair<List<File>, Boolean> {
     val userDicts = mutableListOf<File>()
     var hasInternalDict = false

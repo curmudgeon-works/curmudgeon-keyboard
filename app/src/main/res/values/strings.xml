@@ -582,6 +582,10 @@
     <string name="delete_keyboard_message">\"%s\" will be removed, with its languages, their priorities and its layout choice. This cannot be undone. Its learned and blacklisted words are deleted too. Dictionaries are kept.</string>
     <!-- Asked once when a keyboard is added (2026-10-10). %s: the new keyboard's name -->
     <!-- Add keyboard dialog: title, %s = the new keyboard's name -->
+    <!-- A link in the dictionary dialogs: download our dictionary for the language. %1$s = language, %2$s = size (e.g. "4.9 MB") -->
+    <string name="dictionary_get_ours">Get the %1$s dictionary from curmudgeon.works (%2$s)</string>
+    <!-- Welcome wizard, last step: heading over links to download dictionaries for the phone's languages -->
+    <string name="setup_dictionaries_title">Dictionaries for your languages</string>
     <string name="add_keyboard_dialog_title">Add %s</string>
     <!-- Add keyboard dialog: the button that adds it -->
     <string name="add_keyboard_button">Add</string>

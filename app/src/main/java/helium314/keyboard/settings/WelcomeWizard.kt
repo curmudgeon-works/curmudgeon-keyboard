@@ -183,6 +183,7 @@ private fun WelcomeWizardSteps(
                         painterResource(R.drawable.sym_keyboard_language_switch),
                         close
                     )
+                    DictionaryDownloads(stepBackgroundColor, textColor)
                     Spacer(Modifier.height(4.dp))
                     Row(
                         Modifier.clickable { finish() }
@@ -265,6 +266,36 @@ private fun WidePreview() {
     Theme(previewDark) {
         Surface {
             WelcomeWizard({}) {  }
+        }
+    }
+}
+
+/**
+ * In the last step: the phone's languages that have a dictionary to download and none here yet, each a link to it
+ * (owner 2026-10-10: "Should think about making downloads a part of keyboard onboarding flow"). Nothing when there are none.
+ */
+@Composable
+private fun DictionaryDownloads(background: androidx.compose.ui.graphics.Color, textColor: androidx.compose.ui.graphics.Color) {
+    val ctx = LocalContext.current
+    val downloads = androidx.compose.runtime.remember {
+        val system = androidx.core.os.ConfigurationCompat.getLocales(android.content.res.Resources.getSystem().configuration)
+        (0 until system.size()).mapNotNull { system[it] }
+            .filter { !helium314.keyboard.settings.screens.getUserAndInternalDictionaries(ctx, it).let { (own, internal) -> internal || own.isNotEmpty() } }
+            .mapNotNull { locale -> helium314.keyboard.latin.utils.OnDemandDictionaries.forLocale(ctx, locale)?.let { locale to it } }
+            .distinctBy { it.second.tag }
+    }
+    if (downloads.isEmpty()) return
+    Spacer(Modifier.height(4.dp))
+    Column(Modifier.background(color = background).padding(16.dp)) {
+        Text(stringResource(R.string.setup_dictionaries_title))
+        for ((locale, entry) in downloads) {
+            val label = stringResource(R.string.dictionary_get_ours, entry.name,
+                android.text.format.Formatter.formatShortFileSize(ctx, entry.bytes))
+            Text(label, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(top = 8.dp).clickable {
+                    runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW,
+                        android.net.Uri.parse(helium314.keyboard.latin.utils.OnDemandDictionaries.pageFor(locale)))) }
+                })
         }
     }
 }

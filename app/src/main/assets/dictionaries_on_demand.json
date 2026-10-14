@@ -1,0 +1,121 @@
+[
+ {
+  "tag": "ar",
+  "name": "Arabic",
+  "file": "main_ar.dict",
+  "bytes": 4900240,
+  "licence": "CC BY 4.0"
+ },
+ {
+  "tag": "ca",
+  "name": "Catalan",
+  "file": "main_ca.dict",
+  "bytes": 1934126,
+  "licence": "CC BY 4.0"
+ },
+ {
+  "tag": "hr",
+  "name": "Croatian",
+  "file": "main_hr.dict",
+  "bytes": 5796939,
+  "licence": "CC BY 4.0"
+ },
+ {
+  "tag": "cs",
+  "name": "Czech",
+  "file": "main_cs.dict",
+  "bytes": 16462605,
+  "licence": "CC BY 4.0"
+ },
+ {
+  "tag": "da",
+  "name": "Danish",
+  "file": "main_da.dict",
+  "bytes": 9431163,
+  "licence": "CC BY 4.0"
+ },
+ {
+  "tag": "en-CA",
+  "name": "English (Canada)",
+  "file": "main_en-CA.dict",
+  "bytes": 1593347,
+  "licence": "CC BY 4.0"
+ },
+ {
+  "tag": "et",
+  "name": "Estonian",
+  "file": "main_et.dict",
+  "bytes": 5470621,
+  "licence": "CC BY 4.0"
+ },
+ {
+  "tag": "fi",
+  "name": "Finnish",
+  "file": "main_fi.dict",
+  "bytes": 2787357,
+  "licence": "CC BY 4.0"
+ },
+ {
+  "tag": "hi",
+  "name": "Hindi",
+  "file": "main_hi.dict",
+  "bytes": 2340536,
+  "licence": "CC BY 4.0"
+ },
+ {
+  "tag": "id",
+  "name": "Indonesian",
+  "file": "main_id.dict",
+  "bytes": 1730052,
+  "licence": "CC BY 4.0"
+ },
+ {
+  "tag": "lv",
+  "name": "Latvian",
+  "file": "main_lv.dict",
+  "bytes": 2695180,
+  "licence": "CC BY 4.0"
+ },
+ {
+  "tag": "lt",
+  "name": "Lithuanian",
+  "file": "main_lt.dict",
+  "bytes": 3312970,
+  "licence": "CC BY 4.0"
+ },
+ {
+  "tag": "nb",
+  "name": "Norwegian Bokmål",
+  "file": "main_nb.dict",
+  "bytes": 7582271,
+  "licence": "CC BY 4.0"
+ },
+ {
+  "tag": "fa",
+  "name": "Persian",
+  "file": "main_fa.dict",
+  "bytes": 12746117,
+  "licence": "CC BY 4.0"
+ },
+ {
+  "tag": "sl",
+  "name": "Slovenian",
+  "file": "main_sl.dict",
+  "bytes": 6006086,
+  "licence": "CC BY 4.0"
+ },
+ {
+  "tag": "th",
+  "name": "Thai",
+  "file": "main_th.dict",
+  "bytes": 1127911,
+  "licence": "CC0 1.0"
+ },
+ {
+  "tag": "uk",
+  "name": "Ukrainian",
+  "file": "main_uk.dict",
+  "bytes": 12727554,
+  "licence": "CC BY 4.0"
+ }
+]

@@ -61,6 +61,11 @@ class App : Application() {
         val scope = CoroutineScope(Dispatchers.Default)
         scope.launch { // do some uncritical work in background for faster startup
             SupportedEmojis.load(this@App)
+            // an extracted dictionary of a language no longer built in (Hindi since 2026-10-10) becomes the user's own
+            // copy: the update itself may not clear extracted dictionaries, and only own copies count as a dictionary
+            helium314.keyboard.latin.utils.DictionaryInfoUtils.getCacheDirectories(this@App).forEach { dir ->
+                dir.listFiles()?.forEach { runCatching { helium314.keyboard.latin.keepUnbundledMainDict(this@App, dir, it) } }
+            }
             LayoutUtilsCustom.removeMissingLayouts(this@App)
             // (can't fail for the app itself on a phone; in unit tests this job outlives its test, and the next test's
             // package manager doesn't know the package: the exception landed in that test as a flaky failure)

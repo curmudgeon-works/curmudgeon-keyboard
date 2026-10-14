@@ -68,7 +68,12 @@ fun MissingDictionaryDialog(onDismissRequest: () -> Unit, locale: Locale) {
 @Composable
 fun createDictionaryTextAnnotated(locale: Locale): AnnotatedString {
     val context = LocalContext.current
-    val knownDicts = getKnownDictionariesForLocale(locale, context)
+    // ours first: a download from curmudgeon.works (2026-10-10)
+    val ours = OnDemandDictionaries.forLocale(context, locale)?.let {
+        context.getString(R.string.dictionary_get_ours, it.name, android.text.format.Formatter.formatShortFileSize(context, it.bytes)) to
+            OnDemandDictionaries.pageFor(locale)
+    }
+    val knownDicts = listOfNotNull(ours) + getKnownDictionariesForLocale(locale, context)
     if (knownDicts.isEmpty()) return AnnotatedString("")
     val knownDictLinks = knownDicts.map { (name, link) ->
         "<li>${name.withHtmlLink(link)}</li>"

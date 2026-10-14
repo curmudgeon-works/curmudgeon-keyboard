@@ -388,6 +388,20 @@ fun transferOldPinnedClips(context: Context) {
     }
 }
 
+/**
+ * An extracted main dictionary whose language the app no longer has built in (Hindi, on-demand since 2026-10-10): it
+ * becomes the user's own copy instead of going, else that keyboard lost its dictionary with the update. True if kept.
+ */
+internal fun keepUnbundledMainDict(context: Context, dir: java.io.File, file: java.io.File): Boolean {
+    if (file.name != DictionaryInfoUtils.MAIN_DICT_FILE_NAME) return false
+    val locale = DictionaryInfoUtils.getWordListIdFromFileName(dir.name).constructLocale()
+    val bundled = DictionaryInfoUtils.getAssetsDictionaryList(context).orEmpty().filter { it.startsWith(DictionaryInfoUtils.MAIN_DICT_PREFIX) }
+    if (helium314.keyboard.latin.common.LocaleUtils.getBestMatch(locale, bundled) { DictionaryInfoUtils.extractLocaleFromAssetsDictionaryFile(it) } != null)
+        return false
+    val own = java.io.File(dir, DictionaryInfoUtils.MAIN_DICT_PREFIX + USER_DICTIONARY_SUFFIX)
+    return !own.exists() && file.renameTo(own)
+}
+
 private object AppUpgrade {
     fun onUpgrade(context: Context) {
         val prefs = context.prefs()
@@ -396,7 +410,7 @@ private object AppUpgrade {
         DictionaryInfoUtils.getCacheDirectories(context).forEach {
             for (file in it.listFiles()!!) {
                 if (!file.name.endsWith(USER_DICTIONARY_SUFFIX))
-                    file.delete()
+                    if (!keepUnbundledMainDict(context, it, file)) file.delete()
             }
         }
         if (oldVersion <= 1000) { // upgrade old custom layouts name
