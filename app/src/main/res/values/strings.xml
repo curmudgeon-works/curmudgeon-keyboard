@@ -327,6 +327,9 @@
     <string name="backup_error">Backup error: %s</string>
     <!-- Error message for restore, %s is replaced by the error message -->
     <string name="restore_error">Error restoring the backup: %s</string>
+    <!-- Error message when the full restore's check of the backup, before it deletes anything, fails: nothing was
+         deleted (owner 2026-10-12: "Yes, check backup before wipe") -->
+    <string name="restore_unreadable">This backup can\'t be read; nothing was changed.</string>
     <!-- backup button -->
     <string name="button_backup">Backup</string>
     <!-- restore button -->

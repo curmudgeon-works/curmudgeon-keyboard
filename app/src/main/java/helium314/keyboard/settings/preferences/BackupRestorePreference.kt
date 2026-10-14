@@ -147,6 +147,8 @@ fun BackupRestorePreference(setting: Setting) {
         InfoDialog(
             if (error!!.startsWith("b"))
                 stringResource(R.string.backup_error, error!!.drop(1))
+            // (the full restore found the backup unreadable before it deleted anything, owner 2026-10-12)
+            else if (error!!.startsWith("u")) stringResource(R.string.restore_unreadable)
             else stringResource(R.string.restore_error, error!!.drop(1))
         ) { error = null }
     }
@@ -520,7 +522,8 @@ private fun RestoreChoiceDialog(pending: PendingRestore, plan: RestorePlan, onDi
             confirmButtonText = stringResource(R.string.restore_delete_and_restore),
             onConfirmed = {
                 started = runRestore(ctx, onError, R.string.backup_restored, restoreSteps(pending)) {
-                    try { restoreEverything(ctx, pending.file) } finally { pending.file.delete() }
+                    // (checked whole against what this dialog showed before anything is deleted, owner 2026-10-12)
+                    try { restoreEverything(ctx, pending.file, promised = pending) } finally { pending.file.delete() }
                 }
                 close()
             },
@@ -805,14 +808,21 @@ internal fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: In
     val app = ctx.applicationContext
     ExecutorUtils.getBackgroundExecutor(ExecutorUtils.KEYBOARD).execute {
         var failure: String? = null
+        // the full restore's check found the backup unreadable before anything was deleted (owner 2026-10-12: "Yes,
+        // check backup before wipe"): nothing to follow up or refresh
+        var unchanged = false
         try {
             work()
+        } catch (t: UnreadableBackupException) {
+            failure = "u"
+            unchanged = true
+            Log.w("AdvancedScreen", "backup unreadable, nothing restored", t)
         } catch (t: Throwable) {
             failure = "r" + t.message
             Log.w("AdvancedScreen", "error during restore", t)
         }
         // (after a failure too, as before: what was restored by then is followed up)
-        try {
+        if (!unchanged) try {
             helium314.keyboard.latin.gesture.GestureStats.reload() // (its cached rows would come back over the restored ones)
             restoreFollowUp(ctx)
             transferOldPinnedClips(ctx)
@@ -822,7 +832,7 @@ internal fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: In
         BackupRestoreJob.step() // (the settings)
         BackupRestoreJob.post {
             try {
-                restoreRefresh(ctx)
+                if (!unchanged) restoreRefresh(ctx)
             } catch (t: Throwable) {
                 Log.w("AdvancedScreen", "error refreshing after restore", t)
             } finally {
@@ -874,14 +884,63 @@ private fun restoreRefresh(ctx: Context) {
 
 /** The whole backup replaces everything, as before; a backup from before each keyboard had its own learned words is
  *  then updated as the phone was (2026-10-10). */
-private fun restoreEverything(ctx: Context, file: File) = LearnedKeyboards.withFiles {
-    replaceEverything(ctx, file)
+private fun restoreEverything(ctx: Context, file: File, promised: PendingRestore? = null) = LearnedKeyboards.withFiles {
+    replaceEverything(ctx, file, promised)
     // (a backup from before the keyboards had ids: ids first, so the learned words' update finds each keyboard by its own)
     helium314.keyboard.latin.settings.KeyboardIdUpgrade.upgrade(ctx)
     LearnedKeyboards.updateOnce(ctx)
 }
 
-private fun replaceEverything(ctx: Context, file: File) = keepingPhoneChoices(ctx) {
+/** [promised]: what the restore dialog showed of [file] (null: no dialog, tests), checked with the rest before the wipe
+ *  ([checkFullBackup]). */
+private fun replaceEverything(ctx: Context, file: File, promised: PendingRestore?) {
+    checkFullBackup(file, promised) // (throws, nothing deleted)
+    replaceEverythingChecked(ctx, file)
+}
+
+/**
+ * Reads the whole backup [file] once, writing nothing, before the full restore deletes anything (owner 2026-10-12: "Yes,
+ * check backup before wipe"; there is no safety copy of the device's data): the zip opens and lists its entries (the
+ * list is at the zip's end, so a file cut short has none), every entry reads to its end through the restore's own reader
+ * (which checks each entry's CRC) and they are the ones listed, the settings lines parse, and it has a settings file and
+ * what the restore dialog showed ([promised]: its entries and its keyboards). Throws [UnreadableBackupException].
+ * (The protected settings and the personal dictionary words aren't parsed: the restore never fails over those.)
+ */
+private fun checkFullBackup(file: File, promised: PendingRestore?) {
+    try {
+        val listed = java.util.zip.ZipFile(file).use { z -> z.entries().asSequence().map { it.name }.toSet() }
+        val read = mutableSetOf<String>()
+        var prefs: Map<String, Any?>? = null
+        ZipInputStream(FileInputStream(file)).use { zip ->
+            val sink = ByteArray(8192)
+            var entry: ZipEntry? = zip.nextEntry
+            while (entry != null) {
+                read.add(entry.name)
+                if (entry.name == PREFS_FILE_NAME) prefs = readJsonLinesToMap(String(zip.readBytes()).split("\n"), strict = true)
+                else while (zip.read(sink) >= 0) { }
+                zip.closeEntry()
+                entry = zip.nextEntry
+            }
+        }
+        if (read != listed) throw UnreadableBackupException("entries not readable: ${listed - read}")
+        val settings = prefs ?: throw UnreadableBackupException("no settings file")
+        if (promised != null) {
+            if (!read.containsAll(promised.entries)) throw UnreadableBackupException("entries missing: ${promised.entries - read}")
+            // (by language: a backup from before the keyboards had ids gets fresh ids on each read)
+            val keyboards = pendingOf(file, settings, read).keyboards
+            if (keyboards.map { it.locale } != promised.keyboards.map { it.locale }) throw UnreadableBackupException("keyboards differ")
+        }
+    } catch (e: UnreadableBackupException) {
+        throw e
+    } catch (t: Throwable) {
+        throw UnreadableBackupException(t.toString(), t)
+    }
+}
+
+/** The full restore found its backup unreadable before deleting anything ([checkFullBackup]): nothing was changed. */
+internal class UnreadableBackupException(message: String, cause: Throwable? = null) : Exception(message, cause)
+
+private fun replaceEverythingChecked(ctx: Context, file: File) = keepingPhoneChoices(ctx) {
     val restoredDb = ctx.getDatabasePath(Database.NAME + "_restored")
     ZipInputStream(FileInputStream(file)).use { zip ->
         var entry: ZipEntry? = zip.nextEntry
@@ -1579,6 +1638,11 @@ private fun readBackup(file: File): PendingRestore {
             entry = zip.nextEntry
         }
     }
+    return pendingOf(file, prefs, entries)
+}
+
+/** The backup [file] as read: its preferences [prefs] and the names of its [entries]. */
+private fun pendingOf(file: File, prefs: Map<String, Any?>, entries: Set<String>): PendingRestore {
     // a backup from before the keyboards had ids: its keyboards get fresh ones here, their sets found by its own old map
     // (owner 2026-10-11: "don't care about ... past backups at this point", crude)
     val upgraded = HashMap(prefs)
@@ -1587,19 +1651,27 @@ private fun readBackup(file: File): PendingRestore {
     return PendingRestore(file, upgraded, keyboards, entries, renames)
 }
 
-private fun readJsonLinesToMap(list: List<String>): Map<String, Any?> {
+/** [strict]: a line that is neither a type's heading nor the settings under one throws, and so does a file without any
+ *  heading (the full restore's check, owner 2026-10-12: "the settings lines parse"). */
+private fun readJsonLinesToMap(list: List<String>, strict: Boolean = false): Map<String, Any?> {
     val map = HashMap<String, Any?>()
     val i = list.iterator()
+    var headings = 0
     while (i.hasNext()) {
-        when (i.next()) {
+        val line = i.next()
+        val known = when (line) {
             "boolean settings" -> map.putAll(Json.decodeFromString<Map<String, Boolean>>(i.next()))
             "int settings" -> map.putAll(Json.decodeFromString<Map<String, Int>>(i.next()))
             "long settings" -> map.putAll(Json.decodeFromString<Map<String, Long>>(i.next()))
             "float settings" -> map.putAll(Json.decodeFromString<Map<String, Float>>(i.next()))
             "string settings" -> map.putAll(Json.decodeFromString<Map<String, String>>(i.next()))
             "string set settings" -> map.putAll(Json.decodeFromString<Map<String, Set<String>>>(i.next()))
-        }
+            else -> null
+        } != null
+        if (known) headings++
+        else if (strict && line.isNotBlank()) throw IllegalArgumentException("not a settings line: ${line.take(40)}")
     }
+    if (strict && headings == 0) throw IllegalArgumentException("no settings in the settings file")
     return map
 }
 
