@@ -12,6 +12,7 @@ import helium314.keyboard.latin.utils.FoldableUtils
 import helium314.keyboard.latin.utils.LayoutUtilsCustom
 import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.SubtypeSettings
+import helium314.keyboard.latin.utils.locale
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.upgradeToolbarPrefs
 import kotlinx.coroutines.CoroutineScope
@@ -96,6 +97,15 @@ class App : Application() {
         transferOldPinnedClips(this) // todo: remove in a few months, maybe end 2026
         app = this
         Defaults.initDynamicDefaults(this)
+        // the swipe lists of the keyboards' languages that have none yet (a fresh install): built now in the background,
+        // so they're ready by the end of the setup (owner 2026-10-14: "Yes, option A"). Not under the unit tests: every
+        // test starts the app, and a build running on would write into the next tests' dictionary folders
+        if (Build.FINGERPRINT != "robolectric" && prefs().getBoolean(Settings.PREF_GESTURE_INPUT, Defaults.PREF_GESTURE_INPUT))
+            CoroutineScope(Dispatchers.Default).launch {
+                val locales = SubtypeSettings.getEnabledSubtypes().flatMap { subtype ->
+                    listOf(subtype.locale()) + helium314.keyboard.latin.utils.getSecondaryLocales(subtype.extraValue) }
+                helium314.keyboard.latin.gesture.GestureDecoderVocabulary.buildMissingLists(this@App, locales)
+            }
     }
 
     companion object {

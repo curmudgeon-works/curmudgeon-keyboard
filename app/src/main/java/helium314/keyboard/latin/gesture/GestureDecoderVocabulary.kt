@@ -282,6 +282,20 @@ object GestureDecoderVocabulary {
         return null
     }
 
+    /**
+     * At the app's start (owner 2026-10-14, the first-start lag: "Yes, option A"): each of [locales] without a saved swipe
+     * list gets it built now, in the background, by the same build as a swipe asks for ([getOrBuildAsync]; its bundled
+     * dictionary extracted under the one lock, DictionaryInfoUtils.extractAssetsDictionary), so the list is ready by the
+     * end of the setup instead of the first swipes waiting for the whole dictionary to be walked. A saved list (even an
+     * outdated one) is left to the keyboard's own start. Returns the languages started ([start]: tests).
+     */
+    fun buildMissingLists(context: Context, locales: Collection<Locale>, start: (Locale) -> Unit = { getOrBuildAsync(it) }): List<Locale> {
+        val dir = File(context.filesDir, CACHE_DIR)
+        val missing = locales.distinct().filter { !File(dir, "${it.toLanguageTag()}.txt").isFile }
+        missing.forEach(start)
+        return missing
+    }
+
     private fun startBuild(locale: Locale, key: String) {
         if (!buildAllowed(key)) return
         if (building.add(key)) {
@@ -739,7 +753,7 @@ object GestureDecoderVocabulary {
     }
 
     /** How many words a dictionary has ([total]) and how many of them a swipe could use ([usable]). */
-    private class DictCounts(val total: Int, val usable: Int)
+    internal class DictCounts(val total: Int, val usable: Int)
 
     /**
      * Once per language (2026-10-06): the full dictionary's size next to the [MAX_WORDS] the swipe list keeps, in the
@@ -747,14 +761,18 @@ object GestureDecoderVocabulary {
      * whole dictionary, which only a rebuild does otherwise. Runs on the language's build thread after its list is
      * served, so no swipe waits for it.
      */
-    private fun logDictionarySizeOnce(cacheFile: File, key: String, count: () -> DictCounts?) {
+    @androidx.annotation.VisibleForTesting
+    internal fun logDictionarySizeOnce(cacheFile: File, key: String, count: () -> DictCounts?) {
         val marker = File(cacheFile.parentFile, "$key.size")
         if (marker.exists()) return
         val counts = try { count() } catch (t: Throwable) { Log.w(TAG, "could not count the dictionary for $key", t); null } ?: return
         val line = "full dictionary for $key: ${counts.total} words, ${counts.usable} usable for swiping; the swipe list keeps the top $MAX_WORDS"
         Log.i(TAG, line)
         logVocab(line)
-        try { marker.writeText("${counts.total}\t${counts.usable}\n") } catch (t: Throwable) { Log.w(TAG, "could not note the dictionary size", t) }
+        // (the folder first: on a fresh install the first build counts before its list is written, and the note failed
+        // with FileNotFoundException, so the full dictionary was walked again on the next start; 2026-10-14)
+        try { marker.parentFile?.mkdirs(); marker.writeText("${counts.total}\t${counts.usable}\n") }
+        catch (t: Throwable) { Log.w(TAG, "could not note the dictionary size", t) }
     }
 
     private fun addWordsFromDict(file: File, locale: Locale, blockOffensive: Boolean, words: MutableMap<String, Int>): DictCounts? {
