@@ -701,7 +701,7 @@
     <string name="dictionary_in_use_users">Used by: %s.</string>
     <!-- opened from the only keyboard using it, another dictionary for the language there -->
     <string name="dictionary_in_use_select_first">To delete it, select another version first.</string>
-    <!-- opened from the only keyboard using it, no other dictionary for the language -->
+    <!-- no other dictionary for the language; shown whichever keyboards use it, one or several -->
     <string name="dictionary_in_use_only_one">It is the only dictionary for this language, so it can\'t be deleted while a keyboard uses the language.</string>
     <!-- the same for a dictionary of another kind than main; %s = the kind, lowercase (e.g. emoji) -->
     <string name="dictionary_in_use_only_one_kind">It is the only %s dictionary for this language, so it can\'t be deleted while a keyboard uses the language.</string>
