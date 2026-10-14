@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.material3.Text
 import helium314.keyboard.latin.settings.SettingsSubtype
 import android.content.Context
+import helium314.keyboard.settings.Setting
 import helium314.keyboard.settings.SettingsMode
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -62,7 +63,10 @@ fun MainSettingsScreen(
         title = keyboardName(keyboard, ctx),
         settings = emptyList(),
         showKeyboardName = false, // (the title is its name)
-        searchAll = true, // a keyboard's main screen, every menu under it: its search finds every setting (owner 2026-10-13, SEARCH-SCOPE)
+        // its search finds its own menu entries only; every setting only from the first screen (owner 2026-10-13: "Keyboard
+        // screen search bar should only search items in that screen too", "Whole app search should only be from the
+        // main screen of Curmedgeon Keyboard Settings")
+        searchSettings = remember(keyboard, advanced) { keyboardMenuSearch(ctx, keyboard) },
     ) {
         Scaffold(contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)) { innerPadding ->
             Column(
@@ -175,14 +179,28 @@ fun deleteKeepersText(ctx: Context, @androidx.annotation.PluralsRes id: Int, key
                       edited: SettingsSubtype? = null): String? =
     keyboardsUsing(ctx, listOf(key), edited) { _, value -> value == name }.let { keepersText(ctx, id, it, userNames(ctx, it)) }
 
+/** [KeyboardSettingsEntries] of the keyboard's own screen, one search result each ([KeyboardSettingsEntries]' only);
+ *  App settings only where the screen shows it (not with separate settings). */
+internal fun keyboardMenuSearch(ctx: Context, keyboard: SettingsSubtype): List<Setting> = listOf(
+    "languages" to R.string.languages_title, "layout" to R.string.settings_screen_preferences,
+    "appearance" to R.string.settings_screen_appearance, "swipe" to R.string.swipe_screen,
+    "correction" to R.string.settings_screen_correction, "advanced" to R.string.settings_screen_advanced,
+).filter { (entry, _) -> entry != "advanced" || !helium314.keyboard.latin.settings.KeyboardProfiles.isSeparate(ctx.realPrefs()) }
+    .map { (entry, title) -> Setting(ctx, "keyboard_menu_$entry", title) {
+    KeyboardSettingsEntries(keyboard, showAdvanced = !helium314.keyboard.latin.settings.KeyboardProfiles.isSeparate(LocalContext.current.realPrefs()), only = entry)
+} }
+
 /** The sections of one keyboard's settings, as menu entries. Used by the keyboard's own screen and inline under the keyboards list.
  *  [setId]: the keyboard set the opened screens edit, asked at the tap (null: this screen's own, see KeyboardScopeContext). */
 @Composable
 fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modifier, showLanguages: Boolean = true,
     showAdvanced: Boolean = true, setId: () -> String? = { null },
     // which menus (with separate settings: a keyboard's own ones, or the shared ones once below the keyboards); null: all
-    groups: ((helium314.keyboard.latin.settings.KeyboardProfiles.Group) -> Boolean)? = null, showRefine: Boolean = false) {
+    groups: ((helium314.keyboard.latin.settings.KeyboardProfiles.Group) -> Boolean)? = null, showRefine: Boolean = false,
+    // one entry only (the keyboard screen's search result, [keyboardMenuSearch]); null: all
+    only: String? = null) {
     fun shows(group: helium314.keyboard.latin.settings.KeyboardProfiles.Group) = groups?.invoke(group) ?: true
+    fun shows(entry: String) = only == null || only == entry
     val ctx = LocalContext.current
     val advanced by SettingsMode.state(ctx)
     // the screen opens with the keyboard in its route: it edits that keyboard for as long as it is there
@@ -190,7 +208,7 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
         ?: SettingsDestination.navigateTo(route, ctx)
     Column(modifier) {
     // this keyboard's languages, layout, dictionaries, popup order ...
-    if (showLanguages) Preference(
+    if (showLanguages && shows("languages")) Preference(
         name = stringResource(R.string.languages_title),
         description = keyboardName(keyboard, ctx),
         onClick = { open(SettingsDestination.withKeyboard(SettingsDestination.Languages, keyboard)) },
@@ -198,25 +216,25 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
     ) { NextScreenIcon() }
     // the keyboard's input settings, popups, number row and hints, layout (on the main screen: the keyboard in use);
     // named Preferences since the Preferences screen's groups moved in
-    if (shows(helium314.keyboard.latin.settings.KeyboardProfiles.Group.LAYOUT)) Preference(
+    if (shows(helium314.keyboard.latin.settings.KeyboardProfiles.Group.LAYOUT) && shows("layout")) Preference(
         name = stringResource(R.string.settings_screen_preferences),
         onClick = { open(SettingsDestination.withKeyboard(SettingsDestination.Subtype, keyboard)) },
         icon = R.drawable.ic_settings_preferences
     ) { NextScreenIcon() }
     // (no Preferences: its input and clipboard history groups are on the Layout screen)
-    if (shows(helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE)) Preference(
+    if (shows(helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE) && shows("appearance")) Preference(
         name = stringResource(R.string.settings_screen_appearance),
         onClick = { open(SettingsDestination.Appearance) },
         icon = R.drawable.ic_settings_appearance
     ) { NextScreenIcon() }
     // gesture typing, the swipe extras and the tuning in one screen
-    if (shows(helium314.keyboard.latin.settings.KeyboardProfiles.Group.SWIPE)) Preference(
+    if (shows(helium314.keyboard.latin.settings.KeyboardProfiles.Group.SWIPE) && shows("swipe")) Preference(
             name = stringResource(R.string.swipe_screen),
             onClick = { open(SettingsDestination.withKeyboard(SettingsDestination.SwipeTuning, keyboard)) },
             icon = R.drawable.ic_settings_gesture
         ) { NextScreenIcon() }
     // (the toolbar is a group on Layout & Typing)
-    if (shows(helium314.keyboard.latin.settings.KeyboardProfiles.Group.TEXT_CORRECTION)) Preference(
+    if (shows(helium314.keyboard.latin.settings.KeyboardProfiles.Group.TEXT_CORRECTION) && shows("correction")) Preference(
         name = stringResource(R.string.settings_screen_correction),
         onClick = { open(SettingsDestination.TextCorrection) },
         icon = R.drawable.ic_settings_correction
@@ -225,14 +243,14 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
     // the settings few need (advanced only): Advanced; app-wide, so with separate settings it's one entry outside the
     // keyboards (AdvancedEntry), not one per keyboard
     // "Fine-tune suggestions" when the keyboard keeps its own (advanced only)
-    if (showRefine) RefineEntry(setId)
+    if (showRefine && only == null) RefineEntry(setId)
     // "Fine-tune learning" under a keyboard that keeps it to itself (with separate settings: [groups] picks this
     // keyboard's own menus); shared, it is once in [AdvancedEntry]
     val real = ctx.realPrefs()
-    if (groups != null && shows(helium314.keyboard.latin.settings.KeyboardProfiles.Group.LEARNING)
+    if (groups != null && only == null && shows(helium314.keyboard.latin.settings.KeyboardProfiles.Group.LEARNING)
             && !helium314.keyboard.latin.settings.KeyboardProfiles.isShared(real, helium314.keyboard.latin.settings.KeyboardProfiles.Group.LEARNING))
         LearningEntry(setId)
-    if (showAdvanced) AdvancedEntry(setId)
+    if (showAdvanced && shows("advanced")) AdvancedEntry(setId)
     }
 }
 

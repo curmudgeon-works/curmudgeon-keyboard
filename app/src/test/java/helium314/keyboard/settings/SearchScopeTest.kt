@@ -8,6 +8,7 @@ import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.screens.clipboardHistoryItems
+import helium314.keyboard.settings.screens.keyboardMenuSearch
 import helium314.keyboard.settings.screens.layoutScreenAdvancedKeys
 import helium314.keyboard.settings.screens.layoutScreenKeys
 import helium314.keyboard.settings.screens.popupSearchRows
@@ -79,5 +80,17 @@ class SearchScopeTest {
         assertEquals(listOf(2 to ".  (Web address)", 2 to "@  (Email)"), popupSearchRows(groups, 1, "") { it })
         assertEquals(listOf(1 to "b"), popupSearchRows(groups, 1, "b") { it })
         assertEquals(listOf(2 to "@  (Email)"), popupSearchRows(groups, 0, "@") { it })
+    }
+
+    // owner 2026-10-13: "Keyboard screen search bar should only search items in that screen too", "Whole app search should
+    // only be from the main screen of Curmedgeon Keyboard Settings"
+    @Test fun `a keyboard's own screen finds its menu entries, not the settings under them`() {
+        val keyboard = helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.ENGLISH, "")
+        val entries = keyboardMenuSearch(ctx, keyboard)
+        assertEquals(listOf(ctx.getString(helium314.keyboard.latin.R.string.settings_screen_appearance)),
+            screenSearch(ctx.getString(helium314.keyboard.latin.R.string.settings_screen_appearance), entries).map { it.title })
+        val autoCap = ctx.getString(helium314.keyboard.latin.R.string.auto_cap)
+        assertTrue(screenSearch(autoCap, entries).isEmpty(), "a setting under a menu found on the keyboard's screen")
+        assertTrue(SettingsActivity.settingsContainer.filter(autoCap).isNotEmpty(), "the first screen's search lost it")
     }
 }
