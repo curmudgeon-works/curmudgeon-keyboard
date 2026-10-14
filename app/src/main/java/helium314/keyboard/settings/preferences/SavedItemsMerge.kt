@@ -22,9 +22,10 @@ import helium314.keyboard.settings.LayoutPresets
  */
 internal object SavedItemsMerge {
     class Renames(val popupSets: Map<String, String>, val layouts: Map<String, String>, val themes: Map<String, String>,
-                  val fonts: Map<String, String> = emptyMap(), val keyLayouts: Map<LayoutType, Map<String, String>> = emptyMap()) {
+                  val fonts: Map<String, String> = emptyMap(), val keyLayouts: Map<LayoutType, Map<String, String>> = emptyMap(),
+                  val palettes: Map<String, String> = emptyMap()) {
         /** A restored keyboard's settings ([values], plain keys) naming its items as they are called on the phone now. */
-        fun apply(values: Map<String, Any?>): Map<String, Any?> = values.mapValues { (key, value) ->
+        fun apply(values: Map<String, Any?>): Map<String, Any?> = RestoredCustomCopies.renamePalettes(values, palettes).mapValues { (key, value) ->
             val map = when (key) {
                 KeyPopupOverrides.PREF_SELECTED_SET -> popupSets
                 LayoutPresets.PREF_SELECTED -> layouts
@@ -73,9 +74,12 @@ internal object SavedItemsMerge {
         return generateSequence(2) { it + 1 }.map { "$name $it" }.first { it !in taken }
     }
 
+    /** [keyboards]: the restored keyboards' settings as in the backup (plain keys), [phone]: the phone's stored settings
+     *  without the sets the restore replaces, for the kept palettes' numbers (see [RestoredCustomCopies]). */
     fun merge(ctx: Context, real: SharedPreferences, backup: Map<String, Any?>, asCopies: Boolean,
               fonts: Map<String, String> = emptyMap(), pictures: Map<String, String> = emptyMap(),
-              keyLayouts: Map<LayoutType, Map<String, String>> = emptyMap()): Renames {
+              keyLayouts: Map<LayoutType, Map<String, String>> = emptyMap(),
+              keyboards: Collection<Map<String, Any?>> = emptyList(), phone: Map<String, Any?> = real.all): Renames {
         // the backup's lists, read as the phone reads its own (a scratch store, gone afterwards)
         val scratch = ctx.getSharedPreferences("restore_saved_items", Context.MODE_PRIVATE)
         scratch.edit(commit = true) {
@@ -118,9 +122,14 @@ internal object SavedItemsMerge {
             val builtInThemes = AppearanceLooks.builtIn(ctx).map { it.name }.toSet()
             val phoneThemes = AppearanceLooks.load(real).toMutableList()
             val themeNames = HashMap<String, String>()
-            for (backupLook in AppearanceLooks.load(scratch)) {
-                // (its fonts and pictures named as they came in, before it's compared)
-                val look = AppearanceLooks.Look(backupLook.name, renamedFiles(backupLook.values, fonts, pictures), backupLook.remembered)
+            // kept palette copies ("~custom:N") the phone uses for other colours: the next free number, in the keyboards
+            // and the themes together (review C4)
+            val backupLooks = AppearanceLooks.load(scratch)
+            val palettes = RestoredCustomCopies.paletteRenames(phone, phoneThemes.map { it.values }, keyboards + backupLooks.map { it.values })
+            for (backupLook in backupLooks) {
+                // (its fonts, pictures and kept palettes named as they came in, before it's compared)
+                val look = AppearanceLooks.Look(backupLook.name,
+                    RestoredCustomCopies.renamePalettes(renamedFiles(backupLook.values, fonts, pictures), palettes), backupLook.remembered)
                 phoneThemes.firstOrNull { it.values == look.values }?.let { themeNames[look.name] = it.name; continue }
                 val taken = phoneThemes.map { it.name }.toSet() + builtInThemes
                 if (look.name in taken && !asCopies) { themeNames[look.name] = look.name; continue }
@@ -129,7 +138,7 @@ internal object SavedItemsMerge {
                 themeNames[look.name] = name
             }
             AppearanceLooks.save(real, phoneThemes, now = true)
-            return Renames(setNames, layoutNames, themeNames, fonts, keyLayouts)
+            return Renames(setNames, layoutNames, themeNames, fonts, keyLayouts, palettes)
         } finally {
             scratch.edit(commit = true) { clear() }
         }

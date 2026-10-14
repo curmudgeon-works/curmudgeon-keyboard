@@ -785,8 +785,13 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
     val keyLayouts = if (wanted.isEmpty()) emptyMap() else restoreLayoutFiles(ctx, pending, wanted, chosen)
     val onPhone = chosen.associateWith { keyboard -> LayoutType.entries.fold(keyboard) { kb, type ->
         kb.layoutName(type)?.let { keyLayouts[type]?.get(it) }?.let { kb.withLayout(type, it) } ?: kb } }
-    val renames = if (withSettings) SavedItemsMerge.merge(ctx, real, backup, asCopies, files?.first.orEmpty(), files?.second.orEmpty(), keyLayouts) else null
-    val settings = backupSettings.mapValues { (_, values) -> renames?.apply(values) ?: values }
+    // (their Custom numbers and kept palette copies: the next free ones where the phone's other sets use them, review C4;
+    // the sets of the phone keyboards they replace don't count)
+    val replacing = KeyboardProfiles.idEntries(real).let { ids -> (chosen + onPhone.values).mapNotNull { ids[it.toPref()] } }.toSet() - KeyboardProfiles.SHARED
+    val phone = real.all.filterKeys { KeyboardProfiles.splitOwnKey(it)?.first !in replacing }
+    val renames = if (withSettings) SavedItemsMerge.merge(ctx, real, backup, asCopies, files?.first.orEmpty(), files?.second.orEmpty(), keyLayouts,
+        chosen.map { KeyboardProfiles.effectiveSettingsIn(backup, it) }, phone) else null
+    val settings = RestoredCustomCopies.labels(phone, backupSettings.mapValues { (_, values) -> renames?.apply(values) ?: values })
     if (withSettings && !KeyboardProfiles.isSeparate(real))
         KeyboardProfiles.enable(real, SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }, keepExisting = true)
 
