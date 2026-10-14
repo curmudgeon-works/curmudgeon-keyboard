@@ -198,6 +198,16 @@ class RestoreMergeItemsTest {
         assertEquals("used", dict("fr", "main_user.dict").readText())
     }
 
+    // fail before: a restored keyboard's new dictionary came in unselected, the built-in one the device had selected stayed
+    // in use (owner 2026-10-13: "dictionaries should come and take over")
+    @Test fun `a restored keyboard's new dictionary is selected over a built-in one the device selected`() {
+        real.edit().putString("dict_selected_fr_main", "internal").commit()
+        backup(listOf(frB), entries = mapOf("dicts/fr/main_user.dict" to "backup".toByteArray()))
+        restoreDictionaries(ticked = true)
+        assertEquals("backup", dict("fr", "main_user.dict").readText())
+        assertEquals("main_user.dict", selected("fr"))
+    }
+
     // (passes before too: unticked, the row brought none of these keyboards' dictionaries then either)
     @Test fun `unticked Dictionaries - none for the restored keyboards come in, the device's stays`() {
         dictDir("fr").mkdirs(); dict("fr", "main_user.dict").writeText("device")

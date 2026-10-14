@@ -1512,9 +1512,11 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, plan: Res
         var dictionaries = RestoredDictionaries()
         val restored = restoreKeyboards(ctx, pending, plan, restoring, choice.settings, choice.names, choice.decisions, changing) {
             changing()
-            // (everything unpacked takes over; the other dictionaries' new ones are selected too, over a built-in one)
+            // (everything unpacked takes over; a new one is selected too, over a built-in one the device selected, for a
+            // restored keyboard's language as for the other dictionaries: owner 2026-10-13 "dictionaries should come and
+            // take over")
             dictionaries = restoreDictionaries(ctx, pending.prefs, dictsDir, dictFolders, clashesFor = dictFolders.keys.toSet(),
-                selectNew = dictFolders.keys - backupTags)
+                selectNew = dictFolders.keys.toSet())
             dictsDir.deleteRecursively()
         }
         // (the learned words, the clips and the personal dictionary words change the device too)
