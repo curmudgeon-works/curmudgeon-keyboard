@@ -153,7 +153,12 @@ private val liveDefaultsBefore3008: Map<String, Any> = mapOf(
     // the Curmudgeon Layout's (the default one): undo 50 steps, the emoji key, a 110% bottom row
     Settings.PREF_UNDO_HISTORY_LENGTH to 20,
     Settings.PREF_SHOW_EMOJI_KEY to false,
-) + (0 until 4).associate { createPrefKeyForBooleanSettings(Settings.PREF_BOTTOM_ROW_SCALE_PREFIX, it, 2) to 1f }
+    // and long press 150 ms, backspace speeding up, nothing under the bottom row in portrait (2026-10-10, review M4:
+    // missing here, a phone from 0.3.007 or earlier, or its backup, kept HeliBoard's; landscape was 0 then and now)
+    Settings.PREF_KEY_LONGPRESS_TIMEOUT to 300,
+    Settings.PREF_BACKSPACE_SPEED_UP to false,
+) + (0 until 4).associate { createPrefKeyForBooleanSettings(Settings.PREF_BOTTOM_ROW_SCALE_PREFIX, it, 2) to 1f } +
+    listOf(0, 2).associate { createPrefKeyForBooleanSettings(Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX, it, 2) to 1f }
 
 /** Whether a stored [value] of [key] is at its default: the default now, or the one before 0.3.008 (in the [live]
  *  settings, also those of [liveDefaultsBefore3008]). Long-press ?123 not while the old numpad switch is on

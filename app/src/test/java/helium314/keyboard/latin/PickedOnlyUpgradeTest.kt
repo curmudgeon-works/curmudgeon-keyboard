@@ -160,6 +160,43 @@ class PickedOnlyUpgradeTest {
         for (key in listOf(Settings.PREF_UNDO_HISTORY_LENGTH, Settings.PREF_SHOW_EMOJI_KEY, bottom)) assertFalse(prefs.contains(key), key)
     }
 
+    // review 2026-10-08 M4: a 0.3.007 phone updating straight to now (or restoring a backup from then) kept HeliBoard's
+    // long press, backspace and bottom padding, the defaults written down before 0.3.008 (2026-10-10)
+    @Test fun `long press 300, no backspace speed-up and portrait bottom padding 100 percent follow the defaults from 0_3_007`() {
+        val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
+        fun padding(i: Int) = helium314.keyboard.latin.settings.createPrefKeyForBooleanSettings(Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX, i, 2)
+        val old = mapOf<String, Any>(Settings.PREF_KEY_LONGPRESS_TIMEOUT to 300, Settings.PREF_BACKSPACE_SPEED_UP to false,
+            padding(0) to 1f, padding(1) to 0f, padding(2) to 1f, padding(3) to 0f)
+        fun store(e: SharedPreferences.Editor, key: String, value: Any) =
+            if (value is Int) e.putInt(key, value) else if (value is Boolean) e.putBoolean(key, value) else e.putFloat(key, value as Float)
+        try {
+            // a 0.3.007 phone: every default written down, in the shared set and in keyboard 2's own
+            real.edit().clear().commit()
+            real.edit {
+                putInt(Settings.PREF_VERSION_CODE, 3007)
+                putString("keyboard_profile_ids", """{"en_US:":2}""")
+                for ((key, value) in old) { store(this, key, value); store(this, own(2, key), value) }
+            }
+            checkVersionUpgrade(ctx)
+            for (key in old.keys) {
+                assertFalse(real.contains(key), key)
+                assertFalse(real.contains(own(2, key)), "p2/$key")
+            }
+            for (key in listOf(Settings.PREF_KEY_LONGPRESS_TIMEOUT, Settings.PREF_BACKSPACE_SPEED_UP, padding(0), padding(2)))
+                assertTrue(real.getBoolean(mark(2, key), false), "p2/~$key")
+
+            // a phone that went through 0.3.008: 300 since then is a pick, and stays
+            real.edit().clear().commit()
+            real.edit { putInt(Settings.PREF_VERSION_CODE, 3008); putBoolean(PICKED_ONLY_DONE, true); for ((key, value) in old) store(this, key, value) }
+            checkVersionUpgrade(ctx)
+            for ((key, value) in old.filterKeys { it != padding(1) && it != padding(3) }) assertEquals(value, real.all[key], key)
+        } finally { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
+        // one keyboard restored on its own from a 0.3.007 backup
+        val restored = helium314.keyboard.settings.preferences.restoredSettings(ctx, old,
+            helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.US, ""))
+        for (key in old.keys) assertNull(restored[key], key)
+    }
+
     @Test fun `a theme saves what isn't picked as not set`() {
         val values = AppearanceLooks.snapshot(prefs)
         assertTrue(values.containsKey(Settings.PREF_THEME_KEY_BORDERS))
