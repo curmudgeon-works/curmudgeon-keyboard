@@ -637,6 +637,11 @@
         <item quantity="one">This keyboard keeps its popups, shown as Custom:\n%s</item>
         <item quantity="other">These keyboards keep its popups, shown as Custom:\n%s</item>
     </plurals>
+    <!-- under the list of popup sets: saved sets that couldn't be read (kept aside by the next save); %d = how many -->
+    <plurals name="popup_sets_skipped">
+        <item quantity="one">One saved popup set couldn\'t be read and was set aside.</item>
+        <item quantity="other">%d saved popup sets couldn\'t be read and were set aside.</item>
+    </plurals>
     <string name="key_popups_preset_standard">Curmudgeon</string>
     <string name="key_popups_preset_heliboard">HeliBoard</string>
     <!-- The Layouts that ship with the app (Layout & Typing > Layouts) -->
@@ -814,6 +819,11 @@
         <item quantity="one">This keyboard keeps its settings, shown as Custom. Nothing goes back to the default:\n%s</item>
         <item quantity="other">These keyboards keep its settings, shown as Custom. Nothing goes back to the default:\n%s</item>
     </plurals>
+    <!-- under the list of Layouts: saved Layouts that couldn't be read (kept aside by the next save); %d = how many -->
+    <plurals name="layout_presets_skipped">
+        <item quantity="one">One saved Layout couldn\'t be read and was set aside.</item>
+        <item quantity="other">%d saved Layouts couldn\'t be read and were set aside.</item>
+    </plurals>
     <!-- Layout & Typing: the key arrangement (QWERTY, AZERTY, your own) -->
     <string name="layout_keys">Keys</string>
     <string name="appearance_looks_summary">Built-in themes, and your own: save how the keyboard looks under a name</string>
@@ -827,6 +837,11 @@
     <plurals name="delete_keeps_theme">
         <item quantity="one">This keyboard keeps its colors and look, shown as Custom. Nothing goes back to the default:\n%s</item>
         <item quantity="other">These keyboards keep its colors and look, shown as Custom. Nothing goes back to the default:\n%s</item>
+    </plurals>
+    <!-- under the list of themes: saved themes that couldn't be read (kept aside by the next save); %d = how many -->
+    <plurals name="appearance_looks_skipped">
+        <item quantity="one">One saved theme couldn\'t be read and was set aside.</item>
+        <item quantity="other">%d saved themes couldn\'t be read and were set aside.</item>
     </plurals>
     <!-- the four built-in themes -->
     <string name="theme_preset_dynamic">Dynamic</string>

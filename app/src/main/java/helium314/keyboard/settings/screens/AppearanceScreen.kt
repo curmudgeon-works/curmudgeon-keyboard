@@ -632,6 +632,8 @@ private fun SavedLooksPreference(setting: Setting) {
     val prefs = ctx.prefs()
     var generation by remember { mutableIntStateOf(0) }
     val looks = remember(generation) { AppearanceLooks.load(prefs) }
+    // themes that couldn't be read: said under the list until a save has set them aside (R9 2026-10-11)
+    val skipped = remember(generation) { AppearanceLooks.skipped(prefs) }
     val builtIn = remember { AppearanceLooks.builtIn(ctx) }
     var showList by remember { mutableStateOf(false) }
     // a tap shows the theme on the live keyboard; OK keeps it, Cancel puts back what was set when the list opened
@@ -709,6 +711,8 @@ private fun SavedLooksPreference(setting: Setting) {
             } },
             onItemLongClick = { look -> if (builtIn.none { it === look }) toRename = look },
             footer = {
+                if (skipped > 0) helium314.keyboard.settings.dialogs.SkippedItemsText(
+                    androidx.compose.ui.res.pluralStringResource(R.plurals.appearance_looks_skipped, skipped, skipped))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxWidth().clickable { saveAs = true }
                         .padding(horizontal = 8.dp).heightIn(min = 48.dp)) {

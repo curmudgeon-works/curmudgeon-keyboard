@@ -65,6 +65,7 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -100,6 +101,7 @@ import helium314.keyboard.latin.utils.SubtypeUtilsAdditional
 import helium314.keyboard.settings.dialogs.TextInputDialog
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.dialogs.ListPickerDialog
+import helium314.keyboard.settings.dialogs.SkippedItemsText
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -134,6 +136,8 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
     Column {
         // presets: the generated defaults for every key at once (the user's own per-key edits stay on top)
         val userSets = remember(generation, changed?.value) { KeyPopupOverrides.loadSets(ctx.realPrefs()) }
+        // sets that couldn't be read: said under the list until a save has set them aside (R9 2026-10-11)
+        val skippedSets = remember(generation, changed?.value) { KeyPopupOverrides.skippedSets(ctx.realPrefs()) }
         // a change made while a built-in set is selected is held here until the user names a set for it
         var pendingChange: Pair<String, List<String>?>? by remember { mutableStateOf(null) }
         var showSaveAsDialog by remember { mutableStateOf(false) }
@@ -293,6 +297,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                 onItemLongClick = { p -> p.userName?.let { name -> if (!confirmed) putBack(); confirmed = true; showAccentsDialog = false; setToRename = name } },
                 // the current arrangement (built-in or own, with any changes) as a new set of the user's own
                 footer = {
+                    if (skippedSets > 0) SkippedItemsText(pluralStringResource(R.plurals.popup_sets_skipped, skippedSets, skippedSets))
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp),
                         // (saving keeps what's on the keyboard now, a previewed preset included: that's what gets saved)
                         modifier = Modifier.fillMaxWidth().clickable { confirmed = true; showAccentsDialog = false; pendingChange = null; showSaveAsDialog = true }

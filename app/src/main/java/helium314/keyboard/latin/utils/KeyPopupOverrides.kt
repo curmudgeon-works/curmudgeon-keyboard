@@ -49,24 +49,22 @@ object KeyPopupOverrides {
      *  new set" replaced a same-named set without a word). */
     fun isNewSetName(sets: List<UserSet>, text: String): Boolean = text.isNotBlank() && sets.none { it.name == text.trim() }
 
-    fun loadSets(prefs: SharedPreferences): List<UserSet> {
-        val json = prefs.getString(PREF_SETS, null) ?: return emptyList()
-        return try {
-            val arr = JSONArray(json)
-            List(arr.length()) { i ->
-                val o = arr.getJSONObject(i)
-                val ov = o.getJSONObject("overrides")
-                UserSet(o.getString("name"), o.getString("morePopups"), o.optString("symbolsLayout").ifEmpty { null },
-                    ov.keys().asSequence().associateWith { k -> val a = ov.getJSONArray(k); List(a.length()) { a.getString(it) } },
-                    if (o.has("symbolMap")) o.getString("symbolMap") else null, if (o.has("popupOrder")) o.getString("popupOrder") else null,
-                    o.optJSONArray("atDefault")?.let { a -> (0 until a.length()).map { a.getString(it) }.toSet() } ?: emptySet())
-            }
-        } catch (e: Exception) { emptyList() }
+    fun loadSets(prefs: SharedPreferences): List<UserSet> = helium314.keyboard.settings.readEach(prefs, PREF_SETS, ::readSet).first
+
+    /** How many saved sets couldn't be read (skipped by [loadSets], set aside by the next [saveSets]). */
+    fun skippedSets(prefs: SharedPreferences): Int = helium314.keyboard.settings.readEach(prefs, PREF_SETS, ::readSet).second
+
+    private fun readSet(o: JSONObject): UserSet {
+        val ov = o.getJSONObject("overrides")
+        return UserSet(o.getString("name"), o.getString("morePopups"), o.optString("symbolsLayout").ifEmpty { null },
+            ov.keys().asSequence().associateWith { k -> val a = ov.getJSONArray(k); List(a.length()) { a.getString(it) } },
+            if (o.has("symbolMap")) o.getString("symbolMap") else null, if (o.has("popupOrder")) o.getString("popupOrder") else null,
+            o.optJSONArray("atDefault")?.let { a -> (0 until a.length()).map { a.getString(it) }.toSet() } ?: emptySet())
     }
 
     fun saveSets(prefs: SharedPreferences, sets: List<UserSet>) {
-        // (a list that can't be read loaded as empty: kept aside first, as saved Layouts and themes do; 2026-10-11)
-        helium314.keyboard.settings.keepBrokenAside(prefs, PREF_SETS)
+        // (a list, or a set in it, that can't be read: kept aside first, as saved Layouts and themes do; 2026-10-11)
+        helium314.keyboard.settings.keepBrokenAside(prefs, PREF_SETS, ::readSet)
         val arr = JSONArray()
         for (set in sets) arr.put(JSONObject().apply {
             put("name", set.name); put("morePopups", set.morePopups); put("symbolsLayout", set.symbolsLayout ?: "")

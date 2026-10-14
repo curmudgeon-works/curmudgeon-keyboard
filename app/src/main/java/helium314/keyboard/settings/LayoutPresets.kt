@@ -244,18 +244,16 @@ object LayoutPresets {
             preset.values.filterKeys { it.startsWith(LAYOUT) && !it.startsWith(LAYOUT_TEXT) }
     }
 
-    fun load(prefs: SharedPreferences): List<Preset> {
-        val json = prefs.getString(PREF, null) ?: return emptyList()
-        return runCatching {
-            val arr = JSONArray(json)
-            (0 until arr.length()).map { i ->
-                val o = arr.getJSONObject(i)
-                val v = o.getJSONObject("values")
-                Preset(o.getString("name"), sizeKeys + v.keys().asSequence().associateWith { key ->
-                    v.getJSONObject(key).let { if (it.has("d")) null else AppearanceLooks.fromJson(it) } },
-                    remembered = AppearanceLooks.rememberedIn(v))
-            }
-        }.getOrDefault(emptyList())
+    fun load(prefs: SharedPreferences): List<Preset> = readEach(prefs, PREF, ::read).first
+
+    /** How many saved Layouts couldn't be read (skipped by [load], set aside by the next [save]). */
+    fun skipped(prefs: SharedPreferences): Int = readEach(prefs, PREF, ::read).second
+
+    private fun read(o: JSONObject): Preset {
+        val v = o.getJSONObject("values")
+        return Preset(o.getString("name"), sizeKeys + v.keys().asSequence().associateWith { key ->
+            v.getJSONObject(key).let { if (it.has("d")) null else AppearanceLooks.fromJson(it) } },
+            remembered = AppearanceLooks.rememberedIn(v))
     }
 
     /** Saved Layout [name] goes from the list, and every keyboard that had it chosen has none chosen (2026-10-07: only
@@ -288,7 +286,7 @@ object LayoutPresets {
     }
 
     fun save(prefs: SharedPreferences, presets: List<Preset>) {
-        keepBrokenAside(prefs, PREF)
+        keepBrokenAside(prefs, PREF, ::read)
         val arr = JSONArray()
         for (preset in presets) arr.put(JSONObject().apply {
             put("name", preset.name)

@@ -49,6 +49,8 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
     val prefs = ctx.prefs()
     var generation by remember { mutableIntStateOf(0) }
     val presets = remember(generation) { LayoutPresets.load(prefs) }
+    // Layouts that couldn't be read: said under the list until a save has set them aside (R9 2026-10-11)
+    val skipped = remember(generation) { LayoutPresets.skipped(prefs) }
     // the built-in Layouts first (Curmudgeon, the default; HeliBoard; HeliBoard extra), then the user's
     val builtIn = remember { LayoutPresets.builtIn(ctx) }
     val all = builtIn + presets
@@ -140,6 +142,8 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
             } },
             onItemLongClick = { preset -> if (!preset.builtIn) toRename = preset },
             footer = {
+                if (skipped > 0) helium314.keyboard.settings.dialogs.SkippedItemsText(
+                    androidx.compose.ui.res.pluralStringResource(R.plurals.layout_presets_skipped, skipped, skipped))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxWidth().clickable { saveAs = true }
                         .padding(horizontal = 8.dp).heightIn(min = 48.dp)) {

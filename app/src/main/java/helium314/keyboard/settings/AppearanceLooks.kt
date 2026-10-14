@@ -348,16 +348,14 @@ object AppearanceLooks {
 
     // ---- the saved list; every value carries its type, as JSON alone can't tell an int from a float ----
 
-    fun load(prefs: SharedPreferences): List<Look> {
-        val json = prefs.getString(PREF, null) ?: return emptyList()
-        return runCatching {
-            val arr = JSONArray(json)
-            (0 until arr.length()).map { i ->
-                val o = arr.getJSONObject(i)
-                val v = o.getJSONObject("values")
-                Look(o.getString("name"), v.keys().asSequence().associateWith { key -> fromJson(v.getJSONObject(key)) }, rememberedIn(v))
-            }
-        }.getOrDefault(emptyList())
+    fun load(prefs: SharedPreferences): List<Look> = readEach(prefs, PREF, ::read).first
+
+    /** How many saved themes couldn't be read (skipped by [load], set aside by the next [save]). */
+    fun skipped(prefs: SharedPreferences): Int = readEach(prefs, PREF, ::read).second
+
+    private fun read(o: JSONObject): Look {
+        val v = o.getJSONObject("values")
+        return Look(o.getString("name"), v.keys().asSequence().associateWith { key -> fromJson(v.getJSONObject(key)) }, rememberedIn(v))
     }
 
     /** In every saved look, [keys] reading [from] read [to] (null: not set). */
@@ -382,7 +380,7 @@ object AppearanceLooks {
     }
 
     fun save(prefs: SharedPreferences, looks: List<Look>, now: Boolean = false) {
-        keepBrokenAside(prefs, PREF)
+        keepBrokenAside(prefs, PREF, ::read)
         val arr = JSONArray()
         for (look in looks) arr.put(JSONObject().apply {
             put("name", look.name)
@@ -426,10 +424,19 @@ object AppearanceLooks {
     }
 }
 
-/** The stored list under [key] can't be read (so it loaded as empty): a copy is kept under "[key]_broken_<time>" before
- *  anything is written over it (review 2026-10-06 Low: a load failure turned into an empty save). */
-internal fun keepBrokenAside(prefs: SharedPreferences, key: String) {
-    val stored = prefs.getString(key, null)?.takeIf { it.isNotBlank() } ?: return
-    if (runCatching { JSONArray(stored) }.isSuccess) return
-    prefs.edit { putString("${key}_broken_${System.currentTimeMillis()}", stored) }
+/** The items of the stored list under [key] that [read] can read, and how many it couldn't: a bad one is skipped, the
+ *  rest still load (re-review R9 2026-10-11: one bad item emptied the list). Text that isn't a list counts as one. */
+internal fun <T : Any> readEach(prefs: SharedPreferences, key: String, read: (JSONObject) -> T): Pair<List<T>, Int> {
+    val stored = prefs.getString(key, null)?.takeIf { it.isNotBlank() } ?: return emptyList<T>() to 0
+    val arr = runCatching { JSONArray(stored) }.getOrNull() ?: return emptyList<T>() to 1
+    val items = (0 until arr.length()).mapNotNull { i -> runCatching { read(arr.getJSONObject(i)) }.getOrNull() }
+    return items to arr.length() - items.size
+}
+
+/** The stored list under [key] has something [read] can't read (the whole text, or an item skipped on load): the text
+ *  as stored is kept under "[key]_broken_<time>" before anything is written over it (review 2026-10-06 Low: a load
+ *  failure turned into an empty save; R9 2026-10-11: one bad item, and the good ones went with it). */
+internal fun keepBrokenAside(prefs: SharedPreferences, key: String, read: (JSONObject) -> Any = { it }) {
+    if (readEach(prefs, key, read).second == 0) return
+    prefs.edit { putString("${key}_broken_${System.currentTimeMillis()}", prefs.getString(key, null)) }
 }

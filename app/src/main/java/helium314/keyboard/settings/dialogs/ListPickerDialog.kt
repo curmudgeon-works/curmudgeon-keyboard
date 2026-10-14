@@ -29,6 +29,13 @@ import androidx.compose.ui.unit.dp
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.latin.utils.previewDark
 
+/** A plain line in a list's footer, e.g. saved items that couldn't be read (R9 2026-10-11); like a row's description. */
+@Composable
+fun SkippedItemsText(text: String) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+}
+
 // taken from StreetComplete
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
