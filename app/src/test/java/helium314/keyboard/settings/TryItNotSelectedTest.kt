@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.isFocused
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -84,15 +85,17 @@ class TryItNotSelectedTest {
         val preview = PreviewKeyboard(state, CoroutineScope(Dispatchers.Main), showIme = { imeAsked++ }, reveal = { revealed++ }) { }
         compose.runOnIdle { state.show(TryItMode.NUMBER); preview.dialogOpened(emoji = false, people = false) }
         compose.waitForIdle()
+        // (no text field focused: that is what brings a keyboard up; the tap box may hold the focus outside touch mode,
+        // as Robolectric runs, and that brings up nothing)
         shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(1))
-        compose.onNode(isFocused()).assertDoesNotExist()
+        compose.onNode(isFocused() and hasSetTextAction()).assertDoesNotExist()
         assertEquals(TryItMode.TEXT, state.mode)
         assertEquals(0, revealed)
         assertEquals(0, imeAsked)
         // a tap on the field: Android's keyboard picker, as the bar's Switch
         compose.onNodeWithText(switchLabel).performClick()
         assertEquals(1, pickerOpened)
-        compose.onNode(isFocused()).assertDoesNotExist()
+        compose.onNode(isFocused() and hasSetTextAction()).assertDoesNotExist()
         preview.dialogClosed()
 
         // back with this keyboard selected: the field, its buttons and its keyboard as today
@@ -104,7 +107,7 @@ class TryItNotSelectedTest {
         compose.runOnIdle { state.show(TryItMode.NUMBER) }
         compose.waitForIdle()
         assertEquals(TryItMode.NUMBER, state.mode)
-        compose.onNode(isFocused()).assertExists()
+        compose.onNode(isFocused() and hasSetTextAction()).assertExists()
         assertTrue(pickerOpened == 1)
     }
 }

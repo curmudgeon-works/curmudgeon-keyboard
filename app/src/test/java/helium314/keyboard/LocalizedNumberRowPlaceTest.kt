@@ -86,6 +86,9 @@ class LocalizedNumberRowPlaceTest {
         SettingsMode.set(ctx, Defaults.PREF_ADVANCED_SETTINGS)
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
         SubtypeSettings.reloadEnabledSubtypes(ctx)
+        // (the main search's row changes the keyboard: its old definition maps to the new one for the process, which a
+        // later test's Bengali keyboard would follow)
+        helium314.keyboard.latin.utils.SubtypeUtilsAdditional.changedTo.clear()
     }
 
     private fun open(advanced: Boolean, keyboard: SettingsSubtype = bengali) {
