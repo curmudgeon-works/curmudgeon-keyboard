@@ -152,4 +152,22 @@ class HeldDeletesTest {
             assertEquals(listOf("Sunset"), AppearanceLooks.namesUsingPicture(ctx.prefs(), picture.name))
         }
     }
+
+    // owner 2026-10-12 B4: a snapshot whose draft_prefs.json can't be read; fail before: the draft folder was deleted
+    // before the held files went back, the deleted picture and font lost for good
+    @Test fun `an unreadable snapshot still brings the held picture and font back at the next start`() {
+        val picture = pictureInATheme()
+        AppearanceDraft.of(ctx)
+        assertTrue(AppearanceLooks.deleteFromList(ctx, picture, false))
+        assertTrue(AppearanceDraft.activeOrNull()!!.holdFontDelete(ctx, "Mine.ttf"))
+        assertFalse(picture.exists()); assertFalse(font.exists())
+        val dir = File(ctx.filesDir, "appearance_draft")
+        assertTrue(dir.listFiles()!!.none { it.name.endsWith(".tmp") }, "the lists written through a temporary file, none left")
+        AppearanceDraft.forgetActiveForTest() // the process dies
+        File(dir, "draft_prefs.json").writeText("{\"set\": ") // (cut off mid-write)
+        AppearanceDraft.recoverAfterCrash(ctx)
+        assertEquals("sunset", picture.readText(), "the held picture back in its list")
+        assertEquals("not really a font", font.readText(), "the held font back")
+        assertFalse(dir.exists(), "the folder goes after")
+    }
 }

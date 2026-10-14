@@ -95,7 +95,7 @@ class AppearanceDraft private constructor(
         writes.saved()
         savedPalettes -= opened
         savedPalettes += now
-        File(dir, SUB_SAVES_FILE).writeText(org.json.JSONArray(savedPalettes.toList()).toString())
+        writeAtomically(File(dir, SUB_SAVES_FILE), org.json.JSONArray(savedPalettes.toList()).toString())
     }
 
     /** True when a preference or file in the snapshot's scope differs from it, or something was deleted. */
@@ -209,7 +209,15 @@ class AppearanceDraft private constructor(
         private val LABELS = listOf(CustomLabels.Kind.THEME)
 
         private fun writeHeld(dir: File, held: Collection<String>) =
-            File(dir, HELD_FILE).writeText(org.json.JSONArray(held.toList()).toString())
+            writeAtomically(File(dir, HELD_FILE), org.json.JSONArray(held.toList()).toString())
+
+        /** [text] into [file] through a temporary file renamed over it: a crash mid-write leaves the old file whole, never
+         *  half a list (owner 2026-10-12 B4: a half-written held list lost the held fonts and pictures). */
+        private fun writeAtomically(file: File, text: String) {
+            val tmp = File(file.parentFile, file.name + ".tmp")
+            tmp.writeText(text)
+            if (!tmp.renameTo(file)) { file.writeText(text); tmp.delete() }
+        }
 
         private fun readHeld(dir: File): List<String> =
             runCatching { org.json.JSONArray(File(dir, HELD_FILE).readText()) }.getOrNull()
@@ -310,7 +318,7 @@ class AppearanceDraft private constructor(
             json.put("files", JSONObject().also { o -> files.forEach { (live, saved) ->
                 o.put(live.path, saved?.let { JSONObject().put("length", it.length).put("modified", it.modified) } ?: JSONObject.NULL)
             } })
-            File(dir, PREFS_FILE).writeText(json.toString())
+            writeAtomically(File(dir, PREFS_FILE), json.toString())
         }
 
         /** A snapshot left on disk by a process that died with Appearance open: put it back. Called at app start. */
@@ -318,7 +326,9 @@ class AppearanceDraft private constructor(
             if (active != null) return
             val dir = dir(ctx)
             val json = runCatching { JSONObject(File(dir, PREFS_FILE).readText()) }.getOrNull()
-            if (json == null) { dir.deleteRecursively(); return }
+            // (a snapshot that can't be read: the held fonts and pictures go back to their lists first, then the folder;
+            // owner 2026-10-12 B4: before, the folder went first, and the held files with it)
+            if (json == null) { runCatching { putHeldBack(ctx, dir, readHeld(dir)) }; dir.deleteRecursively(); return }
             runCatching {
                 val p = json.getJSONObject("prefs")
                 val prefs = p.keys().asSequence().associateWith { AppearanceLooks.fromJson(p.getJSONObject(it)) }
