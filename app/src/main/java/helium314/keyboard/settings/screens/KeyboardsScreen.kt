@@ -55,6 +55,11 @@ import androidx.compose.runtime.mutableIntStateOf
 import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.settings.dialogs.ConfirmationDialog
 import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.latin.settings.SwitchedOffKeyboards
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import helium314.keyboard.latin.utils.realPrefs
 import androidx.compose.material3.Icon
 import androidx.compose.ui.res.painterResource
@@ -92,6 +97,7 @@ fun KeyboardsScreen(
     var keyboardToDelete: SettingsSubtype? by remember { mutableStateOf(null) }
     var keyboardMenu: SettingsSubtype? by remember { mutableStateOf(null) } // press and hold: Rename, Delete
     var keyboardToRename: SettingsSubtype? by remember { mutableStateOf(null) }
+    var switchedOffOpen by remember { mutableStateOf(false) } // the Switched-off keyboards tile unfolded
     // a keyboard being added (and the keyboard it's a copy of): one dialog asks its settings and word lists, then adds it
     var adding: Pair<SettingsSubtype, SettingsSubtype?>? by remember { mutableStateOf(null) }
     val real = ctx.realPrefs()
@@ -207,6 +213,47 @@ fun KeyboardsScreen(
                     onClick = { showAddKeyboard = true },
                     icon = R.drawable.ic_plus
                 ) { NextScreenIcon() }
+                // the switched-off keyboards (Advanced, while any): one tile, unfolding them to switch on or delete (owner
+                // 2026-10-11: "Maybe make a single tile for Switched off keyboards, tile expands to show a list where you
+                // can switch on"; "Switched off tile should say these are likely bugs and [should] be deleted")
+                val switchedOff = SwitchedOffKeyboards.list(real)
+                if (advanced && switchedOff.isNotEmpty()) {
+                    Preference(
+                        name = stringResource(R.string.switched_off_keyboards, switchedOff.size),
+                        description = stringResource(R.string.switched_off_keyboards_summary),
+                        onClick = { switchedOffOpen = !switchedOffOpen },
+                        icon = R.drawable.ic_settings_layout,
+                    ) { Icon(painterResource(R.drawable.ic_arrow_left), null, Modifier.rotate(if (switchedOffOpen) 90f else -90f)) }
+                    if (switchedOffOpen) Column(Modifier.padding(start = 24.dp)) {
+                        Text(
+                            stringResource(R.string.switched_off_keyboards_note),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                        for (keyboard in switchedOff) key(keyboard) {
+                            val name = keyboardName(keyboard, ctx)
+                            val switchOn = stringResource(R.string.switch_on_keyboard_of, name)
+                            Preference(
+                                name = name,
+                                description = keyboard.toAdditionalSubtype().mainLayoutName()?.getStringResourceOrName("layout_", ctx) ?: "",
+                                onClick = { }, // (its two buttons do it)
+                            ) {
+                                // Delete is the main one: these are most likely left behind (owner 2026-10-11)
+                                TextButton(
+                                    onClick = {
+                                        if (SwitchedOffKeyboards.switchOn(ctx, keyboard)) generation++
+                                        else android.widget.Toast.makeText(ctx, R.string.switch_on_keyboard_listed, android.widget.Toast.LENGTH_SHORT).show()
+                                    },
+                                    modifier = Modifier.semantics { contentDescription = switchOn },
+                                ) { Text(stringResource(R.string.switch_on_keyboard)) }
+                                FilledIconButton(onClick = { keyboardToDelete = keyboard }) {
+                                    Icon(painterResource(R.drawable.ic_bin), stringResource(R.string.delete_keyboard_of, name))
+                                }
+                            }
+                        }
+                    }
+                }
                 // the sections shared by all keyboards
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
                 if (!separate)
@@ -270,9 +317,7 @@ fun KeyboardsScreen(
         }
         keyboardToDelete?.let { keyboard ->
             DeleteKeyboardDialog(keyboard, onDismissRequest = { keyboardToDelete = null }) { mergeInto ->
-                if (keyboard.isAdditionalSubtype(ctx.prefs())) SubtypeUtilsAdditional.removeAdditionalSubtype(ctx, keyboard.toAdditionalSubtype())
-                SubtypeSettings.removeEnabledSubtype(ctx, keyboard.toAdditionalSubtype())
-                helium314.keyboard.latin.personalization.LearnedKeyboards.deleteKeyboard(ctx, keyboard, mergeInto) // (its words too)
+                deleteKeyboard(ctx, keyboard, mergeInto)
                 keyboardToDelete = null
                 generation++
             }
@@ -370,6 +415,15 @@ private fun startWords(ctx: Context, keyboard: SettingsSubtype, learned: List<Se
             else app.getString(R.string.import_words_done, result.learned, result.blacklisted)
         android.widget.Toast.makeText(app, text, android.widget.Toast.LENGTH_LONG).show()
     }
+}
+
+/** The delete dialog's Delete: [keyboard] (listed or switched off) goes, with its set, its words and its registration as
+ *  an added keyboard; [mergeInto] takes its lists ([DeleteKeyboardDialog]). Switched off, it isn't in the list: taking
+ *  it out does nothing (an added keyboard's definition marks it as one, so no listed keyboard is taken for it). */
+internal fun deleteKeyboard(ctx: Context, keyboard: SettingsSubtype, mergeInto: SettingsSubtype?) {
+    if (keyboard.isAdditionalSubtype(ctx.prefs())) SubtypeUtilsAdditional.removeAdditionalSubtype(ctx, keyboard.toAdditionalSubtype())
+    SubtypeSettings.removeEnabledSubtype(ctx, keyboard.toAdditionalSubtype())
+    helium314.keyboard.latin.personalization.LearnedKeyboards.deleteKeyboard(ctx, keyboard, mergeInto) // (its words too)
 }
 
 /**

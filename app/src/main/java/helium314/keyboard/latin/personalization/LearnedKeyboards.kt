@@ -91,6 +91,10 @@ object LearnedKeyboards {
     private fun nextFree(real: SharedPreferences, map: JSONObject): Int =
         maxOf(real.getInt(PREF_POOL_NEXT, 1), (map.keys().asSequence().maxOfOrNull { map.optInt(it) } ?: 0) + 1, 1)
 
+    /** Every keyboard identity with its pool (reads only). */
+    fun poolEntries(real: SharedPreferences): Map<String, Int> =
+        synchronized(this) { pools(real).let { map -> map.keys().asSequence().associateWith { map.optInt(it) } } }
+
     private fun pools(real: SharedPreferences): JSONObject =
         try { JSONObject(real.getString(PREF_POOLS, null) ?: "{}") } catch (e: Exception) { JSONObject() }
 

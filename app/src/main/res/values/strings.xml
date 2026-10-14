@@ -684,6 +684,19 @@
     <string name="copy_keyboard_common_settings">The common settings</string>
     <string name="delete_keyboard_title">Delete this keyboard?</string>
     <string name="delete_keyboard_message">\"%s\" will be removed, with its languages, their priorities and its layout choice. This cannot be undone. Its learned and blacklisted words are deleted too. Dictionaries are kept.</string>
+    <!-- Keyboards screen, Advanced: one tile for the keyboards neither listed nor deleted (switched off before, or from an
+         old backup), unfolding them (2026-10-11). %d = how many -->
+    <string name="switched_off_keyboards">Switched-off keyboards (%d)</string>
+    <!-- owner 2026-10-11: "Switched off tile should say these are likely bugs and [should] be deleted" -->
+    <string name="switched_off_keyboards_summary">Likely left behind by a bug or an older version: best deleted</string>
+    <!-- at the top of the unfolded list -->
+    <string name="switched_off_keyboards_note">These keyboards were left behind, most likely by a bug or an older version. Delete them unless you need one; Switch on brings one back with its settings and words.</string>
+    <string name="switch_on_keyboard">Switch on</string>
+    <!-- for screen readers, the buttons of one keyboard in that list; %s = its name -->
+    <string name="switch_on_keyboard_of">Switch on %s</string>
+    <string name="delete_keyboard_of">Delete %s</string>
+    <!-- Switch on, when a keyboard just like it is in the list already -->
+    <string name="switch_on_keyboard_listed">This keyboard is in the list already</string>
     <!-- Asked once when a keyboard is added (2026-10-10). %s: the new keyboard's name -->
     <!-- Add keyboard dialog: title, %s = the new keyboard's name -->
     <!-- A link in the dictionary dialogs: download our dictionary for the language. %1$s = language, %2$s = size (e.g. "4.9 MB") -->
