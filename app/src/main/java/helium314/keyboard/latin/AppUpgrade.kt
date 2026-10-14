@@ -218,11 +218,17 @@ private val liveDefaultsBefore3008: Map<String, Any> = mapOf(
 ) + (0 until 4).associate { createPrefKeyForBooleanSettings(Settings.PREF_BOTTOM_ROW_SCALE_PREFIX, it, 2) to 1f } +
     listOf(0, 2).associate { createPrefKeyForBooleanSettings(Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX, it, 2) to 1f }
 
+/** The key gaps' defaults before 0.3.006 (1 / 2 % since): in the live settings of a phone or backup from before that
+ *  ([oldGaps]: no "key_gap_defaults_migrated"), the default then. Saved themes keep them. */
+private val oldGapDefaults: Map<String, Any> = mapOf(Settings.PREF_KEY_HORIZONTAL_GAP to 0.5f, Settings.PREF_KEY_VERTICAL_GAP to 0.75f)
+internal const val KEY_GAP_DEFAULTS_DONE = "key_gap_defaults_migrated"
+
 /** Whether a stored [value] of [key] is at its default: the default now, or the one before 0.3.008 (in the [live]
  *  settings, also those of [liveDefaultsBefore3008]). Long-press ?123 not while the old numpad switch is on
  *  ([numpadOn]): not set, it reads the numpad there. */
-private fun atDefault(key: String, value: Any?, numpadOn: Boolean, live: Boolean = true): Boolean {
+private fun atDefault(key: String, value: Any?, numpadOn: Boolean, live: Boolean = true, oldGaps: Boolean = false): Boolean {
     if (value == null) return false
+    if (live && oldGaps && (oldGapDefaults[key] as? Float)?.let { value is Float && kotlin.math.abs(value - it) < 0.01f } == true) return true
     if (key == Settings.PREF_LONG_PRESS_SYMBOL_ACTION && numpadOn) return false
     val now = helium314.keyboard.settings.SettingDefaults.of(key)
     if (now != null && helium314.keyboard.settings.KnownDefaults.same(key, value, now)) return true
@@ -230,9 +236,9 @@ private fun atDefault(key: String, value: Any?, numpadOn: Boolean, live: Boolean
 }
 
 /** [values] (plain keys, e.g. a keyboard's settings in a backup from before 0.3.008) without the ones at their default. */
-internal fun withoutDefaults(values: Map<String, Any?>): Map<String, Any?> {
+internal fun withoutDefaults(values: Map<String, Any?>, oldGaps: Boolean = false): Map<String, Any?> {
     val numpadOn = values[Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD] == true
-    return values.filterNot { (key, value) -> atDefault(key, value, numpadOn) }
+    return values.filterNot { (key, value) -> atDefault(key, value, numpadOn, oldGaps = oldGaps) }
 }
 
 /**
@@ -249,6 +255,7 @@ internal fun pickedOnlyUpgrade(real: SharedPreferences, freshInstall: Boolean) {
         val all = real.all
         val numpad = Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD
         val sharedNumpad = all[numpad] == true
+        val oldGaps = all[KEY_GAP_DEFAULTS_DONE] != true
         fun numpadOn(id: Int) = all[KeyboardProfiles.ownKey(id, numpad)] as? Boolean
             ?: (!all.containsKey(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + numpad)) && sharedNumpad)
         // the sets whose colours went back to the default (null: the shared one): the theme they named (Midnight)
@@ -258,13 +265,13 @@ internal fun pickedOnlyUpgrade(real: SharedPreferences, freshInstall: Boolean) {
             for ((stored, value) in all) {
                 val own = KeyboardProfiles.splitOwnKey(stored)
                 if (own == null) {
-                    if (!atDefault(stored, value, sharedNumpad)) continue
+                    if (!atDefault(stored, value, sharedNumpad, oldGaps = oldGaps)) continue
                     remove(stored)
                     if (stored == Settings.PREF_THEME_COLORS) colorsCleared.add(null)
                     continue
                 }
                 val (id, key) = own
-                if (key.startsWith(KeyboardProfiles.TOMBSTONE) || !atDefault(key, value, numpadOn(id))) continue
+                if (key.startsWith(KeyboardProfiles.TOMBSTONE) || !atDefault(key, value, numpadOn(id), oldGaps = oldGaps)) continue
                 remove(stored)
                 putBoolean(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + key), true)
                 if (key == Settings.PREF_THEME_COLORS) colorsCleared.add(id)
@@ -373,21 +380,9 @@ internal fun curmudgeonUpgrades(prefs: SharedPreferences, freshInstall: Boolean)
             putBoolean("trail_thickness_migrated", true)
         }
     }
-    // 0.3.006: the app-wide key gaps still on the old defaults (0.5 / 0.75 %) take the new ones (1 / 2 %); other
-    // values, and each keyboard's own (p1/ …) gaps, stay as they are
-    if (!prefs.getBoolean("key_gap_defaults_migrated", false)) {
-        prefs.edit {
-            if (!freshInstall) {
-                if (prefs.contains(Settings.PREF_KEY_HORIZONTAL_GAP)
-                        && kotlin.math.abs(prefs.getFloat(Settings.PREF_KEY_HORIZONTAL_GAP, 0f) - 0.5f) < 0.01f)
-                    putFloat(Settings.PREF_KEY_HORIZONTAL_GAP, Defaults.PREF_KEY_HORIZONTAL_GAP)
-                if (prefs.contains(Settings.PREF_KEY_VERTICAL_GAP)
-                        && kotlin.math.abs(prefs.getFloat(Settings.PREF_KEY_VERTICAL_GAP, 0f) - 0.75f) < 0.01f)
-                    putFloat(Settings.PREF_KEY_VERTICAL_GAP, Defaults.PREF_KEY_VERTICAL_GAP)
-            }
-            putBoolean("key_gap_defaults_migrated", true)
-        }
-    }
+    // (gone 2026-10-11, rule "not picked follows the default": the 0.3.006 key gaps step wrote the new default down,
+    // the 0.1.004 feedback and 0.3.002 Midnight look steps the old ones; pickedOnlyUpgrade treats the old gaps as
+    // defaults instead; their flags are no longer written)
     // 0.1.004: toolbar mode → Toolbar visibility + Show suggestions (the only suggestions switch)
     if (!prefs.contains(Settings.PREF_TOOLBAR_VISIBILITY) && prefs.contains(Settings.PREF_TOOLBAR_MODE)) {
         val old = prefs.getString(Settings.PREF_TOOLBAR_MODE, null)
@@ -395,29 +390,6 @@ internal fun curmudgeonUpgrades(prefs: SharedPreferences, freshInstall: Boolean)
             putString(Settings.PREF_TOOLBAR_VISIBILITY, Settings.readToolbarVisibility(prefs))
             // these showed no suggestions: they stay without them
             if (old == "TOOLBAR_KEYS" || old == "HIDDEN") putBoolean(Settings.PREF_SHOW_SUGGESTIONS, false)
-        }
-    }
-    // 0.1.004: key-press vibration and sound became on by default; installs from before keep what they had
-    if (!prefs.getBoolean("defaults_feedback_on_done", false)) {
-        prefs.edit {
-            if (!freshInstall) {
-                if (!prefs.contains(Settings.PREF_VIBRATE_ON)) putBoolean(Settings.PREF_VIBRATE_ON, false)
-                if (!prefs.contains(Settings.PREF_SOUND_ON)) putBoolean(Settings.PREF_SOUND_ON, false)
-            }
-            putBoolean("defaults_feedback_on_done", true)
-        }
-    }
-    // 0.3.002: new defaults (the Midnight theme, key gaps 1% / 2%): installs from before keep the look they had; a new
-    // install notes that its look is Midnight (the Themes row names it until another theme is chosen)
-    if (!prefs.getBoolean("defaults_look_midnight_done", false)) {
-        prefs.edit {
-            if (!freshInstall) {
-                if (!prefs.contains(Settings.PREF_KEY_HORIZONTAL_GAP)) putFloat(Settings.PREF_KEY_HORIZONTAL_GAP, 0.5f)
-                if (!prefs.contains(Settings.PREF_KEY_VERTICAL_GAP)) putFloat(Settings.PREF_KEY_VERTICAL_GAP, 0.75f)
-                if (!prefs.contains(Settings.PREF_THEME_DAY_NIGHT))
-                    putBoolean(Settings.PREF_THEME_DAY_NIGHT, android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q)
-            } else putBoolean("look_default_midnight", true)
-            putBoolean("defaults_look_midnight_done", true)
         }
     }
     // "midnight" was always black's colours under another name: the colour is black now (the Midnight theme stays)

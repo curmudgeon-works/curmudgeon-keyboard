@@ -202,4 +202,27 @@ class PickedOnlyUpgradeTest {
         assertTrue(values.containsKey(Settings.PREF_THEME_KEY_BORDERS))
         assertNull(values[Settings.PREF_THEME_KEY_BORDERS])
     }
+
+    @Test fun `key gaps at the defaults before 0_3_006 follow the defaults, picked ones and saved themes keep theirs - nothing written down`() {
+        val gap = Settings.PREF_KEY_HORIZONTAL_GAP
+        val vGap = Settings.PREF_KEY_VERTICAL_GAP
+        // a phone (or backup) from 0.3.005: the old defaults written down, a keyboard's own set too; a saved theme
+        prefs.edit { putFloat(gap, 0.5f); putFloat(vGap, 0.75f); putFloat(own(1, gap), 0.5f) }
+        AppearanceLooks.save(prefs, listOf(AppearanceLooks.Look("Mine", mapOf(gap to 0.5f))), now = true)
+        curmudgeonUpgrades(prefs, freshInstall = false)
+        pickedOnlyUpgrade(prefs, freshInstall = false)
+        assertFalse(prefs.contains(gap)); assertFalse(prefs.contains(vGap)); assertFalse(prefs.contains(own(1, gap)))
+        assertTrue(prefs.contains(mark(1, gap)))
+        assertEquals(0.5f, AppearanceLooks.load(prefs).single().values[gap])
+        // from 0.3.006 on (its flag), 0.5 is a pick
+        val later = ctx.getSharedPreferences("picked_only_test_gaps_${System.nanoTime()}", Context.MODE_PRIVATE)
+        later.edit { putBoolean(KEY_GAP_DEFAULTS_DONE, true); putFloat(gap, 0.5f) }
+        pickedOnlyUpgrade(later, freshInstall = false)
+        assertEquals(0.5f, later.getFloat(gap, 0f))
+        // a phone from before 0.3.002 with nothing stored: no step writes the gaps, vibration or sound down any more
+        val older = ctx.getSharedPreferences("picked_only_test_old_${System.nanoTime()}", Context.MODE_PRIVATE)
+        curmudgeonUpgrades(older, freshInstall = false)
+        for (key in listOf(gap, vGap, Settings.PREF_VIBRATE_ON, Settings.PREF_SOUND_ON, Settings.PREF_THEME_DAY_NIGHT, "look_default_midnight"))
+            assertFalse(older.contains(key), key)
+    }
 }

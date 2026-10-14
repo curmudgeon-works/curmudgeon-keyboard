@@ -696,7 +696,7 @@ private fun restoreAllSettings(ctx: Context, pending: PendingRestore) {
  *  backup only wrote defaults down, and with the HeliBoard Layouts' values a backup from before 2026-10-07 lacks. */
 internal fun restoredSettings(ctx: Context, backup: Map<String, Any?>, keyboard: SettingsSubtype): Map<String, Any?> {
     val values = KeyboardProfiles.effectiveSettingsIn(backup, keyboard)
-        .let { values -> if (backup[helium314.keyboard.latin.PICKED_ONLY_DONE] == true) values else helium314.keyboard.latin.withoutDefaults(values) }
+        .let { values -> if (backup[helium314.keyboard.latin.PICKED_ONLY_DONE] == true) values else helium314.keyboard.latin.withoutDefaults(values, oldGaps = backup[helium314.keyboard.latin.KEY_GAP_DEFAULTS_DONE] != true) }
     // (after the defaults went, so a HeliBoard value that equals a default is never stripped as one)
     val pinned = if (backup[helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE] == true) values
         else helium314.keyboard.latin.withHeliBoardPins(ctx, values)
