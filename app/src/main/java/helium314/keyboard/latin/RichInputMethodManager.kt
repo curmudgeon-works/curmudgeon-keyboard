@@ -117,6 +117,7 @@ class RichInputMethodManager private constructor() {
         SubtypeSettings.setSelectedSubtype(context.prefs(), newSubtype)
         KeyboardProfiles.refreshImeId(context.realPrefs()) // the new keyboard's own settings, if it has any
         currentRichInputMethodSubtype = RichInputMethodSubtype.get(newSubtype)
+        updateLanguageOnSpacebar()
         scope.launch { updateShortcutIme() }
         if (DEBUG) {
             Log.w(TAG, "onSubtypeChanged: $currentRichInputMethodSubtype")
@@ -126,7 +127,21 @@ class RichInputMethodManager private constructor() {
     fun refreshSubtypeCaches() {
         inputMethodInfoCache.clear()
         currentRichInputMethodSubtype = RichInputMethodSubtype.get(SubtypeSettings.getSelectedSubtype(context.prefs()))
+        // the space bar's copy of the enabled list in the same step as the list swap (review 2026-10-12 B6: in the
+        // background job it lagged behind, so a keyboard just added or removed showed the old space bar label);
+        // only the shortcut lookup, which asks the system, stays in the background
+        updateLanguageOnSpacebar()
         scope.launch { updateShortcutIme() }
+    }
+
+    /** The space bar's language state and its copy of the enabled list, from the current keyboard and the list now. */
+    private fun updateLanguageOnSpacebar() {
+        val richSubtype = currentRichInputMethodSubtype
+        val implicitlyEnabledSubtype = SubtypeSettings.isEnabled(richSubtype.rawSubtype)
+                && !SubtypeSettings.getEnabledSubtypes(false).contains(richSubtype.rawSubtype)
+        val systemLocale = context.resources.configuration.locale()
+        LanguageOnSpacebarUtils.onSubtypeChanged(richSubtype, implicitlyEnabledSubtype, systemLocale)
+        LanguageOnSpacebarUtils.setEnabledSubtypes(SubtypeSettings.getEnabledSubtypes(true))
     }
 
     fun switchToShortcutIme(inputMethodService: InputMethodService) = scope.launch {
@@ -146,13 +161,6 @@ class RichInputMethodManager private constructor() {
             val old = shortcuts.joinToString("; ") { "${it.imi.id}: ${it.subtype.locale()}, ${it.subtype.mode}" }
             Log.d(TAG, ("Update shortcut IMEs from: $old"))
         }
-        val richSubtype = currentRichInputMethodSubtype
-        val implicitlyEnabledSubtype = SubtypeSettings.isEnabled(richSubtype.rawSubtype)
-                && !SubtypeSettings.getEnabledSubtypes(false).contains(richSubtype.rawSubtype)
-        val systemLocale = context.resources.configuration.locale()
-        LanguageOnSpacebarUtils.onSubtypeChanged(richSubtype, implicitlyEnabledSubtype, systemLocale)
-        LanguageOnSpacebarUtils.setEnabledSubtypes(SubtypeSettings.getEnabledSubtypes(true))
-
         // TODO: Update an icon for shortcut IME
         shortcuts = inputMethodManager.shortcutInputMethodsAndSubtypes.entries.flatMap { (imi, subtypes) ->
             subtypes.map { Shortcut(imi, it) }
