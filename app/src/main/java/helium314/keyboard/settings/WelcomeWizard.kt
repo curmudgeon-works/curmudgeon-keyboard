@@ -45,7 +45,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.utils.JniUtils
 import helium314.keyboard.latin.utils.Theme
@@ -54,8 +53,18 @@ import helium314.keyboard.latin.utils.previewDark
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+/** The setup, always in Curmudgeon's Black with orange (2026-10-10; it had the phone's Dynamic colours, blue before
+ *  Android 12), whatever colours the keyboard has. */
 @Composable
 fun WelcomeWizard(
+    close: () -> Unit,
+    finish: () -> Unit
+) = MaterialTheme(colorScheme = helium314.keyboard.latin.utils.AppLook.curmudgeonScheme, typography = MaterialTheme.typography) {
+    WelcomeWizardSteps(close, finish)
+}
+
+@Composable
+private fun WelcomeWizardSteps(
     close: () -> Unit,
     finish: () -> Unit
 ) {
@@ -78,10 +87,11 @@ fun WelcomeWizard(
             }
     }
     val useWideLayout = isWideScreen()
-    val stepBackgroundColor = Color(ContextCompat.getColor(ctx, R.color.setup_step_background))
-    val textColor = Color(ContextCompat.getColor(ctx, R.color.setup_text_action))
-    val textColorDim = textColor.copy(alpha = 0.5f)
-    val titleColor = Color(ContextCompat.getColor(ctx, R.color.setup_text_title))
+    // black, the steps a shade lighter, the title and what to tap in orange
+    val stepBackgroundColor = MaterialTheme.colorScheme.surfaceContainerHigh
+    val textColor = MaterialTheme.colorScheme.primary
+    val textColorDim = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+    val titleColor = MaterialTheme.colorScheme.primary
     val appName = stringResource(ctx.applicationInfo.labelRes)
     @Composable fun bigText() {
         val resource = if (step == 0) R.string.setup_welcome_title else R.string.setup_steps_title
@@ -105,8 +115,8 @@ fun WelcomeWizard(
             .background(color = stepBackgroundColor)
             .padding(16.dp)
         ) {
-            Text(title)
-            Text(instruction, style = MaterialTheme.typography.bodyLarge.merge(color = textColor))
+            Text(title, color = MaterialTheme.colorScheme.onSurface)
+            Text(instruction, style = MaterialTheme.typography.bodyLarge.merge(color = MaterialTheme.colorScheme.onSurfaceVariant))
         }
         Spacer(Modifier.height(4.dp))
         Row(
