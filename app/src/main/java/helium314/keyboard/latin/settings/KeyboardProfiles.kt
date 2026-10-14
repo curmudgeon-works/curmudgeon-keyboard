@@ -34,7 +34,7 @@ object KeyboardProfiles {
         Settings.PREF_CLIPBOARD_HISTORY_SIZE, Settings.PREF_CLIPBOARD_HISTORY_PINNED_FIRST,
         Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_SWIPE_METRICS, Settings.PREF_AUTO_PREVIEW_KEYBOARD, // logs of the user's swiping: one file, one switch
         Settings.PREF_LEARNING_LOG, // and of what corrections do to the learned words
-        PREF_SEPARATE, PREF_IDS, PREF_NEXT_ID, PREF_START_FROM,
+        PREF_SEPARATE, PREF_IDS, PREF_NEXT_ID, PREF_START_FROM, PREF_SHARED_FROM,
         "key_popup_sets", // saved popup sets are meant to be reused across keyboards
         "appearance_looks", // saved looks too
         "layout_presets", // and saved Layouts
@@ -100,6 +100,8 @@ object KeyboardProfiles {
      * while the menu is shared (owner 2026-10-11: "Deleting should not happen. Behavior should be same", as the main
      * switch). Becoming per keyboard, each keyboard reads its own again; one with nothing of its own there reads the
      * shared values. Background pictures follow Appearance: each keyboard keeps its own, one without gets the shared.
+     * The keyboard the menu was shared from takes the shared values, edits made meanwhile included (owner 2026-10-11:
+     * "Edits made while a menu is shared should only affect the main keyboard who's menu is indeed being changed. So B.").
      */
     @Synchronized
     fun setGroupShared(real: SharedPreferences, group: Group, shared: Boolean, winnerId: Int) {
@@ -126,12 +128,55 @@ object KeyboardProfiles {
         editor.putBoolean(group.prefKey, shared)
         editor.commit()
         sharedGroups = after
+        // which keyboard the menu was shared from: it takes the shared values back ([takeShared])
+        val from = sharedFrom(real, group.name)?.takeIf { !shared && isSeparate(real) && it in profileIds(real) }
+        if (shared && isSeparate(real) && winnerId != SHARED) setSharedFrom(real, group.name, winnerId)
+        else setSharedFrom(real, group.name, null)
+        // (the settings that turn per keyboard: one also on a menu still per keyboard was its own already)
+        if (from != null) takeShared(real, from) { sharedByGroups(it, before) && !sharedByGroups(it, after) }
         if (group == Group.APPEARANCE && isSeparate(real)) {
             if (shared) copyFiles(winnerId, SHARED)
             // its own pictures stay; a keyboard with nothing of its own on Appearance starts from the shared ones
-            else for (id in profileIds(real)) if (!hasOwnFiles(id) && !hasOwnIn(real, id, group)) copyFiles(SHARED, id)
+            else for (id in profileIds(real)) if (id == from || (!hasOwnFiles(id) && !hasOwnIn(real, id, group))) copyFiles(SHARED, id)
         }
         helium314.keyboard.latin.utils.SettingsEventLog.log("group ${group.name} ${if (shared) "shared, from set $winnerId" else "per keyboard"}")
+    }
+
+    // ---- the keyboard the shared settings came from (owner 2026-10-11: B, it keeps the edits made while shared) ----
+
+    /** {group name, or [ALL] for the main switch: set id} */
+    private const val PREF_SHARED_FROM = "keyboard_shared_from"
+    private const val ALL = "ALL"
+
+    private fun sharedFrom(real: SharedPreferences, what: String): Int? =
+        runCatching { JSONObject(real.getString(PREF_SHARED_FROM, null) ?: "{}") }.getOrDefault(JSONObject())
+            .optInt(what, SHARED).takeIf { it != SHARED }
+
+    private fun setSharedFrom(real: SharedPreferences, what: String?, id: Int?, dropId: Int? = null) {
+        val map = runCatching { JSONObject(real.getString(PREF_SHARED_FROM, null) ?: "{}") }.getOrDefault(JSONObject())
+        if (what != null) { if (id == null) map.remove(what) else map.put(what, id) }
+        if (dropId != null) map.keys().asSequence().toList().forEach { if (map.optInt(it) == dropId) map.remove(it) }
+        real.edit().apply { if (map.length() == 0) remove(PREF_SHARED_FROM) else putString(PREF_SHARED_FROM, map.toString()) }.commit()
+    }
+
+    /** Set [id]'s own entries for the keys [which] takes become the shared set's: its values, and a mark where the
+     *  shared set has none but [id] had something of its own (it reads its default, not a later shared value). */
+    private fun takeShared(real: SharedPreferences, id: Int, which: (String) -> Boolean) {
+        val all = real.all
+        val editor = real.edit()
+        val hadOwn = HashSet<String>()
+        for (stored in all.keys) {
+            val plain = splitOwnKey(stored)?.takeIf { it.first == id }?.second?.removePrefix(TOMBSTONE) ?: continue
+            if (isAppWide(plain) || !which(plain)) continue
+            editor.remove(stored); hadOwn.add(plain)
+        }
+        for ((key, value) in all) {
+            if (isAppWide(key) || key.startsWith(TOMBSTONE) || !which(key)) continue
+            put(editor, ownKey(id, key), value); hadOwn.remove(key)
+        }
+        for (plain in hadOwn) if (!isOneTimeFlag(plain)) editor.putBoolean(ownKey(id, TOMBSTONE + plain), true)
+        editor.commit()
+        Log.i("KeyboardProfiles", "set $id takes the shared values")
     }
 
     /** Whether set [id] stores a value or mark of its own for a setting of [group]. */
@@ -311,6 +356,7 @@ object KeyboardProfiles {
         real.all.keys.filter { unprefixedKey(id, it) != null && it.startsWith("$PREFIX$id$SEPARATOR") }.forEach { editor.remove(it) }
         editor.apply()
         deleteFiles(id) // its own pictures: no keyboard uses them any more
+        setSharedFrom(real, null, null, dropId = id) // (the shared settings' edits go to nobody now)
     }
 
     fun hasOwnSettings(real: SharedPreferences, keyboard: SettingsSubtype): Boolean {
@@ -437,11 +483,19 @@ object KeyboardProfiles {
 
     /**
      * Turn separate settings on: every enabled keyboard without a set of its own gets a copy of the shared set
-     * ([keepExisting] false resets keyboards that have an older set too).
+     * ([keepExisting] false resets keyboards that have an older set too). The keyboard the shared settings came from
+     * ([disable]) takes them, edits made meanwhile included, on every menu that is per keyboard (owner 2026-10-11: B); a
+     * menu still shared keeps the shared values for all, and that keyboard's hidden own ones stay as they are.
      */
     @Synchronized
     fun enable(real: SharedPreferences, keyboards: List<SettingsSubtype>, keepExisting: Boolean) {
         helium314.keyboard.latin.utils.SettingsEventLog.log("separate settings ON for ${keyboards.map { it.toPref() }} (keepExisting $keepExisting)")
+        val from = sharedFrom(real, ALL)?.takeIf { keepExisting && it in profileIds(real) && hasOwnEntries(real, it) }
+        setSharedFrom(real, ALL, null)
+        if (from != null) {
+            takeShared(real, from) { !isGlobal(it) }
+            if (Group.APPEARANCE !in sharedGroups) copyFiles(SHARED, from)
+        }
         val startFrom = startFrom(real)
         for (keyboard in keyboards) {
             if (keepExisting && hasOwnSettings(real, keyboard)) continue
@@ -488,7 +542,9 @@ object KeyboardProfiles {
     @Synchronized
     fun disable(real: SharedPreferences, sharedFrom: SettingsSubtype?) {
         helium314.keyboard.latin.utils.SettingsEventLog.log("separate settings OFF, shared from ${sharedFrom?.toPref()}")
-        if (sharedFrom != null) copy(real, idFor(real, sharedFrom), SHARED)
+        val from = sharedFrom?.let { idFor(real, it) }
+        if (from != null) copy(real, from, SHARED)
+        setSharedFrom(real, ALL, from) // (null: where the shared set came from is unknown, nobody takes its edits)
         real.edit().putBoolean(PREF_SEPARATE, false).apply()
     }
 

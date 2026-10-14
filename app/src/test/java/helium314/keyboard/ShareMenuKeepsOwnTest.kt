@@ -82,7 +82,7 @@ class ShareMenuKeepsOwnTest {
         view(3).edit().putFloat(gap, 3f).commit() // (the shared set, while shared)
         unshare()
         assertEquals(3f, view(3).getFloat(gap, 0f))
-        assertEquals(2f, view(1).getFloat(gap, 0f))
+        assertEquals(3f, view(1).getFloat(gap, 0f)) // (owner 2026-10-11: B, the shared keyboard keeps the edits)
     }
 
     @Test fun `a font deleted while shared is gone from a hidden own set too`() {
@@ -107,7 +107,7 @@ class ShareMenuKeepsOwnTest {
         assertEquals("two", pic(2).readText(), "2's own picture went")
         pic(KeyboardProfiles.SHARED).writeText("shared") // changed while shared
         unshare()
-        assertEquals("one", pic(1).readText())
+        assertEquals("shared", pic(1).readText()) // (owner 2026-10-11: B, the shared keyboard keeps the edits)
         assertEquals("two", pic(2).readText())
         assertEquals("shared", pic(3).readText()) // (3 had nothing of its own)
     }
