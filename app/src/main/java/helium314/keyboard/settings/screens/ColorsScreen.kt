@@ -123,6 +123,33 @@ fun ColorsScreen(
     }
     var askLeave by rememberSaveable { mutableStateOf(false) }
     fun leave() { if (changed) askLeave = true else onClickBack() }
+    var askUpdate by rememberSaveable { mutableStateOf(false) }
+    /** Kept for good (the Appearance screen under it doesn't ask again about it), and back. */
+    fun saveAndBack() {
+        helium314.keyboard.settings.AppearanceDraft.rebaseOpen(ctx,
+            (paletteKeys(openedName) + paletteKeys(newThemeName.text) + Settings.PREF_THEME_COLORS + Settings.PREF_THEME_COLORS_NIGHT).toSet())
+        onClickBack()
+    }
+    /** The other keyboards (with their set ids) and the saved themes that use this palette: none with one set of
+     *  settings or Appearance shared (every keyboard has the change), except the saved themes. */
+    fun paletteUsers(): Pair<List<Pair<helium314.keyboard.latin.settings.SettingsSubtype, Int>>, List<String>> {
+        val real = ctx.realPrefs()
+        val names = setOf(openedName, newThemeName.text)
+        val choices = listOf(Settings.PREF_THEME_COLORS, Settings.PREF_THEME_COLORS_NIGHT)
+        val themes = helium314.keyboard.settings.AppearanceLooks.load(real).filter { look -> choices.any { look.values[it] in names } }.map { it.name }
+        val edited = helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(real, helium314.keyboard.settings.PrefsDraft.currentSetId(ctx))
+        if (edited == null || helium314.keyboard.latin.settings.KeyboardProfiles.isShared(real, helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE))
+            return emptyList<Pair<helium314.keyboard.latin.settings.SettingsSubtype, Int>>() to themes
+        // (this keyboard's own copy of the palette: no other keyboard sees the change)
+        if ((prefs as? helium314.keyboard.latin.settings.ProfilePreferences)?.writesShared(Settings.PREF_USER_COLORS_PREFIX + newThemeName.text) == false)
+            return emptyList<Pair<helium314.keyboard.latin.settings.SettingsSubtype, Int>>() to themes
+        val palettes = listOf(Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
+        val keyboards = keyboardsUsing(ctx, choices, edited) { _, v -> v in names }.filter { it != edited }
+            .mapNotNull { kb -> helium314.keyboard.latin.settings.KeyboardProfiles.anyIdIn(real.all, kb)?.let { kb to it } }
+            // (a keyboard with its own copy under that name reads its own: not this one)
+            .filter { (_, id) -> names.none { n -> palettes.any { real.contains(helium314.keyboard.latin.settings.KeyboardProfiles.ownKey(id, it + n)) } } }
+        return keyboards to themes
+    }
 
     // is there really no better way of only setting forceOpposite while the screen is shown (and not paused)?
     // lifecycle stuff is weird, there is no pause and similar when activity is paused
@@ -284,11 +311,28 @@ fun ColorsScreen(
         // saved for good, as on the popups screen: the Appearance screen under it doesn't ask again about it
         onSaveAndExit = {
             askLeave = false
-            helium314.keyboard.settings.AppearanceDraft.rebaseOpen(ctx,
-                (paletteKeys(openedName) + paletteKeys(newThemeName.text) + Settings.PREF_THEME_COLORS + Settings.PREF_THEME_COLORS_NIGHT).toSet())
-            onClickBack()
+            // other keyboards or saved themes using it: which get the new colours (2026-10-11), else saved at once
+            if (made == null && paletteUsers().let { it.first.isNotEmpty() || it.second.isNotEmpty() }) askUpdate = true
+            else saveAndBack()
         },
     )
+    if (askUpdate) {
+        val (keyboards, themes) = remember { paletteUsers() }
+        helium314.keyboard.settings.dialogs.UpdateSavedItemDialog(KeyboardTheme.paletteName(ctx, newThemeName.text),
+            keyboards.map { keyboardName(it.first, ctx) } + themes.map { ctx.getString(R.string.update_item_theme, it) }, null,
+            onDismissRequest = { askUpdate = false },
+        ) { ticked ->
+            val real = ctx.realPrefs()
+            val name = newThemeName.text
+            val old = paletteKeys(openedName).associateWith { opened[it] }
+            KeyboardTheme.keepOldPalette(real, name, openedName, old,
+                keyboards.indices.filter { it !in ticked }.map { keyboards[it].second },
+                themes.indices.filter { it + keyboards.size !in ticked }.map { themes[it] })
+            KeyboardTheme.updateInSavedThemes(real, prefs, name, themes.indices.filter { it + keyboards.size in ticked }.map { themes[it] })
+            askUpdate = false
+            saveAndBack()
+        }
+    }
     if (chosenColor != null) CompositionLocalProvider(helium314.keyboard.settings.dialogs.LocalPreviewKeyboard provides preview) {
         val oldAllColors = KeyboardTheme.readUserAllColors(prefs, newThemeName.text, null)
         // the colour shows on the keyboard while it's picked; Cancel puts back what was there

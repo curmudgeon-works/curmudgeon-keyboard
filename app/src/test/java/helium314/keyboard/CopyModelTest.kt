@@ -132,4 +132,21 @@ class CopyModelTest {
         assertEquals("old picture", picture.readText())
         picture.delete()
     }
+
+    @Test fun `a palette saved with new colours - unticked keyboards and themes keep the old ones as one Custom N, ticked themes take the new`() {
+        val warm = Settings.PREF_USER_COLORS_PREFIX + "Warm"
+        real.edit().putString(warm, "new").putString(Settings.PREF_THEME_COLORS, "Warm").commit() // (keyboard 2 reads it from the shared set)
+        AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Kept", mapOf(Settings.PREF_THEME_COLORS to "Warm", warm to "old")),
+            AppearanceLooks.Look("Updated", mapOf(Settings.PREF_THEME_COLORS to "Warm", warm to "old"))), now = true)
+        helium314.keyboard.keyboard.KeyboardTheme.keepOldPalette(real, "Warm", "Warm", mapOf(warm to "old"), keepOld = listOf(2), keepOldThemes = listOf("Kept"))
+        helium314.keyboard.keyboard.KeyboardTheme.updateInSavedThemes(real, real, "Warm", listOf("Updated"))
+        val hidden = real.getString(own(2, Settings.PREF_THEME_COLORS), null)!!
+        assertTrue(helium314.keyboard.keyboard.KeyboardTheme.isHiddenPalette(hidden))
+        assertEquals("old", real.getString(Settings.PREF_USER_COLORS_PREFIX + hidden, null))
+        assertEquals("new", real.getString(warm, null)) // (the palette itself: the new colours)
+        val looks = AppearanceLooks.load(real).associateBy { it.name }
+        assertEquals(hidden, looks.getValue("Kept").values[Settings.PREF_THEME_COLORS])
+        assertEquals("old", looks.getValue("Kept").values[Settings.PREF_USER_COLORS_PREFIX + hidden])
+        assertEquals("new", looks.getValue("Updated").values[warm])
+    }
 }

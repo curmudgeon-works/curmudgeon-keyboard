@@ -598,12 +598,53 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             else name
 
         /** The next free kept-copy name, numbered across every keyboard's set and the saved themes. */
-        private fun nextHiddenPalette(prefs: SharedPreferences): String {
+        internal fun nextHiddenPalette(prefs: SharedPreferences): String {
             val real = (prefs as? ProfilePreferences)?.underlying ?: prefs
             val text = real.all.values.filterIsInstance<String>() + real.all.keys +
                 helium314.keyboard.settings.AppearanceLooks.load(real).flatMap { it.values.keys + it.values.values.filterIsInstance<String>() }
             val taken = text.flatMap { t -> Regex(Regex.escape(HIDDEN_PALETTE) + "(\\d+)").findAll(t).map { it.groupValues[1].toInt() } }.toSet()
             return HIDDEN_PALETTE + generateSequence(1) { it + 1 }.first { it !in taken }
+        }
+
+        /**
+         * Palette [name] was saved with new colours, and the keyboards [keepOld] (set ids) and saved themes [keepOldThemes]
+         * that use it were left unticked in the update dialog (2026-10-11): they keep its colours of before, [old] (the
+         * palette's keys under [oldName] when the editor opened), as one kept copy, "Custom N", off the list.
+         */
+        internal fun keepOldPalette(real: SharedPreferences, name: String, oldName: String, old: Map<String, Any?>,
+                                    keepOld: Collection<Int>, keepOldThemes: Collection<String>) {
+            if (keepOld.isEmpty() && keepOldThemes.isEmpty()) return
+            val hidden = nextHiddenPalette(real)
+            val prefixes = listOf(Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
+            val choices = listOf(Settings.PREF_THEME_COLORS, Settings.PREF_THEME_COLORS_NIGHT)
+            val copy = prefixes.mapNotNull { p -> old[p + oldName]?.let { p + hidden to it } }.toMap()
+            real.edit().apply {
+                for ((key, value) in copy) KeyboardProfiles.put(this, key, value)
+                for (id in keepOld) for (key in choices) {
+                    val view = ProfilePreferences(real) { id }
+                    if (view.getString(key, null) == name) putString(KeyboardProfiles.ownKey(id, key), hidden)
+                }
+            }.commit()
+            val looks = helium314.keyboard.settings.AppearanceLooks.load(real)
+            if (looks.any { it.name in keepOldThemes })
+                helium314.keyboard.settings.AppearanceLooks.save(real, looks.map { look ->
+                    if (look.name !in keepOldThemes) look
+                    else helium314.keyboard.settings.AppearanceLooks.Look(look.name, look.values.entries.associate { (key, value) ->
+                        val renamed = prefixes.firstOrNull { key == it + name }?.let { it + hidden } ?: key
+                        renamed to if (key in choices && value == name) hidden else value
+                    }, look.remembered)
+                }, now = true)
+        }
+
+        /** Saved themes [ticked] (in the update dialog) take palette [name]'s colours as they are now in [prefs]. */
+        internal fun updateInSavedThemes(real: SharedPreferences, prefs: SharedPreferences, name: String, ticked: Collection<String>) {
+            if (ticked.isEmpty()) return
+            val prefixes = listOf(Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
+            val now = prefixes.associate { it + name to prefs.all[it + name] }
+            helium314.keyboard.settings.AppearanceLooks.save(real, helium314.keyboard.settings.AppearanceLooks.load(real).map { look ->
+                if (look.name !in ticked) look
+                else helium314.keyboard.settings.AppearanceLooks.Look(look.name, look.values + now.filterValues { it != null }, look.remembered)
+            }, now = true)
         }
 
         /** Whether palette [name] is chosen by any keyboard's set (light or dark) or a saved theme. */
