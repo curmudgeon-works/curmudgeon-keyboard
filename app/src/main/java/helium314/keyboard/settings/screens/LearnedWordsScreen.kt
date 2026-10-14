@@ -174,7 +174,8 @@ fun LearnedWordsScreen(onClickBack: () -> Unit, script: String, blacklisted: Boo
         // one job for all of them, off the main thread
         scope.launch {
             withContext(Dispatchers.IO) { deleteWords(ctx, script, pool, locales, items, alsoFromPersonalDictionary = personal) }
-            picked = emptySet()
+            // only the deleted words' ticks go: words ticked while it ran stay ticked (review L4.4)
+            picked = picked - items.map { it.entry.key }.toSet()
             reload++
         }
     }

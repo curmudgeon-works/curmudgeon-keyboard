@@ -31,7 +31,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** A test store of learned words (as [FakeHistory]) whose Remove takes the word out. */
-class RemovableHistory(ctx: Context, script: String, pool: Int)
+open class RemovableHistory(ctx: Context, script: String, pool: Int)
     : UserHistoryDictionary(ctx, LearnedStores.storeName(script, pool), LearnedStores.storeLocale(script)) {
     val counts = ConcurrentHashMap<String, Int>()
     override fun awaitBeforeLoad() { throw IllegalStateException("a test store: no file") }

@@ -162,6 +162,34 @@ class LearnedWordsBatchDeleteTest {
         assertEquals(setOf("teh", "hte", "adn"), blacklist.entries().keys)
     }
 
+    // fail before (L4.4): the end of the delete cleared every tick, also those made while it ran
+    @Test fun `a word ticked while the batch delete runs stays ticked after it`() {
+        val release = java.util.concurrent.CountDownLatch(1)
+        store = object : RemovableHistory(ctx, "Latn", pool) {
+            override fun removeUnigramEntryDynamically(word: String) {
+                release.await(10, java.util.concurrent.TimeUnit.SECONDS)
+                super.removeUnigramEntryDynamically(word)
+            }
+        }
+        PersonalizationHelper.setForTest("Latn", pool, store)
+        try {
+            learn("alpha", "beta", "gamma")
+            show(blacklisted = false, firstWord = "alpha")
+            hold("alpha"); tap("beta")
+            trash()
+            inDialog(ctx.getString(R.string.delete)).performClick()
+            compose.waitForIdle()
+            tap("gamma") // (while the delete waits)
+            compose.onNodeWithText(selected(3)).assertExists()
+            release.countDown()
+            waitFor("not deleted") { store.counts.keys == setOf("gamma") }
+            waitFor("still listed") { compose.onAllNodesWithText("alpha").fetchSemanticsNodes().isEmpty() }
+            compose.onNodeWithText(selected(1)).assertExists()
+        } finally {
+            release.countDown()
+        }
+    }
+
     @Test fun `Back and the cross leave selection mode, not the screen - a tap outside it asks about that word`() {
         learn("alpha", "beta")
         show(blacklisted = false, firstWord = "alpha")
