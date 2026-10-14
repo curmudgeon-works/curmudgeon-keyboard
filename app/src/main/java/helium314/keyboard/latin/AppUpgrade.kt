@@ -67,6 +67,8 @@ fun checkVersionUpgrade(context: Context) {
     heliBoardLayoutPins(context, context.realPrefs(), freshInstall = oldVersion == 0)
     ownSetUpgrades(context.realPrefs(), freshInstall = oldVersion == 0)
     keepUserPopupSetsSymbolMap(context.realPrefs())
+    // saved Layouts, themes and popup sets keep what a changed default was (DefaultChanges)
+    protectSavedItems(context.realPrefs(), freshInstall = oldVersion == 0)
 }
 
 /** Set once [keepUserPopupSetsSymbolMap] ran (a backup from before carries none: its restore runs it again). */
