@@ -152,6 +152,21 @@ object LearnedStores {
     fun blacklistFile(filesDir: File, script: String, pool: Int): File =
         File(File(filesDir, BLACKLIST_DIR), (if (pool == SHARED) "" else "k$pool${File.separator}") + script + ".txt")
 
+    /** The pool and script of blacklist [file] in [filesDir] ([blacklistFile]); null for any other file (one of the
+     *  per-language lists of before, too). */
+    fun blacklistPoolAndScript(filesDir: File, file: File): Pair<Int, String>? {
+        val base = File(filesDir, BLACKLIST_DIR).absolutePath + File.separator
+        val path = file.absolutePath
+        if (!path.startsWith(base) || !path.endsWith(".txt")) return null
+        val parts = path.substring(base.length).removeSuffix(".txt").split(File.separator)
+        val script = parts.last().takeIf { scriptCode.matches(it) } ?: return null
+        return when (parts.size) {
+            1 -> SHARED to script
+            2 -> parts[0].takeIf { it.startsWith("k") }?.drop(1)?.toIntOrNull()?.let { it to script }
+            else -> null
+        }
+    }
+
     const val DICT_EXTENSION = ".dict"
     const val BLACKLIST_DIR = "blacklists"
 

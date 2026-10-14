@@ -1114,6 +1114,10 @@ private fun restoreEverything(ctx: Context, file: File, promised: PendingRestore
  * the full restore: a keyboard restore never wipes, and it merges into the live stores and lists under their own locks.
  */
 private fun underRestoreGate(ctx: Context, work: () -> Unit) {
+    // the device's keyboards' pools before the wipe: a blacklist change made meanwhile goes to its keyboard's list after
+    // the restore, found by the keyboard's id (review 2026-10-12 L2: by the pool number, the file's name, it went to
+    // whichever keyboard has that number in the backup)
+    val poolsBefore = LearnedKeyboards.poolEntries(ctx.realPrefs())
     RestoreGate.begin()
     try {
         PersonalizationHelper.reloadAllFromFiles()
@@ -1121,17 +1125,49 @@ private fun underRestoreGate(ctx: Context, work: () -> Unit) {
         work()
     } finally {
         val filesDir = ctx.filesDir
-        // the blacklists the keyboard holds read the restored files, their changes since on top (still gated: a strike
-        // meanwhile stays pending too)
+        // the blacklists the keyboard holds read the restored files; the changes made on them meanwhile are taken off
+        // them first, to be made again by keyboard below (still gated: a strike meanwhile stays pending too)
+        val gated = ArrayList<Pair<RemovedWords.WordListFile, List<RemovedWords.GatedOp>>>()
         if (filesDir != null) for (list in RemovedWords.cachedIn(filesDir))
-            try { list.reload() } catch (t: Throwable) { Log.w("AdvancedScreen", "error reading a blacklist after restore", t) }
+            try {
+                list.takeGated().takeIf { it.isNotEmpty() }?.let { gated.add(list to it) }
+                list.reload()
+            } catch (t: Throwable) { Log.w("AdvancedScreen", "error reading a blacklist after restore", t) }
         // the swipe statistics read the restored settings at their next use (what they held is the old device's, never
         // written while gated)
         helium314.keyboard.latin.gesture.GestureStats.reload()
         RestoreGate.end()
+        if (filesDir != null && gated.isNotEmpty())
+            try { redoBlacklistChanges(ctx, filesDir, poolsBefore, gated) }
+            catch (t: Throwable) { Log.w("AdvancedScreen", "error making the blacklist changes again after restore", t) }
         if (filesDir != null) for (list in RemovedWords.cachedIn(filesDir))
             try { list.writePending() } catch (t: Throwable) { Log.w("AdvancedScreen", "error writing a blacklist after restore", t) }
     }
+}
+
+/**
+ * The blacklist changes made during a full restore ([gated]: each list's, as made) made again on the restored lists
+ * (review 2026-10-12 L2): a keyboard's own list's on the list of the keyboard with that id after the restore (its pool
+ * there, [poolsBefore]: the pools before the wipe); none if the restore brought no keyboard with that id. The lists of
+ * no keyboard (the shared pool, a per-language list of before) on the same file. As made: a strike is one more on the
+ * restored count, never the count it made on the old list.
+ */
+private fun redoBlacklistChanges(ctx: Context, filesDir: File, poolsBefore: Map<String, Int>,
+                                 gated: List<Pair<RemovedWords.WordListFile, List<RemovedWords.GatedOp>>>) {
+    val keyboardOfPool = poolsBefore.entries.associate { (id, pool) -> pool to id }
+    val poolsNow = LearnedKeyboards.poolEntries(ctx.realPrefs())
+    for ((list, ops) in gated) {
+        val parsed = LearnedStores.blacklistPoolAndScript(filesDir, list.file)
+        if (parsed == null) { list.redo(ops); continue }
+        val (pool, script) = parsed
+        val target = if (pool == LearnedStores.SHARED) pool else keyboardOfPool[pool]?.let { poolsNow[it] }
+        if (target == null) {
+            Log.i("AdvancedScreen", "blacklist changes during the restore dropped: their keyboard isn't in the backup")
+            continue
+        }
+        RemovedWords.forFile(LearnedStores.blacklistFile(filesDir, script, target)).redo(ops)
+    }
+    RemovedWords.awaitWrites()
 }
 
 /**

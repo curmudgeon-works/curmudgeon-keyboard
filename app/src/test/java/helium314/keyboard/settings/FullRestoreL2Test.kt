@@ -11,7 +11,10 @@ import helium314.keyboard.latin.settings.KeyboardIdUpgrade
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
+import helium314.keyboard.latin.personalization.LearnedKeyboards
+import helium314.keyboard.latin.personalization.LearnedStores
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
+import helium314.keyboard.latin.utils.RemovedWords
 import helium314.keyboard.latin.utils.protectedPrefs
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.preferences.BackupRestoreJob
@@ -60,6 +63,7 @@ class FullRestoreL2Test {
         KeyboardProfiles.loadGroups(real)
         ctx.filesDir.deleteRecursively()
         DeviceProtectedUtils.getFilesDir(ctx).deleteRecursively()
+        RemovedWords.cachedIn(ctx.filesDir).forEach { it.reload() } // (the lists held for the process: empty again)
         zip.delete()
     }
 
@@ -135,5 +139,44 @@ class FullRestoreL2Test {
         FullRestore.afterCheck = { zip.writeText("not a zip any more") }
         assertEquals("u", fullRestoreJob())
         assertUnchanged(followedUp)
+    }
+
+    // L2 (3): a blacklist change made while the restore ran was put on top of the restored file of the same pool number
+    // (its file name), whichever keyboard has that number in the backup, with the count it made on the old list
+    @Test fun `a strike during the restore goes to its keyboard's restored list by id, one more on the restored count`() {
+        // the device: keyboard k1 learns into pool 11, "word" removed twice
+        real.edit().putString(LearnedKeyboards.PREF_POOLS, "{\"k1\":11}").putInt(LearnedKeyboards.PREF_POOL_NEXT, 12)
+            .putBoolean(LearnedKeyboards.PREF_DONE, true).commit()
+        val deviceFile = LearnedStores.blacklistFile(ctx.filesDir, "Latn", 11)
+        deviceFile.parentFile!!.mkdirs()
+        deviceFile.writeText("word\t2\n")
+        val list = RemovedWords.forFile(deviceFile)
+        list.reload() // (the keyboard holds k1's list, read)
+        // the backup: k1 is pool 5 there, "word" removed 4 times; pool 11 is another keyboard's, k2
+        val k2 = SettingsSubtype(Locale.GERMANY, "").withId(2)
+        ZipOutputStream(zip.outputStream()).use { z ->
+            z.putNextEntry(ZipEntry("blacklists/k5/Latn.txt")); z.write("word\t4\n".toByteArray()); z.closeEntry()
+            z.putNextEntry(ZipEntry("blacklists/k11/Latn.txt")); z.write("other\n".toByteArray()); z.closeEntry()
+            z.putNextEntry(ZipEntry("preferences.json"))
+            val both = keyboard.toPref() + helium314.keyboard.latin.common.Constants.Separators.SETS + k2.toPref()
+            settingsToJsonStream(mapOf<String?, Any?>(Settings.PREF_ENABLED_SUBTYPES to both,
+                Settings.PREF_ADDITIONAL_SUBTYPES to both, Settings.PREF_SELECTED_SUBTYPE to keyboard.toPref(),
+                KeyboardIdUpgrade.DONE to true, Settings.PREF_VERSION_CODE to helium314.keyboard.latin.BuildConfig.MIGRATION_VERSION,
+                LearnedKeyboards.PREF_POOLS to "{\"k1\":5,\"k2\":11}", LearnedKeyboards.PREF_POOL_NEXT to 12,
+                LearnedKeyboards.PREF_DONE to true), z)
+            z.closeEntry()
+            z.putNextEntry(ZipEntry("protected_preferences.json"))
+            settingsToJsonStream(emptyMap<String?, Any?>(), z)
+            z.closeEntry()
+        }
+        // the keyboard's Remove of "word" (on k1's list as it holds it) while the restore copies the files
+        FullRestore.afterStep = { if (it == "preferences.json") list.strike("word") }
+        restoreEverythingFrom(ctx, zip)
+
+        val k1File = LearnedStores.blacklistFile(ctx.filesDir, "Latn", 5)
+        assertEquals(listOf("word\t5"), k1File.readLines().filter { it.isNotEmpty() }, "k1's restored list: one more strike")
+        assertEquals(RemovedWords.Entry(5), RemovedWords.forFile(k1File).entries()["word"])
+        assertEquals(listOf("other"), deviceFile.readLines().filter { it.isNotEmpty() }, "k2's list got k1's strike")
+        assertEquals(setOf("other"), list.entries().keys)
     }
 }

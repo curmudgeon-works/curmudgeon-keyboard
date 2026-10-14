@@ -245,6 +245,15 @@ object RemovedWords {
             allowed.filterKeys { it !in entries }.map { it.key to formatAllowed(it.key, it.value) })
             .sortedBy { it.first }.joinToString("") { it.second + "\n" }
 
+    /** A change made on a list while a full restore ran (RestoreGate), as it was made: one more strike, not the count it
+     *  made then (review 2026-10-12 L2). At the restore's end it is made again on the restored list of the same keyboard
+     *  ([WordListFile.takeGated], [WordListFile.redo]). */
+    sealed interface GatedOp { val word: String }
+    data class GatedStrike(override val word: String) : GatedOp
+    data class GatedConfirm(override val word: String) : GatedOp
+    data class GatedTakeOff(override val word: String) : GatedOp
+    data class GatedAllow(override val word: String, val level: Int) : GatedOp
+
     // a change in memory, not written yet
     private sealed interface Change
     private class Block(val entry: Entry) : Change
@@ -261,6 +270,34 @@ object RemovedWords {
         private val strikesWhileLoading = HashMap<String, Int>()
         @Volatile private var loaded = false
         private val lock = Any()
+        // the changes made while a full restore ran, as made ([GatedOp])
+        private val gatedOps = ArrayList<GatedOp>()
+
+        private fun recordGated(op: GatedOp) { if (RestoreGate.isSet) gatedOps.add(op) }
+
+        /**
+         * The changes made on this list while a full restore ran ([GatedOp]), taken off it: not put on top of its file
+         * again (the file of this pool number can be another keyboard's after the restore, and their counts are the old
+         * list's); the caller makes them again, by keyboard, with [redo] (review 2026-10-12 L2).
+         */
+        fun takeGated(): List<GatedOp> = synchronized(lock) {
+            val ops = gatedOps.toList()
+            gatedOps.clear()
+            for (op in ops) { pending.remove(op.word); strikesWhileLoading.remove(op.word) }
+            ops
+        }
+
+        /** [ops] made on this list (read first), as made: a strike is one more on the count it has here. Call off the
+         *  main thread. */
+        fun redo(ops: List<GatedOp>) {
+            ensureLoaded()
+            for (op in ops) when (op) {
+                is GatedStrike -> strike(op.word)
+                is GatedConfirm -> confirm(op.word)
+                is GatedTakeOff -> takeOff(op.word)
+                is GatedAllow -> allow(op.word, op.level)
+            }
+        }
 
         fun contains(word: String) = byWord.containsKey(word)
 
@@ -391,6 +428,7 @@ object RemovedWords {
         fun allow(word: String, level: Int): Boolean = synchronized(lock) {
             if (allowedByWord[word] == level && !byWord.containsKey(word)) return false
             setAllowed(word, level)
+            recordGated(GatedAllow(word, level))
             true
         }
 
@@ -414,6 +452,7 @@ object RemovedWords {
             // (a fresh Remove: never confirmed, whatever the borrowed entry had)
             val strikes = Entry((byWord[word]?.strikes ?: 0) + 1).max(floor).strikes
             set(word, Entry(strikes))
+            recordGated(GatedStrike(word))
             return strikes
         }
 
@@ -422,6 +461,7 @@ object RemovedWords {
             val entry = byWord[word] ?: return false
             if (!needsConfirmation(entry.strikes) || entry.confirmed) return false
             set(word, entry.copy(confirmed = true))
+            recordGated(GatedConfirm(word))
             true
         }
 
@@ -431,6 +471,7 @@ object RemovedWords {
             synchronized(lock) {
                 if (!byWord.containsKey(word)) return false
                 set(word, null)
+                recordGated(GatedTakeOff(word))
             }
             return true
         }
@@ -440,6 +481,7 @@ object RemovedWords {
         fun takeOff(word: String): Boolean = synchronized(lock) {
             if (!byWord.containsKey(word)) return false
             set(word, null)
+            recordGated(GatedTakeOff(word))
             true
         }
 
