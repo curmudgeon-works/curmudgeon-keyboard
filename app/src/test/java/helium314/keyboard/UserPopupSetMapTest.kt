@@ -65,4 +65,24 @@ class UserPopupSetMapTest {
         keepUserPopupSetsSymbolMap(real)
         assertNull(real.getString(KeyboardProfiles.ownKey(1, Settings.PREF_SYMBOL_POPUP_MAP), null))
     }
+
+    @Test fun `a keyboard restored on its own from an older backup gets its picked set's map - a built-in set's keyboard nothing`() {
+        keepUserPopupSetsSymbolMap(real) // (the phone's sets have their maps)
+        val backup = mapOf<String, Any?>(KeyPopupOverrides.PREF_SETS to real.getString(KeyPopupOverrides.PREF_SETS, null))
+        val picked = helium314.keyboard.settings.preferences.withUserPopupSetMap(real, backup,
+            mapOf(KeyPopupOverrides.PREF_SELECTED_SET to "Revamped popups"))
+        assertEquals(Defaults.CURMUDGEON_SYMBOL_POPUP_MAP, picked[Settings.PREF_SYMBOL_POPUP_MAP])
+        val builtIn = mapOf<String, Any?>("other" to 1)
+        assertEquals(builtIn, helium314.keyboard.settings.preferences.withUserPopupSetMap(real, backup, builtIn))
+    }
+
+    @Test fun `a popup set a Layout brings back is whole - today's default map written in, not left to follow it`() {
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        real.edit().putString(KeyPopupOverrides.PREF_SETS, "[]").commit() // (the set was deleted)
+        val layout = LayoutPresets.Preset("Mine", mapOf(KeyPopupOverrides.PREF_SELECTED_SET to "Revamped popups", "script" to "Latn"))
+        LayoutPresets.restorePopupSet(ctx, helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.US, ""), layout)
+        val set = KeyPopupOverrides.loadSets(real).single()
+        assertEquals(Defaults.PREF_SYMBOL_POPUP_MAP, set.symbolMap) // (null before: it followed every later default)
+        assertEquals(Defaults.PREF_POPUP_KEYS_ORDER, set.popupOrder)
+    }
 }

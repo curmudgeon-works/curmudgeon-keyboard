@@ -698,8 +698,28 @@ internal fun restoredSettings(ctx: Context, backup: Map<String, Any?>, keyboard:
     val values = KeyboardProfiles.effectiveSettingsIn(backup, keyboard)
         .let { values -> if (backup[helium314.keyboard.latin.PICKED_ONLY_DONE] == true) values else helium314.keyboard.latin.withoutDefaults(values) }
     // (after the defaults went, so a HeliBoard value that equals a default is never stripped as one)
-    return if (backup[helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE] == true) values
+    val pinned = if (backup[helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE] == true) values
         else helium314.keyboard.latin.withHeliBoardPins(ctx, values)
+    return if (backup[helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE] == true) pinned
+        else withUserPopupSetMap(ctx.realPrefs(), backup, pinned)
+}
+
+/**
+ * A keyboard restored on its own from a backup made before [helium314.keyboard.latin.keepUserPopupSetsSymbolMap]: if it
+ * chose a user popup set and keeps no symbol map, it gets the set's (the phone's set of that name, else the backup's,
+ * else the Curmudgeon map such a set showed), as the step gives the keyboards on the phone (review 2026-10-11: a
+ * partial restore skipped it, and the keyboard lost its symbols again).
+ */
+internal fun withUserPopupSetMap(real: android.content.SharedPreferences, backup: Map<String, Any?>, values: Map<String, Any?>): Map<String, Any?> {
+    val name = values[helium314.keyboard.latin.utils.KeyPopupOverrides.PREF_SELECTED_SET] as? String ?: return values
+    if (values[Settings.PREF_SYMBOL_POPUP_MAP] != null) return values
+    val onPhone = helium314.keyboard.latin.utils.KeyPopupOverrides.loadSets(real).firstOrNull { it.name == name }
+    val inBackup = (backup[helium314.keyboard.latin.utils.KeyPopupOverrides.PREF_SETS] as? String)?.let { json ->
+        runCatching { org.json.JSONArray(json) }.getOrNull()?.let { a -> (0 until a.length()).map { a.getJSONObject(it) }.firstOrNull { it.optString("name") == name } } }
+    if (onPhone == null && inBackup == null) return values // (not a user set: a built-in one names its own map)
+    val map = onPhone?.symbolMap ?: inBackup?.optString("symbolMap")?.takeIf { inBackup.has("symbolMap") }
+        ?: helium314.keyboard.latin.settings.Defaults.CURMUDGEON_SYMBOL_POPUP_MAP
+    return values + (Settings.PREF_SYMBOL_POPUP_MAP to map)
 }
 
 /** Restores [keyboards] from the backup [file] as the restore dialog does when not every keyboard is chosen (tests). */

@@ -163,10 +163,14 @@ object LayoutPresets {
         val overrides = (preset.values[KeyPopupOverrides.PREF] as? String)?.let { json ->
             runCatching { JSONObject(json).let { o -> o.keys().asSequence().associateWith { k ->
                 val a = o.getJSONArray(k); List(a.length()) { a.getString(it) } } } }.getOrNull() } ?: emptyMap()
+        // the set comes back whole: a value the Layout kept as "default" is written in as today's default, so it shows
+        // what it shows now and no later default change takes it away (review 2026-10-11: it came back without a map,
+        // the 0.3.012 popups bug again)
         KeyPopupOverrides.saveSets(real, sets + KeyPopupOverrides.UserSet(name,
             preset.values[MORE_POPUPS] as? String ?: ctx.prefs().getString(Settings.PREF_MORE_POPUP_KEYS, Defaults.PREF_MORE_POPUP_KEYS)!!,
             preset.values[LAYOUT + LayoutType.SYMBOLS.name] as? String, overrides,
-            preset.values[Settings.PREF_SYMBOL_POPUP_MAP] as? String, preset.values[Settings.PREF_POPUP_KEYS_ORDER] as? String))
+            preset.values[Settings.PREF_SYMBOL_POPUP_MAP] as? String ?: Defaults.PREF_SYMBOL_POPUP_MAP,
+            preset.values[Settings.PREF_POPUP_KEYS_ORDER] as? String ?: Defaults.PREF_POPUP_KEYS_ORDER))
     }
 
     /** [values] (settings part) replace the current ones: null and missing keys go back to their default. */
