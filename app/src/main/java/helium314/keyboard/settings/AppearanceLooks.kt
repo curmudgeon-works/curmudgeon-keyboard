@@ -100,6 +100,17 @@ object AppearanceLooks {
     // folder of copies per look (its uuid), converted at app start by [migratePictureFolders]
     private const val LIB = "lib:"
 
+    // a slot is the plain picture name, the same on every keyboard (custom_background_image[_landscape][_night]): a
+    // keyboard's own file has its set's "_p<id>" on it, which themes saved before 2026-10-10 kept, so applied on another
+    // keyboard none matched and its pictures were deleted (review 2026-10-08 M5); old names are read without it (2026-10-10)
+    private val keyboardSuffix = Regex("_p\\d+$")
+    internal fun slotOf(fileName: String): String =
+        if (fileName.endsWith(".framing")) slotOf(fileName.removeSuffix(".framing")) + ".framing"
+        else fileName.replace(keyboardSuffix, "")
+    // a look's slots by their plain names (a plain name wins over an old one, should a look have both)
+    private fun slotsOf(refs: JSONObject): Map<String, JSONObject> = refs.keys().asSequence()
+        .sortedBy { slotOf(it) == it }.mapNotNull { k -> refs.optJSONObject(k)?.let { slotOf(k) to it } }.toMap()
+
     /** The background pictures there are now, as a look stores them: their library names (each added to the library
      *  if it isn't there) with their framing; [NO_PICTURES] when there are none. */
     fun savePictures(ctx: Context): String {
@@ -109,7 +120,7 @@ object AppearanceLooks {
             val name = PictureLibrary.nameOf(ctx, live) ?: continue
             val slot = JSONObject().put("p", name)
             PictureFraming.fileFor(live).takeIf { it.isFile }?.let { slot.put("f", it.readText()) }
-            o.put(live.name, slot)
+            o.put(slotOf(live.name), slot)
         }
         return if (o.length() == 0) NO_PICTURES else LIB + o.toString()
     }
@@ -134,7 +145,7 @@ object AppearanceLooks {
                 if (name == null) { complete = false; continue } // (couldn't be copied: the folder stays for the next start)
                 val slot = JSONObject().put("p", name)
                 java.io.File(dir, file.name + ".framing").takeIf { it.isFile }?.let { slot.put("f", it.readText()) }
-                o.put(file.name, slot)
+                o.put(slotOf(file.name), slot)
             }
             // the folder goes only once every picture is in the library (review session 2026-10-07: a failed copy lost it)
             if (!complete) return@map look
@@ -154,11 +165,11 @@ object AppearanceLooks {
      *  part of looks, or whose picture folder is missing (restored from a backup without it), leaves them as they are. */
     fun applyPictures(ctx: Context, look: Look) {
         val id = look.values[PICTURES] as? String ?: return
-        val refs = refsOf(id)
+        val refs = refsOf(id)?.let { slotsOf(it) }
         if (refs != null) {
             for (live in livePictures(ctx)) {
                 if (live.name.endsWith(".framing")) continue
-                val slot = refs.optJSONObject(live.name)
+                val slot = refs[slotOf(live.name)]
                 val framing = PictureFraming.fileFor(live)
                 if (slot == null) { live.delete(); framing.delete(); continue }
                 val source = PictureLibrary.file(ctx, slot.optString("p"))
@@ -172,8 +183,9 @@ object AppearanceLooks {
         val dir = if (id == NO_PICTURES) null else picturesDir(ctx, id)
         // its pictures aren't there: the background stays (review 2026-10-06: it was deleted)
         if (dir != null && !dir.isDirectory) { reload(ctx); return }
+        val folder = dir?.listFiles().orEmpty().associateBy { slotOf(it.name) }
         for (live in livePictures(ctx)) {
-            val saved = dir?.let { java.io.File(it, live.name) }
+            val saved = folder[slotOf(live.name)]
             if (saved?.exists() == true) saved.copyTo(live, overwrite = true) else live.delete()
         }
         reload(ctx)
@@ -186,18 +198,17 @@ object AppearanceLooks {
         val id = look.values[PICTURES] as? String ?: return false // saved before pictures were in themes: not compared
         // a picture by its size, a framing (a few bytes of the same length whatever it says) by its content
         fun sig(f: java.io.File): Any = if (f.name.endsWith(".framing")) f.readText() else f.length()
-        val live = livePictures(ctx).filter { it.exists() }.associate { it.name to sig(it) }
-        refsOf(id)?.let { refs ->
+        val live = livePictures(ctx).filter { it.exists() }.associate { slotOf(it.name) to sig(it) }
+        refsOf(id)?.let { slotsOf(it) }?.let { refs ->
             val saved = HashMap<String, Any>()
-            for (slot in refs.keys()) {
-                val o = refs.getJSONObject(slot)
+            for ((slot, o) in refs) {
                 val lib = PictureLibrary.file(ctx, o.optString("p"))
                 saved[slot] = if (lib.isFile) lib.length() else -1L
                 if (o.has("f")) saved["$slot.framing"] = o.getString("f")
             }
             return saved != live
         }
-        val saved = if (id == NO_PICTURES) emptyMap() else picturesDir(ctx, id).listFiles()?.associate { it.name to sig(it) } ?: emptyMap()
+        val saved = if (id == NO_PICTURES) emptyMap() else picturesDir(ctx, id).listFiles()?.associate { slotOf(it.name) to sig(it) } ?: emptyMap()
         return saved != live
     }
 
