@@ -14,6 +14,7 @@ import helium314.keyboard.settings.screens.layoutFilesSaved
 import helium314.keyboard.settings.screens.paletteEditorSaved
 import helium314.keyboard.idKey
 import helium314.keyboard.kid
+import helium314.keyboard.withId
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -39,6 +40,13 @@ class SubScreenSaveTest {
     // a palette as the editor stores it (the keyboard reads it as it loads), before and after a color change
     private val before = """[{"name":"background","auto":false,"color":-1}]"""
     private val edited = """[{"name":"background","auto":false,"color":-16777216}]"""
+
+    /** Keyboards 1 and 2 on the phone, for the tests writing keyboard 1's own set: a write for no keyboard of the phone
+     *  is dropped (2026-10-12). Not selected: the screens' set stays as it was. */
+    private fun listed() = helium314.keyboard.storeKeyboards(ctx, real, listOf(
+        helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.US, "").withId(1),
+        helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.FRANCE, "").withId(2)),
+        selected = null, reload = false)
 
     /** Separate settings, keyboard 1 edited; keyboard 2 on theme "Sunset", palette "Warm" and popup set "Mine". */
     @Before fun setUp() {
@@ -90,6 +98,7 @@ class SubScreenSaveTest {
 
     // C2
     @Test fun `a popup set deleted on Layout and Typing comes back on its Discard after Customize popups saved`() {
+        listed()
         val draft = LayoutDraft.of(ctx, "en_US:") // Layout & Typing opens
         deletePopupSet(ctx, "Mine")
         assertTrue(KeyPopupOverrides.loadSets(real).isEmpty())
@@ -156,6 +165,7 @@ class SubScreenSaveTest {
     // review S2 (owner 2026-10-11, S2: "yes let's keep saved subscreen changes"): the undo after a crash is no Discard
     // either: what a sub-screen saved stays, the parent's own changes go
     @Test fun `after a crash, Customize popups' save stays and the parent's set delete is undone`() {
+        listed()
         LayoutDraft.of(ctx, "en_US:")
         deletePopupSet(ctx, "Mine")
         LayoutDraft.subScreenOpenedOpen(ctx) // Customize popups opens
@@ -185,6 +195,7 @@ class SubScreenSaveTest {
 
     // a key the parent changed too, after the sub-screen saved it: the sub-screen's saved value wins when the app is left
     @Test fun `leaving the app - a key the parent changed after the sub-screen saved it goes back to the saved value`() {
+        listed()
         LayoutDraft.of(ctx, "en_US:")
         LayoutDraft.subScreenOpenedOpen(ctx)
         KeyPopupOverrides.save(ProfilePreferences(real) { kid(1) }, mapOf("e" to listOf("é")))
@@ -197,6 +208,7 @@ class SubScreenSaveTest {
 
     // the parent's own Discard is unchanged: it undoes the sub-screen's save too
     @Test fun `the parent's Discard still undoes a recorded sub-screen save`() {
+        listed()
         val draft = LayoutDraft.of(ctx, "en_US:")
         LayoutDraft.subScreenOpenedOpen(ctx)
         KeyPopupOverrides.save(ProfilePreferences(real) { kid(1) }, mapOf("e" to listOf("é")))

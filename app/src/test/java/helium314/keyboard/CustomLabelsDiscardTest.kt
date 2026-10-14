@@ -40,6 +40,13 @@ class CustomLabelsDiscardTest {
 
     /** Separate settings; keyboard 2 on theme "Sunset", Layout "Work", popup set "Mine"; keyboard 1 already has a Custom
      *  label of each kind. */
+    /** Keyboards 1 and 2 on the phone, for the tests writing keyboard 2's own set through a view: a write for no
+     *  keyboard of the phone is dropped (2026-10-12). Not selected: the screens' set stays as it was. */
+    private fun listed() = storeKeyboards(ctx, real, listOf(
+        helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.US, "").withId(1),
+        helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.FRANCE, "").withId(2)),
+        selected = null, reload = false)
+
     @Before fun setUp() {
         real.edit().clear()
             .putBoolean("separate_settings_per_keyboard", true)
@@ -74,6 +81,7 @@ class CustomLabelsDiscardTest {
     }
 
     @Test fun `a Custom label alone is no unsaved change on Appearance, and Discard takes it back`() {
+        listed()
         val draft = AppearanceDraft.of(ctx)
         CustomLabels.mark(ProfilePreferences(real) { kid(2) }, CustomLabels.Kind.THEME)
         CustomLabels.mark(real, CustomLabels.Kind.THEME) // (a plain one too, as the old common set had; no common set since 2026-10-11)
@@ -115,6 +123,7 @@ class CustomLabelsDiscardTest {
     }
 
     @Test fun `a Custom label alone is no unsaved change on Layout and Typing`() {
+        listed()
         val draft = LayoutDraft.of(ctx, "en_US:")
         CustomLabels.mark(ProfilePreferences(real) { kid(2) }, CustomLabels.Kind.LAYOUT)
         assertFalse(draft.hasChanges(ctx))

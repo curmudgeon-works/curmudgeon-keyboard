@@ -103,6 +103,9 @@ class CustomLabelsNoNumberTest {
     }
 
     @Test fun `Discard still drops a label added while the screen was open`() {
+        // (both on the phone: a write for no keyboard of the phone is dropped, 2026-10-12)
+        storeKeyboards(ctx, real, listOf(SettingsSubtype(Locale.US, "").withId(1), SettingsSubtype(Locale.FRANCE, "").withId(2)),
+            selected = null, reload = false)
         real.edit().putInt(own(1, theme), 1).commit()
         AppearanceDraft.of(ctx)
         view(2).edit().putInt(theme, 1).commit() // (as the row does when it first shows the label)
