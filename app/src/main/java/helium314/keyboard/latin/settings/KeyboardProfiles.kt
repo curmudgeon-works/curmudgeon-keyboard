@@ -310,10 +310,11 @@ object KeyboardProfiles {
     fun idOrNull(real: SharedPreferences, keyboard: SettingsSubtype): Int? =
         ids(real).let { map -> keyboard.toPref().takeIf { map.has(it) }?.let { map.getInt(it) } }
 
-    /** Whether [keyboard] is in the keyboard list as stored. */
-    fun isListed(real: SharedPreferences, keyboard: SettingsSubtype): Boolean =
-        keyboard in helium314.keyboard.latin.utils.SubtypeSettings.createSettingsSubtypes(
-            real.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!)
+    /** Whether [keyboard] is in the keyboard list as stored, by identity (its pref string, what the records are keyed by;
+     *  two Locale objects of one tag can differ). */
+    fun isListed(real: SharedPreferences, keyboard: SettingsSubtype): Boolean = keyboard.toPref().let { key ->
+        helium314.keyboard.latin.utils.SubtypeSettings.createSettingsSubtypes(
+            real.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!).any { it.toPref() == key } }
 
     /** [keyboard]'s id for a write a user asked for (a screen's tap, an update dialog): its own, else one now if it's in
      *  the list (the net, for one keyboard); null for a keyboard neither listed nor with an id (nothing is written).
@@ -339,7 +340,7 @@ object KeyboardProfiles {
             if (idOrNull(real, keyboard) == null) {
                 idFor(real, keyboard)
                 created = true
-                if (keyboard == selected) selectedGotId = true
+                if (keyboard.toPref() == selected.toPref()) selectedGotId = true
             }
             if (helium314.keyboard.latin.personalization.LearnedKeyboards.ensurePool(real, keyboard)) created = true
         }

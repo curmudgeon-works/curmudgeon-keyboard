@@ -54,7 +54,8 @@ class GhostRecordsTest {
     private val real = ctx.realPrefs()
     private val en = SubtypeUtilsAdditional.createDefaultSubtype(Locale.US).toSettingsSubtype()
     private val de = SubtypeSettings.getResourceSubtypesForLocale(Locale.GERMANY).first().toSettingsSubtype()
-    private val fr = SubtypeSettings.getResourceSubtypesForLocale(Locale.FRANCE).first().toSettingsSubtype()
+    private val fr = SubtypeSettings.getAvailableSubtypeLocales().first { it.language == "fr" }
+        .let { SubtypeSettings.getResourceSubtypesForLocale(it).first().toSettingsSubtype() }
 
     @Before fun setUp() {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
