@@ -49,10 +49,11 @@ class DarkModeTest {
         assertFalse(KeyboardTheme.isNight(ctx, prefs))
     }
 
-    // decision 2026-10-07: on a phone without wallpaper colors (Android 10, 11), Dynamic shows Midnight, not a white keyboard
-    @Test fun `Dynamic falls back to Midnight below Android 12`() {
-        assertEquals(KeyboardTheme.THEME_BLACK, KeyboardTheme.dynamicFallback(android.os.Build.VERSION_CODES.R))
-        assertEquals(KeyboardTheme.THEME_BLACK, KeyboardTheme.dynamicFallback(android.os.Build.VERSION_CODES.Q))
+    // on a device without wallpaper colors (Android 10, 11), Dynamic shows Curmudgeon's colors (owner 2026-10-13, L5.1b;
+    // Midnight's from 2026-10-07), not a white keyboard. Fail before L5.1b: Black
+    @Test fun `Dynamic falls back to Curmudgeon below Android 12`() {
+        assertEquals(KeyboardTheme.THEME_CURMUDGEON, KeyboardTheme.dynamicFallback(android.os.Build.VERSION_CODES.R))
+        assertEquals(KeyboardTheme.THEME_CURMUDGEON, KeyboardTheme.dynamicFallback(android.os.Build.VERSION_CODES.Q))
         assertEquals(KeyboardTheme.THEME_DYNAMIC, KeyboardTheme.dynamicFallback(android.os.Build.VERSION_CODES.S))
     }
 

@@ -58,9 +58,10 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
         const val THEME_DARKER = "darker"
         const val THEME_BLACK = "black"
         const val THEME_DYNAMIC = "dynamic"
-        /** What Dynamic (wallpaper colors, Android 12+) shows on an older phone: Midnight's black (decision 2026-10-07;
-         *  it fell back to Light, a white keyboard in dark mode too). */
-        fun dynamicFallback(sdk: Int): String = if (sdk >= Build.VERSION_CODES.S) THEME_DYNAMIC else THEME_BLACK
+        /** What Dynamic (wallpaper colors, Android 12+) shows on an older device: Curmudgeon's colors, black with the
+         *  orange swipe trail (owner 2026-10-13, L5.1b; Midnight's black from 2026-10-07; before, Light, a white keyboard
+         *  in dark mode too). */
+        fun dynamicFallback(sdk: Int): String = if (sdk >= Build.VERSION_CODES.S) THEME_DYNAMIC else THEME_CURMUDGEON
         // Black's colors with Curmudgeon's orange swipe trail (the suggestions follow the trail) (2026-10-06)
         const val THEME_CURMUDGEON = "curmudgeon"
         const val THEME_BLUE_GRAY = "blue_gray"

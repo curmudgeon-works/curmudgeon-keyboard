@@ -653,7 +653,7 @@ private fun SavedLooksPreference(setting: Setting) {
     // the chosen theme's name; "tweaked" when a value it sets (or its pictures) differs now, "unsaved" while the
     // theme's part of the screen has changes not saved yet
     // (none chosen: the default look, Dynamic, named until another theme is chosen; "tweaked" if anything differs from it)
-    // (older than Android 12: Midnight, review L5.1)
+    // (older than Android 12: Curmudgeon, review L5.1b)
     val chosenName = prefs.getString(AppearanceLooks.PREF_SELECTED, null) ?: AppearanceLooks.defaultName(ctx)
     val chosen = chosenName?.let { name -> (builtIn + looks).firstOrNull { it.name == name } }
     // differs from the chosen theme (none chosen: the default look): the keyboard's own copy, "Custom · from Sunset"
