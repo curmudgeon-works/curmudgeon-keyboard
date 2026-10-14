@@ -76,7 +76,7 @@ fun LayoutEditDialog(
     fun write(text: String) {
             // a keyboard's unsaved layout, its name untouched: stays its own copy
             if (startIsCustom && LayoutUtilsCustom.isPrivateLayout(initialLayoutName) && displayNameValue.text == startDisplayName) {
-                LayoutUtilsCustom.getLayoutFile(initialLayoutName, layoutType, ctx).writeText(text)
+                helium314.keyboard.latin.utils.AtomicFiles.write(LayoutUtilsCustom.getLayoutFile(initialLayoutName, layoutType, ctx), text)
                 LayoutUtilsCustom.onLayoutFileChanged()
                 onEdited(initialLayoutName)
                 (ctx.getActivity() as? SettingsActivity)?.prefChanged()
@@ -88,7 +88,7 @@ fun LayoutEditDialog(
                 LayoutUtilsCustom.getLayoutFile(initialLayoutName, layoutType, ctx).delete()
                 SubtypeSettings.onRenameLayout(layoutType, initialLayoutName, newLayoutName, ctx)
             }
-            LayoutUtilsCustom.getLayoutFile(newLayoutName, layoutType, ctx).writeText(text)
+            helium314.keyboard.latin.utils.AtomicFiles.write(LayoutUtilsCustom.getLayoutFile(newLayoutName, layoutType, ctx), text)
             LayoutUtilsCustom.onLayoutFileChanged()
             onEdited(newLayoutName)
             (ctx.getActivity() as? SettingsActivity)?.prefChanged()

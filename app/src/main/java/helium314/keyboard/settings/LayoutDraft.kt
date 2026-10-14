@@ -8,6 +8,7 @@ import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
+import helium314.keyboard.latin.utils.AtomicFiles
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.LayoutUtilsCustom
 import helium314.keyboard.latin.utils.SubtypeSettings
@@ -60,7 +61,7 @@ class LayoutDraft private constructor(
     fun subScreenSaved(screen: SubScreen) {
         savedSubScreens += screen
         writes.saved()
-        File(dir, SUB_SAVES_FILE).writeText(org.json.JSONArray(savedSubScreens.map { it.name }).toString())
+        AtomicFiles.write(File(dir, SUB_SAVES_FILE), org.json.JSONArray(savedSubScreens.map { it.name }).toString())
     }
 
     // (no rebase: the Save of a screen opened from here, Customize popups or the layout files, leaves this snapshot as
@@ -251,7 +252,7 @@ class LayoutDraft private constructor(
             val json = JSONObject().put("subtype", subtype).put("layouts", hasLayouts).put("learnedDone", learnedDone)
             labels.toJson(json)
             json.put("prefs", JSONObject().also { o -> prefs.forEach { (k, v) -> AppearanceLooks.toJson(v)?.let { o.put(k, it) } } })
-            File(dir, PREFS_FILE).writeText(json.toString())
+            AtomicFiles.write(File(dir, PREFS_FILE), json.toString()) // (crash-safe: never half a snapshot, B4w.2)
         }
 
         /** The screen is left with nothing changed, or a keyboard deleted: the snapshot goes. */

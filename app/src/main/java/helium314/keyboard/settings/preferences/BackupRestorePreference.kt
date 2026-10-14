@@ -1880,7 +1880,7 @@ private fun writeKeyLayouts(ctx: Context, keyLayouts: SavedItemsMerge.KeyLayouts
         val target = File(folder, name)
         if (!target.canonicalPath.startsWith(folder.canonicalPath + File.separator) || target.exists()) continue
         folder.mkdirs()
-        target.writeBytes(bytes)
+        helium314.keyboard.latin.utils.AtomicFiles.write(target, bytes) // (crash-safe, B4w.2)
         wrote = true
     }
     if (wrote) LayoutUtilsCustom.onLayoutFileChanged()

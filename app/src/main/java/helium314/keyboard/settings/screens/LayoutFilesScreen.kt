@@ -140,7 +140,7 @@ fun LayoutFilesScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
                 text == builtIn(t) -> after.withLayout(t, builtInName(t))
                 // (its own copy, rewritten in place: of the letters, only one scoped to its language)
                 current != null && LayoutUtilsCustom.isPrivateLayout(current) && LayoutUtilsCustom.scopeOf(current, t) == scope(t) -> {
-                    LayoutUtilsCustom.getLayoutFile(current, t, ctx).writeText(text); after }
+                    helium314.keyboard.latin.utils.AtomicFiles.write(LayoutUtilsCustom.getLayoutFile(current, t, ctx), text); after }
                 else -> after.withLayout(t, LayoutUtilsCustom.makePrivateLayout(text, t, scope(t), ctx))
             }
             saved[t] = text

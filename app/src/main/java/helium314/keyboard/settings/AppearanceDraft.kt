@@ -268,12 +268,9 @@ class AppearanceDraft private constructor(
             writeAtomically(File(dir, HELD_FILE), org.json.JSONArray(held.toList()).toString())
 
         /** [text] into [file] through a temporary file renamed over it: a crash mid-write leaves the old file whole, never
-         *  half a list (owner 2026-10-12 B4: a half-written held list lost the held fonts and pictures). */
-        private fun writeAtomically(file: File, text: String) {
-            val tmp = File(file.parentFile, file.name + ".tmp")
-            tmp.writeText(text)
-            if (!tmp.renameTo(file)) { file.writeText(text); tmp.delete() }
-        }
+         *  half a list (owner 2026-10-12 B4: a half-written held list lost the held fonts and pictures; shared since
+         *  B4w.2, [helium314.keyboard.latin.utils.AtomicFiles]). */
+        private fun writeAtomically(file: File, text: String) = helium314.keyboard.latin.utils.AtomicFiles.write(file, text)
 
         private fun readHeld(dir: File): List<String> =
             runCatching { org.json.JSONArray(File(dir, HELD_FILE).readText()) }.getOrNull()

@@ -107,7 +107,9 @@ object LayoutUtilsCustom {
 
     fun getLayoutFiles(layoutType: LayoutType, context: Context, locale: Locale? = null): List<File> {
         val layouts = customLayoutMap.getOrPut(layoutType) {
-            File(DeviceProtectedUtils.getFilesDir(context), layoutType.folder).listFiles()?.toList() ?: emptyList()
+            // (not a crash-safe write's temporary file, AtomicFiles)
+            File(DeviceProtectedUtils.getFilesDir(context), layoutType.folder).listFiles()
+                ?.filterNot { it.name.endsWith(AtomicFiles.TMP_SUFFIX) } ?: emptyList()
         }
         if (layoutType != LayoutType.MAIN || locale == null)
             return layouts
@@ -257,7 +259,7 @@ object LayoutUtilsCustom {
     /** A private layout (one keyboard's, unnamed) with [text] as its keys; returns its name. */
     fun makePrivateLayout(text: String, layoutType: LayoutType, scope: String, context: Context): String {
         val name = newPrivateLayoutName(layoutType, scope) { getLayoutFile(it, layoutType, context).exists() }
-        getLayoutFile(name, layoutType, context).writeText(text)
+        AtomicFiles.write(getLayoutFile(name, layoutType, context), text) // (crash-safe, B4w.2)
         onLayoutFileChanged()
         return name
     }
@@ -317,7 +319,7 @@ object LayoutUtilsCustom {
      *  old name as its pick (as before), so the common default, and the edited keyboard reading it, get the edit. The
      *  main keyboard's own set while it holds the common settings is that common one: a pick there too. */
     fun keepOldKeys(name: String, oldFileName: String, type: LayoutType, others: List<helium314.keyboard.latin.settings.SettingsSubtype>, context: Context) {
-        getLayoutFile(oldFileName, type, context).writeText(getLayoutFile(name, type, context).readText())
+        AtomicFiles.write(getLayoutFile(oldFileName, type, context), getLayoutFile(name, type, context).readText())
         onLayoutFileChanged()
         val real = context.realPrefs()
         val key = Settings.PREF_LAYOUT_PREFIX + type.name

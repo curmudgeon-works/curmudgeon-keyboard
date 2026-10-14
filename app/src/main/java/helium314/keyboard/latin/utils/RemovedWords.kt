@@ -395,7 +395,7 @@ object RemovedWords {
             try {
                 if (file.isDirectory) file.delete()
                 file.parentFile?.mkdirs()
-                file.writeText(formatAll(byWord, allowedByWord))
+                AtomicFiles.write(file, formatAll(byWord, allowedByWord)) // (crash-safe: never half a list, B4w.2)
                 pending.clear()
             } catch (e: IOException) {
                 Log.e(TAG, "Exception while trying to write word list ${file.name}", e)

@@ -429,7 +429,7 @@ internal object SavedItemsMerge {
             val target = File(dir, name)
             if (!inside(target)) continue
             val bytes = files(kind, key) ?: continue
-            try { dir.mkdirs(); target.writeBytes(bytes) } catch (e: Exception) { Log.w("SavedItemsMerge", "could not write ${kind.name.lowercase()} $name", e) }
+            try { dir.mkdirs(); helium314.keyboard.latin.utils.AtomicFiles.write(target, bytes) } catch (e: Exception) { Log.w("SavedItemsMerge", "could not write ${kind.name.lowercase()} $name", e) }
         }
     }
 

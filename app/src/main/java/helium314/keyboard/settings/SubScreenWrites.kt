@@ -111,7 +111,7 @@ internal class SubScreenWrites(private val dir: File, private val liveDir: File?
             o.put(k, JSONArray().also { a -> changed.forEach { (id, c) ->
                 a.put(JSONArray().put(id).put(c.element ?: JSONObject.NULL).put(c.added)) } })
         } })
-        File(dir, FILE).writeText(json.toString())
+        helium314.keyboard.latin.utils.AtomicFiles.write(File(dir, FILE), json.toString()) // (crash-safe, B4w.2)
     }
 
     companion object {
