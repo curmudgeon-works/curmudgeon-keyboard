@@ -416,9 +416,13 @@ object SubtypeSettings {
         return true
     }
 
-    private val enabledSubtypes = mutableListOf<InputMethodSubtype>()
+    // (copy on write: a reload runs off the main thread too, e.g. a restore's follow-up on the keyboard executor
+    // (AppUpgrade.onUpgrade), while the keyboard on the main thread goes through the list getEnabledSubtypes hands out;
+    // with a plain list that was a ConcurrentModificationException. A reader may still see the list between its clear
+    // and its new keyboards, as before)
+    private val enabledSubtypes = java.util.concurrent.CopyOnWriteArrayList<InputMethodSubtype>()
     private val resourceSubtypesByLocale = LinkedHashMap<Locale, MutableList<InputMethodSubtype>>(100)
-    private val additionalSubtypes = mutableListOf<InputMethodSubtype>()
+    private val additionalSubtypes = java.util.concurrent.CopyOnWriteArrayList<InputMethodSubtype>()
     private val systemLocales = mutableListOf<Locale>()
     private val systemSubtypes = mutableListOf<InputMethodSubtype>() // (the default keyboard, once worked out)
     private val builtInDictLocales = mutableListOf<Locale>() // the languages of the built-in (asset) main dictionaries
