@@ -74,9 +74,11 @@ internal object RestoreDictionaries {
      *  [renames], the device files renamed first, in order (from -> to; SAME: the device's matching copy last, to
      *  [target]); [select], whether [target] is selected after; [kept], the device's dictionary of that kind the
      *  backup's takes over from, by its name after (a clash: the one moved to "…_prev", else the one already under
-     *  another name; a match: the one moved aside for it), null when none (R-DICT: the restore dialog and summary say it). */
+     *  another name; a match: the one moved aside for it), null when none (R-DICT: the restore dialog and summary say it);
+     *  [unchanged], a match already under the backup's name and in use on the device: nothing changes, and the dialog
+     *  and summary say nothing of it (owner 2026-10-13, 20261013_L3). */
     data class Step(val tag: String, val kind: String, val backupName: String, val action: Action, val target: String,
-                    val renames: List<Pair<String, String>> = emptyList(), val kept: String? = null) {
+                    val renames: List<Pair<String, String>> = emptyList(), val kept: String? = null, val unchanged: Boolean = false) {
         val select get() = action == Action.CLASH || action == Action.SAME
     }
 
@@ -86,9 +88,10 @@ internal object RestoreDictionaries {
 
     /**
      * The step for the backup's [backupName] (content [backupDigest]) of [tag], against [device]: the device's files of
-     * that language, name -> digest (any kind; the plan looks at its kind only).
+     * that language, name -> digest (any kind; the plan looks at its kind only); [selected], the device's selection for
+     * that language and kind (null: none).
      */
-    fun plan(tag: String, backupName: String, backupDigest: String, device: Map<String, String>): Step {
+    fun plan(tag: String, backupName: String, backupDigest: String, device: Map<String, String>, selected: String? = null): Step {
         val kind = kindOf(backupName)
         val sameKind = device.filterKeys { kindOf(it) == kind }
         val target = defaultName(kind)
@@ -96,7 +99,8 @@ internal object RestoreDictionaries {
         if (same.isNotEmpty()) {
             // (B4: the copy of the backup's name if one matches, else the first matching by name, takes the backup's
             // name, the device's of that name with other content moved aside first; then selected)
-            if (backupName in same) return Step(tag, kind, backupName, Action.SAME, backupName)
+            if (backupName in same) return Step(tag, kind, backupName, Action.SAME, backupName,
+                unchanged = inUse(selected, kind, device.keys) == backupName)
             val match = same.sorted().first()
             // (the one of that name moved to the first prev free once the match has left its own name, review B3b: picked
             // before, "main_prev" matching left "main_prev" empty and the old "main" went to "main_prev2"; so the match
@@ -115,16 +119,18 @@ internal object RestoreDictionaries {
     }
 
     /** The steps for the backup's dictionaries of each language: [backup], each file's digest by entry; the backup's
-     *  selections in [backupPrefs]; [device], a language's files on the device (name -> digest). One step per language
-     *  and kind: the backup's dictionary in use (none when it used the built-in one). */
-    fun plan(backup: Map<Entry, String>, backupPrefs: Map<String, Any?>, device: (String) -> Map<String, String>): List<Step> {
+     *  selections in [backupPrefs]; [device], a language's files on the device (name -> digest); [deviceSelected], the
+     *  device's selection by language and kind. One step per language and kind: the backup's dictionary in use (none when
+     *  it used the built-in one). */
+    fun plan(backup: Map<Entry, String>, backupPrefs: Map<String, Any?>, device: (String) -> Map<String, String>,
+             deviceSelected: (String, String) -> String? = { _, _ -> null }): List<Step> {
         val steps = ArrayList<Step>()
         for ((tag, entries) in backup.keys.groupBy { it.tag }) {
             val onDevice = device(tag)
             for ((kind, ofKind) in entries.groupBy { it.kind }) {
                 val names = ofKind.map { it.name }
                 val name = inUse(backupPrefs[selectedKey(tag, kind)] as? String, kind, names) ?: continue
-                steps += plan(tag, name, backup.getValue(Entry(tag, name)), onDevice)
+                steps += plan(tag, name, backup.getValue(Entry(tag, name)), onDevice, deviceSelected(tag, kind))
             }
         }
         return steps

@@ -386,6 +386,11 @@
     <!-- under a keyboard's row while ticked, after "Merge required": its dictionary differs from the device's (owner
          2026-10-13, R-DICT). %s: the device's dictionaries kept aside, e.g. main_prev -->
     <string name="restore_dictionary_differs">Dictionary differs: yours kept as %s</string>
+    <!-- the same place: the device has the backup's dictionary under another name, or not in use; it is selected (owner
+         2026-10-13, 20261013_L3). %s: the name it is selected as, e.g. main -->
+    <string name="restore_dictionary_set">Backup\'s dictionary set as %s</string>
+    <!-- the same, and the device's other dictionary of that name moved aside. %1$s e.g. main, %2$s e.g. main_prev -->
+    <string name="restore_dictionary_set_kept">Backup\'s dictionary set as %1$s, yours kept as %2$s</string>
     <!-- screen 1's last section: rows for what the backup also has, ticked to start (owner 2026-10-13, R-DICT) -->
     <string name="restore_section_also">Also restore</string>
     <!-- the backup's dictionaries of languages no keyboard in the backup has -->
@@ -780,10 +785,17 @@
     <string name="restore_summary_added">Added: %s</string>
     <!-- each line only when it applies (owner 2026-10-13, R-DICT) -->
     <string name="restore_summary_settings">Settings restored.</string>
-    <!-- %s: the languages that got a dictionary, comma-separated, each maybe as restore_summary_dictionary_kept -->
-    <string name="restore_summary_dictionaries">Dictionaries: %s added.</string>
-    <!-- %1$s: a language, %2$s: the device's dictionaries kept aside for the backup's (e.g. main_prev) -->
-    <string name="restore_summary_dictionary_kept">%1$s (yours kept as %2$s)</string>
+    <!-- %s: what each language got, semicolon-separated: restore_summary_dictionary_added, _kept, _set or _set_kept
+         (owner 2026-10-13, 20261013_L3) -->
+    <string name="restore_summary_dictionaries">Dictionaries: %s.</string>
+    <!-- %s: a language whose dictionary came in -->
+    <string name="restore_summary_dictionary_added">%s added</string>
+    <!-- %1$s: a language, %2$s: the device's dictionaries of other content kept aside for the backup's (e.g. main_prev) -->
+    <string name="restore_summary_dictionary_kept">%1$s added (yours kept as %2$s)</string>
+    <!-- %1$s: a language whose matching device copy was selected, %2$s: the name it is selected as (e.g. main) -->
+    <string name="restore_summary_dictionary_set">%1$s: backup\'s set as %2$s</string>
+    <!-- the same, %3$s: the device's other dictionary of that name, moved aside (e.g. main_prev) -->
+    <string name="restore_summary_dictionary_set_kept">%1$s: backup\'s set as %2$s (yours kept as %3$s)</string>
     <string name="restore_summary_clipboard_personal">Clipboard history and personal dictionary words added.</string>
     <string name="restore_summary_clipboard">Clipboard history added.</string>
     <string name="restore_summary_personal">Personal dictionary words added.</string>

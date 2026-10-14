@@ -510,13 +510,40 @@ internal class Restored(val onDevice: Map<SettingsSubtype, SettingsSubtype>, val
                         val dictionaries: RestoredDictionaries = RestoredDictionaries(),
                         val settings: Boolean = false, val clipboard: Boolean = false, val personalWords: Boolean = false)
 
-/** The backup's dictionaries a restore brought: [languages], each language (tag) that got one, with the device's
- *  dictionaries the backup's took over from, by name ("main_prev"), each kept and selectable. */
-internal data class RestoredDictionaries(val languages: Map<String, List<String>> = emptyMap()) {
+/** The backup's dictionaries a restore brought: [steps], each carried out that changed something (a match already in
+ *  use is left out: owner 2026-10-13, 20261013_L3), with the device's dictionary each kept aside ("main_prev"), kept and
+ *  selectable. */
+internal data class RestoredDictionaries(val steps: List<RestoreDictionaries.Step> = emptyList()) {
     /** The languages whose device dictionary was kept aside for the backup's. */
-    val keptAside get() = languages.filterValues { it.isNotEmpty() }.keys
-    val any get() = languages.isNotEmpty()
+    val keptAside get() = steps.filter { it.kept != null }.mapTo(LinkedHashSet()) { it.tag }
+    val any get() = steps.isNotEmpty()
 }
+
+/** The summary's dictionaries line (owner 2026-10-13, 20261013_L3: each language its own phrase): one that came in "Urdu
+ *  added", over the device's "French added (yours kept as main_prev)"; a matching device copy selected "Urdu: backup's
+ *  set as main", with the device's of that name moved aside "Urdu: backup's set as main (yours kept as main_prev)"; a
+ *  match already in use nothing. Null: nothing to say. */
+internal fun restoredDictionariesText(ctx: Context, steps: List<RestoreDictionaries.Step>): String? {
+    val phrases = steps.filter { !it.unchanged }.groupBy { it.tag }.flatMap { (tag, ofTag) ->
+        val name = languageName(ctx, tag)
+        val added = ofTag.filter { it.action != RestoreDictionaries.Action.SAME }
+        val kept = added.mapNotNull { it.kept?.let(RestoreDictionaries::shownName) }
+        listOfNotNull(when {
+            added.isEmpty() -> null
+            kept.isEmpty() -> ctx.getString(R.string.restore_summary_dictionary_added, name)
+            else -> ctx.getString(R.string.restore_summary_dictionary_kept, name, kept.joinToString(", "))
+        }) + ofTag.filter { it.action == RestoreDictionaries.Action.SAME }.map { dictionarySetPhrase(ctx, name, it) }
+    }
+    if (phrases.isEmpty()) return null
+    return ctx.getString(R.string.restore_summary_dictionaries, phrases.joinToString("; "))
+}
+
+/** "Urdu: backup's set as main", "Urdu: backup's set as main (yours kept as main_prev)": a matching device copy of
+ *  language [name] selected (owner 2026-10-13, 20261013_L3). */
+private fun dictionarySetPhrase(ctx: Context, name: String, step: RestoreDictionaries.Step): String =
+    step.kept?.let { ctx.getString(R.string.restore_summary_dictionary_set_kept, name,
+        RestoreDictionaries.shownName(step.target), RestoreDictionaries.shownName(it)) }
+        ?: ctx.getString(R.string.restore_summary_dictionary_set, name, RestoreDictionaries.shownName(step.target))
 
 /** The languages (tags) of [keyboards]: their main and other languages. */
 internal fun backupKeyboardLanguages(keyboards: Collection<SettingsSubtype>): Set<String> =
@@ -524,18 +551,14 @@ internal fun backupKeyboardLanguages(keyboards: Collection<SettingsSubtype>): Se
 
 /** The "Backup restored" dialog's text after a keyboard by keyboard restore, each line only when it applies (owner
  *  2026-10-13, R-DICT; review L3.1 before: "kept as …prev" whatever happened): "Merged: …", "Added: …", "Settings
- *  restored.", "Dictionaries: French (yours kept as main_prev), Urdu added.", the clipboard and personal dictionary
+ *  restored.", "Dictionaries: French added (yours kept as main_prev); Urdu added." ([restoredDictionariesText]), the
+ *  clipboard and personal dictionary
  *  words, then the common settings' note when it applies ([hiddenSettingsNote]). */
 internal fun restoreSummary(ctx: Context, restored: Restored): String = listOfNotNull(
     restored.merged.takeIf { it.isNotEmpty() }?.let { ctx.getString(R.string.restore_summary_merged, it.joinToString(", ")) },
     restored.added.takeIf { it.isNotEmpty() }?.let { ctx.getString(R.string.restore_summary_added, it.joinToString(", ")) },
     if (restored.settings) ctx.getString(R.string.restore_summary_settings) else null,
-    restored.dictionaries.languages.takeIf { it.isNotEmpty() }?.let { languages ->
-        ctx.getString(R.string.restore_summary_dictionaries, languages.entries.joinToString(", ") { (tag, kept) ->
-            val name = java.util.Locale.forLanguageTag(tag).localizedDisplayName(ctx.resources)
-            if (kept.isEmpty()) name else ctx.getString(R.string.restore_summary_dictionary_kept, name, kept.joinToString(", "))
-        })
-    },
+    restoredDictionariesText(ctx, restored.dictionaries.steps),
     when {
         restored.clipboard && restored.personalWords -> ctx.getString(R.string.restore_summary_clipboard_personal)
         restored.clipboard -> ctx.getString(R.string.restore_summary_clipboard)
@@ -709,10 +732,12 @@ private fun RestoreChoiceDialog(pending: PendingRestore, plan: RestorePlan, onDi
                     pending.keyboards.forEach { keyboard ->
                         val ticked = top.ticked(keyboard)
                         // (a clash of its dictionaries, while ticked: "Merge required · Dictionary differs: yours kept
-                        // as main_prev", owner 2026-10-13 R-DICT)
+                        // as main_prev", owner 2026-10-13 R-DICT; a matching device copy selected: "Backup's dictionary
+                        // set as main, yours kept as main_prev", one already in use nothing, owner 2026-10-13, 20261013_L3)
                         val kept = if (ticked) dictionariesKeptText(ctx, plan.dictionariesKept(keyboard)) else null
+                        val set = if (ticked) dictionariesSetText(ctx, plan.dictionariesSet(keyboard)) else null
                         val subtext = listOfNotNull(if (plan.asks(keyboard)) mergeRequired else null,
-                            kept?.let { stringResource(R.string.restore_dictionary_differs, it) }).joinToString(" · ").ifEmpty { null }
+                            kept?.let { stringResource(R.string.restore_dictionary_differs, it) }, set).joinToString(" · ").ifEmpty { null }
                         CheckRow(keyboardName(keyboard, ctx), ticked, subtext = subtext) {
                             if (it) top.selected.add(keyboard) else top.selected.remove(keyboard)
                         }
@@ -738,7 +763,7 @@ private fun RestoreChoiceDialog(pending: PendingRestore, plan: RestorePlan, onDi
                     if (others.isNotEmpty() || flow.hasClipboard || flow.hasPersonalWords) Heading(R.string.restore_section_also)
                     if (others.isNotEmpty())
                         CheckRow(stringResource(R.string.restore_other_dictionaries), flow.otherDictionariesTicked,
-                            subtext = otherDictionariesText(ctx, others)) { flow.otherDictionariesTicked = it }
+                            subtext = otherDictionariesText(ctx, others, plan.dictionarySteps)) { flow.otherDictionariesTicked = it }
                     if (flow.hasClipboard)
                         CheckRow(stringResource(R.string.restore_clipboard), flow.clipboardTicked,
                             subtext = stringResource(R.string.restore_clipboard_added,
@@ -778,12 +803,34 @@ internal fun dictionariesKeptText(ctx: Context, kept: List<Pair<String, String>>
     return kept.joinToString(", ") { (tag, name) -> "$name (${languageName(ctx, tag)})" }
 }
 
-/** The row "Other dictionaries"' subtext: each language, with what it keeps aside: "Korean: yours kept as main_prev". */
-internal fun otherDictionariesText(ctx: Context, others: Map<String, List<String>>): String =
-    others.entries.joinToString(", ") { (tag, kept) ->
-        if (kept.isEmpty()) languageName(ctx, tag)
-        else ctx.getString(R.string.restore_other_dictionary_kept, languageName(ctx, tag), kept.joinToString(", "))
+/** A keyboard's matching device copies selected ([steps]), each "Backup's dictionary set as main" or "Backup's
+ *  dictionary set as main, yours kept as main_prev"; of several languages, each named: "… (French)" (owner 2026-10-13,
+ *  20261013_L3). Null: none. */
+internal fun dictionariesSetText(ctx: Context, steps: List<RestoreDictionaries.Step>): String? {
+    if (steps.isEmpty()) return null
+    val named = steps.map { it.tag }.distinct().size > 1
+    return steps.joinToString(" · ") { step ->
+        val text = step.kept?.let { ctx.getString(R.string.restore_dictionary_set_kept, RestoreDictionaries.shownName(step.target),
+            RestoreDictionaries.shownName(it)) } ?: ctx.getString(R.string.restore_dictionary_set, RestoreDictionaries.shownName(step.target))
+        if (named) "$text (${languageName(ctx, step.tag)})" else text
     }
+}
+
+/** The row "Other dictionaries"' subtext: each language, with what it keeps aside: "Korean: yours kept as main_prev";
+ *  with [steps] (the plan's), a language whose matching device copy is selected as the summary says it, "Korean:
+ *  backup's set as main (yours kept as main_prev)", and one with only a match already in use not at all (owner
+ *  2026-10-13, 20261013_L3). */
+internal fun otherDictionariesText(ctx: Context, others: Map<String, List<String>>, steps: List<RestoreDictionaries.Step> = emptyList()): String =
+    others.entries.flatMap { (tag, kept) ->
+        val ofTag = steps.filter { it.tag == tag }
+        val set = ofTag.filter { it.action == RestoreDictionaries.Action.SAME && !it.unchanged }
+        val onlyMatches = ofTag.isNotEmpty() && ofTag.all { it.action == RestoreDictionaries.Action.SAME }
+        listOfNotNull(when {
+            onlyMatches -> null
+            kept.isEmpty() -> languageName(ctx, tag)
+            else -> ctx.getString(R.string.restore_other_dictionary_kept, languageName(ctx, tag), kept.joinToString(", "))
+        }) + set.map { dictionarySetPhrase(ctx, languageName(ctx, tag), it) }
+    }.joinToString(", ")
 
 /** A row with a checkbox, and [subtext] under its text if any ([warning]: in the app's warning color). */
 @Composable
@@ -1586,8 +1633,10 @@ private fun restoreDictionaries(ctx: Context, backupPrefs: Map<String, Any?>, di
         if (f.isFile) backup[RestoreDictionaries.Entry(tag, f.name)] = f.inputStream().use { RestoreDictionaries.digest(it) }
     }
     if (backup.isEmpty()) return RestoredDictionaries()
-    val steps = RestoreDictionaries.plan(backup, backupPrefs) { tag -> folders[tag]?.let { RestoreDictionaries.deviceDigests(it) }.orEmpty() }
-    val languages = LinkedHashMap<String, MutableList<String>>()
+    val real = ctx.realPrefs()
+    val steps = RestoreDictionaries.plan(backup, backupPrefs, { tag -> folders[tag]?.let { RestoreDictionaries.deviceDigests(it) }.orEmpty() },
+        { tag, kind -> real.all[RestoreDictionaries.selectedKey(tag, kind)] as? String })
+    val applied = ArrayList<RestoreDictionaries.Step>()
     for (step in steps) {
         // (the device's stays: no clash, and no match selected, B4)
         if (step.action != RestoreDictionaries.Action.NEW && step.tag !in clashesFor) continue
@@ -1595,12 +1644,13 @@ private fun restoreDictionaries(ctx: Context, backupPrefs: Map<String, Any?>, di
         try {
             if (!RestoreDictionaries.apply(step, dir, File(File(dictsDir, step.tag), step.backupName), ctx.realPrefs(),
                     selectNew = step.tag in selectNew)) continue
-            languages.getOrPut(step.tag) { ArrayList() }.apply { step.kept?.let { add(RestoreDictionaries.shownName(it)) } }
+            // (a match already in use: nothing changed, nothing to say, owner 2026-10-13, 20261013_L3)
+            if (!step.unchanged) applied += step
         } catch (t: Throwable) {
             Log.w("AdvancedScreen", "error restoring the dictionary ${step.tag}/${step.backupName}", t)
         }
     }
-    return RestoredDictionaries(languages)
+    return RestoredDictionaries(applied)
 }
 
 /** The languages whose dictionary in the backup [pending] clashes with the device's (read off the main thread). */
@@ -1622,8 +1672,10 @@ private fun dictionarySteps(ctx: Context, pending: PendingRestore): List<Restore
     }
     if (backup.isEmpty()) return emptyList()
     val folders = File(DictionaryInfoUtils.getWordListCacheDirectory(ctx))
-    return RestoreDictionaries.plan(backup, pending.prefs) { tag ->
-        File(folders, tag).takeIf { it.isDirectory }?.let { RestoreDictionaries.deviceDigests(it) }.orEmpty() }
+    val real = ctx.realPrefs()
+    return RestoreDictionaries.plan(backup, pending.prefs, { tag ->
+        File(folders, tag).takeIf { it.isDirectory }?.let { RestoreDictionaries.deviceDigests(it) }.orEmpty() },
+        { tag, kind -> real.all[RestoreDictionaries.selectedKey(tag, kind)] as? String })
 }
 
 /** [dictionaryClashes] for the backup [file] (tests). */

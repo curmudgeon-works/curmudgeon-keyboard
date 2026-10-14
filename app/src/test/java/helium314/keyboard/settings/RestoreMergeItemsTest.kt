@@ -301,7 +301,78 @@ class RestoreMergeItemsTest {
         backup(listOf(frB), entries = mapOf("dicts/fr/main_user.dict" to "backup".toByteArray()))
         val restored = restoreDictionaries(ticked = true)
         assertEquals("backup", dict("fr", "main_user.dict").readText())
-        assertEquals(string(helium314.keyboard.latin.R.string.restore_summary_dictionaries, french()), restoreSummary(ctx, restored).lines().last())
+        assertEquals(string(helium314.keyboard.latin.R.string.restore_summary_dictionaries,
+            string(helium314.keyboard.latin.R.string.restore_summary_dictionary_added, french())), restoreSummary(ctx, restored).lines().last())
+        assertEquals("Dictionaries: French added.", restoreSummary(ctx, restored).lines().last())
+    }
+
+    // ---- the wording of a matching device copy (owner 2026-10-13, 20261013_L3). Fail before: the summary said "French
+    // added" for each, the identical one already in use too, and the row "Dictionary differs: yours kept as …" for a
+    // match whose content doesn't differ ----
+
+    private fun row(plan: helium314.keyboard.settings.preferences.RestorePlan): String? {
+        val french = plan.incoming.keys.single()
+        return listOfNotNull(helium314.keyboard.settings.preferences.dictionariesKeptText(ctx, plan.dictionariesKept(french))
+            ?.let { string(helium314.keyboard.latin.R.string.restore_dictionary_differs, it) },
+            helium314.keyboard.settings.preferences.dictionariesSetText(ctx, plan.dictionariesSet(french))).joinToString(" · ").ifEmpty { null }
+    }
+
+    @Test fun `a match not in use, the device's of that name moved aside - set as main, yours kept as main_prev`() {
+        dictDir("fr").mkdirs(); dict("fr", "main_user.dict").writeText("A"); dict("fr", "main_prev_user.dict").writeText("X")
+        backup(listOf(frB), entries = mapOf("dicts/fr/main_user.dict" to "X".toByteArray()))
+        assertEquals("Backup's dictionary set as main, yours kept as main_prev", row(restorePlanFrom(ctx, zip)))
+        val restored = restoreDictionaries(ticked = true)
+        assertEquals("Dictionaries: French: backup's set as main (yours kept as main_prev).", restoreSummary(ctx, restored).lines().last())
+    }
+
+    @Test fun `a match not in use, nothing moved aside - set as main`() {
+        dictDir("fr").mkdirs(); dict("fr", "main_prev_user.dict").writeText("X")
+        backup(listOf(frB), entries = mapOf("dicts/fr/main_user.dict" to "X".toByteArray()))
+        assertEquals("Backup's dictionary set as main", row(restorePlanFrom(ctx, zip)))
+        val restored = restoreDictionaries(ticked = true)
+        assertEquals("X", dict("fr", "main_user.dict").readText())
+        assertEquals("Dictionaries: French: backup's set as main.", restoreSummary(ctx, restored).lines().last())
+    }
+
+    @Test fun `a match under the backup's name but the built-in one selected - set as main`() {
+        real.edit().putString("dict_selected_fr_main", "internal").commit()
+        dictDir("fr").mkdirs(); dict("fr", "main_user.dict").writeText("X")
+        backup(listOf(frB), entries = mapOf("dicts/fr/main_user.dict" to "X".toByteArray()))
+        assertEquals("Backup's dictionary set as main", row(restorePlanFrom(ctx, zip)))
+        val restored = restoreDictionaries(ticked = true)
+        assertEquals("main_user.dict", selected("fr"))
+        assertEquals("Dictionaries: French: backup's set as main.", restoreSummary(ctx, restored).lines().last())
+    }
+
+    @Test fun `the identical dictionary already in use - no line in the dialog or the summary`() {
+        dictDir("fr").mkdirs(); dict("fr", "main_user.dict").writeText("X")
+        backup(listOf(frB), entries = mapOf("dicts/fr/main_user.dict" to "X".toByteArray(), "dicts/ur/main_user.dict" to "X".toByteArray()))
+        dictDir("ur").mkdirs(); dict("ur", "main_user.dict").writeText("X")
+        val plan = restorePlanFrom(ctx, zip)
+        assertEquals(null, row(plan))
+        assertEquals(emptyMap<String, List<String>>(), plan.otherDictionaries(plan.incoming.keys), "nothing would change: no Other dictionaries row")
+        val restored = restoreDictionaries(ticked = true)
+        assertFalse(restored.dictionaries.any)
+        assertFalse(restoreSummary(ctx, restored).contains("Dictionaries"), restoreSummary(ctx, restored))
+    }
+
+    @Test fun `a clash keeps its wording - Dictionary differs, and added with yours kept`() {
+        dictDir("fr").mkdirs(); dict("fr", "main_user.dict").writeText("device")
+        backup(listOf(frB), entries = mapOf("dicts/fr/main_user.dict" to "backup".toByteArray()))
+        assertEquals("Dictionary differs: yours kept as main_prev", row(restorePlanFrom(ctx, zip)))
+        val restored = restoreDictionaries(ticked = true)
+        assertEquals("Dictionaries: French added (yours kept as main_prev).", restoreSummary(ctx, restored).lines().last())
+    }
+
+    @Test fun `Other dictionaries - a match not in use says it is set as main`() {
+        dictDir("ko").mkdirs(); dict("ko", "main_user.dict").writeText("A"); dict("ko", "main_prev_user.dict").writeText("X")
+        backup(listOf(frB), entries = mapOf("dicts/ko/main_user.dict" to "X".toByteArray()))
+        val plan = restorePlanFrom(ctx, zip)
+        val others = plan.otherDictionaries(plan.incoming.keys)
+        assertEquals(mapOf("ko" to emptyList<String>()), others, "a match's moved one is no clash's")
+        fun name(tag: String) = java.util.Locale.forLanguageTag(tag).let { with(helium314.keyboard.latin.common.LocaleUtils) { it.localizedDisplayName(ctx.resources) } }
+        assertEquals("${name("ko")}: backup's set as main (yours kept as main_prev)",
+            helium314.keyboard.settings.preferences.otherDictionariesText(ctx, others, plan.dictionarySteps))
     }
 
     // fail before (L3.4): the device's dictionary couldn't be moved aside (here a folder holds the "…prev" name, so the

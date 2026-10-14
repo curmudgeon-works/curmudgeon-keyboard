@@ -129,19 +129,31 @@ internal class RestorePlan(
         keyboards.flatMap { listOf(it.locale) + helium314.keyboard.latin.utils.getSecondaryLocales(it.extraValues) }
             .map { it.toLanguageTag() }.distinct().filter { it in dictionaryClashes }
 
-    /** The device's dictionaries [keyboard]'s restore keeps aside for the backup's, by language (tag) and name
-     *  ("main_prev"), in its languages' order (R-DICT: "Dictionary differs: yours kept as main_prev"). */
+    /** The device's dictionaries [keyboard]'s restore keeps aside for the backup's of other content, by language (tag)
+     *  and name ("main_prev"), in its languages' order (R-DICT: "Dictionary differs: yours kept as main_prev"; only a
+     *  clash's: a match's say so in [dictionariesSet], owner 2026-10-13, 20261013_L3). */
     fun dictionariesKept(keyboard: SettingsSubtype): List<Pair<String, String>> {
         val tags = backupKeyboardLanguages(listOf(keyboard))
-        return tags.flatMap { tag -> dictionarySteps.filter { it.tag == tag }.mapNotNull { s -> s.kept?.let { tag to RestoreDictionaries.shownName(it) } } }
+        return tags.flatMap { tag -> dictionarySteps.filter { it.tag == tag && it.action == RestoreDictionaries.Action.CLASH }
+            .mapNotNull { s -> s.kept?.let { tag to RestoreDictionaries.shownName(it) } } }
+    }
+
+    /** [keyboard]'s matching device copies the restore selects, in its languages' order; not one already in use, nothing
+     *  changes then (owner 2026-10-13, 20261013_L3: "Backup's dictionary set as main, yours kept as main_prev"). */
+    fun dictionariesSet(keyboard: SettingsSubtype): List<RestoreDictionaries.Step> {
+        val tags = backupKeyboardLanguages(listOf(keyboard))
+        return tags.flatMap { tag -> dictionarySteps.filter { it.tag == tag && it.action == RestoreDictionaries.Action.SAME && !it.unchanged } }
     }
 
     /** The backup's dictionaries of languages none of [keyboards] (the backup's, ticked or not) has: the row "Other
-     *  dictionaries" (R-DICT), by language (tag), with the device's dictionaries each keeps aside ("main_prev"). */
+     *  dictionaries" (R-DICT), by language (tag), with the device's dictionaries each keeps aside for one of other
+     *  content ("main_prev"). Not a language whose only ones are matches already in use: nothing would change (owner
+     *  2026-10-13, 20261013_L3). */
     fun otherDictionaries(keyboards: Collection<SettingsSubtype>): Map<String, List<String>> {
         val tags = backupKeyboardLanguages(keyboards)
         val result = LinkedHashMap<String, MutableList<String>>()
-        for (s in dictionarySteps) if (s.tag !in tags) result.getOrPut(s.tag) { ArrayList() }.apply { s.kept?.let { add(RestoreDictionaries.shownName(it)) } }
+        for (s in dictionarySteps) if (s.tag !in tags && !s.unchanged) result.getOrPut(s.tag) { ArrayList() }.apply {
+            if (s.action == RestoreDictionaries.Action.CLASH) s.kept?.let { add(RestoreDictionaries.shownName(it)) } }
         return result
     }
 
