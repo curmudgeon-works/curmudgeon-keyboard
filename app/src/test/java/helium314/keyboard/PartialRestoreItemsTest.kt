@@ -156,7 +156,7 @@ class PartialRestoreItemsTest {
     // (owner 2026-10-12: Keep both, the backup's keeps the name, the device's is numbered; before, the backup's was
     // "Mine 2.ttf". Replace, answered (Keep both is the suggested answer since owner 2026-10-12 option D, A2): the
     // device's file is the backup's)
-    @Test fun `a font whose name the phone uses for another file - kept both, the phone's is numbered; replaced, the backup's`() {
+    @Test fun `a font whose name the phone uses for another file - kept both, the phone's is numbered, replaced, the backup's`() {
         val fonts = File(DeviceProtectedUtils.getFilesDir(ctx), "fonts").apply { mkdirs() }
         File(fonts, "Mine.ttf").writeText("the phone's")
         ZipOutputStream(zip.outputStream()).use { z ->

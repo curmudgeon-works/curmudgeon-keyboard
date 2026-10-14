@@ -208,7 +208,7 @@ class RestoreBackupWinsNameTest {
 
     // ---- palettes: the phone's saved themes naming them follow too ----
 
-    @Test fun `same-name palette - replaced, Warm has the backup's colors; kept both, the device's is Warm 2 with its users`() {
+    @Test fun `same-name palette - replaced, Warm has the backup's colors, kept both, the device's is Warm 2 with its users`() {
         phone(mapOf(slot to "Warm"), mapOf(Settings.PREF_USER_COLORS_PREFIX + "Warm" to colorsA, looks(look("Mine", 1.0, "Warm"))))
         backup(mapOf(slot to "Warm"), mapOf(Settings.PREF_USER_COLORS_PREFIX + "Warm" to colorsB))
         assertEquals(listOf(Clash(Kind.PALETTES, "Warm", "Warm", "Warm 2")), restorePlanFrom(ctx, zip).clashes)

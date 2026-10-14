@@ -495,7 +495,7 @@ object KeyboardProfiles {
 
     /** Profile of the keyboard in use (the IME's view). Refreshed on every keyboard switch. */
     @Volatile var imeId: String = SHARED
-        private set
+        @androidx.annotation.VisibleForTesting internal set // (tests: the keyboard on screen)
 
     /** The set the settings screen of [context] edits: the keyboard of the screen's own navigation entry
      *  ([KeyboardScopeContext]), else [mainEditingId]. No global that screens set (2026-10-09: "who drew last wins" left

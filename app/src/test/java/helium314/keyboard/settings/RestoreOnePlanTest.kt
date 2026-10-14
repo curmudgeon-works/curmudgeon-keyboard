@@ -385,7 +385,7 @@ class RestoreOnePlanTest {
 
     // fail before: Sunset's question picked Replace of the device's Sunset, which Dusk's merge had taken already (both
     // pointed at it; the run silently kept both), and Keep both said "yours becomes Sunset 2" for a Sunset gone by then
-    @Test fun `Dusk first merges into the device's Sunset; Sunset's question shows it taken by Dusk, Keep both picked, no Sunset 2`() {
+    @Test fun `Dusk first merges into the device's Sunset, Sunset's question shows it taken by Dusk, Keep both picked, no Sunset 2`() {
         val (flow, deviceEnglish) = sunsetAndDusk("Dusk", "Sunset")
         val dusk = flow.itemShowing()
         assertEquals(emptyMap(), dusk.taken)
@@ -407,7 +407,7 @@ class RestoreOnePlanTest {
     // owner 2026-10-12: "Same name but different content feels like both will be valuable to have": Keep both picked for
     // Sunset; Keep both takes no device item, so Dusk still merges into the device's Sunset. Answered Replace instead,
     // Sunset takes it: Dusk's question shows it taken by Sunset, Keep both picked
-    @Test fun `Sunset first - Keep both picked, Dusk merges into the device's Sunset; Sunset replacing it, Dusk shows it taken`() {
+    @Test fun `Sunset first - Keep both picked, Dusk merges into the device's Sunset, Sunset replacing it, Dusk shows it taken`() {
         val (flow, deviceEnglish) = sunsetAndDusk("Sunset", "Dusk")
         val sunset = flow.itemShowing()
         assertEquals(Answer.KeepBoth, sunset.picked, "same name, other colors: Keep both suggested (before: Replace)")
