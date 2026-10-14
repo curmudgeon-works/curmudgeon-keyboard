@@ -169,7 +169,8 @@ class AppearanceDraft private constructor(
         helium314.keyboard.latin.utils.SettingsEventLog.log("Appearance draft put back" + if (keep) ", palette editor saves kept" else "")
         for ((live, saved) in files) {
             if (saved == null) live.delete()
-            else { saved.copy.copyTo(live, overwrite = true); live.setLastModified(saved.modified) }
+            // (crash-safe: a put-back cut off leaves the live file as it was, B4w.3)
+            else { helium314.keyboard.latin.utils.AtomicFiles.copy(saved.copy, live); live.setLastModified(saved.modified) }
         }
         putHeldBack(ctx, dir, held) // the deleted fonts and pictures come back (the themes naming them: in the snapshot's prefs)
         val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)

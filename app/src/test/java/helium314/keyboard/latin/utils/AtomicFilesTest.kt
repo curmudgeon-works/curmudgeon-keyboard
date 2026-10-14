@@ -36,6 +36,24 @@ class AtomicFilesTest {
         assertEquals("new\n", file.readText())
     }
 
+    @Test fun `a copy that can't be read through leaves the target whole`() {
+        val target = File(dir, "main_user.dict").apply { writeText("device's") }
+        val unreadable = File(dir, "picked").apply { mkdirs() } // (a folder: its read fails)
+        assertFailsWith<IOException> { AtomicFiles.copy(unreadable, target) }
+        assertEquals("device's", target.readText())
+        AtomicFiles.copy(File(dir, "new").apply { writeText("new") }, target)
+        assertEquals("new", target.readText())
+    }
+
+    // fail before (B4w.3): the device's dictionary was deleted first, then the picked file renamed in (here a folder,
+    // which a rename takes): the device's dictionary was gone
+    @Test fun `adding a dictionary whose copy fails keeps the device's`() {
+        val dictFile = File(dir, "en-US${File.separator}main_user.dict").apply { parentFile!!.mkdirs(); writeText("device's") }
+        val picked = File(dir, "cached").apply { mkdirs(); File(this, "x").writeText("x") }
+        assertFalse(helium314.keyboard.settings.dialogs.installDictionary(picked, dictFile))
+        assertEquals("device's", dictFile.readText())
+    }
+
     // fail before: the blacklist was written in place (here the write goes through: the new list over the old)
     @Test fun `a blacklist write that can't be made leaves the old list whole`() {
         val file = File(dir, "blacklists${File.separator}Zzzz.txt").apply { parentFile!!.mkdirs(); writeText("teh\nhte\t2\n") }

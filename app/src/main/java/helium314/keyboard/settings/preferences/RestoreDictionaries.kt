@@ -159,7 +159,7 @@ internal object RestoreDictionaries {
             // a device file still under the target's name (its rename failed) is never written over: it stays in use
             if (target.exists()) { incoming.delete(); return false }
             if (!incoming.renameTo(target)) {
-                try { incoming.copyTo(target) } finally { incoming.delete() }
+                try { helium314.keyboard.latin.utils.AtomicFiles.copy(incoming, target) } finally { incoming.delete() } // (B4w.3)
             }
         }
         if (step.select) real.edit(commit = true) { putString(selectedKey(step.tag, step.kind), step.target) }

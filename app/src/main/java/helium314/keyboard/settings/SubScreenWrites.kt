@@ -61,7 +61,7 @@ internal class SubScreenWrites(private val dir: File, private val liveDir: File?
         val nowFiles = listing(liveDir)
         for (path in nowFiles.keys + baselineFiles.keys) if (nowFiles[path] != baselineFiles[path]) {
             val copy = File(copies, path)
-            if (path in nowFiles) { copy.parentFile?.mkdirs(); File(liveDir, path).copyTo(copy, overwrite = true); files[path] = true }
+            if (path in nowFiles) { helium314.keyboard.latin.utils.AtomicFiles.copy(File(liveDir, path), copy); files[path] = true } // (crash-safe, B4w.3)
             else { copy.delete(); files[path] = false }
         }
         baseline = now; baselineFiles = nowFiles
@@ -90,7 +90,7 @@ internal class SubScreenWrites(private val dir: File, private val liveDir: File?
         val live = liveDir ?: return
         for ((path, written) in files) {
             val file = File(live, path)
-            if (written) { file.parentFile?.mkdirs(); File(copies, path).copyTo(file, overwrite = true) } else file.delete()
+            if (written) helium314.keyboard.latin.utils.AtomicFiles.copy(File(copies, path), file) else file.delete() // (crash-safe, B4w.3)
         }
     }
 

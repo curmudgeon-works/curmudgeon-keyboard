@@ -21,6 +21,10 @@ object AtomicFiles {
     @JvmStatic
     fun write(file: File, bytes: ByteArray) = write(file) { it.write(bytes) }
 
+    /** [source]'s content into [target] (B4w.3: a copy cut off leaves [target] as it was). */
+    @JvmStatic
+    fun copy(source: File, target: File) = write(target) { out -> source.inputStream().use { it.copyTo(out) } }
+
     /** What [content] writes into [file]. Throws what the write throws; then [file] is as it was. */
     fun write(file: File, content: (OutputStream) -> Unit) {
         file.parentFile?.mkdirs()

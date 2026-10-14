@@ -74,9 +74,7 @@ fun NewDictionaryDialog(
         ThreeButtonAlertDialog(
             onDismissRequest = { onDismissRequest(); cachedFile.delete() },
             onConfirmed = {
-                dictFile.parentFile?.mkdirs()
-                dictFile.delete()
-                cachedFile.renameTo(dictFile)
+                if (!installDictionary(cachedFile, dictFile)) return@ThreeButtonAlertDialog
                 if (type == Dictionary.TYPE_MAIN) {
                     // replaced main dict, remove the one created from internal data
                     val internalMainDictFile = File(cacheDir, DictionaryInfoUtils.MAIN_DICT_FILE_NAME)
@@ -123,6 +121,21 @@ fun NewDictionaryDialog(
             scrollContent = true,
         )
     }
+}
+
+/**
+ * The picked dictionary [cachedFile] in as [dictFile]: copied in beside it and renamed over it, so a copy that fails or
+ * is cut off leaves the device's dictionary as it was (review B4w.3: it was deleted first, then the picked file renamed
+ * in, and a failed rename left none). The picked file goes either way. @return whether it came in
+ */
+internal fun installDictionary(cachedFile: File, dictFile: File): Boolean = try {
+    helium314.keyboard.latin.utils.AtomicFiles.copy(cachedFile, dictFile)
+    true
+} catch (e: Exception) {
+    helium314.keyboard.latin.utils.Log.w("NewDictionaryDialog", "could not add the dictionary ${dictFile.name}", e)
+    false
+} finally {
+    cachedFile.delete()
 }
 
 private fun checkDict(file: File): Pair<Int?, DictionaryHeader?> {
