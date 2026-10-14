@@ -175,7 +175,11 @@ class RestoreSameKeyboardTest {
             val phoneKeyboard = phone.withLayout(type, numrow)
             val german = available("de-DE").withLayout(type, numrow)
             val backupKeyboard = base.with(ExtraValue.MORE_POPUPS, "main").withLayout(type, numrow)
-            real.edit().putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(phoneKeyboard, german))).commit()
+            // (the list stored with the registration, one write: a reload between them, Settings' listener on the added
+            // keyboards, gave the default keyboard stored at the start records, a switched-off keyboard; the full run 2026-10-11)
+            real.edit().putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(phoneKeyboard, german)))
+                .putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(phoneKeyboard, german)))
+                .putString(Settings.PREF_SELECTED_SUBTYPE, phoneKeyboard.toPref()).commit()
             useKeyboards(ctx, real, phoneKeyboard, german)
             ZipOutputStream(zip.outputStream()).use { z ->
                 z.putNextEntry(ZipEntry("preferences.json"))
@@ -222,7 +226,10 @@ class RestoreSameKeyboardTest {
             folder.deleteRecursively(); folder.mkdirs()
             LayoutUtilsCustom.getLayoutFile(numrow, type, ctx).writeText("A")
             LayoutUtilsCustom.onLayoutFileChanged()
-            real.edit().clear().putString(Settings.PREF_ADDITIONAL_SUBTYPES, phoneKeyboard.toPref()).commit()
+            // (the list stored with the registration, one write: a reload between them, Settings' listener on the added
+            // keyboards, gave the default keyboard stored at the start records, a switched-off keyboard; the full run 2026-10-11)
+            real.edit().clear().putString(Settings.PREF_ADDITIONAL_SUBTYPES, phoneKeyboard.toPref())
+                .putString(Settings.PREF_ENABLED_SUBTYPES, phoneKeyboard.toPref()).putString(Settings.PREF_SELECTED_SUBTYPE, phoneKeyboard.toPref()).commit()
             KeyboardProfiles.loadGroups(real)
             useKeyboards(ctx, real, phoneKeyboard)
             ZipOutputStream(zip.outputStream()).use { z ->
