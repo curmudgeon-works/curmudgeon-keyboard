@@ -115,13 +115,14 @@ internal object SavedItemsMerge {
     // ---- one kind ----
 
     /**
-     * The plans of [backup]'s items of [kind] against the device's [phone] (name, content), [same] content, [reserved]
-     * the built-in names, [numbered] the next free name. The names given ([ItemPlan.keepBothName], [ItemPlan.landName])
+     * The plans of [backup]'s items of [kind] against the device's [phone] (name, content), [reserved] the built-in names,
+     * [numbered] the next free name, [same] content. The names given ([ItemPlan.keepBothName], [ItemPlan.landName])
      * are none the device or the backup has, nor one given before: they don't depend on the answers, so the restore
      * dialog shows what the run does.
      */
-    fun <C> planKind(kind: Kind, phone: List<Pair<String, C>>, backup: List<In<C>>, reserved: Set<String>, same: (C, C) -> Boolean,
-                     numbered: (String, Set<String>) -> String = ::freeName): List<ItemPlan<C>> {
+    fun <C> planKind(kind: Kind, phone: List<Pair<String, C>>, backup: List<In<C>>, reserved: Set<String>,
+                     numbered: (String, Set<String>) -> String = { name, taken -> freeName(name, taken) },
+                     same: (C, C) -> Boolean): List<ItemPlan<C>> {
         val seen = HashSet<String>()
         val items = backup.filter { seen.add(it.key) } // (the first of a name counts)
         val deviceNames = phone.mapTo(HashSet()) { it.first }
@@ -180,7 +181,9 @@ internal object SavedItemsMerge {
             rename(holder, p.keepBothName ?: freeName(p.name, list.mapTo(HashSet()) { it.name }))
         }
         for (p in plans) {
-            if (!choices.ticked(p.kind, p.key)) continue
+            // unticked: it doesn't come in; a restored keyboard naming it names the device's like it (owner 2026-10-11,
+            // kept: the dialog never lets a ticked keyboard's item be unticked, "Required for")
+            if (!choices.ticked(p.kind, p.key)) { (p.exact ?: p.candidates.firstOrNull())?.let(::device)?.let { names[p.key] = it.name }; continue }
             if (p.exact != null) { names[p.key] = device(p.exact)?.name ?: p.exact; continue }
             if (!p.mergeRequired) { add(p, p.landName); continue }
             // (a device item another backup item took already: Keep both)
@@ -273,8 +276,8 @@ internal object SavedItemsMerge {
         try {
             val backupLooks = AppearanceLooks.load(scratch)
             val palettes = planKind(Kind.PALETTES, Palettes.list(phone).toList(), Palettes.backupItems(backup, backupLooks), emptySet()) { a, b -> a == b }
-            val fontPlans = planKind(Kind.FONTS, deviceFonts, fonts, emptySet(), { a, b -> a == b }, ::freeFileName)
-            val picturePlans = planKind(Kind.PICTURES, devicePictures, pictures, emptySet(), { a, b -> a == b }, ::freeFileName)
+            val fontPlans = planKind(Kind.FONTS, deviceFonts, fonts, emptySet(), { name, taken -> freeFileName(name, taken) }) { a, b -> a == b }
+            val picturePlans = planKind(Kind.PICTURES, devicePictures, pictures, emptySet(), { name, taken -> freeFileName(name, taken) }) { a, b -> a == b }
             val sets = planKind(Kind.POPUP_SETS, KeyPopupOverrides.loadSets(real).map { it.name to it },
                 KeyPopupOverrides.loadSets(scratch).map { In(it.name, it.name, it) }, emptySet()) { a, b -> content(a) == content(b) }
             // Layouts: their popup set named as after the restore; compared by content (values, and the remembered ones:
