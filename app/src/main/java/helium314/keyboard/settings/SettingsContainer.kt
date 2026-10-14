@@ -87,6 +87,7 @@ object SettingsWithoutKey {
     const val FACTORY_RESET = "factory_reset"
     const val DEBUG_SETTINGS = "screen_debug"
     const val ABOUT_SCREEN = "screen_about_entry"
+    const val HOW_SAVING_WORKS = "screen_how_saving_works"
     const val BACKGROUND_IMAGE = "background_image"
     const val BACKGROUND_IMAGE_LANDSCAPE = "background_image_landscape"
     const val CUSTOM_FONT = "custom_font"

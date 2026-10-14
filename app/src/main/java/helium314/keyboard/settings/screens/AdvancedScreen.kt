@@ -96,6 +96,7 @@ fun AdvancedSettingsScreen(
         Settings.PREF_SAVE_SUBTYPE_PER_APP, // which keyboard comes up in an app (moved from Layout & Typing)
         // what saved Layouts, themes and popup sets do with settings saved at their default (2026-10-11)
         helium314.keyboard.settings.SavedItemDefaults.PREF,
+        SettingsWithoutKey.HOW_SAVING_WORKS, // what each action does to each kind of thing, read only (2026-10-11)
         SettingsWithoutKey.BACKUP_RESTORE,
         SettingsWithoutKey.FACTORY_RESET,
         if (BuildConfig.DEBUG || prefs.getBoolean(DebugSettings.PREF_SHOW_DEBUG_SETTINGS, Defaults.PREF_SHOW_DEBUG_SETTINGS))
@@ -288,6 +289,10 @@ fun createAdvancedSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_REDO_UNIT, R.string.redo_unit) {
         UnitChoiceRow(it, Defaults.PREF_REDO_UNIT)
+    },
+    Setting(context, SettingsWithoutKey.HOW_SAVING_WORKS, R.string.saving_guide_title, R.string.saving_guide_summary) {
+        Preference(name = it.title, description = it.description,
+            onClick = { SettingsDestination.navigateTo(SettingsDestination.HowSavingWorks) }) { NextScreenIcon() }
     },
     Setting(context, SettingsWithoutKey.ABOUT_SCREEN, R.string.settings_screen_about) {
         Preference(

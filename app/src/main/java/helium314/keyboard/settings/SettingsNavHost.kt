@@ -93,6 +93,9 @@ fun SettingsNavHost(
         screen(SettingsDestination.About) {
             AboutScreen(onClickBack = ::goBack)
         }
+        screen(SettingsDestination.HowSavingWorks) {
+            helium314.keyboard.settings.screens.HowSavingWorksScreen(onClickBack = ::goBack)
+        }
         screen(SettingsDestination.TextCorrection) {
             androidx.compose.runtime.CompositionLocalProvider(LocalSettingsMenu provides helium314.keyboard.latin.settings.KeyboardProfiles.Group.TEXT_CORRECTION) { TextCorrectionScreen(onClickBack = ::goBack) }
         }
@@ -210,6 +213,7 @@ object SettingsDestination {
     const val Keyboards = "keyboards"
     const val Settings = "settings/"
     const val About = "about"
+    const val HowSavingWorks = "how_saving_works"
     const val TextCorrection = "text_correction"
     const val Preferences = "preferences"
     const val Toolbar = "toolbar"

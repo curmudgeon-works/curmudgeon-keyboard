@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- App settings > How saving works (2026-10-11): what each action does to each kind of thing, read only. Each line
+     describes how the app behaves now: change it together with the behaviour. -->
+<resources>
+    <string name="saving_guide_title">How saving works</string>
+    <string name="saving_guide_summary">What choosing, editing, deleting, restoring and updating do to your Layouts, themes and word lists</string>
+
+    <!-- tabs -->
+    <string name="saving_tab_choose">Choose</string>
+    <string name="saving_tab_edit">Edit</string>
+    <string name="saving_tab_save_new">Save as new</string>
+    <string name="saving_tab_rename">Rename</string>
+    <string name="saving_tab_delete">Delete</string>
+    <string name="saving_tab_default">Default</string>
+    <string name="saving_tab_add">Add / Import</string>
+    <string name="saving_tab_export">Export / Share</string>
+    <string name="saving_tab_backup">Backup</string>
+    <string name="saving_tab_partial">Partial restore</string>
+    <string name="saving_tab_full">Full restore</string>
+    <string name="saving_tab_update">App update</string>
+    <string name="saving_tab_reset">Factory reset</string>
+    <string name="saving_tab_separate">Separate settings on/off</string>
+
+    <!-- rows -->
+    <string name="saving_kind_layouts">Layouts</string>
+    <string name="saving_kind_themes">Themes</string>
+    <string name="saving_kind_popups">Popup sets</string>
+    <string name="saving_kind_palettes">Palettes</string>
+    <string name="saving_kind_fonts">Fonts</string>
+    <string name="saving_kind_pictures">Pictures</string>
+    <string name="saving_kind_key_layouts">Custom key layouts</string>
+    <string name="saving_kind_keyboards">Keyboards and their settings</string>
+    <string name="saving_kind_dictionaries">Added dictionaries</string>
+    <string name="saving_kind_learned">Learned words</string>
+    <string name="saving_kind_blacklisted">Blacklisted words</string>
+    <string name="saving_kind_personal">Android\'s personal dictionary</string>
+    <string name="saving_kind_clips">Pinned clipboard items</string>
+    <string name="saving_kind_emoji">Emoji recents</string>
+    <string name="saving_kind_everything">Everything</string>
+
+    <!-- Choose -->
+    <string name="saving_choose_layouts">Puts all its settings and keys on this keyboard. The built-in Layouts always follow the latest defaults.</string>
+    <string name="saving_choose_themes">Puts its colours, fonts, pictures and look on this keyboard.</string>
+    <string name="saving_choose_popups">Puts its popups, accents, symbol map and popup order on this keyboard.</string>
+    <string name="saving_choose_palettes">This keyboard\'s light or dark colours.</string>
+    <string name="saving_choose_fonts">This keyboard\'s font for that text.</string>
+    <string name="saving_choose_pictures">This keyboard\'s background picture.</string>
+    <string name="saving_choose_key_layouts">This keyboard\'s keys for that kind of layout.</string>
+    <string name="saving_choose_saved_defaults">A saved item\'s settings that were at their default when saved: with \"Saved items take new defaults\" on they take today\'s defaults, off they apply as saved.</string>
+
+    <!-- Edit -->
+    <string name="saving_edit_items">Changes stay on this keyboard, shown as \"Custom 1 · from Sunset\". The saved item changes only with its save icon in the list, which asks which other keyboards using it get the change. Everything waits for the screen\'s Save; Discard undoes it everywhere.</string>
+    <string name="saving_edit_popups">Key edits stay on this keyboard, as for Layouts and themes; the set changes only with its save icon. Saved Layouts holding the set are listed with ticks too.</string>
+    <string name="saving_edit_palettes">Edited in the palette editor; Discard there, or on Appearance, undoes it.</string>
+    <string name="saving_edit_key_layouts">Edits the layout file: every keyboard using it changes. Layout &amp; Typing\'s Discard undoes it.</string>
+    <string name="saving_edit_keyboards">With separate settings, each keyboard\'s settings are its own; with one set of settings, a change reaches every keyboard.</string>
+
+    <!-- Save as new -->
+    <string name="saving_new_items">Saves this keyboard\'s settings under a new name. If another saved item has exactly these settings, the dialog says so; it still saves.</string>
+
+    <!-- Rename -->
+    <string name="saving_rename_items">Long-press the name. Every keyboard and saved item naming it follows. Waits for the screen\'s Save.</string>
+    <string name="saving_rename_palettes">In the palette editor. Keyboards and saved themes naming it follow.</string>
+    <string name="saving_rename_key_layouts">Keyboards and saved Layouts using it follow.</string>
+    <string name="saving_rename_keyboards">Long-press the keyboard\'s name.</string>
+
+    <!-- Delete -->
+    <string name="saving_delete_items">Off the list only. Keyboards using it keep its settings, shown as Custom 1, Custom 2 …; nothing goes back to the default. The dialog names them. Waits for the screen\'s Save.</string>
+    <string name="saving_delete_popups">Off the list. Keyboards using it keep its popups as Custom N; saved Layouts keep its popups without the name, and it never comes back by itself.</string>
+    <string name="saving_delete_palettes">Off the list. Keyboards and saved themes using it keep its colours as Custom N. One nothing uses is deleted.</string>
+    <string name="saving_delete_fonts">Off the list; keyboards and themes using it keep it. One nothing uses: you\'re asked whether to delete the file for good.</string>
+    <string name="saving_delete_pictures">Off the picture list; keyboards and themes keep their copies.</string>
+    <string name="saving_delete_key_layouts">Keyboards that chose it keep its keys as an unsaved layout of their own; keyboards that only had it as their default for that kind of layout go back to the default keys.</string>
+    <string name="saving_delete_keyboards">Its learned and blacklisted words go too. Keyboards reading them (\"Use lists from other keyboards\") are named, and one you pick can take them, merged into its own.</string>
+    <string name="saving_delete_dictionaries">Only if no other keyboard has the language; if one does, you can turn the language off on this keyboard instead.</string>
+    <string name="saving_delete_learned">Delete in the Learned list: gone as if never typed, also for keyboards reading this list.</string>
+    <string name="saving_delete_blacklisted">Delete in the Blacklisted list: the word can be suggested again.</string>
+    <string name="saving_delete_personal">Remove (long-press a suggestion) deletes it there too, with the learned word, and blacklists it on this keyboard.</string>
+    <string name="saving_delete_clips">Unpin or delete it in the clipboard: one list for every keyboard.</string>
+
+    <!-- Default -->
+    <string name="saving_default_keyboards">A setting\'s Default button: this keyboard only. It then follows the latest default.</string>
+    <string name="saving_default_items">Choosing the Layout, theme or popup set again brings back what it carries.</string>
+
+    <!-- Add / Import -->
+    <string name="saving_add_palettes">Add a palette, or Load one from a file or text.</string>
+    <string name="saving_add_fonts">Load a font file in a text style. The same font loaded again is reused; a font taken off the list comes back.</string>
+    <string name="saving_add_pictures">Pick a picture: it joins the picture list every keyboard chooses from.</string>
+    <string name="saving_add_key_layouts">Add custom layout (paste one into the editor), or Load file in Full customization with JSON.</string>
+    <string name="saving_add_keyboards">Add a keyboard, or a copy of one. A new keyboard can start with words from other keyboards.</string>
+    <string name="saving_add_dictionaries">Add from Downloads, or get one from curmudgeon.works.</string>
+    <string name="saving_add_personal">Add word, in Android\'s personal dictionary.</string>
+
+    <!-- Export / Share -->
+    <string name="saving_export_palettes">Save the palette to a file, or copy it as text, in the palette editor.</string>
+    <string name="saving_export_everything">A backup holds everything (Backup and restore).</string>
+
+    <!-- Backup -->
+    <string name="saving_backup_items">Included as they are, with the values their unpicked settings had when saved.</string>
+    <string name="saving_backup_keyboards">Each keyboard\'s settings: only what you picked.</string>
+    <string name="saving_backup_files">Fonts, pictures, custom key layouts and added dictionaries are included.</string>
+    <string name="saving_backup_words">Learned and blacklisted words, Android\'s personal dictionary and the clipboard are included.</string>
+
+    <!-- Partial restore -->
+    <string name="saving_partial_keyboards">Choose keyboards: those not on this phone are marked new and ticked; those here start unticked, and restoring one replaces it.</string>
+    <string name="saving_partial_items">Come in unless one with the same content is here already (then that one is used). A name in use gets the next free number, \"Sunset 2\"; with \"bring them in as copies\" off, this phone\'s is used. A Layout\'s popup set is matched first, and the keyboards point at what their items became.</string>
+    <string name="saving_partial_files">Come in like the saved items: the same file here already is used; a name in use for another file gets the next free number, \"Mine 2\", and the restored keyboards and themes name that one.</string>
+    <string name="saving_partial_words">Added to this phone\'s, never replacing them.</string>
+    <string name="saving_partial_switch">The phone\'s \"Saved items take new defaults\" switch stays as it is.</string>
+
+    <!-- Full restore -->
+    <string name="saving_full_everything">Wipes this phone\'s settings and replaces everything with the backup\'s: keyboards, saved items, files, word lists, dictionaries and clipboard. The phone\'s \"Saved items take new defaults\" switch stays as it is.</string>
+
+    <!-- App update -->
+    <string name="saving_update_keyboards">What you picked stays; what you never picked follows the new defaults.</string>
+    <string name="saving_update_items">With \"Saved items take new defaults\" on, settings saved at their default take the new ones the next time you choose the item; off, the update changes no keyboard. Built-ins always follow.</string>
+    <string name="saving_update_files">Stay as they are.</string>
+    <string name="saving_update_words">Stay as they are.</string>
+
+    <!-- Factory reset -->
+    <string name="saving_reset_keyboards">Every setting back to its default. Ticks decide whether keyboards and languages go back too.</string>
+    <string name="saving_reset_items">Kept, unless \"Your own layouts, popup layouts, saved themes and Layouts …\" is ticked.</string>
+    <string name="saving_reset_words">Kept, unless ticked (learned words, clipboard history).</string>
+
+    <!-- Separate settings on / off -->
+    <string name="saving_separate_on">On: each keyboard gets a copy of the common settings, then its own (a keyboard that had its own before keeps them).</string>
+    <string name="saving_separate_off">Off: every keyboard uses one set, from the keyboard you pick; each keyboard\'s own settings stay stored and come back when it\'s on again.</string>
+    <string name="saving_separate_items">Saved items are shared by all keyboards either way. With one set of settings, the update and delete dialogs have no keyboards to tick.</string>
+    <string name="saving_separate_words">Each keyboard always keeps its own learned and blacklisted words.</string>
+</resources>
