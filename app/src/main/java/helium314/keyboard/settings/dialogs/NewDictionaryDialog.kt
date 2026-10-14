@@ -74,7 +74,7 @@ fun NewDictionaryDialog(
         ThreeButtonAlertDialog(
             onDismissRequest = { onDismissRequest(); cachedFile.delete() },
             onConfirmed = {
-                if (!installDictionary(cachedFile, dictFile)) return@ThreeButtonAlertDialog
+                if (!installDictionaryOrSay(ctx, cachedFile, dictFile)) return@ThreeButtonAlertDialog
                 if (type == Dictionary.TYPE_MAIN) {
                     // replaced main dict, remove the one created from internal data
                     val internalMainDictFile = File(cacheDir, DictionaryInfoUtils.MAIN_DICT_FILE_NAME)
@@ -137,6 +137,12 @@ internal fun installDictionary(cachedFile: File, dictFile: File): Boolean = try 
 } finally {
     cachedFile.delete()
 }
+
+/** [installDictionary], and when it fails a toast says so (round-5 review 20261013_L19: nothing was said). */
+internal fun installDictionaryOrSay(ctx: android.content.Context, cachedFile: File, dictFile: File): Boolean =
+    installDictionary(cachedFile, dictFile).also { added ->
+        if (!added) android.widget.Toast.makeText(ctx, R.string.dictionary_add_error, android.widget.Toast.LENGTH_LONG).show()
+    }
 
 private fun checkDict(file: File): Pair<Int?, DictionaryHeader?> {
     val newHeader = DictionaryInfoUtils.getDictionaryFileHeaderOrNull(file)

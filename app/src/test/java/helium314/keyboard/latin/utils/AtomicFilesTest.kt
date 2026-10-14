@@ -55,6 +55,20 @@ class AtomicFilesTest {
         assertEquals("device's", dictFile.readText())
     }
 
+    // round-5 review 20261013_L19 (owner: "B"): the dialog's add says when it failed. Fail before: nothing was said
+    @Test fun `adding a dictionary that fails says so`() {
+        val dictFile = File(dir, "en-US${File.separator}main_user.dict").apply { parentFile!!.mkdirs(); writeText("device's") }
+        val picked = File(dir, "cached").apply { mkdirs(); File(this, "x").writeText("x") }
+        org.robolectric.shadows.ShadowToast.reset()
+        assertFalse(helium314.keyboard.settings.dialogs.installDictionaryOrSay(ctx, picked, dictFile))
+        assertEquals("Error adding dictionary. Nothing was changed.", org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
+        assertEquals("device's", dictFile.readText())
+        // (one that comes in says nothing)
+        org.robolectric.shadows.ShadowToast.reset()
+        assertTrue(helium314.keyboard.settings.dialogs.installDictionaryOrSay(ctx, File(dir, "new").apply { writeText("new") }, dictFile))
+        assertEquals(null, org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
+    }
+
     // fail before: the blacklist was written in place (here the write goes through: the new list over the old)
     @Test fun `a blacklist write that can't be made leaves the old list whole`() {
         val file = File(dir, "blacklists${File.separator}Zzzz.txt").apply { parentFile!!.mkdirs(); writeText("teh\nhte\t2\n") }

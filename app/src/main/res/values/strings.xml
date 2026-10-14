@@ -1556,6 +1556,8 @@ New dictionary:
     <string name="dictionary_file_wrong_script">"Error: script not compatible with this keyboard"</string>
     <!-- Text shown on other errors when loading dictionary file -->
     <string name="dictionary_load_error">"Error loading dictionary file"</string>
+    <!-- Toast when a picked dictionary file could not be copied in (the device's dictionaries are as they were) -->
+    <string name="dictionary_add_error">"Error adding dictionary. Nothing was changed."</string>
     <!-- Message about some dictionary indicating it can be downloaded, but hasn't been yet -->
     <string name="dictionary_available">Dictionary available</string>
     <!-- Hint to tell when the data was last updated. Usage : "Last updated [date]", may contain a : or so. -->
