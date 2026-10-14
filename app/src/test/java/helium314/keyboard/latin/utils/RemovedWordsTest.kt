@@ -178,4 +178,27 @@ class RemovedWordsTest {
         assertEquals(Entry(3, true), Entry(3).max(Entry(3, true)))
         assertEquals(Entry(2), Entry(2).max(null))
     }
+
+    // 20261013_L15: a re-read that fails (here: the restored file can't be read) leaves the list unread, so the old
+    // list in memory is never written over the restored file; the change made meanwhile lands once a read succeeds
+    @Test fun `a failed re-read writes nothing over the file until a read succeeds`() {
+        file.delete()
+        val list = RemovedWords.blacklist(ctx, script, 0)
+        list.reload()
+        list.strike("old1"); list.strike("old2")
+        list.reload()
+        assertEquals(listOf("old1", "old2"), file.readLines())
+        // a full restore put another list there, and it can't be read
+        file.writeText("restored\n")
+        assertTrue(file.setReadable(false))
+        try {
+            list.reload()
+            list.strike("meanwhile") // (reads again first: fails again)
+            RemovedWords.awaitWrites()
+        } finally { file.setReadable(true) }
+        assertEquals(listOf("restored"), file.readLines()) // without the fix: old1, old2, meanwhile over it
+        list.reload()
+        assertEquals(listOf("meanwhile", "restored"), file.readLines())
+        assertEquals(listOf("meanwhile", "restored"), list.words().sorted())
+    }
 }

@@ -407,6 +407,10 @@ object RemovedWords {
                 if (file.isFile) file.readLines() else emptyList()
             } catch (e: IOException) {
                 Log.e(TAG, "Exception while trying to read word list ${file.name}", e)
+                // (round-5 review 20261013_L15: a failed re-read, e.g. after a full restore replaced the file, is a
+                // failed first read: unread, so nothing is written over the file ([writeLocked]) and the next use reads
+                // it again; what's in memory stays as it is)
+                loaded = false
                 return
             }
             val read = parseAll(lines)
@@ -437,6 +441,9 @@ object RemovedWords {
             allowedByWord.putAll(allowedResult)
             allowedByWord.keys.retainAll(allowedResult.keys)
             loaded = true
+            // the changes made while the list couldn't be read (never written then, [writeLocked]) are written now, on
+            // top of the file as read; while a full restore runs they stay pending ([writePending] writes them)
+            if (pending.isNotEmpty() && !RestoreGate.isSet) writeLocked()
         }
 
         // the whole list each time (a count changes in place; the lists are short), after the changes before it
@@ -451,6 +458,9 @@ object RemovedWords {
         }
 
         private fun writeLocked() {
+            // an unread list (its read failed) holds only what's in memory: written, it would replace the file's rows;
+            // the changes stay pending until a read succeeds (20261013_L15)
+            if (!loaded) return
             try {
                 if (file.isDirectory) file.delete()
                 file.parentFile?.mkdirs()
