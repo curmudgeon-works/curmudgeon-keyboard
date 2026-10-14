@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"შეთავაზებებისას წინა სიტყვის გამოყენება"</string>
     <string name="gesture_input">"ჟესტებით წერის ჩართვა"</string>
     <string name="gesture_input_summary">"სიტყვის შეყვანა ასო-ნიშნებზე გასრიალებით"</string>
-    <string name="gesture_preview_trail">"ჟესტიკულაციის კუდის ჩვენება"</string>
     <string name="gesture_floating_preview_text">"დინამიურად მოლივლივე გადახედვა"</string>
     <string name="subtype_en_GB">"ინგლისური (გართ. სამ.)"</string>
     <string name="subtype_en_US">"ინგლისური (აშშ)"</string>

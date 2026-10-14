@@ -41,7 +41,6 @@
     <string name="bigram_prediction_summary">"Gamitin ang naunang salita sa paggawa ng mga suhestyon"</string>
     <string name="gesture_input">"I-enable ang gesture typing"</string>
     <string name="gesture_input_summary">"Mag-input ng salita sa pamamagitan ng pag-slide sa mga titik"</string>
-    <string name="gesture_preview_trail">"Ipakita ang trail ng gesture"</string>
     <string name="gesture_floating_preview_text">"Dynamic na floating preview"</string>
     <string name="subtype_en_GB">"English (UK)"</string>
     <string name="subtype_en_US">"English (United States)"</string>

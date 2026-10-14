@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"ਸੁਝਾਅ ਦੇਣ ਵਿੱਚ ਪਿਛਲਾ ਸ਼ਬਦ ਵਰਤੋ"</string>
     <string name="gesture_input">"ਸੰਕੇਤ ਟਾਈਪਿੰਗ ਚਾਲੂ ਕਰੋ"</string>
     <string name="gesture_input_summary">"ਅੱਖਰਾਂ ਰਾਹੀਂ ਸਲਾਈਡ ਕਰਕੇ ਇੱਕ ਸ਼ਬਦ ਦਾਖਲ ਕਰੋ"</string>
-    <string name="gesture_preview_trail">"ਸੰਕੇਤ ਲੀਹ ਦਿਖਾਓ"</string>
     <string name="gesture_floating_preview_text">"ਸਕਿਰਿਆ ਫਲੋਟਿੰਗ ਪੂਰਵ-ਝਲਕ"</string>
     <string name="subtype_en_GB">"ਅੰਗ੍ਰੇਜ਼ੀ (ਯੂਕੇ)"</string>
     <string name="subtype_en_US">"ਅੰਗ੍ਰੇਜੀ (ਅਮਰੀਕਾ)"</string>

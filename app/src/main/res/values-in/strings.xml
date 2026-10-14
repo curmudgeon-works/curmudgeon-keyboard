@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"Gunakan kata sebelumnya dalam membuat saran"</string>
     <string name="gesture_input">"Aktifkan pengetikan gestur"</string>
     <string name="gesture_input_summary">"Masukkan kata dengan menggeser huruf ke kanan/kiri"</string>
-    <string name="gesture_preview_trail">"Tampilkan jejak gestur"</string>
     <string name="gesture_floating_preview_text">"Pratinjau mengambang dinamis"</string>
     <string name="subtype_en_GB">"Inggris (Inggris)"</string>
     <string name="subtype_en_US">"Inggris (AS)"</string>

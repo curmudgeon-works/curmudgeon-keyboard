@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">שימוש במילה הקודמת ביצירת הצעות</string>
     <string name="gesture_input">"אפשר הקלדה רציפה"</string>
     <string name="gesture_input_summary">"הזן מילה על ידי החלקת האצבע מאות לאות"</string>
-    <string name="gesture_preview_trail">"הצגת שובל תנועות"</string>
     <string name="gesture_floating_preview_text">"תצוגה צפה דינמית"</string>
     <string name="subtype_en_GB">"אנגלית (בריטניה)"</string>
     <string name="subtype_en_US">"אנגלית (ארה\"ב)"</string>

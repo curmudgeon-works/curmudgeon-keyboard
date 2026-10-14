@@ -41,7 +41,6 @@
     <string name="bigram_prediction_summary">"Návrhy na základě předchozího slova"</string>
     <string name="gesture_input">"Aktivovat psaní gesty"</string>
     <string name="gesture_input_summary">"Zadávat slova přejetím po písmenech"</string>
-    <string name="gesture_preview_trail">"Zobrazovat stopu gesta"</string>
     <string name="gesture_floating_preview_text">"Dynamický plovoucí náhled"</string>
     <string name="subtype_en_GB">"Angličtina (Velká Británie)"</string>
     <string name="subtype_en_US">"Angličtina (USA)"</string>

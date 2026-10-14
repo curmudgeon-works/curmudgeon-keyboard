@@ -41,7 +41,6 @@
     <string name="bigram_prediction_summary">"Sebenzisa igama langaphambilini ekwenzeni iziphakamiso"</string>
     <string name="gesture_input">"Nika amandla okuthayipha ngokuthinta"</string>
     <string name="gesture_input_summary">"Faka igama ngokushelelisa ezinhlamvini"</string>
-    <string name="gesture_preview_trail">"Bonisa i-trail yokuthinta"</string>
     <string name="gesture_floating_preview_text">"Ukuhlola kuqala okuntantayo okunamandla"</string>
     <string name="subtype_en_GB">"i-English(UK)"</string>
     <string name="subtype_en_US">"i-English (US)"</string>

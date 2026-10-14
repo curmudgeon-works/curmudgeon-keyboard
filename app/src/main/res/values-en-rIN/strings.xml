@@ -41,7 +41,6 @@
     <string name="bigram_prediction_summary">"Use the previous word when making suggestions"</string>
     <string name="gesture_input">"Enable gesture typing"</string>
     <string name="gesture_input_summary">"Input a word by sliding through the letters"</string>
-    <string name="gesture_preview_trail">"Show gesture trail"</string>
     <string name="gesture_floating_preview_text">"Dynamic floating preview"</string>
     <string name="subtype_en_GB">"English (UK)"</string>
     <string name="subtype_en_US">"English (US)"</string>

@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"Nota fyrra orð til að útbúa tillögur"</string>
     <string name="gesture_input">"Kveikja á bendingainnslætti"</string>
     <string name="gesture_input_summary">"Slá inn orð með því að renna í gegnum stafina"</string>
-    <string name="gesture_preview_trail">"Sýna bendingaslóð"</string>
     <string name="gesture_floating_preview_text">"Fljótandi rauntímaforskoðun"</string>
     <string name="subtype_en_GB">"Enskt (Bretland)"</string>
     <string name="subtype_en_US">"Enskt (Bandaríkin)"</string>

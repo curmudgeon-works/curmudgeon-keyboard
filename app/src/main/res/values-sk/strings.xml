@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"Návrhy podľa predchádzajúceho slova"</string>
     <string name="gesture_input">"Povoliť písanie gestami"</string>
     <string name="gesture_input_summary">"Zadávanie slov prejdením prstom po písmenách"</string>
-    <string name="gesture_preview_trail">"Zobrazovať stopu gesta"</string>
     <string name="gesture_floating_preview_text">"Dynamická plávajúca ukážka"</string>
     <string name="subtype_en_GB">"angličtina (Veľká Británia)"</string>
     <string name="subtype_en_US">"angličtina (USA)"</string>

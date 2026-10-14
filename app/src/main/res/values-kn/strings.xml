@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"ಸಲಹೆಗಳನ್ನು ಮಾಡುವಾಗ ಹಿಂದಿನ ಪದವನ್ನು ಬಳಸು"</string>
     <string name="gesture_input">"ಗೆಶ್ಚರ್ ಟೈಪಿಂಗ್ ಸಕ್ರಿಯಗೊಳಿಸು"</string>
     <string name="gesture_input_summary">"ಅಕ್ಷರಗಳ ಮೇಲೆ ಸರಿಸುವ ಮೂಲಕ ಪದವೊಂದನ್ನು ನಮೂದಿಸಿ"</string>
-    <string name="gesture_preview_trail">"ಗೆಶ್ಚರ್ ಟ್ರೇಲ್ ತೋರಿಸು"</string>
     <string name="gesture_floating_preview_text">"ಡೈನಮಿಕ್ ಫ್ಲೋಟಿಂಗ್ ಪೂರ್ವವೀಕ್ಷಣೆ"</string>
     <string name="subtype_en_GB">"ಇಂಗ್ಲಿಷ್ (ಯುಕೆ)"</string>
     <string name="subtype_en_US">"ಇಂಗ್ಲಿಷ್ (US)"</string>

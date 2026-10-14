@@ -33,7 +33,6 @@
     <string name="bigram_prediction">Sugerir palavra(s) seguinte(s)</string>
     <string name="gesture_input">Ativar digitação por gestos</string>
     <string name="gesture_input_summary">Insira uma palavra ao deslizar pelas letras</string>
-    <string name="gesture_preview_trail">Mostrar rastro do gesto</string>
     <string name="gesture_floating_preview_text">Pré-visualização flutuante dinâmica</string>
     <string name="enable_clipboard_history">Ativar histórico da área de transferência</string>
     <string name="delete_swipe_summary">Deslize da tecla delete para selecionar e remover partes de texto maiores de uma vez só</string>

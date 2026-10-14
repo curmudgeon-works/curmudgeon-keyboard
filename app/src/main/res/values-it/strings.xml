@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">Tieni conto della parola precedente per i suggerimenti</string>
     <string name="gesture_input">Attiva la digitazione gestuale</string>
     <string name="gesture_input_summary">Digita le parole percorrendo con un gesto le lettere che le compongono</string>
-    <string name="gesture_preview_trail">Mostra la traccia del gesto</string>
     <string name="gesture_floating_preview_text">"Anteprima mobile dinamica"</string>
     <string name="subtype_en_GB">Inglese (Regno Unito)</string>
     <string name="subtype_en_US">Inglese (Stati Uniti)</string>

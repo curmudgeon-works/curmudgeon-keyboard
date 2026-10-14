@@ -41,7 +41,6 @@
     <string name="bigram_prediction_summary">"ໃຊ້ຄຳທີ່ຜ່ານມາໃນການແນະນຳຄຳ"</string>
     <string name="gesture_input">"ເປີດນຳໃຊ້ການພິມແບບ Gesture"</string>
     <string name="gesture_input_summary">"ໃສ່ຄຳສັບລົງໄປໂດຍການສະໄລ້ຜ່ານໂຕອັກສອນ"</string>
-    <string name="gesture_preview_trail">"ສະແດງຫາງຂອງ Gesture"</string>
     <string name="gesture_floating_preview_text">"ມີຄຳຕົວຢ່າງລອຍຂຶ້ນມາ"</string>
     <string name="subtype_en_GB">"ອັງກິດ (ສະຫະລາດຊະອານາຈັກ)"</string>
     <string name="subtype_en_US">"ອັງກິດ (ສະຫະລັດຯ)"</string>

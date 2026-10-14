@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"Sử dụng từ trước đó khi đưa ra đề xuất"</string>
     <string name="gesture_input">"Bật nhập bằng cử chỉ"</string>
     <string name="gesture_input_summary">"Nhập từ bằng cách trượt qua các chữ cái"</string>
-    <string name="gesture_preview_trail">"Hiển thị vệt cử chỉ"</string>
     <string name="gesture_floating_preview_text">"Xem trước nổi động"</string>
     <string name="subtype_en_GB">"Tiếng Anh (Anh)"</string>
     <string name="subtype_en_US">"Tiếng Anh (Mỹ)"</string>

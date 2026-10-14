@@ -42,7 +42,6 @@
     <string name="bigram_prediction_summary">"Prilikom odlučivanja koristi prethodno"</string>
     <string name="gesture_input">"Omogućite pisanje pokretima"</string>
     <string name="gesture_input_summary">"Unesite riječ klizanjem prstom preko slova"</string>
-    <string name="gesture_preview_trail">"Prikaži trag pokreta"</string>
     <string name="gesture_floating_preview_text">"Pregled dinamičkim lebdenjem"</string>
     <string name="subtype_en_GB">"engleski (UK)"</string>
     <string name="subtype_en_US">"engleski (SAD)"</string>

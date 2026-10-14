@@ -2,7 +2,6 @@
 package helium314.keyboard.settings.screens
 
 import android.content.Context
-import android.content.SharedPreferences
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -25,32 +24,9 @@ import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.settings.initPreview
 import helium314.keyboard.latin.utils.previewDark
 
-/** The gesture typing items, shown on the Swiping screen. */
-fun gestureTypingItems(prefs: SharedPreferences): List<String?> {
-    val gestureEnabled = prefs.getBoolean(Settings.PREF_GESTURE_INPUT, Defaults.PREF_GESTURE_INPUT)
-    return listOf(
-        Settings.PREF_GESTURE_INPUT,
-        if (gestureEnabled)
-            Settings.PREF_GESTURE_PREVIEW_TRAIL else null,
-        // the swiped word shows in the suggestion strip only (see SettingsValues), so no floating preview rows
-        // the own decoder's swipe-up capitals and apostrophe are on the keyboard's Swipe screen
-        if (gestureEnabled)
-            Settings.PREF_GESTURE_FAST_TYPING_COOLDOWN else null,
-        if (gestureEnabled && prefs.getBoolean(Settings.PREF_GESTURE_PREVIEW_TRAIL, Defaults.PREF_GESTURE_PREVIEW_TRAIL))
-            Settings.PREF_GESTURE_TRAIL_FADEOUT_DURATION else null
-        )
-}
-
-val gestureTypingSimpleModeKeys = setOf(
-    Settings.PREF_GESTURE_INPUT, Settings.PREF_GESTURE_PREVIEW_TRAIL,
-)
-
 fun createGestureTypingSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_GESTURE_INPUT, R.string.gesture_input) {
         SwitchPreference(it, Defaults.PREF_GESTURE_INPUT)
-    },
-    Setting(context, Settings.PREF_GESTURE_PREVIEW_TRAIL, R.string.gesture_preview_trail) {
-        SwitchPreference(it, Defaults.PREF_GESTURE_PREVIEW_TRAIL)
     },
     Setting(context, Settings.PREF_GESTURE_CAPS_SWIPE, R.string.gesture_caps_swipe) {
         SwitchPreference(it, Defaults.PREF_GESTURE_CAPS_SWIPE)

@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"Ұсыныстар жасауда алдыңғы сөзді пайдалану"</string>
     <string name="gesture_input">"Қимылмен теруді қосу"</string>
     <string name="gesture_input_summary">"Әріптерді сипап өту арқылы сөз енгізу"</string>
-    <string name="gesture_preview_trail">"Қимыл қадамын көрсету"</string>
     <string name="gesture_floating_preview_text">"Динамикалық қалқымалы қарап шығу"</string>
     <string name="subtype_en_GB">"ағылшын (ҰБ)"</string>
     <string name="subtype_en_US">"ағылшын (АҚШ)"</string>

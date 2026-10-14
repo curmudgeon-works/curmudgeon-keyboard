@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"సూచనలను రూపొందించడంలో మునుపటి పదాన్ని ఉపయోగించు"</string>
     <string name="gesture_input">"సంజ్ఞ టైపింగ్‌ను ప్రారంభించండి"</string>
     <string name="gesture_input_summary">"అక్షరాల గుండా స్లైడ్ చేయడం ద్వారా పదాన్ని ఇన్‌పుట్ చేయండి"</string>
-    <string name="gesture_preview_trail">"సంజ్ఞ ట్రయిల్‌ను చూపు"</string>
     <string name="gesture_floating_preview_text">"డైనమిక్ ఫ్లోటింగ్ పరిదృశం"</string>
     <string name="subtype_en_GB">"ఆంగ్లం (యుకె)"</string>
     <string name="subtype_en_US">"ఆంగ్లం (యుఎస్)"</string>

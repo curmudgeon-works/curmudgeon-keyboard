@@ -41,7 +41,6 @@
     <string name="bigram_prediction_summary">Usar palavra anterior para fazer sugestões</string>
     <string name="gesture_input">Ativar escrita ao deslizar</string>
     <string name="gesture_input_summary">Introduzir uma palavra ao deslizar pelas letras</string>
-    <string name="gesture_preview_trail">"Mostrar percurso do gesto"</string>
     <string name="gesture_floating_preview_text">"Pré-visual. flutuante dinâmica"</string>
     <string name="subtype_en_GB">Inglês (Reino Unido)</string>
     <string name="subtype_en_US">"Inglês (EUA)"</string>

@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"Avvalgi so‘zlar asosida keyingi so‘zni taklif qilish"</string>
     <string name="gesture_input">"Qo‘l uzmasdan yozish"</string>
     <string name="gesture_input_summary">"So‘zlarni barmog‘ingizni klaviaturadan uzmasdan yozing"</string>
-    <string name="gesture_preview_trail">"Barmoq yo‘lini chizish"</string>
     <string name="gesture_floating_preview_text">"Takliflarni ko‘rsatish"</string>
     <string name="subtype_en_GB">"Ingliz (Buyuk Britaniya)"</string>
     <string name="subtype_en_US">"Ingliz (AQSH)"</string>

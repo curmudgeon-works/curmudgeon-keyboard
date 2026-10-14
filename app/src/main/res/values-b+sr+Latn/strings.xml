@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"Koristi prethodnu reč pri davanju predloga"</string>
     <string name="gesture_input">"Omogući unos pokretom"</string>
     <string name="gesture_input_summary">"Unesite reč prevlačenjem prsta preko od slova do slova na ekranu"</string>
-    <string name="gesture_preview_trail">"Prikaži trag pokreta"</string>
     <string name="gesture_floating_preview_text">"Dinamički plutajući pregled"</string>
     <string name="subtype_en_GB">"engleski (UK)"</string>
     <string name="subtype_en_US">"engleski (SAD)"</string>

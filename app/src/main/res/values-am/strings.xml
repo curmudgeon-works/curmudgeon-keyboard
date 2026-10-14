@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"አስተያየቶች መስጠት ላይ ቀዳሚውን ቃል ተጠቀም"</string>
     <string name="gesture_input">"በምልክት መተየብ ያንቁ"</string>
     <string name="gesture_input_summary">"በፊደሎች መካከል በማንሸራተት ቃል ያስገቡ"</string>
-    <string name="gesture_preview_trail">"ምልክት የሚሄድበት መንገድ አሳይ"</string>
     <string name="gesture_floating_preview_text">"ተለዋዋጭ ተንሳፋፊ ቅድመ-እይታ"</string>
     <string name="subtype_en_GB">"እንግሊዘኛ (የታላቋ ብሪታንያ)"</string>
     <string name="subtype_en_US">"እንግሊዘኛ (ዩ.ኤስ)"</string>

@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"Erabili aurreko hitza iradokizunak egiteko"</string>
     <string name="gesture_input">Gaitu keinu-idazketa</string>
     <string name="gesture_input_summary">"Idatzi hitzak hizki batetik bestera hatza lerratuta"</string>
-    <string name="gesture_preview_trail">"Erakutsi keinuaren bidea"</string>
     <string name="gesture_floating_preview_text">"Flotatze dinamikodun aurrebista"</string>
     <string name="subtype_en_GB">"Ingelesa (Erresuma Batua)"</string>
     <string name="subtype_en_US">"Ingelesa (AEB)"</string>

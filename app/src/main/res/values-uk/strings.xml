@@ -41,7 +41,6 @@
     <string name="bigram_prediction_summary">"Використовувати попереднє слово, щоб надавати пропозиції"</string>
     <string name="gesture_input">"Увімкнути ввід жестами"</string>
     <string name="gesture_input_summary">"Вводьте слова, проводячи пальцем по літерах"</string>
-    <string name="gesture_preview_trail">"Показувати слід жестів"</string>
     <string name="gesture_floating_preview_text">"Показувати підказки"</string>
     <string name="subtype_en_GB">"Англійська (Велика Британія)"</string>
     <string name="subtype_en_US">"Англійська (США)"</string>

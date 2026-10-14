@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"Az előző szó felhasználása a javaslatoknál"</string>
     <string name="gesture_input">Kézmozdulat-gépelés engedélyezése</string>
     <string name="gesture_input_summary">Szó beírása a betűkön való csúsztatással</string>
-    <string name="gesture_preview_trail">Kézmozdulat nyomának megjelenítése</string>
     <string name="gesture_floating_preview_text">"Dinamikus lebegő előnézet"</string>
     <string name="subtype_en_GB">Angol (brit)</string>
     <string name="subtype_en_US">Angol (amerikai)</string>

@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">استخدم الكلمة السابقة لتقديم الاقتراحات</string>
     <string name="gesture_input">فعّل الكتابة بالإيماءة</string>
     <string name="gesture_input_summary">"إدخال كلمة من خلال التمرير على الأحرف"</string>
-    <string name="gesture_preview_trail">اعرض مسار الإيماءة</string>
     <string name="gesture_floating_preview_text">"معاينة نصوص متحركة ديناميكية"</string>
     <string name="subtype_en_GB">"الإنجليزية (المملكة المتحدة)"</string>
     <string name="subtype_en_US">"الإنجليزية (الولايات المتحدة)"</string>

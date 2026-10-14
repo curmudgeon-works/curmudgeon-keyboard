@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"Gebruik die vorige woord om voorstelle te maak"</string>
     <string name="gesture_input">"Aktiveer gebaar-tik"</string>
     <string name="gesture_input_summary">"Voer \'n woord in deur te gly deur die letters"</string>
-    <string name="gesture_preview_trail">"Wys gebaarspoor"</string>
     <string name="gesture_floating_preview_text">"Dinamiese sweefvoorskou"</string>
     <string name="subtype_en_GB">"Engels (VK)"</string>
     <string name="subtype_en_US">"Engels (VS)"</string>

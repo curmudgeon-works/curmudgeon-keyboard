@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"सुझावहरू निर्माण गर्न अघिल्लो शब्द प्रयोग गर्नुहोस्"</string>
     <string name="gesture_input">"इशारा टाइप गर्ने सक्षम पार्नुहोस्"</string>
     <string name="gesture_input_summary">"अक्षर स्लाइड गरी शब्द इनपुट गर्नुहोस्"</string>
-    <string name="gesture_preview_trail">"इशारा ट्रेल देखाउनुहोस्"</string>
     <string name="gesture_floating_preview_text">"गतिशील फ्लोटिङ पूर्वावलोकन"</string>
     <string name="subtype_en_GB">"अंग्रेजी (युके)"</string>
     <string name="subtype_en_US">"अंग्रेजी (युएस्)"</string>

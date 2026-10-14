@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"Utilizează cuvântul anterior pentru sugestii"</string>
     <string name="gesture_input">Activează tastarea gestuală</string>
     <string name="gesture_input_summary">Introdu un cuvânt glisând ușor între litere</string>
-    <string name="gesture_preview_trail">"Se afișează urma gestului"</string>
     <string name="gesture_floating_preview_text">"Sugestie flotantă dinamică"</string>
     <string name="subtype_en_GB">"engleză (Regatul Unit)"</string>
     <string name="subtype_en_US">"engleză (S.U.A.)"</string>

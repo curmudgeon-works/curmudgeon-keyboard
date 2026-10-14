@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"Soovituste tegemisel eelmise sõna kasutamine"</string>
     <string name="gesture_input">"Luba joonistusega sisestamine"</string>
     <string name="gesture_input_summary">"Sõna sisestamine tähtede lohistamisega"</string>
-    <string name="gesture_preview_trail">"Näita liigutuse jälge"</string>
     <string name="gesture_floating_preview_text">"Dünaamiline ujuv eelvaade"</string>
     <string name="subtype_en_GB">"Inglise (UK)"</string>
     <string name="subtype_en_US">"Inglise (USA)"</string>

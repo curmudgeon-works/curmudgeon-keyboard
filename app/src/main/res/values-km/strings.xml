@@ -41,7 +41,6 @@
     <string name="bigram_prediction_summary">"ប្រើ​ពាក្យ​មុន​​នៅ​ពេល​ធ្វើ​ការ​​​ស្នើ"</string>
     <string name="gesture_input">"បើក​ការ​​បញ្ចូល​​កាយវិការ"</string>
     <string name="gesture_input_summary">"បញ្ចូល​ពាក្យ​ដោយ​រំកិល​​​តាម​​អក្សរ"</string>
-    <string name="gesture_preview_trail">"បង្ហាញ​ដាន​កាយវិការ"</string>
     <string name="gesture_floating_preview_text">"មើល​ការ​​អណ្ដែត​ដែល​មាន​ចលនា​ជា​មុន"</string>
     <string name="subtype_en_GB">"អង់គ្លេស (​អង់គ្លេស)"</string>
     <string name="subtype_en_US">"អង់គ្លេស (សហរដ្ឋ​អាមេរិក)"</string>

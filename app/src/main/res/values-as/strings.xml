@@ -41,7 +41,6 @@
     <string name="bigram_prediction_summary">"পৰামৰ্শ প্ৰদান কৰিবলৈ পূৰ্বৱৰ্তী শব্দটো ব্যৱহাৰ কৰক"</string>
     <string name="gesture_input">"স্পৰ্শ লিখন সক্ষম কৰক"</string>
     <string name="gesture_input_summary">"আখৰৰ ওপৰেৰে আঙুলি পিছলাই শব্দ লিখক"</string>
-    <string name="gesture_preview_trail">"আঙুলি পিছলাই দিয়া নিৰ্দেশসমূহৰ গতিপথৰ চিহ্ন দেখুৱাওক"</string>
     <string name="gesture_floating_preview_text">"গতিশীল প্ৰবাহিত পূৰ্বদৰ্শন"</string>
     <string name="add">"যোগ কৰক"</string>
     <string name="remove">"আঁতৰাওক"</string>

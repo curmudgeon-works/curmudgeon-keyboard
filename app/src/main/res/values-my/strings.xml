@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">ယခင်သုံးဖူးသည့် ဝေါဟာရကို အကြံပြုချက်များတွင် အသုံးပြုမည်</string>
     <string name="gesture_input">ပွတ်ဆွဲ၍စာရိုက်ခြင်းစနစ် ဖွင့်ရန်</string>
     <string name="gesture_input_summary">မိမိရေးလိုသော ဝေါဟာရတွင်ပါဝင်သော အက္ခရာတစ်ခုမှ တစ်ခုသို့ အစဉ်တိုင်း ပွတ်ဆွဲပါ</string>
-    <string name="gesture_preview_trail">ပွတ်ဆွဲရာ၌ စွတ်ကြောင်းကိုပြရန်</string>
     <string name="gesture_floating_preview_text">အကြံပြုဝေါဟာရရုပ်ကြွပုံကို လက်ချောင်းပေါ်တွင်ပြသရန်</string>
     <string name="subtype_en_GB">"အင်္ဂလိပ်(ယူကေ)"</string>
     <string name="subtype_en_US">"အင်္ဂလိပ် (ယူအက်စ်)"</string>

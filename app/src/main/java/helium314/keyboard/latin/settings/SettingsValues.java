@@ -330,9 +330,9 @@ public class SettingsValues {
         mGestureDecoderScorer = prefs.getString(DebugSettings.PREF_GESTURE_DECODER_SCORER, Defaults.PREF_GESTURE_DECODER_SCORER);
         mGestureCapsHeight = prefs.getInt(Settings.PREF_GESTURE_CAPS_HEIGHT, Defaults.PREF_GESTURE_CAPS_HEIGHT) / 100f;
         mGestureTrailThickness = prefs.getInt(Settings.PREF_GESTURE_TRAIL_THICKNESS, Defaults.PREF_GESTURE_TRAIL_THICKNESS);
-        // (the old "Show swipe trail" switch is thickness 0 now; see AppUpgrade)
-        mGestureTrailEnabled = prefs.getBoolean(Settings.PREF_GESTURE_PREVIEW_TRAIL, Defaults.PREF_GESTURE_PREVIEW_TRAIL)
-                && mGestureTrailThickness > 0;
+        // the trail is off at thickness 0 only: the old "Show full swipe trail" switch is thickness 0 now (AppUpgrade),
+        // and no longer read (round-7 review 20261013_L5_3: still read, it turned the trail off from the swipe search)
+        mGestureTrailEnabled = mGestureTrailThickness > 0;
         mGestureTrailWhole = prefs.getBoolean(Settings.PREF_GESTURE_TRAIL_WHOLE, Defaults.PREF_GESTURE_TRAIL_WHOLE);
         mGestureTrailWholeLinger = prefs.getInt(Settings.PREF_GESTURE_TRAIL_WHOLE_LINGER, Defaults.PREF_GESTURE_TRAIL_WHOLE_LINGER);
         // swiped words show in the suggestion strip only, never floating over the keyboard

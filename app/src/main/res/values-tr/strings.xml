@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"Öneride bulunurken önceki kelimeyi kullanır"</string>
     <string name="gesture_input">"Hareketle yazmayı etkinleştir"</string>
     <string name="gesture_input_summary">"Kelime girmek için parmağınızı harflerin üzerinde kaydırın"</string>
-    <string name="gesture_preview_trail">"Hareket izini göster"</string>
     <string name="gesture_floating_preview_text">"Dinamik kayan önizleme"</string>
     <string name="subtype_en_GB">"İngilizce (BK)"</string>
     <string name="subtype_en_US">"İngilizce (ABD)"</string>

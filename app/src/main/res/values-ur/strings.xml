@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"تجاویز پیش کرتے وقت گزشتہ لفظ استعمال کریں"</string>
     <string name="gesture_input">"اشارہ جاتی ٹائپنگ کو فعال کریں"</string>
     <string name="gesture_input_summary">"حروف پر سلائیڈ کر کے ایک لفظ درج کریں"</string>
-    <string name="gesture_preview_trail">"اشارہ ٹریل دکھائیں"</string>
     <string name="gesture_floating_preview_text">"ڈائنیمک فلوٹنگ پیش منظر"</string>
     <string name="subtype_en_GB">"انگریزی (برطانیہ)"</string>
     <string name="subtype_en_US">"انگریزی (امریکہ)"</string>

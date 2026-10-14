@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"Користи претходну реч при давању предлога"</string>
     <string name="gesture_input">"Омогући унос покретом"</string>
     <string name="gesture_input_summary">"Унесите реч превлачењем прста преко од слова до слова на екрану"</string>
-    <string name="gesture_preview_trail">"Прикажи траг покрета"</string>
     <string name="gesture_floating_preview_text">"Динамички плутајући преглед"</string>
     <string name="subtype_en_GB">"енглески (УК)"</string>
     <string name="subtype_en_US">"енглески (САД)"</string>

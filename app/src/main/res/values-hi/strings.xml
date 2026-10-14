@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"सुझाव बनाने में पिछले शब्द का उपयोग करें"</string>
     <string name="gesture_input">"जेश्चर टाइपिंग चालू करें"</string>
     <string name="gesture_input_summary">"अक्षरों से स्लाइड करते हुए शब्द इनपुट करें"</string>
-    <string name="gesture_preview_trail">"हाथ के जेस्चर का ट्रेल दिखाएं"</string>
     <string name="gesture_floating_preview_text">"डायनामिक फ़्लोटिंग की झलक"</string>
     <string name="subtype_en_GB">"अंग्रेज़ी (यूके)"</string>
     <string name="subtype_en_US">"अंग्रेज़ी (यूएस)"</string>

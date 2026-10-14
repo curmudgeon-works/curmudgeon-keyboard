@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"Pri predlogu upoštevaj prejšnjo besedo"</string>
     <string name="gesture_input">"Omogoči vnos s potezo"</string>
     <string name="gesture_input_summary">"Vnos besede s podrsavanjem od črke do črke"</string>
-    <string name="gesture_preview_trail">"Prikaži pot poteze"</string>
     <string name="gesture_floating_preview_text">"Dinamični plavajoči predogled"</string>
     <string name="subtype_en_GB">"angleščina (Združeno kraljestvo)"</string>
     <string name="subtype_en_US">"angleščina (ZDA)"</string>

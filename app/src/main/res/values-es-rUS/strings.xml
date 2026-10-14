@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"Usar la palabra anterior para hacer sugerencias"</string>
     <string name="gesture_input">"Habilitar escritura gestual"</string>
     <string name="gesture_input_summary">"Ingresa una palabra deslizando el dedo sobre las letras."</string>
-    <string name="gesture_preview_trail">"Mostrar recorrido de gesto"</string>
     <string name="gesture_floating_preview_text">"Vista previa dinámica flotante"</string>
     <string name="subtype_en_GB">"Inglés (Reino Unido)"</string>
     <string name="subtype_en_US">"Inglés (EE.UU.)"</string>

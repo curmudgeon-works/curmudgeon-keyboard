@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"Brug det forrige ord til at give forslag"</string>
     <string name="gesture_input">"Aktivér glidende indtastning"</string>
     <string name="gesture_input_summary">Indtast et ord ved at glide mellem bogstaverne</string>
-    <string name="gesture_preview_trail">"Vis glidende trykspor"</string>
     <string name="gesture_floating_preview_text">"Dynamiske ordeksempler"</string>
     <string name="subtype_en_GB">Engelsk (Storbritannien)</string>
     <string name="subtype_en_US">Engelsk (USA)</string>

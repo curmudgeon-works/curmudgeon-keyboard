@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"Използване на предишната дума при даване на предложения"</string>
     <string name="gesture_input">"Актив. на въвеждане чрез жест"</string>
     <string name="gesture_input_summary">"Въвеждане на дума чрез плъзгане на пръст през буквите"</string>
-    <string name="gesture_preview_trail">"Следа от жестовете"</string>
     <string name="gesture_floating_preview_text">Динамична плаваща визуализация</string>
     <string name="subtype_en_GB">"английски (Великобритания)"</string>
     <string name="subtype_en_US">"английски (САЩ)"</string>

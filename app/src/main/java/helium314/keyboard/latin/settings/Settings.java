@@ -347,7 +347,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
         }
         // swiping on / off and its trail: the keyboard takes them when it starts, so the one already up (the settings
         // preview) went on swiping (or not) until it was closed and opened again
-        if (PREF_GESTURE_INPUT.equals(key) || PREF_GESTURE_PREVIEW_TRAIL.equals(key) || PREF_GESTURE_TRAIL_THICKNESS.equals(key)) {
+        if (PREF_GESTURE_INPUT.equals(key) || PREF_GESTURE_TRAIL_THICKNESS.equals(key)) {
             final SettingsValues sv = mSettingsValues;
             final helium314.keyboard.keyboard.MainKeyboardView view = helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().getMainKeyboardView();
             if (view != null) view.post(() -> view.setGestureHandlingEnabledByUser(sv.mGestureInputEnabled,

@@ -41,7 +41,6 @@
     <string name="bigram_prediction_summary">"Выкарыстоўваць папярэдняе слова, каб атрымлiваць падказкi"</string>
     <string name="gesture_input">Ўключыць ўвод жэстамі</string>
     <string name="gesture_input_summary">Ўвядзіце слова, перасоўваючы палец па літарах</string>
-    <string name="gesture_preview_trail">"Паказаць след жэста"</string>
     <string name="gesture_floating_preview_text">"Дынамічны плаваючы прагляд"</string>
     <string name="subtype_en_GB">"Англійская (Вялікабрытанія)"</string>
     <string name="subtype_en_US">"Англійская (ЗША)"</string>

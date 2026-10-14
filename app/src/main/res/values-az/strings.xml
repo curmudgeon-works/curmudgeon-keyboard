@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"Təkliflər edilməsində əvvəlki sözdən istifadə et"</string>
     <string name="gesture_input">"Jestlərlə yazmağı aktiv et"</string>
     <string name="gesture_input_summary">"Hərflər üzərində sürüşdürərək söz daxil edin"</string>
-    <string name="gesture_preview_trail">"Jest izini göstər"</string>
     <string name="gesture_floating_preview_text">"Dinamik üzmə önizləməsi"</string>
     <string name="subtype_en_GB">"İngilis (BK)"</string>
     <string name="subtype_en_US">"İngilis (ABŞ)"</string>

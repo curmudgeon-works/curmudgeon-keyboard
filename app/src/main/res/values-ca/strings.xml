@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"Utilitza la paraula anterior per fer suggeriments"</string>
     <string name="gesture_input">"Activa l\'escriptura gestual"</string>
     <string name="gesture_input_summary">"Escriu una paraula fent lliscar el dit per les lletres"</string>
-    <string name="gesture_preview_trail">Mostra el rastre del gest</string>
     <string name="gesture_floating_preview_text">"Previsualització dinàmica flotant"</string>
     <string name="subtype_en_GB">Anglès (Regne Unit)</string>
     <string name="subtype_en_US">Anglès (EUA)</string>

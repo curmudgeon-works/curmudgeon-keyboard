@@ -41,7 +41,6 @@
     <string name="bigram_prediction_summary">"Χρήση της προηγούμενης λέξης για τη δημιουργία προτάσεων"</string>
     <string name="gesture_input">"Ενεργ. πληκτρολ. με κινήσεις"</string>
     <string name="gesture_input_summary">"Εισαγάγετε μια λέξη με ολίσθηση μεταξύ των γραμμάτων"</string>
-    <string name="gesture_preview_trail">"Εμφάνιση διαδρομής χειρονομίας"</string>
     <string name="gesture_floating_preview_text">"Προεπισκόπ. δυναμικής κίνησης"</string>
     <string name="subtype_en_GB">"Αγγλικά (ΗΒ)"</string>
     <string name="subtype_en_US">"Αγγλικά (ΗΠΑ)"</string>

@@ -80,7 +80,6 @@
     <string name="center_suggestion_text_to_enter_summary">Sa pag-pindot ng space o punctuation, ilalagay ang mungkahi sa gitna</string>
     <string name="gesture_input_summary">Maglagay ng salita sa pamamagitan ng pag-slide sa mga letra</string>
     <string name="center_suggestion_text_to_enter">Palaging gamitin ang mungkahi sa gitna</string>
-    <string name="gesture_preview_trail">Ipakita ang trail ng gesture</string>
     <string name="enable_clipboard_history">I-enable ang clipboard history</string>
     <string name="suggest_clipboard_content">Imungkahi ang nilalaman ng clipboard</string>
     <string name="suggest_clipboard_content_summary">Pinapakita ang kamakailang kinopya na nilalaman ng clipboard bilang mungkahi</string>

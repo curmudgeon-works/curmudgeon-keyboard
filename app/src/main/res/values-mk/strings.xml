@@ -40,7 +40,6 @@
     <string name="bigram_prediction_summary">"Употребете го претходниот збор за предлози"</string>
     <string name="gesture_input">"Овозможи пишување со движење"</string>
     <string name="gesture_input_summary">"Внесете збор со лизгање низ буквите"</string>
-    <string name="gesture_preview_trail">"Покажи патека на движења"</string>
     <string name="gesture_floating_preview_text">"Динамичен лебдечки преглед"</string>
     <string name="subtype_en_GB">"англиски (ОК)"</string>
     <string name="subtype_en_US">"англиски (САД)"</string>
