@@ -328,7 +328,10 @@ object KeyboardProfiles {
             val own = real.all.mapNotNull { (key, value) -> unprefixedKey(fromId, key)?.takeIf { it != key }?.let { it to value } }
             // first what's at its default in the source (no shared value then), then its own values: a value of its own
             // wins over a mark left behind (before, the file's order decided)
-            for ((plain, _) in own) if (plain.startsWith(TOMBSTONE)) values.remove(plain.removePrefix(TOMBSTONE))
+            // (a mark on a one-time flag, left by a "defaults only" keyboard before 2026-10-10, means nothing: the flag
+            // stays, else its step runs again; review 2026-10-08 area 1 #5)
+            for ((plain, _) in own) if (plain.startsWith(TOMBSTONE) && !isOneTimeFlag(plain.removePrefix(TOMBSTONE)))
+                values.remove(plain.removePrefix(TOMBSTONE))
             for ((plain, value) in own) if (!isGlobal(plain) && !(plain.startsWith(TOMBSTONE) && own.any { it.first == plain.removePrefix(TOMBSTONE) }))
                 values[plain] = value
         }
@@ -359,7 +362,9 @@ object KeyboardProfiles {
         for ((key, value) in settings) put(editor, prefixedKey(id, key), value)
         if (markDefaults && id != SHARED)
             for (key in real.all.keys)
-                if (!isGlobal(key) && !key.startsWith(TOMBSTONE) && key !in settings && !upgradeFlag.matches(key))
+                // (no one-time flag either, the settings moves' ones included: a mark on one made separate OFF from
+                // this keyboard drop it, and the move ran again; review 2026-10-08 area 1 #5)
+                if (!isGlobal(key) && !key.startsWith(TOMBSTONE) && key !in settings && !isOneTimeFlag(key))
                     editor.putBoolean(prefixedKey(id, TOMBSTONE + key), true)
         editor.apply()
     }
