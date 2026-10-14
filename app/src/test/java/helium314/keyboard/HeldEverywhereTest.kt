@@ -113,4 +113,15 @@ class HeldEverywhereTest {
         AppearanceDraft.rejectOpen(ctx)
         assertFalse(real.contains(own(1, Settings.PREF_KEY_HORIZONTAL_GAP)))
     }
+
+    // review C9 (owner: "yes go by meaning"): another keyboard's own set storing the value it already read is no change
+    @Test fun `another keyboard's switch turned on and off again is no change, a different value is`() {
+        val draft = AppearanceDraft.of(ctx)
+        assertFalse(draft.hasChanges(ctx))
+        ProfilePreferences(real) { 2 }.edit().putBoolean(Settings.PREF_KEY_TEXT_BOLD, false).commit() // its default
+        assertTrue(real.contains(own(2, Settings.PREF_KEY_TEXT_BOLD))) // (stored as picked)
+        assertFalse(draft.hasChanges(ctx))
+        ProfilePreferences(real) { 2 }.edit().putBoolean(Settings.PREF_KEY_TEXT_BOLD, true).commit()
+        assertTrue(draft.hasChanges(ctx))
+    }
 }

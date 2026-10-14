@@ -69,10 +69,25 @@ class AppearanceDraft private constructor(
     /** True when a preference or file in the snapshot's scope differs from it, or something was deleted. */
     fun hasChanges(ctx: Context): Boolean {
         if (held.isNotEmpty()) return true
-        if (reachedNow(ctx) != reached) return true
+        if (reachedChanged(ctx)) return true
         if (changedKeys(ctx).isNotEmpty()) return true
         return files.any { (live, saved) ->
             if (saved == null) live.exists() else !live.exists() || live.length() != saved.length || live.lastModified() != saved.modified
+        }
+    }
+
+    /** Whether what the saved items reach beyond the edited set differs from [reached] by meaning (review C9, owner: "yes
+     *  go by meaning"): a keyboard's own set storing the value it already read (a switch turned on and off again) is
+     *  no change. The stored values stay as picked; Discard still puts the raw snapshot back. */
+    private fun reachedChanged(ctx: Context): Boolean {
+        val all = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx).all
+        val now = all.filterKeys { reachesBeyond(it) }
+        if (now == reached) return false
+        val keys = (now.keys + reached.keys).mapTo(HashSet()) { LayoutDraft.base(it) }
+        return keys.any { key ->
+            val plain = LayoutDraft.plain(key)
+            if (plain == AppearanceLooks.PREF) now[key] != reached[key] // (the saved themes: a JSON string)
+            else !KnownDefaults.same(plain, reads(now, all, key), reads(reached, all, key))
         }
     }
 
@@ -203,6 +218,16 @@ class AppearanceDraft private constructor(
                 || plain.startsWith(Settings.PREF_USER_COLORS_PREFIX) || plain.startsWith(Settings.PREF_USER_ALL_COLORS_PREFIX)
                 || plain.startsWith(Settings.PREF_USER_MORE_COLORS_PREFIX)
         }
+        /** What [key] (full) reads as in [stored]: its value; a keyboard's key "at its default" (its "~" mark) its
+         *  default; a keyboard's key with neither the shared value (from [stored], else as it is now in [all]). */
+        private fun reads(stored: Map<String, Any?>, all: Map<String, Any?>, key: String): Any? {
+            if (key in stored) return stored[key]
+            val plain = LayoutDraft.plain(key)
+            if (plain == key) return null
+            if (LayoutDraft.mark(key) in stored) return KnownDefaults.of(plain) ?: AT_DEFAULT
+            return if (plain in stored) stored[plain] else all[plain]
+        }
+        private val AT_DEFAULT = Any() // a mark whose default isn't known: equal only to itself
         private fun reachedNow(ctx: Context): Map<String, Any?> =
             helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx).all.filterKeys { reachesBeyond(it) }
 
