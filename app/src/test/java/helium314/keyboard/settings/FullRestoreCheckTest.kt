@@ -145,7 +145,17 @@ class FullRestoreCheckTest {
         restoreEverythingFrom(ctx, zip)
         assertEquals(222, real.all[Settings.PREF_KEY_LONGPRESS_TIMEOUT])
         assertEquals(null, real.all[Settings.PREF_SHOW_NUMBER_ROW], "the device's settings weren't replaced")
-        assertEquals("backupwords\n".repeat(2000), File(ctx.filesDir, "blacklists/en-US.txt").readText())
+        // the backup's per-language blacklist (from before they were per script) went the way the app start takes it
+        // (LearnedStoreMigration, then LearnedKeyboards.updateOnce): set aside whole, its words in the per-script list,
+        // and in each keyboard's own copy of it when the restored list has keyboards with ids
+        val words = mapOf("backupwords" to helium314.keyboard.latin.utils.RemovedWords.Entry())
+        assertEquals("backupwords\n".repeat(2000),
+            File(ctx.filesDir, "${helium314.keyboard.latin.personalization.LearnedStoreMigration.PREMERGE_DIR}/blacklists/en-US.txt").readText())
+        assertEquals(false, File(ctx.filesDir, "blacklists/en-US.txt").exists(), "the per-language list stayed")
+        assertEquals(words, helium314.keyboard.latin.personalization.readList(ctx.filesDir, "Latn",
+            helium314.keyboard.latin.personalization.LearnedStores.SHARED), "the per-script list")
+        for ((id, pool) in helium314.keyboard.latin.personalization.storedPools(real))
+            assertEquals(words, helium314.keyboard.latin.personalization.readList(ctx.filesDir, "Latn", pool), "keyboard $id's list")
         assertEquals(false, File(ctx.filesDir, "custom_background_image").exists(), "the device's files weren't deleted")
     }
 }
