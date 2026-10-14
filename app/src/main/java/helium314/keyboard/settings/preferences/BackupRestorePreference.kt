@@ -59,6 +59,7 @@ import helium314.keyboard.latin.utils.ScriptUtils
 import helium314.keyboard.latin.utils.ScriptUtils.script
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
@@ -612,9 +613,11 @@ private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: Restore
 private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, choice: RestoreChoice, io: LearnedStoreIo) {
     val everyKeyboard = choice.keyboards.toSet() == pending.keyboards.toSet()
     val allSettings = choice.settings && choice.keyboards.isNotEmpty() && everyKeyboard
+    // each chosen keyboard as it is on the phone now (its custom key layouts can come in under other names)
+    var onPhone: Map<SettingsSubtype, SettingsSubtype> = emptyMap()
     if (choice.keyboards.isNotEmpty()) {
         if (allSettings) restoreAllSettings(ctx, pending)
-        else restoreKeyboards(ctx, pending, choice.keyboards, choice.settings, choice.asCopies)
+        else onPhone = restoreKeyboards(ctx, pending, choice.keyboards, choice.settings, choice.asCopies)
     }
     val tags = choice.keyboards.flatMap { listOf(it.locale) + getSecondaryLocales(it.extraValues) }.map { it.toLanguageTag() }.toSet()
     val filesDir = ctx.filesDir ?: return
@@ -667,7 +670,7 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, choice: R
     }
     if (choice.clipboard) Database.copyFromDb(restoredDb, ctx)
     if (choice.learnedWords) {
-        restoreLearnedWords(ctx, pending.prefs, choice.keyboards, learnedDir, io)
+        restoreLearnedWords(ctx, pending.prefs, choice.keyboards.map { it to (onPhone[it] ?: it) }, learnedDir, io)
         learnedDir.deleteRecursively()
     }
     BackupRestoreJob.step() // (the learned words)
@@ -751,9 +754,12 @@ internal fun restoreKeyboardsFrom(ctx: Context, file: File, keyboards: List<Sett
  * Only [chosen] keyboards come out of the backup: each is added (or replaced) with its custom layout files and,
  * [withSettings], its settings and the priorities of its languages. Other keyboards stay as they
  * are. The keyboard's settings need a set of its own, so separate settings per keyboard get switched on if they
- * aren't; the existing keyboards keep the shared set they behave by now.
+ * aren't; the existing keyboards keep the shared set they behave by now. A custom layout the phone has under the same
+ * name with other keys comes in numbered ([restoreLayoutFiles]), and the keyboard is restored naming that one: the
+ * result is each chosen keyboard as it is on the phone now.
  */
-private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List<SettingsSubtype>, withSettings: Boolean, asCopies: Boolean = true) {
+private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List<SettingsSubtype>, withSettings: Boolean,
+                             asCopies: Boolean = true): Map<SettingsSubtype, SettingsSubtype> {
     val real = ctx.realPrefs()
     val prefs = ctx.prefs()
     val backup = pending.prefs
@@ -766,30 +772,23 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
     // (the loaded fonts and pictures first: a name the phone has for another file comes in numbered, and the themes and
     // keyboards naming it are rewritten with it; owner 2026-10-11: "for fonts and pictures too do the same pattern")
     val files = if (withSettings) restoreLibraryFiles(ctx, pending) else null
-    val renames = if (withSettings) SavedItemsMerge.merge(ctx, real, backup, asCopies, files?.first.orEmpty(), files?.second.orEmpty()) else null
-    val settings = chosen.associateWith { restoredSettings(ctx, backup, it).let { values -> renames?.apply(values) ?: values } }
+    // (by the keyboard as it was in the backup: the backup's sets are found by it)
+    val backupSettings = if (withSettings) chosen.associateWith { restoredSettings(ctx, backup, it) } else emptyMap()
+    // the custom key layouts the chosen keyboards use (picked, or their default for a type), owner 2026-10-11: "Yes", the
+    // pattern of fonts and pictures: one the phone has under that name with other keys comes in numbered, "My numrow 2",
+    // and the keyboards, their defaults and the restored Layouts name that one (before, it was written over the phone's,
+    // and every other keyboard using it silently got the backup's keys)
+    val wanted = (chosen.flatMap { keyboard -> LayoutType.entries.mapNotNull { type -> keyboard.layoutName(type)?.let { type to it } } } +
+        backupSettings.values.flatMap { values -> LayoutType.entries.mapNotNull { type ->
+            (values[Settings.PREF_LAYOUT_PREFIX + type.name] as? String)?.let { type to it } } })
+        .filter { LayoutUtilsCustom.isCustomLayout(it.second) }.toSet()
+    val keyLayouts = if (wanted.isEmpty()) emptyMap() else restoreLayoutFiles(ctx, pending, wanted, chosen)
+    val onPhone = chosen.associateWith { keyboard -> LayoutType.entries.fold(keyboard) { kb, type ->
+        kb.layoutName(type)?.let { keyLayouts[type]?.get(it) }?.let { kb.withLayout(type, it) } ?: kb } }
+    val renames = if (withSettings) SavedItemsMerge.merge(ctx, real, backup, asCopies, files?.first.orEmpty(), files?.second.orEmpty(), keyLayouts) else null
+    val settings = backupSettings.mapValues { (_, values) -> renames?.apply(values) ?: values }
     if (withSettings && !KeyboardProfiles.isSeparate(real))
         KeyboardProfiles.enable(real, SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }, keepExisting = true)
-
-    // custom layout files the chosen keyboards use, by their path inside the backup
-    val wanted = chosen.flatMap { keyboard ->
-        LayoutType.entries.mapNotNull { type ->
-            keyboard.layoutName(type)?.takeIf { it.startsWith(LayoutUtilsCustom.CUSTOM_LAYOUT_PREFIX) }?.let { type.folder + File.separator + it }
-        }
-    }.toSet()
-    if (wanted.isNotEmpty()) {
-        val deviceProtectedFilesDir = DeviceProtectedUtils.getFilesDir(ctx)
-        ZipInputStream(FileInputStream(pending.file)).use { zip ->
-            var entry: ZipEntry? = zip.nextEntry
-            while (entry != null) {
-                val adjustedName = entry.name.substringAfter("unprotected${File.separator}", "")
-                if (adjustedName in wanted) FileUtils.copyStreamToNewFile(zip, File(deviceProtectedFilesDir, adjustedName))
-                zip.closeEntry()
-                entry = zip.nextEntry
-            }
-        }
-        LayoutUtilsCustom.onLayoutFileChanged()
-    }
 
     if (withSettings) {
         // the languages' adding times are app-wide (the priorities are the keyboard's: written with its set below)
@@ -821,11 +820,17 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
     }
 
     for (keyboard in chosen) {
-        SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, keyboard, ctx) // registers it unless it equals a built-in one
-        if (SubtypeSettings.getEnabledSubtypes().none { it.toSettingsSubtype() == keyboard })
-            SubtypeSettings.addEnabledSubtype(prefs, keyboard.toAdditionalSubtype())
+        val phoneKeyboard = onPhone.getValue(keyboard)
+        // registers it unless it equals a built-in one; the phone's same keyboard, if its layouts came in under other
+        // names, is replaced by it (in its place, its set and learned words going along)
+        val present = SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() } +
+            SubtypeSettings.createSettingsSubtypes(prefs.getString(Settings.PREF_ADDITIONAL_SUBTYPES, Defaults.PREF_ADDITIONAL_SUBTYPES)!!)
+        val from = if (phoneKeyboard != keyboard && keyboard in present && phoneKeyboard !in present) keyboard else phoneKeyboard
+        SubtypeUtilsAdditional.changeAdditionalSubtype(from, phoneKeyboard, ctx)
+        if (SubtypeSettings.getEnabledSubtypes().none { it.toSettingsSubtype() == phoneKeyboard })
+            SubtypeSettings.addEnabledSubtype(prefs, phoneKeyboard.toAdditionalSubtype())
         if (withSettings) {
-            val id = KeyboardProfiles.idFor(real, keyboard)
+            val id = KeyboardProfiles.idFor(real, phoneKeyboard)
             // exactly that set: a setting the backup leaves at its default gets a default mark, so it doesn't read
             // the phone's shared value instead
             KeyboardProfiles.write(real, id, settings.getValue(keyboard), markDefaults = true)
@@ -847,8 +852,71 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
     if (withSettings) {
         Settings.clearCachedBackgroundImages(); helium314.keyboard.keyboard.KeyboardTypeface.clearCache()
         // whether they use the other keyboards' learned and blacklisted words, as in the backup
-        LearnedKeyboards.restoreButtons(real, backup, chosen)
+        LearnedKeyboards.restoreButtons(real, backup, chosen, onPhone)
     }
+    return onPhone
+}
+
+/**
+ * The custom key layouts [wanted] (type to name) out of the backup, for [chosen] keyboards restored on their own: one the
+ * phone has under the same name with the same keys is the phone's; a name the phone uses for other keys gets the next
+ * free number ("My numrow 2", reusing a numbered one with these keys, so a second restore adds nothing). An unsaved one
+ * (a keyboard's own) gets a new unsaved name, reusing one with these keys only if no keyboard but the same one uses it.
+ * Nothing on the phone is written over. The renames, by type.
+ */
+private fun restoreLayoutFiles(ctx: Context, pending: PendingRestore, wanted: Set<Pair<LayoutType, String>>,
+                               chosen: List<SettingsSubtype>): Map<LayoutType, Map<String, String>> {
+    val byPath = wanted.associateBy { (type, name) -> type.folder + File.separator + name }
+    val contents = LinkedHashMap<Pair<LayoutType, String>, ByteArray>()
+    ZipInputStream(FileInputStream(pending.file)).use { zip ->
+        var entry: ZipEntry? = zip.nextEntry
+        while (entry != null) {
+            byPath[entry.name.substringAfter("unprotected${File.separator}", "")]?.let { contents[it] = zip.readBytes() }
+            zip.closeEntry()
+            entry = zip.nextEntry
+        }
+    }
+    val renames = HashMap<LayoutType, HashMap<String, String>>()
+    val dir = DeviceProtectedUtils.getFilesDir(ctx)
+    // (named ones first: whether an unsaved one's keyboard is the same is seen with its named layouts as they came in)
+    for ((key, bytes) in contents.entries.sortedBy { LayoutUtilsCustom.isPrivateLayout(it.key.second) }) {
+        val (type, name) = key
+        val folderDir = File(dir, type.folder)
+        val target = File(folderDir, name)
+        // (never outside the app's folder, whatever the zip says)
+        if (!target.canonicalPath.startsWith(folderDir.canonicalPath + File.separator)) continue
+        if (!target.exists()) { folderDir.mkdirs(); target.writeBytes(bytes); continue }
+        if (target.readBytes().contentEquals(bytes)) continue
+        val newName = if (LayoutUtilsCustom.isPrivateLayout(name)) privateLayoutFor(ctx, type, name, bytes, chosen, renames)
+        else generateSequence(2) { it + 1 }.map { LayoutUtilsCustom.numberedLayoutName(name, type, it) }
+            .first { val f = File(folderDir, it); !f.exists() || f.readBytes().contentEquals(bytes) }
+            .also { val f = File(folderDir, it); if (!f.exists()) f.writeBytes(bytes) }
+        renames.getOrPut(type) { HashMap() }[name] = newName
+    }
+    LayoutUtilsCustom.onLayoutFileChanged()
+    return renames
+}
+
+/** For [restoreLayoutFiles]: an unsaved layout of the phone with [bytes] that only [chosen]'s keyboards naming [name] use
+ *  (a restore of the same backup before), else a new one; its name. */
+private fun privateLayoutFor(ctx: Context, type: LayoutType, name: String, bytes: ByteArray, chosen: List<SettingsSubtype>,
+                             renames: Map<LayoutType, Map<String, String>>): String {
+    val scope = LayoutUtilsCustom.scopeOf(name, type)
+    // a keyboard with its unsaved layouts left out, its named ones as they came in
+    fun normalized(kb: SettingsSubtype) = LayoutType.entries.fold(kb) { k, t ->
+        val n = k.layoutName(t) ?: return@fold k
+        if (LayoutUtilsCustom.isPrivateLayout(n)) k.withLayout(t, "~") else renames[t]?.get(n)?.let { k.withLayout(t, it) } ?: k }
+    val owners = chosen.filter { it.layoutName(type) == name }.map { normalized(it) }.toSet()
+    val prefs = ctx.prefs()
+    val phone = (SubtypeSettings.createSettingsSubtypes(prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!)
+        + SubtypeSettings.createSettingsSubtypes(prefs.getString(Settings.PREF_ADDITIONAL_SUBTYPES, Defaults.PREF_ADDITIONAL_SUBTYPES)!!)).distinct()
+    val reusable = LayoutUtilsCustom.getLayoutFiles(type, ctx).firstOrNull { file ->
+        val candidate = file.name
+        candidate != name && LayoutUtilsCustom.isPrivateLayout(candidate) && LayoutUtilsCustom.scopeOf(candidate, type) == scope
+            && file.readBytes().contentEquals(bytes)
+            && phone.filter { it.layoutName(type) == candidate }.let { users -> users.isNotEmpty() && users.all { normalized(it) in owners } }
+    }
+    return reusable?.name ?: LayoutUtilsCustom.makePrivateLayout(String(bytes), type, scope, ctx)
 }
 
 /**
@@ -1055,15 +1123,16 @@ internal val backupFilePatterns by lazy { listOf(
  * languages, each word into its script's). Counts add up, the latest last use is kept (mergeAdding); blacklists keep the
  * most strikes. A backup store is put into one phone store once, however many chosen keyboards lead there.
  */
-private fun restoreLearnedWords(ctx: Context, backup: Map<String, Any?>, keyboards: List<SettingsSubtype>, learnedDir: File,
-                                io: LearnedStoreIo) {
+private fun restoreLearnedWords(ctx: Context, backup: Map<String, Any?>, keyboards: List<Pair<SettingsSubtype, SettingsSubtype>>,
+                                learnedDir: File, io: LearnedStoreIo) {
     val filesDir = ctx.filesDir ?: return
     val real = ctx.realPrefs()
     // (phone pool, script) -> the backup's stores and lists that go there
     val stores = LinkedHashMap<Pair<Int, String>, MutableSet<File>>()
     val lists = LinkedHashMap<Pair<Int, String>, MutableSet<File>>()
-    for (keyboard in keyboards) {
-        val pool = LearnedKeyboards.poolFor(real, keyboard)
+    // (each keyboard as it was in the backup, and as it is on the phone now)
+    for ((keyboard, onPhone) in keyboards) {
+        val pool = LearnedKeyboards.poolFor(real, onPhone)
         val backupPool = LearnedKeyboards.poolIn(backup, keyboard)
         val locales = listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)
         if (backupPool != null) for (script in locales.map { it.script() }.distinct()) {

@@ -104,7 +104,7 @@
     <!-- Partial restore -->
     <string name="saving_partial_keyboards">Choose keyboards: those not on this phone are marked new and ticked; those here start unticked, and restoring one replaces it.</string>
     <string name="saving_partial_items">Come in unless one with the same content is here already (then that one is used). A name in use gets the next free number, \"Sunset 2\"; with \"bring them in as copies\" off, this phone\'s is used. A Layout\'s popup set is matched first, and the keyboards point at what their items became.</string>
-    <string name="saving_partial_files">Come in like the saved items: the same file here already is used; a name in use for another file gets the next free number, \"Mine 2\", and the restored keyboards and themes name that one.</string>
+    <string name="saving_partial_files">Come in like the saved items: the same file here already is used; a name in use for another file gets the next free number, \"Mine 2\", and the restored keyboards, themes (fonts, pictures) and Layouts (key layouts) name that one. This phone\'s file is never replaced, so its other keyboards keep it.</string>
     <string name="saving_partial_words">Added to this phone\'s, never replacing them.</string>
     <string name="saving_partial_switch">The phone\'s \"Saved items take new defaults\" switch stays as it is.</string>
 

@@ -196,6 +196,13 @@ object LayoutUtilsCustom {
         else CUSTOM_LAYOUT_PREFIX + locale.toLanguageTag() + "." + encodeBase36(displayName) + "."
     }
 
+    /** Named layout [layoutName] numbered: the name whose display name is "<its display name> [number]" ("My numrow 2"),
+     *  for the same languages (a main layout's scope). */
+    fun numberedLayoutName(layoutName: String, layoutType: LayoutType, number: Int): String {
+        val scopePart = if (layoutType == LayoutType.MAIN) scopeOf(layoutName, layoutType) + "." else ""
+        return CUSTOM_LAYOUT_PREFIX + scopePart + encodeBase36("${getDisplayName(layoutName)} $number") + "."
+    }
+
     fun isCustomLayout(layoutName: String) = layoutName.startsWith(CUSTOM_LAYOUT_PREFIX)
 
     /** A keyboard's own copy of a deleted layout: "custom.<scope>.~<n>." (main) or "custom.~<n>." */

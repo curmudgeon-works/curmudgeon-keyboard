@@ -448,8 +448,9 @@ object LearnedKeyboards {
     }
 
     /** [keyboards]' buttons as in the [backup] (its preferences); a backup from before them: on if it shared its words,
-     *  as the update does. */
-    fun restoreButtons(real: SharedPreferences, backup: Map<String, Any?>, keyboards: List<SettingsSubtype>) = synchronized(this) {
+     *  as the update does. [onPhone]: a keyboard as it is called on the phone now, if not as in the backup. */
+    fun restoreButtons(real: SharedPreferences, backup: Map<String, Any?>, keyboards: List<SettingsSubtype>,
+                       onPhone: Map<SettingsSubtype, SettingsSubtype> = emptyMap()) = synchronized(this) {
         val withButtons = backup[PREF_DONE] == true
         val shared = backup[Settings.PREF_SHARE_LEARNED_WORDS] != false
         val editor = real.edit()
@@ -457,8 +458,8 @@ object LearnedKeyboards {
             val set = ids(real.getString(pref, null))
             val inBackup = ids(backup[pref] as? String)
             for (keyboard in keyboards) {
-                val key = keyboard.toPref()
-                if (if (withButtons) key in inBackup else shared) set.add(key) else set.remove(key)
+                val key = (onPhone[keyboard] ?: keyboard).toPref()
+                if (if (withButtons) keyboard.toPref() in inBackup else shared) set.add(key) else set.remove(key)
             }
             editor.putIds(pref, set)
         }
