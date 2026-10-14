@@ -85,12 +85,14 @@ object SavedItemDefaults {
         val sharedDropped = HashSet<String>() // (taken off the shared set in this pass: it goes first)
         for (id in listOf(KeyboardProfiles.SHARED) + before.keys.mapNotNull { KeyboardProfiles.splitOwnKey(it)?.first }.distinct().sorted()) {
             // what set [id] chose for [key]: its own entry, nothing where marked, else the shared one; a shared menu's
-            // choice and settings are the shared set's alone
+            // own entries too, kept hidden until the menu is per keyboard again (owner 2026-10-11: "Deleting should
+            // not happen. Behavior should be same")
             fun chosen(key: String): String? = when {
                 id == KeyboardProfiles.SHARED -> before[key] as? String
-                KeyboardProfiles.isGlobal(key) -> null
+                KeyboardProfiles.isAppWide(key) -> null
                 before.containsKey(KeyboardProfiles.ownKey(id, key)) -> before[KeyboardProfiles.ownKey(id, key)] as? String
                 before.containsKey(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + key)) -> null
+                KeyboardProfiles.isGlobal(key) -> null // (a shared menu, nothing of its own: the shared set's choice)
                 else -> before[key] as? String
             }
             // (a Layout's popups only go on a keyboard of its script: the keyboards of this set)
@@ -109,7 +111,7 @@ object SavedItemDefaults {
                     else if (takeNew && atChosenDefault(key, before[key], held)) { editor.remove(key); sharedDropped.add(key); changed = true }
                     continue
                 }
-                if (KeyboardProfiles.isGlobal(key)) continue // (the shared set's)
+                if (KeyboardProfiles.isAppWide(key)) continue // (the shared set's)
                 val own = KeyboardProfiles.ownKey(id, key)
                 val mark = KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + key)
                 if (!takeNew) {

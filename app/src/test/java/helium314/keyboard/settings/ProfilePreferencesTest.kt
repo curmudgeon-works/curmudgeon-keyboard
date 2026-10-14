@@ -181,14 +181,15 @@ class ProfilePreferencesTest {
     private val turn = helium314.keyboard.latin.settings.Settings.PREF_GESTURE_TURN_WEIGHT // Refine swipe and learning
     private val correction = KeyboardProfiles.Group.TEXT_CORRECTION
 
-    @Test fun aMenuMadeSharedTakesTheChosenKeyboardsValuesAndDropsTheOwnCopies() {
+    @Test fun aMenuMadeSharedTakesTheChosenKeyboardsValuesAndKeepsTheOwnCopies() {
         real.edit().putBoolean(autoCap, true).putBoolean("p1/$autoCap", true).putBoolean("p2/$autoCap", false).commit()
         assertFalse(KeyboardProfiles.isGlobal(autoCap))
         KeyboardProfiles.setGroupShared(real, correction, true, winnerId = 2)
         assertTrue(KeyboardProfiles.isGlobal(autoCap))
         assertFalse(real.getBoolean(autoCap, true)) // keyboard 2's value
-        assertFalse(real.contains("p1/$autoCap"))
-        assertFalse(real.contains("p2/$autoCap"))
+        // (owner 2026-10-11: sharing a menu keeps each keyboard's own) stored, unread while shared
+        assertTrue(real.getBoolean("p1/$autoCap", false))
+        assertTrue(real.contains("p2/$autoCap"))
         assertFalse(set(1).getBoolean(autoCap, true))
         set(1).edit().putBoolean(autoCap, true).commit() // one set for all now
         assertTrue(set(2).getBoolean(autoCap, false))
@@ -198,7 +199,7 @@ class ProfilePreferencesTest {
         real.edit().putBoolean(autoCap, false).putBoolean("p1/~$autoCap", true).commit() // keyboard 1: "Default"
         KeyboardProfiles.setGroupShared(real, correction, true, winnerId = 1)
         assertFalse(real.contains(autoCap))
-        assertFalse(real.contains("p1/~$autoCap"))
+        assertTrue(real.contains("p1/~$autoCap")) // (owner 2026-10-11: sharing a menu keeps each keyboard's own)
     }
 
     @Test fun aMenuBackToPerKeyboardStartsEachKeyboardFromTheSharedValues() {

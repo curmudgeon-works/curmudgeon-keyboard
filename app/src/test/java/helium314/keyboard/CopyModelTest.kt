@@ -260,6 +260,9 @@ class CopyModelTest {
         assertEquals(2, CustomLabels.number(real, view(2), CustomLabels.Kind.THEME))
         KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.APPEARANCE, true, 2)
         assertEquals(2, CustomLabels.number(real, view(1), CustomLabels.Kind.THEME)) // (keyboard 2's copy won: its number)
-        assertFalse(real.contains(own(1, CustomLabels.Kind.THEME.key)) || real.contains(own(2, CustomLabels.Kind.THEME.key)))
+        // (owner 2026-10-11: sharing a menu keeps each keyboard's own) kept, unread, back when per keyboard again
+        assertEquals(1, real.getInt(own(1, CustomLabels.Kind.THEME.key), 0)); assertEquals(2, real.getInt(own(2, CustomLabels.Kind.THEME.key), 0))
+        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.APPEARANCE, false, KeyboardProfiles.SHARED)
+        assertEquals(1, CustomLabels.number(real, view(1), CustomLabels.Kind.THEME))
     }
 }

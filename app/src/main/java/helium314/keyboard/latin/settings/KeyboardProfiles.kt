@@ -96,8 +96,10 @@ object KeyboardProfiles {
 
     /**
      * [group] becomes shared by all keyboards ([shared]) or each keyboard's own. Becoming shared, the settings that
-     * turn shared take the values of keyboard [winnerId] and every keyboard's own copy goes; becoming per keyboard,
-     * each keyboard starts from the shared values (its reads fall back to them). Background pictures follow Appearance.
+     * turn shared take the values of keyboard [winnerId]; every keyboard's own values and marks stay stored, unread
+     * while the menu is shared (owner 2026-10-11: "Deleting should not happen. Behavior should be same", as the main
+     * switch). Becoming per keyboard, each keyboard reads its own again; one with nothing of its own there reads the
+     * shared values. Background pictures follow Appearance: each keyboard keeps its own, one without gets the shared.
      */
     @Synchronized
     fun setGroupShared(real: SharedPreferences, group: Group, shared: Boolean, winnerId: Int) {
@@ -115,7 +117,7 @@ object KeyboardProfiles {
                 val plain = raw.removePrefix(TOMBSTONE)
                 if (!sharedByGroups(plain, after) || sharedByGroups(plain, before)) continue
                 if (id == winnerId) { if (raw.startsWith(TOMBSTONE)) winnerDefaults.add(plain) else winnerValues[plain] = value }
-                editor.remove(stored)
+                // (nothing removed: each keyboard's own comes back when the menu is per keyboard again)
             }
             // a value of its own wins over a "default" mark left behind (as in [copy])
             for (plain in winnerDefaults) if (plain !in winnerValues) editor.remove(plain)
@@ -126,10 +128,15 @@ object KeyboardProfiles {
         sharedGroups = after
         if (group == Group.APPEARANCE && isSeparate(real)) {
             if (shared) copyFiles(winnerId, SHARED)
-            else for (id in profileIds(real)) copyFiles(SHARED, id)
+            // its own pictures stay; a keyboard with nothing of its own on Appearance starts from the shared ones
+            else for (id in profileIds(real)) if (!hasOwnFiles(id) && !hasOwnIn(real, id, group)) copyFiles(SHARED, id)
         }
         helium314.keyboard.latin.utils.SettingsEventLog.log("group ${group.name} ${if (shared) "shared, from set $winnerId" else "per keyboard"}")
     }
+
+    /** Whether set [id] stores a value or mark of its own for a setting of [group]. */
+    private fun hasOwnIn(real: SharedPreferences, id: Int, group: Group): Boolean = real.all.keys.any { stored ->
+        splitOwnKey(stored)?.takeIf { it.first == id }?.second?.removePrefix(TOMBSTONE)?.let { group.contains(it) } == true }
 
     private fun profileIds(real: SharedPreferences): List<Int> {
         val map = ids(real)
@@ -596,6 +603,11 @@ object KeyboardProfiles {
         }
     }
 
+    private fun hasOwnFiles(id: Int): Boolean {
+        val dir = filesDir ?: return false
+        return profileFileNames.any { java.io.File(dir, it + suffix(id)).exists() }
+    }
+
     /** The files of set [id] (not the shared set's). */
     fun deleteFiles(id: Int) {
         if (id == SHARED) return
@@ -788,7 +800,8 @@ class ProfilePreferences(private val real: SharedPreferences, private val active
             val own = HashMap<String, Any?>()
             for ((key, value) in real.all) {
                 val plain = KeyboardProfiles.unprefixedKey(id, key)?.takeIf { it != key } ?: continue
-                if (plain.startsWith(KeyboardProfiles.TOMBSTONE)) marked.add(plain.removePrefix(KeyboardProfiles.TOMBSTONE)) else own[plain] = value
+                if (plain.startsWith(KeyboardProfiles.TOMBSTONE)) marked.add(plain.removePrefix(KeyboardProfiles.TOMBSTONE))
+                else if (!KeyboardProfiles.isGlobal(plain)) own[plain] = value // (a shared menu's own value: kept, unread)
             }
             for (key in marked) if (!KeyboardProfiles.isGlobal(key)) result.remove(key)
             result.putAll(own) // a value of its own wins over a mark left behind
