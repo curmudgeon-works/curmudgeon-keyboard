@@ -537,7 +537,7 @@ internal fun fontUsers(ctx: Context, name: String): List<String> {
         if (keyboard in enabled) return@mapNotNull null
         if (FontLibrary.fontPrefs.none { real.getString(helium314.keyboard.latin.settings.KeyboardProfiles.ownKey(id, it), null) == value })
             return@mapNotNull null
-        ctx.getString(R.string.font_delete_switched_off, helium314.keyboard.settings.screens.keyboardName(keyboard, ctx))
+        ctx.getString(R.string.keyboard_switched_off, helium314.keyboard.settings.screens.keyboardName(keyboard, ctx))
     }.distinct()
     val themes = helium314.keyboard.settings.AppearanceLooks.load(real)
         .filter { look -> FontLibrary.fontPrefs.any { look.values[it] == value } }

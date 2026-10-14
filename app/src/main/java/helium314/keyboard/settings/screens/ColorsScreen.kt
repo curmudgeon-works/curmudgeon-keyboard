@@ -78,6 +78,48 @@ internal fun paletteEditorSaved(opened: String, now: String) {
     helium314.keyboard.settings.AppearanceDraft.paletteSavedOpen(opened, now) // (named in its Discard question)
 }
 
+/** The other keyboards and the saved themes that use palette [openedName] (saved as [newName]), for the update
+ *  dialog (the editor's [prefs]; out of the screen for the tests): the enabled keyboards, none with one set of settings,
+ *  then the switched-off ones whose own set chose it; none with Appearance shared (every keyboard has the change),
+ *  except the saved themes. */
+internal fun paletteUsers(ctx: Context, prefs: SharedPreferences, openedName: String, newName: String): Pair<List<helium314.keyboard.latin.settings.SettingsSubtype>, List<String>> {
+    val real = ctx.realPrefs()
+    val names = setOf(openedName, newName)
+    val choices = listOf(Settings.PREF_THEME_COLORS, Settings.PREF_THEME_COLORS_NIGHT)
+    val themes = helium314.keyboard.settings.AppearanceLooks.load(real).filter { look -> choices.any { look.values[it] in names } }.map { it.name }
+    if (helium314.keyboard.latin.settings.KeyboardProfiles.isShared(real, helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE))
+        return emptyList<helium314.keyboard.latin.settings.SettingsSubtype>() to themes
+    // (this keyboard's own copy of the palette: no other keyboard sees the change)
+    if ((prefs as? helium314.keyboard.latin.settings.ProfilePreferences)?.writesShared(Settings.PREF_USER_COLORS_PREFIX + newName) == false)
+        return emptyList<helium314.keyboard.latin.settings.SettingsSubtype>() to themes
+    val palettes = listOf(Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
+    // (a keyboard with its own copy under that name reads its own: not this one)
+    fun ownCopy(id: Int) = names.any { n -> palettes.any { real.contains(helium314.keyboard.latin.settings.KeyboardProfiles.ownKey(id, it + n)) } }
+    val editingId = helium314.keyboard.settings.PrefsDraft.currentSetId(ctx)
+    val edited = helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(real, editingId)
+    // (one without a set of its own yet reads the shared set: listed too, its set comes when it's left unticked
+    // and keeps the old colours; before, it was left out and took the new ones unasked; review 2026-10-11 C8)
+    val keyboards = if (edited == null) emptyList() else keyboardsUsing(ctx, choices, edited) { _, v -> v in names }.filter { it != edited }
+        .filter { kb -> val id = helium314.keyboard.latin.settings.KeyboardProfiles.anyIdIn(real.all, kb); id == null || !ownCopy(id) }
+    // (owner 2026-10-11: switched-off keyboards are asked too; one switched off on the Languages screen keeps its id
+    // and own set, which took the new colours unasked. Its own set's choice only, whether or not separate settings is
+    // on, as the font delete warning)
+    val enabled = helium314.keyboard.latin.utils.SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.toSet()
+    val switchedOff = helium314.keyboard.latin.settings.KeyboardProfiles.idEntries(real).mapNotNull { (pref, id) ->
+        if (id == helium314.keyboard.latin.settings.KeyboardProfiles.SHARED || id == editingId || ownCopy(id)) return@mapNotNull null
+        val keyboard = pref.toSettingsSubtype()
+        if (keyboard in enabled || keyboard == edited) return@mapNotNull null
+        keyboard.takeIf { choices.any { real.getString(helium314.keyboard.latin.settings.KeyboardProfiles.ownKey(id, it), null) in names } }
+    }.distinct()
+    return keyboards + switchedOff to themes
+}
+
+/** [paletteUsers]' keyboards as the update dialog names them: a switched-off one "<name> (switched off)". */
+internal fun paletteUserNames(ctx: Context, keyboards: List<helium314.keyboard.latin.settings.SettingsSubtype>): List<String> {
+    val enabled = helium314.keyboard.latin.utils.SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.toSet()
+    return keyboards.map { if (it in enabled) keyboardName(it, ctx) else ctx.getString(R.string.keyboard_switched_off, keyboardName(it, ctx)) }
+}
+
 @Composable
 fun ColorsScreen(
     isNight: Boolean,
@@ -139,28 +181,7 @@ fun ColorsScreen(
         paletteEditorSaved(openedName, newThemeName.text)
         onClickBack()
     }
-    /** The other keyboards and the saved themes that use this palette: none with one set of
-     *  settings or Appearance shared (every keyboard has the change), except the saved themes. */
-    fun paletteUsers(): Pair<List<helium314.keyboard.latin.settings.SettingsSubtype>, List<String>> {
-        val real = ctx.realPrefs()
-        val names = setOf(openedName, newThemeName.text)
-        val choices = listOf(Settings.PREF_THEME_COLORS, Settings.PREF_THEME_COLORS_NIGHT)
-        val themes = helium314.keyboard.settings.AppearanceLooks.load(real).filter { look -> choices.any { look.values[it] in names } }.map { it.name }
-        val edited = helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(real, helium314.keyboard.settings.PrefsDraft.currentSetId(ctx))
-        if (edited == null || helium314.keyboard.latin.settings.KeyboardProfiles.isShared(real, helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE))
-            return emptyList<helium314.keyboard.latin.settings.SettingsSubtype>() to themes
-        // (this keyboard's own copy of the palette: no other keyboard sees the change)
-        if ((prefs as? helium314.keyboard.latin.settings.ProfilePreferences)?.writesShared(Settings.PREF_USER_COLORS_PREFIX + newThemeName.text) == false)
-            return emptyList<helium314.keyboard.latin.settings.SettingsSubtype>() to themes
-        val palettes = listOf(Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
-        // (one without a set of its own yet reads the shared set: listed too, its set comes when it's left unticked
-        // and keeps the old colours; before, it was left out and took the new ones unasked; review 2026-10-11 C8)
-        val keyboards = keyboardsUsing(ctx, choices, edited) { _, v -> v in names }.filter { it != edited }
-            // (a keyboard with its own copy under that name reads its own: not this one)
-            .filter { kb -> val id = helium314.keyboard.latin.settings.KeyboardProfiles.anyIdIn(real.all, kb)
-                id == null || names.none { n -> palettes.any { real.contains(helium314.keyboard.latin.settings.KeyboardProfiles.ownKey(id, it + n)) } } }
-        return keyboards to themes
-    }
+    fun paletteUsers() = helium314.keyboard.settings.screens.paletteUsers(ctx, prefs, openedName, newThemeName.text)
 
     // is there really no better way of only setting forceOpposite while the screen is shown (and not paused)?
     // lifecycle stuff is weird, there is no pause and similar when activity is paused
@@ -330,7 +351,7 @@ fun ColorsScreen(
     if (askUpdate) {
         val (keyboards, themes) = remember { paletteUsers() }
         helium314.keyboard.settings.dialogs.UpdateSavedItemDialog(KeyboardTheme.paletteName(ctx, newThemeName.text),
-            keyboards.map { keyboardName(it, ctx) } + themes.map { ctx.getString(R.string.update_item_theme, it) }, null,
+            paletteUserNames(ctx, keyboards) + themes.map { ctx.getString(R.string.update_item_theme, it) }, null,
             onDismissRequest = { askUpdate = false },
         ) { ticked ->
             val real = ctx.realPrefs()

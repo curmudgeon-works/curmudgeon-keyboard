@@ -610,7 +610,8 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
          * Palette [name] was saved with new colours, and the keyboards [keepOld] and saved themes [keepOldThemes] that use
          * it were left unticked in the update dialog (2026-10-11): they keep its colours of before, [old] (the palette's
          * keys under [oldName] when the editor opened), as one kept copy, "Custom N", off the list. A keyboard without a
-         * set of its own yet gets one now, as opening its settings gives one (review 2026-10-11 C8).
+         * set of its own yet gets one now, as opening its settings gives one (review 2026-10-11 C8); a switched-off one
+         * keeps them in its own set.
          */
         internal fun keepOldPalette(real: SharedPreferences, name: String, oldName: String, old: Map<String, Any?>,
                                     keepOld: Collection<helium314.keyboard.latin.settings.SettingsSubtype>, keepOldThemes: Collection<String>) {
@@ -623,8 +624,11 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             real.edit().apply {
                 for ((key, value) in copy) KeyboardProfiles.put(this, key, value)
                 for (id in ids) for (key in choices) {
-                    val view = ProfilePreferences(real) { id }
-                    if (view.getString(key, null) == name) putString(KeyboardProfiles.ownKey(id, key), hidden)
+                    // (its own set's choice first: with one set of settings the view reads the shared set, and a
+                    // switched-off keyboard is asked by its own choice; owner 2026-10-11)
+                    val own = KeyboardProfiles.ownKey(id, key)
+                    val chosen = if (real.contains(own)) real.getString(own, null) else ProfilePreferences(real) { id }.getString(key, null)
+                    if (chosen == name) putString(own, hidden)
                 }
             }.commit()
             val looks = helium314.keyboard.settings.AppearanceLooks.load(real)

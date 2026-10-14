@@ -59,7 +59,7 @@ class ReReview2S6Test {
         KeyboardProfiles.refreshImeId(real)
     }
 
-    private fun offName() = ctx.getString(R.string.font_delete_switched_off, keyboardName(b, ctx))
+    private fun offName() = ctx.getString(R.string.keyboard_switched_off, keyboardName(b, ctx))
 
     @Test fun `a switched-off keyboard whose own set chose the font is named, a set nobody maps to is not`() {
         assertEquals(listOf(offName()), fontUsers(ctx, "Mine.ttf"))
