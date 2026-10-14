@@ -43,6 +43,8 @@
     <!-- Summary (2026-10-14) -->
     <string name="saving_summary_save_discard_title">Screens with Save and Discard</string>
     <string name="saving_summary_save_discard_text">Appearance, Layout &amp; typing, Text correction, Swipe and the Fine-tune screens hold your changes until you save or leave, with the changed settings in italics. Every other screen saves a change at once.</string>
+    <!-- the same, where the Fine-tune screens aren't shown -->
+    <string name="saving_summary_save_discard_text_no_fine_tune">Appearance, Layout &amp; typing, Text correction and Swipe hold your changes until you save or leave, with the changed settings in italics. Every other screen saves a change at once.</string>
     <string name="saving_summary_keeps_on_title">Leaving a screen keeps your changes: on</string>
     <string name="saving_summary_keeps_on_text">Back, Save and leaving the app keep your changes without asking. Only Discard asks, and then undoes them. On to start with; the switch is in App settings (advanced).</string>
     <string name="saving_summary_keeps_off_title">Leaving a screen keeps your changes: off</string>
@@ -109,7 +111,7 @@
 
     <!-- Export / Share -->
     <string name="saving_export_palettes">Save the palette to a file, or copy it as text, in the palette editor.</string>
-    <string name="saving_export_everything">A backup holds everything (Backup and restore).</string>
+    <string name="saving_export_everything">A backup holds everything but the logs: swipe results, swipe corpus, corrections and settings changes (Backup and restore).</string>
 
     <!-- Backup -->
     <string name="saving_backup_items">Included as they are, with the values their unpicked settings had when saved.</string>
@@ -129,7 +131,7 @@
 
     <!-- Full restore ("Full restore (delete app data)", ticked to start with; also the message of the question asked
          before it wipes) -->
-    <string name="saving_full_everything">Wipes this device\'s settings and replaces everything with the backup\'s: keyboards, saved items, files, word lists, dictionaries and clipboard. The device\'s \"Saved items take new defaults\" switch stays as it is.</string>
+    <string name="saving_full_everything">Wipes this device\'s settings and replaces them with the backup\'s: keyboards, saved items, files, word lists, dictionaries and clipboard. Android\'s personal dictionary is merged: the backup\'s words are added. A clipboard the backup can\'t read is skipped, and this device\'s clips stay. The device\'s \"Saved items take new defaults\" switch stays as it is.</string>
 
     <!-- App update -->
     <string name="saving_update_keyboards">What you picked stays; what you never picked follows the new defaults.</string>

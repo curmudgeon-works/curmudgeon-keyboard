@@ -139,6 +139,20 @@ class HowSavingWorksTest {
         assertTrue(SavedItemDefaults.DEFAULT) // ("goes back on")
     }
 
+    // owner 2026-10-14: "Fix the facts." The Summary names the Fine-tune screens only where they are shown; a full restore
+    // merges the personal dictionary and skips a clipboard it can't read; a backup holds no logs. Fail before: "the
+    // Fine-tune screens" in the public build, "replaces everything", "A backup holds everything"
+    @Test fun `the guide's facts - Fine-tune only where shown, full restore merges and skips, no logs in a backup`() {
+        val summary = ctx.getString(savingSummary.first().text)
+        assertEquals(REFINE_MENU_SHOWN, "Fine-tune" in summary, summary)
+        val full = ctx.getString(R.string.saving_full_everything)
+        assertTrue("replaces everything" !in full, full)
+        assertTrue("personal dictionary is merged" in full && "can't read is skipped" in full, full)
+        val export = ctx.getString(R.string.saving_export_everything)
+        assertTrue("holds everything but the logs" in export, export)
+        for (log in listOf("swipe results", "swipe corpus", "corrections", "settings changes")) assertTrue(log in export, log)
+    }
+
     // owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones
     @Test fun `separate settings rows - the first keyboard's settings, nothing copied, delete and reorder`() {
         val separate = savingGuide.last().rows.map { it.text }

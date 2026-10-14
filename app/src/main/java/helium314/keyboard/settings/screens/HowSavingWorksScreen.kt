@@ -56,7 +56,9 @@ internal class SavingTab(@StringRes val title: Int, val rows: List<SavingRow>)
 internal val savingGuide: List<SavingTab> = listOf(
     // owner 2026-10-14: "Screen should open on summary each time yes": first, the text above the grid
     SavingTab(R.string.saving_tab_summary, listOf(
-        SavingRow(R.string.saving_summary_save_discard_title, R.string.saving_summary_save_discard_text),
+        // (the Fine-tune screens named only where they are shown, REFINE_MENU_SHOWN: round-7c review 20261014_L8_2)
+        SavingRow(R.string.saving_summary_save_discard_title, if (helium314.keyboard.settings.REFINE_MENU_SHOWN)
+            R.string.saving_summary_save_discard_text else R.string.saving_summary_save_discard_text_no_fine_tune),
         SavingRow(R.string.saving_summary_keeps_on_title, R.string.saving_summary_keeps_on_text),
         SavingRow(R.string.saving_summary_keeps_off_title, R.string.saving_summary_keeps_off_text),
         SavingRow(R.string.saving_summary_editors_title, R.string.saving_summary_editors_text),
