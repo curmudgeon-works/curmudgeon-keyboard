@@ -146,10 +146,15 @@ class NoCommonSetTest {
         assertFalse(real.contains(gap)); assertFalse(real.contains(vGap))
         assertEquals(2f, real.getFloat(own(1, gap), 0f)); assertFalse(real.contains(own(1, vGap)), "the main keyboard was gap-filled")
         assertEquals(9f, real.getFloat(own(3, gap), 0f))
-        // (to be confirmed) another keyboard with a set keeps what it read from the common set where its own held nothing;
-        // the main keyboard only the palettes it lacks
-        assertEquals(1.5f, real.getFloat(own(3, vGap), 0f))
+        // another keyboard with a set: the main's treatment, not gap-filled (owner 2026-10-11: "Main keyboard got the right
+        // treatment when common was trashed. Other keyboards should havr gotten the same."); its gap reads the default
+        assertFalse(real.contains(own(3, vGap)), "keyboard 3 was gap-filled")
+        separate(true); KeyboardProfiles.Group.entries.forEach { KeyboardProfiles.setGroupShared(real, it, false) }
+        assertEquals(-1f, view(3).getFloat(vGap, -1f))
+        separate(false); KeyboardProfiles.loadGroups(real)
+        // each keyboard with a set gets the palettes it lacks (until palettes are app-wide, owner 2026-10-11)
         assertEquals("colors", real.getString(own(1, palette), null))
+        assertEquals("colors", real.getString(own(3, palette), null))
         assertFalse(real.contains(palette))
 
         assertTrue(real.getBoolean(Settings.PREF_ADVANCED_SETTINGS, false), "an app-wide key went")
@@ -161,12 +166,14 @@ class NoCommonSetTest {
         assertEquals(before, real.all)
     }
 
-    @Test fun `a keyboard added with one set for all starts from its pick at the upgrade`() {
-        // keyboard 2 and 3 without a set; 3 was added picking "keyboard 1's settings" (kept for later before 2026-10-11)
+    @Test fun `a pending Add keyboard pick is ignored at the upgrade, the keyboard gets the common set`() {
+        // keyboard 2 and 3 without a set; 3 was added picking "keyboard 1's settings", 2 "every default" (kept for later
+        // before 2026-10-11; owner 2026-10-11: "don't care about keyboards before this update really")
         real.edit().putFloat(gap, 7f).putFloat(own(1, gap), 2f).putFloat(own(1, vGap), 1f)
-            .putString("keyboard_start_from", JSONObject().put("3", JSONObject().put("from", 1).put("noPopups", false)).toString()).commit()
+            .putString("keyboard_start_from", JSONObject().put("3", JSONObject().put("from", 1).put("noPopups", false))
+                .put("2", JSONObject().put("from", KeyboardProfiles.START_DEFAULTS).put("noPopups", false)).toString()).commit()
         KeyboardProfiles.dropCommonSet(real, fromCommon = true)
-        assertEquals(2f, real.getFloat(own(3, gap), 0f)); assertEquals(1f, real.getFloat(own(3, vGap), 0f))
+        assertEquals(7f, real.getFloat(own(3, gap), 0f)); assertFalse(real.contains(own(3, vGap)))
         assertEquals(7f, real.getFloat(own(2, gap), 0f))
         assertFalse(real.contains("keyboard_start_from"))
     }

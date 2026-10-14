@@ -120,8 +120,9 @@ object KeyboardProfiles {
 
     // ---- the main keyboard (owner 2026-10-11: "Not the keyboard you pick, but the first keyboard in our list") ----
 
-    /** The first keyboard in the list (the Keyboards screen's order): its own set is the common settings. With no list
-     *  stored yet, the first keyboard the list shows (the system's languages), else the one selected. */
+    /** The first keyboard in the list (the Keyboards screen's order): its own set is the common settings. The list is
+     *  stored from the first start on (SubtypeSettings stores the default keyboard, owner 2026-10-11); found empty all
+     *  the same (defensive, a read writes nothing): the keyboards loaded, else the default keyboard, else the selected. */
     fun mainKeyboard(real: SharedPreferences): SettingsSubtype {
         val enabled = real.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!
         enabled.split(helium314.keyboard.latin.common.Constants.Separators.SETS).firstOrNull { it.isNotEmpty() }?.let { return it.toSettingsSubtype() }
@@ -779,8 +780,12 @@ object KeyboardProfiles {
      * had"): every keyboard in the list without a set of its own (the main one too) gets a copy of the common set, what it
      * read so far, so it keeps what it sees ([fromCommon]; false, after a whole restore of a backup from before: the
      * main keyboard's own set instead, the backup's common set ignored: "fine to trash common set with upgrade and
-     * restore"), its pictures too; then the common set's keyboard settings and pictures go. The main keyboard keeps its
-     * own set as it is; app-wide keys and one-time flags stay.
+     * restore"), its pictures too; then the common set's keyboard settings and pictures go. A keyboard with a set of its
+     * own keeps it as it is, the main one and the others alike (owner 2026-10-11: "Main keyboard got the right treatment
+     * when common was trashed. Other keyboards should havr gotten the same."): no gap-filling from the common set, only
+     * the common colour palettes it lacks. An Add keyboard pick kept for later ("keyboard_start_from", before
+     * 2026-10-11) is dropped, not applied (owner 2026-10-11: "don't care about keyboards before this update really").
+     * App-wide keys and one-time flags stay.
      */
     @Synchronized
     fun dropCommonSet(real: SharedPreferences, fromCommon: Boolean) {
@@ -793,41 +798,23 @@ object KeyboardProfiles {
         // (one-time flags too, as a copy always took them: a set's own steps mustn't run again on it)
         val common = all.filterKeys { splitOwnKey(it) == null && !isAppWide(it) && !it.startsWith(TOMBSTONE) }
         val editor = real.edit()
-        // a keyboard added while one set was for all kept its Add keyboard pick for later (2026-10-10, "keyboard_start_from"):
-        // it starts from that now, as it would have when settings were made separate
-        val picks = runCatching { JSONObject(real.getString(PREF_START_FROM, null) ?: "{}") }.getOrDefault(JSONObject())
         for (id in without) {
-            val pick = picks.optJSONObject(id.toString())?.takeIf { fromCommon }
-            val from = pick?.optInt("from", SHARED) ?: SHARED
-            if (from == START_DEFAULTS) continue
-            if (fromCommon) {
-                val values = HashMap(common)
-                if (from != SHARED) for ((stored, value) in all) { // (what that keyboard read: the common set, its own on top)
-                    val raw = splitOwnKey(stored)?.takeIf { it.first == from }?.second ?: continue
-                    if (raw.startsWith(TOMBSTONE)) values.remove(raw.removePrefix(TOMBSTONE)) else values[raw] = value
-                }
-                if (pick?.optBoolean("noPopups") == true) listOf("key_popups", "key_popup_set_selected", Settings.PREF_SYMBOL_POPUP_MAP).forEach { values.remove(it) }
-                for ((key, value) in values) put(editor, ownKey(id, key), value)
-            }
+            if (fromCommon) for ((key, value) in common) put(editor, ownKey(id, key), value)
             else if (id != main) for ((stored, value) in all) {
                 val (set, raw) = splitOwnKey(stored) ?: continue
                 if (set == main) put(editor, ownKey(id, raw), value)
             }
         }
-        editor.remove(PREF_START_FROM).remove(PREF_SHARED_FROM) // (the old bookkeeping)
-        // (to be confirmed, 2026-10-11: the owner's words cover the main keyboard and the keyboards without a set) a
-        // keyboard with a set of its own, not the main one, read the common set wherever its own held nothing (no value,
-        // no mark): it gets those values, so it keeps what it sees, now and once settings are separate or its menus per
-        // keyboard again. The main keyboard only gets the common colour palettes it lacks: named definitions its colour
-        // choice and palette list point at, not values
+        // (the old bookkeeping; a pending Add keyboard pick isn't applied: a keyboard without a set got the common one)
+        editor.remove(PREF_START_FROM).remove(PREF_SHARED_FROM)
+        // a keyboard with a set of its own (the main one and the others) gets the common colour palettes it lacks: named
+        // definitions its colour choice and palette list point at, not values (until palettes are app-wide, owner
+        // 2026-10-11)
         if (fromCommon) {
             val palettes = common.filterKeys { key -> palettePrefixes.any { key.startsWith(it) } }
             val withSet = ids(real).let { map -> map.keys().asSequence().map { map.optInt(it, SHARED) } }.toSet() - without.toSet() - SHARED
-            for (id in withSet.filter { hasOwnEntries(real, it) }) {
-                val fill = if (id == main) palettes else common.filterKeys { !isOneTimeFlag(it) }
-                for ((key, value) in fill)
-                    if (!all.containsKey(ownKey(id, key)) && !all.containsKey(ownKey(id, TOMBSTONE + key))) put(editor, ownKey(id, key), value)
-            }
+            for (id in withSet.filter { hasOwnEntries(real, it) }) for ((key, value) in palettes)
+                if (!all.containsKey(ownKey(id, key)) && !all.containsKey(ownKey(id, TOMBSTONE + key))) put(editor, ownKey(id, key), value)
         }
         for (key in common.keys) if (!isOneTimeFlag(key)) editor.remove(key)
         editor.putBoolean(NO_COMMON_SET_DONE, true)

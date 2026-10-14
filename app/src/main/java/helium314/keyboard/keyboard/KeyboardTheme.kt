@@ -578,7 +578,7 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             val editor = real.edit()
             val prefixes = listOf(Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
             // (the palette as the edited set has it now: no set reads another's, so a set that follows gets a copy;
-            // owner 2026-10-11, no separate common set)
+            // owner 2026-10-11, no separate common set; until palettes are app-wide, owner 2026-10-11)
             val colorsNow = if (to == null) emptyMap() else prefs.all.filterKeys { k -> prefixes.any { k == it + to } }
             val colorsOfName = prefs.all.filterKeys { k -> prefixes.any { k == it + name } }
             for ((stored, value) in all) {
@@ -642,7 +642,8 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                         val chosen = if (real.contains(own)) real.getString(own, null) else ProfilePreferences(real) { id }.getString(key, null)
                         if (chosen == name) { putString(own, hidden); keeps = true }
                     }
-                    // the kept copy in its own set, where it reads it (owner 2026-10-11: no separate common set to put it in)
+                    // the kept copy in its own set, where it reads it (owner 2026-10-11: no separate common set to put it in;
+                    // until palettes are app-wide, owner 2026-10-11)
                     if (keeps) for ((key, value) in copy) KeyboardProfiles.put(this, KeyboardProfiles.ownKey(id, key), value)
                 }
             }.commit()
