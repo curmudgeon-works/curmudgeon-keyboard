@@ -11,7 +11,7 @@ import helium314.keyboard.latin.utils.LayoutType
 import helium314.keyboard.latin.utils.RemovedWords
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.SubtypeUtilsAdditional
-import helium314.keyboard.settings.screens.scriptSections
+import helium314.keyboard.settings.screens.scriptRows
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -208,12 +208,12 @@ class LearnedKeyboardsUpdateTest {
         assertNotEquals(poolB, LearnedKeyboards.poolFor(real, b))
     }
 
-    @Test fun `the Learned & blacklisted words screen lists every keyboard with its own pool`() {
+    @Test fun `each keyboard's Learned & blacklisted words screen lists its own pool`() {
         useKeyboards(ctx, real, a, b)
         sharedWords()
         runUpdate()
-        val sections = scriptSections(ctx)
-        assertEquals(2, sections.size)
-        assertEquals(listOf(LearnedKeyboards.poolFor(real, a), LearnedKeyboards.poolFor(real, b)), sections.map { it.second.first().pool })
+        // (on the keyboard's own screen since 2026-10-10: one keyboard's lists each)
+        assertEquals(listOf(LearnedKeyboards.poolFor(real, a)), scriptRows(ctx, a).map { it.pool }.distinct())
+        assertEquals(listOf(LearnedKeyboards.poolFor(real, b)), scriptRows(ctx, b).map { it.pool }.distinct())
     }
 }

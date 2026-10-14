@@ -27,8 +27,6 @@ import helium314.keyboard.latin.personalization.LearnedKeyboards
 import helium314.keyboard.latin.personalization.LearningEventLog
 import helium314.keyboard.latin.personalization.LearnedStores
 import helium314.keyboard.latin.personalization.PersonalizationHelper
-import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
-import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.getSecondaryLocales
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.latin.utils.FrequentLongWords
@@ -50,9 +48,10 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 
 /*
- * "Learned & blacklisted words" (Text correction): per script (Latin, Devanagari, …), as the keyboard keeps them (one
- * store of learned words and one blacklist per script, shared by its languages: see LearnedStores). Each keyboard has its
- * own (LearnedKeyboards): the scripts are listed per keyboard. Per script:
+ * "Learned & blacklisted words" of one keyboard (on the keyboard's screen, 2026-10-10): per script (Latin, Devanagari,
+ * …), as the keyboard keeps them (one store of learned words and one blacklist per script, shared by its languages: see
+ * LearnedStores). Each keyboard has its own (LearnedKeyboards): only those are listed, not the other keyboards' it reads
+ * with its buttons "Use lists from other keyboards". Per script:
  * - Your words: the script's learned words, merged with the Android personal dictionary's words of the script (from
  *   their letters; the personal dictionary stays per language, Android's), each word once (case-insensitive, shown in
  *   its most typed spelling). Remove: the same as long-press Remove (DictionaryFacilitatorImpl.removeWords), plus its
@@ -70,15 +69,14 @@ const val LIST_BLACKLISTED = "blacklisted"
 /** One row of the scripts list: [script] with its [locales], in learned-words [pool]. */
 internal class ScriptRowData(val script: String, val locales: List<Locale>, val pool: Int)
 
-/** The scripts of the keyboard's languages, each with its two lists (2026-10-04): Learned (learned words and the
- *  personal dictionary together) and Blacklisted; per keyboard when keyboards don't share them. The personal
- *  dictionary's own screens (shortcuts, words for all languages) stay reachable below, in advanced mode. */
+/** The scripts of [keyboard]'s languages, each with its two lists (2026-10-04): Learned (learned words and the
+ *  personal dictionary together) and Blacklisted. The personal dictionary's own screens (shortcuts, words for all
+ *  languages) stay reachable below, in advanced mode. */
 @Composable
-fun LearnedWordsScriptsScreen(onClickBack: () -> Unit) {
+fun LearnedWordsScriptsScreen(onClickBack: () -> Unit, keyboard: helium314.keyboard.latin.settings.SettingsSubtype) {
     val ctx = LocalContext.current
     val advanced by helium314.keyboard.settings.SettingsMode.state(ctx)
-    // shared: one list of scripts; else a heading per keyboard with the scripts of its languages
-    val sections = remember { scriptSections(ctx) }
+    val rows = remember(keyboard) { scriptRows(ctx, keyboard) }
     fun open(row: ScriptRowData, list: String) =
         SettingsDestination.navigateTo("${SettingsDestination.LearnedWordsOfScript}${row.script}/$list/${row.pool}", ctx)
     @Composable
@@ -96,18 +94,20 @@ fun LearnedWordsScriptsScreen(onClickBack: () -> Unit) {
                 Text(stringResource(R.string.learned_words_list_blacklisted)) }
         }
     }
-    val rows = sections.flatMap { it.second }
     SearchScreen(
         onClickBack = onClickBack,
-        title = { Text(stringResource(R.string.learned_words)) },
+        title = {
+            Column {
+                Text(stringResource(R.string.learned_words))
+                Text(keyboardName(keyboard, ctx), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        showKeyboardName = false, // (the keyboard is this one, whichever settings are being edited)
         filteredItems = { term -> rows.filter { s -> scriptName(s.script).startsWith(term, true)
             || s.locales.any { it.getLocaleDisplayNameForUserDictSettings(ctx).startsWith(term, true) } } },
         itemContent = { ScriptRow(it) },
     ) {
-        for ((heading, sectionRows) in sections) {
-            if (heading != null) PreferenceCategory(heading)
-            sectionRows.forEach { ScriptRow(it) }
-        }
+        rows.forEach { ScriptRow(it) }
         if (advanced) HorizontalDivider()
         if (advanced) Preference(
             name = stringResource(R.string.edit_personal_dictionary),
@@ -117,15 +117,11 @@ fun LearnedWordsScriptsScreen(onClickBack: () -> Unit) {
     }
 }
 
-/** The rows of the scripts list, under each keyboard: every keyboard has its own learned words (2026-10-10). */
-internal fun scriptSections(context: Context): List<Pair<String?, List<ScriptRowData>>> {
-    val real = context.realPrefs()
-    return SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.distinct().map { keyboard ->
-        val pool = LearnedKeyboards.poolFor(real, keyboard)
-        val rows = (listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)).groupBy { it.script() }
-            .map { (script, locales) -> ScriptRowData(script, locales, pool) }
-        keyboardName(keyboard, context) to rows
-    }
+/** The rows of [keyboard]'s scripts list: its own learned words (2026-10-10). */
+internal fun scriptRows(context: Context, keyboard: helium314.keyboard.latin.settings.SettingsSubtype): List<ScriptRowData> {
+    val pool = LearnedKeyboards.poolFor(context.realPrefs(), keyboard)
+    return (listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)).groupBy { it.script() }
+        .map { (script, locales) -> ScriptRowData(script, locales, pool) }
 }
 
 @Composable

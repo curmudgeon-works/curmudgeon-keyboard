@@ -128,8 +128,9 @@ fun SettingsNavHost(
         screen(SettingsDestination.PersonalDictionaries) {
             PersonalDictionariesScreen(onClickBack = ::goBack)
         }
-        screen(SettingsDestination.LearnedWords) {
-            helium314.keyboard.settings.screens.LearnedWordsScriptsScreen(onClickBack = ::goBack)
+        screen(SettingsDestination.LearnedWords + "{keyboard}") { // (one keyboard's own lists, from its screen)
+            helium314.keyboard.settings.screens.LearnedWordsScriptsScreen(onClickBack = ::goBack,
+                keyboard = it.arguments?.getString("keyboard")!!.toSettingsSubtype())
         }
         screen(SettingsDestination.LearnedWordsOfScript + "{script}/{list}/{pool}") {
             helium314.keyboard.settings.screens.LearnedWordsScreen(onClickBack = ::goBack, script = it.arguments?.getString("script") ?: "",
@@ -216,7 +217,7 @@ object SettingsDestination {
     const val ColorsNight = "colors_night/"
     const val PersonalDictionaries = "personal_dictionaries"
     const val PersonalDictionary = "personal_dictionary/"
-    const val LearnedWords = "learned_words"
+    const val LearnedWords = "learned_words_of/"
     const val LearnedWordsOfScript = "learned_words/"
     const val Languages = "languages/"
     const val AllKeyboards = "all_keyboards"

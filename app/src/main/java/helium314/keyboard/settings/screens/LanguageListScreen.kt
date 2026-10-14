@@ -2,6 +2,14 @@
 package helium314.keyboard.settings.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import helium314.keyboard.latin.personalization.LearnedKeyboards
+import helium314.keyboard.latin.utils.realPrefs
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -67,6 +75,9 @@ fun LanguageListScreen(
     var keyboard by remember { mutableStateOf(initialKeyboard) }
     var generation by remember { mutableIntStateOf(0) } // bumped after every change so the list re-sorts
     val (ownLanguages, otherLanguages) = remember(keyboard, generation) { languagesFor(ctx, keyboard) }
+    // the buttons "Use lists from other keyboards": only with other keyboards in the list (what's stored stays)
+    val severalKeyboards = remember(keyboard, generation) {
+        SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype().toPref() }.distinct().size > 1 }
     fun setKeyboard(new: SettingsSubtype) {
         SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, new, ctx)
         keyboard = new
@@ -85,17 +96,76 @@ fun LanguageListScreen(
             }
         },
         // (the layout and swipe screens are on the main screen)
+        // above the languages: the keyboard's learned words (2026-10-10)
         filteredItems = { term ->
-            if (term.isBlank()) ownLanguages + otherLanguages
+            if (term.isBlank()) listOfNotNull(if (severalKeyboards) UseOthersItem else null, LearnedWordsItem) + ownLanguages + otherLanguages
             else (ownLanguages + otherLanguages).filter { locale ->
                 locale.localizedDisplayName(ctx.resources).replace("(", "")
                     .splitOnWhitespace().any { it.startsWith(term, true) }
             }
         },
         itemContent = { item ->
-            LanguageRow(item as Locale, keyboard, ::setKeyboard)
+            when (item) {
+                UseOthersItem -> UseOthersRow(keyboard)
+                LearnedWordsItem -> Preference(
+                    name = stringResource(R.string.learned_words),
+                    onClick = { SettingsDestination.navigateTo(SettingsDestination.withKeyboard(SettingsDestination.LearnedWords, keyboard)) },
+                ) { NextScreenIcon() }
+                else -> LanguageRow(item as Locale, keyboard, ::setKeyboard)
+            }
         },
     )
+}
+
+private object UseOthersItem
+private object LearnedWordsItem
+
+/**
+ * "Use lists from other keyboards" with its two buttons [Learned] [Blacklisted] (2026-10-10): this keyboard reads the
+ * other keyboards' learned words, and their blacklists apply on it (LearnedStores.LearnedView). The label and the
+ * buttons share a row if they fit; else both buttons go to the next row together.
+ */
+@Composable
+internal fun UseOthersRow(keyboard: SettingsSubtype) {
+    val ctx = LocalContext.current
+    val real = ctx.realPrefs()
+    @Composable
+    fun UseOthersButton(pref: String, label: Int) {
+        var on by remember(keyboard) { mutableStateOf(LearnedKeyboards.usesOthers(real, pref, keyboard)) }
+        UseOthersToggle(stringResource(label), on) {
+            on = !on
+            LearnedKeyboards.setUsesOthers(real, pref, keyboard, on) // (the keyboard follows: LearnedStores' listener)
+        }
+    }
+    FlowRow(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(stringResource(R.string.learned_use_others), style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.align(Alignment.CenterVertically).padding(end = 8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag(USE_OTHERS_BUTTONS_TAG)) {
+            UseOthersButton(LearnedKeyboards.PREF_USE_OTHERS_LEARNED, R.string.learned_words_list_learned)
+            UseOthersButton(LearnedKeyboards.PREF_USE_OTHERS_BLACKLISTED, R.string.learned_words_list_blacklisted)
+        }
+    }
+}
+
+internal const val USE_OTHERS_BUTTONS_TAG = "use_others_buttons"
+
+/** The Learned / Blacklisted buttons of the keyboard's learned words screen, as a toggle: filled with a tick when on. */
+@Composable
+private fun UseOthersToggle(label: String, on: Boolean, onClick: () -> Unit) {
+    androidx.compose.material3.OutlinedButton(onClick,
+        modifier = Modifier.semantics { selected = on },
+        colors = if (on) androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer)
+            else androidx.compose.material3.ButtonDefaults.outlinedButtonColors(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp)) {
+        if (on) Icon(painterResource(R.drawable.ic_check), null, Modifier.padding(end = 4.dp).size(18.dp))
+        Text(label)
+    }
 }
 
 /** The keyboard's languages by priority, the same priority in the order they were added; and every other language:

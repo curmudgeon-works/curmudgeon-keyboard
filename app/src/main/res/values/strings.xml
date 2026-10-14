@@ -142,6 +142,8 @@
     <string name="learned_words_section_yours">Learned words</string>
     <string name="learned_words_list_learned">Learned</string>
     <string name="learned_words_list_blacklisted">Blacklisted</string>
+    <!-- A keyboard's screen: above its languages, two toggle buttons ("Learned", "Blacklisted") that make it use the other keyboards' learned words and blacklists -->
+    <string name="learned_use_others">Use lists from other keyboards</string>
     <string name="learned_words_section_blacklisted">Blacklisted words</string>
     <string name="learned_words_none">None</string>
     <string name="learned_words_loading">Reading your words…</string>

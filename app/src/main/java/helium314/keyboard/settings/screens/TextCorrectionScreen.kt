@@ -73,7 +73,7 @@ fun TextCorrectionScreen(
     val suggestionsEnabled = suggestionsVisible && prefs.getBoolean(Settings.PREF_SHOW_SUGGESTIONS, Defaults.PREF_SHOW_SUGGESTIONS)
     val gestureEnabled = prefs.getBoolean(Settings.PREF_GESTURE_INPUT, Defaults.PREF_GESTURE_INPUT)
     val items = listOf(
-        SettingsWithoutKey.LEARNED_WORDS, // (the personal dictionary's own screens: from there)
+        // (Learned & blacklisted words: on each keyboard's screen since 2026-10-10; still found by searching)
         R.string.settings_category_correction,
         Settings.PREF_AUTO_CORRECTION,
         if (autocorrectEnabled) Settings.PREF_MORE_AUTO_CORRECTION else null,
@@ -201,16 +201,20 @@ internal val correctionKeys = listOf(
 )
 
 fun createCorrectionSettings(context: Context) = listOf(
+    // (not on this screen any more: each keyboard's screen has its own, 2026-10-10; found by searching, it opens the lists
+    // of the keyboard being edited, else the one in use)
     Setting(context, SettingsWithoutKey.LEARNED_WORDS, R.string.learned_words) {
-        // a line above it too, like under the headings
-        val ctx = LocalContext.current // (this screen's: what opens from it edits the same keyboard)
-        androidx.compose.foundation.layout.Column {
-            androidx.compose.material3.HorizontalDivider()
-            Preference(
-                name = stringResource(R.string.learned_words),
-                onClick = { SettingsDestination.navigateTo(SettingsDestination.LearnedWords, ctx) },
-            ) { NextScreenIcon() }
-        }
+        val ctx = LocalContext.current
+        Preference(
+            name = stringResource(R.string.learned_words),
+            onClick = {
+                val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
+                val keyboard = helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(real,
+                    helium314.keyboard.latin.settings.KeyboardProfiles.editingId(ctx))
+                    ?: helium314.keyboard.latin.settings.KeyboardProfiles.selectedKeyboard(real)
+                SettingsDestination.navigateTo(SettingsDestination.withKeyboard(SettingsDestination.LearnedWords, keyboard))
+            },
+        ) { NextScreenIcon() }
     },
     // (no longer on the screen: reached from Learned & blacklisted words, and by searching)
     Setting(context, SettingsWithoutKey.EDIT_PERSONAL_DICTIONARY, R.string.edit_personal_dictionary) {
