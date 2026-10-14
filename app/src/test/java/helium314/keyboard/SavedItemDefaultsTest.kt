@@ -219,7 +219,7 @@ class SavedItemDefaultsTest {
         flip(true)
         for (id in listOf(1, 2)) {
             assertFalse(real.contains(own(id, longPress)), "set $id kept the value written with the switch off")
-            assertTrue(real.contains(mark(id, longPress))) // (the default, not the shared value)
+            assertFalse(real.contains(mark(id, longPress))) // (the shared set holds none: no mark, review 2026-10-11 S4)
             assertEquals(Defaults.PREF_KEY_LONGPRESS_TIMEOUT, view(id).getInt(longPress, Defaults.PREF_KEY_LONGPRESS_TIMEOUT))
             assertFalse(real.contains(own(id, gap)), "set $id kept the theme's gap")
         }

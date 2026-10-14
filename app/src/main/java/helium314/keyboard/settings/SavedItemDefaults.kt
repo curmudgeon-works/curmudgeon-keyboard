@@ -64,7 +64,9 @@ object SavedItemDefaults {
      * it at once for the user's Layout, theme and popup set it chose (owner 2026-10-11, review A2/A3). For each setting
      * such an item holds at its default with a remembered value: off, a set storing no value of its own for it gets the
      * remembered one (a keyboard's own set that reads a value the shared set picked keeps reading that); on, a set
-     * storing just that value has it taken off, a keyboard's own then reads the default (a mark), not the shared value.
+     * storing just that value has it taken off, a keyboard's own then reads the default (a mark) where the shared set
+     * still holds a value, else it holds nothing, as before it was turned off (review 2026-10-11 S4: it was marked
+     * either way, so a value picked in the shared set later no longer reached it).
      * By value, no notes per keyboard (owner: a value set by hand to exactly the remembered one moves with the switch).
      * A popup set's accents level is the keyboard's (in its identity): the keyboards in use get it.
      */
@@ -80,6 +82,7 @@ object SavedItemDefaults {
         val enabled = SubtypeSettings.createSettingsSubtypes(real.getString(Settings.PREF_ENABLED_SUBTYPES, "")!!)
         val editor = real.edit()
         var changed = false
+        val sharedDropped = HashSet<String>() // (taken off the shared set in this pass: it goes first)
         for (id in listOf(KeyboardProfiles.SHARED) + before.keys.mapNotNull { KeyboardProfiles.splitOwnKey(it)?.first }.distinct().sorted()) {
             // what set [id] chose for [key]: its own entry, nothing where marked, else the shared one; a shared menu's
             // choice and settings are the shared set's alone
@@ -103,7 +106,7 @@ object SavedItemDefaults {
             for ((key, value) in held) {
                 if (id == KeyboardProfiles.SHARED) {
                     if (!takeNew && !before.containsKey(key)) { KeyboardProfiles.put(editor, key, value); changed = true }
-                    else if (takeNew && atChosenDefault(key, before[key], held)) { editor.remove(key); changed = true }
+                    else if (takeNew && atChosenDefault(key, before[key], held)) { editor.remove(key); sharedDropped.add(key); changed = true }
                     continue
                 }
                 if (KeyboardProfiles.isGlobal(key)) continue // (the shared set's)
@@ -116,7 +119,8 @@ object SavedItemDefaults {
                     editor.remove(mark)
                     changed = true
                 } else if (before.containsKey(own) && atChosenDefault(key, before[own], held)) {
-                    editor.remove(own).putBoolean(mark, true)
+                    editor.remove(own)
+                    if (before.containsKey(key) && key !in sharedDropped) editor.putBoolean(mark, true)
                     changed = true
                 }
             }
