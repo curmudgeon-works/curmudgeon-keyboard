@@ -264,37 +264,76 @@ object LayoutUtilsCustom {
         return name
     }
 
-    /** The keyboards (but [except]) whose [type] keys are [name]: their own pick, or their default (per keyboard with
-     *  separate settings); then the switched-off ones (owner 2026-10-11): their pick, or their own set's default. */
+    /** The keyboards (but [except]) whose [type] keys are [name]: their own pick, or with none their default, what they
+     *  read now (per keyboard with separate settings, else the common one) or what their own set keeps, shown or hidden
+     *  behind the common settings; then the switched-off ones (owner 2026-10-11): their pick, or their own set's
+     *  default. A keyboard's own set counts in every mode (owner 2026-10-12: "our saving policies should not be affected
+     *  by the common/separate toggle at all."; until then a hidden own default was never named). */
     fun keyboardsUsing(context: Context, type: LayoutType, name: String, except: helium314.keyboard.latin.settings.SettingsSubtype?):
             List<helium314.keyboard.latin.settings.SettingsSubtype> {
         val real = context.realPrefs()
-        val separate = helium314.keyboard.latin.settings.KeyboardProfiles.isSeparate(real)
+        val all = real.all
         return SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.distinct().filter { kb ->
             if (kb.sameKeyboard(except)) return@filter false
             val own = kb.layoutName(type)
             if (own != null) return@filter own == name
             if (type == LayoutType.MAIN) return@filter false // (no own pick: the language's built-in letters)
-            val prefs = if (separate) helium314.keyboard.latin.settings.ProfilePreferences(real) {
-                // (a lookup, owner 2026-10-11: no set, its defaults)
-                kb.keyboardId ?: helium314.keyboard.latin.settings.KeyboardProfiles.NO_SET
-            } else context.prefs()
-            Settings.readDefaultLayoutName(type, prefs) == name
+            readDefault(context, kb, type) == name || ownDefault(all, kb, type) == name
         } + switchedOffKeyboards(context).filter { kb ->
             if (kb.sameKeyboard(except)) return@filter false
             val own = kb.layoutName(type)
             if (own != null || type == LayoutType.MAIN) return@filter own == name
-            val all = real.all
-            kb.keyboardId
-                ?.let { all[helium314.keyboard.latin.settings.KeyboardProfiles.ownKey(it, Settings.PREF_LAYOUT_PREFIX + type.name)] } == name
+            ownDefault(all, kb, type) == name
         }
     }
 
-    /** "No" in the edit question: [others] keep [name]'s keys of now, under [oldFileName] (then the edit is written). */
+    /** The [type] default enabled keyboard [kb] reads now: its own set's with separate settings (a shared Layout menu:
+     *  the main keyboard's), else the common one. */
+    private fun readDefault(context: Context, kb: helium314.keyboard.latin.settings.SettingsSubtype, type: LayoutType): String? {
+        val real = context.realPrefs()
+        val prefs = if (helium314.keyboard.latin.settings.KeyboardProfiles.isSeparate(real)) helium314.keyboard.latin.settings.ProfilePreferences(real) {
+            // (a lookup, owner 2026-10-11: no set, its defaults)
+            kb.keyboardId ?: helium314.keyboard.latin.settings.KeyboardProfiles.NO_SET
+        } else context.prefs()
+        return Settings.readDefaultLayoutName(type, prefs)
+    }
+
+    /** The [type] default [kb]'s own set keeps as stored (shown or hidden), from [all] (the stored preferences); null:
+     *  none, or no id. */
+    private fun ownDefault(all: Map<String, *>, kb: helium314.keyboard.latin.settings.SettingsSubtype, type: LayoutType): Any? =
+        kb.keyboardId?.let { all[helium314.keyboard.latin.settings.KeyboardProfiles.ownKey(it, Settings.PREF_LAYOUT_PREFIX + type.name)] }
+
+    /** "No" in the edit question: [others] keep [name]'s keys of now, under [oldFileName] (then the edit is written). One
+     *  that picked it gets the old name as its pick. One that has it as its default keeps it the way it has it: its own
+     *  set's default (shown or hidden) becomes the old name there (owner 2026-10-12: "our saving policies should not be
+     *  affected by the common/separate toggle at all."), and one that reads it now through the common settings gets the
+     *  old name as its pick (as before), so the common default, and the edited keyboard reading it, get the edit. The
+     *  main keyboard's own set while it holds the common settings is that common one: a pick there too. */
     fun keepOldKeys(name: String, oldFileName: String, type: LayoutType, others: List<helium314.keyboard.latin.settings.SettingsSubtype>, context: Context) {
         getLayoutFile(oldFileName, type, context).writeText(getLayoutFile(name, type, context).readText())
         onLayoutFileChanged()
-        for (other in others) SubtypeUtilsAdditional.changeAdditionalSubtype(other, other.withLayout(type, oldFileName), context)
+        val real = context.realPrefs()
+        val key = Settings.PREF_LAYOUT_PREFIX + type.name
+        val enabled = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }
+        val mainId = KeyboardProfiles.mainId(real)
+        // (whether a default is read from the main keyboard's set by every keyboard: one set of settings, Layout shared)
+        val common = !KeyboardProfiles.isSeparate(real) || KeyboardProfiles.isGlobal(key)
+        val all = real.all
+        val picks = ArrayList<helium314.keyboard.latin.settings.SettingsSubtype>()
+        val editor = real.edit()
+        for (other in others) {
+            if (other.layoutName(type) != null || type == LayoutType.MAIN) { picks += other; continue }
+            val id = other.keyboardId
+            val holdsCommon = id == mainId && common
+            val keptInOwn = id != null && !holdsCommon && ownDefault(all, other, type) == name
+            if (keptInOwn) editor.putString(KeyboardProfiles.ownKey(id!!, key), oldFileName)
+            // (the set it reads its default from now: the main keyboard's for the common settings, else its own)
+            val readsOwn = id != null && !common
+            if (enabled.any { it.sameKeyboard(other) } && readDefault(context, other, type) == name && !(keptInOwn && readsOwn))
+                picks += other
+        }
+        editor.commit()
+        for (other in picks) SubtypeUtilsAdditional.changeAdditionalSubtype(other, other.withLayout(type, oldFileName), context)
     }
 
     /** Whether going from [before] to [after] leaves one of [before]'s private (unsaved) layouts unused. */
