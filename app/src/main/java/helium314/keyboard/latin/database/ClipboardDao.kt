@@ -88,15 +88,52 @@ class ClipboardDao private constructor(private val db: Database) {
         db.writableDatabase.update(TABLE, cv, "$COLUMN_ID = ${existing.id}", null)
     }
 
-    /** Keeps the newest [size] unpinned clips, pins all (as [clearOldClips], right away and with the size given; not
-     *  while the clipboard is shown). */
+    /**
+     * A backup's [clips] (time, pinned, text) merged in ([mergeClip] each), then the history [size] applied
+     * ([keepNewestUnpinned]), all in one transaction (review L3.6): a merge that fails partway leaves the clips as they
+     * were, and the cache is read again.
+     */
+    fun mergeClips(clips: List<Triple<Long, Boolean, String>>, size: Int) {
+        val w = db.writableDatabase
+        w.beginTransaction()
+        var done = false
+        try {
+            for ((timestamp, pinned, text) in clips) mergeClip(timestamp, pinned, text)
+            keepNewestUnpinned(size)
+            w.setTransactionSuccessful()
+            done = true
+        } finally {
+            w.endTransaction()
+            if (!done) reloadCache()
+        }
+    }
+
+    /** Keeps the newest [size] unpinned clips, pins all (as [clearOldClips], right away and with the size given); also
+     *  while the clipboard is shown (review L3.6: it was skipped then), the view told of each one removed. */
     fun keepNewestUnpinned(size: Int) {
-        if (listener != null) return
         val unpinned = cache.filter { !it.isPinned }.sortedByDescending { it.timeStamp }
         if (unpinned.size <= size) return
         val old = unpinned.drop(size)
-        cache.removeAll(old.toSet())
+        for (entry in old) {
+            val index = cache.indexOf(entry)
+            cache.removeAt(index)
+            listener?.onClipsRemoved(index, 1)
+        }
         db.writableDatabase.delete(TABLE, "$COLUMN_ID IN (${old.joinToString { it.id.toString() }})", null)
+    }
+
+    /** The cache read again from the table (after a failed merge). */
+    private fun reloadCache() {
+        cache.clear()
+        cache.addAll(readTable())
+    }
+
+    private fun readTable(): List<ClipboardHistoryEntry> = mutableListOf<ClipboardHistoryEntry>().apply {
+        db.readableDatabase.query(TABLE, arrayOf(COLUMN_ID, COLUMN_TIMESTAMP, COLUMN_PINNED, COLUMN_TEXT),
+            null, null, null, null, "$COLUMN_PINNED, $COLUMN_TIMESTAMP DESC").use {
+            while (it.moveToNext()) add(ClipboardHistoryEntry(it.getLong(0), it.getLong(1), it.getInt(2) != 0, it.getString(3)))
+        }
+        sort()
     }
 
     private fun insertNewEntry(timestamp: Long, pinned: Boolean, text: String, trim: Boolean = true) {

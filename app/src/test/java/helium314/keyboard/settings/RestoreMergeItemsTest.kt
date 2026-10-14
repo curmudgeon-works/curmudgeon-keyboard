@@ -310,6 +310,37 @@ class RestoreMergeItemsTest {
         assertFalse(clips.any { it.first == "f" }, "the oldest unpinned beyond the size stays out")
     }
 
+    // fail before (L3.6): with the clipboard view listening the size wasn't applied, and each clip was its own write
+    @Test fun `clipboard merge - one transaction, and the size applied while the clipboard is shown`() {
+        real.edit().putInt(Settings.PREF_CLIPBOARD_HISTORY_SIZE, 2).commit()
+        val dao = ClipboardDao.getInstance(ctx)!!
+        dao.addClip(10, false, "a")
+        val inTransaction = mutableListOf<Boolean>()
+        var removed = 0
+        dao.listener = object : ClipboardDao.Listener {
+            override fun onClipInserted(position: Int) { inTransaction += Database.getInstance(ctx).writableDatabase.inTransaction() }
+            override fun onClipsRemoved(position: Int, count: Int) { removed += count }
+            override fun onClipMoved(oldPosition: Int, newPosition: Int) { }
+        }
+        try {
+            val db = File(ctx.cacheDir, "clips-${System.nanoTime()}.db")
+            SQLiteDatabase.openOrCreateDatabase(db, null).use { d ->
+                d.execSQL(ClipboardDao.CREATE_TABLE)
+                d.version = 2
+                for ((t, text) in listOf(20L to "b", 30L to "c"))
+                    d.insert("CLIPBOARD", null, ContentValues().apply { put("TIMESTAMP", t); put("PINNED", 0); put("TEXT", text) })
+            }
+            backup(emptyList(), entries = mapOf(Database.NAME to db.readBytes()))
+            db.delete()
+            restoreChosenFrom(ctx, zip, emptyList(), settings = false, learnedWords = false, io = io, clipboard = true)
+            assertEquals(listOf(true, true), inTransaction)
+            assertEquals(1, removed)
+            assertEquals(listOf("c", "b"), (0 until dao.count()).map { dao.getAt(it).text })
+        } finally {
+            dao.listener = null
+        }
+    }
+
     /** Android's personal dictionary, rows "word|locale"; inserts recorded. */
     class FakeUserDictionary : ContentProvider() {
         val rows = mutableListOf<String>()

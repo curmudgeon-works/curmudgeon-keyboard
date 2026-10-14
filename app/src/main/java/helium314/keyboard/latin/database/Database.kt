@@ -50,16 +50,18 @@ class Database private constructor(context: Context, name: String = NAME) : SQLi
             if (clipDao == null) {
                 Log.e(TAG, "can't transfer clipboard data because ClipboardDao is null")
             } else {
+                val clips = ArrayList<Triple<Long, Boolean, String>>()
                 otherDb.readableDatabase.rawQuery("SELECT TIMESTAMP, PINNED, TEXT FROM CLIPBOARD", null)
                     .use {
-                        if (mergeKeeping == null) clipDao.clear()
                         while (it.moveToNext()) {
                             val text = it.getString(2) ?: continue
-                            if (mergeKeeping == null) clipDao.addClip(it.getLong(0), it.getInt(1) != 0, text)
-                            else clipDao.mergeClip(it.getLong(0), it.getInt(1) != 0, text)
+                            clips += Triple(it.getLong(0), it.getInt(1) != 0, text)
                         }
                     }
-                if (mergeKeeping != null) clipDao.keepNewestUnpinned(mergeKeeping)
+                if (mergeKeeping == null) {
+                    clipDao.clear()
+                    for ((timestamp, pinned, text) in clips) clipDao.addClip(timestamp, pinned, text)
+                } else clipDao.mergeClips(clips, mergeKeeping) // (one transaction, the size applied after, L3.6)
             }
             // (upstream also copied its gesture-data table here: not in this app, and fresh installs don't have it)
             otherDb.close()
