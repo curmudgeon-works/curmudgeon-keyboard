@@ -43,6 +43,9 @@ object RemovedWords {
     /** The list object for [file] if anything holds it already, else null. */
     fun cached(file: File): WordListFile? = lists[file.absolutePath]
 
+    /** The list objects held for files in [dir] (or below it). */
+    fun cachedIn(dir: File): List<WordListFile> = (dir.absolutePath + File.separator).let { start -> lists.filterKeys { it.startsWith(start) }.values.toList() }
+
     // ------------------------------- the rule -------------------------------
 
     /** A removed word: removed [strikes] times; [confirmed]: brought back with the strip's "+" (3rd strike). */

@@ -134,7 +134,7 @@ fun SettingsNavHost(
         screen(SettingsDestination.LearnedWordsOfScript + "{script}/{list}/{pool}") {
             helium314.keyboard.settings.screens.LearnedWordsScreen(onClickBack = ::goBack, script = it.arguments?.getString("script") ?: "",
                 blacklisted = it.arguments?.getString("list") == helium314.keyboard.settings.screens.LIST_BLACKLISTED,
-                // the keyboard whose own learned words these are, 0: shared by all (see LearnedStores)
+                // the keyboard whose own learned words these are (see LearnedKeyboards; 0: the shared ones of before)
                 pool = it.arguments?.getString("pool")?.toIntOrNull() ?: 0)
         }
         screen(SettingsDestination.AllKeyboards) {

@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import helium314.keyboard.latin.personalization.FakeLearnedStoreIo
 import helium314.keyboard.latin.personalization.LearnedEntry
+import helium314.keyboard.latin.personalization.LearnedKeyboards
 import helium314.keyboard.latin.personalization.LearnedStoreIo
 import helium314.keyboard.latin.personalization.LearnedStores
 import helium314.keyboard.latin.personalization.word
@@ -29,8 +30,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** A restore with all settings prepares the learned words of the backup's keyboards, not those of the keyboards the
- *  phone had before (review 2026-10-07). */
+/** A restore with all settings gives the backup's keyboards their own learned words of the backup, and leaves the
+ *  phone's keyboards' as they are (review 2026-10-07; every keyboard its own since 2026-10-10). */
 @RunWith(RobolectricTestRunner::class)
 class RestoreLearnedPoolsTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
@@ -68,7 +69,7 @@ class RestoreLearnedPoolsTest {
     private fun available(language: String) =
         SubtypeSettings.getAllAvailableSubtypes().map { it.toSettingsSubtype() }.first { it.locale == Locale.forLanguageTag(language) }
 
-    @Test fun `the backup's keyboards get the shared words, the phone's old ones nothing`() {
+    @Test fun `the backup's keyboards get their own words, the phone's keep theirs`() {
         // the phone: keyboards A and B, learned words per keyboard, the shared ones with x
         SubtypeSettings.init(ctx)
         val a = available("en-US"); val b = available("de-DE")
@@ -92,13 +93,21 @@ class RestoreLearnedPoolsTest {
             z.putNextEntry(ZipEntry("$store/$store.body")); z.write((FakeLearnedStoreIo.format(word("c", 2, 200)) + "\n").toByteArray()); z.closeEntry()
         }
 
-        restoreChosenFrom(ctx, zip, listOf(c, d), settings = true, learnedWords = true, io = io)
+        LearnedKeyboards.storeIo = io
+        try { restoreChosenFrom(ctx, zip, listOf(c, d), settings = true, learnedWords = true, io = io) }
+        finally { LearnedKeyboards.storeIo = LearnedStoreIo.Native }
 
         val ids = JSONObject(real.getString("keyboard_profile_ids", "{}")!!)
         assertEquals(setOf(c.toPref(), d.toPref()), ids.keys().asSequence().toSet(), "the phone's old keyboards got ids")
-        val pools = LearnedStores.keyboardPoolsOnDisk(ctx.filesDir)
-        assertTrue(pools.all { it in setOf(1, 2) }, "learned words of keyboards not in the backup: $pools")
-        assertEquals(setOf("x", "c"), words(1), "C: the shared words and its own")
-        assertEquals(setOf("x"), words(2), "D: the shared words")
+        // the phone's keyboards kept their pools (sharing was off there), the backup's got their own
+        val pools = JSONObject(real.getString(LearnedKeyboards.PREF_POOLS, "{}")!!)
+        assertEquals(5, pools.getInt(a.toPref()))
+        assertEquals(setOf("x"), words(5), "A's own words")
+        val poolC = LearnedKeyboards.poolFor(real, c)
+        val poolD = LearnedKeyboards.poolFor(real, d)
+        assertTrue(poolC !in setOf(0, 5, 6) && poolD !in setOf(0, 5, 6, poolC), "pools $poolC $poolD")
+        assertEquals(setOf("c"), words(poolC), "C: its own words in the backup")
+        assertEquals(emptySet(), words(poolD), "D: it had none")
+        assertEquals(setOf("x"), words(LearnedStores.SHARED), "the phone's shared words of before, untouched")
     }
 }

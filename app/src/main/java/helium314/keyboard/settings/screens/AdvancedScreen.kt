@@ -19,17 +19,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import helium314.keyboard.latin.gesture.SwipeMetrics
-import helium314.keyboard.latin.personalization.LearnedPools
-import helium314.keyboard.latin.personalization.LearnedStores
 import helium314.keyboard.latin.personalization.LearningEventLog
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.dialogs.ConfirmationDialog
-import android.widget.Toast
 import androidx.compose.material3.Switch
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import helium314.keyboard.settings.dialogs.LocalPreviewEmoji
@@ -113,8 +106,7 @@ fun AdvancedSettingsScreen(
             // (Refine suggestions & learning: no row while the menu isn't shown, see REFINE_MENU_SHOWN)
             .filter { it != helium314.keyboard.latin.settings.KeyboardProfiles.Group.REFINE || helium314.keyboard.settings.REFINE_MENU_SHOWN }
             .map { it.prefKey }.toTypedArray() else emptyArray<String>()),
-        // learned & blacklisted words (files, their own switch); shown without separate settings too while they're per keyboard
-        if (separate || !LearnedStores.isShared(real)) Settings.PREF_SHARE_LEARNED_WORDS else null,
+        // (learned & blacklisted words: always each keyboard's own since 2026-10-10, no switch)
         SettingsWithoutKey.DIVIDER, // a line above About (2026-10-06)
         SettingsWithoutKey.ABOUT_SCREEN, // last (moved from the main screen, 2026-10-04)
         // (once under Experimental; the emoji version is on Appearance's Emoji group, next to the emoji font, URL
@@ -235,9 +227,6 @@ fun createAdvancedSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_ABC_AFTER_CLIP, R.string.switch_keyboard_after, R.string.after_clip) {
         SwitchPreference(it, Defaults.PREF_ABC_AFTER_CLIP)
-    },
-    Setting(context, Settings.PREF_SHARE_LEARNED_WORDS, R.string.learned_words_per_keyboard) { setting ->
-        ShareLearnedWordsPreference(setting)
     },
     Setting(context, SettingsWithoutKey.SEPARATE_SETTINGS, R.string.separate_settings_use) { setting ->
         SeparateSettingsPreference(setting)
@@ -418,36 +407,6 @@ private fun Preview() {
 }
 
 /** A character or a whole word per press (undo / redo): two buttons in the row, like a language's L / M / H. */
-/** The switch asks first, saying what happens to the words (see LearnedPools), which are then moved in the background. */
-@Composable
-private fun ShareLearnedWordsPreference(setting: Setting) {
-    val ctx = LocalContext.current
-    val real = ctx.realPrefs()
-    var shared by remember { mutableStateOf(LearnedStores.isShared(real)) }
-    var asking by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    // on = each keyboard its own, like the other rows under Per keyboard
-    Preference(name = setting.title, onClick = { asking = true }) {
-        Switch(checked = !shared, onCheckedChange = { asking = true })
-    }
-    if (asking) ConfirmationDialog(
-        onDismissRequest = { asking = false },
-        onConfirmed = {
-            val to = !shared
-            shared = to
-            scope.launch {
-                val ok = withContext(Dispatchers.IO) { LearnedPools.setShared(ctx, real, to) }
-                if (!ok) {
-                    shared = !to
-                    Toast.makeText(ctx, R.string.share_learned_words_failed, Toast.LENGTH_LONG).show()
-                }
-            }
-        },
-        title = { Text(setting.title) },
-        content = { Text(stringResource(if (shared) R.string.share_learned_words_off_message else R.string.share_learned_words_on_message)) },
-    )
-}
-
 /** The menu a Per keyboard row is for, named as on the main screen. */
 private fun groupTitle(group: helium314.keyboard.latin.settings.KeyboardProfiles.Group) = when (group) {
     helium314.keyboard.latin.settings.KeyboardProfiles.Group.LAYOUT -> R.string.settings_screen_preferences

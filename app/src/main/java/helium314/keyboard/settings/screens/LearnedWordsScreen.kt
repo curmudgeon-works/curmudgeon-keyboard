@@ -51,8 +51,8 @@ import java.util.Locale
 
 /*
  * "Learned & blacklisted words" (Text correction): per script (Latin, Devanagari, …), as the keyboard keeps them (one
- * store of learned words and one blacklist per script, shared by its languages: see LearnedStores). With "Share learned
- * & blacklisted words across keyboards" off, each keyboard has its own: the scripts are listed per keyboard. Per script:
+ * store of learned words and one blacklist per script, shared by its languages: see LearnedStores). Each keyboard has its
+ * own (LearnedKeyboards): the scripts are listed per keyboard. Per script:
  * - Your words: the script's learned words, merged with the Android personal dictionary's words of the script (from
  *   their letters; the personal dictionary stays per language, Android's), each word once (case-insensitive, shown in
  *   its most typed spelling). Remove: the same as long-press Remove (DictionaryFacilitatorImpl.removeWords), plus its
@@ -117,11 +117,9 @@ fun LearnedWordsScriptsScreen(onClickBack: () -> Unit) {
     }
 }
 
-/** The rows of the scripts list: without a heading when the keyboards share their words, else under each keyboard. */
+/** The rows of the scripts list, under each keyboard: every keyboard has its own learned words (2026-10-10). */
 internal fun scriptSections(context: Context): List<Pair<String?, List<ScriptRowData>>> {
     val real = context.realPrefs()
-    if (LearnedStores.isShared(real))
-        return listOf(null to scriptLocales().map { (script, locales) -> ScriptRowData(script, locales, LearnedStores.SHARED) })
     return SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.distinct().map { keyboard ->
         val pool = LearnedKeyboards.poolFor(real, keyboard)
         val rows = (listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)).groupBy { it.script() }

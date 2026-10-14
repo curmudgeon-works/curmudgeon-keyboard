@@ -26,10 +26,9 @@ import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.database.ClipboardDao
 import helium314.keyboard.latin.gesture.GestureDecoderVocabulary
-import helium314.keyboard.latin.personalization.LearnedPools
-import helium314.keyboard.latin.personalization.LearnedStoreIo
+import helium314.keyboard.latin.personalization.LearnedKeyboards
 import helium314.keyboard.latin.personalization.LearnedStores
-import helium314.keyboard.latin.personalization.PersonalizationHelper
+import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
@@ -93,20 +92,28 @@ fun FactoryResetPreference(setting: Setting) {
 }
 
 /**
- * The reset, started from the dialog: keyboards with their own learned words go back to one shared set (the setting's
- * default, which the reset brings back), put together first so nothing is lost on the way. That reads every store, so it
- * runs on the app's background executor (review 2026-10-06: it froze the screen), which outlives the dialog (re-review:
- * a task started in the dialog's scope was cancelled when the dialog closed, and nothing was reset); the reset itself
- * then runs on the main thread, and [onDone] after it.
+ * The reset, started from the dialog. The learned words' files are changed on the app's background executor (review
+ * 2026-10-06: on the screen thread it froze), which outlives the dialog (re-review: a task started in the dialog's scope
+ * was cancelled when the dialog closed, and nothing was reset); the reset itself runs on the main thread, and [onDone]
+ * after it. Learned words (2026-10-10): with them ticked every keyboard's learned words and blacklists go; with the
+ * keyboards ticked the keyboard left keeps its own words and the other keyboards' go; each keyboard keeps its pool.
  */
 internal fun startFactoryReset(ctx: Context, keyboards: Boolean, learnedWords: Boolean, clipboard: Boolean, custom: Boolean, onDone: () -> Unit) {
-    val real = ctx.realPrefs()
-    val filesDir = ctx.filesDir
-    helium314.keyboard.latin.utils.ExecutorUtils.getBackgroundExecutor(helium314.keyboard.latin.utils.ExecutorUtils.KEYBOARD).execute {
-        if (!LearnedStores.isShared(real) && filesDir != null) LearnedPools.share(filesDir, LearnedStoreIo.Native)
-        android.os.Handler(android.os.Looper.getMainLooper()).post {
+    val executor = helium314.keyboard.latin.utils.ExecutorUtils.getBackgroundExecutor(helium314.keyboard.latin.utils.ExecutorUtils.KEYBOARD)
+    val main = android.os.Handler(android.os.Looper.getMainLooper())
+    executor.execute {
+        try { LearnedKeyboards.beforeFactoryReset(ctx, learnedWords) }
+        catch (e: Exception) { helium314.keyboard.latin.utils.Log.e("FactoryReset", "learned words not reset", e) }
+        main.post {
             factoryReset(ctx, keyboards, learnedWords, clipboard, custom)
-            onDone()
+            if (!keyboards) { onDone(); return@post }
+            // the keyboard list after the reset: the others' learned words go (they're another keyboard's no more)
+            val left = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }
+            executor.execute {
+                try { LearnedKeyboards.keepOnly(ctx, left) }
+                catch (e: Exception) { helium314.keyboard.latin.utils.Log.e("FactoryReset", "other keyboards' learned words not deleted", e) }
+                main.post { onDone() }
+            }
         }
     }
 }
@@ -118,6 +125,7 @@ internal fun startFactoryReset(ctx: Context, keyboards: Boolean, learnedWords: B
  */
 internal fun keptOnReset(key: String, keyboards: Boolean, custom: Boolean): Boolean =
     key == Settings.PREF_VERSION_CODE || KeyboardProfiles.isOneTimeFlag(key)
+        || key in LearnedKeyboards.keptOnReset // (which pool each keyboard's words are in: data, not a setting)
         || (!keyboards && (key == Settings.PREF_ENABLED_SUBTYPES || key == Settings.PREF_ADDITIONAL_SUBTYPES
             || key == Settings.PREF_SELECTED_SUBTYPE || LanguagePriority.isLanguageKey(key)))
         || (!custom && (key == KeyPopupOverrides.PREF || key == KeyPopupOverrides.PREF_SETS
@@ -126,17 +134,15 @@ internal fun keptOnReset(key: String, keyboards: Boolean, custom: Boolean): Bool
 
 private fun factoryReset(ctx: Context, keyboards: Boolean, learnedWords: Boolean, clipboard: Boolean, custom: Boolean) {
     val prefs = ctx.realPrefs()
-    // (the keyboards' own learned words were put together before, see the dialog)
+    // (the learned words were reset before, see the dialog; the buttons to use other keyboards' lists go with the settings)
     Settings.getInstance().stopListener()
     prefs.edit { prefs.all.keys.filterNot { keptOnReset(it, keyboards, custom) }.forEach { remove(it) } }
     helium314.keyboard.latin.gesture.GestureStats.reload() // (its cached rows would come back over the reset)
-    if (keyboards) ctx.filesDir?.let { LearnedPools.forgetSeeded(it) } // (the keyboards' ids start again)
     LearnedStores.refresh(prefs)
     // the background pictures belong to the settings (every keyboard's: the set ids start again after a reset, and a
     // new keyboard mustn't find an old one's picture)
     KeyboardProfiles.deleteAllFiles()
     Settings.clearCachedBackgroundImages()
-    if (learnedWords) PersonalizationHelper.removeAllUserHistoryDictionaries(ctx)
     if (clipboard) ClipboardDao.getInstance(ctx)?.clear()
     if (custom) {
         // the saved themes' background pictures (the themes themselves were settings)

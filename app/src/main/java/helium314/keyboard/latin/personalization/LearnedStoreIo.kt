@@ -10,7 +10,7 @@ import java.util.Locale
 
 /**
  * Reading and writing whole stores of learned words, for what puts stores together (LearnedStoreMigration,
- * LearnedPools, the backup restore). An interface so that logic can be tested without the native library.
+ * the one-time per-keyboard update, the backup restore). An interface so that logic can be tested without the native library.
  */
 interface LearnedStoreIo {
     /** The entries of the store in [dir] (a file nobody has open), null if there's no readable store. */

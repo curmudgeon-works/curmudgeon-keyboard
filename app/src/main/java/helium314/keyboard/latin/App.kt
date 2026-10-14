@@ -35,9 +35,9 @@ class App : Application() {
         // that had their own set before that (the emoji font is one shared file in the font list, see FontLibrary: each
         // keyboard only stores its choice)
         helium314.keyboard.latin.settings.KeyboardProfiles.filesDir = helium314.keyboard.latin.utils.DeviceProtectedUtils.getFilesDir(this)
-        // the keyboards' own learned-word pools from before the seeded markers count as seeded
-        helium314.keyboard.latin.personalization.LearnedPools.markExistingPools(helium314.keyboard.latin.utils.DeviceProtectedUtils.getFilesDir(this),
-            helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
+        // once (2026-10-10): every keyboard its own learned words, from the shared ones if they were shared (after
+        // unlock, in the background; see LearnedKeyboards)
+        helium314.keyboard.latin.personalization.LearnedKeyboards.startUpdate(this)
         helium314.keyboard.latin.settings.KeyboardProfiles.loadGroups(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
         helium314.keyboard.latin.settings.KeyboardProfiles.migrateFiles(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
         helium314.keyboard.latin.settings.KeyboardProfiles.settingsMoves(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))

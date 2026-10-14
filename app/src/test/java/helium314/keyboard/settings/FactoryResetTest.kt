@@ -15,21 +15,23 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** The factory reset runs to the end from the dialog's button, with the learned-words merge off the screen thread. */
+/** The factory reset runs to the end from the dialog's button, with the learned words' files off the screen thread. */
 @RunWith(RobolectricTestRunner::class)
 class FactoryResetTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
 
-    @Test fun `the reset runs, with shared learned words off too`() {
+    @Test fun `the reset runs, and each keyboard keeps which learned words are its own`() {
         val real = ctx.realPrefs()
         real.edit { putInt(Settings.PREF_KEY_LONGPRESS_TIMEOUT, 999); putBoolean(Settings.PREF_SHARE_LEARNED_WORDS, false) }
         var done = false
         startFactoryReset(ctx, keyboards = true, learnedWords = false, clipboard = false, custom = false) { done = true }
-        // the merge runs on a background thread, the reset is posted to the main one
+        // the learned words' part runs on a background thread, the reset is posted to the main one
         val until = System.currentTimeMillis() + 10_000
         while (!done && System.currentTimeMillis() < until) { shadowOf(Looper.getMainLooper()).idle(); Thread.sleep(50) }
         assertTrue(done, "the reset never ran")
         assertFalse(real.contains(Settings.PREF_KEY_LONGPRESS_TIMEOUT))
-        assertTrue(helium314.keyboard.latin.personalization.LearnedStores.isShared(real))
+        // (each keyboard its own learned words first, if not done yet; that bookkeeping isn't a setting)
+        assertTrue(helium314.keyboard.latin.personalization.LearnedKeyboards.isDone(real))
+        assertTrue(real.contains(helium314.keyboard.latin.personalization.LearnedKeyboards.PREF_POOLS))
     }
 }

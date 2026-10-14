@@ -34,18 +34,19 @@ object KeyboardProfiles {
         Settings.PREF_CLIPBOARD_HISTORY_SIZE, Settings.PREF_CLIPBOARD_HISTORY_PINNED_FIRST,
         Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_SWIPE_METRICS, Settings.PREF_AUTO_PREVIEW_KEYBOARD, // logs of the user's swiping: one file, one switch
         Settings.PREF_LEARNING_LOG, // and of what corrections do to the learned words
-        Settings.PREF_SHARE_LEARNED_WORDS, // it says whether the keyboards have their own learned words: app-wide
         PREF_SEPARATE, PREF_IDS, PREF_NEXT_ID,
         "key_popup_sets", // saved popup sets are meant to be reused across keyboards
         "appearance_looks", // saved looks too
         "layout_presets", // and saved Layouts
-    ) + Group.entries.map { it.prefKey }
+    ) + Group.entries.map { it.prefKey } +
+        // which pool of learned words each keyboard has, its buttons, the old switch (read by the update only)
+        helium314.keyboard.latin.personalization.LearnedKeyboards.appWideKeys
 
     /**
      * The top-level menus whose settings can be the keyboard's own or shared by all keyboards (App settings > Per
      * keyboard). A setting on two menus (auto-space after a swipe: Swipe and Text correction) is shared only when both
      * are; when one is per keyboard it belongs to that one and the shared menu doesn't show it ([hiddenOn]).
-     * Learned & blacklisted words are files, not settings: their own switch (LearnedStores.isShared).
+     * Learned & blacklisted words are files, not settings: always each keyboard's own (LearnedKeyboards).
      */
     enum class Group(val prefKey: String, val sharedByDefault: Boolean) {
         LAYOUT("share_group_layout", false),
@@ -251,10 +252,17 @@ object KeyboardProfiles {
         return id
     }
 
-    /** A keyboard changed identity (layout, languages ...): its settings follow it. */
+    /** The next profile id to be given out. */
+    fun nextProfileId(real: SharedPreferences): Int = real.getInt(PREF_NEXT_ID, 1)
+
+    /** Every keyboard identity with its profile id (reads only). */
+    fun idEntries(real: SharedPreferences): Map<String, Int> = ids(real).let { map -> map.keys().asSequence().associateWith { map.optInt(it, SHARED) } }
+
+    /** A keyboard changed identity (layout, languages ...): its settings follow it, and its learned words. */
     @Synchronized
     fun onKeyboardChanged(real: SharedPreferences, from: SettingsSubtype, to: SettingsSubtype) {
         if (from == to) return
+        helium314.keyboard.latin.personalization.LearnedKeyboards.onKeyboardChanged(real, from, to)
         val map = ids(real)
         val fromPref = from.toPref()
         if (!map.has(fromPref)) return
@@ -267,9 +275,10 @@ object KeyboardProfiles {
         real.edit().putString(PREF_IDS, map.toString()).apply()
     }
 
-    /** A keyboard was deleted: its set goes with it. */
+    /** A keyboard was deleted: its set goes with it (and which learned words it had). */
     @Synchronized
     fun onKeyboardDeleted(real: SharedPreferences, keyboard: SettingsSubtype) {
+        helium314.keyboard.latin.personalization.LearnedKeyboards.onKeyboardDeleted(real, keyboard)
         val map = ids(real)
         val pref = keyboard.toPref()
         // apps that remembered it remember nothing now (review 2026-10-07: the entry stayed, naming a deleted keyboard)

@@ -2,9 +2,7 @@
 package helium314.keyboard.latin.personalization
 
 import android.content.SharedPreferences
-import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.KeyboardProfiles
-import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.ScriptUtils
 import helium314.keyboard.latin.utils.ScriptUtils.script
@@ -16,14 +14,13 @@ import java.util.Locale
  * language. English and Hinglish are both Latin and share their words; a word goes into the store of its own script,
  * read from its letters (ScriptUtils.scriptOfWord), whichever language was preferred when it was typed.
  *
- * A pool is a set of such stores, one per script: [SHARED] for every keyboard (the setting "Share learned &
- * blacklisted words across keyboards", default on), or with that setting off one pool per keyboard, numbered by the
- * keyboard's profile id (KeyboardProfiles.idFor, which exists for every keyboard whether or not its settings are
- * separate).
+ * A pool is a set of such stores, one per script: each keyboard has its own (LearnedKeyboards, 2026-10-10). [SHARED]
+ * (pool 0, the files without a number) held the words all keyboards shared before; nothing reads it after the one-time
+ * update, which copied it into each keyboard's pool.
  *
  * Files (in filesDir):
- * - learned words: UserHistoryDictionary.<script>.dict, a keyboard's own UserHistoryDictionary.<script>.k<id>.dict
- * - blacklist: blacklists/<script>.txt, a keyboard's own blacklists/k<id>/<script>.txt
+ * - learned words: UserHistoryDictionary.<script>.k<pool>.dict (pool 0: UserHistoryDictionary.<script>.dict)
+ * - blacklist: blacklists/k<pool>/<script>.txt (pool 0: blacklists/<script>.txt)
  * Before, both were per language (UserHistoryDictionary.<languageTag>.dict, blacklists/<languageTag>.txt); a language
  * tag never looks like a script code (4 letters, capital first), so old and new files can't be confused.
  */
@@ -35,47 +32,17 @@ object LearnedStores {
     @Volatile var currentPool = SHARED
         private set
 
-    fun isShared(prefs: SharedPreferences) = prefs.getBoolean(Settings.PREF_SHARE_LEARNED_WORDS, Defaults.PREF_SHARE_LEARNED_WORDS)
-
-    /** The pool of the selected keyboard. [real]: the preferences as stored (not a keyboard's profile view). */
+    /** The pool of the selected keyboard (LearnedKeyboards). [real]: the preferences as stored (not a keyboard's profile view). */
     fun poolFor(real: SharedPreferences): Int = LearnedKeyboards.poolFor(real, KeyboardProfiles.selectedKeyboard(real))
 
-    /** Re-reads which pool is in use (on every keyboard switch, and after the setting changed). A keyboard's own pool
-     *  with nothing on disk yet (added since sharing went off) is first filled with a copy of the shared words, in the
-     *  background (re-review 2026-10-07: on the main thread it froze the switch); the keyboard keeps the pool it had
-     *  until the copy is done, then this runs again and switches. */
+    /** Re-reads which pool is in use (on every keyboard switch, after the one-time update, a reset or a restore). */
     fun refresh(real: SharedPreferences) {
         val pool = try { poolFor(real) } catch (e: Exception) { Log.w(TAG, "could not read the pool", e); SHARED }
         if (pool == currentPool) return
-        if (needsSeeding(pool)) { seedInBackground(pool) { refresh(real) }; return }
         currentPool = pool
         helium314.keyboard.latin.utils.HotWords.usePool(pool) // (its recent words with it)
         Log.i(TAG, "learned words pool now $pool")
         listeners.forEach { it() }
-    }
-
-    private fun needsSeeding(pool: Int): Boolean {
-        if (pool == SHARED || pool == seedingFailed) return false
-        val dir = KeyboardProfiles.filesDir ?: return false
-        return !LearnedPools.isSeeded(dir, pool)
-    }
-
-    private val seeding = java.util.concurrent.ConcurrentHashMap.newKeySet<Int>() // the pools being filled now (a repeat call doesn't start another)
-    @Volatile private var seedingFailed: Int? = null // a pool whose copy failed: used empty rather than never
-    /** Fills [pool] off the main thread, then calls back on it with whether the copy was made (replaceable by tests). */
-    internal var seedRunner: (pool: Int, done: (Boolean) -> Unit) -> Unit = { pool, done ->
-        helium314.keyboard.latin.utils.ExecutorUtils.getBackgroundExecutor(helium314.keyboard.latin.utils.ExecutorUtils.KEYBOARD).execute {
-            val ok = KeyboardProfiles.filesDir?.let { LearnedPools.seedIfNew(it, LearnedStoreIo.Native, pool) } ?: false
-            android.os.Handler(android.os.Looper.getMainLooper()).post { done(ok) }
-        }
-    }
-    private fun seedInBackground(pool: Int, then: () -> Unit) {
-        if (!seeding.add(pool)) return
-        seedRunner(pool) { ok ->
-            seeding.remove(pool)
-            if (!ok) { Log.w(TAG, "keyboard $pool: its learned words couldn't be copied, starting empty"); seedingFailed = pool }
-            then()
-        }
     }
 
     // things built from the learned words of the pool in use (swipe vocabularies, frequent long words): rebuilt when it

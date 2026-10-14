@@ -42,7 +42,6 @@ import helium314.keyboard.latin.personalization.LearnedEntry
 import helium314.keyboard.latin.personalization.LearnedKeyboards
 import helium314.keyboard.latin.personalization.LearnedStoreFiles
 import helium314.keyboard.latin.personalization.LearnedStoreIo
-import helium314.keyboard.latin.personalization.LearnedPools
 import helium314.keyboard.latin.personalization.LearnedStoreMigration
 import helium314.keyboard.latin.personalization.LearnedStores
 import helium314.keyboard.latin.personalization.PersonalizationHelper
@@ -331,7 +330,7 @@ internal fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: In
     helium314.keyboard.latin.gesture.GestureStats.reload() // (its cached rows would come back over the restored ones)
     restoreFollowUp(ctx)
     transferOldPinnedClips(ctx)
-    LearnedStores.refresh(ctx.realPrefs()) // (the keyboards' own learned words, or the shared ones, as restored)
+    LearnedStores.refresh(ctx.realPrefs()) // (the keyboard's learned words, as restored)
     Settings.getInstance().startListener()
     SubtypeSettings.reloadEnabledSubtypes(ctx)
     val newDictBroadcast = Intent(DictionaryPackConstants.NEW_DICTIONARY_INTENT_ACTION)
@@ -346,8 +345,14 @@ internal fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: In
     KeyboardSwitcher.getInstance().setThemeNeedsReload()
 }
 
-/** The whole backup replaces everything, as before. */
-private fun restoreEverything(ctx: Context, file: File) {
+/** The whole backup replaces everything, as before; a backup from before each keyboard had its own learned words is
+ *  then updated as the phone was (2026-10-10). */
+private fun restoreEverything(ctx: Context, file: File) = LearnedKeyboards.withFiles {
+    replaceEverything(ctx, file)
+    LearnedKeyboards.updateOnce(ctx)
+}
+
+private fun replaceEverything(ctx: Context, file: File) {
     val restoredDb = ctx.getDatabasePath(Database.NAME + "_restored")
     ZipInputStream(FileInputStream(file)).use { zip ->
         var entry: ZipEntry? = zip.nextEntry
@@ -422,11 +427,18 @@ internal fun restoreChosenFrom(ctx: Context, file: File, keyboards: List<Setting
  * was) replaces the phone's; a subset is restored keyboard by keyboard, see [restoreKeyboards]. Learned words and
  * added dictionaries follow the chosen keyboards' languages.
  */
-private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: RestoreChoice, io: LearnedStoreIo = LearnedStoreIo.Native) {
+private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: RestoreChoice, io: LearnedStoreIo = LearnedStoreIo.Native) =
+    LearnedKeyboards.withFiles {
+        // (each keyboard its own learned words first, if this start couldn't do it yet: they're restored by keyboard)
+        LearnedKeyboards.updateOnce(ctx)
+        restoreChosenLocked(ctx, pending, choice, io)
+    }
+
+private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, choice: RestoreChoice, io: LearnedStoreIo) {
     val everyKeyboard = choice.keyboards.toSet() == pending.keyboards.toSet()
     val allSettings = choice.settings && choice.keyboards.isNotEmpty() && everyKeyboard
     if (choice.keyboards.isNotEmpty()) {
-        if (allSettings) restoreAllSettings(ctx, pending, io)
+        if (allSettings) restoreAllSettings(ctx, pending)
         else restoreKeyboards(ctx, pending, choice.keyboards, choice.settings)
     }
     val tags = choice.keyboards.flatMap { listOf(it.locale) + getSecondaryLocales(it.extraValues) }.map { it.toLanguageTag() }.toSet()
@@ -494,12 +506,10 @@ private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: Restore
 }
 
 /** The backup's preferences replace the phone's, every keyboard's set included. */
-private fun restoreAllSettings(ctx: Context, pending: PendingRestore, io: LearnedStoreIo) {
-    // "Share learned & blacklisted words across keyboards" comes from the backup too: the words move as when it's
-    // switched (LearnedPools), the keyboards' own put together first, then copied to each keyboard if the backup says so
-    // (by the backup's keyboard ids, which replace the phone's)
-    val filesDir = ctx.filesDir
-    if (filesDir != null && !LearnedStores.isShared(ctx.realPrefs())) LearnedPools.share(filesDir, io)
+private fun restoreAllSettings(ctx: Context, pending: PendingRestore) {
+    // which pool each keyboard's learned words are in names the phone's files: the phone's stays (the backup's words are
+    // added keyboard by keyboard, restoreLearnedWords)
+    val phone = LearnedKeyboards.phoneState(ctx.realPrefs())
     Settings.getInstance().stopListener()
     // the backup's set ids replace the phone's: pictures of the phone's sets would turn up on the backup's keyboards
     KeyboardProfiles.deleteAllFiles()
@@ -509,10 +519,8 @@ private fun restoreAllSettings(ctx: Context, pending: PendingRestore, io: Learne
         for ((key, value) in pending.prefs) KeyboardProfiles.put(this, key, value)
     }
     val real = ctx.realPrefs()
-    // the backup's keyboards (review 2026-10-07: the phone's list, not reloaded yet, gave the phone's old keyboards ids
-    // and copies, and the backup's keyboards new to the phone none)
-    if (filesDir != null && !LearnedStores.isShared(real))
-        LearnedPools.separate(filesDir, io, pending.keyboards.map { LearnedKeyboards.poolFor(real, it) }.distinct())
+    // and the buttons of the backup's keyboards (review 2026-10-07: not the phone's list, which isn't reloaded yet)
+    LearnedKeyboards.afterFullRestore(real, phone, pending.prefs, pending.keyboards)
     LearnedStores.refresh(real)
 }
 
@@ -628,7 +636,11 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
                 perKeyboardBackup = backup["profile_files_migrated"] == true)
         }
     }
-    if (withSettings) { Settings.clearCachedBackgroundImages(); helium314.keyboard.keyboard.KeyboardTypeface.clearCache() }
+    if (withSettings) {
+        Settings.clearCachedBackgroundImages(); helium314.keyboard.keyboard.KeyboardTypeface.clearCache()
+        // whether they use the other keyboards' learned and blacklisted words, as in the backup
+        LearnedKeyboards.restoreButtons(real, backup, chosen)
+    }
 }
 
 /** The files behind the settings (restored with all of them): custom layouts (a keyboard's layout must exist for it),
@@ -646,9 +658,6 @@ internal fun restoreFollowUp(ctx: Context) {
     KeyboardProfiles.loadGroups(ctx.realPrefs())
     checkVersionUpgrade(ctx)
     KeyboardProfiles.settingsMoves(ctx.realPrefs())
-    // the keyboards' own learned words that came out of the backup are whole: never to be copied over by the pool
-    // refresh that follows (reviewer 2026-10-07: a restored pool without its marker got the shared words instead)
-    ctx.filesDir?.let { LearnedPools.markPoolsOnDisk(it) }
 }
 
 /** Reads the preferences entry of a backup, the keyboards listed in it and the names of all its entries. */
@@ -776,7 +785,6 @@ private const val PERSONAL_DICT_FILE_NAME = "personal_dictionary.json"
 
 internal val backupFilePatterns by lazy { listOf(
     "blacklists${File.separator}.*\\.txt".toRegex(),
-    "learned_seeded_k[0-9]+".toRegex(), // a keyboard's own learned words are complete (LearnedPools.isSeeded)
     "layouts${File.separator}.*${LayoutUtilsCustom.CUSTOM_LAYOUT_PREFIX}+\\..{0,4}".toRegex(), // can't expect a period at the end, as this would break restoring older backups
     "dicts${File.separator}.*${File.separator}.*user\\.dict".toRegex(),
     "UserHistoryDictionary.*${File.separator}UserHistoryDictionary.*\\.(body|header)".toRegex(),
@@ -794,9 +802,9 @@ internal val backupFilePatterns by lazy { listOf(
 
 /**
  * Adds the learned words of the backup ([learnedDir]: its stores and blacklists, unpacked) for the chosen [keyboards] to
- * the phone's, by script: where each keyboard learns on the phone (the shared pool, or its own with "Share learned &
- * blacklisted words across keyboards" off) gets what it had in the backup (the backup's shared store of each of its
- * scripts, or its own if the backup had them per keyboard; in a backup from before the per-script stores, those of its
+ * the phone's, by script: each keyboard's own pool on the phone (LearnedKeyboards) gets what it had in the backup (its
+ * own pool's stores there; in a backup from before each keyboard had its own, the shared ones (a copy for each, as the
+ * update does) or its own if sharing was off then; in a backup from before the per-script stores, those of its
  * languages, each word into its script's). Counts add up, the latest last use is kept (mergeAdding); blacklists keep the
  * most strikes. A backup store is put into one phone store once, however many chosen keyboards lead there.
  */
@@ -804,15 +812,14 @@ private fun restoreLearnedWords(ctx: Context, backup: Map<String, Any?>, keyboar
                                 io: LearnedStoreIo) {
     val filesDir = ctx.filesDir ?: return
     val real = ctx.realPrefs()
-    val backupShared = backup[Settings.PREF_SHARE_LEARNED_WORDS] != false
     // (phone pool, script) -> the backup's stores and lists that go there
     val stores = LinkedHashMap<Pair<Int, String>, MutableSet<File>>()
     val lists = LinkedHashMap<Pair<Int, String>, MutableSet<File>>()
     for (keyboard in keyboards) {
         val pool = LearnedKeyboards.poolFor(real, keyboard)
-        val backupPool = if (backupShared) LearnedStores.SHARED else KeyboardProfiles.anyIdIn(backup, keyboard) ?: LearnedStores.SHARED
+        val backupPool = LearnedKeyboards.poolIn(backup, keyboard)
         val locales = listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)
-        for (script in locales.map { it.script() }.distinct()) {
+        if (backupPool != null) for (script in locales.map { it.script() }.distinct()) {
             stores.getOrPut(pool to script) { LinkedHashSet() }.add(LearnedStores.storeFile(learnedDir, script, backupPool))
             lists.getOrPut(pool to script) { LinkedHashSet() }.add(LearnedStores.blacklistFile(learnedDir, script, backupPool))
         }
