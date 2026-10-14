@@ -50,23 +50,30 @@ class AllowedHereTest {
         !RemovedWords.isRemoved(lists.entryFor(word), learnedCount) && lists.allowHere(word)
 
     // fail before: a Remove's disallow while a full restore ran wasn't one of the changes made again after it; its
-    // pending row (the old list's own strikes) stayed and was put on top of the restored file at its next read
+    // pending row (the old list's own strikes) stayed and was put on top of the restored file at its next read.
+    // (20261013_L14, round-5 review B8: the struck spelling, "zorp", is another than the allowed row's, "Zorp", as when
+    // the dictionaries list the word in lowercase: the strike leaves "Zorp"'s allowed part alone, only the re-made
+    // disallow takes it off the restored list; and each op's own word is the row its pending change is on, so the test
+    // doesn't hang on takeGated's lowercase removal. Before, "Foo" and "foo": the strike's lowercase branch took the
+    // allowed part off already, and the test failed before only through that lowercase removal)
     @Test fun `a Remove during a full restore takes the allowed part off the restored list, its strikes from the file`() {
         val file = java.io.File(ctx.filesDir, "blacklists${java.io.File.separator}gated-${System.nanoTime()}.txt")
         file.parentFile!!.mkdirs()
-        file.writeText("foo\t1\tallowed\t2\n")
+        file.writeText("Zorp\t1\tallowed\t2\n")
         val list = RemovedWords.forFile(file)
         try {
             list.reload()
             helium314.keyboard.latin.personalization.RestoreGate.setForTest(Thread.currentThread())
-            list.strike("Foo"); list.disallow("Foo") // (as DictionaryFacilitatorImpl.removeWords does)
+            list.strike("zorp"); list.disallow("Zorp") // (as DictionaryFacilitatorImpl.removeWords does: the spelling, the word)
+            assertNull(list.allowedFor("Zorp"), "the Remove's disallow, in memory")
             val ops = list.takeGated()
-            file.writeText("foo\t3\tallowed\t2\n") // (the restored list of the same keyboard)
+            file.writeText("zorp\t2\nZorp\t4\tallowed\t2\n") // (the restored list of the same keyboard)
             list.reload() // (the gate still set: the writes queued meanwhile wrote nothing)
             helium314.keyboard.latin.personalization.RestoreGate.setForTest(null)
             list.redo(ops)
-            assertNull(list.allowedFor("foo"))
-            assertEquals(3, list.entries()["foo"]?.strikes) // (the restored file's, not the old list's 1)
+            assertNull(list.allowedFor("Zorp"), "the allowed part of the restored row stayed: the disallow wasn't made again")
+            assertEquals(4, list.entries()["Zorp"]?.strikes, "the restored file's own strikes, not the old list's 1")
+            assertEquals(3, list.entries()["zorp"]?.strikes) // (the strike made again: one more on the restored 2)
         } finally {
             helium314.keyboard.latin.personalization.RestoreGate.setForTest(null)
             file.delete()
