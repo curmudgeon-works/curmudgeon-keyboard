@@ -5,7 +5,10 @@ import android.content.Context
 import android.provider.UserDictionary
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,6 +22,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import helium314.keyboard.latin.DictionaryFacilitatorImpl
@@ -126,6 +131,15 @@ internal fun scriptRows(context: Context, keyboard: helium314.keyboard.latin.set
         .map { (script, locales) -> ScriptRowData(script, locales, pool) }
 }
 
+/*
+ * Batch delete (owner 2026-10-11: "longpress to start multi-select and then tap tap tap tap to select multiples and
+ * delete all at once"): a long-press on a word starts selection mode with it ticked; a tap then ticks / unticks a row
+ * (no word ticked: the mode ends). The selection is of this screen's one list (Learned or Blacklisted words of the
+ * script); Select all ticks the words shown (those the search finds, while searching). Delete asks once, as the single
+ * delete; with every word of the list ticked a second time (owner 2026-10-11: "select all and delete should have
+ * additional warning for are you sure?"). Then each word goes exactly as by the single delete, in one background job.
+ * Back, the back arrow and the cross leave selection mode first. Numbers / edit / batch edit: later.
+ */
 @Composable
 fun LearnedWordsScreen(onClickBack: () -> Unit, script: String, blacklisted: Boolean, pool: Int = LearnedStores.SHARED) {
     val ctx = LocalContext.current
@@ -136,24 +150,51 @@ fun LearnedWordsScreen(onClickBack: () -> Unit, script: String, blacklisted: Boo
     var selected: Item? by remember { mutableStateOf(null) }
     var adding by remember { mutableStateOf(false) }
     val locales = remember(script) { scriptLocales()[script].orEmpty() }
+    // selection mode: the keys (Entry.key) of the words ticked; none: not selecting
+    var picked by remember { mutableStateOf(emptySet<String>()) }
+    var askDelete by remember { mutableStateOf(false) }
+    var askDeleteAll by remember { mutableStateOf(false) }
+    val selecting = picked.isNotEmpty()
+    val kind = if (blacklisted) Kind.BLACKLISTED else Kind.YOURS
+    val listEntries = data?.let { if (blacklisted) it.blacklisted else it.yours }.orEmpty()
+    // the search term the list was last shown for (Select all ticks what's shown)
+    val shownTerm = remember { arrayOf("") }
 
-    fun run(item: Item) {
+    fun run(items: List<Item>) {
+        // one job for all of them, off the main thread
         scope.launch {
-            withContext(Dispatchers.IO) { apply(ctx, script, pool, locales, item) }
+            withContext(Dispatchers.IO) { deleteWords(ctx, script, pool, locales, items) }
+            picked = emptySet()
             reload++
         }
     }
+    fun toggle(key: String) { picked = if (key in picked) picked - key else picked + key }
+    fun pickedItems() = listEntries.filter { it.key in picked }.map { Item(it, kind) }
 
     SearchScreen(
-        onClickBack = onClickBack,
+        // (read at the time of Back: the state now, not as composed)
+        onClickBack = { if (picked.isNotEmpty()) picked = emptySet() else onClickBack() },
         title = {
-            Column {
+            if (selecting) Text(pluralStringResource(R.plurals.learned_words_selected, picked.size, picked.size))
+            else Column {
                 Text(stringResource(if (blacklisted) R.string.learned_words_section_blacklisted else R.string.learned_words_section_yours))
                 Text(scriptName(script), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
-        // Add a word: the list's first row (as Add keyboard on the keyboards list), not while searching
-        filteredItems = { term -> (if (term.isBlank() && !blacklisted) listOf(Row.Add) else emptyList()) +
+        showAdvancedSwitch = !selecting,
+        icon = if (selecting) ({}) else null, // (no search button while selecting)
+        leadingActions = {
+            if (selecting) {
+                IconButton({ picked = WordLists.matching(listEntries, shownTerm[0]).mapTo(HashSet()) { it.key } }) {
+                    Icon(painterResource(R.drawable.ic_select_all), stringResource(R.string.learned_words_select_all)) }
+                IconButton({ askDelete = true }) { Icon(painterResource(R.drawable.ic_bin), stringResource(R.string.delete)) }
+                IconButton({ picked = emptySet() }) {
+                    Icon(painterResource(R.drawable.ic_close), stringResource(R.string.learned_words_selection_close)) }
+            }
+        },
+        // Add a word: the list's first row (as Add keyboard on the keyboards list), not while searching or selecting
+        filteredItems = { term -> shownTerm[0] = term;
+            (if (term.isBlank() && !blacklisted && !selecting) listOf(Row.Add) else emptyList()) +
             (data?.rows(term, blacklisted) ?: listOf(Row.Note(R.string.learned_words_loading))) },
         itemContent = { row ->
             when (row) {
@@ -163,7 +204,13 @@ fun LearnedWordsScreen(onClickBack: () -> Unit, script: String, blacklisted: Boo
                 is Row.Note -> Text(stringResource(row.text), style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 22.dp, end = 12.dp, top = 4.dp, bottom = 8.dp))
                 is Item -> CompositionLocalProvider(LocalRowStart provides 22.dp) {
-                    Preference(name = row.entry.word, description = row.description(), onClick = { selected = row })
+                    val key = row.entry.key
+                    Preference(name = row.entry.word, description = row.description(),
+                        // (the state at the time of the tap)
+                        onClick = { if (picked.isNotEmpty()) toggle(key) else selected = row },
+                        onLongClick = { if (picked.isNotEmpty()) toggle(key) else picked = setOf(key) },
+                        value = if (!selecting) null else ({ Checkbox(checked = key in picked, onCheckedChange = { toggle(key) }) }),
+                    )
                 }
             }
         },
@@ -172,11 +219,36 @@ fun LearnedWordsScreen(onClickBack: () -> Unit, script: String, blacklisted: Boo
     selected?.let { item ->
         ConfirmationDialog(
             onDismissRequest = { selected = null },
-            onConfirmed = { run(item) },
+            onConfirmed = { run(listOf(item)) },
             title = { Text(item.entry.word) },
             content = { Text(stringResource(if (item.kind == Kind.YOURS) R.string.learned_words_delete_message
                 else R.string.learned_words_unblacklist_message)) },
             confirmButtonText = stringResource(R.string.delete),
+        )
+    }
+    if (askDelete && selecting) {
+        val n = picked.size
+        ConfirmationDialog(
+            onDismissRequest = { askDelete = false },
+            onConfirmed = {
+                // every word of the list: asked once more
+                if (listEntries.all { it.key in picked }) askDeleteAll = true else run(pickedItems())
+            },
+            title = { Text(pluralStringResource(R.plurals.learned_words_delete_selected, n, n)) },
+            content = { Text(stringResource(if (blacklisted) R.string.learned_words_unblacklist_message
+                else R.string.learned_words_delete_message)) },
+            confirmButtonText = stringResource(R.string.delete),
+        )
+    }
+    if (askDeleteAll && selecting) {
+        val n = picked.size
+        val list = stringResource(if (blacklisted) R.string.learned_words_section_blacklisted else R.string.learned_words_section_yours)
+        ConfirmationDialog(
+            onDismissRequest = { askDeleteAll = false },
+            onConfirmed = { run(pickedItems()) },
+            title = { Text(pluralStringResource(R.plurals.learned_words_delete_all_title, n, n, list, scriptName(script))) },
+            content = { Text(stringResource(R.string.learned_words_delete_all_message)) },
+            confirmButtonText = stringResource(R.string.learned_words_delete_all_button),
         )
     }
     if (adding) // the personal dictionary's own add dialog
@@ -197,7 +269,10 @@ internal class Entry(
     val personal: List<PersonalEntry>,
     val listed: List<String>, // blacklist rows: the spelling of each
     val strikes: Int, // how often removed (the most of its rows), 0: not blacklisted
-)
+) {
+    /** The word's key in its list (the lists are case-insensitive): what selection mode ticks. */
+    val key: String get() = word.lowercase()
+}
 
 internal sealed interface Row {
     object Add : Row
@@ -227,11 +302,17 @@ internal class WordLists(val yours: List<Entry>, val blacklisted: List<Entry>) {
     fun rows(term: String, ofBlacklist: Boolean): List<Row> {
         val result = mutableListOf<Row>()
         val entries = if (ofBlacklist) blacklisted else yours
-        val shown = if (term.isBlank()) entries else entries.filter { e -> e.spellings.any { it.contains(term, true) } }
+        val shown = matching(entries, term)
         if (ofBlacklist && shown.isNotEmpty() && term.isBlank()) result.add(Row.Note(R.string.learned_words_blacklisted_summary))
         if (shown.isEmpty()) result.add(Row.Note(R.string.learned_words_none))
         shown.mapTo(result) { Item(it, if (ofBlacklist) Kind.BLACKLISTED else Kind.YOURS) }
         return result
+    }
+
+    companion object {
+        /** The [entries] the search for [term] finds (all for a blank term). */
+        fun matching(entries: List<Entry>, term: String): List<Entry> =
+            if (term.isBlank()) entries else entries.filter { e -> e.spellings.any { it.contains(term, true) } }
     }
 }
 
@@ -330,6 +411,11 @@ internal fun buildWordLists(script: String, learned: List<Pair<String, Int>>, pe
 // (DictionaryFacilitatorImpl.removeWords), the learned words are the same UserHistoryDictionary objects it uses
 // (PersonalizationHelper's cache), the personal dictionary is watched by its UserBinaryDictionary, and the blacklists
 // are the same RemovedWords objects it checks (settings and keyboard: one process).
+
+/** Deletes [items], each exactly as the single delete does (call off the main thread). */
+internal fun deleteWords(context: Context, script: String, pool: Int, scriptLocales: List<Locale>, items: List<Item>) {
+    for (item in items) apply(context, script, pool, scriptLocales, item)
+}
 
 private fun apply(context: Context, script: String, pool: Int, scriptLocales: List<Locale>, item: Item) {
     val entry = item.entry

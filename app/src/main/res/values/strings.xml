@@ -177,6 +177,26 @@
     <string name="learned_words_unblacklist_message">Off the list as if it was never removed: suggested again, and how often it was removed starts over.</string>
     <!-- Learned words list, Delete dialog: the word goes as if never typed; it is not blacklisted -->
     <string name="learned_words_delete_message">Off the list as if you never typed it: forgets how often you typed it and takes it out of the personal dictionary. It isn\'t blacklisted (long-press Remove in the suggestions does that).</string>
+    <!-- Learned / Blacklisted words list, selection mode (a long-press on a word starts it): the top bar's title; %d = how many words are ticked -->
+    <plurals name="learned_words_selected">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
+    <!-- selection mode: the top bar's buttons -->
+    <string name="learned_words_select_all">Select all</string>
+    <string name="learned_words_selection_close">Close selection</string>
+    <!-- selection mode, Delete: the question's title (its text is the list's delete message); %d = how many words -->
+    <plurals name="learned_words_delete_selected">
+        <item quantity="one">Delete %d word?</item>
+        <item quantity="other">Delete %d words?</item>
+    </plurals>
+    <!-- selection mode, Delete with every word of the list ticked: a second question; %1$d = how many words, %2$s = the list ("Learned words" or "Blacklisted words"), %3$s = the script ("Latin") -->
+    <plurals name="learned_words_delete_all_title">
+        <item quantity="one">Delete the only word in %2$s (%3$s)?</item>
+        <item quantity="other">Delete all %1$d words in %2$s (%3$s)?</item>
+    </plurals>
+    <string name="learned_words_delete_all_message">This can\'t be undone.</string>
+    <string name="learned_words_delete_all_button">Delete all</string>
     <!-- Name of the main dictionary, as opposed to auxiliary dictionaries (medical/entertainment/sports...) -->
     <string name="main_dictionary">Main dictionary</string>
     <!-- Option to enable showing suggestions -->
