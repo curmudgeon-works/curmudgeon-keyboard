@@ -147,7 +147,9 @@ class LearnedWordsBatchDeleteTest {
         compose.onNodeWithText(selected(3)).assertExists()
         trash()
         inDialog(ctx.resources.getQuantityString(R.plurals.learned_words_delete_selected, 3, 3)).assertExists()
-        inDialog(ctx.getString(R.string.learned_words_delete_message)).assertExists()
+        // (L4.3: plural wording; the personal dictionary isn't promised, its box decides that)
+        inDialog(ctx.resources.getQuantityString(R.plurals.learned_words_delete_message_batch, 3, 3)).assertExists()
+        assertFalse(ctx.getString(R.string.learned_words_delete_message).contains("personal dictionary"))
         inDialog(ctx.getString(R.string.delete)).performClick()
         // one question only: not every word of the list
         compose.onNodeWithText(ctx.getString(R.string.learned_words_delete_all_button)).assertDoesNotExist()
@@ -192,7 +194,7 @@ class LearnedWordsBatchDeleteTest {
         compose.onNodeWithContentDescription(ctx.getString(R.string.learned_words_select_all)).performClick()
         compose.onNodeWithText(selected(3)).assertExists()
         trash()
-        inDialog(ctx.getString(R.string.learned_words_unblacklist_message)).assertExists()
+        inDialog(ctx.resources.getQuantityString(R.plurals.learned_words_unblacklist_message_batch, 3, 3)).assertExists()
         inDialog(ctx.getString(R.string.delete)).performClick()
         val all = ctx.resources.getQuantityString(R.plurals.learned_words_delete_all_title, 3, 3,
             ctx.getString(R.string.learned_words_section_blacklisted), latin)

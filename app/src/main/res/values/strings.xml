@@ -175,7 +175,17 @@
     <string name="learned_words_remove_message">As long-press Remove: forgets how often you typed it, takes it out of the personal dictionary, and it isn\'t suggested until you type it again (the more often removed, the more it takes).</string>
     <string name="learned_words_unblacklist_message">Off the list as if it was never removed: suggested again, and how often it was removed starts over.</string>
     <!-- Learned words list, Delete dialog: the word goes as if never typed; it is not blacklisted -->
-    <string name="learned_words_delete_message">Off the list as if you never typed it: forgets how often you typed it and takes it out of the personal dictionary. It isn\'t blacklisted (long-press Remove in the suggestions does that).</string>
+    <string name="learned_words_delete_message">Off the list as if you never typed it: forgets how often you typed it. It isn\'t blacklisted (long-press Remove in the suggestions does that).</string>
+    <!-- the same, selection mode's Delete of several words; %d = how many -->
+    <plurals name="learned_words_delete_message_batch">
+        <item quantity="one">Off the list as if you never typed it: forgets how often you typed it. It isn\'t blacklisted (long-press Remove in the suggestions does that).</item>
+        <item quantity="other">Off the list as if you never typed them: forgets how often you typed them. They aren\'t blacklisted (long-press Remove in the suggestions does that).</item>
+    </plurals>
+    <!-- Blacklisted words list, selection mode's Delete of several words; %d = how many -->
+    <plurals name="learned_words_unblacklist_message_batch">
+        <item quantity="one">Off the list as if it was never removed: suggested again, and how often it was removed starts over.</item>
+        <item quantity="other">Off the list as if they were never removed: suggested again, and how often they were removed starts over.</item>
+    </plurals>
     <!-- Learned words list, Delete dialog (single and batch): shown only when a selected word is in Android's personal dictionary; ticked by default -->
     <string name="learned_words_delete_also_personal">Also delete them from your device\'s personal dictionary</string>
     <!-- the same dialog, with that box unticked -->

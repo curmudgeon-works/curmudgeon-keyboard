@@ -179,9 +179,9 @@ fun LearnedWordsScreen(onClickBack: () -> Unit, script: String, blacklisted: Boo
         }
     }
     @Composable
-    fun DeleteContent(message: Int, items: List<Item>) {
+    fun DeleteContent(message: String, items: List<Item>) {
         Column {
-            Text(stringResource(message))
+            Text(message)
             if (asksAboutPersonalDictionary(items)) {
                 androidx.compose.foundation.layout.Row(
                     Modifier.padding(top = 8.dp).clickable { alsoPersonal = !alsoPersonal },
@@ -250,8 +250,8 @@ fun LearnedWordsScreen(onClickBack: () -> Unit, script: String, blacklisted: Boo
             onDismissRequest = { selected = null },
             onConfirmed = { run(listOf(item)) },
             title = { Text(item.entry.word) },
-            content = { DeleteContent(if (item.kind == Kind.YOURS) R.string.learned_words_delete_message
-                else R.string.learned_words_unblacklist_message, listOf(item)) },
+            content = { DeleteContent(stringResource(if (item.kind == Kind.YOURS) R.string.learned_words_delete_message
+                else R.string.learned_words_unblacklist_message), listOf(item)) },
             confirmButtonText = stringResource(R.string.delete),
         )
     }
@@ -264,8 +264,9 @@ fun LearnedWordsScreen(onClickBack: () -> Unit, script: String, blacklisted: Boo
                 if (listEntries.all { it.key in picked }) askDeleteAll = true else run(pickedItems())
             },
             title = { Text(pluralStringResource(R.plurals.learned_words_delete_selected, n, n)) },
-            content = { DeleteContent(if (blacklisted) R.string.learned_words_unblacklist_message
-                else R.string.learned_words_delete_message, pickedItems()) },
+            // (plural wording, review L4.3)
+            content = { DeleteContent(pluralStringResource(if (blacklisted) R.plurals.learned_words_unblacklist_message_batch
+                else R.plurals.learned_words_delete_message_batch, n, n), pickedItems()) },
             confirmButtonText = stringResource(R.string.delete),
         )
     }
@@ -276,7 +277,7 @@ fun LearnedWordsScreen(onClickBack: () -> Unit, script: String, blacklisted: Boo
             onDismissRequest = { askDeleteAll = false },
             onConfirmed = { run(pickedItems()) },
             title = { Text(pluralStringResource(R.plurals.learned_words_delete_all_title, n, n, list, scriptName(script))) },
-            content = { DeleteContent(R.string.learned_words_delete_all_message, pickedItems()) },
+            content = { DeleteContent(stringResource(R.string.learned_words_delete_all_message), pickedItems()) },
             confirmButtonText = stringResource(R.string.learned_words_delete_all_button),
         )
     }
