@@ -156,4 +156,61 @@ class PartialRestoreItemsTest {
         assertEquals(1, AppearanceLooks.load(real).size)
         fonts.deleteRecursively()
     }
+
+    /** A backup holding only Layout "Work": long press at its default (not picked), remembering [remembered] ms. */
+    private fun backupWorkRemembering(remembered: Int) {
+        val work = JSONObject().put("name", "Work").put("values", JSONObject()
+            .put(Settings.PREF_KEY_LONGPRESS_TIMEOUT, JSONObject().put("d", true).put("v", JSONObject().put("i", remembered))))
+        ZipOutputStream(zip.outputStream()).use { z ->
+            z.putNextEntry(ZipEntry("preferences.json"))
+            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to keyboard.toPref(),
+                LayoutPresets.PREF to JSONArray(listOf(work)).toString(), LayoutPresets.PREF_SELECTED to "Work",
+                helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
+                helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
+            z.closeEntry()
+        }
+    }
+    private fun phoneWorkRemembering(remembered: Int) = LayoutPresets.save(real, listOf(LayoutPresets.Preset("Work",
+        mapOf(Settings.PREF_KEY_LONGPRESS_TIMEOUT to null), remembered = mapOf(Settings.PREF_KEY_LONGPRESS_TIMEOUT to remembered))))
+
+    // review C6 2026-10-11: two items both at the default but remembering different values apply differently with
+    // "Saved items take new defaults" off, so they are not the same content
+    @Test fun `a Layout remembering another value for an unpicked setting comes in numbered`() {
+        phoneWorkRemembering(150)
+        backupWorkRemembering(300)
+        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true)
+        val layouts = LayoutPresets.load(real)
+        assertEquals(listOf("Work", "Work 2"), layouts.map { it.name })
+        assertEquals(150, (layouts[0].remembered[Settings.PREF_KEY_LONGPRESS_TIMEOUT] as Number).toInt())
+        assertEquals(300, (layouts[1].remembered[Settings.PREF_KEY_LONGPRESS_TIMEOUT] as Number).toInt())
+        assertEquals("Work 2", ownChoice(LayoutPresets.PREF_SELECTED))
+    }
+
+    @Test fun `a Layout remembering the same value is the phone's`() {
+        phoneWorkRemembering(300)
+        backupWorkRemembering(300)
+        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true)
+        assertEquals(listOf("Work"), LayoutPresets.load(real).map { it.name })
+        assertEquals("Work", ownChoice(LayoutPresets.PREF_SELECTED))
+    }
+
+    @Test fun `a theme remembering another value for an unpicked setting comes in numbered`() {
+        AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Sunset", mapOf(Settings.PREF_KEY_HORIZONTAL_GAP to null),
+            mapOf(Settings.PREF_KEY_HORIZONTAL_GAP to 1f))), now = true)
+        ZipOutputStream(zip.outputStream()).use { z ->
+            z.putNextEntry(ZipEntry("preferences.json"))
+            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to keyboard.toPref(),
+                AppearanceLooks.PREF to JSONArray(listOf(JSONObject().put("name", "Sunset").put("values", JSONObject()
+                    .put(Settings.PREF_KEY_HORIZONTAL_GAP, JSONObject().put("d", true).put("v", JSONObject().put("f", 3.0)))))).toString(),
+                AppearanceLooks.PREF_SELECTED to "Sunset",
+                helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
+                helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
+            z.closeEntry()
+        }
+        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true)
+        assertEquals(listOf("Sunset", "Sunset 2"), AppearanceLooks.load(real).map { it.name })
+        assertEquals("Sunset 2", ownChoice(AppearanceLooks.PREF_SELECTED))
+        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true) // (again: nothing new)
+        assertEquals(2, AppearanceLooks.load(real).size)
+    }
 }

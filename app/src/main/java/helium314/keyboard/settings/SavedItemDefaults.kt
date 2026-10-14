@@ -140,6 +140,18 @@ object SavedItemDefaults {
         if (changed) AppearanceLooks.reload(ctx)
     }
 
+    /** Whether two saved items hold the same (review C6 2026-10-11): the same settings, each picked alike, and each
+     *  one both leave unpicked (null) remembered alike, as with the switch off they apply that (Preset / Look equals
+     *  leave the remembered out: list identity). None remembered is
+     *  today's default, as [applied] gives then (an item from before [rememberToday] matches its migrated copy). */
+    fun sameContent(values: Map<String, Any?>, remembered: Map<String, Any>,
+                    otherValues: Map<String, Any?>, otherRemembered: Map<String, Any>): Boolean =
+        values.keys == otherValues.keys && values.all { (key, value) ->
+            val other = otherValues[key]
+            if (value == null && other == null) KnownDefaults.same(key, remembered[key], otherRemembered[key])
+            else value != null && other != null && KnownDefaults.same(key, value, other)
+        }
+
     /** Set once [rememberToday] ran. */
     const val REMEMBERED_DONE = "saved_item_defaults_remembered_done"
 

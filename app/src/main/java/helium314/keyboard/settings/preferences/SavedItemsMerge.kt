@@ -9,6 +9,7 @@ import helium314.keyboard.latin.utils.KeyPopupOverrides
 import helium314.keyboard.latin.utils.LayoutType
 import helium314.keyboard.settings.AppearanceLooks
 import helium314.keyboard.settings.LayoutPresets
+import helium314.keyboard.settings.SavedItemDefaults
 
 /**
  * Restoring some keyboards brings in the backup's saved items (owner 2026-10-11: "partial restore -- keep everything
@@ -103,7 +104,8 @@ internal object SavedItemsMerge {
                 (backup[key] as? String)?.let { putString(key, it) }
         }
         try {
-            // popup sets: by everything but the name
+            // popup sets: by everything but the name (a field at its default keeps its remembered value in place, so
+            // that is compared too)
             fun content(s: KeyPopupOverrides.UserSet) = listOf(s.morePopups, s.symbolsLayout, s.overrides, s.symbolMap, s.popupOrder, s.atDefault)
             val phoneSets = KeyPopupOverrides.loadSets(real).toMutableList()
             val setNames = HashMap<String, String>()
@@ -118,7 +120,7 @@ internal object SavedItemsMerge {
             }
             KeyPopupOverrides.saveSets(real, phoneSets)
 
-            // Layouts: their popup set and custom key layouts named as on the phone now, then by content (values)
+            // Layouts: their popup set and custom key layouts named as on the phone now, then by content (values, and the remembered ones: SavedItemDefaults.sameContent)
             val builtInLayouts = LayoutPresets.builtIn(ctx).map { it.name }.toSet()
             val phoneLayouts = LayoutPresets.load(real).toMutableList()
             val layoutNames = HashMap<String, String>()
@@ -128,7 +130,7 @@ internal object SavedItemsMerge {
                 val values = renamedKeyLayouts(preset.values, keyLayouts)
                     .filter { (key, value) -> key != KeyPopupOverrides.PREF_SELECTED_SET || value !in setsNotBrought }.mapValues { (key, value) ->
                     if (key == KeyPopupOverrides.PREF_SELECTED_SET) (value as? String)?.let { setNames[it] ?: it } else value }
-                phoneLayouts.firstOrNull { it.values == values }?.let { layoutNames[preset.name] = it.name; continue }
+                phoneLayouts.firstOrNull { SavedItemDefaults.sameContent(it.values, it.remembered, values, preset.remembered) }?.let { layoutNames[preset.name] = it.name; continue }
                 val taken = phoneLayouts.map { it.name }.toSet() + builtInLayouts
                 if (preset.name in taken && !asCopies) { layoutsNotBrought += preset.name; continue }
                 val name = freeName(preset.name, taken)
@@ -137,7 +139,7 @@ internal object SavedItemsMerge {
             }
             LayoutPresets.save(real, phoneLayouts)
 
-            // themes, by content (values)
+            // themes, by content (values and remembered, likewise)
             val builtInThemes = AppearanceLooks.builtIn(ctx).map { it.name }.toSet()
             val phoneThemes = AppearanceLooks.load(real).toMutableList()
             val themeNames = HashMap<String, String>()
@@ -150,7 +152,7 @@ internal object SavedItemsMerge {
                 // (its fonts, pictures and kept palettes named as they came in, before it's compared)
                 val look = AppearanceLooks.Look(backupLook.name,
                     RestoredCustomCopies.renamePalettes(renamedFiles(backupLook.values, fonts, pictures), palettes), backupLook.remembered)
-                phoneThemes.firstOrNull { it.values == look.values }?.let { themeNames[look.name] = it.name; continue }
+                phoneThemes.firstOrNull { SavedItemDefaults.sameContent(it.values, it.remembered, look.values, look.remembered) }?.let { themeNames[look.name] = it.name; continue }
                 val taken = phoneThemes.map { it.name }.toSet() + builtInThemes
                 if (look.name in taken && !asCopies) { themesNotBrought += look.name; continue }
                 val name = freeName(look.name, taken)
