@@ -101,37 +101,70 @@ fun keyboardName(keyboard: SettingsSubtype, ctx: Context): String =
     customKeyboardName(keyboard) ?: (listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)).joinToString(" + ") { it.localizedDisplayName(ctx.resources) } +
         (keyboard.getExtraValueOf(helium314.keyboard.latin.common.Constants.Subtype.ExtraValue.KEYBOARD_COPY)?.let { " ($it)" } ?: "")
 
-/** The enabled keyboards, in the Keyboards screen's order, that use a saved item (a Layout, theme, popup set or font)
- *  through [keys] ([helium314.keyboard.latin.settings.KeyboardProfiles.keyboardsUsing]): the ones its delete warning names. */
+/** [keyboards] as the update and delete questions name them: a switched-off one "<name> (switched off)". */
+fun userNames(ctx: Context, keyboards: List<SettingsSubtype>): List<String> {
+    val enabled = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.toSet()
+    return keyboards.map { if (it in enabled) keyboardName(it, ctx) else ctx.getString(R.string.keyboard_switched_off, keyboardName(it, ctx)) }
+}
+
+/** The keyboards, in the Keyboards screen's order, that use a saved item (a Layout, theme, popup set or font) through
+ *  [keys] ([helium314.keyboard.latin.settings.KeyboardProfiles.keyboardsUsing]), then the switched-off ones
+ *  ([switchedOffUsing]): the ones its delete warning names. */
 fun keyboardsUsing(ctx: Context, keys: Collection<String>, edited: SettingsSubtype? = null,
                    matches: (key: String, value: String?) -> Boolean): List<SettingsSubtype> {
     // [edited]: the keyboard the screen edits, which reads the set being edited whatever identity it has now
     val editingId = helium314.keyboard.latin.settings.KeyboardProfiles.editingId(ctx)
     return helium314.keyboard.latin.settings.KeyboardProfiles.keyboardsUsing(ctx.realPrefs(),
         SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }, keys,
-        edited?.takeIf { editingId != helium314.keyboard.latin.settings.KeyboardProfiles.SHARED }?.let { it to editingId }, matches)
+        edited?.takeIf { editingId != helium314.keyboard.latin.settings.KeyboardProfiles.SHARED }?.let { it to editingId }, matches) +
+        switchedOffUsing(ctx, keys, edited, matches)
 }
 
-/** The other keyboards whose chosen saved item under [key] is [name], for the update dialog's ticks (2026-10-11): none
- *  with one set of settings, or with [group]'s menu shared (every keyboard already has the change). */
-fun otherUsers(ctx: Context, key: String, name: String, edited: SettingsSubtype,
-               group: helium314.keyboard.latin.settings.KeyboardProfiles.Group): List<SettingsSubtype> {
+/** The keyboards switched off on the Languages screen (an id of their own, not enabled) whose own set chose a saved
+ *  item through [keys], whether or not separate settings is on (owner 2026-10-11: switched-off keyboards are asked
+ *  too): their own set's choice only, one following the shared choice reads what the enabled ones read. Not the set
+ *  being edited, nor [edited]. */
+fun switchedOffUsing(ctx: Context, keys: Collection<String>, edited: SettingsSubtype? = null,
+                     matches: (key: String, value: String?) -> Boolean): List<SettingsSubtype> {
     val real = ctx.realPrefs()
-    if (!helium314.keyboard.latin.settings.KeyboardProfiles.isSeparate(real)
-        || helium314.keyboard.latin.settings.KeyboardProfiles.isShared(real, group)) return emptyList()
-    return keyboardsUsing(ctx, listOf(key), edited) { _, value -> value == name }.filter { it != edited }
+    val editingId = helium314.keyboard.latin.settings.KeyboardProfiles.editingId(ctx)
+    val enabled = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.toSet()
+    return helium314.keyboard.latin.settings.KeyboardProfiles.idEntries(real).mapNotNull { (pref, id) ->
+        if (id == helium314.keyboard.latin.settings.KeyboardProfiles.SHARED || id == editingId) return@mapNotNull null
+        val keyboard = pref.toSettingsSubtype()
+        if (keyboard in enabled || keyboard == edited) return@mapNotNull null
+        keyboard.takeIf { keys.any { key -> val own = helium314.keyboard.latin.settings.KeyboardProfiles.ownKey(id, key)
+            real.contains(own) && matches(key, real.getString(own, null)) } }
+    }.distinct()
 }
 
-/** A delete warning's line: plural [id] with the keyboards' names one per line (never "all keyboards", 2026-10-08);
+/** The other keyboards whose chosen saved item through [keys] [matches], for the update dialog's ticks (2026-10-11):
+ *  none with [group]'s menu shared (every keyboard already has the change); with one set of settings (or no keyboard's
+ *  set edited) only the switched-off ones, whose own set keeps its choice (owner 2026-10-11: they are asked too). */
+fun otherUsers(ctx: Context, keys: Collection<String>, edited: SettingsSubtype?,
+               group: helium314.keyboard.latin.settings.KeyboardProfiles.Group, matches: (key: String, value: String?) -> Boolean): List<SettingsSubtype> {
+    val real = ctx.realPrefs()
+    if (helium314.keyboard.latin.settings.KeyboardProfiles.isShared(real, group)) return emptyList()
+    if (!helium314.keyboard.latin.settings.KeyboardProfiles.isSeparate(real) || edited == null) return switchedOffUsing(ctx, keys, edited, matches)
+    return keyboardsUsing(ctx, keys, edited, matches).filter { it != edited }
+}
+
+/** [otherUsers] of the saved item [name] chosen under [key]. */
+fun otherUsers(ctx: Context, key: String, name: String, edited: SettingsSubtype?,
+               group: helium314.keyboard.latin.settings.KeyboardProfiles.Group): List<SettingsSubtype> =
+    otherUsers(ctx, listOf(key), edited, group) { _, value -> value == name }
+
+/** A delete warning's line: plural [id] with the keyboards' [names] one per line (never "all keyboards", 2026-10-08);
  *  null when no keyboard uses the item (the title alone). */
-fun keepersText(ctx: Context, @androidx.annotation.PluralsRes id: Int, keyboards: List<SettingsSubtype>): String? =
+fun keepersText(ctx: Context, @androidx.annotation.PluralsRes id: Int, keyboards: List<SettingsSubtype>,
+                names: List<String> = keyboards.map { keyboardName(it, ctx) }): String? =
     if (keyboards.isEmpty()) null
-    else ctx.resources.getQuantityString(id, keyboards.size, keyboards.joinToString("\n") { keyboardName(it, ctx) })
+    else ctx.resources.getQuantityString(id, keyboards.size, names.joinToString("\n"))
 
 /** The delete warning of a saved item chosen by name under [key] (Layout, theme, popup set). */
 fun deleteKeepersText(ctx: Context, @androidx.annotation.PluralsRes id: Int, key: String, name: String,
                       edited: SettingsSubtype? = null): String? =
-    keepersText(ctx, id, keyboardsUsing(ctx, listOf(key), edited) { _, value -> value == name })
+    keyboardsUsing(ctx, listOf(key), edited) { _, value -> value == name }.let { keepersText(ctx, id, it, userNames(ctx, it)) }
 
 /** The sections of one keyboard's settings, as menu entries. Used by the keyboard's own screen and inline under the keyboards list.
  *  [setId]: the keyboard set the opened screens edit, asked at the tap (null: this screen's own, see KeyboardScopeContext). */

@@ -14,7 +14,7 @@ import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.AppearanceDraft
 import helium314.keyboard.settings.screens.keyboardName
-import helium314.keyboard.settings.screens.paletteUserNames
+import helium314.keyboard.settings.screens.userNames
 import helium314.keyboard.settings.screens.paletteUsers
 import helium314.keyboard.settings.screens.withKeyboardName
 import org.junit.After
@@ -66,7 +66,7 @@ class ReReview2PaletteOffTest {
     private fun keepOld(users: List<SettingsSubtype>) = KeyboardTheme.keepOldPalette(real, "Warm", "Warm", mapOf(warm to "old"), users, emptyList())
 
     @Test fun `the update question names a switched-off keyboard whose own set chose the palette`() {
-        assertEquals(listOf(offName()), paletteUserNames(ctx, users()))
+        assertEquals(listOf(offName()), userNames(ctx, users()))
     }
 
     @Test fun `left unticked, the switched-off keyboard keeps the old colours as a kept copy`() {
@@ -79,7 +79,7 @@ class ReReview2PaletteOffTest {
 
     @Test fun `with one set of settings it is named too, and its own choice keeps the old colours`() {
         real.edit { putBoolean("separate_settings_per_keyboard", false) }
-        assertEquals(listOf(offName()), paletteUserNames(ctx, users()))
+        assertEquals(listOf(offName()), userNames(ctx, users()))
         keepOld(users())
         assertTrue(KeyboardTheme.isHiddenPalette(real.getString(bChoice, null)!!))
     }

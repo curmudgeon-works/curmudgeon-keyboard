@@ -207,7 +207,9 @@ object LayoutPresets {
         // (one without a set of its own yet reads the shared set, so it was listed: it gets its set now, as opening its
         // settings gives one, then the change; before, it was skipped; review 2026-10-11 C8)
         val id = KeyboardProfiles.idFor(real, keyboard)
-        val view = helium314.keyboard.latin.settings.ProfilePreferences(real) { id }
+        // (its own set, with one set of settings too: a switched-off keyboard is asked by its own choice; owner
+        // 2026-10-11)
+        val view = helium314.keyboard.latin.settings.ProfilePreferences(real, ownSet = true) { id }
         applySettings(ctx, settingsFor(keyboard, preset, SavedItemDefaults.takeNewDefaults(real)), view)
         view.edit { putString(PREF_SELECTED, preset.name) }
         CustomLabels.clear(view, CustomLabels.Kind.LAYOUT)

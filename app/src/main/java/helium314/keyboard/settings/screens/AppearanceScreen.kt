@@ -755,10 +755,10 @@ private fun SavedLooksPreference(setting: Setting) {
     toUpdate?.let { look ->
         val edited = remember(look) { helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(ctx.realPrefs(),
             helium314.keyboard.settings.PrefsDraft.currentSetId(ctx)) }
-        val others = remember(look) { if (edited == null) emptyList() else otherUsers(ctx, AppearanceLooks.PREF_SELECTED, look.name,
+        val others = remember(look) { otherUsers(ctx, AppearanceLooks.PREF_SELECTED, look.name,
             edited, helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE) }
         val sameAs = remember(look) { looks.firstOrNull { it !== look && differs[it] == false }?.name }
-        helium314.keyboard.settings.dialogs.UpdateSavedItemDialog(look.name, others.map { keyboardName(it, ctx) }, sameAs,
+        helium314.keyboard.settings.dialogs.UpdateSavedItemDialog(look.name, userNames(ctx, others), sameAs,
             onDismissRequest = { toUpdate = null },
         ) { ticked ->
             val updated = AppearanceLooks.saved(ctx, look.name, chosen)

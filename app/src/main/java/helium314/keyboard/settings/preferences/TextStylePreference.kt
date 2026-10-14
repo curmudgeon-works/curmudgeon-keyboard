@@ -525,24 +525,15 @@ internal fun fontUsers(ctx: Context, name: String): List<String> {
     val value = FontLibrary.PREFIX + name
     val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
     val edited = helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(real, helium314.keyboard.settings.PrefsDraft.currentSetId(ctx))
-    val keyboards = helium314.keyboard.settings.screens.keyboardsUsing(ctx, FontLibrary.fontPrefs, edited) { _, v -> v == value }
-        .map { helium314.keyboard.settings.screens.keyboardName(it, ctx) }
     // (review 2026-10-11 S6: a keyboard switched off on the Languages screen keeps its id and own set, and the delete
-    // resets that set too; named whether or not separate settings is on, as enabled keyboards' hidden sets are. A set
-    // no keyboard maps to: nothing to name)
-    val enabled = helium314.keyboard.latin.utils.SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.toSet()
-    val switchedOff = helium314.keyboard.latin.settings.KeyboardProfiles.idEntries(real).mapNotNull { (pref, id) ->
-        if (id == helium314.keyboard.latin.settings.KeyboardProfiles.SHARED) return@mapNotNull null
-        val keyboard = pref.toSettingsSubtype()
-        if (keyboard in enabled) return@mapNotNull null
-        if (FontLibrary.fontPrefs.none { real.getString(helium314.keyboard.latin.settings.KeyboardProfiles.ownKey(id, it), null) == value })
-            return@mapNotNull null
-        ctx.getString(R.string.keyboard_switched_off, helium314.keyboard.settings.screens.keyboardName(keyboard, ctx))
-    }.distinct()
+    // resets that set too: the wrapper names it last, whether or not separate settings is on, as enabled keyboards'
+    // hidden sets are. A set no keyboard maps to: nothing to name)
+    val keyboards = helium314.keyboard.settings.screens.userNames(ctx,
+        helium314.keyboard.settings.screens.keyboardsUsing(ctx, FontLibrary.fontPrefs, edited) { _, v -> v == value })
     val themes = helium314.keyboard.settings.AppearanceLooks.load(real)
         .filter { look -> FontLibrary.fontPrefs.any { look.values[it] == value } }
         .map { ctx.getString(R.string.font_delete_theme, it.name) }
-    return keyboards + switchedOff + themes
+    return keyboards + themes
 }
 
 /**

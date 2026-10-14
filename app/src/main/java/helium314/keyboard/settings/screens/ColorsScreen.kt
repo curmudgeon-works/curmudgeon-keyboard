@@ -98,26 +98,12 @@ internal fun paletteUsers(ctx: Context, prefs: SharedPreferences, openedName: St
     val editingId = helium314.keyboard.settings.PrefsDraft.currentSetId(ctx)
     val edited = helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(real, editingId)
     // (one without a set of its own yet reads the shared set: listed too, its set comes when it's left unticked
-    // and keeps the old colours; before, it was left out and took the new ones unasked; review 2026-10-11 C8)
-    val keyboards = if (edited == null) emptyList() else keyboardsUsing(ctx, choices, edited) { _, v -> v in names }.filter { it != edited }
+    // and keeps the old colours; before, it was left out and took the new ones unasked; review 2026-10-11 C8. The
+    // switched-off ones whose own set chose it come last, whether or not separate settings is on: owner 2026-10-11,
+    // one switched off on the Languages screen keeps its id and own set, which took the new colours unasked)
+    val keyboards = otherUsers(ctx, choices, edited, helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE) { _, v -> v in names }
         .filter { kb -> val id = helium314.keyboard.latin.settings.KeyboardProfiles.anyIdIn(real.all, kb); id == null || !ownCopy(id) }
-    // (owner 2026-10-11: switched-off keyboards are asked too; one switched off on the Languages screen keeps its id
-    // and own set, which took the new colours unasked. Its own set's choice only, whether or not separate settings is
-    // on, as the font delete warning)
-    val enabled = helium314.keyboard.latin.utils.SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.toSet()
-    val switchedOff = helium314.keyboard.latin.settings.KeyboardProfiles.idEntries(real).mapNotNull { (pref, id) ->
-        if (id == helium314.keyboard.latin.settings.KeyboardProfiles.SHARED || id == editingId || ownCopy(id)) return@mapNotNull null
-        val keyboard = pref.toSettingsSubtype()
-        if (keyboard in enabled || keyboard == edited) return@mapNotNull null
-        keyboard.takeIf { choices.any { real.getString(helium314.keyboard.latin.settings.KeyboardProfiles.ownKey(id, it), null) in names } }
-    }.distinct()
-    return keyboards + switchedOff to themes
-}
-
-/** [paletteUsers]' keyboards as the update dialog names them: a switched-off one "<name> (switched off)". */
-internal fun paletteUserNames(ctx: Context, keyboards: List<helium314.keyboard.latin.settings.SettingsSubtype>): List<String> {
-    val enabled = helium314.keyboard.latin.utils.SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.toSet()
-    return keyboards.map { if (it in enabled) keyboardName(it, ctx) else ctx.getString(R.string.keyboard_switched_off, keyboardName(it, ctx)) }
+    return keyboards to themes
 }
 
 @Composable
@@ -351,7 +337,7 @@ fun ColorsScreen(
     if (askUpdate) {
         val (keyboards, themes) = remember { paletteUsers() }
         helium314.keyboard.settings.dialogs.UpdateSavedItemDialog(KeyboardTheme.paletteName(ctx, newThemeName.text),
-            paletteUserNames(ctx, keyboards) + themes.map { ctx.getString(R.string.update_item_theme, it) }, null,
+            userNames(ctx, keyboards) + themes.map { ctx.getString(R.string.update_item_theme, it) }, null,
             onDismissRequest = { askUpdate = false },
         ) { ticked ->
             val real = ctx.realPrefs()

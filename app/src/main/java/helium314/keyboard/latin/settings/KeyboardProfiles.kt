@@ -860,9 +860,12 @@ object KeyboardProfiles {
 /**
  * The preferences every part of the app talks to. Reads and writes are redirected to the active profile's keys
  * when separate settings are on; listeners get the un-prefixed key names. [activeId] is looked up on every call.
+ * [ownSet]: the profile's own keys with one set of settings too (an update reaching a switched-off keyboard's set).
  */
-class ProfilePreferences(private val real: SharedPreferences, private val activeId: () -> Int) : SharedPreferences {
-    private fun id() = if (KeyboardProfiles.isSeparate(real)) activeId() else KeyboardProfiles.SHARED
+class ProfilePreferences(private val real: SharedPreferences, private val ownSet: Boolean,
+                         private val activeId: () -> Int) : SharedPreferences {
+    constructor(real: SharedPreferences, activeId: () -> Int) : this(real, false, activeId)
+    private fun id() = if (ownSet || KeyboardProfiles.isSeparate(real)) activeId() else KeyboardProfiles.SHARED
     private fun k(key: String) = KeyboardProfiles.prefixedKey(id(), key)
     // a profile key that was never written falls back to the shared value, so a half-copied set still behaves
     private fun has(key: String) = real.contains(k(key))
