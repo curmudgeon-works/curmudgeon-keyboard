@@ -1276,17 +1276,20 @@ private fun underRestoreGate(ctx: Context, work: () -> Unit) {
     } finally {
         val filesDir = ctx.filesDir
         // the blacklists the keyboard holds read the restored files; the changes made on them meanwhile are taken off
-        // them first, to be made again by keyboard below (still gated: a strike meanwhile stays pending too)
+        // them first, to be made again by keyboard below, in one step with the read (round-5 review B2, 20261013_L8:
+        // no change between the two; still gated: a strike after it is made on the restored list, kept pending)
         val gated = ArrayList<Pair<RemovedWords.WordListFile, List<RemovedWords.GatedOp>>>()
         if (filesDir != null) for (list in RemovedWords.cachedIn(filesDir))
             try {
-                list.takeGated().takeIf { it.isNotEmpty() }?.let { gated.add(list to it) }
-                list.reload()
+                list.takeGatedAndReload().takeIf { it.isNotEmpty() }?.let { gated.add(list to it) }
             } catch (t: Throwable) { Log.w("AdvancedScreen", "error reading a blacklist after restore", t) }
         // the swipe statistics read the restored settings at their next use (what they held is the old device's, never
         // written while gated)
         helium314.keyboard.latin.gesture.GestureStats.reload()
         RestoreGate.end()
+        // the changes recorded since a list's read are on the restored list already: dropped, never made again (they
+        // stayed and the next full restore made them again, 20261013_L8)
+        RemovedWords.dropGatedOps()
         if (filesDir != null && gated.isNotEmpty())
             try { redoBlacklistChanges(ctx, filesDir, poolsBefore, gated) }
             catch (t: Throwable) { Log.w("AdvancedScreen", "error making the blacklist changes again after restore", t) }

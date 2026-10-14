@@ -212,6 +212,46 @@ class FullRestoreRaceTest {
         assertEquals(setOf("backupword"), list.entries().keys, "the keyboard's list isn't the restored one")
     }
 
+    /**
+     * Round-5 review B2, 20261013_L8: a Remove after the restore re-read a list but before the gate went (here while the
+     * restore waits to drop the swipe statistics) is made on the restored list and written with it. Fail before: it
+     * stayed recorded as a restore change, and the next full restore made it again ("late" back on a backup without it).
+     */
+    @Test fun `a strike after a list's re-read, before the gate goes - written once, never made again by the next full restore`() {
+        backup(blacklist = "backupword\n")
+        val file = LearnedStores.blacklistFile(ctx.filesDir, "Latn", LearnedStores.SHARED)
+        file.parentFile!!.mkdirs()
+        file.writeText("oldword\n")
+        val list = RemovedWords.forFile(file)
+        list.reload() // (the keyboard holds the device's list, read)
+        val holding = CountDownLatch(1)
+        var struck = false
+        FullRestore.afterStep = { step ->
+            if (step == BLACKLIST) {
+                // the restore's drop of the swipe statistics waits (its lock held) until the Remove, made once the list
+                // reads the restored file
+                Thread {
+                    synchronized(GestureStats) {
+                        holding.countDown()
+                        val until = System.currentTimeMillis() + 10_000
+                        while (!list.contains("backupword") && System.currentTimeMillis() < until) Thread.sleep(1)
+                        if (RestoreGate.isSet && list.contains("backupword")) { list.strike("late"); struck = true }
+                    }
+                }.start()
+                holding.await()
+            }
+        }
+        restoreEverythingFrom(ctx, zip)
+        assertTrue(struck, "the Remove didn't come between the list's re-read and the gate's end")
+        assertEquals(setOf("backupword", "late"), file.readLines().filter { it.isNotEmpty() }.toSet(), "the Remove on the restored list, written")
+        // the next full restore, of a backup without it
+        FullRestore.afterStep = null
+        backup(blacklist = "backupword\n")
+        restoreEverythingFrom(ctx, zip)
+        assertEquals(setOf("backupword"), file.readLines().filter { it.isNotEmpty() }.toSet(), "the earlier restore's Remove was made again")
+        assertEquals(setOf("backupword"), list.entries().keys)
+    }
+
     @Test fun `the swipe statistics after a full restore are the backup's, not the old ones in memory`() {
         GestureStats.prefsProvider = { real }
         real.edit().putString(GestureStats.PREF_KEY, "{\"oldtuning\":{\"n\":40,\"kept\":30}}").commit()

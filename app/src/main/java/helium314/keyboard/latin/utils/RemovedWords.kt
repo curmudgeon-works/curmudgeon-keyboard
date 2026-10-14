@@ -67,6 +67,12 @@ object RemovedWords {
      *  again after the restore; the files written here are replaced by the restore. */
     fun writeAllPending() { for (list in lists.values) list.writePending() }
 
+    /** A full restore's end, after RestoreGate.end(): the changes recorded since each list's re-read
+     *  ([WordListFile.takeGatedAndReload]) were made on the restored list already (and are written with it): dropped,
+     *  never made again (round-5 review B2, 20261013_L8: they stayed recorded and the next full restore made them again,
+     *  an extra strike). */
+    fun dropGatedOps() { for (list in lists.values) list.dropGated() }
+
     // ------------------------------- the rule -------------------------------
 
     /** A removed word: removed [strikes] times; [confirmed]: brought back with the strip's "+" (3rd strike). */
@@ -314,6 +320,19 @@ object RemovedWords {
             for (op in ops) for (w in setOf(op.word, op.word.lowercase())) { pending.remove(w); strikesWhileLoading.remove(w); allowsWhileLoading.remove(w) }
             ops
         }
+
+        /** [takeGated] and the file read again in one step under the list's lock, after what's being written (call off
+         *  the main thread): no change can come between the two (round-5 review B2, 20261013_L8: a strike between them
+         *  counted on from the old list and the read put that count on top of the restored file). A change made after
+         *  it is made on the restored list. */
+        fun takeGatedAndReload(): List<GatedOp> = io.submit<List<GatedOp>> {
+            // (as [read]: the migration waited for outside the lock)
+            LearnedStoreMigration.awaitDone()
+            synchronized(lock) { takeGated().also { readNow() } }
+        }.get()
+
+        /** The changes recorded while a full restore ran, dropped ([dropGatedOps]). */
+        internal fun dropGated() { synchronized(lock) { gatedOps.clear() } }
 
         /** [ops] made on this list (read first), as made: a strike is one more on the count it has here. Call off the
          *  main thread. */
