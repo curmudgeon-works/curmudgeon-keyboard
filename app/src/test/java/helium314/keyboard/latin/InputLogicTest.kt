@@ -433,6 +433,22 @@ class InputLogicTest {
         assertFalse(unlearnedWords.any { it.equals("hi", ignoreCase = true) }, "unlearned: $unlearnedWords")
     }
 
+    // review 2026-10-08 area 3 #5: a word picked in the strip or swiped stayed in the address run (the space after it
+    // is the keyboard's, not typed), and the "@" took a use back from it
+    @Test fun `an address after a picked or swiped word doesn't unlearn that word`() {
+        for (commit in listOf<(String) -> Unit>({ pickSuggestion(it) }, { swipe(it) })) {
+            reset()
+            autospaceOn()
+            commit("hello")
+            unlearnedWords.clear()
+            chainInput("john.smith")
+            assertEquals("hello john. smith", text)
+            inputRewriting('@')
+            assertEquals("hello john.smith@", text)
+            assertFalse(unlearnedWords.any { it.equals("hello", ignoreCase = true) }, "unlearned: $unlearnedWords")
+        }
+    }
+
     @Test fun `full stop auto-space is taken back after a web ending`() {
         reset()
         autospaceOn()

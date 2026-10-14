@@ -3040,8 +3040,10 @@ public final class InputLogic {
                 && !mConnection.textBeforeCursorLooksLikeURL() // adding this check to textBeforeCursorMayBeUrlOrSimilar might not be wanted for word continuation (see effect on unit tests)
                 && !(mConnection.getCodePointBeforeCursor() == Constants.CODE_PERIOD && mConnection.wordBeforeCursorMayBeEmail())
         ) {
-            if (mConnection.getCodePointBeforeCursor() == Constants.CODE_PERIOD && !mConnection.hasSelection())
-                mRunAutoSpaces.add(mConnection.getExpectedSelectionStart());
+            if (mConnection.getCodePointBeforeCursor() == Constants.CODE_PERIOD) {
+                if (!mConnection.hasSelection()) mRunAutoSpaces.add(mConnection.getExpectedSelectionStart());
+            } else resetRun(); // the space after a word picked in the strip or swiped ends the run as a typed space does
+                // (review 2026-10-08 area 3 #5: the word stayed in it, and "name.surname@" then took its uses back)
             mConnection.commitCodePoint(Constants.CODE_SPACE);
             // todo: why not remove phantom space state?
         }
