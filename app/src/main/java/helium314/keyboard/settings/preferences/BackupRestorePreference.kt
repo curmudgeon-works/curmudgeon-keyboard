@@ -1571,6 +1571,24 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, plan: Re
             helium314.keyboard.latin.settings.KeyboardIds.giveNewId(ctx, device).keyboardId?.let { idMap[old] = it }
         }
     }
+    // a backup keyboard added whose Android subtype number a device keyboard's id has too (two ids, one hash; review
+    // 2026-10-12 L1#1: Android would take them for one keyboard) comes in under a fresh id, as giveNewId gives one (none
+    // the device knows, no clashing number); its settings, pictures, priorities, buttons and learned words are written
+    // under the id it gets on the device (onPhone below), as a merge's go to the device keyboard's: backup id -> fresh id
+    val freshIds = HashMap<String, String>()
+    run {
+        val (on, off) = phoneKeyboards(real)
+        val deviceNumbers = (on + off).mapNotNullTo(HashSet()) { kb -> kb.keyboardId?.let { helium314.keyboard.latin.settings.KeyboardIds.androidSubtypeId(it) } }
+        val taken = chosen.mapNotNullTo(ArrayList()) { it.keyboardId }
+        for (keyboard in chosen) {
+            if (decisions[keyboard] is RestoreDecision.Merge) continue
+            val id = keyboard.keyboardId ?: continue
+            if (helium314.keyboard.latin.settings.KeyboardIds.androidSubtypeId(id) !in deviceNumbers) continue
+            val fresh = helium314.keyboard.latin.settings.KeyboardIds.newId(real, taken)
+            taken += fresh
+            freshIds[id] = fresh
+        }
+    }
     // a device keyboard as the dialog had it, as it is now: by its id through the map (its name and key layouts as now)
     fun onDeviceNow(original: SettingsSubtype): SettingsSubtype? {
         val id = original.keyboardId?.let { idMap[it] ?: it } ?: return null
@@ -1636,7 +1654,12 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, plan: Re
     beforeKeyboards()
 
     // one mapping, backup keyboard -> the device keyboard it becomes: merged or added as answered, named as answered
-    val onPhone = chosen.associateWith { keyboard -> RestoreDecision.result(decisions[keyboard], keyboard, nameOf)!! }
+    // (one added under a fresh id, its Android number a device keyboard's: with that id, its came-from as in the backup)
+    val onPhone = chosen.associateWith { keyboard ->
+        val result = RestoreDecision.result(decisions[keyboard], keyboard, nameOf)!!
+        val fresh = if (decisions[keyboard] is RestoreDecision.Merge) null else result.keyboardId?.let { freshIds[it] }
+        if (fresh == null) result else result.withKeyboardId(fresh, result.keyboardFrom).toPref().toSettingsSubtype()
+    }
     // its saved items named as they are called on the device after the restore
     val settings = backupSettings.mapValues { (_, values) -> applied?.renames?.apply(values) ?: values }
     val wasSeparate = KeyboardProfiles.isSeparate(real)
