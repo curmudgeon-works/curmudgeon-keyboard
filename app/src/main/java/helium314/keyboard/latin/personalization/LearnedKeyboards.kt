@@ -410,11 +410,11 @@ object LearnedKeyboards {
 
     // ---------------- factory reset ----------------
 
-    /** A factory reset, before the settings go (background): the update done first; [learnedWords]: every store and every
+    /** A factory reset, before the settings go (background): the update done first; [deleteWords]: every store and every
      *  blacklist deleted (2026-10-10: the blacklists stayed). */
-    fun beforeFactoryReset(context: Context, learnedWords: Boolean) = withFiles {
+    fun beforeFactoryReset(context: Context, deleteWords: Boolean) = withFiles {
         updateOnce(context)
-        if (!learnedWords) return@withFiles
+        if (!deleteWords) return@withFiles
         PersonalizationHelper.removeAllUserHistoryDictionaries(context)
         val dir = File(context.filesDir ?: return@withFiles, LearnedStores.BLACKLIST_DIR)
         deleteLists(dir)
@@ -437,6 +437,40 @@ object LearnedKeyboards {
         val gone = LearnedStores.keyboardPoolsOnDisk(filesDir) - kept
         for (pool in gone) deletePool(filesDir, storeIo, pool)
         Log.i(TAG, "factory reset: ${gone.size} other keyboards' learned words deleted, ${kept.size} kept")
+    }
+
+    /**
+     * A factory reset of the keyboards that keeps the words (owner 2026-10-11: "b. merge into default keyboard's words,
+     * retaining all script-wise lists"), after it (background): the words and blacklists of the keyboards that went are
+     * merged into those of the first of [keyboards] (the list left), every script (as [LearnedImport]: a word's highest
+     * count, a blacklisted word's most strikes); then their entries go, and their files only once all is merged (else the
+     * files stay on disk, read by nobody: never a word lost). Pool 0 (the shared words of before) is never touched.
+     */
+    fun mergeRemovedInto(context: Context, keyboards: List<SettingsSubtype>) = withFiles {
+        val real = DeviceProtectedUtils.getRealSharedPreferences(context)
+        if (!isDone(real)) return@withFiles
+        val first = keyboards.firstOrNull() ?: return@withFiles
+        val keep = keyboards.map { it.toPref() }.toSet()
+        val target = poolFor(real, first) // (a merge: an explicit moment, it may give the keyboard left its pool)
+        val goneEntries = synchronized(this) { poolEntries(real).filterKeys { it !in keep } }
+        val keptPools = synchronized(this) { poolEntries(real).filterKeys { it in keep }.values.toSet() }
+        val gone = goneEntries.values.filter { it != LearnedStores.SHARED && it !in keptPools }.distinct()
+        var complete = true
+        if (gone.isNotEmpty()) {
+            val result = try { LearnedImport.importNow(context, target, gone, gone) }
+                catch (e: Exception) { Log.e(TAG, "factory reset: the removed keyboards' words not merged", e); null }
+            if (result != null) Handler(Looper.getMainLooper()).post { LearnedStores.notifyPoolChanged(target) }
+            complete = result?.complete == true
+        }
+        synchronized(this) {
+            val map = pools(real)
+            goneEntries.keys.forEach { map.remove(it) }
+            real.edit().putString(PREF_POOLS, map.toString()).commit()
+        }
+        val filesDir = context.filesDir ?: return@withFiles
+        if (!complete) { Log.w(TAG, "factory reset: not all of the removed keyboards' words merged, their files kept ($gone)"); return@withFiles }
+        for (pool in gone) deletePool(filesDir, storeIo, pool)
+        Log.i(TAG, "factory reset: ${gone.size} removed keyboards' words merged into pool $target")
     }
 
     /** [pool]'s stores and lists gone. */

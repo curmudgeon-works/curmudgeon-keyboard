@@ -343,12 +343,14 @@
     <!-- Group on the Preferences screen: the backspace key\'s settings -->
     <string name="factory_reset">Factory reset</string>
     <string name="factory_reset_summary">Settings back to how they were at install</string>
-    <string name="factory_reset_message">All settings go back to their defaults. This can\'t be undone. Also reset:</string>
+    <string name="factory_reset_message">All settings go back to their defaults. This can\'t be undone.</string>
+    <!-- (owner 2026-10-11: ticks mean keep; all unticked = full reset) -->
+    <string name="factory_reset_keep">Select items you DON\'T want to reset:</string>
     <string name="factory_reset_keyboards">Keyboards and languages</string>
-    <string name="factory_reset_learned_words">Learned words</string>
+    <string name="factory_reset_learned_words">Learned and blacklisted words</string>
     <string name="factory_reset_clipboard">Clipboard history</string>
-    <string name="factory_reset_custom">Your own layouts, popup layouts, saved themes and Layouts, palettes, added dictionaries, and loaded fonts and pictures</string>
-    <string name="factory_reset_backup_hint">To be able to go back, make a backup first (Backup and restore, above).</string>
+    <string name="factory_reset_custom">Saved layouts &amp; popups, themes &amp; color palettes, added dictionaries, and loaded fonts and pictures</string>
+    <string name="factory_reset_button">Reset</string>
     <string name="factory_reset_done">Reset done</string>
     <string name="backspace_settings">Backspace</string>
     <string name="backspace_hold_deletes_words">Long-press backspace deletes whole words</string>

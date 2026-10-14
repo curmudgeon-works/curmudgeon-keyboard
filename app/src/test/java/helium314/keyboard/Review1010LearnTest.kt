@@ -166,7 +166,7 @@ class Review1010LearnTest {
         ctx.prefs().edit().putInt(priorityKey, LanguagePriority.LOW).commit() // (the first keyboard's set)
         warmCaches(LanguagePriority.LOW)
         var done = false
-        startFactoryReset(ctx, keyboards = true, learnedWords = false, clipboard = false, custom = false) { done = true }
+        startFactoryReset(ctx, helium314.keyboard.settings.preferences.ResetKeep(words = true, clipboard = true, own = true)) { done = true } // (owner 2026-10-11: ticks mean keep; all unticked = full reset)
         idle { done }
         assertTrue(done, "the reset never ran")
         assertFalse(ctx.prefs().contains(priorityKey), "not reset")

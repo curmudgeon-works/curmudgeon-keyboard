@@ -29,6 +29,7 @@ import helium314.keyboard.settings.preferences.RestoreDecision
 import helium314.keyboard.settings.preferences.restoreChosenFrom
 import helium314.keyboard.settings.preferences.restoreEverythingFrom
 import helium314.keyboard.settings.preferences.settingsToJsonStream
+import helium314.keyboard.settings.preferences.ResetKeep
 import helium314.keyboard.settings.preferences.startFactoryReset
 import org.json.JSONArray
 import org.json.JSONObject
@@ -93,9 +94,10 @@ class LearnedKeyboardsResetRestoreTest {
         }
     }
 
-    private fun reset(keyboards: Boolean, learnedWords: Boolean) {
+    // (owner 2026-10-11: ticks mean keep; all unticked = full reset)
+    private fun reset(keepKeyboards: Boolean, keepWords: Boolean) {
         var done = false
-        startFactoryReset(ctx, keyboards = keyboards, learnedWords = learnedWords, clipboard = false, custom = false) { done = true }
+        startFactoryReset(ctx, ResetKeep(keyboards = keepKeyboards, words = keepWords, clipboard = true, own = true)) { done = true }
         idleUntil { done }
         assertTrue(done, "the reset never ran")
     }
@@ -107,23 +109,79 @@ class LearnedKeyboardsResetRestoreTest {
         return SubtypeSettings.getEnabledSubtypes(true).first().toSettingsSubtype()
     }
 
-    @Test fun `a reset of the keyboards - the keyboard left keeps its own words, the others' go, buttons off`() {
+    // (owner 2026-10-11: "b. merge into default keyboard's words, retaining all script-wise lists"; before, the removed
+    // keyboards' words were deleted)
+    @Test fun `a reset of the keyboards keeping the words - the removed keyboards' words and lists join the default keyboard's, every script`() {
+        val kept = defaultKeyboard()
+        val other = available("de-DE")
+        val third = available("fr")
+        useKeyboards(ctx, real, kept, other, third)
+        updatedPhone(mapOf(kept to 5, other to 6, third to 7), next = 9)
+        // a second script on a removed keyboard, and a word on two of them (highest count, most strikes win)
+        io.store(ce, "Cyrl", 6, word("привет", 4, 300))
+        writeList(ce, "Cyrl", 6, "плохо\n")
+        io.store(ce, "Latn", 7, word("phone7", 2, 100), word("phone6", 9, 500))
+        writeList(ce, "Latn", 7, "bad7\nbad6\t3\n")
+
+        reset(keepKeyboards = false, keepWords = true)
+
+        assertEquals(setOf("phone5", "phone6", "phone7"), io.words(ce, "Latn", 5))
+        assertEquals(9, io.read(ce, "Latn", 5)!!.getValue("phone6").first, "the highest count")
+        assertEquals(setOf("привет"), io.words(ce, "Cyrl", 5))
+        val list = readList(ce, "Latn", 5)!!
+        assertEquals(setOf("bad5", "bad6", "bad7"), list.keys)
+        assertEquals(3, list.getValue("bad6").strikes, "the most strikes: $list")
+        assertEquals(setOf("плохо"), readList(ce, "Cyrl", 5)?.keys)
+        for (pool in listOf(6, 7)) {
+            assertFalse(LearnedStores.storeFile(ce, "Latn", pool).exists(), "pool $pool's words are left")
+            assertFalse(File(ce, "${LearnedStores.BLACKLIST_DIR}/k$pool").exists(), "pool $pool's blacklists are left")
+        }
+        assertFalse(LearnedStores.storeFile(ce, "Cyrl", 6).exists())
+        assertEquals(mapOf(kept.toPref() to 5), storedPools(real))
+        for (pref in LearnedKeyboards.buttonPrefs) assertFalse(real.contains(pref), pref)
+        assertTrue(real.getInt(LearnedKeyboards.PREF_POOL_NEXT, 0) >= 9)
+        assertTrue(LearnedKeyboards.isDone(real))
+    }
+
+    @Test fun `a reset of the keyboards keeping the words, the default keyboard new - it gets a pool with all their words`() {
+        val def = defaultKeyboard()
+        val a = available("de-DE"); val b = available("fr")
+        useKeyboards(ctx, real, a, b)
+        updatedPhone(mapOf(a to 5, b to 6), next = 9)
+
+        reset(keepKeyboards = false, keepWords = true)
+
+        val pool = storedPools(real).getValue(def.toPref())
+        assertTrue(pool >= 9, "a fresh pool: $pool")
+        assertEquals(setOf("phone5", "phone6"), io.words(ce, "Latn", pool))
+        assertEquals(setOf("bad5", "bad6"), readList(ce, "Latn", pool)?.keys)
+        assertEquals(setOf(pool), LearnedStores.keyboardPoolsOnDisk(ce), "left: ${LearnedStores.keyboardPoolsOnDisk(ce)}")
+    }
+
+    @Test fun `nothing kept - every keyboard's words and lists go`() {
         val kept = defaultKeyboard()
         val other = available("de-DE")
         useKeyboards(ctx, real, kept, other)
         updatedPhone(mapOf(kept to 5, other to 6), next = 9)
 
-        reset(keyboards = true, learnedWords = false)
+        reset(keepKeyboards = false, keepWords = false)
+
+        assertTrue(LearnedStores.keyboardPoolsOnDisk(ce).isEmpty(), "left: ${LearnedStores.keyboardPoolsOnDisk(ce)}")
+        assertFalse(File(ce, LearnedStores.BLACKLIST_DIR).exists(), "blacklists left: ${snapshot(ce).keys}")
+        assertFalse(other.toPref() in storedPools(real))
+    }
+
+    @Test fun `keyboards and words kept - each keyboard keeps its own, nothing merged`() {
+        val a = available("en-US"); val b = available("de-DE")
+        useKeyboards(ctx, real, a, b)
+        updatedPhone(mapOf(a to 5, b to 6), next = 9)
+
+        reset(keepKeyboards = true, keepWords = true)
 
         assertEquals(setOf("phone5"), io.words(ce, "Latn", 5))
-        assertEquals(mapOf("bad5" to RemovedWords.Entry(1)), readList(ce, "Latn", 5))
-        assertFalse(LearnedStores.storeFile(ce, "Latn", 6).exists(), "the other keyboard's words are left")
-        assertFalse(File(ce, "${LearnedStores.BLACKLIST_DIR}/k6").exists(), "the other keyboard's blacklist is left")
-        assertEquals(5, storedPools(real)[kept.toPref()])
-        assertFalse(other.toPref() in storedPools(real))
-        for (pref in LearnedKeyboards.buttonPrefs) assertFalse(real.contains(pref), pref)
-        assertTrue(real.getInt(LearnedKeyboards.PREF_POOL_NEXT, 0) >= 9)
-        assertTrue(LearnedKeyboards.isDone(real))
+        assertEquals(setOf("phone6"), io.words(ce, "Latn", 6))
+        assertEquals(setOf("bad6"), readList(ce, "Latn", 6)?.keys)
+        assertEquals(mapOf(a.toPref() to 5, b.toPref() to 6), storedPools(real))
     }
 
     @Test fun `a reset of the learned words - every keyboard's words and blacklists go, the pools stay`() {
@@ -132,7 +190,7 @@ class LearnedKeyboardsResetRestoreTest {
         updatedPhone(mapOf(a to 5, b to 6), next = 9)
         writeList(ce, "Latn", 0, "old\n")
 
-        reset(keyboards = false, learnedWords = true)
+        reset(keepKeyboards = true, keepWords = false)
 
         assertTrue(LearnedStores.keyboardPoolsOnDisk(ce).isEmpty(), "left: ${LearnedStores.keyboardPoolsOnDisk(ce)}")
         assertFalse(LearnedStores.storeFile(ce, "Latn", 5).exists())

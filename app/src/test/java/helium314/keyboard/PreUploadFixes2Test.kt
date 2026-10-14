@@ -8,6 +8,7 @@ import helium314.keyboard.settings.AppearanceDraft
 import helium314.keyboard.settings.AppearanceLooks
 import helium314.keyboard.settings.LayoutPresets
 import helium314.keyboard.settings.SettingsDestination
+import helium314.keyboard.settings.preferences.ResetKeep
 import helium314.keyboard.settings.preferences.keptOnReset
 import helium314.keyboard.settings.screens.withKeyboardName
 import org.junit.runner.RunWith
@@ -43,16 +44,17 @@ class PreUploadFixes2Test {
         assertTrue("@xml/data_extraction_rules" in manifest && "@xml/backup_rules" in manifest)
     }
 
-    @Test fun `a factory reset keeps the one-time flags, and your own themes and Layouts unless ticked`() {
+    // (owner 2026-10-11: ticks mean keep; all unticked = full reset)
+    @Test fun `a factory reset keeps the one-time flags, and your own themes and Layouts only ticked`() {
         for (flag in listOf("defaults_look_midnight_done", "key_gap_defaults_migrated", "learning_swiping_global",
                 "suggestions_refine_moved", "settings_picked_only_done"))
-            assertTrue(keptOnReset(flag, keyboards = true, custom = true), flag)
-        assertTrue(keptOnReset(Settings.PREF_VERSION_CODE, keyboards = true, custom = true))
-        assertFalse(keptOnReset("p1/fonts_follow_migrated", keyboards = true, custom = true)) // a keyboard's own: its set goes
-        assertFalse(keptOnReset(Settings.PREF_KEY_HORIZONTAL_GAP, keyboards = false, custom = false))
+            assertTrue(keptOnReset(flag, ResetKeep()), flag)
+        assertTrue(keptOnReset(Settings.PREF_VERSION_CODE, ResetKeep()))
+        assertFalse(keptOnReset("p1/fonts_follow_migrated", ResetKeep())) // a keyboard's own: its set goes
+        assertFalse(keptOnReset(Settings.PREF_KEY_HORIZONTAL_GAP, ResetKeep(keyboards = true, own = true)))
         for (saved in listOf(AppearanceLooks.PREF, LayoutPresets.PREF)) {
-            assertTrue(keptOnReset(saved, keyboards = true, custom = false), saved)
-            assertFalse(keptOnReset(saved, keyboards = true, custom = true), saved)
+            assertTrue(keptOnReset(saved, ResetKeep(own = true)), saved)
+            assertFalse(keptOnReset(saved, ResetKeep()), saved)
         }
     }
 

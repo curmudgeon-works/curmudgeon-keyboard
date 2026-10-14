@@ -114,7 +114,7 @@ fun BackupRestorePreference(setting: Setting) {
     var showDialog by rememberSaveable { mutableStateOf(false) }
     val ctx = LocalContext.current
     var error: String? by rememberSaveable { mutableStateOf(null) }
-    val backupLauncher = backupLauncher { error = it }
+    val backupLauncher = backupLauncher(onError = { error = it })
     var picked: PickedBackup? by remember { mutableStateOf(null) }
     val restoreLauncher = restoreLauncher { picked = it }
     Preference(name = setting.title, onClick = { showDialog = true })
@@ -132,18 +132,7 @@ fun BackupRestorePreference(setting: Setting) {
                     .setType("application/zip")
                 restoreLauncher.launch(intent)
             },
-            onConfirmed = {
-                val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Calendar.getInstance().time)
-                val intent = Intent(Intent.ACTION_CREATE_DOCUMENT)
-                    .addCategory(Intent.CATEGORY_OPENABLE)
-                    .putExtra(
-                        Intent.EXTRA_TITLE,
-                        ctx.getString(R.string.english_ime_name)
-                            .replace(" ", "_") + "_backup_$currentDate.zip"
-                    )
-                    .setType("application/zip")
-                backupLauncher.launch(intent)
-            }
+            onConfirmed = { backupLauncher.launch(backupIntent(ctx)) }
         )
     }
     picked?.let { pick ->
@@ -162,12 +151,23 @@ fun BackupRestorePreference(setting: Setting) {
     }
 }
 
+/** The document picker's request for a new backup file (also the factory reset's Backup, 2026-10-11). */
+internal fun backupIntent(ctx: Context): Intent {
+    val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Calendar.getInstance().time)
+    return Intent(Intent.ACTION_CREATE_DOCUMENT)
+        .addCategory(Intent.CATEGORY_OPENABLE)
+        .putExtra(Intent.EXTRA_TITLE, ctx.getString(R.string.english_ime_name).replace(" ", "_") + "_backup_$currentDate.zip")
+        .setType("application/zip")
+}
+
+/** The picker for [backupIntent], then the backup into the file picked; [onDone]: see [runBackup]. A cancelled pick
+ *  calls nothing. */
 @Composable
-private fun backupLauncher(onError: (String) -> Unit): ManagedActivityResultLauncher<Intent, ActivityResult> {
+internal fun backupLauncher(onError: (String) -> Unit, onDone: (Boolean) -> Unit = {}): ManagedActivityResultLauncher<Intent, ActivityResult> {
     val ctx = LocalContext.current
     return filePicker { uri ->
         val resolver = ctx.getActivity()?.contentResolver ?: return@filePicker
-        runBackup(ctx, onError) { resolver.openOutputStream(uri) }
+        runBackup(ctx, onError, onDone) { resolver.openOutputStream(uri) }
     }
 }
 
@@ -176,12 +176,13 @@ private fun backupLauncher(onError: (String) -> Unit): ManagedActivityResultLaun
  * 2026-10-08 M2, 2026-10-10: the screen thread waited for it, and a touch meanwhile was an ANR). False when a backup or
  * restore is running already. [onError] is called on the main thread.
  */
-internal fun runBackup(ctx: Context, onError: (String) -> Unit, open: () -> OutputStream?): Boolean {
+internal fun runBackup(ctx: Context, onError: (String) -> Unit, onDone: (Boolean) -> Unit = {}, open: () -> OutputStream?): Boolean {
     if (!BackupRestoreJob.start(R.string.backup_running, 1)) return false
     ExecutorUtils.getBackgroundExecutor(ExecutorUtils.KEYBOARD).execute {
         var failure: String? = null
+        var written = false
         try {
-            writeBackup(ctx, open)
+            written = writeBackup(ctx, open)
         } catch (t: Throwable) {
             failure = "b" + t.message
             Log.w("AdvancedScreen", "error during backup", t)
@@ -189,16 +190,19 @@ internal fun runBackup(ctx: Context, onError: (String) -> Unit, open: () -> Outp
             BackupRestoreJob.post {
                 BackupRestoreJob.finish()
                 failure?.let(onError)
+                // (2026-10-11: true only for a backup written to the end; the factory reset's Backup greys out then)
+                onDone(written && failure == null)
             }
         }
     }
     return true
 }
 
-private fun writeBackup(ctx: Context, open: () -> OutputStream?) {
+/** @return whether the backup was written (false: no files folder, or the file couldn't be opened) */
+private fun writeBackup(ctx: Context, open: () -> OutputStream?): Boolean {
     // zip all files matching the backup patterns
     // essentially this is the typed words information, and user-added dictionaries
-    val filesDir = ctx.filesDir ?: return
+    val filesDir = ctx.filesDir ?: return false
     val filesPath = filesDir.path + File.separator
     val files = mutableListOf<File>()
     filesDir.walk().forEach { file ->
@@ -261,7 +265,8 @@ private fun writeBackup(ctx: Context, open: () -> OutputStream?) {
         zipStream.closeEntry()
         BackupRestoreJob.step()
         zipStream.close()
-    }
+    } ?: return false
+    return true
 }
 
 /**

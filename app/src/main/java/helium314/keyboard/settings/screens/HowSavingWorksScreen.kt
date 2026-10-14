@@ -149,8 +149,14 @@ internal val savingGuide: List<SavingTab> = listOf(
         SavingRow(R.string.saving_kind_themes, R.string.saving_reset_items),
         SavingRow(R.string.saving_kind_popups, R.string.saving_reset_items),
         SavingRow(R.string.saving_kind_palettes, R.string.saving_reset_items),
+        // (2026-10-11: the files the 4th box keeps too)
+        SavingRow(R.string.saving_kind_fonts, R.string.saving_reset_items),
+        SavingRow(R.string.saving_kind_pictures, R.string.saving_reset_items),
+        SavingRow(R.string.saving_kind_key_layouts, R.string.saving_reset_items),
+        SavingRow(R.string.saving_kind_dictionaries, R.string.saving_reset_items),
         SavingRow(R.string.saving_kind_learned, R.string.saving_reset_words),
-        SavingRow(R.string.saving_kind_clips, R.string.saving_reset_words),
+        SavingRow(R.string.saving_kind_blacklisted, R.string.saving_reset_words),
+        SavingRow(R.string.saving_kind_clips, R.string.saving_reset_clips),
     )),
     SavingTab(R.string.saving_tab_separate, listOf(
         SavingRow(R.string.saving_kind_keyboards, R.string.saving_separate_on),

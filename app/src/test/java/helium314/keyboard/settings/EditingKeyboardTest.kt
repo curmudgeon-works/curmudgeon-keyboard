@@ -242,8 +242,9 @@ class EditingKeyboardTest {
         openCorrectionOfB()
         frames(1000)
         var done = false
-        activity.runOnUiThread { helium314.keyboard.settings.preferences.startFactoryReset(activity, keyboards = false,
-            learnedWords = false, clipboard = false, custom = false) { done = true } }
+        // (owner 2026-10-11: ticks mean keep; all unticked = full reset)
+        activity.runOnUiThread { helium314.keyboard.settings.preferences.startFactoryReset(activity,
+            helium314.keyboard.settings.preferences.ResetKeep(keyboards = true, words = true, clipboard = true, own = true)) { done = true } }
         val until = System.currentTimeMillis() + 5000
         while (!done && System.currentTimeMillis() < until) { idle(); Thread.sleep(20) }
         assertTrue(done, "the reset didn't run")

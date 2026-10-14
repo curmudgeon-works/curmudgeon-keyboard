@@ -17,6 +17,7 @@ import helium314.keyboard.settings.AppearanceDraft
 import helium314.keyboard.settings.AppearanceLooks
 import helium314.keyboard.settings.Palettes
 import helium314.keyboard.settings.Palettes.Choice
+import helium314.keyboard.settings.preferences.ResetKeep
 import helium314.keyboard.settings.preferences.keptOnReset
 import helium314.keyboard.settings.screens.keyboardName
 import helium314.keyboard.settings.screens.paletteUsers
@@ -296,10 +297,11 @@ class CentralPalettesTest {
 
     // ---- factory reset ----
 
-    @Test fun `factory reset - palettes kept unticked, removed ticked`() {
+    // (owner 2026-10-11: ticks mean keep; all unticked = full reset)
+    @Test fun `factory reset - palettes kept ticked, removed unticked`() {
         for (key in Palettes.keys("Warm")) {
-            assertTrue(keptOnReset(key, keyboards = true, custom = false), key)
-            assertFalse(keptOnReset(key, keyboards = true, custom = true), key)
+            assertTrue(keptOnReset(key, ResetKeep(own = true)), key)
+            assertFalse(keptOnReset(key, ResetKeep()), key)
         }
         assertTrue(ctx.getString(helium314.keyboard.latin.R.string.factory_reset_custom).contains("palettes"))
     }

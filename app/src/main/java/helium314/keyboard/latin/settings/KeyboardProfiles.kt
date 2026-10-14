@@ -115,6 +115,10 @@ object KeyboardProfiles {
         helium314.keyboard.latin.utils.SettingsEventLog.log("group ${group.name} ${if (shared) "shared, the main keyboard's" else "per keyboard"}")
     }
 
+    /** What a factory reset keeping the keyboards keeps of their sets (owner 2026-10-11, ticks mean keep): which set is
+     *  whose, the next id, separate settings and the shared menus, so each keyboard reads its set as before. */
+    val setStructureKeys: Set<String> get() = setOf(PREF_IDS, PREF_NEXT_ID, PREF_SEPARATE) + Group.entries.map { it.prefKey }
+
     /** "keyboard_shared_from", the old record of where shared settings came from (before 2026-10-11): unread. */
     private const val PREF_SHARED_FROM = "keyboard_shared_from"
 

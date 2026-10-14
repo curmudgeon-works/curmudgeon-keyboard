@@ -98,6 +98,7 @@ fun ThreeButtonAlertDialog(
     confirmButtonText: String? = stringResource(android.R.string.ok),
     cancelButtonText: String = stringResource(android.R.string.cancel),
     neutralButtonText: String? = null,
+    neutralEnabled: Boolean = true, // (greyed out: e.g. the factory reset's Backup, once done)
     reducePadding: Boolean = false,
     properties: DialogProperties = DialogProperties(),
     confirmFirst: Boolean = false, // OK left of Cancel, for dialogs whose buttons are spelled out as "Ok: …" / "Cancel: …"
@@ -222,6 +223,7 @@ fun ThreeButtonAlertDialog(
                     FlowRow(horizontalArrangement = Arrangement.End) {
                         if (neutralButtonText != null)
                             TextButton(
+                                enabled = neutralEnabled,
                                 onClick = onNeutral
                             ) { Text(neutralButtonText) }
                         Spacer(Modifier.weight(1f))
