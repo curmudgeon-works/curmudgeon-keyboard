@@ -19,7 +19,7 @@ import java.io.File
  */
 class AppearanceDraft private constructor(
     private var prefs: Map<String, Any?>,
-    private val files: Map<File, Saved?>, // the live file -> its saved copy, null when it didn't exist
+    private var files: Map<File, Saved?>, // the live file -> its saved copy, null when it didn't exist
     private val dir: File,
     private val setId: Int = KeyboardProfiles.SHARED, // the set the screen edited (see PrefsDraft)
     // what the screen's saved items reach beyond the edited set, as stored (every keyboard's own set too): the saved
@@ -45,6 +45,17 @@ class AppearanceDraft private constructor(
         writeHeld(dir, held)
         version.intValue++
         return true
+    }
+
+    /** [more] files (another keyboard's pictures, about to be written by the update dialog) join the snapshot: Discard
+     *  puts them back too. Files already in it stay as they were taken. */
+    fun holdFiles(more: List<File>) {
+        val added = more.filter { it !in files }.associateWith { live ->
+            if (live.exists()) Saved(live.copyTo(File(dir, live.name), overwrite = true), live.length(), live.lastModified()) else null // (another set: its own names)
+        }
+        if (added.isEmpty()) return
+        files = files + added
+        writeSnapshot(dir, setId, prefs, files, reached)
     }
 
     /** Palette [name] deleted with the screen open: the edited keyboard's part is done (the snapshot puts it back), the
@@ -169,6 +180,9 @@ class AppearanceDraft private constructor(
         /** Tests: the process died with the screen open (the draft's folder stays for [recoverAfterCrash]). */
         @androidx.annotation.VisibleForTesting internal fun forgetActiveForTest() { active = null }
 
+        /** [AppearanceDraft.holdFiles] of the running draft, if there is one. */
+        fun holdFilesOpen(files: List<File>) { active?.holdFiles(files) }
+
         /** [AppearanceDraft.rebase] of the running draft, if there is one. */
         fun rebaseOpen(ctx: Context, keys: Set<String>) { active?.rebase(ctx, keys) }
 
@@ -189,9 +203,13 @@ class AppearanceDraft private constructor(
         }
 
         /** A stored key beyond the edited set that the screen's saved items reach ([reached]): the saved themes; in
-         *  any set, the theme choice, the light and dark colours' choice, the palettes, and their "at default" marks. */
+         *  any set, the theme choice, the light and dark colours' choice, the palettes, and their "at default" marks;
+         *  in every keyboard's own set, its theme settings. */
         private fun reachesBeyond(stored: String): Boolean {
-            val plain = (KeyboardProfiles.splitOwnKey(stored)?.second ?: stored).removePrefix(KeyboardProfiles.TOMBSTONE)
+            val own = KeyboardProfiles.splitOwnKey(stored)
+            val plain = (own?.second ?: stored).removePrefix(KeyboardProfiles.TOMBSTONE)
+            // (a keyboard's own theme settings: the update dialog writes them on the keyboards ticked there)
+            if (own != null && (AppearanceLooks.inScope(plain) || plain == CustomLabels.Kind.THEME.key)) return true
             return plain == AppearanceLooks.PREF || plain == AppearanceLooks.PREF_SELECTED
                 || plain == Settings.PREF_THEME_COLORS || plain == Settings.PREF_THEME_COLORS_NIGHT
                 || plain.startsWith(Settings.PREF_USER_COLORS_PREFIX) || plain.startsWith(Settings.PREF_USER_ALL_COLORS_PREFIX)

@@ -112,6 +112,16 @@ fun keyboardsUsing(ctx: Context, keys: Collection<String>, edited: SettingsSubty
         edited?.takeIf { editingId != helium314.keyboard.latin.settings.KeyboardProfiles.SHARED }?.let { it to editingId }, matches)
 }
 
+/** The other keyboards whose chosen saved item under [key] is [name], for the update dialog's ticks (2026-10-11): none
+ *  with one set of settings, or with [group]'s menu shared (every keyboard already has the change). */
+fun otherUsers(ctx: Context, key: String, name: String, edited: SettingsSubtype,
+               group: helium314.keyboard.latin.settings.KeyboardProfiles.Group): List<SettingsSubtype> {
+    val real = ctx.realPrefs()
+    if (!helium314.keyboard.latin.settings.KeyboardProfiles.isSeparate(real)
+        || helium314.keyboard.latin.settings.KeyboardProfiles.isShared(real, group)) return emptyList()
+    return keyboardsUsing(ctx, listOf(key), edited) { _, value -> value == name }.filter { it != edited }
+}
+
 /** A delete warning's line: plural [id] with the keyboards' names one per line (never "all keyboards", 2026-10-08);
  *  null when no keyboard uses the item (the title alone). */
 fun keepersText(ctx: Context, @androidx.annotation.PluralsRes id: Int, keyboards: List<SettingsSubtype>): String? =

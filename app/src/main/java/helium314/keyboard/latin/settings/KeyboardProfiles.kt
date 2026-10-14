@@ -575,6 +575,13 @@ object KeyboardProfiles {
 
     private fun suffix(id: Int) = if (id == SHARED) "" else "_p$id"
 
+    /** Set [id]'s background picture files, each followed by its framing file (whether they exist or not). */
+    fun pictureFiles(context: android.content.Context, id: Int): List<java.io.File> {
+        val dir = helium314.keyboard.latin.utils.DeviceProtectedUtils.getFilesDir(context)
+        return profileFileNames.flatMap { name -> java.io.File(dir, name + suffix(id)).let {
+            listOf(it, helium314.keyboard.latin.common.PictureFraming.fileFor(it)) } }
+    }
+
     /** The files of set [fromId] over those of [toId] (one missing in [fromId] is removed in [toId]). */
     private fun copyFiles(fromId: Int, toId: Int) {
         val dir = filesDir ?: return

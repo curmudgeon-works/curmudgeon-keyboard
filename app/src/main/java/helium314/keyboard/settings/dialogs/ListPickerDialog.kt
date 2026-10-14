@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.dialogs
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
@@ -30,6 +30,7 @@ import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.latin.utils.previewDark
 
 // taken from StreetComplete
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun <T: Any> ListPickerDialog(
     onDismissRequest: () -> Unit,
@@ -50,6 +51,8 @@ fun <T: Any> ListPickerDialog(
     /** The items are things to do (e.g. Rename, Delete), not choices: drawn in the action colour, like buttons. */
     itemsAreActions: Boolean = false,
     summonKeyboard: Boolean = true, // see ThreeButtonAlertDialog
+    /** A long press on an item's row (2026-10-11: renames the user's own saved items). */
+    onItemLongClick: ((T) -> Unit)? = null,
 ) {
     var selected by remember { mutableStateOf(selectedItem) }
     val state = rememberLazyListState()
@@ -78,7 +81,7 @@ fun <T: Any> ListPickerDialog(
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .clickable {
+                                .combinedClickable(onLongClick = onItemLongClick?.let { { it(item) } }) {
                                     if (confirmImmediately) {
                                         onDismissRequest()
                                         onItemSelected(item)

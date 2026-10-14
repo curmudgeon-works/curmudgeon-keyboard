@@ -567,6 +567,22 @@
     <string name="key_popups_full">Customize popup for each key</string>
     <string name="key_popups_full_summary">Every key\'s long-press popups, a tab per group of keys</string>
     <string name="key_popups_custom">Custom</string>
+    <!-- a keyboard's own copy of a Layout, theme or popups that differs from the saved item (or whose item was deleted) -->
+    <string name="custom_n">Custom %d</string>
+    <!-- "Custom 1 · from Sunset": the copy and the saved item it came from -->
+    <string name="custom_from">%1$s · from %2$s</string>
+    <!-- the save icon on a saved Layout, theme or popup set: it gets the settings of the keyboard being edited -->
+    <string name="update_item_title">Update %s?</string>
+    <string name="update_item_text">%s gets this keyboard\'s settings.</string>
+    <string name="update_item_others">Also used by the ones below: tick those that should get the change. The others keep %s as it was, shown as Custom.</string>
+    <string name="update_item">Update</string>
+    <string name="update_item_anyway">Update anyway</string>
+    <!-- a saved Layout holding the popup set, in its update dialog's list -->
+    <string name="update_item_layout">Layout “%s”</string>
+    <string name="update_item_icon">Update with this keyboard\'s settings</string>
+    <!-- a saved item with these exact settings exists already (Update, Save as new); nothing is blocked -->
+    <string name="same_settings_as">These settings are the same as “%s”.</string>
+    <string name="save_anyway">Save anyway</string>
     <string name="key_popups_save_as_new">Save current popup layout</string>
     <string name="key_popups_save_change_title">Save this change to a set of your own</string>
     <string name="key_popups_my_set">My popups</string>

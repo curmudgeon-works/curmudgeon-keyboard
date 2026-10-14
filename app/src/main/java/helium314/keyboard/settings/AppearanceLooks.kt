@@ -180,11 +180,11 @@ object AppearanceLooks {
 
     /** The look's pictures become the background ones (a built-in look: none); a look saved before pictures were
      *  part of looks, or whose picture folder is missing (restored from a backup without it), leaves them as they are. */
-    fun applyPictures(ctx: Context, look: Look) {
+    fun applyPictures(ctx: Context, look: Look, files: List<java.io.File> = livePictures(ctx)) {
         val id = look.values[PICTURES] as? String ?: return
         val refs = refsOf(id)?.let { slotsOf(it) }
         if (refs != null) {
-            for (live in livePictures(ctx)) {
+            for (live in files) {
                 if (live.name.endsWith(".framing")) continue
                 val slot = refs[slotOf(live.name)]
                 val framing = PictureFraming.fileFor(live)
@@ -201,7 +201,7 @@ object AppearanceLooks {
         // its pictures aren't there: the background stays (review 2026-10-06: it was deleted)
         if (dir != null && !dir.isDirectory) { reload(ctx); return }
         val folder = dir?.listFiles().orEmpty().associateBy { slotOf(it.name) }
-        for (live in livePictures(ctx)) {
+        for (live in files) {
             val saved = folder[slotOf(live.name)]
             if (saved?.exists() == true) saved.copyTo(live, overwrite = true) else live.delete()
         }
@@ -287,8 +287,7 @@ object AppearanceLooks {
 
     /** [values] replace the current appearance values as a whole (keys missing from it go back to default);
      *  to apply a theme on top of the current values, pass `current + theme`. The live keyboard reloads. */
-    fun apply(ctx: Context, values: Map<String, Any?>) {
-        val prefs = ctx.prefs()
+    fun apply(ctx: Context, values: Map<String, Any?>, prefs: SharedPreferences = ctx.prefs()) {
         val now = current(prefs)
         prefs.edit {
             for (key in now.keys) if (key !in values) remove(key)
@@ -299,6 +298,21 @@ object AppearanceLooks {
             }
         }
         reload(ctx)
+    }
+
+    /** [look] (just updated with the edited keyboard's look) on another [keyboard] that uses it and was ticked in the
+     *  update dialog (2026-10-11): its settings and pictures, the name, no Custom label. The open screen's Discard puts
+     *  that keyboard's pictures back too (held first). */
+    fun applyToOther(ctx: Context, keyboard: helium314.keyboard.latin.settings.SettingsSubtype, look: Look) {
+        val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
+        val id = KeyboardProfiles.anyIdIn(real.all, keyboard) ?: return
+        val view = helium314.keyboard.latin.settings.ProfilePreferences(real) { id }
+        apply(ctx, current(view) + applied(look, SavedItemDefaults.takeNewDefaults(real)), view)
+        view.edit { putString(PREF_SELECTED, look.name) }
+        CustomLabels.clear(view, CustomLabels.Kind.THEME)
+        val files = KeyboardProfiles.pictureFiles(ctx, id)
+        AppearanceDraft.holdFilesOpen(files)
+        applyPictures(ctx, look, files)
     }
 
     /** What a theme saves: the values set now (picked), and every other theme setting as "not set" (null); the value

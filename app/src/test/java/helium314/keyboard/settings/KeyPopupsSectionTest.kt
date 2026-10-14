@@ -63,7 +63,7 @@ class KeyPopupsSectionTest {
         ctx.prefs().edit().putString(KeyPopupOverrides.PREF, p1).putString(KeyPopupOverrides.PREF_SELECTED_SET, "S").commit()
         deletePopupSet(ctx, "S")
         open().use {
-            compose.onNodeWithText("Custom").assertExists() // the keyboard keeps its popups
+            compose.onNodeWithText("Custom 1").assertExists() // the keyboard keeps its popups
             applyLayout(LayoutPresets.builtIn(ctx).first()) // the Curmudgeon Layout: no popups of its own
             compose.waitForIdle()
             compose.onNodeWithText(ctx.getString(helium314.keyboard.latin.R.string.key_popups_preset_heliboard_packed)).assertExists() // the default popups
@@ -78,14 +78,16 @@ class KeyPopupsSectionTest {
         deletePopupSet(ctx, "S")
         ctx.prefs().edit().putString(KeyPopupOverrides.PREF, p1).commit()
         open().use {
-            compose.onNodeWithText("Custom").assertExists()
+            compose.onNodeWithText("Custom 1").assertExists()
             applyLayout(layout) // p2 on the keyboard, S back in the list
             compose.waitForIdle()
             compose.onNodeWithText("S").assertExists() // the set the Layout brought back
             compose.onNodeWithText("Preset popups").performClick()
             compose.onNodeWithText("Save current popup layout").performClick()
             compose.onNode(isEditable()).performTextReplacement("New")
-            compose.onNodeWithText(ctx.getString(android.R.string.ok)).performClick()
+            // (S has these popups already: the note says so, and the button is "Save anyway"; 2026-10-11)
+            compose.onNodeWithText(ctx.getString(helium314.keyboard.latin.R.string.same_settings_as, "S")).assertExists()
+            compose.onNodeWithText(ctx.getString(helium314.keyboard.latin.R.string.save_anyway)).performClick()
             compose.waitForIdle()
         }
         assertEquals(mapOf("c" to listOf("d")), KeyPopupOverrides.loadSets(real).first { it.name == "New" }.overrides)

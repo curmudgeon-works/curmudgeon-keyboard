@@ -656,8 +656,14 @@ private fun SavedLooksPreference(setting: Setting) {
     val draft = AppearanceDraft.version.intValue.let { AppearanceDraft.activeOrNull() }
     val unsaved = draft != null && (draft.changedKeys(ctx).any { AppearanceLooks.inScope(it) || it == AppearanceLooks.PREF_SELECTED }
         || draft.changedFiles().any { it.startsWith("custom_background") })
-    val state = listOfNotNull(stringResource(R.string.theme_tweaked).takeIf { tweaked }, stringResource(R.string.theme_unsaved).takeIf { unsaved })
-    val summary = chosen?.let { if (state.isEmpty()) it.name else it.name + " (" + state.joinToString(", ") + ")" }
+    // differs from the chosen theme: the keyboard's own copy, "Custom 1 · from Sunset" (2026-10-11; was "Sunset (tweaked)")
+    val shown = chosen?.let { look -> if (!tweaked) look.name else remember(look.name, tweaked) {
+        helium314.keyboard.settings.CustomLabels.text(ctx, helium314.keyboard.settings.CustomLabels.number(ctx.realPrefs(), prefs,
+            helium314.keyboard.settings.CustomLabels.Kind.THEME), look.name) } }
+    val summary = shown?.let { if (unsaved) it + " (" + stringResource(R.string.theme_unsaved) + ")" else it }
+    // which of the user's themes differ from the keyboard as it was when the list opened: those get the save icon
+    val differs = remember(showList, generation) { looks.associateWith { AppearanceLooks.isTweaked(ctx, it) } }
+    var toUpdate: AppearanceLooks.Look? by remember { mutableStateOf(null) }
     Preference(name = setting.title, description = summary, onClick = { showList = true }) { NextScreenIcon() }
     // the previewed theme off again: what was there when the list opened
     fun putBack() {
@@ -686,12 +692,17 @@ private fun SavedLooksPreference(setting: Setting) {
                 // (the list's own copy: renamed since, it's found again by content; deleted, nothing is on the keyboard)
                 val it = (builtIn + looks).firstOrNull { l -> l == tapped } ?: return@ListPickerDialog
                 prefs.edit { putString(AppearanceLooks.PREF_SELECTED, it.name) }
+                helium314.keyboard.settings.CustomLabels.clear(prefs, helium314.keyboard.settings.CustomLabels.Kind.THEME)
             },
-            // the built-in themes come first and can't be changed; the user's own are renamed and deleted here
+            // the built-in themes come first and can't be changed; the user's own: long press renames (2026-10-11), the
+            // save icon (only where it differs from the keyboard) updates it with this keyboard's look, the trash deletes
             trailing = { look -> if (builtIn.none { it === look }) { // (by identity: a theme of the same content is still yours)
-                IconButton({ toRename = look }) { Icon(painterResource(R.drawable.ic_edit), stringResource(R.string.appearance_look_rename)) }
+                if (differs[look] == true)
+                    IconButton({ if (previewed != null) { putBack(); previewed = null }; toUpdate = look }) {
+                        Icon(painterResource(R.drawable.ic_save), stringResource(R.string.update_item_icon)) }
                 DeleteButton { toDelete = look }
             } },
+            onItemLongClick = { look -> if (builtIn.none { it === look }) toRename = look },
             footer = {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxWidth().clickable { saveAs = true }
@@ -701,10 +712,14 @@ private fun SavedLooksPreference(setting: Setting) {
                 }
             },
         )
+    val sameAsNow = if (!saveAs) null else remember(saveAs) { looks.firstOrNull { !AppearanceLooks.isTweaked(ctx, it) }?.name }
     if (saveAs)
         TextInputDialog(
             onDismissRequest = { saveAs = false },
             title = { Text(stringResource(R.string.appearance_look_save)) },
+            // a saved theme with this look already: said, nothing blocked (2026-10-11: "include the already exists note")
+            description = sameAsNow?.let { { helium314.keyboard.settings.dialogs.SameSettingsNote(it) } },
+            confirmButtonText = stringResource(if (sameAsNow != null) R.string.save_anyway else android.R.string.ok),
             initialText = stringResource(R.string.appearance_look_default_name, looks.size + 1),
             // not a built-in theme's name either, as on the Layouts list (2026-10-10: a user theme named Curmudgeon took
             // the built-in's place, and renaming it renamed every keyboard's built-in choice)
@@ -727,6 +742,24 @@ private fun SavedLooksPreference(setting: Setting) {
                 AppearanceLooks.choiceRenamed(ctx, look.name, name)
             },
         )
+    }
+    toUpdate?.let { look ->
+        val edited = remember(look) { helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(ctx.realPrefs(),
+            helium314.keyboard.settings.PrefsDraft.currentSetId(ctx)) }
+        val others = remember(look) { if (edited == null) emptyList() else otherUsers(ctx, AppearanceLooks.PREF_SELECTED, look.name,
+            edited, helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE) }
+        val sameAs = remember(look) { looks.firstOrNull { it !== look && differs[it] == false }?.name }
+        helium314.keyboard.settings.dialogs.UpdateSavedItemDialog(look.name, others.map { keyboardName(it, ctx) }, sameAs,
+            onDismissRequest = { toUpdate = null },
+        ) { ticked ->
+            val values = AppearanceLooks.snapshot(prefs) + (AppearanceLooks.PICTURES to AppearanceLooks.savePictures(ctx))
+            val updated = AppearanceLooks.Look(look.name, values, helium314.keyboard.settings.SavedItemDefaults.remembered(values))
+            store(looks.map { if (it === look) updated else it })
+            prefs.edit { putString(AppearanceLooks.PREF_SELECTED, look.name) } // (this keyboard is that theme now)
+            helium314.keyboard.settings.CustomLabels.clear(prefs, helium314.keyboard.settings.CustomLabels.Kind.THEME)
+            for (i in ticked) AppearanceLooks.applyToOther(ctx, others[i], updated)
+            toUpdate = null
+        }
     }
     toDelete?.let { look ->
         // the keyboards using it keep its colors and look: named (2026-10-08)

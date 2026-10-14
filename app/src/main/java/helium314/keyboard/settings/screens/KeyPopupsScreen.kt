@@ -142,18 +142,55 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
             ?: prefs.getString(Settings.PREF_MORE_POPUP_KEYS, Defaults.PREF_MORE_POPUP_KEYS)!!
         val symbolsLayout = keyboard.layoutName(LayoutType.SYMBOLS)
         val current = currentPopupPreset(prefs, keyboard, presets, overrides)
+        @Composable fun presetName(p: Preset) = p.userName ?: stringResource(p.name)
+        // the keyboard's popups differ from the set it chose (edits stay on the keyboard until saved, 2026-10-11): it
+        // shows "Custom 1 · from Mine"; no set and no built-in recipe: "Custom 1"
+        val chosenSet = current?.userName?.let { name -> userSets.firstOrNull { it.name == name } }
+        val differs = chosenSet != null && popupSetDiffers(prefs, keyboard, chosenSet, overrides,
+            helium314.keyboard.settings.SavedItemDefaults.takeNewDefaults(ctx.realPrefs()))
+        val custom = current == null || differs
+        val rowLabel = if (!custom) presetName(current!!) else remember(custom, chosenSet?.name, generation) {
+            helium314.keyboard.settings.CustomLabels.text(ctx,
+                helium314.keyboard.settings.CustomLabels.number(ctx.realPrefs(), prefs, helium314.keyboard.settings.CustomLabels.Kind.POPUPS),
+                chosenSet?.name)
+        }
         // every arrangement belongs to a set of the user's own: into the selected one, or into a new one to be named
         fun storeInSet(name: String, all: Map<String, List<String>>) {
             storePopupSet(ctx, keyboard, name, accentsValue, symbolsLayout, all)
             generation++
         }
-        @Composable fun presetName(p: Preset) = p.userName ?: stringResource(p.name)
         fun deleteSet(name: String) {
             deletePopupSet(ctx, name) // (the keyboard's popups stay as they are: no new preview)
             generation++
         }
         var setToDelete: String? by remember { mutableStateOf(null) }
         var setToRename: String? by remember { mutableStateOf(null) }
+        var setToUpdate: String? by remember { mutableStateOf(null) }
+        val takeNew = helium314.keyboard.settings.SavedItemDefaults.takeNewDefaults(ctx.realPrefs())
+        // which of the user's sets differ from the keyboard's popups as they were when the list opened
+        val setDiffers = remember(showAccentsDialog, generation) {
+            userSets.associate { it.name to popupSetDiffers(prefs, keyboard, it, overrides, takeNew) } }
+        setToUpdate?.let { name ->
+            val set = userSets.firstOrNull { it.name == name }
+            // the other keyboards on it, and the saved Layouts that hold it (owner 2026-10-11: those are listed too)
+            val keyboards = remember(name) { otherUsers(ctx, KeyPopupOverrides.PREF_SELECTED_SET, name, keyboard,
+                KeyboardProfiles.Group.LAYOUT) }
+            val layouts = remember(name) { helium314.keyboard.settings.LayoutPresets.load(ctx.realPrefs())
+                .filter { it.values[KeyPopupOverrides.PREF_SELECTED_SET] == name }.map { it.name } }
+            val sameAs = remember(name) { userSets.firstOrNull { it.name != name && setDiffers[it.name] == false }?.name }
+            if (set != null) helium314.keyboard.settings.dialogs.UpdateSavedItemDialog(name,
+                keyboards.map { keyboardName(it, ctx) } + layouts.map { ctx.getString(R.string.update_item_layout, it) }, sameAs,
+                onDismissRequest = { setToUpdate = null },
+            ) { ticked ->
+                storeInSet(name, KeyPopupOverrides.load(prefs))
+                val updated = KeyPopupOverrides.loadSets(ctx.realPrefs()).first { it.name == name }
+                for (i in ticked) {
+                    if (i < keyboards.size) applySetToOther(ctx, keyboards[i], updated, takeNew)
+                    else updateSetInLayout(ctx.realPrefs(), layouts[i - keyboards.size], updated)
+                }
+                setToUpdate = null
+            }
+        }
         setToRename?.let { oldName ->
             TextInputDialog(
                 onDismissRequest = { setToRename = null },
@@ -178,6 +215,8 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                 confirmButtonText = stringResource(R.string.delete),
             )
         }
+        val sameAsNow = if (!showSaveAsDialog) null else remember(showSaveAsDialog) {
+            userSets.firstOrNull { !popupSetDiffers(prefs, keyboard, it, KeyPopupOverrides.load(prefs), takeNew) }?.name }
         if (showSaveAsDialog)
             TextInputDialog(
                 onDismissRequest = { showSaveAsDialog = false; pendingChange = null }, // cancel = the change is dropped
@@ -190,6 +229,9 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                 title = { Text(stringResource(if (pendingChange != null) R.string.key_popups_save_change_title else R.string.key_popups_save_as_new)) },
                 initialText = if (current?.userName != null) "" else stringResource(R.string.key_popups_my_set),
                 checkTextValid = { KeyPopupOverrides.isNewSetName(userSets, it) },
+                // a set with these popups already: said, nothing blocked (2026-10-11: "include the already exists note")
+                description = sameAsNow?.let { { helium314.keyboard.settings.dialogs.SameSettingsNote(it) } },
+                confirmButtonText = stringResource(if (sameAsNow != null) R.string.save_anyway else android.R.string.ok),
             )
         // a tap shows the preset on the preview and the list stays (like Themes); OK keeps it, Cancel puts back what
         // was there when the list opened (the keyboard's accents and symbols page, the arrangement, the set, the map)
@@ -217,6 +259,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
             // a preset with its own popup order sets it, and the keyboard's own order (if any) goes
             if (preset.popupOrder != null) changed = changed.without(ExtraValue.POPUP_ORDER)
             KeyPopupOverrides.save(prefs, preset.overrides ?: emptyMap())
+            helium314.keyboard.settings.CustomLabels.clear(prefs, helium314.keyboard.settings.CustomLabels.Kind.POPUPS) // (an item chosen: no copy)
             prefs.edit().apply {
                 if (preset.userName != null) putString(KeyPopupOverrides.PREF_SELECTED_SET, preset.userName) else remove(KeyPopupOverrides.PREF_SELECTED_SET)
                 // (a set's setting kept at its default, with "Saved items take new defaults" on: the default again)
@@ -235,14 +278,19 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                 title = { Text(stringResource(R.string.key_popups_presets)) },
                 items = presets,
                 getItemName = { presetName(it) },
-                selectedItem = current,
+                selectedItem = if (custom) null else current, // (none marked while the keyboard has its own copy)
                 confirmImmediately = false,
                 onItemHighlighted = { applyPreset(it) },
                 // (rename / delete: what was only previewed is put back first)
+                // the user's own sets: long press renames (2026-10-11), the save icon (only where the set differs from the
+                // keyboard) updates it with this keyboard's popups, the trash deletes
                 trailing = { p -> p.userName?.let { name ->
-                    IconButton({ if (!confirmed) putBack(); confirmed = true; showAccentsDialog = false; setToRename = name }) { Icon(painterResource(R.drawable.ic_edit), stringResource(R.string.key_popups_rename_set)) }
+                    if (setDiffers[name] == true)
+                        IconButton({ if (!confirmed) putBack(); confirmed = true; showAccentsDialog = false; setToUpdate = name }) {
+                            Icon(painterResource(R.drawable.ic_save), stringResource(R.string.update_item_icon)) }
                     DeleteButton { if (!confirmed) putBack(); confirmed = true; showAccentsDialog = false; setToDelete = name }
                 } },
+                onItemLongClick = { p -> p.userName?.let { name -> if (!confirmed) putBack(); confirmed = true; showAccentsDialog = false; setToRename = name } },
                 // the current arrangement (built-in or own, with any changes) as a new set of the user's own
                 footer = {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -267,7 +315,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                 modifier = Modifier.fillMaxWidth().clickable { showAccentsDialog = true }.heightIn(min = ROW_HEIGHT).padding(vertical = 4.dp).padding(start = 10.dp)) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.key_popups_presets), style = MaterialTheme.typography.bodyLarge)
-                    Text(current?.let { presetName(it) } ?: stringResource(R.string.key_popups_custom), style = MaterialTheme.typography.bodySmall,
+                    Text(rowLabel, style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 NextScreenIcon()
@@ -297,7 +345,29 @@ private fun storePopupSet(ctx: Context, keyboard: SettingsSubtype, name: String,
     KeyPopupOverrides.saveSets(ctx.realPrefs(), KeyPopupOverrides.loadSets(ctx.realPrefs()).filter { it.name != name } + set)
     KeyPopupOverrides.save(prefs, all)
     prefs.edit().putString(KeyPopupOverrides.PREF_SELECTED_SET, name).apply()
+    helium314.keyboard.settings.CustomLabels.clear(prefs, helium314.keyboard.settings.CustomLabels.Kind.POPUPS) // (it is the set now)
     reloadPreview()
+}
+
+/**
+ * Whether the keyboard's popups differ from user set [set] it chose: the arrangement [overrides], the accents level,
+ * the symbols page, the symbol map and the popup order (a setting the set kept at its default compares with what the
+ * keyboard reads with "Saved items take new defaults" [takeNew] on: the default).
+ */
+internal fun popupSetDiffers(prefs: SharedPreferences, keyboard: SettingsSubtype, set: KeyPopupOverrides.UserSet,
+                             overrides: Map<String, List<String>>, takeNew: Boolean): Boolean {
+    if (overrides != set.overrides) return true
+    if (keyboard.layoutName(LayoutType.SYMBOLS) != set.symbolsLayout) return true
+    val follows = if (takeNew) set.atDefault else emptySet()
+    val accents = keyboard.getExtraValueOf(ExtraValue.MORE_POPUPS)
+    if (KeyPopupOverrides.ACCENTS in follows) { if (accents != null) return true }
+    else if ((accents ?: prefs.getString(Settings.PREF_MORE_POPUP_KEYS, Defaults.PREF_MORE_POPUP_KEYS)) != set.morePopups) return true
+    if (KeyPopupOverrides.MAP in follows) { if (prefs.contains(Settings.PREF_SYMBOL_POPUP_MAP)) return true }
+    else if (set.symbolMap != null && prefs.getString(Settings.PREF_SYMBOL_POPUP_MAP, Defaults.PREF_SYMBOL_POPUP_MAP) != set.symbolMap) return true
+    val order = keyboard.getExtraValueOf(ExtraValue.POPUP_ORDER)
+    if (KeyPopupOverrides.ORDER in follows) { if (order != null || prefs.contains(Settings.PREF_POPUP_KEYS_ORDER)) return true }
+    else if (set.popupOrder != null && (order ?: prefs.getString(Settings.PREF_POPUP_KEYS_ORDER, Defaults.PREF_POPUP_KEYS_ORDER)) != set.popupOrder) return true
+    return false
 }
 
 /** Renames the user's popup set [oldName] to [name], and every keyboard that had it chosen follows. */
@@ -313,6 +383,49 @@ internal fun renamePopupSet(ctx: Context, oldName: String, name: String) {
 /** Deletes the user's popup set [name]: every keyboard that had it chosen has none chosen (2026-10-07: only the keyboard
  *  being edited forgot it) and keeps its popups as they are, shown as "Custom" (2026-10-08: the keyboard being edited
  *  lost its popups, and with separate settings off or the Layout menu shared every keyboard did). */
+/** User set [set] (just updated with the edited keyboard's popups) on another [keyboard] ticked in the update dialog
+ *  (2026-10-11): its arrangement, accents level, symbols page, map and order, the set's name, no Custom label. */
+internal fun applySetToOther(ctx: Context, keyboard: SettingsSubtype, set: KeyPopupOverrides.UserSet, takeNew: Boolean) {
+    val real = ctx.realPrefs()
+    val id = KeyboardProfiles.anyIdIn(real.all, keyboard) ?: return
+    val view = helium314.keyboard.latin.settings.ProfilePreferences(real) { id }
+    val follows = if (takeNew) set.atDefault else emptySet()
+    KeyPopupOverrides.save(view, set.overrides)
+    view.edit().apply {
+        putString(KeyPopupOverrides.PREF_SELECTED_SET, set.name)
+        if (KeyPopupOverrides.MAP in follows) remove(Settings.PREF_SYMBOL_POPUP_MAP)
+        else if (set.symbolMap != null) putString(Settings.PREF_SYMBOL_POPUP_MAP, set.symbolMap)
+        if (KeyPopupOverrides.ORDER in follows) remove(Settings.PREF_POPUP_KEYS_ORDER)
+        else if (set.popupOrder != null) putString(Settings.PREF_POPUP_KEYS_ORDER, set.popupOrder)
+    }.commit()
+    helium314.keyboard.settings.CustomLabels.clear(view, helium314.keyboard.settings.CustomLabels.Kind.POPUPS)
+    var changed = if (KeyPopupOverrides.ACCENTS in follows) keyboard.without(ExtraValue.MORE_POPUPS) else keyboard.with(ExtraValue.MORE_POPUPS, set.morePopups)
+    changed = if (set.symbolsLayout == null) changed.withoutLayout(LayoutType.SYMBOLS) else changed.withLayout(LayoutType.SYMBOLS, set.symbolsLayout)
+    if (set.popupOrder != null) changed = changed.without(ExtraValue.POPUP_ORDER)
+    if (changed != keyboard) helium314.keyboard.latin.utils.SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, changed, ctx)
+}
+
+/** Saved Layout [layoutName] ticked in a popup set's update dialog: its copy of the set becomes [set]'s. */
+internal fun updateSetInLayout(real: SharedPreferences, layoutName: String, set: KeyPopupOverrides.UserSet) {
+    val presets = helium314.keyboard.settings.LayoutPresets.load(real)
+    helium314.keyboard.settings.LayoutPresets.save(real, presets.map { p ->
+        if (p.name != layoutName) p
+        else {
+            val o = org.json.JSONObject().also { j -> set.overrides.forEach { (k, v) -> j.put(k, org.json.JSONArray(v)) } }
+            fun kept(field: String, value: Any?) = if (field in set.atDefault) null else value
+            helium314.keyboard.settings.LayoutPresets.Preset(p.name, p.values + mapOf(
+                KeyPopupOverrides.PREF to o.toString(),
+                Settings.PREF_SYMBOL_POPUP_MAP to kept(KeyPopupOverrides.MAP, set.symbolMap),
+                Settings.PREF_POPUP_KEYS_ORDER to kept(KeyPopupOverrides.ORDER, set.popupOrder),
+                "morePopups" to kept(KeyPopupOverrides.ACCENTS, set.morePopups),
+                "layout:" + LayoutType.SYMBOLS.name to set.symbolsLayout,
+            ), p.builtIn, p.remembered + listOfNotNull(
+                set.symbolMap?.takeIf { KeyPopupOverrides.MAP in set.atDefault }?.let { Settings.PREF_SYMBOL_POPUP_MAP to it },
+                set.popupOrder?.takeIf { KeyPopupOverrides.ORDER in set.atDefault }?.let { Settings.PREF_POPUP_KEYS_ORDER to it }).toMap())
+        }
+    })
+}
+
 internal fun deletePopupSet(ctx: Context, name: String) {
     val real = ctx.realPrefs()
     KeyPopupOverrides.saveSets(real, KeyPopupOverrides.loadSets(real).filter { it.name != name })
@@ -376,8 +489,8 @@ fun NavRow(title: String, summary: String? = null, onClick: () -> Unit) {
 
 /**
  * Every key's long-press popups, a tab per key group (letters and digits, the keys that change with the text field,
- * the symbol pages, the number pad); each key folds open to its popups, switchable and draggable. A change goes into
- * the selected popup set of the user's own, or asks for the name of a new one.
+ * the symbol pages, the number pad); each key folds open to its popups, switchable and draggable. A change stays on the
+ * keyboard (2026-10-11): the set it chose changes only through its save icon in the presets list.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -387,19 +500,15 @@ fun CustomizePopupsScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     var generation by remember { mutableIntStateOf(0) }
     val groups = remember(keyboard, generation) { keysWithPopups(ctx, keyboard) }
     val overrides = remember(generation) { KeyPopupOverrides.load(prefs) }
-    val selectedUserSet = remember(generation) {
-        prefs.getString(KeyPopupOverrides.PREF_SELECTED_SET, null)?.let { name -> KeyPopupOverrides.loadSets(ctx.realPrefs()).firstOrNull { it.name == name } }
-    }
-    val accentsValue = keyboard.getExtraValueOf(ExtraValue.MORE_POPUPS) ?: prefs.getString(Settings.PREF_MORE_POPUP_KEYS, Defaults.PREF_MORE_POPUP_KEYS)!!
-    val symbolsLayout = keyboard.layoutName(LayoutType.SYMBOLS)
     val unfolded = rememberSaveable(saver = listSaver(save = { it.toList() }, restore = { mutableStateListOf(*it.toTypedArray()) })) { mutableStateListOf<String>() }
     var tab by rememberSaveable { mutableIntStateOf(0) }
-    // a change made while a built-in set is selected is held here until the user names a set for it
-    var pendingChange: Pair<String, List<String>?>? by remember { mutableStateOf(null) }
+    // a change stays on the keyboard (owner 2026-10-11: a saved item changes only when deliberately updated, its save
+    // icon in the presets list): the keyboard shows "Custom 1 · from <set>" until then
     fun applyChange(overrideKey: String, labels: List<String>?) {
         val all = overrides.toMutableMap().also { if (labels == null) it.remove(overrideKey) else it[overrideKey] = labels }
-        if (selectedUserSet != null) { storePopupSet(ctx, keyboard, selectedUserSet.name, accentsValue, symbolsLayout, all); generation++ }
-        else pendingChange = overrideKey to labels
+        KeyPopupOverrides.save(prefs, all)
+        generation++
+        reloadPreview()
     }
     val tryIt = remember { TryItState() }
     // Keep / Discard like the other screens: every change shows at once (the preview), the cross puts back what was
@@ -475,21 +584,6 @@ fun CustomizePopupsScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
                 }
             }
         }
-    }
-    pendingChange?.let { change ->
-        TextInputDialog(
-            onDismissRequest = { pendingChange = null }, // cancel = the change is dropped
-            onConfirmed = { name ->
-                val all = overrides.toMutableMap()
-                change.second.let { if (it == null) all.remove(change.first) else all[change.first] = it }
-                storePopupSet(ctx, keyboard, name.trim(), accentsValue, symbolsLayout, all)
-                pendingChange = null
-                generation++
-            },
-            title = { Text(stringResource(R.string.key_popups_save_change_title)) },
-            initialText = stringResource(R.string.key_popups_my_set),
-            checkTextValid = { KeyPopupOverrides.isNewSetName(KeyPopupOverrides.loadSets(real), it) },
-        )
     }
 }
 

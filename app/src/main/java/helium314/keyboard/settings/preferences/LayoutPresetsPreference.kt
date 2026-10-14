@@ -68,9 +68,17 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
     val chosen = prefs.getString(LayoutPresets.PREF_SELECTED, null)?.let { name -> all.firstOrNull { it.name == name } }
         ?: builtIn.first()
     val tweaked = remember(changed?.value, keyboard, chosen, generation) { LayoutPresets.isTweaked(ctx, keyboard, chosen) }
+    // differs from it: the keyboard's own copy, "Custom 1 · from Work" (2026-10-11; was "unsaved")
+    val customText = if (!tweaked) null else remember(tweaked, chosen.name, generation) {
+        helium314.keyboard.settings.CustomLabels.text(ctx, helium314.keyboard.settings.CustomLabels.number(ctx.realPrefs(), prefs,
+            helium314.keyboard.settings.CustomLabels.Kind.LAYOUT), chosen.name)
+    }
     Preference(name = stringResource(R.string.layout_presets),
-        description = if (tweaked) stringResource(R.string.theme_unsaved) else chosen.name, descriptionItalic = tweaked,
+        description = customText ?: chosen.name, descriptionItalic = tweaked,
         onClick = { showList = true }) { NextScreenIcon() }
+    // which of the user's Layouts differ from the keyboard as it was when the list opened: those get the save icon
+    val differs = remember(showList, generation) { presets.associateWith { LayoutPresets.isTweaked(ctx, keyboard, it) } }
+    var toUpdate: LayoutPresets.Preset? by remember { mutableStateOf(null) }
     // while the list is open nothing of the keyboard's is cleaned up (its unsaved layout must survive a preview
     // for Cancel); afterwards what no keyboard uses goes
     // OK would drop the keyboard's unsaved layout: asked first (the preset, and what was there for a "no")
@@ -78,6 +86,7 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
     fun keep(preset: LayoutPresets.Preset, from: SettingsSubtype) {
         LayoutPresets.restorePopupSet(ctx, from, preset) // its popup set, if deleted since
         prefs.edit { putString(LayoutPresets.PREF_SELECTED, preset.name) }
+        helium314.keyboard.settings.CustomLabels.clear(prefs, helium314.keyboard.settings.CustomLabels.Kind.LAYOUT)
     }
     if (showList || askLoss != null) androidx.compose.runtime.DisposableEffect(Unit) {
         helium314.keyboard.latin.utils.LayoutUtilsCustom.cleanupHeld++
@@ -118,11 +127,15 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
                     askLoss = Triple(it, initial, initialKeyboard)
                 else keep(it, initialKeyboard)
             },
-            // the built-in Layouts can't be changed; the user's own are renamed and deleted here
+            // the built-in Layouts can't be changed; the user's own: long press renames (2026-10-11), the save icon
+            // (only where it differs from the keyboard) updates it with this keyboard's settings, the trash deletes
             trailing = { preset -> if (!preset.builtIn) {
-                IconButton({ toRename = preset }) { Icon(painterResource(R.drawable.ic_edit), stringResource(R.string.layout_preset_rename)) }
+                if (differs[preset] == true)
+                    IconButton({ if (previewed != null) { putBack(); previewed = null }; toUpdate = preset }) {
+                        Icon(painterResource(R.drawable.ic_save), stringResource(R.string.update_item_icon)) }
                 DeleteButton { toDelete = preset }
             } },
+            onItemLongClick = { preset -> if (!preset.builtIn) toRename = preset },
             footer = {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxWidth().clickable { saveAs = true }
@@ -132,12 +145,16 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
                 }
             },
         )
+    val sameAsNow = if (!saveAs) null else remember(saveAs) { presets.firstOrNull { !LayoutPresets.isTweaked(ctx, keyboard, it) }?.name }
     if (saveAs)
         TextInputDialog(
             onDismissRequest = { saveAs = false },
             title = { Text(stringResource(R.string.layout_preset_save)) },
             initialText = stringResource(R.string.layout_preset_default_name, presets.size + 1),
             checkTextValid = { name -> name.isNotBlank() && all.none { it.name == name } },
+            // a saved Layout with these settings already: said, nothing blocked (2026-10-11: "include the already exists note")
+            description = sameAsNow?.let { { helium314.keyboard.settings.dialogs.SameSettingsNote(it) } },
+            confirmButtonText = stringResource(if (sameAsNow != null) R.string.save_anyway else android.R.string.ok),
             onConfirmed = { name ->
                 // what is on the keyboard now, a previewed Layout included
                 store(presets + LayoutPresets.snapshot(ctx, keyboard).let { values ->
@@ -157,6 +174,24 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
                 KeyboardProfiles.replaceValueEverywhere(ctx.realPrefs(), LayoutPresets.PREF_SELECTED, preset.name, name)
             },
         )
+    }
+    toUpdate?.let { preset ->
+        // (the keyboard as it was when the list opened: a preview was put back first)
+        val others = remember(preset) { helium314.keyboard.settings.screens.otherUsers(ctx, LayoutPresets.PREF_SELECTED, preset.name,
+            initialKeyboard, KeyboardProfiles.Group.LAYOUT) }
+        val sameAs = remember(preset) { presets.firstOrNull { it != preset && differs[it] == false }?.name }
+        helium314.keyboard.settings.dialogs.UpdateSavedItemDialog(preset.name,
+            others.map { helium314.keyboard.settings.screens.keyboardName(it, ctx) }, sameAs,
+            onDismissRequest = { toUpdate = null },
+        ) { ticked ->
+            val values = LayoutPresets.snapshot(ctx, initialKeyboard)
+            val updated = LayoutPresets.Preset(preset.name, values, remembered = helium314.keyboard.settings.SavedItemDefaults.remembered(values))
+            store(presets.map { if (it.name == preset.name) updated else it })
+            prefs.edit { putString(LayoutPresets.PREF_SELECTED, preset.name) } // (this keyboard is that Layout now)
+            helium314.keyboard.settings.CustomLabels.clear(prefs, helium314.keyboard.settings.CustomLabels.Kind.LAYOUT)
+            for (i in ticked) LayoutPresets.applyToOther(ctx, others[i], updated)
+            toUpdate = null
+        }
     }
     askLoss?.let { (preset, before, beforeKeyboard) ->
         ConfirmationDialog(

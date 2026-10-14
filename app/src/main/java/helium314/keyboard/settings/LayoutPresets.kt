@@ -185,9 +185,22 @@ object LayoutPresets {
             kept(Settings.PREF_POPUP_KEYS_ORDER, Defaults.PREF_POPUP_KEYS_ORDER), atDefault))
     }
 
-    /** [values] (settings part) replace the current ones: null and missing keys go back to their default. */
-    fun applySettings(ctx: Context, values: Map<String, Any?>) {
-        val prefs = ctx.prefs()
+    /** [preset] (just updated with the edited keyboard's settings) on another [keyboard] that uses it and was ticked in
+     *  the update dialog (2026-10-11): its settings, its keys, the name, no Custom label. */
+    fun applyToOther(ctx: Context, keyboard: SettingsSubtype, preset: Preset) {
+        val real = ctx.realPrefs()
+        val id = KeyboardProfiles.anyIdIn(real.all, keyboard) ?: return
+        val view = helium314.keyboard.latin.settings.ProfilePreferences(real) { id }
+        applySettings(ctx, settingsFor(keyboard, preset, SavedItemDefaults.takeNewDefaults(real)), view)
+        view.edit { putString(PREF_SELECTED, preset.name) }
+        CustomLabels.clear(view, CustomLabels.Kind.LAYOUT)
+        val changed = keyboardWith(ctx, keyboard, preset)
+        if (changed != keyboard) helium314.keyboard.latin.utils.SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, changed, ctx)
+    }
+
+    /** [values] (settings part) replace the current ones ([prefs]: the edited keyboard's): null and missing keys go
+     *  back to their default. */
+    fun applySettings(ctx: Context, values: Map<String, Any?>, prefs: SharedPreferences = ctx.prefs()) {
         val now = current(prefs)
         prefs.edit {
             for (key in now.keys) if (inScope(key) && !values.containsKey(key)) remove(key)

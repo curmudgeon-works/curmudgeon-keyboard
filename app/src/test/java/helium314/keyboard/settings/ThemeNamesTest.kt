@@ -12,6 +12,8 @@ import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ActivityScenario
@@ -70,7 +72,7 @@ class ThemeNamesTest {
         open().use {
             compose.onNodeWithText(ctx.getString(R.string.appearance_looks)).performClick()
             compose.onNode(hasScrollAction()).performScrollToNode(hasText("Mine")) // (after the built-in ones)
-            compose.onNodeWithContentDescription(ctx.getString(R.string.appearance_look_rename)).performClick()
+            compose.onNodeWithText("Mine").performTouchInput { longClick() } // (a long press renames, 2026-10-11)
             typeAndOk(curmudgeon)
             assertEquals(listOf("Mine"), names())
             typeAndOk("Work")
