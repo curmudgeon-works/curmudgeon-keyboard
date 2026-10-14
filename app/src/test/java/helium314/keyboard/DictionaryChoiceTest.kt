@@ -9,6 +9,7 @@ import helium314.keyboard.latin.dictionary.DictionarySelection
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.DictionaryInfoUtils
+import helium314.keyboard.settings.preferences.RestoreDictionaries
 import helium314.keyboard.settings.screens.getUserAndInternalDictionaries
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -33,7 +34,11 @@ class DictionaryChoiceTest {
     private fun add(locale: Locale, name: String) = File(dir(locale), name).apply { writeText(name) }
 
     @Before fun clean() {
-        listOf(hi, en).forEach { dir(it).deleteRecursively(); DictionarySelection.clear(ctx, it) }
+        listOf(hi, en).forEach {
+            dir(it).deleteRecursively()
+            DictionarySelection.clear(ctx, it)
+            DictionarySelection.clear(ctx, it, Dictionary.TYPE_EMOJI)
+        }
     }
 
     /** The main dictionary the engine loads (the first main one it tries): an added file's name, or "internal". */
@@ -116,10 +121,72 @@ class DictionaryChoiceTest {
         assertEquals("main_prev.user.dict", dialogInUse(hi))
     }
 
-    @Test fun `other kinds are unchanged`() {
+    @Test fun `the main choice leaves other kinds alone`() {
         add(hi, "emoji_user.dict")
         DictionarySelection.select(ctx, hi, DictionarySelection.INTERNAL)
         val (extracted, _) = DictionaryFactory.dictionaryFilesInOrder(ctx, hi, true)
         assertTrue(extracted.any { it.name == "emoji_user.dict" })
+    }
+
+    // emoji as main (review M3, owner 2026-10-12: "empji dict restore behavior should match main. _prev, _prev2 should
+    // happen, and should be de-selected in favor of the backup's version. User should still be able to tap on the older
+    // versions to activate just like main"); before, every added emoji file was tried, the first listed winning
+
+    /** The added emoji files the engine tries (the first loading one is used). */
+    private fun engineEmoji(locale: Locale): List<String> =
+        DictionaryFactory.dictionaryFilesInOrder(ctx, locale, true).first
+            .filter { DictionarySelection.isAdded(it) && DictionarySelection.typeOf(it) == Dictionary.TYPE_EMOJI }.map { it.name }
+
+    @Test fun `of two added emoji files only the selected one is used, whichever is listed first`() {
+        add(hi, "emoji_prev_user.dict"); add(hi, "emoji_user.dict"); add(hi, "main_user.dict")
+        assertEquals(listOf("emoji_user.dict"), engineEmoji(hi), "no selection: emoji_user.dict")
+        DictionarySelection.select(ctx, hi, "emoji_prev_user.dict", Dictionary.TYPE_EMOJI)
+        assertEquals(listOf("emoji_prev_user.dict"), engineEmoji(hi))
+        assertEquals("main_user.dict", engineMain(hi, emoji = true), "main is not changed by the emoji choice")
+        DictionarySelection.select(ctx, hi, "emoji_user.dict", Dictionary.TYPE_EMOJI)
+        assertEquals(listOf("emoji_user.dict"), engineEmoji(hi))
+        // what the dialog marks in use for emoji (no internal emoji dictionary)
+        val (files, _) = getUserAndInternalDictionaries(ctx, hi)
+        assertEquals("emoji_user.dict", DictionarySelection.inUse(ctx, hi, files, false, Dictionary.TYPE_EMOJI))
+        // the selected one deleted: back to the other one
+        File(dir(hi), "emoji_user.dict").delete()
+        assertEquals(listOf("emoji_prev_user.dict"), engineEmoji(hi))
+    }
+
+    /** A partial restore of the backup's [content] as "emoji_user.dict" of [locale], through the restore's plan and apply. */
+    private fun restoreEmoji(locale: Locale, content: String): RestoreDictionaries.Step {
+        val source = File(ctx.cacheDir, "backup_emoji_user.dict").apply { writeText(content) }
+        val tag = dir(locale).name
+        val step = RestoreDictionaries.plan(tag, "emoji_user.dict", source.inputStream().use { RestoreDictionaries.digest(it) },
+            RestoreDictionaries.deviceDigests(dir(locale)))
+        RestoreDictionaries.apply(step, dir(locale), source, DeviceProtectedUtils.getRealSharedPreferences(ctx))
+        return step
+    }
+
+    @Test fun `a clashing emoji restore keeps the device's as prev and uses the backup's`() {
+        add(hi, "emoji_user.dict") // (the device's: its content is its name)
+        val step = restoreEmoji(hi, "backup 1")
+        assertEquals(RestoreDictionaries.Action.CLASH, step.action)
+        assertEquals("emoji_user.dict", File(dir(hi), "emoji_prev_user.dict").readText(), "the device's kept aside")
+        assertEquals("backup 1", File(dir(hi), "emoji_user.dict").readText(), "the backup's in")
+        assertEquals("emoji_user.dict", DictionarySelection.selected(ctx, hi, Dictionary.TYPE_EMOJI), "the backup's selected")
+        assertEquals(listOf("emoji_user.dict"), engineEmoji(hi), "the engine uses the backup's only")
+        // a second clash: the next free name
+        restoreEmoji(hi, "backup 2")
+        assertEquals("backup 1", File(dir(hi), "emoji_prev2_user.dict").readText())
+        assertEquals("emoji_user.dict", File(dir(hi), "emoji_prev_user.dict").readText())
+        assertEquals("backup 2", File(dir(hi), "emoji_user.dict").readText())
+        assertEquals(listOf("emoji_user.dict"), engineEmoji(hi))
+    }
+
+    @Test fun `tapping a restore's prev emoji file makes the engine use it`() {
+        add(hi, "emoji_user.dict")
+        restoreEmoji(hi, "backup")
+        DictionarySelection.select(ctx, hi, "emoji_prev_user.dict", Dictionary.TYPE_EMOJI) // (the dialog's tap)
+        assertEquals(listOf("emoji_prev_user.dict"), engineEmoji(hi))
+        val (files, _) = getUserAndInternalDictionaries(ctx, hi)
+        assertEquals("emoji_prev_user.dict", DictionarySelection.inUse(ctx, hi, files, false, Dictionary.TYPE_EMOJI))
+        // the selection key the restore writes is the one the engine reads
+        assertEquals(RestoreDictionaries.selectedKey(dir(hi).name, Dictionary.TYPE_EMOJI), DictionarySelection.prefKey(hi, Dictionary.TYPE_EMOJI))
     }
 }

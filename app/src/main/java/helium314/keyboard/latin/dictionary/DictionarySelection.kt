@@ -22,12 +22,16 @@ import java.util.Locale
  * With nothing selected, or the selected file gone: "main_user.dict" if there, else the internal one, never a "_prev"
  * file (before, the first file of a kind in the folder listing's order won); only with no internal dictionary for the
  * language and no "main_user.dict" the first of the other added main files by name.
+ *
+ * Every other kind (in practice "emoji") the same way, by its own preference (`dict_selected_hi_emoji`), its default
+ * "<kind>_user.dict" and its internal one if there is any (owner 2026-10-12, review M3: "empji dict restore behavior
+ * should match main"; before, every added file of another kind was tried, the first in the listing's order winning).
  */
 object DictionarySelection {
     const val PREF_PREFIX = "dict_selected_"
     const val INTERNAL = "internal"
     /** The added main dictionary's name, as NewDictionaryDialog writes it. */
-    val DEFAULT_USER_MAIN = Dictionary.TYPE_MAIN + "_" + DictionaryInfoUtils.USER_DICTIONARY_SUFFIX
+    val DEFAULT_USER_MAIN = defaultName(Dictionary.TYPE_MAIN)
 
     fun prefKey(locale: Locale, type: String) = PREF_PREFIX + locale.toLanguageTag() + "_" + type
 
@@ -50,24 +54,38 @@ object DictionarySelection {
 
     fun isAdded(file: File) = file.name.endsWith(DictionaryInfoUtils.USER_DICTIONARY_SUFFIX)
 
-    private fun isAddedMain(file: File) = isAdded(file) && typeOf(file) == Dictionary.TYPE_MAIN
+    private fun isAdded(file: File, type: String) = isAdded(file) && typeOf(file) == type
+
+    /** The added dictionary's name used when nothing of [type] is selected: "main_user.dict", "emoji_user.dict". */
+    fun defaultName(type: String) = type + "_" + DictionaryInfoUtils.USER_DICTIONARY_SUFFIX
 
     /**
-     * The added main dictionary in use among [files] (the language's folder), or null for the internal one, by
-     * [selection] (see the class). [hasInternal]: the language has an internal main dictionary.
+     * The added dictionary of [type] in use among [files] (the language's folder), or null for the internal one (or
+     * none), by [selection] (see the class). [hasInternal]: the language has an internal dictionary of [type].
      */
-    fun mainAdded(files: Collection<File>, selection: String?, hasInternal: Boolean): File? {
-        val added = files.filter { isAddedMain(it) }
+    fun added(files: Collection<File>, type: String, selection: String?, hasInternal: Boolean): File? {
+        val added = files.filter { isAdded(it, type) }
         if (selection == INTERNAL && hasInternal) return null
         selection?.let { s -> added.firstOrNull { it.name == s }?.let { return it } }
-        added.firstOrNull { it.name == DEFAULT_USER_MAIN }?.let { return it }
+        val defaultFile = defaultName(type)
+        added.firstOrNull { it.name == defaultFile }?.let { return it }
         return if (hasInternal) null else added.minByOrNull { it.name }
     }
 
-    /** What the dialog marks as in use: the file's name, or [INTERNAL] (also when there is no main dictionary at all). */
-    fun inUse(ctx: Context, locale: Locale, files: Collection<File>, hasInternal: Boolean): String =
-        mainAdded(files, selected(ctx, locale), hasInternal)?.name ?: INTERNAL
+    /** The added main dictionary in use ([added] of "main"). */
+    fun mainAdded(files: Collection<File>, selection: String?, hasInternal: Boolean): File? =
+        added(files, Dictionary.TYPE_MAIN, selection, hasInternal)
 
-    /** [files] without the added main dictionaries not in use ([main]: the one in use; null: the internal one). */
-    fun withoutUnused(files: List<File>, main: File?): List<File> = files.filter { !isAddedMain(it) || it == main }
+    /** What the dialog marks as in use for [type]: the file's name, or [INTERNAL] (also when there is no dictionary
+     *  of [type] at all). */
+    fun inUse(ctx: Context, locale: Locale, files: Collection<File>, hasInternal: Boolean, type: String = Dictionary.TYPE_MAIN): String =
+        added(files, type, selected(ctx, locale, type), hasInternal)?.name ?: INTERNAL
+
+    /** [files] without the added dictionaries not in use, of every kind: per kind [added], by [selection] (the stored
+     *  choice of a kind) and [hasInternal] (the language has an internal one of the kind). */
+    fun withoutUnused(files: List<File>, selection: (String) -> String?, hasInternal: (String) -> Boolean): List<File> {
+        val inUse = files.filter { isAdded(it) }.map { typeOf(it) }.distinct()
+            .associateWith { added(files, it, selection(it), hasInternal(it)) }
+        return files.filter { !isAdded(it) || inUse[typeOf(it)] == it }
+    }
 }

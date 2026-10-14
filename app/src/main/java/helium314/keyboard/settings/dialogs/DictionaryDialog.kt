@@ -60,20 +60,27 @@ fun DictionaryDialog(
     val mainDict = dictionaries.firstOrNull { it.name == Dictionary.TYPE_MAIN + "_" + DictionaryInfoUtils.USER_DICTIONARY_SUFFIX }
     val addonDicts = dictionaries.filterNot { it == mainDict }
     val picker = dictionaryFilePicker(locale)
-    // the main dictionary in use: a tap on a greyed main row (the internal one, an added one) selects it, for every
-    // keyboard with this language (2026-10-12, DictionarySelection); rows and names as before
+    // the dictionary of each kind in use: a tap on a greyed row (the internal main one, an added one of any kind, e.g.
+    // a restore's "emoji_prev_user.dict") selects it, for every keyboard with this language (2026-10-12,
+    // DictionarySelection; emoji as main since review M3); rows and names as before
     var selectionChanged by remember { mutableIntStateOf(0) }
-    val inUse = remember(selectionChanged, dictionaries, hasInternal) { DictionarySelection.inUse(ctx, locale, dictionaries, hasInternal) }
-    fun select(name: String) {
-        if (name == inUse) return
-        DictionarySelection.select(ctx, locale, name)
+    // (only main has internal dictionaries: none of another kind is bundled)
+    fun hasInternalOf(type: String) = type == Dictionary.TYPE_MAIN && hasInternal
+    val inUse = remember(selectionChanged, dictionaries, hasInternal) {
+        (dictionaries.filter { DictionarySelection.isAdded(it) }.map { DictionarySelection.typeOf(it) } + Dictionary.TYPE_MAIN)
+            .distinct().associateWith { DictionarySelection.inUse(ctx, locale, dictionaries, hasInternalOf(it), it) }
+    }
+    fun select(name: String, type: String) {
+        if (name == inUse[type]) return
+        DictionarySelection.select(ctx, locale, name, type)
         selectionChanged++
         ctx.sendBroadcast(Intent(DictionaryPackConstants.NEW_DICTIONARY_INTENT_ACTION)) // (the keyboard loads it)
     }
     val greyed = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) // for disabled look
-    fun mainRow(dict: File): Pair<Boolean, () -> Unit>? =
-        if (DictionarySelection.isAdded(dict) && DictionarySelection.typeOf(dict) == Dictionary.TYPE_MAIN)
-            Pair(inUse == dict.name) { select(dict.name) }
+    fun selectableRow(dict: File): Pair<Boolean, () -> Unit>? =
+        if (DictionarySelection.isAdded(dict)) DictionarySelection.typeOf(dict).let { type ->
+            Pair(inUse[type] == dict.name) { select(dict.name, type) }
+        }
         else null
     ThreeButtonAlertDialog(
         onDismissRequest = onDismissRequest,
@@ -84,26 +91,26 @@ fun DictionaryDialog(
         content = {
             Column {
                 if (hasInternal) {
-                    val color = if (inUse == DictionarySelection.INTERNAL) MaterialTheme.typography.titleSmall.color else greyed
+                    val color = if (inUse[Dictionary.TYPE_MAIN] == DictionarySelection.INTERNAL) MaterialTheme.typography.titleSmall.color else greyed
                     val bottomPadding = if (mainDict == null) 12.dp else 0.dp
                     Text(stringResource(R.string.internal_dictionary_summary),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { select(DictionarySelection.INTERNAL) }
+                            .clickable { select(DictionarySelection.INTERNAL, Dictionary.TYPE_MAIN) }
                             .padding(bottom = bottomPadding),
                         color = color,
                         style = MaterialTheme.typography.titleSmall
                     )
                 }
                 if (mainDict != null)
-                    DictionaryDetails(mainDict, locale, keyboard, onTurnOff, mainRow(mainDict), greyed)
+                    DictionaryDetails(mainDict, locale, keyboard, onTurnOff, selectableRow(mainDict), greyed)
                 if (addonDicts.isNotEmpty()) {
                     HorizontalDivider()
                     Text(stringResource(R.string.dictionary_category_title),
                         modifier = Modifier.padding(vertical = 12.dp),
                         style = MaterialTheme.typography.titleSmall
                     )
-                    addonDicts.forEach { DictionaryDetails(it, locale, keyboard, onTurnOff, mainRow(it), greyed) }
+                    addonDicts.forEach { DictionaryDetails(it, locale, keyboard, onTurnOff, selectableRow(it), greyed) }
                 }
                 val dictString = createDictionaryTextAnnotated(locale)
                 if (dictString.isNotEmpty()) {
@@ -128,7 +135,8 @@ fun DictionaryDialog(
 @Composable
 private fun DictionaryDetails(dict: File, locale: Locale, keyboard: helium314.keyboard.latin.settings.SettingsSubtype?,
                               onTurnOff: (() -> Unit)?,
-                              /** A main dictionary's row: whether it is in use, and selecting it; null: another kind. */
+                              /** An added dictionary's row: whether it is in use among those of its kind, and selecting
+                               *  it; null: not selectable. */
                               main: Pair<Boolean, () -> Unit>? = null,
                               greyed: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Unspecified) {
     val header = DictionaryInfoUtils.getDictionaryFileHeaderOrNull(dict) ?: return
@@ -142,7 +150,7 @@ private fun DictionaryDetails(dict: File, locale: Locale, keyboard: helium314.ke
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth()
     ) {
-        // a main dictionary not in use: greyed, a tap selects it
+        // a dictionary not in use (of its kind): greyed, a tap selects it
         Text(title, style = MaterialTheme.typography.titleSmall,
             color = if (main == null || main.first) androidx.compose.ui.graphics.Color.Unspecified else greyed,
             modifier = Modifier.weight(1f).let { m -> if (main == null) m else m.clickable { main.second() } })
