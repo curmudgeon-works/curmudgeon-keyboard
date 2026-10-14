@@ -152,7 +152,7 @@ object GestureDecoderVocabulary {
         if (specs.size == 1 && specs[0].factor == 1f) return getOrBuildAsync(specs[0].locale)
         val key = specs.joinToString("|") { it.key }
         merged[key]?.let { return it }
-        if (!mergeable(specs, ::getOrBuildAsync) { it in noDictionary }) { wanted[key] = specs; return null }
+        if (!mergeable(specs, ::getOrBuildAsync, ::nothingToWaitFor)) { wanted[key] = specs; return null }
         // one merge at a time: the keyboard's warm-up and the first swipe may both get here; the second waits for the
         // first's result instead of doing the same work at the same time (review 2026-10-06). One lock for all lists:
         // merges are rare and two of different lists at once are rarer, and a lock per list name piled up (2026-10-06)
@@ -168,6 +168,10 @@ object GestureDecoderVocabulary {
      * builds of those that aren't), or the language has no dictionary at all ([hasNoDictionary]: nothing to wait for;
      * merge() skips it). Review 2026-10-06: one language without a dictionary left every swipe of the keyboard empty.
      */
+    /** A language the merge doesn't wait for: no dictionary at all, or one whose build just failed (a broken file; review
+     *  2026-10-08 area 5 #5: one broken dictionary left a multilingual keyboard with no swipes). merge() skips it. */
+    internal fun nothingToWaitFor(tag: String): Boolean = tag in noDictionary || !buildAllowed(tag)
+
     internal fun mergeable(specs: List<LocaleSpec>, listFor: (Locale) -> Vocabulary?, hasNoDictionary: (String) -> Boolean): Boolean {
         var ready = true
         for (spec in specs) // (no early stop: every language's build is started)
@@ -189,7 +193,8 @@ object GestureDecoderVocabulary {
         // dictionaries from different sources use different frequency scales (the Hinglish list's top thousand words
         // all sit at 248+, English's "the" is 222), so every further language is put on the first language's scale
         // by rank before its priority factor applies; otherwise the factor fights the scale instead of expressing priority
-        val reference = specs.firstNotNullOfOrNull { mainEntries[it.locale.toLanguageTag()] }?.map { it.second }
+        // (the first language WITH dictionary words: one without a dictionary keeps an empty list)
+        val reference = specs.firstNotNullOfOrNull { mainEntries[it.locale.toLanguageTag()]?.takeIf { e -> e.isNotEmpty() } }?.map { it.second }
         mergeInto(vocab, specs, reference, { mainEntries[it] }, { locale, entries -> withoutExcluded(context, locale, entries, learned = false) },
             { learnedOf(context, it) })
         if (vocab.size == 0) return null
@@ -271,6 +276,7 @@ object GestureDecoderVocabulary {
     private fun startBuild(locale: Locale, key: String) {
         if (!buildAllowed(key)) return
         if (building.add(key)) {
+            val clearsAtStart = clears.get()
             Thread({
                 try {
                     loadOrBuild(locale, key)
@@ -278,10 +284,18 @@ object GestureDecoderVocabulary {
                     Log.w(TAG, "vocabulary build failed for $key", t)
                 } finally {
                     building.remove(key)
+                    // a clear() came while this build ran: it read the dictionaries from before, and the rebuild the clear
+                    // asked for couldn't start beside it (review 2026-10-08 area 5 #3: the old words stayed till a restart)
+                    if (clears.get() != clearsAtStart) {
+                        if (cache.containsKey(key)) stale.add(key) // (still served until the new build publishes)
+                        buildFailedAt.remove(key)
+                        startBuild(locale, key)
+                    }
                 }
             }, "GestureVocabBuild-$key").start()
         }
     }
+    private val clears = java.util.concurrent.atomic.AtomicInteger()
 
     /**
      * Drop in-memory vocabularies — call when dictionaries change. The disk cache is
@@ -291,6 +305,7 @@ object GestureDecoderVocabulary {
      * without a dead-swipe window.
      */
     fun clear() {
+        clears.incrementAndGet()
         stale.addAll(cache.keys) // (kept and served until each rebuild publishes its list)
         common.clear()
         contractions.clear()
@@ -337,12 +352,14 @@ object GestureDecoderVocabulary {
      * any casing (its learned copies in all casings are gone too). Rebuilds leave it out via [exclusion]; a removed
      * word typed again often enough comes back as learned through [onWordLearned].
      */
-    fun onWordRemoved(locale: Locale, word: String) {
+    fun onWordRemoved(locale: Locale, word: String, pool: Int = LearnedStores.currentPool) {
         if (word.isEmpty()) return
         learnExecutor.execute {
             try {
                 val tag = locale.toLanguageTag()
-                for (m in learned.values) m.keys.removeIf { it.equals(word, ignoreCase = true) }
+                // the learned copy of the keyboard it was removed on ([pool]) only: another keyboard keeps its own (Rahul
+                // 2026-10-10: "We should only delete from current keyboard and move it into that keyboard's blacklist")
+                learned[storeKey(locale.script(), pool)]?.keys?.removeIf { it.equals(word, ignoreCase = true) }
                 cache[tag]?.remove(word)
                 for ((key, vocab) in merged)
                     if (mergedSpecs[key]?.any { it.locale.toLanguageTag() == tag } == true) vocab.remove(word)
@@ -396,8 +413,20 @@ object GestureDecoderVocabulary {
             Log.w(TAG, "no main dictionary file found for $locale")
         }
         if (words.isEmpty()) { // keep whatever the disk cache provided
-            if (mainDictFile != null && disk == null) noteBuildFailed(key) // (a dictionary file with nothing in it)
-            if (mainDictFile == null && disk == null) {
+            if (mainDictFile != null && disk == null) { // (a dictionary file with nothing in it)
+                noteBuildFailed(key)
+                mergeWanted(key) // the keyboards waiting for it merge without it now (nothingToWaitFor)
+            }
+            if (mainDictFile == null && disk != null) {
+                // the dictionary was removed (Dictionaries > delete, factory reset): its saved list goes too, else its
+                // words were swiped on every start (review 2026-10-08 area 5 #4); then as for no dictionary below
+                cacheFile.delete()
+                mainEntries.remove(key)
+                common.remove(key)
+                contractions.remove(key)
+                clearMerged()
+            }
+            if (mainDictFile == null) {
                 // no dictionary: the learned words alone, if there are any (re-review 2026-10-07: a keyboard of such a
                 // language couldn't swipe its own words), else nothing to wait for
                 val before = cache[key] // (a list kept from before a clear: its dictionary is gone now)
@@ -429,7 +458,7 @@ object GestureDecoderVocabulary {
         for (spec in specs) {
             val entries = entriesFor(spec.locale.toLanguageTag())
             if (entries != null) {
-                val normalized = if (reference == null || entries.map { it.second } == reference) entries
+                val normalized = if (reference.isNullOrEmpty() || entries.map { it.second } == reference) entries
                     else entries.mapIndexed { i, (word, _) -> word to reference[i.coerceAtMost(reference.lastIndex)] }
                 for ((word, freq) in withoutExcluded(spec.locale, normalized))
                     vocab.add(word, (freq * spec.factor).toInt().coerceAtLeast(MIN_PROBABILITY))
@@ -456,6 +485,14 @@ object GestureDecoderVocabulary {
             // the keyboards that asked for this language's merged vocabulary before it was ready get it now, on this
             // build thread, instead of at their first swipe
             mergeWanted(key)
+        } else if (mainEntries.isEmpty() && cache.remove(key) != null) {
+            // a language without a dictionary whose list was only learned words, and the pool now in use has none of its
+            // script (another keyboard's own learned words): the old pool's list goes, else that keyboard's words were
+            // swiped here (review 2026-10-08 area 5 #6). onWordLearned brings the language back with its first word.
+            stale.remove(key)
+            this.mainEntries.remove(key)
+            noDictionary.add(key)
+            clearMerged()
         }
         return history.size
     }

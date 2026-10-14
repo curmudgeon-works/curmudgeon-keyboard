@@ -884,12 +884,10 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
     }
 
     override fun removeWord(word: String) {
+        // this keyboard's learned words and blacklist only (Rahul 2026-10-10: "We should only delete from current keyboard
+        // and move it into that keyboard's blacklist"): no more deleting from Android's personal dictionary, which every
+        // keyboard reads; the blacklist keeps the word out of this keyboard's suggestions
         removeWords(listOf(word))
-        // and out of Android's personal dictionary for real: the in-memory copy alone came back with its next reload
-        val context = dictionaryGroups.firstNotNullOfOrNull { it.getSubDict(Dictionary.TYPE_USER)?.mContext } ?: return
-        val locales = locales
-        // (the provider can be missing or fail on some devices, see addToPersonalDictionaryIfInvalidButInHistory)
-        scope.launch { runCatching { deleteFromPersonalDictionary(context, word, locales) } }
     }
 
     /**
@@ -905,7 +903,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         for (word in words) {
             val history = historyFor(word)
             // each language's dictionaries say how the word is listed: as written if one of them has it so, else lowercase
-            val spellings = dictionaryGroups.map { it.removeEverywhere(word, history, swipe) }
+            val spellings = dictionaryGroups.map { it.removeEverywhere(word, history, swipe, learnedPool) }
             struck.add(if (word in spellings) word else spellings.firstOrNull() ?: word.lowercase())
         }
         for (spelling in struck) {
@@ -967,7 +965,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
             try {
                 val struck = LinkedHashSet<String>()
                 for (word in words) {
-                    val spellings = groups.map { it.removeEverywhere(word, history, swipe) }
+                    val spellings = groups.map { it.removeEverywhere(word, history, swipe, pool) }
                     struck.add(if (word in spellings || spellings.isEmpty()) word else spellings.first())
                 }
                 val list = RemovedWords.blacklist(context, script, pool)
@@ -1109,18 +1107,17 @@ private class DictionaryGroup(
      * the languages of a script share; the blacklist strike is the caller's, once per word); [swipe]: the swipe lists of the keyboard in use read [history] or its blacklist.
      * @return the spelling its blacklist entry has
      */
-    fun removeEverywhere(word: String, history: ExpandableBinaryDictionary?, swipe: Boolean = true): String {
+    fun removeEverywhere(word: String, history: ExpandableBinaryDictionary?, swipe: Boolean = true,
+                         pool: Int = helium314.keyboard.latin.personalization.LearnedStores.currentPool): String {
         // from the learned words and the personal dictionary in every capitalization ("Hello" at a sentence start was
         // learned as "hello"; "HELLO" with caps lock)
         val lower = word.lowercase(locale)
         val forms = linkedSetOf(word, lower, word.uppercase(locale), lower.replaceFirstChar { it.titlecase(locale) })
-        for (form in forms) {
-            history?.removeUnigramEntryDynamically(form)
-            getSubDict(Dictionary.TYPE_USER)?.removeUnigramEntryDynamically(form)
-        }
+        // (not from the personal dictionary: Android's, every keyboard's; the blacklist keeps it out here, 2026-10-10)
+        for (form in forms) history?.removeUnigramEntryDynamically(form)
         // and from the swipe vocabularies already built (the removed words list keeps it out of rebuilds), when they are
-        // [history]'s keyboard's ([swipe])
-        if (swipe) GestureDecoderVocabulary.onWordRemoved(locale, word)
+        // [history]'s keyboard's ([swipe]); the learned copy of [pool] only
+        if (swipe) GestureDecoderVocabulary.onWordRemoved(locale, word, pool)
 
         val contactsDict = getSubDict(Dictionary.TYPE_CONTACTS)
         if (contactsDict != null && contactsDict.isInDictionary(word)) {
