@@ -7,6 +7,7 @@ import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import helium314.keyboard.dictionarypack.DictionaryPackConstants
 import helium314.keyboard.latin.R
+import helium314.keyboard.latin.gesture.GestureStats
 import helium314.keyboard.latin.personalization.LearnedStores
 import helium314.keyboard.latin.personalization.LoadCountingHistory
 import helium314.keyboard.latin.personalization.RestoreGate
@@ -160,6 +161,20 @@ class FullRestoreRaceTest {
         assertTrue("newstrike" in lines, "the strike made during the restore was lost: $lines")
         assertFalse("oldword" in lines, "the old device's word came back: $lines")
         assertEquals(setOf("backupword", "newstrike"), list.entries().keys, "the keyboard's list isn't the restored one")
+    }
+
+    @Test fun `the swipe statistics after a full restore are the backup's, not the old ones in memory`() {
+        GestureStats.prefsProvider = { real }
+        real.edit().putString(GestureStats.PREF_KEY, "{\"oldtuning\":{\"n\":40,\"kept\":30}}").commit()
+        GestureStats.reload()
+        assertEquals(setOf("oldtuning"), GestureStats.read(real).keys) // (the keyboard holds the device's rows)
+        backup(extra = mapOf(GestureStats.PREF_KEY to "{\"backuptuning\":{\"n\":50,\"kept\":45}}"))
+        // a swipe right after the restore put the settings in place, and its write 2 s later (the old rows, with it)
+        FullRestore.afterStep = { if (it == "preferences.json") { GestureStats.onSwipe("swipedtuning", 10); GestureStats.flush(real) } }
+        assertEquals(null, fullRestoreJob())
+        val stored = org.json.JSONObject(real.getString(GestureStats.PREF_KEY, "{}")!!).keys().asSequence().toSet()
+        assertEquals(setOf("backuptuning"), stored, "the old rows were written over the restored ones")
+        assertEquals(setOf("backuptuning"), GestureStats.read(real).keys, "the keyboard's rows aren't the restored ones")
     }
 
     private companion object {

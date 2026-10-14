@@ -972,9 +972,9 @@ private fun restoreEverything(ctx: Context, file: File, promised: PendingRestore
  * what it still holds of the old device over the restored files (owner 2026-10-12: "A + B + swipe stats makes sense"):
  * the open learned-word stores are closed first, without saving (the restore replaces their files), and stay closed
  * until it's done; the blacklists keep their changes in memory meanwhile, put on top of the restored files at the end
- * and written then (a word removed during the restore stays removed). The gate goes after [work], when it failed too,
- * so it never sticks. Only the full restore: a keyboard restore never wipes, and it merges into the live stores and
- * lists under their own locks.
+ * and written then (a word removed during the restore stays removed); the swipe statistics aren't written meanwhile,
+ * and what they held is dropped at the end. The gate goes after [work], when it failed too, so it never sticks. Only
+ * the full restore: a keyboard restore never wipes, and it merges into the live stores and lists under their own locks.
  */
 private fun underRestoreGate(ctx: Context, work: () -> Unit) {
     RestoreGate.begin()
@@ -988,6 +988,9 @@ private fun underRestoreGate(ctx: Context, work: () -> Unit) {
         // meanwhile stays pending too)
         if (filesDir != null) for (list in RemovedWords.cachedIn(filesDir))
             try { list.reload() } catch (t: Throwable) { Log.w("AdvancedScreen", "error reading a blacklist after restore", t) }
+        // the swipe statistics read the restored settings at their next use (what they held is the old device's, never
+        // written while gated)
+        helium314.keyboard.latin.gesture.GestureStats.reload()
         RestoreGate.end()
         if (filesDir != null) for (list in RemovedWords.cachedIn(filesDir))
             try { list.writePending() } catch (t: Throwable) { Log.w("AdvancedScreen", "error writing a blacklist after restore", t) }

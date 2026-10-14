@@ -2,6 +2,7 @@
 package helium314.keyboard.latin.gesture
 
 import android.content.SharedPreferences
+import helium314.keyboard.latin.personalization.RestoreGate
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.realPrefs
@@ -64,6 +65,10 @@ object GestureStats {
     /** Writes what changed now (tests, and the scheduled write). */
     @Synchronized fun flush(prefs: SharedPreferences) {
         writePending = false
+        // while a full restore replaces the settings (owner 2026-10-12: "A + B + swipe stats makes sense"), the rows in
+        // memory are the old device's (or were read halfway through): nothing is written, and the restore drops them
+        // ([reload]) before the gate goes
+        if (RestoreGate.isSet) return
         val o = live ?: return
         prefs.edit().putString(PREF_KEY, o.toString()).apply()
     }
