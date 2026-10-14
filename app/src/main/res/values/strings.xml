@@ -380,7 +380,20 @@
     <string name="restore_required_for">Required for %s</string>
     <!-- under the top checkbox, unticked, when a ticked row needs merging (owner 2026-10-12) -->
     <string name="restore_tricky">Tricky merging ahead!</string>
+    <!-- under a keyboard's row while ticked, after "Merge required": its dictionary differs from the device's (owner
+         2026-10-13, R-DICT). %s: the device's dictionaries kept aside, e.g. main_prev -->
+    <string name="restore_dictionary_differs">Dictionary differs: yours kept as %s</string>
+    <!-- screen 1's last section: rows for what the backup also has, ticked to start (owner 2026-10-13, R-DICT) -->
+    <string name="restore_section_also">Also restore</string>
+    <!-- the backup's dictionaries of languages no keyboard in the backup has -->
+    <string name="restore_other_dictionaries">Other dictionaries</string>
+    <!-- in that row's subtext, a language whose device dictionary is kept aside: %1$s the language, %2$s e.g. main_prev -->
+    <string name="restore_other_dictionary_kept">%1$s: yours kept as %2$s</string>
     <string name="restore_clipboard">Clipboard history</string>
+    <!-- %d: the clipboard history size setting -->
+    <string name="restore_clipboard_added">Added to yours; the newest %d kept</string>
+    <string name="restore_personal_words">Android personal dictionary words</string>
+    <string name="restore_added_to_yours">Added to yours</string>
     <!-- Swipe tuning screen (own gesture decoder): inflection weights and per-setting statistics -->
     <string name="swipe_tuning">Swipe suggestion parameters</string>
     <!-- One line under the heading: what the six sliders below are -->

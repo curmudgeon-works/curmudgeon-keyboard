@@ -471,7 +471,8 @@ internal class PendingRestore(val file: File, val prefs: Map<String, Any?>, val 
     private val plain = entries.map { it.substringAfter("unprotected${File.separator}") }
     val hasLearnedWords = plain.any { it.startsWith(UserHistoryDictionary.NAME) || it.startsWith("blacklists${File.separator}") }
     val hasDictionaries = plain.any { it.startsWith("dicts${File.separator}") && it.endsWith(DictionaryInfoUtils.USER_DICTIONARY_SUFFIX) }
-    /** Android's personal dictionary words: brought by every keyboard by keyboard restore (owner 2026-10-12, no row). */
+    /** Android's personal dictionary words: brought by a keyboard by keyboard restore with their "Also restore" row
+     *  ticked (owner 2026-10-13, R-DICT; 2026-10-12: always, no row). */
     val hasPersonalDictionary = PERSONAL_DICT_FILE_NAME in entries
     val hasClipboard = Database.NAME in entries
     /** Learned or blacklisted words, or personal dictionary words. */
@@ -479,8 +480,9 @@ internal class PendingRestore(val file: File, val prefs: Map<String, Any?>, val 
 }
 
 /** What the restore dialog was told to bring: [keyboards] with their [settings], their learned words, the
- *  [dictionaries], Android's [personalDictionary] words and the [clipboard] (merged into the device's); the dialog always
- *  brings all of these, no row (owner 2026-10-12; tests pick). */
+ *  keyboards' [dictionaries], Android's [personalDictionary] words and the [clipboard] (merged into the device's), and
+ *  the [otherDictionaries]; the last three by their "Also restore" rows (owner 2026-10-13, R-DICT; 2026-10-12: always,
+ *  no row). */
 private class RestoreChoice(
     val keyboards: List<SettingsSubtype>, val settings: Boolean, val learnedWords: Boolean, val dictionaries: Boolean,
     val personalDictionary: Boolean, val clipboard: Boolean,
@@ -614,25 +616,27 @@ private fun ReadingDialog(onCancel: () -> Unit) = ThreeButtonAlertDialog(
  * on top as before (ticked: the "Delete and restore" question, then the full restore). Unticked: one row per backup
  * keyboard and saved item by section (Keyboards · Layouts & popups · Themes · Palettes & images · Fonts), names as in the
  * backup, every row ticked to start with ([RestoreFlow]); then one question per ticked row that needs merging, Back /
- * Next, the last one's button Restore. Settings and dictionaries, the clipboard history and Android's personal
- * dictionary words come with every restore, no row (the "Restore their", "And merge" and "For other clashes" rows of
- * before are gone). Everything reads [plan], made once when the backup was read off the main thread
+ * Next, the last one's button Restore. Settings, dictionaries and learned words come with each keyboard (a clash of its
+ * dictionaries said under its row); a last section "Also restore" has a row each for the other dictionaries, the
+ * clipboard history and Android's personal dictionary words, ticked to start (owner 2026-10-13, R-DICT; before, those
+ * came with every restore, no row). Everything reads [plan], made once when the backup was read off the main thread
  * ([readRestoreDialog], R5).
  */
 @Composable
 private fun RestoreChoiceDialog(pending: PendingRestore, plan: RestorePlan, onDismiss: () -> Unit, onError: (String) -> Unit) {
     val ctx = LocalContext.current
-    val flow = remember(pending) { RestoreFlow(plan, pending.keyboards) }
+    val flow = remember(pending) { RestoreFlow(plan, pending.keyboards, pending.hasClipboard, pending.hasPersonalDictionary) }
     val top = flow.top
     // once the restore started, the job deletes the file when done with it (2026-10-10: it runs after the dialog closed)
     var started by remember { mutableStateOf(false) }
     fun close() { if (!started) pending.file.delete(); onDismiss() }
     fun start() {
-        // (owner 2026-10-12: settings and dictionaries, the clipboard history and Android's personal dictionary words
-        // always, no row; the learned words come with each keyboard)
+        // (settings and the keyboards' dictionaries and learned words come with each keyboard; the other dictionaries, the
+        // clipboard history and Android's personal dictionary words with their "Also restore" rows, owner 2026-10-13
+        // R-DICT; were "always, no row", 2026-10-12)
         val choice = RestoreChoice(flow.restoring(), settings = true, learnedWords = pending.hasLearnedWords,
-            dictionaries = pending.hasDictionaries, personalDictionary = pending.hasPersonalDictionary, clipboard = pending.hasClipboard,
-            names = flow.choices(), decisions = flow.decisions())
+            dictionaries = pending.hasDictionaries, personalDictionary = flow.bringsPersonalWords, clipboard = flow.bringsClipboard,
+            names = flow.choices(), decisions = flow.decisions(), otherDictionaries = flow.bringsOtherDictionaries)
         var restored: Restored? = null
         started = runRestore(ctx, onError, R.string.backup_restored, restoreSteps(pending), noteTitle = R.string.backup_restored,
             note = { restored?.let { restoreSummary(ctx, it) } }) {
@@ -699,7 +703,13 @@ private fun RestoreChoiceDialog(pending: PendingRestore, plan: RestorePlan, onDi
                     if (pending.keyboards.isNotEmpty()) Heading(R.string.restore_keyboards)
                     // (names as in the backup: no "(new)" any more, owner 2026-10-12)
                     pending.keyboards.forEach { keyboard ->
-                        CheckRow(keyboardName(keyboard, ctx), top.ticked(keyboard), subtext = if (plan.asks(keyboard)) mergeRequired else null) {
+                        val ticked = top.ticked(keyboard)
+                        // (a clash of its dictionaries, while ticked: "Merge required · Dictionary differs: yours kept
+                        // as main_prev", owner 2026-10-13 R-DICT)
+                        val kept = if (ticked) dictionariesKeptText(ctx, plan.dictionariesKept(keyboard)) else null
+                        val subtext = listOfNotNull(if (plan.asks(keyboard)) mergeRequired else null,
+                            kept?.let { stringResource(R.string.restore_dictionary_differs, it) }).joinToString(" · ").ifEmpty { null }
+                        CheckRow(keyboardName(keyboard, ctx), ticked, subtext = subtext) {
                             if (it) top.selected.add(keyboard) else top.selected.remove(keyboard)
                         }
                     }
@@ -719,6 +729,20 @@ private fun RestoreChoiceDialog(pending: PendingRestore, plan: RestorePlan, onDi
                             CheckRow(item.name, flow.ticked(key), required.isEmpty(), subtext) { flow.tick(key, it) }
                         }
                     }
+                    // ALSO RESTORE, last: a row each the backup has, ticked to start (owner 2026-10-13, R-DICT)
+                    val others = flow.otherDictionaries
+                    if (others.isNotEmpty() || flow.hasClipboard || flow.hasPersonalWords) Heading(R.string.restore_section_also)
+                    if (others.isNotEmpty())
+                        CheckRow(stringResource(R.string.restore_other_dictionaries), flow.otherDictionariesTicked,
+                            subtext = otherDictionariesText(ctx, others)) { flow.otherDictionariesTicked = it }
+                    if (flow.hasClipboard)
+                        CheckRow(stringResource(R.string.restore_clipboard), flow.clipboardTicked,
+                            subtext = stringResource(R.string.restore_clipboard_added,
+                                ctx.prefs().getInt(Settings.PREF_CLIPBOARD_HISTORY_SIZE, Defaults.PREF_CLIPBOARD_HISTORY_SIZE))) {
+                            flow.clipboardTicked = it }
+                    if (flow.hasPersonalWords)
+                        CheckRow(stringResource(R.string.restore_personal_words), flow.personalWordsTicked,
+                            subtext = stringResource(R.string.restore_added_to_yours)) { flow.personalWordsTicked = it }
                 }
             }
         },
@@ -739,6 +763,23 @@ private fun RestoreChoiceDialog(pending: PendingRestore, plan: RestorePlan, onDi
         },
     )
 }
+
+private fun languageName(ctx: Context, tag: String) = java.util.Locale.forLanguageTag(tag).localizedDisplayName(ctx.resources)
+
+/** A keyboard's dictionaries kept aside ([kept]: language tag, name), compactly: "main_prev" or "main_prev, emoji_prev";
+ *  of several languages, each named: "main_prev (French), main_prev (Italian)". Null: none. */
+internal fun dictionariesKeptText(ctx: Context, kept: List<Pair<String, String>>): String? {
+    if (kept.isEmpty()) return null
+    if (kept.map { it.first }.distinct().size == 1) return kept.joinToString(", ") { it.second }
+    return kept.joinToString(", ") { (tag, name) -> "$name (${languageName(ctx, tag)})" }
+}
+
+/** The row "Other dictionaries"' subtext: each language, with what it keeps aside: "Korean: yours kept as main_prev". */
+internal fun otherDictionariesText(ctx: Context, others: Map<String, List<String>>): String =
+    others.entries.joinToString(", ") { (tag, kept) ->
+        if (kept.isEmpty()) languageName(ctx, tag)
+        else ctx.getString(R.string.restore_other_dictionary_kept, languageName(ctx, tag), kept.joinToString(", "))
+    }
 
 /** A row with a checkbox, and [subtext] under its text if any ([warning]: in the app's warning color). */
 @Composable
@@ -1539,9 +1580,13 @@ private fun restoreDictionaries(ctx: Context, backupPrefs: Map<String, Any?>, di
     return RestoredDictionaries(languages)
 }
 
-/** The languages whose dictionary in the backup [pending] clashes with the device's (the restore dialog's subtext; read
- *  off the main thread). */
-private fun dictionaryClashes(ctx: Context, pending: PendingRestore): Set<String> {
+/** The languages whose dictionary in the backup [pending] clashes with the device's (read off the main thread). */
+private fun dictionaryClashes(ctx: Context, pending: PendingRestore): Set<String> =
+    RestoreDictionaries.clashTags(dictionarySteps(ctx, pending))
+
+/** The backup [pending]'s dictionaries as the restore would bring each against the device's (the restore dialog's
+ *  subtexts, R-DICT; read off the main thread). */
+private fun dictionarySteps(ctx: Context, pending: PendingRestore): List<RestoreDictionaries.Step> {
     val backup = HashMap<RestoreDictionaries.Entry, String>()
     ZipInputStream(FileInputStream(pending.file)).use { zip ->
         var entry: ZipEntry? = zip.nextEntry
@@ -1552,10 +1597,10 @@ private fun dictionaryClashes(ctx: Context, pending: PendingRestore): Set<String
             entry = zip.nextEntry
         }
     }
-    if (backup.isEmpty()) return emptySet()
+    if (backup.isEmpty()) return emptyList()
     val folders = File(DictionaryInfoUtils.getWordListCacheDirectory(ctx))
-    return RestoreDictionaries.clashTags(RestoreDictionaries.plan(backup, pending.prefs) { tag ->
-        File(folders, tag).takeIf { it.isDirectory }?.let { RestoreDictionaries.deviceDigests(it) }.orEmpty() })
+    return RestoreDictionaries.plan(backup, pending.prefs) { tag ->
+        File(folders, tag).takeIf { it.isDirectory }?.let { RestoreDictionaries.deviceDigests(it) }.orEmpty() }
 }
 
 /** [dictionaryClashes] for the backup [file] (tests). */
@@ -2068,6 +2113,7 @@ private fun restorePlan(ctx: Context, pending: PendingRestore): RestorePlan {
         Log.w("AdvancedScreen", "error planning the backup's saved items", e)
         SavedItemsMerge.Plan()
     }
+    val dictionarySteps = try { dictionarySteps(ctx, pending) } catch (e: Exception) { emptyList() }
     val keyLayouts = items.keyLayouts
     val dir = DeviceProtectedUtils.getFilesDir(ctx)
     fun deviceKeys(type: LayoutType, name: String) = File(File(dir, type.folder), name).takeIf { it.isFile }?.readBytes()
@@ -2113,7 +2159,8 @@ private fun restorePlan(ctx: Context, pending: PendingRestore): RestorePlan {
         backupSettings = { keyboard, choices -> restoredSettings(ctx, pending.prefs, keyboard).let { renames(choices)?.apply(it) ?: it } },
         phoneSettings = { values, choices -> renames(choices)?.phoneApply(values) ?: values },
         clashes = items.clashes,
-        dictionaryClashes = try { dictionaryClashes(ctx, pending) } catch (e: Exception) { emptySet() },
+        dictionaryClashes = RestoreDictionaries.clashTags(dictionarySteps),
+        dictionarySteps = dictionarySteps,
         items = items, usedBy = usedBy, usedByItems = usedByItems, deviceUsers = deviceUsers, unsavedSave = unsavedSave)
 }
 

@@ -357,6 +357,44 @@ class RestoreMergeItemsTest {
         assertEquals(listOf("clip"), (0 until dao.count()).map { dao.getAt(it).text })
     }
 
+    // ---- the restore dialog's screen 1 (owner 2026-10-13, R-DICT) ----
+
+    // fail before: with no keyboard or item ticked Restore was greyed, whatever else the backup had; there were no rows
+    @Test fun `screen 1 - the Also restore rows count for Restore, all unticked greys it out`() {
+        backup(listOf(frB), entries = mapOf("dicts/ur/main_user.dict" to "urdu".toByteArray()))
+        val plan = restorePlanFrom(ctx, zip)
+        val flow = helium314.keyboard.settings.preferences.RestoreFlow(plan, plan.incoming.keys.toList(), hasClipboard = true, hasPersonalWords = true)
+        flow.top.check(false)
+        flow.top.selected.clear() // (no keyboard ticked)
+        assertEquals(setOf("ur"), flow.otherDictionaries.keys)
+        assertTrue(flow.anythingTicked, "the Also restore rows, ticked to start")
+        flow.otherDictionariesTicked = false; flow.clipboardTicked = false; flow.personalWordsTicked = false
+        assertFalse(flow.anythingTicked, "nothing ticked: Restore greyed out")
+        assertFalse(flow.bringsClipboard, "an unticked clipboard row brings no clips")
+        flow.clipboardTicked = true
+        assertTrue(flow.anythingTicked)
+        assertTrue(flow.bringsClipboard)
+        assertFalse(flow.bringsOtherDictionaries)
+    }
+
+    // fail before: no row said what a keyboard's dictionary clash does, nor which other dictionaries come
+    @Test fun `screen 1 - a keyboard's row names the dictionary kept aside, Other dictionaries names its languages`() {
+        dictDir("fr").mkdirs(); dict("fr", "main_user.dict").writeText("device")
+        dictDir("ko").mkdirs(); dict("ko", "main_user.dict").writeText("device ko")
+        backup(listOf(frB), entries = mapOf("dicts/fr/main_user.dict" to "backup".toByteArray(),
+            "dicts/ko/main_user.dict" to "backup ko".toByteArray(), "dicts/ur/main_user.dict" to "urdu".toByteArray()))
+        val plan = restorePlanFrom(ctx, zip)
+        val french = plan.incoming.keys.single()
+        assertEquals(listOf("fr" to "main_prev"), plan.dictionariesKept(french))
+        assertEquals("main_prev", helium314.keyboard.settings.preferences.dictionariesKeptText(ctx, plan.dictionariesKept(french)))
+        val others = plan.otherDictionaries(plan.incoming.keys)
+        assertEquals(mapOf("ko" to listOf("main_prev"), "ur" to emptyList()), others)
+        val text = helium314.keyboard.settings.preferences.otherDictionariesText(ctx, others)
+        fun name(tag: String) = java.util.Locale.forLanguageTag(tag).let { with(helium314.keyboard.latin.common.LocaleUtils) { it.localizedDisplayName(ctx.resources) } }
+        assertTrue(text.contains(string(helium314.keyboard.latin.R.string.restore_other_dictionary_kept, name("ko"), "main_prev")), text)
+        assertTrue(text.contains(name("ur")), text)
+    }
+
     // ---- Q1: after "Keep both", the restored copy of the keyboard being typed on is in use ----
 
     private fun inUse() = SubtypeSettings.getSelectedSubtype(real).let { with(SettingsSubtype) { it.toSettingsSubtype() } }

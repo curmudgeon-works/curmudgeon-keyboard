@@ -100,6 +100,8 @@ internal class RestorePlan(
     val phoneSettings: (Map<String, Any?>, SavedItemsMerge.Choices) -> Map<String, Any?> = { values, _ -> values },
     val clashes: List<SavedItemsMerge.Clash> = emptyList(),
     val dictionaryClashes: Set<String> = emptySet(),
+    // the backup's dictionaries as the restore would bring each against the device's (R-DICT: the rows' subtexts)
+    val dictionarySteps: List<RestoreDictionaries.Step> = emptyList(),
     val items: SavedItemsMerge.Plan = SavedItemsMerge.Plan(),
     val usedBy: Map<Pair<SavedItemsMerge.Kind, String>, List<SettingsSubtype>> = emptyMap(),
     val usedByItems: Map<Pair<SavedItemsMerge.Kind, String>, Set<Pair<SavedItemsMerge.Kind, String>>> = emptyMap(),
@@ -116,6 +118,22 @@ internal class RestorePlan(
     fun dictionaryClashLanguages(keyboards: Collection<SettingsSubtype>): List<String> =
         keyboards.flatMap { listOf(it.locale) + helium314.keyboard.latin.utils.getSecondaryLocales(it.extraValues) }
             .map { it.toLanguageTag() }.distinct().filter { it in dictionaryClashes }
+
+    /** The device's dictionaries [keyboard]'s restore keeps aside for the backup's, by language (tag) and name
+     *  ("main_prev"), in its languages' order (R-DICT: "Dictionary differs: yours kept as main_prev"). */
+    fun dictionariesKept(keyboard: SettingsSubtype): List<Pair<String, String>> {
+        val tags = backupKeyboardLanguages(listOf(keyboard))
+        return tags.flatMap { tag -> dictionarySteps.filter { it.tag == tag }.mapNotNull { s -> s.kept?.let { tag to RestoreDictionaries.shownName(it) } } }
+    }
+
+    /** The backup's dictionaries of languages none of [keyboards] (the backup's, ticked or not) has: the row "Other
+     *  dictionaries" (R-DICT), by language (tag), with the device's dictionaries each keeps aside ("main_prev"). */
+    fun otherDictionaries(keyboards: Collection<SettingsSubtype>): Map<String, List<String>> {
+        val tags = backupKeyboardLanguages(keyboards)
+        val result = LinkedHashMap<String, MutableList<String>>()
+        for (s in dictionarySteps) if (s.tag !in tags) result.getOrPut(s.tag) { ArrayList() }.apply { s.kept?.let { add(RestoreDictionaries.shownName(it)) } }
+        return result
+    }
 
     fun isSwitchedOff(keyboard: SettingsSubtype) = enabled.none { it.sameKeyboard(keyboard) }
 
@@ -332,8 +350,20 @@ internal class RestoreDialogState(private val keyboards: List<SettingsSubtype>) 
  * it. The answers are kept through Back and through unticking: a row unticked drops its question, ticked again its
  * earlier answer comes back. All of it reads [plan], made once when the backup was read.
  */
-internal class RestoreFlow(val plan: RestorePlan, val keyboards: List<SettingsSubtype>) {
+internal class RestoreFlow(val plan: RestorePlan, val keyboards: List<SettingsSubtype>,
+                           val hasClipboard: Boolean = false, val hasPersonalWords: Boolean = false) {
     val top = RestoreDialogState(keyboards)
+
+    // ---- "Also restore", screen 1's last section (owner 2026-10-13, R-DICT): a row each the backup has, ticked to start
+    /** The backup's dictionaries of languages no backup keyboard has, by language, with what each keeps aside. */
+    val otherDictionaries = plan.otherDictionaries(keyboards)
+    var otherDictionariesTicked by mutableStateOf(true)
+    var clipboardTicked by mutableStateOf(true)
+    var personalWordsTicked by mutableStateOf(true)
+    /** The "Also restore" rows ticked: what each brings. */
+    val bringsOtherDictionaries get() = !top.wipe && otherDictionaries.isNotEmpty() && otherDictionariesTicked
+    val bringsClipboard get() = !top.wipe && hasClipboard && clipboardTicked
+    val bringsPersonalWords get() = !top.wipe && hasPersonalWords && personalWordsTicked
     /** The items unticked on screen 1, by kind and backup key (a required one stays ticked whatever is here). */
     val unticked = androidx.compose.runtime.mutableStateListOf<Pair<SavedItemsMerge.Kind, String>>()
     /** The keyboard questions' answers, by backup keyboard. */
@@ -391,11 +421,13 @@ internal class RestoreFlow(val plan: RestorePlan, val keyboards: List<SettingsSu
         SavedItemsMerge.applyOrder.flatMap { plan.items.of(it) }.filter { it.mergeRequired && ticked(it.kind to it.key) }
             .map { Question.Item(it.kind, it.key) } + restoring().filter { plan.asks(it) }.map { Question.Keyboard(it) }
 
-    /** Screen 1's Restore / Next can be tapped: the full restore ticked, or a keyboard or item row ticked (owner 2026-10-12
-     *  A6: with every row unticked, Restore ran anyway and merged the clipboard, Android's personal dictionary and new
-     *  dictionaries without asking; overrides "Restore enabled with nothing ticked"). */
+    /** Screen 1's Restore / Next can be tapped: the full restore ticked, or a keyboard, item or "Also restore" row ticked
+     *  (owner 2026-10-12 A6: with every row unticked, Restore ran anyway and merged the clipboard, Android's personal
+     *  dictionary and new dictionaries without asking; overrides "Restore enabled with nothing ticked"; 2026-10-13
+     *  R-DICT: the "Also restore" rows count too). */
     val anythingTicked get() = top.wipe || restoring().isNotEmpty() ||
-        sections.any { section -> items(section).any { ticked(it.kind to it.key) } }
+        sections.any { section -> items(section).any { ticked(it.kind to it.key) } } ||
+        bringsOtherDictionaries || bringsClipboard || bringsPersonalWords
 
     /** "Tricky merging ahead!": the full restore unticked and a ticked row that needs merging (owner 2026-10-12). */
     val trickyAhead get() = !top.wipe && questions.isNotEmpty()
