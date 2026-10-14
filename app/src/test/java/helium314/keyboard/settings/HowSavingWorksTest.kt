@@ -86,8 +86,8 @@ class HowSavingWorksTest {
         assertTrue("\"Custom · from Sunset\"" in texts[4], texts[4])
     }
 
-    // owner 2026-10-12: the restore dialog's groups (Full restore (delete app data); Restore their: Settings,
-    // Dictionaries; And merge: Learned words, Clipboard history), told as they work now; "device", never "phone"
+    // owner 2026-10-12: the restore dialog's groups (Full restore (delete app data); since R-DICT, 2026-10-13, the
+    // keyboards and "Also restore"), told as they work now; "device", never "phone"
     @Test fun `partial and full restore rows - the new names, dictionaries and clipboard, device not phone`() {
         val partial = savingGuide.first { ctx.getString(it.title) == "Partial restore" }.rows.map { it.text }
         val full = savingGuide.first { ctx.getString(it.title) == "Full restore" }.rows.map { it.text }
@@ -98,6 +98,19 @@ class HowSavingWorksTest {
         assertTrue(texts.any { "Full restore (delete app data)" in it })
         assertTrue(texts.any { "higher count" in it && "personal dictionary" in it })
         assertTrue(texts.any { "…prev" in it })
+    }
+
+    // owner 2026-10-14 ("yes A."): the Partial restore rows follow the dialog of today (R-DICT): each keyboard brings its
+    // own dictionaries, no tick; "Also restore" has Other dictionaries, Clipboard history and Android personal dictionary
+    // words, all ticked. Fail before: they named "And merge" and "Restore their", headings the dialog no longer has
+    @Test fun `partial restore rows name the dialog's Also restore rows, not the old headings`() {
+        val texts = listOf(R.string.saving_partial_words, R.string.saving_partial_dictionaries, R.string.saving_partial_clips)
+            .map { ctx.getString(it) }
+        assertTrue(texts.none { "And merge" in it || "Restore their" in it || "Unticked, none" in it }, texts.toString())
+        assertTrue(texts.all { ctx.getString(R.string.restore_section_also) in it && "ticked to start with" in it }, texts.toString())
+        for (row in listOf(R.string.restore_other_dictionaries, R.string.restore_clipboard, R.string.restore_personal_words))
+            assertTrue(texts.any { "\"${ctx.getString(row)}\"" in it }, ctx.getString(row))
+        assertTrue("brings the dictionaries of its languages, no tick" in texts[1], texts[1])
     }
 
     // owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones
