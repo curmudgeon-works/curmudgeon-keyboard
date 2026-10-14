@@ -31,7 +31,7 @@ object FontLibrary {
         Triple(SLOT_SUGGESTION, Settings.PREF_SUGGESTION_FONT, "Suggestion strip font"),
         Triple(SLOT_EMOJI, Settings.PREF_EMOJI_FONT, "Emoji font"),
     )
-    private val fontPrefs = slots.map { it.second }
+    internal val fontPrefs = slots.map { it.second }
 
     @Volatile private var migrated = false
 

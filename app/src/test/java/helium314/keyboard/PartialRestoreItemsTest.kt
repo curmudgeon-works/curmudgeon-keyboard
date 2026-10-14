@@ -103,4 +103,28 @@ class PartialRestoreItemsTest {
         assertEquals("Curmudgeon 2", SavedItemsMerge.freeName("Curmudgeon", setOf("Curmudgeon")))
         assertEquals("Sunset 3", SavedItemsMerge.freeName("Sunset", setOf("Sunset", "Sunset 2")))
     }
+
+    @Test fun `a font whose name the phone uses for another file comes in numbered, and the keyboard names that one`() {
+        val fonts = File(DeviceProtectedUtils.getFilesDir(ctx), "fonts").apply { mkdirs() }
+        File(fonts, "Mine.ttf").writeText("the phone's")
+        ZipOutputStream(zip.outputStream()).use { z ->
+            z.putNextEntry(ZipEntry("preferences.json"))
+            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to keyboard.toPref(), Settings.PREF_KEY_FONT to "font:Mine.ttf",
+                AppearanceLooks.PREF to JSONArray(listOf(JSONObject().put("name", "Sunset").put("values",
+                    JSONObject().put(Settings.PREF_KEY_FONT, JSONObject().put("s", "font:Mine.ttf"))))).toString(),
+                helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
+                helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
+            z.closeEntry()
+            z.putNextEntry(ZipEntry("unprotected/fonts/Mine.ttf")); z.write("the backup's".toByteArray()); z.closeEntry()
+        }
+        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true)
+        assertEquals("the phone's", File(fonts, "Mine.ttf").readText())
+        assertEquals("the backup's", File(fonts, "Mine 2.ttf").readText())
+        assertEquals("font:Mine 2.ttf", ownChoice(Settings.PREF_KEY_FONT))
+        assertEquals("font:Mine 2.ttf", AppearanceLooks.load(real).single().values[Settings.PREF_KEY_FONT])
+        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true) // (again: nothing new)
+        assertEquals(setOf("Mine.ttf", "Mine 2.ttf"), fonts.list()!!.toSet())
+        assertEquals(1, AppearanceLooks.load(real).size)
+        fonts.deleteRecursively()
+    }
 }

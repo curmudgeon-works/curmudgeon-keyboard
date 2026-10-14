@@ -18,7 +18,8 @@ import helium314.keyboard.settings.LayoutPresets
  * of the same backup adds nothing. The result maps each kind's backup names to the phone's.
  */
 internal object SavedItemsMerge {
-    class Renames(val popupSets: Map<String, String>, val layouts: Map<String, String>, val themes: Map<String, String>) {
+    class Renames(val popupSets: Map<String, String>, val layouts: Map<String, String>, val themes: Map<String, String>,
+                  val fonts: Map<String, String> = emptyMap()) {
         /** A restored keyboard's settings ([values], plain keys) naming its items as they are called on the phone now. */
         fun apply(values: Map<String, Any?>): Map<String, Any?> = values.mapValues { (key, value) ->
             val map = when (key) {
@@ -27,9 +28,29 @@ internal object SavedItemsMerge {
                 AppearanceLooks.PREF_SELECTED -> themes
                 else -> null
             }
+            if (key in helium314.keyboard.keyboard.FontLibrary.fontPrefs) return@mapValues renamedFont(value, fonts)
             (value as? String)?.let { map?.get(it) } ?: value
         }
     }
+
+    /** A font choice ("font:<file>") naming [fonts]' new name. */
+    fun renamedFont(value: Any?, fonts: Map<String, String>): Any? {
+        val name = (value as? String)?.takeIf { it.startsWith(helium314.keyboard.keyboard.FontLibrary.PREFIX) }
+            ?.removePrefix(helium314.keyboard.keyboard.FontLibrary.PREFIX) ?: return value
+        return fonts[name]?.let { helium314.keyboard.keyboard.FontLibrary.PREFIX + it } ?: value
+    }
+
+    /** A theme's values with its fonts and library pictures named as they came in ([fonts], [pictures]). */
+    private fun renamedFiles(values: Map<String, Any?>, fonts: Map<String, String>, pictures: Map<String, String>): Map<String, Any?> =
+        values.mapValues { (key, value) -> when {
+            key in helium314.keyboard.keyboard.FontLibrary.fontPrefs -> renamedFont(value, fonts)
+            key == AppearanceLooks.PICTURES && pictures.isNotEmpty() && (value as? String)?.startsWith("lib:") == true -> runCatching {
+                val o = org.json.JSONObject(value.removePrefix("lib:"))
+                for (slot in o.keys()) o.optJSONObject(slot)?.let { s -> pictures[s.optString("p")]?.let { s.put("p", it) } }
+                "lib:$o"
+            }.getOrDefault(value)
+            else -> value
+        } }
 
     /** The next free name for [name]: itself if free, else "Name 2", "Name 3" … */
     fun freeName(name: String, taken: Set<String>): String {
@@ -37,7 +58,8 @@ internal object SavedItemsMerge {
         return generateSequence(2) { it + 1 }.map { "$name $it" }.first { it !in taken }
     }
 
-    fun merge(ctx: Context, real: SharedPreferences, backup: Map<String, Any?>, asCopies: Boolean): Renames {
+    fun merge(ctx: Context, real: SharedPreferences, backup: Map<String, Any?>, asCopies: Boolean,
+              fonts: Map<String, String> = emptyMap(), pictures: Map<String, String> = emptyMap()): Renames {
         // the backup's lists, read as the phone reads its own (a scratch store, gone afterwards)
         val scratch = ctx.getSharedPreferences("restore_saved_items", Context.MODE_PRIVATE)
         scratch.edit(commit = true) {
@@ -80,7 +102,9 @@ internal object SavedItemsMerge {
             val builtInThemes = AppearanceLooks.builtIn(ctx).map { it.name }.toSet()
             val phoneThemes = AppearanceLooks.load(real).toMutableList()
             val themeNames = HashMap<String, String>()
-            for (look in AppearanceLooks.load(scratch)) {
+            for (backupLook in AppearanceLooks.load(scratch)) {
+                // (its fonts and pictures named as they came in, before it's compared)
+                val look = AppearanceLooks.Look(backupLook.name, renamedFiles(backupLook.values, fonts, pictures), backupLook.remembered)
                 phoneThemes.firstOrNull { it.values == look.values }?.let { themeNames[look.name] = it.name; continue }
                 val taken = phoneThemes.map { it.name }.toSet() + builtInThemes
                 if (look.name in taken && !asCopies) { themeNames[look.name] = look.name; continue }
@@ -89,7 +113,7 @@ internal object SavedItemsMerge {
                 themeNames[look.name] = name
             }
             AppearanceLooks.save(real, phoneThemes, now = true)
-            return Renames(setNames, layoutNames, themeNames)
+            return Renames(setNames, layoutNames, themeNames, fonts)
         } finally {
             scratch.edit(commit = true) { clear() }
         }

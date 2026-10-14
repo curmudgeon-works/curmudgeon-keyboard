@@ -763,7 +763,10 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
     // defaults here; see pickedOnlyUpgrade)
     // the backup's saved items come in first (by content, taken names numbered), and the keyboards name them as they're
     // called on the phone now (2026-10-11; before, the names dangled or silently took the phone's same-named item)
-    val renames = if (withSettings) SavedItemsMerge.merge(ctx, real, backup, asCopies) else null
+    // (the loaded fonts and pictures first: a name the phone has for another file comes in numbered, and the themes and
+    // keyboards naming it are rewritten with it; owner 2026-10-11: "for fonts and pictures too do the same pattern")
+    val files = if (withSettings) restoreLibraryFiles(ctx, pending) else null
+    val renames = if (withSettings) SavedItemsMerge.merge(ctx, real, backup, asCopies, files?.first.orEmpty(), files?.second.orEmpty()) else null
     val settings = chosen.associateWith { restoredSettings(ctx, backup, it).let { values -> renames?.apply(values) ?: values } }
     if (withSettings && !KeyboardProfiles.isSeparate(real))
         KeyboardProfiles.enable(real, SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }, keepExisting = true)
@@ -810,13 +813,6 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
                 val name = entry.name.substringAfter("unprotected${File.separator}", "")
                 when {
                     name in wantedPictures -> pictureFiles[name] = zip.readBytes()
-                    (name.startsWith("fonts${File.separator}") || name.startsWith("pictures${File.separator}"))
-                        && backupFilePatterns.any { name.matches(it) } -> {
-                        val target = File(deviceProtectedFilesDir, name)
-                        // (and never outside the app's folder, whatever the zip says)
-                        val inside = target.canonicalPath.startsWith(deviceProtectedFilesDir.canonicalPath + File.separator)
-                        if (inside && !target.exists()) FileUtils.copyStreamToNewFile(zip, target)
-                    }
                 }
                 zip.closeEntry()
                 entry = zip.nextEntry
@@ -853,6 +849,45 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
         // whether they use the other keyboards' learned and blacklisted words, as in the backup
         LearnedKeyboards.restoreButtons(real, backup, chosen)
     }
+}
+
+/**
+ * The backup's loaded fonts and pictures (FontLibrary, PictureLibrary) into the phone's lists, for keyboards restored on
+ * their own: a file the phone has under the same name with the same content is the phone's; a name the phone uses for
+ * another file gets the next free number ("Mine 2.ttf"). The renames, fonts and pictures, by file name.
+ */
+private fun restoreLibraryFiles(ctx: Context, pending: PendingRestore): Pair<Map<String, String>, Map<String, String>> {
+    val fonts = HashMap<String, String>(); val pictures = HashMap<String, String>()
+    val dir = DeviceProtectedUtils.getFilesDir(ctx)
+    ZipInputStream(FileInputStream(pending.file)).use { zip ->
+        var entry: ZipEntry? = zip.nextEntry
+        while (entry != null) {
+            val name = entry.name.substringAfter("unprotected${File.separator}", "")
+            val folder = name.substringBefore(File.separator, "")
+            if ((folder == "fonts" || folder == "pictures") && backupFilePatterns.any { name.matches(it) } && !name.removePrefix("$folder${File.separator}").contains(File.separator)) {
+                val bytes = zip.readBytes()
+                val fileName = name.removePrefix("$folder${File.separator}")
+                val folderDir = File(dir, folder)
+                var target = File(folderDir, fileName)
+                // (and never outside the app's folder, whatever the zip says)
+                if (target.canonicalPath.startsWith(folderDir.canonicalPath + File.separator)) {
+                    if (!target.exists() || !target.readBytes().contentEquals(bytes)) {
+                        if (target.exists()) {
+                            // the next free number, reusing a numbered one with this content (a second restore adds nothing)
+                            val base = fileName.substringBeforeLast('.', fileName); val ext = fileName.substringAfterLast('.', "").let { if (it.isEmpty()) "" else ".$it" }
+                            target = generateSequence(2) { it + 1 }.map { File(folderDir, "$base $it$ext") }
+                                .first { !it.exists() || it.readBytes().contentEquals(bytes) }
+                            (if (folder == "fonts") fonts else pictures)[fileName] = target.name
+                        }
+                        if (!target.exists()) { folderDir.mkdirs(); target.writeBytes(bytes) }
+                    }
+                }
+            }
+            zip.closeEntry()
+            entry = zip.nextEntry
+        }
+    }
+    return fonts to pictures
 }
 
 /** The files behind the settings (restored with all of them): custom layouts (a keyboard's layout must exist for it),
