@@ -128,4 +128,12 @@ class SavedItemDefaultsTest {
         assertFalse(real.contains(SavedItemDefaults.PREF))
         zip.delete()
     }
+
+    @Test fun `the switch is one for all keyboards, also when set from a keyboard with its own settings`() {
+        assertTrue(helium314.keyboard.latin.settings.KeyboardProfiles.isAppWide(SavedItemDefaults.PREF))
+        real.edit().putBoolean("separate_settings_per_keyboard", true).commit()
+        helium314.keyboard.latin.settings.ProfilePreferences(real) { 5 }.edit().putBoolean(SavedItemDefaults.PREF, false).commit()
+        assertEquals(false, real.all[SavedItemDefaults.PREF])
+        assertFalse(SavedItemDefaults.takeNewDefaults(real))
+    }
 }

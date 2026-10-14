@@ -94,6 +94,8 @@ fun AdvancedSettingsScreen(
         // (the physical keyboard's emoji key and the timestamp format: on Others)
         Settings.PREF_AUTO_PREVIEW_KEYBOARD, // settings screens bring up the preview keyboard by themselves
         Settings.PREF_SAVE_SUBTYPE_PER_APP, // which keyboard comes up in an app (moved from Layout & Typing)
+        // what saved Layouts, themes and popup sets do with settings saved at their default (2026-10-11)
+        helium314.keyboard.settings.SavedItemDefaults.PREF,
         SettingsWithoutKey.BACKUP_RESTORE,
         SettingsWithoutKey.FACTORY_RESET,
         if (BuildConfig.DEBUG || prefs.getBoolean(DebugSettings.PREF_SHOW_DEBUG_SETTINGS, Defaults.PREF_SHOW_DEBUG_SETTINGS))
@@ -125,6 +127,17 @@ fun AdvancedSettingsScreen(
 
 @SuppressLint("ApplySharedPref")
 fun createAdvancedSettings(context: Context) = listOf(
+    // owner 2026-10-11: on, a saved item's settings left at their default take the latest defaults; off, every saved
+    // value applies as saved; the subtext says which, and a dialog says when it takes effect
+    Setting(context, helium314.keyboard.settings.SavedItemDefaults.PREF, R.string.saved_items_take_new_defaults) { setting ->
+        val ctx = LocalContext.current
+        var on by remember { mutableStateOf(helium314.keyboard.settings.SavedItemDefaults.takeNewDefaults(ctx.realPrefs())) }
+        var explain by remember { mutableStateOf(false) }
+        SwitchPreference(name = setting.title, key = setting.key, default = helium314.keyboard.settings.SavedItemDefaults.DEFAULT,
+            description = stringResource(if (on) R.string.saved_items_take_new_defaults_on else R.string.saved_items_take_new_defaults_off),
+        ) { on = it; explain = true }
+        if (explain) helium314.keyboard.settings.dialogs.InfoDialog(stringResource(R.string.saved_items_take_new_defaults_when)) { explain = false }
+    },
     Setting(context, Settings.PREF_ALWAYS_INCOGNITO_MODE,
         R.string.prefs_force_incognito_mode_summary) // "Disable learning of new words" as the title, no subtext
     {
