@@ -10,9 +10,12 @@ const val REFINE_MENU_SHOWN = false
 
 /** Settings no screen shows, so search mustn't find them either (re-review 2026-10-07): Refine's while the menu isn't
  *  shown (but the number of suggestions, on Text correction then), and the retired "space enters the middle suggestion"
- *  switch (its Setting stays so the key is known; SettingsValues keeps it off). */
+ *  switch (its Setting stays so the key is known; SettingsValues keeps it off). Also Backup and restore and Factory
+ *  reset: started from search, an edit screen's open Save/Discard draft survived them and Discard (or leaving the app)
+ *  put its pre-restore snapshot back (owner 2026-10-13, 20261013_M2: only from App settings). */
 fun hiddenFromSearch(key: String): Boolean =
     key == helium314.keyboard.latin.settings.Settings.PREF_CENTER_SUGGESTION_TEXT_TO_ENTER
+        || key == SettingsWithoutKey.BACKUP_RESTORE || key == SettingsWithoutKey.FACTORY_RESET
         || (!REFINE_MENU_SHOWN && key != helium314.keyboard.latin.settings.Settings.PREF_SUGGESTION_COUNT
             && (helium314.keyboard.latin.settings.KeyboardProfiles.Group.REFINE.contains(key)
                 || helium314.keyboard.latin.settings.KeyboardProfiles.Group.LEARNING.contains(key)))
