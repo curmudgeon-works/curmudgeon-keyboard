@@ -219,7 +219,7 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
     if (shows(helium314.keyboard.latin.settings.KeyboardProfiles.Group.LAYOUT) && shows("layout")) Preference(
         name = stringResource(R.string.settings_screen_preferences),
         onClick = { open(SettingsDestination.withKeyboard(SettingsDestination.Subtype, keyboard)) },
-        icon = R.drawable.ic_settings_preferences
+        icon = R.drawable.ic_settings_layout // the keyboard (owner 2026-10-14: "Layout and typing should use the keyboard")
     ) { NextScreenIcon() }
     // (no Preferences: its input and clipboard history groups are on the Layout screen)
     if (shows(helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE) && shows("appearance")) Preference(

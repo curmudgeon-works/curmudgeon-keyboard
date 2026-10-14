@@ -449,7 +449,7 @@ internal fun groupTitle(group: helium314.keyboard.latin.settings.KeyboardProfile
 
 /** The icon a menu has on the main screen. */
 private fun groupIcon(group: helium314.keyboard.latin.settings.KeyboardProfiles.Group) = when (group) {
-    helium314.keyboard.latin.settings.KeyboardProfiles.Group.LAYOUT -> R.drawable.ic_settings_preferences
+    helium314.keyboard.latin.settings.KeyboardProfiles.Group.LAYOUT -> R.drawable.ic_settings_layout
     helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE -> R.drawable.ic_settings_appearance
     helium314.keyboard.latin.settings.KeyboardProfiles.Group.SWIPE -> R.drawable.ic_settings_gesture
     helium314.keyboard.latin.settings.KeyboardProfiles.Group.TEXT_CORRECTION -> R.drawable.ic_settings_correction

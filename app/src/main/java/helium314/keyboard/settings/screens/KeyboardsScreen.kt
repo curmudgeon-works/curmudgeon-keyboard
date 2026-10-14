@@ -172,7 +172,9 @@ fun KeyboardsScreen(
                                     SettingsDestination.Languages, keyboard), if (separate) KeyboardProfiles.idForListed(real, keyboard) else null))
                             }
                         },
-                        icon = R.drawable.ic_settings_layout, // a keyboard (the globe is for its languages)
+                        // the globe, as at first (owner 2026-10-14: "Keyboards should go back to the globe that was there
+                        // originally"; the keyboard icon is Layout & Typing's)
+                        icon = R.drawable.ic_settings_languages,
                         onLongClick = { keyboardMenu = keyboard },
                     ) {
                         if (order.size > 1)
@@ -229,7 +231,7 @@ fun KeyboardsScreen(
                         name = stringResource(R.string.switched_off_keyboards, switchedOff.size),
                         description = stringResource(R.string.switched_off_keyboards_summary),
                         onClick = { switchedOffOpen = !switchedOffOpen },
-                        icon = R.drawable.ic_settings_layout,
+                        icon = R.drawable.ic_settings_languages,
                     ) { Icon(painterResource(R.drawable.ic_arrow_left), null, Modifier.rotate(if (switchedOffOpen) 90f else -90f)) }
                     if (switchedOffOpen) Column(Modifier.padding(start = 24.dp)) {
                         Text(
