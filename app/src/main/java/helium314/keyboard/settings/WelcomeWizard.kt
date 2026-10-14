@@ -6,8 +6,6 @@ import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.RowScope
@@ -51,6 +49,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -66,7 +65,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import helium314.keyboard.latin.R
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import helium314.keyboard.latin.utils.JniUtils
+import helium314.keyboard.latin.utils.getActivity
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.latin.utils.UncachedInputMethodManagerUtils
 import helium314.keyboard.latin.utils.previewDark
@@ -135,6 +137,29 @@ private fun WelcomeWizardSteps(
         while (!UncachedInputMethodManagerUtils.isThisImeCurrent(ctx, imm)) delay(50)
         step = 3
     }
+    // Android's keyboard settings opened from Enable in Settings: looked at every 0.2 seconds (owner 2026-10-14: "Keep
+    // 0.2 seconds"), and once the keyboard is enabled there this screen comes back on its own, on 2 (as AOSP's setup
+    // did). The look goes on while the settings cover this screen (the composition stays, so its effects run), ends when
+    // the keyboard is enabled, the screen is no longer 1, or the activity is gone.
+    var waitingForEnable by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(step, waitingForEnable) {
+        if (step != 1 || !waitingForEnable) return@LaunchedEffect
+        while (!UncachedInputMethodManagerUtils.isThisImeEnabled(ctx, imm)) delay(200)
+        waitingForEnable = false
+        step = 2
+        bringBack(ctx)
+    }
+    // back from Android's settings (by hand, or brought back): where the setup is now, and no more looking
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event != Lifecycle.Event.ON_RESUME) return@LifecycleEventObserver
+            waitingForEnable = false
+            if (step < 3) step = determineStep()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val useWideLayout = isWideScreen()
     // black, the rows a shade lighter, the title and what to tap in orange; the card's text a dimmer gray (owner
     // 2026-10-14: "White text is too bright. It can be dimmer gray")
@@ -188,9 +213,6 @@ private fun WelcomeWizardSteps(
     }
     @Composable fun steps() {
         Column(Modifier.verticalScroll(rememberScrollState())) {
-            val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-                step = determineStep()
-            }
             when (step) {
                 1 -> card(stringResource(R.string.setup_enable_card, appName), null)
                 2 -> card(stringResource(R.string.setup_switch_card), null)
@@ -200,7 +222,11 @@ private fun WelcomeWizardSteps(
                 val intent = Intent()
                 intent.action = Settings.ACTION_INPUT_METHOD_SETTINGS
                 intent.addCategory(Intent.CATEGORY_DEFAULT)
-                launcher.launch(intent)
+                // (with a request code of our own, so the settings can be closed again: bringBack; the return is looked
+                // at on resume, above)
+                @Suppress("DEPRECATION")
+                ctx.getActivity()?.startActivityForResult(intent, SETUP_ENABLE_REQUEST)
+                waitingForEnable = true
             }
             row(SetupRow.SWITCH, stringResource(R.string.setup_step2_action), painterResource(R.drawable.ic_setup_select),
                 imm::showInputMethodPicker)
@@ -247,6 +273,25 @@ private fun WelcomeWizardSteps(
                     }
             }
         }
+    }
+}
+
+/** The request code Android's keyboard settings are opened with from the setup. */
+private const val SETUP_ENABLE_REQUEST = 0x5e7
+
+/**
+ * The setup's activity on top again, over Android's keyboard settings opened from it: those settings are closed
+ * ([Activity.finishActivity] needs no start from the background, which Android 10 and up hold back, and 15 and up even
+ * from under another app's screen in the same task); should they be another task or a screen opened from them, the
+ * activity is also brought to the front as it is (CLEAR_TOP with SINGLE_TOP: the same instance, no new one, so the setup
+ * keeps its state; an Android that holds that start back just logs it).
+ */
+private fun bringBack(ctx: Context) {
+    val activity = ctx.getActivity() ?: return
+    activity.finishActivity(SETUP_ENABLE_REQUEST)
+    runCatching {
+        activity.startActivity(Intent(activity, activity.javaClass)
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
     }
 }
 
