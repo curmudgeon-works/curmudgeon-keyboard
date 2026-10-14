@@ -139,6 +139,9 @@ public class SettingsValues {
     public final boolean mUrlDetectionEnabled;
     public final boolean mAutocorrectFrequentWords;
     public final int mTrustTypedCount;
+    // what a space and a tap in the strip learn (Fine-tune learning): LearnableText.Kind bits
+    public final int mLearnBySpace;
+    public final int mLearnByStrip;
     public final float mBottomPaddingScale;
     public final float mSidePaddingScale;
     public final ToolbarMode mToolbarMode;
@@ -265,6 +268,8 @@ public class SettingsValues {
         mUrlDetectionEnabled = prefs.getBoolean(Settings.PREF_URL_DETECTION, Defaults.PREF_URL_DETECTION);
         mAutocorrectFrequentWords = prefs.getBoolean(Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, Defaults.PREF_AUTOCORRECT_FREQUENT_WORDS);
         mTrustTypedCount = Math.max(1, prefs.getInt(Settings.PREF_TRUST_TYPED_COUNT, Defaults.PREF_TRUST_TYPED_COUNT));
+        mLearnBySpace = helium314.keyboard.latin.personalization.LearnableText.INSTANCE.mask(prefs, false);
+        mLearnByStrip = helium314.keyboard.latin.personalization.LearnableText.INSTANCE.mask(prefs, true);
         mAutoCorrectionEnabledPerUserSettings = prefs.getBoolean(Settings.PREF_AUTO_CORRECTION, Defaults.PREF_AUTO_CORRECTION);
         mAutoCorrectEnabled = mAutoCorrectionEnabledPerUserSettings
                 && (mInputAttributes.mInputTypeShouldAutoCorrect || prefs.getBoolean(Settings.PREF_MORE_AUTO_CORRECTION, Defaults.PREF_MORE_AUTO_CORRECTION))

@@ -391,6 +391,32 @@ class InputLogicTest {
         assertEquals("user2024", lastAddedWord)
     }
 
+    // Fine-tune learning's table (2026-10-11): each kind of text learned by space and by strip tap as set
+    @Test fun `a space learns letters with digits once that box is ticked`() {
+        reset()
+        latinIME.prefs().edit { putBoolean(helium314.keyboard.latin.personalization.LearnableText.Kind.WITH_DIGITS.spaceKey, true) }
+        lastAddedWord = ""
+        chainInput("user2024 ")
+        assertEquals("user2024", lastAddedWord)
+    }
+
+    @Test fun `a space doesn't learn words once that box is cleared`() {
+        reset()
+        latinIME.prefs().edit { putBoolean(helium314.keyboard.latin.personalization.LearnableText.Kind.WORD.spaceKey, false) }
+        lastAddedWord = ""
+        chainInput("don't ")
+        assertNotEquals("don't", lastAddedWord)
+    }
+
+    @Test fun `a strip tap doesn't learn letters with digits once that box is cleared`() {
+        reset()
+        latinIME.prefs().edit { putBoolean(helium314.keyboard.latin.personalization.LearnableText.Kind.WITH_DIGITS.stripKey, false) }
+        lastAddedWord = ""
+        chainInput("user2024")
+        pickSuggestion("user2024")
+        assertNotEquals("user2024", lastAddedWord)
+    }
+
     @Test fun `the whole run tapped in the strip is learned, the text stays`() {
         reset()
         lastAddedWord = ""

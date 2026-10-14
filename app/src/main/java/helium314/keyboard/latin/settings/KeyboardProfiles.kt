@@ -140,7 +140,8 @@ object KeyboardProfiles {
         Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, Settings.PREF_TRUST_TYPED_COUNT,
     )
     /** "Fine-tune learning" (2026-10-10): how your own words are learned and trusted ([Group.LEARNING]). */
-    private val learningKeys: Set<String> get() = setOf(Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, Settings.PREF_TRUST_TYPED_COUNT)
+    private val learningKeys: Set<String> get() = setOf(Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, Settings.PREF_TRUST_TYPED_COUNT) +
+        helium314.keyboard.latin.personalization.LearnableText.keys // what a space and the strip learn
     /** "Fine-tune suggestions": the rest of the old Refine menu ([Group.REFINE]). */
     private val refineKeys: Set<String> get() = learningSwipingKeys - learningKeys
     // ("share_user_history_": the retired per-language share switch, kept global so old keys stay where they are)

@@ -57,6 +57,23 @@
     <string name="learning_swiping_screen">Fine-tune suggestions</string>
     <!-- the menu with how the keyboard learns your words (split from Fine-tune suggestions, 2026-10-10) -->
     <string name="fine_tune_learning_screen">Fine-tune learning</string>
+    <!-- Fine-tune learning: the table of which kinds of text a space and a tap in the strip learn (2026-10-11) -->
+    <string name="learn_table_title">What gets learned</string>
+    <string name="learn_table_summary">Space: a word ended by space or punctuation, or edited. Strip tap: a word tapped in the suggestion strip.</string>
+    <string name="learn_table_space">Space</string>
+    <string name="learn_table_strip">Strip tap</string>
+    <string name="learn_kind_word">Words</string>
+    <string name="learn_kind_word_example">don\'t, well-known</string>
+    <string name="learn_kind_dotted">Words with periods</string>
+    <string name="learn_kind_dotted_example">google.com, hello.world</string>
+    <string name="learn_kind_email">Email addresses</string>
+    <string name="learn_kind_email_example">name@mail.com</string>
+    <string name="learn_kind_number">Numbers</string>
+    <string name="learn_kind_number_example">2026, 3.14, 10:30</string>
+    <string name="learn_kind_digits">Letters with digits</string>
+    <string name="learn_kind_digits_example">mp3, b2b, 4u</string>
+    <string name="learn_kind_other">Other symbols</string>
+    <string name="learn_kind_other_example">#tag, c++, a_b</string>
     <string name="learning_group">Learning</string>
     <!-- Settings screen title for keyboard theme settings -->
     <string name="settings_screen_theme">Theme</string>

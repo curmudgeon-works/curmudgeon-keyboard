@@ -77,7 +77,6 @@ import helium314.keyboard.latin.utils.WebEndings;
 import java.util.ArrayList;
 import java.util.Locale;
 import java.util.TreeSet;
-import java.util.regex.Pattern;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -564,7 +563,7 @@ public final class InputLogic {
             // If the user is in the middle of correcting a word, we should learn it before moving
             // the cursor away.
             if (!TextUtils.isEmpty(mWordBeingCorrectedByCursor)) {
-                if (learnsHere(settingsValues) && !notLearnedBySpace(mWordBeingCorrectedByCursor, LearningEventLog.EDIT))
+                if (learnsHere(settingsValues) && !notLearnedBySpace(settingsValues, mWordBeingCorrectedByCursor, LearningEventLog.EDIT))
                     logLearningEvent(LearningEventLog.ACCEPTED, LearningEventLog.EDIT,
                             mEditedInPlaceWord == null ? "" : mEditedInPlaceWord, mWordBeingCorrectedByCursor);
                 // an accepted word corrected in place (it took back its use) counts like a strip pick; other words
@@ -2242,7 +2241,7 @@ public final class InputLogic {
             mDictionaryFacilitator.adjustConfidences(word, wasAutoCapitalized);
             return;
         }
-        if (notLearnedBySpace(word, origin)) return;
+        if (notLearnedBySpace(settingsValues, word, origin)) return;
         final int timeStampInSeconds = (int)TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis());
         if (extraUses == 0)
             mDictionaryFacilitator.addToUserHistory(word, wasAutoCapitalized, ngramContext,
@@ -2254,17 +2253,13 @@ public final class InputLogic {
         mRunLearnedUses.add(1 + extraUses);
     }
 
-    // what a space (punctuation, an edit) learns: letters, with ' - . between them (don't, well-known, hello.world,
-    // google.com; an apostrophe may also start or end it: 'til, students'), or an email address (letters, digits and
-    // . _ - around the @). A tap in the strip learns anything without a space (2026-10-04).
-    private static final Pattern LEARNED_BY_SPACE = Pattern.compile(
-            "['\u2019]?[\\p{L}\\p{M}]+(?:['\u2019.\\-][\\p{L}\\p{M}]+)*['\u2019]?"
-            + "|[\\p{L}\\p{M}0-9._\\-]+@[\\p{L}\\p{M}0-9._\\-]+");
-
-    /** Whether [word], committed from [origin], is learned: anything picked from the strip, else [LEARNED_BY_SPACE]. */
-    private static boolean notLearnedBySpace(final String word, final String origin) {
-        if (LearningEventLog.STRIP.equals(origin) || LearningEventLog.PREDICTION.equals(origin)) return false;
-        return !LEARNED_BY_SPACE.matcher(word).matches();
+    /** Whether [word], committed from [origin], is not learned: the kinds of text a tap in the strip (or a prediction)
+     *  learns, else the kinds a space (punctuation, an edit) learns, as set on Fine-tune learning (LearnableText; the
+     *  defaults are the fixed rule of 2026-10-04: a space learns words and email addresses, the strip anything). */
+    private static boolean notLearnedBySpace(final SettingsValues settingsValues, final String word, final String origin) {
+        final boolean byStrip = LearningEventLog.STRIP.equals(origin) || LearningEventLog.PREDICTION.equals(origin);
+        return !helium314.keyboard.latin.personalization.LearnableText.learns(
+                byStrip ? settingsValues.mLearnByStrip : settingsValues.mLearnBySpace, word);
     }
 
     // strip word separators from end (may be necessary for urls, e.g. when the user has typed
@@ -3246,7 +3241,7 @@ public final class InputLogic {
         final boolean reAccepted = resumedFrom != null && resumedFrom.equals(chosenWord)
                 && commitType != LastComposedWord.COMMIT_TYPE_MANUAL_PICK;
         final String origin = learningOrigin(commitType, chosenWord);
-        if (!afterDigit && !notLearnedBySpace(chosenWord, origin) && learnsHere(settingsValues) && LearningEventLog.isEnabled()) {
+        if (!afterDigit && !notLearnedBySpace(settingsValues, chosenWord, origin) && learnsHere(settingsValues) && LearningEventLog.isEnabled()) {
             final String event;
             final String before;
             if (reAccepted) {
