@@ -193,6 +193,7 @@ object SubtypeSettings {
         val key = Settings.PREF_LAYOUT_PREFIX + type.name
         if (to == null) helium314.keyboard.latin.settings.KeyboardProfiles.forgetValueEverywhere(real, key, from)
         else helium314.keyboard.latin.settings.KeyboardProfiles.replaceValueEverywhere(real, key, from, to)
+        helium314.keyboard.settings.LayoutPresets.onLayoutRenamed(real, type, from, to) // and the saved Layouts (review 2026-10-08 area 4 #4)
         reloadEnabledSubtypes(context)
     }
 

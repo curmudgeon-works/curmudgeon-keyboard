@@ -217,6 +217,27 @@ object LayoutPresets {
         KeyboardProfiles.forgetValueEverywhere(real, PREF_SELECTED, name)
     }
 
+    /** A name the saved Layouts carry as [key]'s value was renamed to [to], or deleted ([to] null: "not set", the
+     *  default, as the keyboards get): they follow, as the keyboards do (review 2026-10-08 area 4 #4: applying a Layout
+     *  brought the old name back, and with a popup set a second copy of it). */
+    private fun followValue(real: SharedPreferences, key: String, from: String, to: String?) {
+        val presets = load(real)
+        if (presets.none { it.values[key] == from }) return
+        save(real, presets.map { if (it.values[key] == from) Preset(it.name, it.values + (key to to)) else it })
+    }
+
+    /** User popup set [from] renamed to [to]. (A deleted one stays named: applying the Layout brings it back,
+     *  [restorePopupSet].) */
+    fun onPopupSetRenamed(real: SharedPreferences, from: String, to: String) = followValue(real, KeyPopupOverrides.PREF_SELECTED_SET, from, to)
+
+    /** Custom key layout [from] of [type] renamed to [to], or deleted ([to] null). The default for its type follows
+     *  (deleted: the built-in one); the keys' own name only follows a rename, a deleted one comes back from the content
+     *  the Layout keeps, as the keyboard's own copy ([keyboardWith]). */
+    fun onLayoutRenamed(real: SharedPreferences, type: LayoutType, from: String, to: String?) {
+        followValue(real, Settings.PREF_LAYOUT_PREFIX + type.name, from, to)
+        if (to != null) followValue(real, LAYOUT + type.name, from, to)
+    }
+
     fun save(prefs: SharedPreferences, presets: List<Preset>) {
         keepBrokenAside(prefs, PREF)
         val arr = JSONArray()

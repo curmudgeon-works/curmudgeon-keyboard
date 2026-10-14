@@ -158,11 +158,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
             TextInputDialog(
                 onDismissRequest = { setToRename = null },
                 onConfirmed = { newName ->
-                    val name = newName.trim()
-                    KeyPopupOverrides.saveSets(ctx.realPrefs(), userSets.map {
-                        if (it.name == oldName) KeyPopupOverrides.UserSet(name, it.morePopups, it.symbolsLayout, it.overrides, it.symbolMap, it.popupOrder) else it
-                    })
-                    KeyboardProfiles.replaceValueEverywhere(ctx.realPrefs(), KeyPopupOverrides.PREF_SELECTED_SET, oldName, name)
+                    renamePopupSet(ctx, oldName, newName.trim())
                     setToRename = null
                     generation++
                 },
@@ -293,6 +289,16 @@ private fun storePopupSet(ctx: Context, keyboard: SettingsSubtype, name: String,
     KeyPopupOverrides.save(prefs, all)
     prefs.edit().putString(KeyPopupOverrides.PREF_SELECTED_SET, name).apply()
     reloadPreview()
+}
+
+/** Renames the user's popup set [oldName] to [name], and every keyboard that had it chosen follows. */
+internal fun renamePopupSet(ctx: Context, oldName: String, name: String) {
+    val real = ctx.realPrefs()
+    KeyPopupOverrides.saveSets(real, KeyPopupOverrides.loadSets(real).map {
+        if (it.name == oldName) KeyPopupOverrides.UserSet(name, it.morePopups, it.symbolsLayout, it.overrides, it.symbolMap, it.popupOrder) else it
+    })
+    KeyboardProfiles.replaceValueEverywhere(real, KeyPopupOverrides.PREF_SELECTED_SET, oldName, name)
+    helium314.keyboard.settings.LayoutPresets.onPopupSetRenamed(real, oldName, name) // and the saved Layouts (review 2026-10-08 area 4 #4)
 }
 
 /** Deletes the user's popup set [name]: every keyboard that had it chosen has none chosen (2026-10-07: only the keyboard

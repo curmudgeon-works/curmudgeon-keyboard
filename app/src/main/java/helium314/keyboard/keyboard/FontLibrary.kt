@@ -94,6 +94,9 @@ object FontLibrary {
         File(dir(ctx), name).delete()
         val real = ctx.realPrefs()
         fontPrefs.forEach { KeyboardProfiles.replaceValueEverywhere(real, it, PREFIX + name, "default") }
+        // and in the saved themes: applying one wrote the gone name again, and a font loaded later under it was taken up
+        // (review 2026-10-08 area 4 #4)
+        helium314.keyboard.settings.AppearanceLooks.replaceValue(real, fontPrefs, PREFIX + name, "default")
     }
 
     private fun sameContent(a: File, b: File) = a.length() == b.length() && a.readBytes().contentEquals(b.readBytes())

@@ -3,11 +3,19 @@ package helium314.keyboard
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import helium314.keyboard.keyboard.FontLibrary
 import helium314.keyboard.keyboard.KeyboardTheme
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.ProfilePreferences
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
+import helium314.keyboard.latin.utils.KeyPopupOverrides
+import helium314.keyboard.latin.utils.LayoutType
+import helium314.keyboard.latin.utils.LayoutUtilsCustom
+import helium314.keyboard.latin.utils.SubtypeSettings
+import helium314.keyboard.settings.AppearanceLooks
+import helium314.keyboard.settings.LayoutPresets
+import helium314.keyboard.settings.screens.renamePopupSet
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -81,5 +89,40 @@ class Review1010ThemesTest {
         KeyboardTheme.deleteUserColors(ctx, set(2), "My theme")
         assertEquals("My theme", real.getString("p1/$colors", null))
         assertEquals("My theme", real.getString(colors, null))
+    }
+
+    // ---- #4: saved Layouts and themes follow a renamed or deleted name they carry ----
+
+    @Test fun `a saved Layout follows its popup set's rename, so applying it doesn't bring the old set back`() {
+        KeyPopupOverrides.saveSets(real, listOf(KeyPopupOverrides.UserSet("S", "main", null, mapOf("a" to listOf("b")))))
+        LayoutPresets.save(real, listOf(LayoutPresets.Preset("Work", mapOf(KeyPopupOverrides.PREF_SELECTED_SET to "S"))))
+        renamePopupSet(ctx, "S", "T")
+        assertEquals(listOf("T"), KeyPopupOverrides.loadSets(real).map { it.name })
+        assertEquals("T", LayoutPresets.load(real).single().values[KeyPopupOverrides.PREF_SELECTED_SET])
+    }
+
+    private val numberRow = Settings.PREF_LAYOUT_PREFIX + LayoutType.NUMBER_ROW.name
+    private fun custom(name: String) = LayoutUtilsCustom.getLayoutName(name, LayoutType.NUMBER_ROW)
+    private fun file(name: String) = LayoutUtilsCustom.getLayoutFile(name, LayoutType.NUMBER_ROW, ctx)
+    @After fun removeLayoutFiles() { file("x").parentFile?.deleteRecursively(); LayoutUtilsCustom.onLayoutFileChanged() }
+
+    @Test fun `a saved Layout follows a custom default layout's rename and forgets it when deleted`() {
+        val x = custom("x"); val y = custom("y"); val z = custom("z")
+        LayoutPresets.save(real, listOf(LayoutPresets.Preset("Work", mapOf(numberRow to x)), LayoutPresets.Preset("Home", mapOf(numberRow to z))))
+        SubtypeSettings.onRenameLayout(LayoutType.NUMBER_ROW, x, y, ctx)
+        SubtypeSettings.onRenameLayout(LayoutType.NUMBER_ROW, z, null, ctx)
+        val presets = LayoutPresets.load(real).associateBy { it.name }
+        assertEquals(y, presets["Work"]!!.values[numberRow])
+        assertTrue(presets["Home"]!!.values.containsKey(numberRow))
+        assertNull(presets["Home"]!!.values[numberRow], "the deleted layout's name comes back with the Layout")
+    }
+
+    @Test fun `a saved theme forgets a deleted font, so applying it doesn't name the font again`() {
+        AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Mine", mapOf(Settings.PREF_KEY_FONT to "font:X",
+            Settings.PREF_EMOJI_FONT to "font:Y"))))
+        FontLibrary.delete(ctx, "X")
+        val look = AppearanceLooks.load(real).single()
+        assertEquals("default", look.values[Settings.PREF_KEY_FONT])
+        assertEquals("font:Y", look.values[Settings.PREF_EMOJI_FONT])
     }
 }

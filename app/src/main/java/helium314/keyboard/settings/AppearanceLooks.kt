@@ -312,6 +312,16 @@ object AppearanceLooks {
         }.getOrDefault(emptyList())
     }
 
+    /** In every saved look, [keys] reading [from] read [to] (null: not set). */
+    fun replaceValue(prefs: SharedPreferences, keys: Collection<String>, from: String, to: String?) {
+        val looks = load(prefs)
+        if (looks.none { look -> keys.any { look.values[it] == from } }) return
+        save(prefs, looks.map { look ->
+            if (keys.none { look.values[it] == from }) look
+            else Look(look.name, look.values.mapValues { (key, value) -> if (key in keys && value == from) to else value })
+        })
+    }
+
     fun save(prefs: SharedPreferences, looks: List<Look>) {
         keepBrokenAside(prefs, PREF)
         val arr = JSONArray()
