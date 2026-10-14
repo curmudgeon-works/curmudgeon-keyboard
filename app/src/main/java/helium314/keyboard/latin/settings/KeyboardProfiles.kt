@@ -323,6 +323,17 @@ object KeyboardProfiles {
     /** Every keyboard identity with its profile id (reads only). */
     fun idEntries(real: SharedPreferences): Map<String, Int> = ids(real).let { map -> map.keys().asSequence().associateWith { map.optInt(it, SHARED) } }
 
+    /** The switched-off keyboards: in the id map (not on the shared set) or the learned pools, but not enabled; each
+     *  one once, an entry that doesn't parse skipped. (Owner 2026-10-11: they count as switched-on ones in saving.) */
+    internal fun switchedOffKeyboards(real: SharedPreferences): List<SettingsSubtype> {
+        val enabled = helium314.keyboard.latin.utils.SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.toSet()
+        val pools = try { JSONObject(real.getString(helium314.keyboard.latin.personalization.LearnedKeyboards.PREF_POOLS, null) ?: "{}") }
+            catch (e: Exception) { JSONObject() }
+        return (idEntries(real).filterValues { it != SHARED }.keys + pools.keys().asSequence())
+            .mapNotNull { runCatching { it.toSettingsSubtype() }.getOrNull() }
+            .distinct().filter { it !in enabled }
+    }
+
     /** A keyboard changed identity (layout, languages ...): its settings follow it, and its learned words. */
     @Synchronized
     fun onKeyboardChanged(real: SharedPreferences, from: SettingsSubtype, to: SettingsSubtype) {

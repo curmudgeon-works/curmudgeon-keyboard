@@ -146,7 +146,7 @@ private fun DictionaryDetails(dict: File, locale: Locale, keyboard: helium314.ke
             cancelButtonText = stringResource(if (canTurnOff) android.R.string.cancel else android.R.string.ok),
             title = { Text(stringResource(R.string.dictionary_in_use_title, type)) },
             content = { Text(stringResource(R.string.dictionary_in_use_message,
-                others.joinToString("\n") { helium314.keyboard.settings.screens.keyboardName(it, context) })) },
+                dictionaryUserNames(context, others).joinToString("\n"))) },
         )
     } else if (showDeleteDialog) {
         ConfirmationDialog(
@@ -162,7 +162,7 @@ private fun DictionaryDetails(dict: File, locale: Locale, keyboard: helium314.ke
                 Text(stringResource(R.string.remove_dictionary_message, type) + when {
                     users == null -> ""
                     users.isEmpty() -> "\n\n" + stringResource(R.string.dictionary_used_by_none)
-                    else -> "\n\n" + stringResource(R.string.dictionary_used_by_one, helium314.keyboard.settings.screens.keyboardName(users.first(), context))
+                    else -> "\n\n" + stringResource(R.string.dictionary_used_by_one, dictionaryUserNames(context, users.take(1)).first())
                 })
             }
         )
@@ -177,11 +177,27 @@ internal fun dictionaryUsers(context: android.content.Context, locale: Locale,
     return if (keyboard != null) users.filter { it != keyboard } else if (users.size < 2) emptyList() else users
 }
 
-/** Every enabled keyboard with [locale] as its language or a second one. */
+/** Every keyboard with [locale] as its language or a second one: the enabled ones, then the switched-off ones (owner
+ *  2026-10-11: they count as switched-on ones; before, a dictionary only a switched-off keyboard used could be deleted,
+ *  and was gone when it came back). */
 internal fun allDictionaryUsers(context: android.content.Context, locale: Locale): List<helium314.keyboard.latin.settings.SettingsSubtype> =
-    helium314.keyboard.latin.utils.SubtypeSettings.getEnabledSubtypes(true)
-        .map { with(helium314.keyboard.latin.settings.SettingsSubtype) { it.toSettingsSubtype() } }.distinct()
+    (helium314.keyboard.latin.utils.SubtypeSettings.getEnabledSubtypes(true)
+        .map { with(helium314.keyboard.latin.settings.SettingsSubtype) { it.toSettingsSubtype() } } +
+        helium314.keyboard.latin.settings.KeyboardProfiles.switchedOffKeyboards(
+            helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(context)))
+        .distinct()
         .filter { kb -> kb.locale == locale || locale in helium314.keyboard.latin.utils.getSecondaryLocales(kb.extraValues) }
+
+/** [users] as the dialogs name them: a switched-off one "<name> (switched off)". */
+internal fun dictionaryUserNames(context: android.content.Context,
+                                 users: List<helium314.keyboard.latin.settings.SettingsSubtype>): List<String> {
+    val enabled = helium314.keyboard.latin.utils.SubtypeSettings.getEnabledSubtypes(true)
+        .map { with(helium314.keyboard.latin.settings.SettingsSubtype) { it.toSettingsSubtype() } }.toSet()
+    return users.map {
+        val name = helium314.keyboard.settings.screens.keyboardName(it, context)
+        if (it in enabled) name else context.getString(R.string.keyboard_switched_off, name)
+    }
+}
 
 @Preview
 @Composable
