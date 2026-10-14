@@ -83,6 +83,14 @@ SPDX-License-Identifier: Apache-2.0 AND GPL-3.0-only
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:mimeType="application/octet-stream" android:scheme="content" android:host="*" android:pathPattern=".*\\.dict" />
             </intent-filter>
+            <!-- our dictionaries, served from dl.curmudgeon.works with their own file type: a downloaded one opens here
+                 straight from the browser or Files (their links carry no file name, so the filter above misses them) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="application/x-curmudgeon-dict" android:scheme="content" />
+            </intent-filter>
         </activity>
 
         <activity android:name=".spellcheck.SpellCheckerSettingsActivity"
