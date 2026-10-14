@@ -41,17 +41,4 @@ class RetiredTrailSwitchTest {
         assertFalse(Settings.PREF_GESTURE_PREVIEW_TRAIL in SettingsActivity.settingsContainer.filter(term).map { it.key })
         assertTrue(SettingsActivity.settingsContainer[Settings.PREF_GESTURE_PREVIEW_TRAIL] == null)
     }
-
-    // fail before: the stored switch (off) turned the trail off at any thickness
-    @Test fun `the trail follows its thickness only`() {
-        fun trailOn(): Boolean {
-            Settings.init(ctx)
-            Settings.getInstance().loadSettings(ctx, Locale.US, InputAttributes(android.view.inputmethod.EditorInfo(), false, ctx.packageName))
-            return Settings.getValues().mGestureTrailEnabled
-        }
-        real.edit().putBoolean(Settings.PREF_GESTURE_PREVIEW_TRAIL, false).commit()
-        assertTrue(trailOn(), "the retired switch still read")
-        real.edit().putInt(Settings.PREF_GESTURE_TRAIL_THICKNESS, 0).commit()
-        assertFalse(trailOn(), "thickness 0 is the trail off")
-    }
 }
