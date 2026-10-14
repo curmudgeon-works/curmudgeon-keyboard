@@ -402,6 +402,13 @@ class SubScreenSaveRealPathTest {
     /** What defines the keyboards: their definitions (with their ids, so their sets), which are on and in use. */
     private fun keyboardsNow() = listOf(Settings.PREF_ADDITIONAL_SUBTYPES, Settings.PREF_ENABLED_SUBTYPES,
         Settings.PREF_SELECTED_SUBTYPE).associateWith { real.all[it] }
+    /** [keyboardsNow] with the definitions as a set: replaying a sub-screen's save onto the restored list puts each
+     *  keyboard back where it was at the open (review E4), so their order may differ, not what they are. */
+    private fun keyboardsAsSet(k: Map<String, Any?>) = k.mapValues { (key, v) ->
+        if (key == Settings.PREF_ADDITIONAL_SUBTYPES && v is String)
+            v.split(helium314.keyboard.latin.common.Constants.Separators.SETS).filter { it.isNotEmpty() }.toSet()
+        else v
+    }
     private var keyboardsAtOpen: Map<String, Any?> = emptyMap()
 
     /** In the layout files screen: the number row's text changed (still valid, not the built-in one any more). */
@@ -568,7 +575,8 @@ class SubScreenSaveRealPathTest {
         assertTrue(files.isNotEmpty()); assertTrue(keyboards != keyboardsAtOpen)
         leaveApp()
         assertEquals(files, layoutFiles().associate { it.path to it.readText() }) // the layout written there stays
-        assertEquals(keyboards, keyboardsNow()) // and the keyboard naming it (definition with its id, in use)
+        // and the keyboard naming it (definition with its id, in use); the definitions in any order
+        assertEquals(keyboardsAsSet(keyboards), keyboardsAsSet(keyboardsNow()))
         assertEquals(kid(1), storedEnabled(real).single().keyboardId) // (the same keyboard: no set moved)
         assertEquals(setOf(kid(1), kid(2)), KeyboardProfiles.setIds(real.all))
         assertEquals(listOf("Mine"), KeyPopupOverrides.loadSets(real).map { it.name }) // the parent's delete is undone
