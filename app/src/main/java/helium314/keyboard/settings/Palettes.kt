@@ -231,21 +231,29 @@ object Palettes {
         helium314.keyboard.latin.utils.Log.i("Palettes", "one list: ${list.size - before.size} palettes moved in")
     }
 
+    /** A restore's palettes ([merge]): backup name -> name on the phone, the phone's renamed with their users
+     *  following (in order), the clashes the restore dialog asks about. */
+    internal class Merged(val names: Map<String, String>, val phoneRenames: List<Pair<String, String>>,
+                 val clashes: List<helium314.keyboard.settings.preferences.SavedItemsMerge.Clash>)
+
     /**
-     * Restoring some keyboards (until stage 3b: backup-wins naming and a Palettes section in the restore question come
-     * there): the backup's palettes come in like its saved themes, by content: one the phone has with the same colors,
-     * whatever its name, is the phone's; a name the phone uses for other colors gets the next number. From the
-     * backup's list ([backup], plain keys), and from an older backup its sets' and saved themes' copies ([backupLooks]),
-     * the first of a name counting. [phone]: the phone's stored settings. [write]: the new ones are added to [real]
-     * (else the names only, for the restore question). @return backup name -> name on the phone
+     * Restoring some keyboards: the backup's palettes come into the one list as its saved themes do (owner 2026-10-11:
+     * "palette with same name but different colours in the backup should get priority and be called Sunset, while
+     * existing palette in the app still remains and becomes Sunset 2 ... if user checks the palette's box"; "palette with
+     * different name but same everything else should also appear as a checkbox ... the backup's name should overwrite
+     * the name that's live in app in all keyboards and themes that use them"): see [SavedItemsMerge.mergeKind], [choices].
+     * From the backup's list ([backup], plain keys), and from an older backup its sets' and saved themes' copies
+     * ([backupLooks]), the first of a name counting; an old kept copy "~custom:N" asks for "Palette N", matched by colors
+     * or numbered, never asked about. [phone]: the phone's stored settings. [write]: the list written to [real] (the
+     * users of a renamed one follow in [SavedItemsMerge.merge]); else the names only, for the restore question.
      */
-    fun merge(real: SharedPreferences, phone: Map<String, *>, backup: Map<String, *>,
-              backupLooks: List<AppearanceLooks.Look>, write: Boolean): Map<String, String> {
+    internal fun merge(real: SharedPreferences, phone: Map<String, *>, backup: Map<String, *>, backupLooks: List<AppearanceLooks.Look>,
+              choices: helium314.keyboard.settings.preferences.SavedItemsMerge.Choices, write: Boolean): Merged {
         val before = list(phone)
-        val list = LinkedHashMap(before)
-        val origins = HashMap<String, MutableSet<String>>()
-        val renames = LinkedHashMap<String, String>()
-        fun take(name: String, colors: Map<String, Any?>) { if (name !in renames) renames[name] = land(list, origins, name, colors, byContent = true) }
+        val items = ArrayList<helium314.keyboard.settings.preferences.SavedItemsMerge.In<Map<String, Any?>>>()
+        fun take(name: String, colors: Map<String, Any?>) {
+            items += helium314.keyboard.settings.preferences.SavedItemsMerge.In(name, listName(name), colors, plain = name.startsWith(OLD_KEPT))
+        }
         for ((name, colors) in list(backup)) take(name, colors)
         val sets = java.util.TreeMap<Int, HashMap<String, Any?>>()
         for ((stored, value) in backup) {
@@ -254,7 +262,14 @@ object Palettes {
         }
         for (own in sets.values) for (name in own.keys.mapNotNullTo(sortedSetOf<String>()) { nameOf(it) }) take(name, colorsIn(own, name))
         for (look in backupLooks) for (name in look.values.keys.mapNotNullTo(sortedSetOf<String>()) { nameOf(it) }) take(name, colorsIn(look.values, name))
-        if (write && list.size > before.size) real.edit().apply { for ((name, colors) in list) if (name !in before) put(this, name, colors) }.commit()
-        return renames
+        val result = helium314.keyboard.settings.preferences.SavedItemsMerge.mergeKind(
+            helium314.keyboard.settings.preferences.SavedItemsMerge.Kind.PALETTES, before.toList(), items, emptySet(), choices) { a, b -> a == b }
+        val after = result.list.toMap()
+        if (write && after != before) real.edit().apply {
+            // (the old names first: a name taken over gets its new colors after)
+            for ((name, colors) in before) if (after[name] != colors) for (key in keys(name)) remove(key)
+            for ((name, colors) in after) if (before[name] != colors) put(this, name, colors)
+        }.commit()
+        return Merged(result.names, result.phoneRenames, result.clashes)
     }
 }

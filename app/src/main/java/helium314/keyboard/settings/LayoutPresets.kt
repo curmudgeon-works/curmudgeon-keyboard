@@ -33,8 +33,8 @@ import org.json.JSONObject
 object LayoutPresets {
     const val PREF = "layout_presets"
     const val PREF_SELECTED = "layout_preset_selected"
-    private const val LAYOUT = "layout:" // + type: the keys' layout name (no entry: the default)
-    private const val LAYOUT_TEXT = "layoutText:" // + type: a custom layout's content
+    internal const val LAYOUT = "layout:" // + type: the keys' layout name (no entry: the default)
+    internal const val LAYOUT_TEXT = "layoutText:" // + type: a custom layout's content
     private const val SCRIPT = "script" // the script of the keyboard it was saved from (popups only go to that script)
     private const val MORE_POPUPS = "morePopups" // the keyboard's own accents level (no entry / null: the general one)
 

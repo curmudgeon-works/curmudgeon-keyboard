@@ -646,9 +646,18 @@
     <!-- deleting a keyboard whose word lists other keyboards read -->
     <string name="delete_keyboard_readers">These keyboards use its learned and blacklisted words (Use lists from other keyboards). Pick one to keep them, merged into its own; the others then read them from there:</string>
     <string name="delete_keyboard_merge_none">None: the lists go</string>
-    <!-- the restore dialog: a keyboard not on this phone; and what to do with saved items whose names are taken -->
+    <!-- the restore dialog: a keyboard not on this phone -->
     <string name="restore_keyboard_new">%s (new)</string>
-    <string name="restore_saved_items_as_copies">Saved items whose names you already use: bring them in as copies</string>
+    <!-- the restore dialog, keyboard by keyboard: the backup's saved items clashing with this phone's, each ticked to
+         start with (owner 2026-10-11: "backup wins the name if ticked"; replaces "bring them in as copies") -->
+    <string name="restore_clashes">Saved items that clash with yours</string>
+    <string name="restore_clashes_note">Ticked: the backup\'s name wins, and every keyboard and saved item using that name uses the backup\'s. Unticked: nothing of yours is renamed, and a backup item with one of your names doesn\'t come in.</string>
+    <!-- same name, other content. %1$s: the name, %2$s: what this phone's item becomes, e.g. "Sunset 2" -->
+    <string name="restore_clash_same_name">%1$s: use the backup\'s, yours becomes %2$s</string>
+    <!-- the same content under another name. %1$s: this phone's name, %2$s: the backup's name -->
+    <string name="restore_clash_same_content">%1$s is the backup\'s %2$s: rename yours to %2$s</string>
+    <!-- a Layout's custom key layout, same name with other keys. %1$s: the key layout's name, %2$s: what this phone's becomes -->
+    <string name="restore_clash_key_layout">key layout %1$s: use the backup\'s, yours becomes %2$s</string>
     <!-- the restore: the phone has keyboards of a chosen backup keyboard's language (owner 2026-10-11: restore matches by
          language and asks). The app can't tell which one is newer: never say newer or older. %s: the backup keyboard's name -->
     <string name="restore_merge_title">Restoring %s</string>

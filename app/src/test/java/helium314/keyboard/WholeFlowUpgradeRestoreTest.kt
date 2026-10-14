@@ -278,7 +278,8 @@ class WholeFlowUpgradeRestoreTest {
         KeyboardProfiles.loadGroups(real)
     }
 
-    @Test fun `US restored on its own from a 3afbeeebc backup - its Work comes in as Work 2, again adds nothing, French untouched`() {
+    // (owner 2026-10-11: backup wins the name if ticked; before, the backup's Work came in as "Work 2")
+    @Test fun `US restored on its own from a 3afbeeebc backup - its Work wins the name, the phone's is Work 2, again adds nothing, French untouched`() {
         backupOf(phoneOn3afbeeebc())
         newPhoneWithOtherWork()
         val phoneWork = LayoutPresets.load(real).single()
@@ -288,7 +289,7 @@ class WholeFlowUpgradeRestoreTest {
         restoreFollowUp(ctx)
 
         val layouts = LayoutPresets.load(real)
-        assertEquals(listOf("Work", "Work 2"), layouts.map { it.name })
+        assertEquals(listOf("Work 2", "Work"), layouts.map { it.name })
         assertEquals(phoneWork.values, layouts[0].values, "the phone's Work changed")
         assertEquals(true, layouts[1].values[numberRow])
         assertEquals("Mine", layouts[1].values[selectedSet])
@@ -297,22 +298,23 @@ class WholeFlowUpgradeRestoreTest {
         assertEquals(listOf("Sunset"), AppearanceLooks.load(real).map { it.name })
         val usId = KeyboardProfiles.idFor(real, us)
         assertNotEquals(1, usId)
-        assertEquals("Work 2", real.getString(own(usId, LayoutPresets.PREF_SELECTED), null))
+        assertEquals("Work", real.getString(own(usId, LayoutPresets.PREF_SELECTED), null))
         assertEquals("Mine", real.getString(own(usId, selectedSet), null))
         assertEquals("Sunset", real.getString(own(usId, AppearanceLooks.PREF_SELECTED), null))
         assertEquals(true, real.all[own(usId, numberRow)])
         assertEquals(3f, real.all[own(usId, gap)])
+        // (French still names "Work", the backup's now; its own values as they were)
         assertEquals(french, real.all.filterKeys { it.startsWith("p1/") }, "the phone's French keyboard changed")
         val saved = listOf(LayoutPresets.PREF, AppearanceLooks.PREF, KeyPopupOverrides.PREF_SETS).associateWith { real.all[it] }
 
         restoreKeyboardsFrom(ctx, zip, listOf(us), withSettings = true)
         restoreFollowUp(ctx)
 
-        assertEquals(listOf("Work", "Work 2"), LayoutPresets.load(real).map { it.name }, "the second restore added a Layout")
+        assertEquals(listOf("Work 2", "Work"), LayoutPresets.load(real).map { it.name }, "the second restore added a Layout")
         assertEquals(1, KeyPopupOverrides.loadSets(real).size, "the second restore added a popup set")
         assertEquals(1, AppearanceLooks.load(real).size, "the second restore added a theme")
         assertEquals(saved, listOf(LayoutPresets.PREF, AppearanceLooks.PREF, KeyPopupOverrides.PREF_SETS).associateWith { real.all[it] })
-        assertEquals("Work 2", real.getString(own(KeyboardProfiles.idFor(real, us), LayoutPresets.PREF_SELECTED), null))
+        assertEquals("Work", real.getString(own(KeyboardProfiles.idFor(real, us), LayoutPresets.PREF_SELECTED), null))
         assertEquals(french, real.all.filterKeys { it.startsWith("p1/") }, "the phone's French keyboard changed")
     }
 }

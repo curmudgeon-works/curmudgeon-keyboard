@@ -28,13 +28,12 @@ import java.util.zip.ZipOutputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 /**
  * Owner 2026-10-11, restoring some keyboards: "keep everything existing and also add whatever was in the backup", by
- * content ("Items inside items must be renamed together"), a taken name numbered ("Next free number"), and the
- * restored keyboard pointing at what its items became; a second restore of the same backup adds nothing.
+ * content ("Items inside items must be renamed together"), and the restored keyboard pointing at what its items became;
+ * a second restore of the same backup adds nothing. A taken name: the backup's wins it if ticked, the phone's gets the
+ * next number (owner 2026-10-11: backup wins the name if ticked; before, the backup's came in numbered).
  */
 @RunWith(RobolectricTestRunner::class)
 class PartialRestoreItemsTest {
@@ -90,47 +89,49 @@ class PartialRestoreItemsTest {
         assertEquals(1, AppearanceLooks.load(real).size)
     }
 
-    @Test fun `a taken name with other content comes in numbered, the Layout inside follows, the keyboard points at both`() {
+    // (owner 2026-10-11: backup wins the name if ticked; before, the backup's came in as "Mine 2")
+    @Test fun `a taken name with other content - ticked the backup's wins it, the phone's is numbered, the Layout inside and the keyboard name the backup's`() {
         KeyPopupOverrides.saveSets(real, listOf(KeyPopupOverrides.UserSet("Mine", "all", null, mapOf("a" to listOf("à")))))
         backup()
         restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true)
-        assertEquals(listOf("Mine", "Mine 2"), KeyPopupOverrides.loadSets(real).map { it.name })
+        assertEquals(listOf("Mine 2", "Mine"), KeyPopupOverrides.loadSets(real).map { it.name })
+        assertEquals(listOf("à"), KeyPopupOverrides.loadSets(real).first().overrides["a"]) // (the phone's, numbered)
         assertEquals(listOf("á"), KeyPopupOverrides.loadSets(real).last().overrides["a"])
-        assertEquals("Mine 2", LayoutPresets.load(real).single().values[KeyPopupOverrides.PREF_SELECTED_SET])
-        assertEquals("Mine 2", ownChoice(KeyPopupOverrides.PREF_SELECTED_SET))
+        assertEquals("Mine", LayoutPresets.load(real).single().values[KeyPopupOverrides.PREF_SELECTED_SET])
+        assertEquals("Mine", ownChoice(KeyPopupOverrides.PREF_SELECTED_SET))
         assertEquals("Work", ownChoice(LayoutPresets.PREF_SELECTED))
     }
 
-    @Test fun `the same content under another name is the phone's, and with copies off a taken name is the phone's`() {
+    // (owner 2026-10-11: backup wins the name if ticked; "bring them in as copies" off, before: the keyboard named no
+    // theme and showed "Custom", option 2)
+    @Test fun `unticked - the same content under another name is the phone's, and a taken name is the phone's`() {
         KeyPopupOverrides.saveSets(real, listOf(KeyPopupOverrides.UserSet("Ours", "all", null, mapOf("a" to listOf("á")))))
         AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Sunset", mapOf(Settings.PREF_KEY_HORIZONTAL_GAP to 1f))), now = true)
         backup()
-        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true, asCopies = false)
+        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true, names = SavedItemsMerge.Choices(setOf(
+            SavedItemsMerge.Kind.POPUP_SETS to "Mine", SavedItemsMerge.Kind.THEMES to "Sunset")))
         assertEquals(listOf("Ours"), KeyPopupOverrides.loadSets(real).map { it.name })
         assertEquals("Ours", ownChoice(KeyPopupOverrides.PREF_SELECTED_SET))
         assertEquals(listOf("Sunset"), AppearanceLooks.load(real).map { it.name }) // (the phone's Sunset)
         assertEquals(1f, AppearanceLooks.load(real).single().values[Settings.PREF_KEY_HORIZONTAL_GAP])
-        // the taken name with other content: the keyboard keeps the backup's look but names no theme, so it shows a
-        // plain "Custom", not "Custom · from Sunset" (owner 2026-10-11 chose option 2: names never point at other
-        // content; before, it named the phone's Sunset) (owner 2026-10-11: labels are just "Custom", no number; only kept palettes are numbered)
+        // the taken name with other content: the backup's doesn't come in, the keyboard keeps the backup's look and
+        // names the phone's Sunset ("backup's doesn't come in at all")
         assertEquals(3f, own().getFloat(Settings.PREF_KEY_HORIZONTAL_GAP, 0f))
-        assertNull(own().getString(AppearanceLooks.PREF_SELECTED, null))
-        assertTrue(CustomLabels.has(own(), CustomLabels.Kind.THEME))
+        assertEquals("Sunset", own().getString(AppearanceLooks.PREF_SELECTED, null))
     }
 
-    @Test fun `with copies off a popup set whose name the phone uses for other content is not brought in, and nothing names it`() {
+    // (owner 2026-10-11: backup wins the name if ticked; with copies off before, the keyboard and the Layout named no set)
+    @Test fun `unticked a popup set whose name the phone uses for other content is not brought in, and its users name the phone's`() {
         KeyPopupOverrides.saveSets(real, listOf(KeyPopupOverrides.UserSet("Mine", "all", null, mapOf("a" to listOf("à")))))
         backup()
-        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true, asCopies = false)
+        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true,
+            names = SavedItemsMerge.Choices(setOf(SavedItemsMerge.Kind.POPUP_SETS to "Mine")))
         assertEquals(listOf("Mine"), KeyPopupOverrides.loadSets(real).map { it.name }) // (the phone's Mine, unchanged)
         assertEquals(listOf("à"), KeyPopupOverrides.loadSets(real).single().overrides["a"])
-        // (owner 2026-10-11, option 2: the keyboard names no set and shows "Custom"; the Layout brought in keeps its
-        // popups but names no set either)
-        assertNull(own().getString(KeyPopupOverrides.PREF_SELECTED_SET, null))
-        assertTrue(CustomLabels.has(own(), CustomLabels.Kind.POPUPS))
+        assertEquals("Mine", own().getString(KeyPopupOverrides.PREF_SELECTED_SET, null))
         val work = LayoutPresets.load(real).single()
         assertEquals("Work", work.name)
-        assertFalse(work.values.containsKey(KeyPopupOverrides.PREF_SELECTED_SET))
+        assertEquals("Mine", work.values[KeyPopupOverrides.PREF_SELECTED_SET])
         assertEquals("Work", ownChoice(LayoutPresets.PREF_SELECTED))
         assertFalse(CustomLabels.has(own(), CustomLabels.Kind.LAYOUT))
     }
@@ -182,15 +183,16 @@ class PartialRestoreItemsTest {
 
     // review C6 2026-10-11: two items both at the default but remembering different values apply differently with
     // "Saved items take new defaults" off, so they are not the same content
-    @Test fun `a Layout remembering another value for an unpicked setting comes in numbered`() {
+    // (owner 2026-10-11: backup wins the name if ticked; before, the backup's came in as "Work 2")
+    @Test fun `a Layout remembering another value for an unpicked setting is another Layout - the backup's wins the name`() {
         phoneWorkRemembering(150)
         backupWorkRemembering(300)
         restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true)
         val layouts = LayoutPresets.load(real)
-        assertEquals(listOf("Work", "Work 2"), layouts.map { it.name })
+        assertEquals(listOf("Work 2", "Work"), layouts.map { it.name })
         assertEquals(150, (layouts[0].remembered[Settings.PREF_KEY_LONGPRESS_TIMEOUT] as Number).toInt())
         assertEquals(300, (layouts[1].remembered[Settings.PREF_KEY_LONGPRESS_TIMEOUT] as Number).toInt())
-        assertEquals("Work 2", ownChoice(LayoutPresets.PREF_SELECTED))
+        assertEquals("Work", ownChoice(LayoutPresets.PREF_SELECTED))
     }
 
     @Test fun `a Layout remembering the same value is the phone's`() {
@@ -201,7 +203,8 @@ class PartialRestoreItemsTest {
         assertEquals("Work", ownChoice(LayoutPresets.PREF_SELECTED))
     }
 
-    @Test fun `a theme remembering another value for an unpicked setting comes in numbered`() {
+    // (owner 2026-10-11: backup wins the name if ticked; before, the backup's came in as "Sunset 2")
+    @Test fun `a theme remembering another value for an unpicked setting is another theme - the backup's wins the name`() {
         AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Sunset", mapOf(Settings.PREF_KEY_HORIZONTAL_GAP to null),
             mapOf(Settings.PREF_KEY_HORIZONTAL_GAP to 1f))), now = true)
         ZipOutputStream(zip.outputStream()).use { z ->
@@ -215,8 +218,9 @@ class PartialRestoreItemsTest {
             z.closeEntry()
         }
         restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true)
-        assertEquals(listOf("Sunset", "Sunset 2"), AppearanceLooks.load(real).map { it.name })
-        assertEquals("Sunset 2", ownChoice(AppearanceLooks.PREF_SELECTED))
+        assertEquals(listOf("Sunset 2", "Sunset"), AppearanceLooks.load(real).map { it.name })
+        assertEquals(1f, AppearanceLooks.load(real).first().remembered[Settings.PREF_KEY_HORIZONTAL_GAP]) // (the phone's, numbered)
+        assertEquals("Sunset", ownChoice(AppearanceLooks.PREF_SELECTED))
         restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true) // (again: nothing new)
         assertEquals(2, AppearanceLooks.load(real).size)
     }

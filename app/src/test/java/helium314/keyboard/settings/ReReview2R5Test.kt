@@ -26,6 +26,7 @@ import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.preferences.RestoreChoiceDialogFrom
 import helium314.keyboard.settings.preferences.RestoreDialogData
+import helium314.keyboard.settings.preferences.SavedItemsMerge
 import helium314.keyboard.settings.preferences.readRestoreDialog
 import helium314.keyboard.settings.preferences.restorePlanFrom
 import helium314.keyboard.settings.preferences.settingsToJsonStream
@@ -120,9 +121,11 @@ class ReReview2R5Test {
         assertEquals(before.switchedOff, plan.switchedOff)
         for (k in data.pending.keyboards) {
             assertEquals(before.asks(k), plan.asks(k))
-            for (copies in listOf(true, false))
-                assertEquals(unnamed(before.backupSettings(k, copies)), unnamed(plan.backupSettings(k, copies)))
+            // (owner 2026-10-11: backup wins the name if ticked; the ticks replace "bring them in as copies")
+            for (names in listOf(SavedItemsMerge.Choices(), SavedItemsMerge.Choices(setOf(SavedItemsMerge.Kind.THEMES to "x"))))
+                assertEquals(unnamed(before.backupSettings(k, names)), unnamed(plan.backupSettings(k, names)))
         }
+        assertEquals(before.clashes, plan.clashes)
         assertTrue(zip.exists(), "(the loader deleted the backup)")
         assertEquals(1, folder.list()!!.size, "the dry runs wrote: ${folder.list()!!.toList()}")
     }

@@ -77,7 +77,9 @@ internal sealed class RestoreDecision {
  * [switchedOff] (owner 2026-10-11: switched-off keyboards are treated like switched-on ones); [nameOf], a keyboard's
  * name as the screens show it. For "What to merge" (review 2026-10-11 R3): [sameLayout], whether two key layouts of a
  * type are the same keys (an unsaved one compared by its keys); [backupSettings], a backup keyboard's settings with its
- * saved items named as the restore would name them (with copies or not).
+ * saved items named as the restore would name them, and [phoneSettings], a phone keyboard's, for the restore dialog's
+ * ticks ([SavedItemsMerge.Choices]); [clashes], the backup's saved items the restore dialog asks about (owner
+ * 2026-10-11: "backup wins the name if ticked").
  */
 internal class RestorePlan(
     val incoming: Map<SettingsSubtype, SettingsSubtype>,
@@ -85,7 +87,9 @@ internal class RestorePlan(
     val switchedOff: List<SettingsSubtype>,
     val nameOf: (SettingsSubtype) -> String,
     val sameLayout: (helium314.keyboard.latin.utils.LayoutType, String, String) -> Boolean = { _, a, b -> a == b },
-    val backupSettings: (SettingsSubtype, Boolean) -> Map<String, Any?> = { _, _ -> emptyMap() },
+    val backupSettings: (SettingsSubtype, SavedItemsMerge.Choices) -> Map<String, Any?> = { _, _ -> emptyMap() },
+    val phoneSettings: (Map<String, Any?>, SavedItemsMerge.Choices) -> Map<String, Any?> = { values, _ -> values },
+    val clashes: List<SavedItemsMerge.Clash> = emptyList(),
 ) {
     val phone = (enabled + switchedOff).distinct()
 

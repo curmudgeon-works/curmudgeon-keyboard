@@ -16,6 +16,7 @@ import helium314.keyboard.latin.utils.LayoutUtilsCustom
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.settings.AppearanceLooks
 import helium314.keyboard.settings.preferences.RestoreMatch
+import helium314.keyboard.settings.preferences.SavedItemsMerge
 import helium314.keyboard.settings.preferences.restoreDifferencesFrom
 import helium314.keyboard.settings.preferences.restoreKeyboardsFrom
 import helium314.keyboard.settings.preferences.restorePlanFrom
@@ -38,7 +39,8 @@ import kotlin.test.assertTrue
  * (review 2026-10-11 R3; owner 2026-10-11: "Screen 2 should handle unsaved items as named yes") "What to merge" sees an
  * unsaved key layout ("~N") as the restore would bring it in, compared by its keys; the real run changes the keys only
  * when ticked, and an unsaved file no keyboard uses afterwards goes. Menus are compared with the saved items named as the
- * merge would name them ("Sunset" coming in as "Sunset 2").
+ * merge would name them, the phone keyboard's too (owner 2026-10-11: backup wins the name if ticked; before, "Sunset"
+ * coming in as "Sunset 2").
  */
 @RunWith(RobolectricTestRunner::class)
 class ReReview2R3Test {
@@ -185,16 +187,25 @@ class ReReview2R3Test {
     private fun appearanceRow(differences: List<RestoreMatch.Difference>) =
         differences.any { it == RestoreMatch.Difference.Menu(KeyboardProfiles.Group.APPEARANCE) }
 
-    @Test fun `(c) the backup's Sunset with other content comes in as Sunset 2 - Appearance differs`() {
+    // (owner 2026-10-11: backup wins the name if ticked; before, the backup's came in as Sunset 2)
+    @Test fun `(c) the backup's Sunset with other content - Appearance differs, ticked or not`() {
         themes("Sunset", 1f, "Sunset", 3f)
         val before = real.all
         assertTrue(appearanceRow(restoreDifferencesFrom(ctx, zip, english, english)))
+        assertTrue(appearanceRow(restoreDifferencesFrom(ctx, zip, english, english,
+            names = SavedItemsMerge.Choices(setOf(SavedItemsMerge.Kind.THEMES to "Sunset")))))
         assertEquals(before, real.all) // (nothing written)
         assertEquals(listOf("Sunset"), AppearanceLooks.load(real).map { it.name })
     }
 
-    @Test fun `(c) the same content under another name is the phone's - no Appearance row`() {
+    // (owner 2026-10-11: backup wins the name if ticked) ticked, the phone's Sunset is Dawn after the restore: the phone
+    // keyboard compared as naming Dawn; unticked, the backup's Dawn is the phone's Sunset
+    @Test fun `(c) the same content under another name - no Appearance row, ticked or not`() {
         themes("Sunset", 1f, "Dawn", 1f)
+        val before = real.all
         assertFalse(appearanceRow(restoreDifferencesFrom(ctx, zip, english, english)))
+        assertFalse(appearanceRow(restoreDifferencesFrom(ctx, zip, english, english,
+            names = SavedItemsMerge.Choices(setOf(SavedItemsMerge.Kind.THEMES to "Dawn")))))
+        assertEquals(before, real.all) // (nothing written)
     }
 }
