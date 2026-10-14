@@ -179,6 +179,32 @@ class DictionaryChoiceTest {
         assertEquals(listOf("emoji_user.dict"), engineEmoji(hi))
     }
 
+    // owner 2026-10-12 B4: the backup's emoji dictionary is the device's kept-aside copy; fail before: nothing happened,
+    // emoji_user.dict (other content) stayed in use and the backup's version wasn't
+    @Test fun `a restore matching the device's prev emoji file renames it to the backup's name and uses it`() {
+        add(hi, "emoji_user.dict"); add(hi, "emoji_prev_user.dict") // (the device's: each one's content is its name)
+        val step = restoreEmoji(hi, "emoji_prev_user.dict") // (the backup's: the same as the device's prev)
+        assertEquals(RestoreDictionaries.Action.SAME, step.action)
+        assertEquals("emoji_prev_user.dict", File(dir(hi), "emoji_user.dict").readText(), "the match took the backup's name")
+        assertEquals("emoji_user.dict", File(dir(hi), "emoji_prev2_user.dict").readText(), "the device's of that name moved aside")
+        assertFalse(File(dir(hi), "emoji_prev_user.dict").exists())
+        assertEquals("emoji_user.dict", DictionarySelection.selected(ctx, hi, Dictionary.TYPE_EMOJI), "selected")
+        assertEquals(listOf("emoji_user.dict"), engineEmoji(hi), "the engine uses the backup's version")
+    }
+
+    @Test fun `a restore matching the main dictionary in use under the backup's name selects it, nothing renamed`() {
+        add(hi, "main_user.dict"); add(hi, "main_prev_user.dict")
+        DictionarySelection.select(ctx, hi, "main_prev_user.dict")
+        val source = File(ctx.cacheDir, "backup_main_user.dict").apply { writeText("main_user.dict") }
+        val step = RestoreDictionaries.plan(dir(hi).name, "main_user.dict", source.inputStream().use { RestoreDictionaries.digest(it) },
+            RestoreDictionaries.deviceDigests(dir(hi)))
+        RestoreDictionaries.apply(step, dir(hi), source, DeviceProtectedUtils.getRealSharedPreferences(ctx))
+        assertEquals("main_user.dict", File(dir(hi), "main_user.dict").readText())
+        assertEquals("main_prev_user.dict", File(dir(hi), "main_prev_user.dict").readText())
+        assertEquals("main_user.dict", DictionarySelection.selected(ctx, hi))
+        assertEquals("main_user.dict", engineMain(hi))
+    }
+
     @Test fun `tapping a restore's prev emoji file makes the engine use it`() {
         add(hi, "emoji_user.dict")
         restoreEmoji(hi, "backup")

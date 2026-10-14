@@ -1385,8 +1385,9 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, plan: Res
 
 /**
  * The backup's added dictionaries unpacked in [dictsDir] ("<tag>/<name>") into the device's language folders
- * ([folders], by tag) as [RestoreDictionaries] plans them: a clash only for the languages [clashesFor] (the restored
- * keyboards', Dictionaries ticked); for the others only the new ones come in, the device's stay.
+ * ([folders], by tag) as [RestoreDictionaries] plans them: a clash, or a match selected (B4), only for the languages
+ * [clashesFor] (the restored keyboards', Dictionaries ticked); for the others only the new ones come in, the device's
+ * stay.
  */
 private fun restoreDictionaries(ctx: Context, backupPrefs: Map<String, Any?>, dictsDir: File, folders: Map<String, File>, clashesFor: Set<String>) {
     val backup = HashMap<RestoreDictionaries.Entry, String>()
@@ -1396,7 +1397,8 @@ private fun restoreDictionaries(ctx: Context, backupPrefs: Map<String, Any?>, di
     if (backup.isEmpty()) return
     val steps = RestoreDictionaries.plan(backup, backupPrefs) { tag -> folders[tag]?.let { RestoreDictionaries.deviceDigests(it) }.orEmpty() }
     for (step in steps) {
-        if (step.action == RestoreDictionaries.Action.CLASH && step.tag !in clashesFor) continue // (the device's stays)
+        // (the device's stays: no clash, and no match selected, B4)
+        if (step.action != RestoreDictionaries.Action.NEW && step.tag !in clashesFor) continue
         val dir = folders[step.tag] ?: continue
         try {
             RestoreDictionaries.apply(step, dir, File(File(dictsDir, step.tag), step.backupName), ctx.realPrefs())

@@ -12,12 +12,16 @@ import java.security.MessageDigest
  * The backup's added dictionaries in a partial restore (owner 2026-10-12, "DICTIONARY CHOICE" and "RESTORE DIALOG v3"),
  * per language (its folder "dicts/<tag>") and kind (the file name's start, "main" of "main_user.dict"):
  * - the backup's dictionary of a kind is the one it had selected ([inUse]); one the backup didn't use stays out;
- * - the same content anywhere for that language and kind on the device: nothing ([Action.SAME]);
+ * - the same content anywhere for that language and kind on the device ([Action.SAME]): that copy is selected and
+ *   renamed to the backup's name, a device file of that name with other content moved aside first to the next free
+ *   "…_prev" ("_prev2" …) (owner 2026-10-12 B4: "When backups dict matches, yes select that copy and also rename that
+ *   copy to backups"; before, nothing, and a match kept aside, e.g. "emoji_prev", stayed unused);
  * - none of that kind on the device: it comes in ([Action.NEW]);
  * - content differs: the backup's comes in and is selected, the device's of that name is renamed on disk to
  *   "…_prev" (the next free one: "_prev2" …), the ".user.dict" ending kept so the app still lists it, and stays
  *   selectable ([Action.CLASH]).
- * A language no restored keyboard has gets its NEW ones silently, never a CLASH (the device's stays).
+ * A language no restored keyboard has gets its NEW ones silently, never a CLASH nor a SAME's selection (the device's
+ * stays).
  * The selection (per language and kind, app-wide; its owner is the dictionary dialog and the engine): [selectedKey] =
  * the selected file's name or [INTERNAL]; no value: the engine uses "<kind>_user.dict".
  */
@@ -62,11 +66,16 @@ internal object RestoreDictionaries {
     enum class Action { SAME, NEW, CLASH }
 
     /** What the restore does with the backup's [backupName] of [tag] and its kind: [target], its name on the device;
-     *  [renames], the device files moved aside first (from -> to); [select], whether it is selected after. */
+     *  [renames], the device files renamed first, in order (from -> to; SAME: the device's matching copy last, to
+     *  [target]); [select], whether [target] is selected after. */
     data class Step(val tag: String, val kind: String, val backupName: String, val action: Action, val target: String,
                     val renames: List<Pair<String, String>> = emptyList()) {
-        val select get() = action == Action.CLASH
+        val select get() = action == Action.CLASH || action == Action.SAME
     }
+
+    /** The first kept-aside name of [kind] not among [taken]. */
+    private fun nextPrev(kind: String, taken: Collection<String>) =
+        generateSequence(1) { it + 1 }.map { prevName(kind, it) }.first { it !in taken }
 
     /**
      * The step for the backup's [backupName] (content [backupDigest]) of [tag], against [device]: the device's files of
@@ -76,14 +85,20 @@ internal object RestoreDictionaries {
         val kind = kindOf(backupName)
         val sameKind = device.filterKeys { kindOf(it) == kind }
         val target = defaultName(kind)
-        if (sameKind.values.any { it == backupDigest }) return Step(tag, kind, backupName, Action.SAME, target)
+        val same = sameKind.filterValues { it == backupDigest }.keys
+        if (same.isNotEmpty()) {
+            // (B4: the copy of the backup's name if one matches, else the first matching by name, takes the backup's
+            // name, the device's of that name with other content moved aside first; then selected)
+            if (backupName in same) return Step(tag, kind, backupName, Action.SAME, backupName)
+            val match = same.sorted().first()
+            val renames = if (backupName in device) listOf(backupName to nextPrev(kind, device.keys), match to backupName)
+                else listOf(match to backupName)
+            return Step(tag, kind, backupName, Action.SAME, backupName, renames)
+        }
         if (sameKind.isEmpty()) return Step(tag, kind, backupName, Action.NEW, target)
         // (the device's of the default name, the one in use unless another was selected, moved aside; one already
         // under another name stays as it is, selectable)
-        val renames = if (target in device) {
-            val prev = generateSequence(1) { it + 1 }.map { prevName(kind, it) }.first { it !in device }
-            listOf(target to prev)
-        } else emptyList()
+        val renames = if (target in device) listOf(target to nextPrev(kind, device.keys)) else emptyList()
         return Step(tag, kind, backupName, Action.CLASH, target, renames)
     }
 
@@ -106,19 +121,21 @@ internal object RestoreDictionaries {
     /** The languages of [steps] whose dictionary clashes (the restore dialog's subtext). */
     fun clashTags(steps: List<Step>): Set<String> = steps.filter { it.action == Action.CLASH }.mapTo(LinkedHashSet()) { it.tag }
 
-    /** Carries out [step] in the language's folder [dir], the backup's file read from [source]; with [real], selects
-     *  it on a clash. */
+    /** Carries out [step] in the language's folder [dir], the backup's file read from [source] (SAME: not read, the
+     *  device's copy is renamed); with [real], selects it on a clash or a match. */
     fun apply(step: Step, dir: File, source: File, real: SharedPreferences) {
-        if (step.action == Action.SAME) return
+        val target = File(dir, step.target)
+        // (never outside the folder, whatever the zip says)
+        fun inside(f: File) = f.canonicalPath.startsWith(dir.canonicalPath + File.separator)
+        if (!inside(target)) return
         dir.mkdirs()
         for ((from, to) in step.renames) {
             val f = File(dir, from)
-            if (f.isFile && !File(dir, to).exists()) f.renameTo(File(dir, to))
+            if (inside(f) && inside(File(dir, to)) && f.isFile && !File(dir, to).exists()) f.renameTo(File(dir, to))
         }
-        val target = File(dir, step.target)
-        // (never outside the folder, whatever the zip says)
-        if (!target.canonicalPath.startsWith(dir.canonicalPath + File.separator)) return
-        source.copyTo(target, overwrite = true)
+        if (step.action == Action.SAME) {
+            if (!target.isFile) return // (the rename failed: the selection stays as it was)
+        } else source.copyTo(target, overwrite = true)
         if (step.select) real.edit(commit = true) { putString(selectedKey(step.tag, step.kind), step.target) }
     }
 

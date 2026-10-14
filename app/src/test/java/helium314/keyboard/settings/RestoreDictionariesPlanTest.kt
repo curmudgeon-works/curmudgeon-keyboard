@@ -14,9 +14,27 @@ import kotlin.test.assertNull
  *  anywhere: nothing; new: comes in; differs: the backup's selected, the device's renamed "…_prev", "…_prev2" … */
 @RunWith(RobolectricTestRunner::class)
 class RestoreDictionariesPlanTest {
-    @Test fun `same content anywhere of that kind is nothing, another kind's doesn't count`() {
+    @Test fun `same content anywhere of that kind is a match, another kind's doesn't count`() {
         assertEquals(Action.SAME, RestoreDictionaries.plan("hi", "main_user.dict", "x", mapOf("main_prev_user.dict" to "x")).action)
         assertEquals(Action.NEW, RestoreDictionaries.plan("hi", "main_user.dict", "x", mapOf("emoji_user.dict" to "x")).action)
+    }
+
+    // owner 2026-10-12 B4: the matching copy takes the backup's name and is selected; a device file of that name with other
+    // content moves to the next free prev first. Fail before: SAME did nothing, nothing selected or renamed
+    @Test fun `a match is renamed to the backup's name and selected, the one of that name moved aside first`() {
+        val kept = RestoreDictionaries.plan("hi", "main_user.dict", "x", mapOf("main_prev_user.dict" to "x"))
+        assertEquals(listOf("main_prev_user.dict" to "main_user.dict"), kept.renames)
+        assertEquals("main_user.dict", kept.target)
+        assertEquals(true, kept.select)
+        val taken = RestoreDictionaries.plan("hi", "main_user.dict", "x", mapOf("main_user.dict" to "a", "main_prev_user.dict" to "x"))
+        assertEquals(listOf("main_user.dict" to "main_prev2_user.dict", "main_prev_user.dict" to "main_user.dict"), taken.renames)
+        assertEquals(true, taken.select)
+        // already under the backup's name: only selected
+        val named = RestoreDictionaries.plan("hi", "emoji_user.dict", "x", mapOf("emoji_user.dict" to "x", "emoji_prev_user.dict" to "x"))
+        assertEquals(Action.SAME, named.action)
+        assertEquals(emptyList(), named.renames)
+        assertEquals("emoji_user.dict", named.target)
+        assertEquals(true, named.select)
     }
 
     @Test fun `a clash moves the default-named one to the next free prev, keeping the user dict ending`() {
