@@ -884,7 +884,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
     }
 
     override fun removeWord(word: String) {
-        // this keyboard's learned words and blacklist only (Rahul 2026-10-10: "We should only delete from current keyboard
+        // this keyboard's learned words and blacklist only (owner 2026-10-10: "We should only delete from current keyboard
         // and move it into that keyboard's blacklist"): no more deleting from Android's personal dictionary, which every
         // keyboard reads; the blacklist keeps the word out of this keyboard's suggestions
         removeWords(listOf(word))

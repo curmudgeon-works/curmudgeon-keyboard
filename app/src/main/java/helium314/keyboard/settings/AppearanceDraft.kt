@@ -27,7 +27,7 @@ class AppearanceDraft private constructor(
     class Saved(val copy: File, val length: Long, val modified: Long)
 
     // fonts and palettes deleted while the screen is open ("font:<name>", "palette:<name>"): done for good when the changes
-    // are kept, undone with them (Rahul 2026-10-10: "so discard should bring the font back"). Until then a deleted font's
+    // are kept, undone with them (owner 2026-10-10: "so discard should bring the font back"). Until then a deleted font's
     // file waits in the snapshot folder, and only the edited keyboard has let go of it.
     private val held = LinkedHashSet<String>()
 

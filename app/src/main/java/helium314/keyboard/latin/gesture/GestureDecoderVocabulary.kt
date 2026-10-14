@@ -357,7 +357,7 @@ object GestureDecoderVocabulary {
         learnExecutor.execute {
             try {
                 val tag = locale.toLanguageTag()
-                // the learned copy of the keyboard it was removed on ([pool]) only: another keyboard keeps its own (Rahul
+                // the learned copy of the keyboard it was removed on ([pool]) only: another keyboard keeps its own (owner
                 // 2026-10-10: "We should only delete from current keyboard and move it into that keyboard's blacklist")
                 learned[storeKey(locale.script(), pool)]?.keys?.removeIf { it.equals(word, ignoreCase = true) }
                 cache[tag]?.remove(word)

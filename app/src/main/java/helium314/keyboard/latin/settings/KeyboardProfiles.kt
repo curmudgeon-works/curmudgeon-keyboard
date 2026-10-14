@@ -443,7 +443,7 @@ object KeyboardProfiles {
 
     // ---- the settings a keyboard starts from (the Add keyboard dialog, 2026-10-10) ----
 
-    /** A keyboard added while one set of settings is for all: which settings it starts from once they are separate. Rahul
+    /** A keyboard added while one set of settings is for all: which settings it starts from once they are separate. The owner
      *  2026-10-10: Add keyboard always asks, whether settings are separate or not. {set id: {"from": set id or
      *  [START_DEFAULTS], "noPopups": true when the source is of another script}} */
     private const val PREF_START_FROM = "keyboard_start_from"

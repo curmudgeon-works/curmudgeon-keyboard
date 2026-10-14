@@ -19,7 +19,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** 2026-10-10 (Rahul: "so discard should bring the font back"): a font deleted with Appearance open is deleted for good
+/** 2026-10-10 (owner: "so discard should bring the font back"): a font deleted with Appearance open is deleted for good
  *  only when its changes are kept; Discard (or leaving the app, or a crash) brings it back. */
 @RunWith(RobolectricTestRunner::class)
 class HeldDeletesTest {

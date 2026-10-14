@@ -36,7 +36,7 @@ sealed interface StartSettings {
 }
 
 /**
- * Adding [added] (Rahul 2026-10-10: "Add keyboard should always ask to copy another keyboard's settings, regardless of
+ * Adding [added] (owner 2026-10-10: "Add keyboard should always ask to copy another keyboard's settings, regardless of
  * use separate settings being toggled off ... in a single dialog box along with word list selection"): one keyboard's
  * settings (a radio button per keyboard, the common settings, every default) and the learned and blacklisted words of
  * any number of keyboards (check boxes). [copyOf]: a copy, which starts as that keyboard (its settings and both its
