@@ -102,6 +102,9 @@ class PrefsDraft private constructor(private val name: String, private val value
         /** The app is left with such a screen open: changes not accepted are undone. */
         fun rejectOpen(ctx: Context) { active.values.toList().forEach { it.reject(ctx) } }
 
+        /** Whether such a screen is open (its draft running). */
+        fun anyOpen(): Boolean = active.isNotEmpty()
+
         /** Snapshots left on disk by a process that died with the screen open: put them back. Called at app start. */
         fun recoverAfterCrash(ctx: Context) {
             ctx.filesDir.listFiles { f -> f.name.startsWith(PREFIX) }?.forEach { file ->
@@ -117,6 +120,12 @@ class PrefsDraft private constructor(private val name: String, private val value
         }
     }
 }
+
+/** Whether a Save/Discard edit is open: Appearance, Layout & Typing, or a screen with a [PrefsDraft]. Backup and restore
+ *  and Factory reset are switched off then, and a restore or reset doesn't start (round-6 review 20261013_L4_2, owner
+ *  2026-10-13: one check where they start, in place of hiding them from search; a second window, e.g. in split screen,
+ *  reached them with an edit open in the first, whose Discard then put the pre-restore snapshot back). */
+fun editOpen(): Boolean = AppearanceDraft.activeOrNull() != null || LayoutDraft.isOpen() || PrefsDraft.anyOpen()
 
 /** What a screen with a [PrefsDraft] needs: the pending keys (italic titles), the top bar's cross and tick, and leaving. */
 class PrefsDraftUi(val pending: Set<String>, val leave: () -> Unit, val topActions: @Composable RowScope.() -> Unit,

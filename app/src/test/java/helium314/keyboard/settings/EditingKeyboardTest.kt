@@ -241,6 +241,8 @@ class EditingKeyboardTest {
     @Test fun `a factory reset with B's screen open goes back to the main screen`() = launch { _, activity ->
         openCorrectionOfB()
         frames(1000)
+        // (its snapshot let go, as after a Save: with a Save/Discard edit open the reset doesn't start, 20261013_L4_2)
+        PrefsDraft.close("correction")
         var done = false
         // (owner 2026-10-11: ticks mean keep; all unticked = full reset)
         activity.runOnUiThread { helium314.keyboard.settings.preferences.startFactoryReset(activity,
@@ -261,6 +263,8 @@ class EditingKeyboardTest {
         // their definitions)
         val restoredA = a.withoutIds().withId(2)
         val restoredB = b.withoutIds().withId(1)
+        // (its snapshot let go, as after a Save: with a Save/Discard edit open the restore doesn't start, 20261013_L4_2)
+        PrefsDraft.close("correction")
         activity.runOnUiThread { helium314.keyboard.settings.preferences.runRestore(activity, {}, R.string.backup_restored) {
             val lists = SubtypeSettings.createPrefSubtypes(listOf(restoredB, restoredA))
             real.edit().clear().putString(Settings.PREF_ENABLED_SUBTYPES, lists).putString(Settings.PREF_ADDITIONAL_SUBTYPES, lists)

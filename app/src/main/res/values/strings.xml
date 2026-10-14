@@ -331,6 +331,8 @@
     <string name="delete_swipe_summary">Perform a swipe from the delete key to select and remove bigger portions of text at once</string>
     <!-- Preferences item and dialog title for backup and restore -->
     <string name="backup_restore_title">Backup and restore</string>
+    <!-- Backup and restore and Factory reset while a Save/Discard edit is open (switched off) -->
+    <string name="edit_open_save_or_discard_first">Save or discard your open changes first.</string>
     <!-- Message for backup and restore dialog -->
     <string name="backup_restore_message">Save or load from file. Warning: restore will overwrite existing data</string>
     <!-- Error message for backup -->

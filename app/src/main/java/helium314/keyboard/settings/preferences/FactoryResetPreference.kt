@@ -18,6 +18,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -42,6 +43,7 @@ import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.getActivity
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.Setting
+import helium314.keyboard.settings.editOpen
 import helium314.keyboard.settings.SettingsActivity
 import helium314.keyboard.settings.dialogs.InfoDialog
 import helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog
@@ -73,8 +75,12 @@ fun FactoryResetPreference(setting: Setting) {
     val backedUp = BackupRestoreJob.backupsWritten > writtenAtOpen
     var error: String? by rememberSaveable { mutableStateOf(null) }
     val backupLauncher = backupLauncher(onError = { error = it })
-    Preference(name = setting.title, description = setting.description,
-        onClick = { writtenAtOpen = BackupRestoreJob.backupsWritten; showDialog = true })
+    // switched off while a Save/Discard edit is open (round-6 review 20261013_L4_2, owner 2026-10-13)
+    val blocked = editOpenNow()
+    Preference(name = setting.title,
+        description = if (blocked) stringResource(R.string.edit_open_save_or_discard_first) else setting.description,
+        modifier = if (blocked) Modifier.alpha(0.38f) else Modifier,
+        onClick = { if (!editOpen()) { writtenAtOpen = BackupRestoreJob.backupsWritten; showDialog = true } })
     error?.let { InfoDialog(stringResource(R.string.backup_error, it.drop(1))) { error = null } }
     if (!showDialog) return
     FactoryResetDialog(
@@ -138,6 +144,9 @@ internal fun FactoryResetDialog(backedUp: Boolean, backupRunning: Boolean, onDis
  * the default keyboard's, every script ("b. merge into default keyboard's words, retaining all script-wise lists").
  */
 internal fun startFactoryReset(ctx: Context, keep: ResetKeep, onDone: () -> Unit) {
+    // not with a Save/Discard edit open (the dialog opened before it was): its Discard would put the pre-reset snapshot
+    // back (round-6 review 20261013_L4_2, owner 2026-10-13)
+    if (refusedForOpenEdit(ctx)) return
     val executor = helium314.keyboard.latin.utils.ExecutorUtils.getBackgroundExecutor(helium314.keyboard.latin.utils.ExecutorUtils.KEYBOARD)
     val main = android.os.Handler(android.os.Looper.getMainLooper())
     executor.execute {

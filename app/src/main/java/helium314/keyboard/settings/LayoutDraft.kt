@@ -249,6 +249,9 @@ class LayoutDraft private constructor(
         private var rejectedSubtype: String? = null
         fun takeRejectedSubtype(): String? = rejectedSubtype.also { rejectedSubtype = null }
 
+        /** Whether the screen is open (its draft running). */
+        fun isOpen(): Boolean = active != null
+
         /** The running draft for [subtype], or a fresh snapshot. */
         fun of(ctx: Context, subtype: String): LayoutDraft = active ?: start(ctx, subtype).also { active = it }
 

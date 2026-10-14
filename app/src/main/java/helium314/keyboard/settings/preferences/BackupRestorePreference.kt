@@ -35,6 +35,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -85,6 +86,7 @@ import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.latin.utils.protectedPrefs
 import helium314.keyboard.settings.Setting
+import helium314.keyboard.settings.editOpen
 import helium314.keyboard.settings.SettingsActivity
 import helium314.keyboard.settings.dialogs.ConfirmationDialog
 import helium314.keyboard.settings.dialogs.InfoDialog
@@ -118,7 +120,11 @@ fun BackupRestorePreference(setting: Setting) {
     var error: String? by rememberSaveable { mutableStateOf(null) }
     val backupLauncher = backupLauncher(onError = { error = it })
     val restore = restoreEntry(onError = { error = it })
-    Preference(name = setting.title, onClick = { showDialog = true })
+    // switched off while a Save/Discard edit is open (round-6 review 20261013_L4_2, owner 2026-10-13)
+    val blocked = editOpenNow()
+    Preference(name = setting.title, onClick = { if (!editOpen()) showDialog = true },
+        description = if (blocked) stringResource(R.string.edit_open_save_or_discard_first) else null,
+        modifier = if (blocked) Modifier.alpha(0.38f) else Modifier)
     if (showDialog) {
         ConfirmationDialog(
             onDismissRequest = { showDialog = false },
@@ -135,6 +141,14 @@ fun BackupRestorePreference(setting: Setting) {
     }
     BackupRestoreJob.progress?.let { ProgressDialog(it) }
     error?.let { BackupRestoreErrorDialog(it) { error = null } }
+}
+
+/** [editOpen] for a row that is drawn again when Appearance's edit ends ([helium314.keyboard.settings.AppearanceDraft.version];
+ *  the other screens' edits end with their screen, which a window showing the row has left). */
+@Composable
+internal fun editOpenNow(): Boolean {
+    helium314.keyboard.settings.AppearanceDraft.version.intValue
+    return editOpen()
 }
 
 /** A backup's or restore's error, [error] as [runBackup] and [runRestore] give it; OK closes it ([onDismiss]). */
@@ -1127,6 +1141,14 @@ internal fun hiddenSettingsNote(ctx: Context, keyboards: List<SettingsSubtype>):
     return listOfNotNull(mainNote, others).joinToString("\n")
 }
 
+/** True, with a word to the user, when a Save/Discard edit is open ([editOpen]): a restore or factory reset doesn't
+ *  start then (round-6 review 20261013_L4_2, owner 2026-10-13). */
+internal fun refusedForOpenEdit(ctx: Context): Boolean {
+    if (!editOpen()) return false
+    Toast.makeText(ctx.applicationContext, R.string.edit_open_save_or_discard_first, Toast.LENGTH_LONG).show()
+    return true
+}
+
 /** The steps of restoring [pending]'s job: each of its entries, then the learned words (the settings: see runRestore). */
 private fun restoreSteps(pending: PendingRestore) = pending.entries.size + 1
 
@@ -1138,6 +1160,9 @@ private fun restoreSteps(pending: PendingRestore) = pending.entries.size + 1
  */
 internal fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: Int, steps: Int = 0, note: () -> String? = { null },
                         fullRestore: Boolean = false, noteTitle: Int? = null, work: () -> Unit): Boolean {
+    // not with a Save/Discard edit open (a restore dialog opened before it was): its Discard would put the pre-restore
+    // snapshot back (round-6 review 20261013_L4_2, owner 2026-10-13)
+    if (refusedForOpenEdit(ctx)) return false
     if (!BackupRestoreJob.start(R.string.restore_running, steps + 1, restore = true)) return false
     val app = ctx.applicationContext
     ExecutorUtils.getBackgroundExecutor(ExecutorUtils.KEYBOARD).execute {
