@@ -4,6 +4,7 @@ import helium314.keyboard.settings.SettingsWithoutKey
 import helium314.keyboard.settings.dialogs.UnsavedChangesDialog
 import helium314.keyboard.settings.dialogs.SaveChangesDialog
 import helium314.keyboard.settings.dialogs.DiscardChangesDialog
+import helium314.keyboard.settings.dialogs.savedSubScreenNames
 import helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog
 import helium314.keyboard.settings.preferences.LocalPendingChange
 import helium314.keyboard.settings.LayoutDraft
@@ -291,7 +292,7 @@ fun SubtypeScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-    if (askReject) DiscardChangesDialog({ askReject = false }) { discardChanges(); draft = LayoutDraft.of(ctx, currentSubtypeString) }
+    if (askReject) DiscardChangesDialog({ askReject = false }, savedSubScreenNames(ctx, draft.savedSubScreens())) { discardChanges(); draft = LayoutDraft.of(ctx, currentSubtypeString) }
     if (askAccept) SaveChangesDialog({ askAccept = false }) { draft.accept(); draft = LayoutDraft.of(ctx, currentSubtypeString) }
     if (askDelete) DeleteKeyboardDialog(currentSubtype, onDismissRequest = { askDelete = false }) { mergeInto ->
         askDelete = false
@@ -305,6 +306,7 @@ fun SubtypeScreen(
         onKeepWorking = { askOnLeave = false },
         onDiscardAndExit = { discardChanges(); askOnLeave = false; onClickBack() },
         onSaveAndExit = { draft.accept(); askOnLeave = false; onClickBack() },
+        alsoUndoes = savedSubScreenNames(ctx, draft.savedSubScreens()),
     )
     SearchScreen(
         onClickBack = ::leave,

@@ -765,6 +765,12 @@
     <string name="appearance_accept_all">Save</string>
     <string name="appearance_reject_title">Discard all changes?</string>
     <string name="appearance_discard_all">Discard</string>
+    <!-- Line under "Discard all changes?" when screens opened from this one were saved meanwhile (their Save only keeps the change until this screen's Save or Discard). %s: the screens, joined by " · " -->
+    <string name="discard_also_undoes">This also undoes what you saved in: %s</string>
+    <!-- The same line in the leave dialog (Keep working / Discard and exit / Save and exit) -->
+    <string name="discard_and_exit_also_undoes">Discard and exit also undoes what you saved in: %s</string>
+    <!-- One entry of that line: a palette saved in the palette editor. %s: its name as shown -->
+    <string name="discard_also_undoes_palette">palette \"%s\"</string>
     <string name="appearance_keep_working">Keep working</string>
     <string name="appearance_reject">Discard changes</string>
     <string name="appearance_reject_message">The keyboard goes back to how it looked when you opened Appearance.</string>

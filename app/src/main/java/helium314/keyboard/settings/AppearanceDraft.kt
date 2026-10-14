@@ -58,6 +58,20 @@ class AppearanceDraft private constructor(
         writeSnapshot(dir, setId, prefs, files, reached)
     }
 
+    // palettes the palette editor saved while the screen is open (its Save only keeps them, this screen's Save or
+    // Discard decides): the Discard question names them (owner 2026-10-11: "send the discard warning yes")
+    private val savedPalettes = LinkedHashSet<String>()
+
+    /** The palettes (stored names) saved in the palette editor since the screen opened. */
+    fun savedPalettes(): List<String> = savedPalettes.toList()
+
+    /** The palette editor saved, the palette opened as [opened] and now called [now] (renamed: one entry, the new name). */
+    fun paletteSaved(opened: String, now: String) {
+        savedPalettes -= opened
+        savedPalettes += now
+        File(dir, SUB_SAVES_FILE).writeText(org.json.JSONArray(savedPalettes.toList()).toString())
+    }
+
     /** Palette [name] deleted with the screen open: the edited keyboard's part is done (the snapshot puts it back), the
      *  other keyboards follow only when the changes are kept. */
     fun holdPaletteDelete(name: String) {
@@ -142,6 +156,7 @@ class AppearanceDraft private constructor(
 
     private fun discard() {
         dir.deleteRecursively()
+        savedPalettes.clear()
         if (active === this) active = null
         version.intValue++
     }
@@ -163,6 +178,7 @@ class AppearanceDraft private constructor(
         private const val PREFS_FILE = "draft_prefs.json" // written last: its presence means a complete snapshot
         private const val HELD_FILE = "held_deletes.json"
         private const val HELD_FONTS = "held_fonts"
+        private const val SUB_SAVES_FILE = "sub_screen_saves.json"
         private const val FONT = "font:"
         private const val PALETTE = "palette:"
 
@@ -187,6 +203,16 @@ class AppearanceDraft private constructor(
 
         /** [AppearanceDraft.holdFiles] of the running draft, if there is one. */
         fun holdFilesOpen(files: List<File>) { active?.holdFiles(files) }
+
+        /** [AppearanceDraft.paletteSaved] of the running draft, if there is one. */
+        fun paletteSavedOpen(opened: String, now: String) { active?.paletteSaved(opened, now) }
+
+        /** Tests: the saved palettes as kept on disk with the snapshot. */
+        @androidx.annotation.VisibleForTesting internal fun savedPalettesOnDisk(ctx: Context): List<String> = readSubSaves(dir(ctx))
+
+        private fun readSubSaves(dir: File): List<String> =
+            runCatching { org.json.JSONArray(File(dir, SUB_SAVES_FILE).readText()) }.getOrNull()
+                ?.let { a -> List(a.length()) { a.getString(it) } } ?: emptyList()
 
 
         /** The app is left (or the screen goes to the background) with the screen open: changes not accepted are undone. */

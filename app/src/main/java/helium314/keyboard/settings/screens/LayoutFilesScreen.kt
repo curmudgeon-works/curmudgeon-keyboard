@@ -63,6 +63,7 @@ import org.json.JSONObject
  *  deleted there came back on its Discard, but the saved Layouts lost its name for good (same as review C2). */
 internal fun layoutFilesSaved() {
     helium314.keyboard.latin.utils.SettingsEventLog.log("Layout files saved: held until Layout & Typing's Save")
+    helium314.keyboard.settings.LayoutDraft.subScreenSavedOpen(helium314.keyboard.settings.LayoutDraft.SubScreen.LAYOUT_FILES) // (named in its Discard question)
 }
 
 /** The layouts edited here, one tab each: everything but the letters (own picker) and the symbols pages (popup editor). */

@@ -441,6 +441,7 @@ internal fun updateSetInLayout(real: SharedPreferences, layoutName: String, set:
  *  stayed deleted after its Discard, while the saved Layouts got its name back (review C2). */
 internal fun customizePopupsSaved() {
     helium314.keyboard.latin.utils.SettingsEventLog.log("Customize popups saved: held until Layout & Typing's Save")
+    helium314.keyboard.settings.LayoutDraft.subScreenSavedOpen(helium314.keyboard.settings.LayoutDraft.SubScreen.POPUPS) // (named in its Discard question)
 }
 
 internal fun deletePopupSet(ctx: Context, name: String) {

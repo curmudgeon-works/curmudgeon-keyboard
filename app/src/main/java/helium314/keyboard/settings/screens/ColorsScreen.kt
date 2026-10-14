@@ -75,6 +75,7 @@ import kotlinx.serialization.json.Json
  *  a theme deleted on Appearance stayed deleted after its Discard (review B1). */
 internal fun paletteEditorSaved(opened: String, now: String) {
     helium314.keyboard.latin.utils.SettingsEventLog.log("Palette editor saved ($opened -> $now): held until Appearance's Save")
+    helium314.keyboard.settings.AppearanceDraft.paletteSavedOpen(opened, now) // (named in its Discard question)
 }
 
 @Composable

@@ -6,6 +6,7 @@ import androidx.compose.ui.layout.layout
 import helium314.keyboard.settings.dialogs.UnsavedChangesDialog
 import helium314.keyboard.settings.dialogs.SaveChangesDialog
 import helium314.keyboard.settings.dialogs.DiscardChangesDialog
+import helium314.keyboard.settings.dialogs.savedPaletteNames
 import androidx.compose.runtime.DisposableEffect
 
 import helium314.keyboard.settings.dialogs.LocalPreviewEmojiPeople
@@ -273,13 +274,14 @@ fun AppearanceScreen(
         revealer = revealer,
         isPending = { tile -> tileChanged(tile, pendingKeys, pendingFiles) },
     )
-    if (askReject) DiscardChangesDialog({ askReject = false }) { draft.reject(ctx); draft = AppearanceDraft.of(ctx) }
+    if (askReject) DiscardChangesDialog({ askReject = false }, savedPaletteNames(ctx, draft.savedPalettes())) { draft.reject(ctx); draft = AppearanceDraft.of(ctx) }
     if (askAccept) SaveChangesDialog({ askAccept = false }) { draft.accept(ctx); draft = AppearanceDraft.of(ctx) }
     }
     if (askOnLeave) UnsavedChangesDialog(
         onKeepWorking = { askOnLeave = false },
         onDiscardAndExit = { draft.reject(ctx); askOnLeave = false; onClickBack() },
         onSaveAndExit = { draft.accept(ctx); askOnLeave = false; onClickBack() },
+        alsoUndoes = savedPaletteNames(ctx, draft.savedPalettes()),
     )
 }
 

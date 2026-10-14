@@ -125,4 +125,37 @@ class SubScreenSaveTest {
             assertTrue(java.io.File(layouts, "number").resolve("old.txt").exists())
         } finally { layouts.deleteRecursively() }
     }
+
+    // owner 2026-10-11 ("send the discard warning yes"): the parent's Discard says which sub-screen saves it also undoes
+    @Test fun `the palette editor's save is reported by the open Appearance draft until its Discard`() {
+        val draft = AppearanceDraft.of(ctx)
+        assertEquals(emptyList(), draft.savedPalettes()) // a fresh draft: none
+        paletteEditorSaved("Warm", "Warm")
+        paletteEditorSaved("Warm", "Hot") // saved again, renamed: one entry, by the new name
+        assertEquals(listOf("Hot"), draft.savedPalettes())
+        assertEquals(listOf("Hot"), AppearanceDraft.savedPalettesOnDisk(ctx)) // kept with the snapshot
+        AppearanceDraft.rejectOpen(ctx) // Appearance's Discard
+        assertEquals(emptyList(), AppearanceDraft.savedPalettesOnDisk(ctx))
+        assertEquals(emptyList(), AppearanceDraft.of(ctx).savedPalettes()) // the next snapshot starts with none
+    }
+
+    @Test fun `Customize popups and layout files saves are reported by the open Layout draft until its Discard`() {
+        val draft = LayoutDraft.of(ctx, "en_US:")
+        assertEquals(emptyList(), draft.savedSubScreens())
+        customizePopupsSaved()
+        layoutFilesSaved()
+        customizePopupsSaved() // twice: once in the list
+        val both = listOf(LayoutDraft.SubScreen.POPUPS, LayoutDraft.SubScreen.LAYOUT_FILES)
+        assertEquals(both, draft.savedSubScreens())
+        assertEquals(both, LayoutDraft.savedSubScreensOnDisk(ctx))
+        LayoutDraft.rejectOpen(ctx) // Layout & Typing's Discard
+        assertEquals(emptyList(), LayoutDraft.savedSubScreensOnDisk(ctx))
+        assertEquals(emptyList(), LayoutDraft.of(ctx, "en_US:").savedSubScreens())
+    }
+
+    @Test fun `a sub-screen saved without its parent open records nothing`() {
+        paletteEditorSaved("Warm", "Warm"); customizePopupsSaved(); layoutFilesSaved()
+        assertEquals(emptyList(), AppearanceDraft.of(ctx).savedPalettes())
+        assertEquals(emptyList(), LayoutDraft.of(ctx, "en_US:").savedSubScreens())
+    }
 }

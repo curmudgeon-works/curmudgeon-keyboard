@@ -31,6 +31,22 @@ class LayoutDraft private constructor(
 ) {
     fun hasChanges(ctx: Context): Boolean = changedKeys(ctx).isNotEmpty() || layoutsChanged(ctx)
 
+    /** A screen opened from here whose Save only keeps its change (this screen's Save or Discard decides it). */
+    enum class SubScreen { POPUPS, LAYOUT_FILES }
+
+    // the sub-screens saved while the screen is open, in that order: the Discard question names them (owner
+    // 2026-10-11: "send the discard warning yes")
+    private val savedSubScreens = LinkedHashSet<SubScreen>()
+
+    /** The sub-screens saved since the screen opened. */
+    fun savedSubScreens(): List<SubScreen> = savedSubScreens.toList()
+
+    /** [screen] saved with this screen open. */
+    fun subScreenSaved(screen: SubScreen) {
+        savedSubScreens += screen
+        File(dir, SUB_SAVES_FILE).writeText(org.json.JSONArray(savedSubScreens.map { it.name }).toString())
+    }
+
     // (no rebase: the Save of a screen opened from here, Customize popups or the layout files, leaves this snapshot as
     // it is, so this screen's Save or Discard decides those changes too; owner 2026-10-11, option 1, review C2)
 
@@ -108,6 +124,7 @@ class LayoutDraft private constructor(
 
     private fun discard() {
         dir.deleteRecursively()
+        savedSubScreens.clear()
         if (active === this) active = null
     }
 
@@ -173,6 +190,7 @@ class LayoutDraft private constructor(
 
         private fun dir(ctx: Context) = File(ctx.filesDir, "layout_draft")
         private const val PREFS_FILE = "draft_prefs.json" // written last: its presence means a complete snapshot
+        private const val SUB_SAVES_FILE = "sub_screen_saves.json"
 
         private var active: LayoutDraft? = null
 
@@ -195,6 +213,14 @@ class LayoutDraft private constructor(
 
         /** The app is left with the screen open: changes not kept are undone. */
         fun rejectOpen(ctx: Context) { active?.reject(ctx) }
+
+        /** [LayoutDraft.subScreenSaved] of the running draft, if there is one. */
+        fun subScreenSavedOpen(screen: SubScreen) { active?.subScreenSaved(screen) }
+
+        /** Tests: the saved sub-screens as kept on disk with the snapshot. */
+        @androidx.annotation.VisibleForTesting internal fun savedSubScreensOnDisk(ctx: Context): List<SubScreen> =
+            runCatching { org.json.JSONArray(File(dir(ctx), SUB_SAVES_FILE).readText()) }.getOrNull()
+                ?.let { a -> List(a.length()) { SubScreen.valueOf(a.getString(it)) } } ?: emptyList()
 
         private fun start(ctx: Context, subtype: String): LayoutDraft {
             helium314.keyboard.latin.utils.SettingsEventLog.log("Layout & Typing snapshot taken for $subtype")

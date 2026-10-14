@@ -10,12 +10,30 @@ import helium314.keyboard.latin.R
 // The Save / Discard dialogs of the screens that preview on the live keyboard (Appearance, Layout & Typing):
 // the same wording and buttons on both, and they don't bring the preview keyboard up.
 
-/** The top bar's cross: undo everything changed since the screen opened. */
+/** What a Discard also undoes, the sub-screen saves since the screen opened ([alsoUndoes]: their names as shown), as the
+ *  line under the question ([res]: its text with the names); none: no line. */
 @Composable
-fun DiscardChangesDialog(onDismissRequest: () -> Unit, onDiscard: () -> Unit) = NoPreview {
+private fun alsoUndoesLine(res: Int, alsoUndoes: List<String>): (@Composable () -> Unit)? =
+    if (alsoUndoes.isEmpty()) null else { { Text(stringResource(res, alsoUndoes.joinToString(" · "))) } }
+
+/** The names of [palettes] (stored names) for that line, as the palette list shows them. */
+fun savedPaletteNames(ctx: android.content.Context, palettes: List<String>): List<String> =
+    palettes.map { ctx.getString(R.string.discard_also_undoes_palette, helium314.keyboard.keyboard.KeyboardTheme.paletteName(ctx, it)) }
+
+/** The names of the Layout & Typing sub-screens [saved] for that line, as their rows show them. */
+fun savedSubScreenNames(ctx: android.content.Context, saved: List<helium314.keyboard.settings.LayoutDraft.SubScreen>): List<String> =
+    saved.map { ctx.getString(when (it) {
+        helium314.keyboard.settings.LayoutDraft.SubScreen.POPUPS -> R.string.key_popups_full
+        helium314.keyboard.settings.LayoutDraft.SubScreen.LAYOUT_FILES -> R.string.layout_files
+    }) }
+
+/** The top bar's cross: undo everything changed since the screen opened, [alsoUndoes] (sub-screen saves) named. */
+@Composable
+fun DiscardChangesDialog(onDismissRequest: () -> Unit, alsoUndoes: List<String> = emptyList(), onDiscard: () -> Unit) = NoPreview {
     ConfirmationDialog(
         onDismissRequest = onDismissRequest,
         title = { Text(stringResource(R.string.appearance_reject_title)) },
+        content = alsoUndoesLine(R.string.discard_also_undoes, alsoUndoes),
         cancelButtonText = stringResource(R.string.appearance_keep_working),
         confirmButtonText = stringResource(R.string.appearance_discard_all),
         onConfirmed = onDiscard,
@@ -34,13 +52,15 @@ fun SaveChangesDialog(onDismissRequest: () -> Unit, onSave: () -> Unit) = NoPrev
     )
 }
 
-/** Leaving the screen with changes: keep working (left; also a tap outside), or discard / save and leave (right). */
+/** Leaving the screen with changes: keep working (left; also a tap outside), or discard / save and leave (right);
+ *  [alsoUndoes]: the sub-screen saves a Discard and exit undoes too, named. */
 @Composable
-fun UnsavedChangesDialog(onKeepWorking: () -> Unit, onDiscardAndExit: () -> Unit, onSaveAndExit: () -> Unit) = NoPreview {
+fun UnsavedChangesDialog(onKeepWorking: () -> Unit, onDiscardAndExit: () -> Unit, onSaveAndExit: () -> Unit,
+                         alsoUndoes: List<String> = emptyList()) = NoPreview {
     ThreeButtonAlertDialog(
         onDismissRequest = onKeepWorking,
         title = { Text(stringResource(R.string.unsaved_changes_title)) },
-        content = null,
+        content = alsoUndoesLine(R.string.discard_and_exit_also_undoes, alsoUndoes),
         neutralButtonText = stringResource(R.string.appearance_keep_working),
         onNeutral = onKeepWorking,
         cancelButtonText = stringResource(R.string.discard_and_exit),
