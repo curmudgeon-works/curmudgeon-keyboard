@@ -349,6 +349,8 @@ private class PendingRestore(val file: File, val prefs: Map<String, Any?>, val k
 private class RestoreChoice(
     val keyboards: List<SettingsSubtype>, val settings: Boolean, val learnedWords: Boolean, val dictionaries: Boolean,
     val customWords: Boolean, val clipboard: Boolean,
+    // restoring some keyboards: the backup's saved items whose names the phone uses come in as numbered copies (2026-10-11)
+    val asCopies: Boolean = true,
 )
 
 @Composable
@@ -379,7 +381,10 @@ private fun restoreLauncher(onError: (String) -> Unit, onChoose: (PendingRestore
 @Composable
 private fun RestoreChoiceDialog(pending: PendingRestore, onDismiss: () -> Unit, onError: (String) -> Unit) {
     val ctx = LocalContext.current
-    val selected = remember(pending) { mutableStateListOf<SettingsSubtype>().apply { addAll(pending.keyboards) } }
+    // keyboards not on this phone are new and ticked; those here start unticked: restoring one replaces it (2026-10-11)
+    val onPhone = remember(pending) { SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.toSet() }
+    val selected = remember(pending) { mutableStateListOf<SettingsSubtype>().apply { addAll(pending.keyboards.filter { it !in onPhone }) } }
+    var asCopies by rememberSaveable { mutableStateOf(true) }
     var settings by rememberSaveable { mutableStateOf(true) }
     var learnedWords by rememberSaveable { mutableStateOf(true) }
     var dictionaries by rememberSaveable { mutableStateOf(true) }
@@ -404,10 +409,14 @@ private fun RestoreChoiceDialog(pending: PendingRestore, onDismiss: () -> Unit, 
                     }
                 Heading(R.string.restore_keyboards)
                 pending.keyboards.forEach { keyboard ->
-                    CheckRow(keyboardName(keyboard, ctx), keyboard in selected) { if (it) selected.add(keyboard) else selected.remove(keyboard) }
+                    val name = keyboardName(keyboard, ctx).let { if (keyboard in onPhone) it else stringResource(R.string.restore_keyboard_new, it) }
+                    CheckRow(name, keyboard in selected) { if (it) selected.add(keyboard) else selected.remove(keyboard) }
                 }
                 Heading(R.string.restore_with_keyboards)
                 CheckRow(stringResource(R.string.restore_settings), settings, withKeyboards) { settings = it }
+                // (only when some keyboards come back: all of them with their settings replace everything)
+                if (settings && withKeyboards && selected.toSet() != pending.keyboards.toSet())
+                    CheckRow(stringResource(R.string.restore_saved_items_as_copies), asCopies) { asCopies = it }
                 if (pending.hasLearnedWords)
                     CheckRow(stringResource(R.string.restore_learned_words), learnedWords, withKeyboards) { learnedWords = it }
                 if (pending.hasDictionaries)
@@ -426,7 +435,7 @@ private fun RestoreChoiceDialog(pending: PendingRestore, onDismiss: () -> Unit, 
         checkOk = { withKeyboards || (customWords && pending.hasCustomWords) || (clipboard && pending.hasClipboard) },
         onConfirmed = {
             val choice = RestoreChoice(selected.toList(), settings, learnedWords && pending.hasLearnedWords,
-                dictionaries && pending.hasDictionaries, customWords && pending.hasCustomWords, clipboard && pending.hasClipboard)
+                dictionaries && pending.hasDictionaries, customWords && pending.hasCustomWords, clipboard && pending.hasClipboard, asCopies)
             started = runRestore(ctx, onError, R.string.backup_restored, restoreSteps(pending)) {
                 try { restoreChosen(ctx, pending, choice) } finally { pending.file.delete() }
             }
@@ -605,7 +614,7 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, choice: R
     val allSettings = choice.settings && choice.keyboards.isNotEmpty() && everyKeyboard
     if (choice.keyboards.isNotEmpty()) {
         if (allSettings) restoreAllSettings(ctx, pending)
-        else restoreKeyboards(ctx, pending, choice.keyboards, choice.settings)
+        else restoreKeyboards(ctx, pending, choice.keyboards, choice.settings, choice.asCopies)
     }
     val tags = choice.keyboards.flatMap { listOf(it.locale) + getSecondaryLocales(it.extraValues) }.map { it.toLanguageTag() }.toSet()
     val filesDir = ctx.filesDir ?: return
@@ -735,8 +744,8 @@ internal fun withUserPopupSetMap(real: android.content.SharedPreferences, backup
 }
 
 /** Restores [keyboards] from the backup [file] as the restore dialog does when not every keyboard is chosen (tests). */
-internal fun restoreKeyboardsFrom(ctx: Context, file: File, keyboards: List<SettingsSubtype>, withSettings: Boolean) =
-    restoreKeyboards(ctx, readBackup(file), keyboards, withSettings)
+internal fun restoreKeyboardsFrom(ctx: Context, file: File, keyboards: List<SettingsSubtype>, withSettings: Boolean, asCopies: Boolean = true) =
+    restoreKeyboards(ctx, readBackup(file), keyboards, withSettings, asCopies)
 
 /**
  * Only [chosen] keyboards come out of the backup: each is added (or replaced) with its custom layout files and,
@@ -744,7 +753,7 @@ internal fun restoreKeyboardsFrom(ctx: Context, file: File, keyboards: List<Sett
  * are. The keyboard's settings need a set of its own, so separate settings per keyboard get switched on if they
  * aren't; the existing keyboards keep the shared set they behave by now.
  */
-private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List<SettingsSubtype>, withSettings: Boolean) {
+private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List<SettingsSubtype>, withSettings: Boolean, asCopies: Boolean = true) {
     val real = ctx.realPrefs()
     val prefs = ctx.prefs()
     val backup = pending.prefs
@@ -752,7 +761,10 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
     // (the backup's shared set with the keyboard's own on top: what it read on the old phone)
     // (a backup from before 0.3.008 wrote every setting at its default down: those are left out, so they follow the
     // defaults here; see pickedOnlyUpgrade)
-    val settings = chosen.associateWith { restoredSettings(ctx, backup, it) }
+    // the backup's saved items come in first (by content, taken names numbered), and the keyboards name them as they're
+    // called on the phone now (2026-10-11; before, the names dangled or silently took the phone's same-named item)
+    val renames = if (withSettings) SavedItemsMerge.merge(ctx, real, backup, asCopies) else null
+    val settings = chosen.associateWith { restoredSettings(ctx, backup, it).let { values -> renames?.apply(values) ?: values } }
     if (withSettings && !KeyboardProfiles.isSeparate(real))
         KeyboardProfiles.enable(real, SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }, keepExisting = true)
 

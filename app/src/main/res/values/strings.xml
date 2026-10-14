@@ -595,6 +595,9 @@
     <!-- deleting a keyboard whose word lists other keyboards read -->
     <string name="delete_keyboard_readers">These keyboards use its learned and blacklisted words (Use lists from other keyboards). Pick one to keep them, merged into its own; the others then read them from there:</string>
     <string name="delete_keyboard_merge_none">None: the lists go</string>
+    <!-- the restore dialog: a keyboard not on this phone; and what to do with saved items whose names are taken -->
+    <string name="restore_keyboard_new">%s (new)</string>
+    <string name="restore_saved_items_as_copies">Saved items whose names you already use: bring them in as copies</string>
     <string name="key_popups_save_as_new">Save current popup layout</string>
     <string name="key_popups_save_change_title">Save this change to a set of your own</string>
     <string name="key_popups_my_set">My popups</string>
