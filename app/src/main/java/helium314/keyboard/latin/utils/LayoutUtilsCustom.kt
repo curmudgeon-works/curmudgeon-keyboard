@@ -163,7 +163,19 @@ object LayoutUtilsCustom {
             ProfilePreferences(real) { id ?: KeyboardProfiles.SHARED }.getString(key, null) == layoutName
                 || id != null && all[KeyboardProfiles.ownKey(id, key)] == layoutName
         }
-        return (keeps + backToDefault) to emptyList()
+        // then the switched-off ones (owner 2026-10-11): their pick, or their own set's default
+        val off = switchedOffKeyboards(context).filter { keyboard ->
+            keyboard.layoutName(layoutType) == layoutName || keyboard.layoutName(layoutType) == null
+                && KeyboardProfiles.anyIdIn(all, keyboard)?.let { all[KeyboardProfiles.ownKey(it, key)] } == layoutName
+        }
+        return (keeps + backToDefault + off) to emptyList()
+    }
+
+    /** The keyboards switched off on the Languages screen (in the additional list, not enabled): they keep their set. */
+    private fun switchedOffKeyboards(context: Context): List<SettingsSubtype> {
+        val enabled = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.toSet()
+        return SubtypeSettings.createSettingsSubtypes(context.prefs().getString(Settings.PREF_ADDITIONAL_SUBTYPES, Defaults.PREF_ADDITIONAL_SUBTYPES)!!)
+            .distinct().filter { it !in enabled }
     }
 
     /** The delete warning's text for [keeps] and [backToDefault] (keyboard names, see [deleteEffects]); null: none. */
@@ -247,7 +259,7 @@ object LayoutUtilsCustom {
     }
 
     /** The keyboards (but [except]) whose [type] keys are [name]: their own pick, or their default (per keyboard with
-     *  separate settings). */
+     *  separate settings); then the switched-off ones (owner 2026-10-11): their pick, or their own set's default. */
     fun keyboardsUsing(context: Context, type: LayoutType, name: String, except: helium314.keyboard.latin.settings.SettingsSubtype?):
             List<helium314.keyboard.latin.settings.SettingsSubtype> {
         val real = context.realPrefs()
@@ -260,7 +272,21 @@ object LayoutUtilsCustom {
             val prefs = if (separate) helium314.keyboard.latin.settings.ProfilePreferences(real) {
                 helium314.keyboard.latin.settings.KeyboardProfiles.idFor(real, kb) } else context.prefs()
             Settings.readDefaultLayoutName(type, prefs) == name
+        } + switchedOffKeyboards(context).filter { kb ->
+            if (kb == except) return@filter false
+            val own = kb.layoutName(type)
+            if (own != null || type == LayoutType.MAIN) return@filter own == name
+            val all = real.all
+            helium314.keyboard.latin.settings.KeyboardProfiles.anyIdIn(all, kb)
+                ?.let { all[helium314.keyboard.latin.settings.KeyboardProfiles.ownKey(it, Settings.PREF_LAYOUT_PREFIX + type.name)] } == name
         }
+    }
+
+    /** "No" in the edit question: [others] keep [name]'s keys of now, under [oldFileName] (then the edit is written). */
+    fun keepOldKeys(name: String, oldFileName: String, type: LayoutType, others: List<helium314.keyboard.latin.settings.SettingsSubtype>, context: Context) {
+        getLayoutFile(oldFileName, type, context).writeText(getLayoutFile(name, type, context).readText())
+        onLayoutFileChanged()
+        for (other in others) SubtypeUtilsAdditional.changeAdditionalSubtype(other, other.withLayout(type, oldFileName), context)
     }
 
     /** Whether going from [before] to [after] leaves one of [before]'s private (unsaved) layouts unused. */

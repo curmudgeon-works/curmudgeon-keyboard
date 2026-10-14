@@ -636,7 +636,7 @@ private fun MainLayoutRow(
             if (showLayoutDeleteDialog) {
                 // who keeps its keys and who goes back to the default, by name (this one included)
                 val effects = remember(it) { LayoutUtilsCustom.deleteEffects(it, LayoutType.MAIN, ctx).let { (keeps, back) ->
-                    LayoutUtilsCustom.deleteEffectsText(ctx, keeps.map { kb -> keyboardName(kb, ctx) }, back.map { kb -> keyboardName(kb, ctx) }) } }
+                    LayoutUtilsCustom.deleteEffectsText(ctx, userNames(ctx, keeps), userNames(ctx, back)) } }
                 ConfirmationDialog(
                     onDismissRequest = { showLayoutDeleteDialog = false },
                     confirmButtonText = stringResource(R.string.delete),

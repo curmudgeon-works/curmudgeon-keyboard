@@ -145,7 +145,7 @@ fun LayoutEditDialog(
     )
     askOthers?.let { (name, others) ->
         val shown = LayoutUtilsCustom.getDisplayName(name)
-        val names = others.joinToString(", ") { helium314.keyboard.settings.screens.keyboardName(it, ctx) }
+        val names = helium314.keyboard.settings.screens.userNames(ctx, others).joinToString(", ")
         if (!askName) ThreeButtonAlertDialog(
             onDismissRequest = { askOthers = null }, // back to editing
             title = { Text(stringResource(R.string.layout_overwrite_title, shown)) },
@@ -163,9 +163,7 @@ fun LayoutEditDialog(
             onConfirmed = { oldName ->
                 // the others keep their keys, under the new name; then this keyboard's change is written
                 val oldFileName = LayoutUtilsCustom.getLayoutName(oldName.trim(), layoutType, locale)
-                LayoutUtilsCustom.getLayoutFile(oldFileName, layoutType, ctx).writeText(LayoutUtilsCustom.getLayoutFile(name, layoutType, ctx).readText())
-                LayoutUtilsCustom.onLayoutFileChanged()
-                for (other in others) helium314.keyboard.latin.utils.SubtypeUtilsAdditional.changeAdditionalSubtype(other, other.withLayout(layoutType, oldFileName), ctx)
+                LayoutUtilsCustom.keepOldKeys(name, oldFileName, layoutType, others, ctx)
                 write(pendingText)
                 askName = false; askOthers = null
                 onDismissRequest()

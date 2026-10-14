@@ -156,7 +156,9 @@ object SubtypeSettings {
     fun onRenameLayout(type: LayoutType, from: String, to: String?, context: Context) {
         val prefs = context.prefs()
         val editor = prefs.edit() // calling apply for each separate setting would result in an invalid intermediate state
-        // the keyboards that change, old to new: their own settings (separate settings) move with them
+        // the keyboards that change, old to new: their own settings (separate settings) move with them; switched-off
+        // ones too (in the additional list only; owner 2026-10-11: treated like switched-on ones), also when one now
+        // equals a built-in keyboard and leaves the list: its set and learned words move to that definition
         val changed = LinkedHashMap<SettingsSubtype, SettingsSubtype>()
         listOf(
             Settings.PREF_ADDITIONAL_SUBTYPES to Defaults.PREF_ADDITIONAL_SUBTYPES,
@@ -174,11 +176,11 @@ object SubtypeSettings {
                             else resourceSubtypesByLocale[subtype.locale]?.first()?.mainLayoutName()
                         val newSubtype = if (defaultLayout == null) subtype.withoutLayout(type)
                             else subtype.withLayout(type, defaultLayout)
-                        if (key == Settings.PREF_ENABLED_SUBTYPES) changed[subtype] = newSubtype
+                        changed[subtype] = newSubtype
                         if (newSubtype.isSameAsDefault() && key == Settings.PREF_ADDITIONAL_SUBTYPES) null
                         else newSubtype.toPref()
                     }
-                    else subtype.withLayout(type, to).also { if (key == Settings.PREF_ENABLED_SUBTYPES) changed[subtype] = it }.toPref()
+                    else subtype.withLayout(type, to).also { changed[subtype] = it }.toPref()
                 }
                 else subtype.toPref()
             }.joinToString(Separators.SETS)
