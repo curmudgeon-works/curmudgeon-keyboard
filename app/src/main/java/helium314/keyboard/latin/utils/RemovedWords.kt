@@ -271,6 +271,7 @@ object RemovedWords {
     data class GatedConfirm(override val word: String) : GatedOp
     data class GatedTakeOff(override val word: String) : GatedOp
     data class GatedAllow(override val word: String, val level: Int) : GatedOp
+    data class GatedDisallow(override val word: String) : GatedOp
 
     // a change in memory, not written yet: the word's row now, its own entry and its allowed part (either may be null)
     private class Change(val entry: Entry?, val allowed: Int?)
@@ -299,7 +300,8 @@ object RemovedWords {
         fun takeGated(): List<GatedOp> = synchronized(lock) {
             val ops = gatedOps.toList()
             gatedOps.clear()
-            for (op in ops) { pending.remove(op.word); strikesWhileLoading.remove(op.word) }
+            // (a strike or disallow changes the lowercase spelling too, L4.2)
+            for (op in ops) for (w in setOf(op.word, op.word.lowercase())) { pending.remove(w); strikesWhileLoading.remove(w) }
             ops
         }
 
@@ -312,6 +314,7 @@ object RemovedWords {
                 is GatedConfirm -> confirm(op.word)
                 is GatedTakeOff -> takeOff(op.word)
                 is GatedAllow -> allow(op.word, op.level)
+                is GatedDisallow -> disallow(op.word)
             }
         }
 
@@ -483,6 +486,7 @@ object RemovedWords {
                 // (only the allowed part: own strikes of the spelling stay in its row, owner 2026-10-12 one row holds both)
                 for (spelling in setOf(word, word.lowercase()))
                     if (allowedByWord.containsKey(spelling)) set(spelling, byWord[spelling], null)
+                recordGated(GatedDisallow(word))
             }
         }
 

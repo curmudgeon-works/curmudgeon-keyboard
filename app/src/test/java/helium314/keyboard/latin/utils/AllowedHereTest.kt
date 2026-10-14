@@ -49,6 +49,31 @@ class AllowedHereTest {
     private fun typedEnoughOnB(word: String, learnedCount: Int): Boolean =
         !RemovedWords.isRemoved(lists.entryFor(word), learnedCount) && lists.allowHere(word)
 
+    // fail before: a Remove's disallow while a full restore ran wasn't one of the changes made again after it; its
+    // pending row (the old list's own strikes) stayed and was put on top of the restored file at its next read
+    @Test fun `a Remove during a full restore takes the allowed part off the restored list, its strikes from the file`() {
+        val file = java.io.File(ctx.filesDir, "blacklists${java.io.File.separator}gated-${System.nanoTime()}.txt")
+        file.parentFile!!.mkdirs()
+        file.writeText("foo\t1\tallowed\t2\n")
+        val list = RemovedWords.forFile(file)
+        try {
+            list.reload()
+            helium314.keyboard.latin.personalization.RestoreGate.setForTest(Thread.currentThread())
+            list.strike("Foo"); list.disallow("Foo") // (as DictionaryFacilitatorImpl.removeWords does)
+            val ops = list.takeGated()
+            file.writeText("foo\t3\tallowed\t2\n") // (the restored list of the same keyboard)
+            list.reload() // (the gate still set: the writes queued meanwhile wrote nothing)
+            helium314.keyboard.latin.personalization.RestoreGate.setForTest(null)
+            list.redo(ops)
+            assertNull(list.allowedFor("foo"))
+            assertEquals(3, list.entries()["foo"]?.strikes) // (the restored file's, not the old list's 1)
+        } finally {
+            helium314.keyboard.latin.personalization.RestoreGate.setForTest(null)
+            file.delete()
+            list.reload()
+        }
+    }
+
     // fail before (L4.1): allow() on a list not read yet wrote the new row alone, the file's other rows were lost
     @Test fun `an allowed row on a list not read yet keeps the file's other rows`() {
         val file = java.io.File(ctx.filesDir, "blacklists${java.io.File.separator}allow-unread-${System.nanoTime()}.txt")
