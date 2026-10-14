@@ -56,7 +56,7 @@ object LayoutPresets {
         Settings.PREF_ADDITIONAL_SUBTYPES, Settings.PREF_ENABLED_SUBTYPES, Settings.PREF_SELECTED_SUBTYPE, "keyboard_profile_ids")
     private val prefixes = LayoutDraft.prefixes.filter { it != Settings.PREF_SAVED_APP_SUBTYPE_PREFIX }
 
-    fun inScope(key: String) = !KeyboardProfiles.isAppWide(key) && key !in notInPresets && !key.startsWith(KeyboardProfiles.TOMBSTONE)
+    fun inScope(key: String) = !KeyboardProfiles.isAppWide(key) && key !in notInPresets
         && (key in LayoutDraft.keys || prefixes.any { key.startsWith(it) })
 
     /**
@@ -265,7 +265,7 @@ object LayoutPresets {
     fun delete(real: SharedPreferences, name: String) {
         CustomLabels.detach(real, PREF_SELECTED, name, CustomLabels.Kind.LAYOUT) // (they keep their copy: Custom)
         save(real, load(real).filter { it.name != name })
-        KeyboardProfiles.forgetValueEverywhere(real, PREF_SELECTED, name)
+        KeyboardProfiles.replaceValueEverywhere(real, PREF_SELECTED, name, null)
     }
 
     /** A name the saved Layouts carry as [key]'s value was renamed to [to], or deleted ([to] null: "not set", the

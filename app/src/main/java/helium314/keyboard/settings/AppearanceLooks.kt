@@ -371,12 +371,11 @@ object AppearanceLooks {
 
     /** [now]: written before this returns (commit), not in the background. */
     /** A saved theme renamed to [new], or deleted ([new] null): every keyboard that chose [old] follows, and the open Appearance screen's snapshot (see
-     *  [KeyboardProfiles.replaceValueEverywhere] and [KeyboardProfiles.forgetValueEverywhere]). */
+     *  [KeyboardProfiles.replaceValueEverywhere]; deleted: removed, the default). */
     fun choiceRenamed(ctx: Context, old: String, new: String?) {
         val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
         if (new == null) CustomLabels.detach(real, PREF_SELECTED, old, CustomLabels.Kind.THEME) // (they keep the look: Custom)
-        if (new == null) KeyboardProfiles.forgetValueEverywhere(real, PREF_SELECTED, old)
-        else KeyboardProfiles.replaceValueEverywhere(real, PREF_SELECTED, old, new)
+        KeyboardProfiles.replaceValueEverywhere(real, PREF_SELECTED, old, new)
         // (the open screen's Discard undoes it everywhere: its snapshot holds every keyboard's choice, 2026-10-11)
     }
 

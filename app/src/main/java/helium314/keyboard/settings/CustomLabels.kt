@@ -50,11 +50,7 @@ object CustomLabels {
         if (real.getInt(own, 0) > 0 && from == null) return
         real.edit(commit = true) {
             if (real.getInt(own, 0) <= 0) putInt(own, SET)
-            remove(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + kind.key))
-            if (from != null) {
-                putString(KeyboardProfiles.ownKey(id, kind.fromKey), from)
-                remove(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + kind.fromKey))
-            }
+            if (from != null) putString(KeyboardProfiles.ownKey(id, kind.fromKey), from)
         }
     }
 

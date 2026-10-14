@@ -103,11 +103,10 @@ object SavedItemDefaults {
             for ((key, value) in held) {
                 if (KeyboardProfiles.isAppWide(key)) continue // (no keyboard's)
                 val own = KeyboardProfiles.ownKey(id, key)
-                val mark = KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + key)
+                // (nothing stored = the default: no marks to read or write, owner 2026-10-11)
                 if (!takeNew) {
                     if (before.containsKey(own)) continue
                     KeyboardProfiles.put(editor, own, value)
-                    editor.remove(mark)
                     changed = true
                 } else if (before.containsKey(own) && atChosenDefault(key, before[own], held)) {
                     editor.remove(own)

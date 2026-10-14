@@ -76,6 +76,8 @@ fun checkVersionUpgrade(context: Context, restoring: Boolean = false) {
     // (after it) the palettes of the sets and saved themes move into the one list (owner 2026-10-11: "palettes are one
     // app-wide list"); a restored backup from before moves too
     helium314.keyboard.settings.Palettes.centralize(context.realPrefs())
+    // (last: the steps above still read the old default marks) nothing stored = the default (owner 2026-10-11)
+    KeyboardProfiles.removeDefaultMarks(context.realPrefs())
 }
 
 /** Set once [keepUserPopupSetsSymbolMap] ran (a backup from before carries none: its restore runs it again). */
@@ -110,16 +112,11 @@ internal fun keepUserPopupSetsSymbolMap(real: SharedPreferences) {
                     else if (real.contains(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + selected))) null
                     else real.getString(selected, null)
                 if (real.contains(KeyboardProfiles.ownKey(id, symbolMap))) continue
-                if (choice !in lacking) {
-                    // it reads the common map, which just got the set's: it stays at the default it showed (review
-                    // 2026-10-11: a keyboard that chose no set took the map without picking it)
-                    if (sharedGetsMap && !real.contains(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + symbolMap)))
-                        putBoolean(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + symbolMap), true)
-                    continue
-                }
+                // (no set of those chosen: it stays at the default it showed, nothing written; with no common set and no
+                // fallback read it never takes the common map, owner 2026-10-11: no default marks)
+                if (choice !in lacking) continue
                 val atDefault = real.contains(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + symbolMap))
                 if (!atDefault && sharedHasMap) continue // (it reads the common settings' map: someone picked that)
-                remove(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + symbolMap))
                 putString(KeyboardProfiles.ownKey(id, symbolMap), map)
             }
         }
@@ -170,10 +167,8 @@ internal fun heliBoardLayoutPins(context: Context, real: SharedPreferences, fres
                 // where it reads the default of then (a mark) instead of the shared pin; else it reads the shared set's
                 val picked = id == KeyboardProfiles.SHARED || all.containsKey(own(helium314.keyboard.settings.LayoutPresets.PREF_SELECTED))
                 if (picked && selected == oldExtra) putString(own(helium314.keyboard.settings.LayoutPresets.PREF_SELECTED), extra)
-                for ((key, value) in heliBoardPins()) if (reads(key) == null && (picked || marked(key))) {
-                    KeyboardProfiles.put(this, own(key), value)
-                    if (marked(key)) remove(own(KeyboardProfiles.TOMBSTONE + key))
-                }
+                for ((key, value) in heliBoardPins()) if (reads(key) == null && (picked || marked(key)))
+                    KeyboardProfiles.put(this, own(key), value) // (its old mark goes with removeDefaultMarks)
             }
         }
     }
@@ -252,9 +247,9 @@ internal fun withoutDefaults(values: Map<String, Any?>, oldGaps: Boolean = false
  * 0.3.008: a stored setting is one you picked, as in any Android app; one not stored follows the defaults, also when they
  * change. Before, backups (from 2026-10-03), saved themes and Layouts (from 2026-10-02) and upgrade steps also wrote
  * settings down at their default, which froze them. Once, and again after restoring a backup from before: every stored
- * setting at its default (now, or before 0.3.008) is unset, in the shared set (removed) and in every keyboard's own set,
- * also of keyboards whose set isn't in use (a reset mark, so it doesn't take the shared value instead); the saved themes
- * and Layouts likewise. A default picked before can't be told apart: it goes too (2026-10-06).
+ * setting at its default (now, or before 0.3.008) is unset, in the shared set and in every keyboard's own set, also
+ * of keyboards whose set isn't in use (removed: no default mark since 2026-10-11, nothing stored = the default); the
+ * saved themes and Layouts likewise. A default picked before can't be told apart: it goes too (2026-10-06).
  */
 internal fun pickedOnlyUpgrade(real: SharedPreferences, freshInstall: Boolean) {
     if (real.getBoolean(PICKED_ONLY_DONE, false)) return
@@ -280,13 +275,11 @@ internal fun pickedOnlyUpgrade(real: SharedPreferences, freshInstall: Boolean) {
                 val (id, key) = own
                 if (key.startsWith(KeyboardProfiles.TOMBSTONE) || !atDefault(key, value, numpadOn(id), oldGaps = oldGaps)) continue
                 remove(stored)
-                putBoolean(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + key), true)
                 if (key == Settings.PREF_THEME_COLORS) colorsCleared.add(id)
             }
             for (id in colorsCleared) {
                 if (id == null) { remove(AppearanceLooks.PREF_SELECTED); continue }
                 remove(KeyboardProfiles.ownKey(id, AppearanceLooks.PREF_SELECTED))
-                putBoolean(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + AppearanceLooks.PREF_SELECTED), true)
             }
         }
         AppearanceLooks.save(real, AppearanceLooks.load(real).map { look -> AppearanceLooks.Look(look.name,

@@ -94,11 +94,10 @@ internal object RestoreMatch {
         return menus
     }
 
-    /** The menus whose settings differ between [phone] and [backup] (plain keys, no marks; not stored = the default). */
+    /** The menus whose settings differ between [phone] and [backup] (plain keys; not stored = the default). */
     fun menuDifferences(phone: Map<String, Any?>, backup: Map<String, Any?>): List<Difference.Menu> {
         val differing = HashSet<KeyboardProfiles.Group>()
         for (key in phone.keys + backup.keys) {
-            if (key.startsWith(KeyboardProfiles.TOMBSTONE)) continue
             val menus = menusOf(key)
             if (menus.isEmpty() || differing.containsAll(menus)) continue
             if (!KnownDefaults.same(key, phone[key], backup[key])) differing.addAll(menus)

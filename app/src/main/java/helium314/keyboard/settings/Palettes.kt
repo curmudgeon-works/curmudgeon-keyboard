@@ -96,9 +96,8 @@ object Palettes {
                 val own = KeyboardProfiles.ownKey(id, slot)
                 val chosen = if (real.contains(own)) real.getString(own, null) else ProfilePreferences(real) { id }.getString(slot, null)
                 if (chosen != name) continue
-                val mark = KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + slot)
-                if (choice == Choice.KEEP_OLD) editor.putString(own, keeper).remove(mark)
-                else editor.remove(own).putBoolean(mark, true)
+                // (the default: nothing stored, owner 2026-10-11: no default marks)
+                if (choice == Choice.KEEP_OLD) editor.putString(own, keeper) else editor.remove(own)
             }
         }
         editor.commit()
@@ -124,7 +123,7 @@ object Palettes {
             prefs.edit().apply { for (slot in slots) if (prefs.getString(slot, null) == name) remove(slot) }.commit()
         } else {
             real.edit().apply { for (key in keys(name)) remove(key) }.commit()
-            for (slot in slots) KeyboardProfiles.forgetValueEverywhere(real, slot, name)
+            for (slot in slots) KeyboardProfiles.replaceValueEverywhere(real, slot, name, null)
             replaceInThemes(real, name, null)
         }
         helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().setThemeNeedsReload()
@@ -185,7 +184,8 @@ object Palettes {
      * palettes in the keyboards' sets ("p<id>/user_*colors_*") and in the saved themes move into the list, in this
      * order: the list as it is, the sets by id, the themes as listed. Same name and colours: one; same name, other
      * colours: the later one numbered ("Warm 2"), and the set or theme naming it names that; an old kept copy
-     * "~custom:N": "Palette N" (or the next free number), its users following. The copies go, with their marks. After
+     * "~custom:N": "Palette N" (or the next free number), its users following. The copies go (their old marks with
+     * [KeyboardProfiles.removeDefaultMarks], after this). After
      * [KeyboardProfiles.dropCommonSet] (the common set's palettes are deleted there, owner: "fine to delete due to our
      * early stages"). Run again (stopped half way): what moved already is found by name and colours.
      */
@@ -216,7 +216,7 @@ object Palettes {
                 val to = renamed(now, setRenames.getValue(id))
                 if (to != now) KeyboardProfiles.put(editor, KeyboardProfiles.ownKey(id, slot), to)
             }
-            for (key in own.keys) if (isKey(key.removePrefix(KeyboardProfiles.TOMBSTONE))) editor.remove(KeyboardProfiles.ownKey(id, key))
+            for (key in own.keys) if (isKey(key)) editor.remove(KeyboardProfiles.ownKey(id, key))
         }
         for ((name, colors) in list) if (name !in before) put(editor, name, colors)
         editor.commit()

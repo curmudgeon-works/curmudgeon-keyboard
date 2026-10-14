@@ -210,8 +210,7 @@ object SubtypeSettings {
         // keyboard being edited followed, the others fell back to the built-in keys (rename) or kept the gone name and
         // took a layout saved later under it (delete). Deleted: a keyboard's own default goes back to the built-in one.
         val key = Settings.PREF_LAYOUT_PREFIX + type.name
-        if (to == null) helium314.keyboard.latin.settings.KeyboardProfiles.forgetValueEverywhere(real, key, from)
-        else helium314.keyboard.latin.settings.KeyboardProfiles.replaceValueEverywhere(real, key, from, to)
+        helium314.keyboard.latin.settings.KeyboardProfiles.replaceValueEverywhere(real, key, from, to)
         helium314.keyboard.settings.LayoutPresets.onLayoutRenamed(real, type, from, to) // and the saved Layouts (review 2026-10-08 area 4 #4)
         reloadEnabledSubtypes(context)
     }

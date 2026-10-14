@@ -68,18 +68,10 @@ class LayoutDraft private constructor(
     /** The changed preferences, as plain keys (without a keyboard's p<id>/ prefix). */
     fun changedKeys(ctx: Context): Set<String> {
         val now = scoped(ctx)
-        // the rows: every key of either snapshot, a "~" mark standing for its key
-        val keys = (now.keys + prefs.keys).mapTo(HashSet()) { base(it) }
-        return keys.filterTo(HashSet()) { it !in learnedKeys && !switchState(it) && !KnownDefaults.same(plain(it), reads(now, it), reads(prefs, it)) }.mapTo(HashSet()) { plain(it) }
-    }
-
-    /** What [key] (full) reads as in [stored]: its value; a keyboard's key "at its default" (its "~" mark, see
-     *  ProfilePreferences) its default; a keyboard's key with neither the shared value. */
-    private fun reads(stored: Map<String, Any?>, key: String): Any? {
-        if (key in stored) return stored[key]
-        if (plain(key) == key) return null
-        if (mark(key) in stored) return KnownDefaults.of(plain(key)) ?: AT_DEFAULT
-        return stored[plain(key)]
+        // the rows: every key of either snapshot; one not stored reads its default (owner 2026-10-11: no default marks,
+        // no common set to fall back on)
+        val keys = now.keys + prefs.keys
+        return keys.filterTo(HashSet()) { it !in learnedKeys && !switchState(it) && !KnownDefaults.same(plain(it), now[it], prefs[it]) }.mapTo(HashSet()) { plain(it) }
     }
 
     /** The layout types (folder names, e.g. "main", "symbols") whose custom files changed. */
@@ -208,11 +200,6 @@ class LayoutDraft private constructor(
          *  box is tapped) is no change of this screen's settings, and Discard doesn't switch back. */
         private fun switchState(key: String) = plain(key) == Settings.PREF_SELECTED_SUBTYPE || plain(key).startsWith(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX)
         fun plain(key: String) = key.replace(profileKey, "")
-        private val AT_DEFAULT = Any() // a mark whose default isn't known: equal only to itself
-        private val TOMB = KeyboardProfiles.TOMBSTONE
-        /** The key a "~" mark stands for ("p3/~x" -> "p3/x"); other keys as they are. */
-        fun base(key: String) = if (plain(key).startsWith(TOMB)) key.substring(0, key.length - plain(key).length) + plain(key).removePrefix(TOMB) else key
-        fun mark(key: String) = key.substring(0, key.length - plain(key).length) + TOMB + plain(key)
         fun inScope(plainKey: String) = plainKey in keys || prefixes.any { plainKey.startsWith(it) }
         // the learned words' records, keyed by the keyboards' identities as "keyboard_profile_ids" is: put back with
         // it (owner 2026-10-11), no setting of the screen (not in [keys]: no menu's, no saved Layout's, no change shown)
@@ -222,13 +209,12 @@ class LayoutDraft private constructor(
         /** A stored key a sub-screen's save is recorded with ([SubScreenWrites]): what the undo puts back, and the
          *  Custom labels; not which keyboard is in use. */
         private fun recorded(key: String): Boolean {
-            val p = plain(key).removePrefix(TOMB)
-            return (inScope(p) && !switchState(base(key))) || LABELS.any { it.key == p } || key in learnedKeys
+            val p = plain(key)
+            return (inScope(p) && !switchState(key)) || LABELS.any { it.key == p } || key in learnedKeys
         }
 
-        // (with the "at its default" marks of a keyboard's own set, so Discard puts those back too)
         private fun scoped(ctx: Context): Map<String, Any?> =
-            ctx.realPrefs().all.filterKeys { inScope(plain(it).removePrefix(helium314.keyboard.latin.settings.KeyboardProfiles.TOMBSTONE)) || it in learnedKeys }
+            ctx.realPrefs().all.filterKeys { inScope(plain(it)) || it in learnedKeys }
 
         private fun layoutsDir(ctx: Context) = File(DeviceProtectedUtils.getFilesDir(ctx), "layouts")
         /** relative path -> size and time, enough to tell a change without reading */

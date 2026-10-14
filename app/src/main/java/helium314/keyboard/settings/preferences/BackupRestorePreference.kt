@@ -245,8 +245,8 @@ private fun writeBackup(ctx: Context, open: () -> OutputStream?) {
         }
         BackupRestoreJob.step()
         zipStream.putNextEntry(ZipEntry(PREFS_FILE_NAME))
-        // every keyboard's set, not just the edited one: what is stored (the settings you picked, and the keyboards'
-        // "reset to default" marks), so a setting left at its default follows the defaults of the version it's
+        // every keyboard's set, not just the edited one: what is stored (the settings you picked; none for one at its
+        // default, no marks since 2026-10-11), so a setting left at its default follows the defaults of the version it's
         // restored on (0.3.008; from 2026-10-03 every default was written out, which froze them)
         settingsToJsonStream(ctx.realPrefs().all.mapKeys { it.key as String? }, zipStream)
         zipStream.closeEntry()

@@ -472,7 +472,7 @@ internal fun deletePopupSet(ctx: Context, name: String) {
     helium314.keyboard.settings.CustomLabels.detach(real, KeyPopupOverrides.PREF_SELECTED_SET, name,
         helium314.keyboard.settings.CustomLabels.Kind.POPUPS) // (keyboards keep their popups: Custom)
     KeyPopupOverrides.saveSets(real, KeyPopupOverrides.loadSets(real).filter { it.name != name })
-    KeyboardProfiles.forgetValueEverywhere(real, KeyPopupOverrides.PREF_SELECTED_SET, name)
+    KeyboardProfiles.replaceValueEverywhere(real, KeyPopupOverrides.PREF_SELECTED_SET, name, null)
     helium314.keyboard.settings.LayoutPresets.onPopupSetRenamed(real, name, null) // (saved Layouts keep the popups, not the name)
 }
 

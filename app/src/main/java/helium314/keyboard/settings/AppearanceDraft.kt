@@ -101,11 +101,11 @@ class AppearanceDraft private constructor(
         val all = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx).all
         val now = all.filterKeys { reachesBeyond(it) }
         if (now == reached) return false
-        val keys = (now.keys + reached.keys).mapTo(HashSet()) { LayoutDraft.base(it) }
-        return keys.any { key ->
+        // (one not stored reads its default: owner 2026-10-11, no default marks, no common set to fall back on)
+        return (now.keys + reached.keys).any { key ->
             val plain = LayoutDraft.plain(key)
             if (plain == AppearanceLooks.PREF) now[key] != reached[key] // (the saved themes: a JSON string)
-            else !KnownDefaults.same(plain, reads(now, all, key), reads(reached, all, key))
+            else !KnownDefaults.same(plain, now[key], reached[key])
         }
     }
 
@@ -247,10 +247,10 @@ class AppearanceDraft private constructor(
 
         /** A stored key beyond the edited set that the screen's saved items reach ([reached]): the saved themes, the
          *  palettes (the app-wide list; a set's old copy too); in any set, the theme choice, the light and dark colours'
-         *  choice, and their "at default" marks; in every keyboard's own set, its theme settings. */
+         *  choice; in every keyboard's own set, its theme settings. */
         private fun reachesBeyond(stored: String): Boolean {
             val own = KeyboardProfiles.splitOwnKey(stored)
-            val plain = (own?.second ?: stored).removePrefix(KeyboardProfiles.TOMBSTONE)
+            val plain = own?.second ?: stored
             // (a keyboard's own theme settings: the update dialog writes them on the keyboards ticked there; not its Custom
             // label, which the Themes row gives when it first shows one: that's no change of the screen)
             if (own != null && AppearanceLooks.inScope(plain)) return true
@@ -259,20 +259,10 @@ class AppearanceDraft private constructor(
                 || plain.startsWith(Settings.PREF_USER_COLORS_PREFIX) || plain.startsWith(Settings.PREF_USER_ALL_COLORS_PREFIX)
                 || plain.startsWith(Settings.PREF_USER_MORE_COLORS_PREFIX)
         }
-        /** What [key] (full) reads as in [stored]: its value; a keyboard's key "at its default" (its "~" mark) its
-         *  default; a keyboard's key with neither the shared value (from [stored], else as it is now in [all]). */
-        private fun reads(stored: Map<String, Any?>, all: Map<String, Any?>, key: String): Any? {
-            if (key in stored) return stored[key]
-            val plain = LayoutDraft.plain(key)
-            if (plain == key) return null
-            if (LayoutDraft.mark(key) in stored) return KnownDefaults.of(plain) ?: AT_DEFAULT
-            return if (plain in stored) stored[plain] else all[plain]
-        }
-        private val AT_DEFAULT = Any() // a mark whose default isn't known: equal only to itself
         /** A stored key the palette editor's save is recorded with ([SubScreenWrites]): what the undo puts back (on the
          *  screen, in any set, or reached beyond it), and the theme Custom label. */
         private fun recorded(stored: String): Boolean {
-            val plain = LayoutDraft.plain(stored).removePrefix(KeyboardProfiles.TOMBSTONE)
+            val plain = LayoutDraft.plain(stored)
             return reachesBeyond(stored) || AppearanceLooks.onScreen(plain) || LABELS.any { it.key == plain }
         }
         private fun reachedNow(ctx: Context): Map<String, Any?> =
