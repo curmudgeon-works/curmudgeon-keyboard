@@ -16,6 +16,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
+import helium314.keyboard.latin.DictionaryFacilitatorImpl
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.gesture.GestureDecoderVocabulary
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
@@ -271,5 +272,47 @@ class LearnedWordsBatchDeleteTest {
         deleteWords(ctx, "Latn", pool, listOf(Locale.US), zorp) { _, p -> deleted.add(p.word.word) }
         assertEquals(listOf("zorp"), deleted)
         assertFalse(store.counts.containsKey("zorp"))
+    }
+
+    // review round 5 M6 (2026-10-12): a batch delete was a single delete per word, ~300 swipe rebuilds and ~300 loads
+    // of the languages' dictionaries on Select all
+    @Test fun `a batch un-blacklist asks for one swipe rebuild, after the last word`() {
+        writeList(ctx.filesDir, "Latn", pool, (1..30).joinToString("") { "word$it\n" })
+        blacklist.reload()
+        val lists = buildWordLists("Latn", emptyList(), emptyList(), blacklist.entries())
+        assertEquals(30, lists.blacklisted.size)
+        val before = GestureDecoderVocabulary.rebuildRequests.get()
+        deleteWords(ctx, "Latn", pool, listOf(Locale.US), lists.blacklisted.map { Item(it, Kind.BLACKLISTED) })
+        assertEquals(1, GestureDecoderVocabulary.rebuildRequests.get() - before)
+        assertTrue(blacklist.entries().isEmpty())
+        // none of them on the list any more: nothing to rebuild
+        deleteWords(ctx, "Latn", pool, listOf(Locale.US), lists.blacklisted.map { Item(it, Kind.BLACKLISTED) })
+        assertEquals(1, GestureDecoderVocabulary.rebuildRequests.get() - before)
+    }
+
+    @Test fun `a batch delete of learned words loads the dictionaries once`() {
+        val words = (1..30).map { "word$it" }
+        learn(*words.toTypedArray())
+        val lists = buildWordLists("Latn", store.counts.map { it.key to it.value }, emptyList(), blacklist.entries())
+        val before = DictionaryFacilitatorImpl.mainDictionaryLoads.get()
+        deleteWords(ctx, "Latn", pool, listOf(Locale.US), lists.yours.map { Item(it, Kind.YOURS) })
+        assertEquals(1, DictionaryFacilitatorImpl.mainDictionaryLoads.get() - before)
+        assertTrue(store.counts.isEmpty(), "still learned: ${store.counts.keys}")
+        assertEquals(setOf("teh", "hte", "adn"), blacklist.entries().keys) // (a plain delete: none blacklisted)
+    }
+
+    @Test fun `a word that fails doesn't keep the others of the batch`() {
+        val failing = object : RemovableHistory(ctx, "Latn", pool) {
+            override fun removeUnigramEntryDynamically(word: String) {
+                if (word.equals("beta", ignoreCase = true)) throw IllegalStateException("a word that can't be removed")
+                super.removeUnigramEntryDynamically(word)
+            }
+        }
+        store = failing
+        PersonalizationHelper.setForTest("Latn", pool, failing)
+        learn("alpha", "beta", "gamma", "delta")
+        val lists = buildWordLists("Latn", store.counts.map { it.key to it.value }, emptyList(), blacklist.entries())
+        deleteWords(ctx, "Latn", pool, listOf(Locale.US), lists.yours.map { Item(it, Kind.YOURS) })
+        assertEquals(setOf("beta"), store.counts.keys)
     }
 }

@@ -460,49 +460,55 @@ private fun deletePersonalRow(context: Context, p: PersonalEntry) {
  * Deletes [items], each exactly as the single delete does (call off the main thread). [alsoFromPersonalDictionary]
  * false (the dialog's box unticked): Android's personal dictionary keeps them, in the keyboard's copy too.
  * [deletePersonal]: how a row of it is deleted (tests).
+ * All at once: one Remove for the learned words of the same languages (one load of their dictionaries), one rebuild of
+ * the swipe lists (a batch of ~300 words loaded the dictionaries and started a rebuild per word; 2026-10-12).
  */
 internal fun deleteWords(context: Context, script: String, pool: Int, scriptLocales: List<Locale>, items: List<Item>,
                          alsoFromPersonalDictionary: Boolean = true,
                          deletePersonal: (Context, PersonalEntry) -> Unit = ::deletePersonalRow) {
-    for (item in items) apply(context, script, pool, scriptLocales, item, alsoFromPersonalDictionary, deletePersonal)
-}
-
-private fun apply(context: Context, script: String, pool: Int, scriptLocales: List<Locale>, item: Item,
-                  alsoFromPersonalDictionary: Boolean, deletePersonal: (Context, PersonalEntry) -> Unit) {
-    val entry = item.entry
-    when (item.kind) {
-        Kind.YOURS -> {
-            // every capitalization of each spelling out of the script's learned words, no strike (a plain delete); the
-            // languages of the script (and those whose personal dictionary has it) say how it's listed
-            val locales = (scriptLocales + entry.personal.mapNotNull { it.locale }).distinct()
-            try {
-                if (LearningEventLog.isEnabled()) {
-                    val counts = LearningEventLog.countsIn(PersonalizationHelper.getUserHistoryDictionary(context, script, pool))
-                    for (word in entry.spellings)
-                        LearningEventLog.log(LearningEventLog.REMOVED, LearningEventLog.SETTINGS, word, "",
-                            LearnedStores.label(script, pool), counts)
-                }
-                DictionaryFacilitatorImpl.removeWords(context, script, pool, locales, entry.spellings, blacklist = false,
-                    personal = alsoFromPersonalDictionary)
-            } catch (e: Exception) {
-                Log.w("LearnedWordsScreen", "could not remove a word of $script", e)
+    val yours = items.filter { it.kind == Kind.YOURS }
+    // every capitalization of each spelling out of the script's learned words, no strike (a plain delete); the
+    // languages of the script (and those whose personal dictionary has it) say how it's listed
+    for ((locales, sameLocales) in yours.groupBy { (scriptLocales + it.entry.personal.mapNotNull { p -> p.locale }).distinct() }) {
+        val spellings = LinkedHashSet<String>()
+        for (item in sameLocales) spellings.addAll(item.entry.spellings)
+        try {
+            if (LearningEventLog.isEnabled()) {
+                val counts = LearningEventLog.countsIn(PersonalizationHelper.getUserHistoryDictionary(context, script, pool))
+                for (word in spellings)
+                    LearningEventLog.log(LearningEventLog.REMOVED, LearningEventLog.SETTINGS, word, "",
+                        LearnedStores.label(script, pool), counts)
             }
-            // and its rows in the Android personal dictionary (each spelling found, for its language or all), unless
-            // the box was unticked (they stay there, and so on this list); an allowed row (RemovedWords) stays either
-            // way: this forgets the count only
-            if (alsoFromPersonalDictionary) for (p in entry.personal)
-                try { deletePersonal(context, p) } catch (e: Exception) { Log.w("LearnedWordsScreen", "could not delete a personal dictionary word", e) }
-            // its recent and frequent uses go too (as LatinIME.removeSuggestion)
-            entry.spellings.forEach { HotWords.forget(it); FrequentLongWords.forget(it) }
+            // (a word that fails is skipped there, the others go on)
+            DictionaryFacilitatorImpl.removeWords(context, script, pool, locales, spellings, blacklist = false,
+                personal = alsoFromPersonalDictionary)
+        } catch (e: Exception) {
+            Log.w("LearnedWordsScreen", "could not remove words of $script", e)
         }
-        Kind.BLACKLISTED -> entry.listed.forEach { word ->
-            // its strikes go with it (and it's swipeable again)
+    }
+    for (item in yours) {
+        val entry = item.entry
+        // and its rows in the Android personal dictionary (each spelling found, for its language or all), unless
+        // the box was unticked (they stay there, and so on this list); an allowed row (RemovedWords) stays either
+        // way: this forgets the count only
+        if (alsoFromPersonalDictionary) for (p in entry.personal)
+            try { deletePersonal(context, p) } catch (e: Exception) { Log.w("LearnedWordsScreen", "could not delete a personal dictionary word", e) }
+        // its recent and frequent uses go too (as LatinIME.removeSuggestion)
+        entry.spellings.forEach { HotWords.forget(it); FrequentLongWords.forget(it) }
+    }
+    // its strikes go with it (and it's swipeable again: one rebuild for all of them, after the last)
+    var unblacklisted: String? = null
+    for (item in items) if (item.kind == Kind.BLACKLISTED) item.entry.listed.forEach { word ->
+        try {
             if (RemovedWords.blacklist(context, script, pool).remove(word)) {
-                helium314.keyboard.latin.gesture.GestureDecoderVocabulary.onWordUnblacklisted(LearnedStores.storeLocale(script), word)
+                unblacklisted = word
                 if (LearningEventLog.isEnabled())
                     LearningEventLog.log(LearningEventLog.RESTORED, LearningEventLog.SETTINGS, "", word, LearnedStores.label(script, pool),
                         LearningEventLog.countsIn(PersonalizationHelper.getUserHistoryDictionary(context, script, pool)))
             }
+        } catch (e: Exception) {
+            Log.w("LearnedWordsScreen", "could not take a word of $script off the blacklist", e)
         }
     }
+    unblacklisted?.let { helium314.keyboard.latin.gesture.GestureDecoderVocabulary.onWordUnblacklisted(LearnedStores.storeLocale(script), it) }
 }

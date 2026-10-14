@@ -921,14 +921,18 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         // (the swipe lists are the keyboard in use's: not touched for the words of another keyboard, e.g. through the
         // spell checker's facilitator still set up for it)
         val swipe = inUseReads(learnedPool)
-        for (word in words) {
+        for (word in words) try {
             val history = historyFor(word)
             // each language's dictionaries say how the word is listed: as written if one of them has it so, else lowercase
             val spellings = dictionaryGroups.map { it.removeEverywhere(word, history, swipe, learnedPool, personal) }
             struck.add(if (word in spellings) word else spellings.firstOrNull() ?: word.lowercase())
+        } catch (e: Exception) { // (one word that fails doesn't keep the others of a batch delete)
+            Log.w(TAG, "could not remove a word", e)
         }
         if (!blacklist) { // (a plain delete: a dictionary word's copy is swiped again, as if never learned)
-            if (swipe) for (group in dictionaryGroups) GestureDecoderVocabulary.onWordUnblacklisted(group.locale, struck.firstOrNull() ?: return)
+            // (one rebuild for all of them: it rebuilds every language)
+            val word = struck.firstOrNull() ?: return
+            if (swipe) dictionaryGroups.firstOrNull()?.let { GestureDecoderVocabulary.onWordUnblacklisted(it.locale, word) }
             return
         }
         for (spelling in struck) {
@@ -989,16 +993,21 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
                 f.learnedPool == pool && f.dictionaryGroups.any { it.locale in locales && it.hasDict(Dictionary.TYPE_MAIN) } }
             if (live != null) return live.removeWords(words, blacklist, personal)
             val history = PersonalizationHelper.getUserHistoryDictionary(context, script, pool)
+            mainDictionaryLoads.incrementAndGet()
             val groups = locales.map { DictionaryGroup(it, DictionaryFactory.createMainDictionaryCollection(context, it, false)) }
             val swipe = inUseReads(pool)
             try {
                 val struck = LinkedHashSet<String>()
-                for (word in words) {
+                for (word in words) try {
                     val spellings = groups.map { it.removeEverywhere(word, history, swipe, pool, personal) }
                     struck.add(if (word in spellings || spellings.isEmpty()) word else spellings.first())
+                } catch (e: Exception) { // (one word that fails doesn't keep the others of a batch delete)
+                    Log.w(TAG, "could not remove a word", e)
                 }
                 if (!blacklist) { // (a plain delete from the Learned words list: no strike)
-                    if (swipe) for (locale in locales) GestureDecoderVocabulary.onWordUnblacklisted(locale, struck.firstOrNull() ?: break)
+                    // (one rebuild for all of them: it rebuilds every language)
+                    val word = struck.firstOrNull()
+                    if (swipe && word != null) locales.firstOrNull()?.let { GestureDecoderVocabulary.onWordUnblacklisted(it, word) }
                     history.onFinishInput()
                     return
                 }
@@ -1012,6 +1021,11 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
                 groups.forEach { it.closeDict(Dictionary.TYPE_MAIN) }
             }
         }
+
+        /** The times [removeWords] loaded the languages' main dictionaries (no running keyboard had them; tests: a batch
+         *  delete loads them once). */
+        @androidx.annotation.VisibleForTesting
+        internal val mainDictionaryLoads = java.util.concurrent.atomic.AtomicInteger()
 
         /** Whether the keyboard in use reads the learned words or the blacklist of [pool] (its own, or another keyboard's
          *  through the buttons): only then do its swipe lists change with a Remove there (review 2026-10-08 area 3 #6:
