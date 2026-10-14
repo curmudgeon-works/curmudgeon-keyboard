@@ -137,7 +137,8 @@ internal fun appSettingsItems(prefs: android.content.SharedPreferences, real: an
         SettingsWithoutKey.ABOUT_SCREEN, // last (moved from the main screen, 2026-10-04)
         // (once under Experimental; the emoji version is on Appearance's Emoji group, next to the emoji font, URL
         //  detection on Text correction's Correction group)
-        // (recording the swipe corpus and logging swipe results: on Fine-tune suggestions)
+        // (recording the swipe corpus and logging swipe results: on Fine-tune suggestions where that screen is shown,
+        //  else above with the learning log, see hiddenMenuLogKeys)
     )
 }
 

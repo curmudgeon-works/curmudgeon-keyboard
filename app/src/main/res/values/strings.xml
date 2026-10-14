@@ -445,7 +445,8 @@
     <string name="layout_files_summary">Number row, number pads, phone pad, bottom rows… in one editor and one file</string>
     <!-- Name under which an edited layout is kept as the user's own -->
     <string name="layout_files_own_name">My layout</string>
-    <string name="layout_files_builtin">Built-in</string>
+    <!-- (no longer shown since the Built-in question's title reads "App's original", 2026-10-14; kept) -->
+    <string name="layout_files_builtin" tools:ignore="UnusedResources">Built-in</string>
     <!-- The layout files screen's button that puts the tab's layout that came with the app back (asks first) -->
     <string name="layout_files_builtin_button">App\'s original</string>
     <string name="layout_files_builtin_confirm">Replace this tab with the original layout that came with the app? Your changes in it will be lost.</string>

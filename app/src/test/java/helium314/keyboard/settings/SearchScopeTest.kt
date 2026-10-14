@@ -44,7 +44,7 @@ class SearchScopeTest {
 
     private fun keys(found: List<Setting>) = found.map { it.key }
 
-    @Test fun `a screen's search finds its own settings only, the main screen's every setting`() {
+    @Test fun `a screen's search finds its own settings only, the main screen's every setting a screen shows`() {
         val term = "clipboard history"
         // the main screens
         assertTrue(Settings.PREF_ENABLE_CLIPBOARD_HISTORY in keys(SettingsActivity.settingsContainer.filter(term, ctx)))
