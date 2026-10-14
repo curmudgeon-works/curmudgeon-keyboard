@@ -773,6 +773,12 @@
     <string name="delete_keyboard_main_blocked">%s\'s settings are the common ones. Move another keyboard to the top first.</string>
     <!-- a reorder made another keyboard the first while settings are common or a menu is shared: %s the keyboard -->
     <string name="common_settings_now_from">Common settings now come from %s</string>
+    <!-- the same with separate settings on and only some menus shared: %1$s the shared menus ("Appearance, Swiping"),
+         %2$s the keyboard -->
+    <plurals name="shared_menus_now_from">
+        <item quantity="one">%1$s now comes from %2$s</item>
+        <item quantity="other">%1$s now come from %2$s</item>
+    </plurals>
     <string name="delete_keyboard_message">\"%s\" will be removed, with its languages, their priorities and its layout choice. This cannot be undone. Its learned and blacklisted words are deleted too. Dictionaries are kept.</string>
     <!-- Keyboards screen, Advanced: one tile for the keyboards neither listed nor deleted (switched off before, or from an
          old backup), unfolding them (2026-10-11). %d = how many -->

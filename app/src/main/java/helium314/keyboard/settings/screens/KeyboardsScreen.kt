@@ -476,7 +476,19 @@ internal fun onOrderChanged(ctx: Context, mainBefore: SettingsSubtype) {
     helium314.keyboard.settings.preferences.clearSettingsCaches()
     helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().setThemeNeedsReload()
     (ctx.getActivity() as? helium314.keyboard.settings.SettingsActivity)?.prefChanged()
-    android.widget.Toast.makeText(ctx, ctx.getString(R.string.common_settings_now_from, keyboardName(main, ctx)), android.widget.Toast.LENGTH_LONG).show()
+    android.widget.Toast.makeText(ctx, mainChangedMessage(ctx, main), android.widget.Toast.LENGTH_LONG).show()
+}
+
+/** What the line says when [main] is the new first keyboard: separate settings off, all settings are common ("Common
+ *  settings now come from Hindi"); on, the shared menus are named, in the menus' order ("Appearance, Swiping now come
+ *  from Hindi"), as the restore's note names them ([helium314.keyboard.settings.preferences.commonMenusNote]). */
+internal fun mainChangedMessage(ctx: Context, main: SettingsSubtype): String {
+    val real = ctx.realPrefs()
+    val name = keyboardName(main, ctx)
+    if (!KeyboardProfiles.isSeparate(real)) return ctx.getString(R.string.common_settings_now_from, name)
+    val shared = KeyboardProfiles.Group.entries.filter { KeyboardProfiles.isShared(real, it) }
+    val menus = shared.joinToString(", ") { ctx.getString(groupTitle(it)) }
+    return ctx.resources.getQuantityString(R.plurals.shared_menus_now_from, shared.size, menus, name)
 }
 
 /**
