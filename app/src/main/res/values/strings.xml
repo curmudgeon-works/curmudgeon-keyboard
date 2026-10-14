@@ -315,9 +315,10 @@
     <!-- Above the progress bar while a backup is restored -->
     <string name="restore_running">Restoring…</string>
     <!-- Restore dialog: one checklist, mirroring the factory reset one -->
-    <string name="restore_choice_message">Choose what to bring from the backup.</string>
-    <!-- the restore dialog's own choice of the full restore, which wipes (owner 2026-10-11); its message: saving_full_everything -->
-    <string name="restore_everything">Restore everything</string>
+    <!-- the restore dialog's top checkbox, checked to start with: the full restore, which wipes (owner 2026-10-11) -->
+    <string name="restore_delete_app_data">Delete app data and restore from backup</string>
+    <!-- title and button of the question asked before that wipe; its message: saving_full_everything -->
+    <string name="restore_delete_and_restore">Delete and restore</string>
     <string name="restore_keyboards">Keyboards</string>
     <string name="restore_with_keyboards">Bring with them</string>
     <string name="restore_settings">Settings</string>
@@ -326,7 +327,8 @@
     <string name="restore_also">Also restore</string>
     <string name="restore_custom_words">Custom words</string>
     <string name="restore_clipboard">Clipboard history</string>
-    <string name="restore_replaces_note">What\'s chosen replaces what the phone has now; learned words are added to the phone\'s.</string>
+    <!-- under the restore dialog's rows when its top checkbox is unchecked (owner 2026-10-11) -->
+    <string name="restore_merge_note">App data won\'t be deleted. Each selected keyboard will be merged or added, based on your selection on next screens.</string>
     <!-- Swipe tuning screen (own gesture decoder): inflection weights and per-setting statistics -->
     <string name="swipe_tuning">Swipe suggestion parameters</string>
     <!-- One line under the heading: what the six sliders below are -->

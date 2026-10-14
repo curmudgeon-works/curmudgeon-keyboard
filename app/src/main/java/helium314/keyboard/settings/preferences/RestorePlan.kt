@@ -216,3 +216,37 @@ internal class MergeChoice(val question: MergeQuestion, val target: SettingsSubt
     /** The keyboard it would be the same as (blocked), or null. */
     val sameAs get() = decision.let { if (it is RestoreDecision.Skip) null else plan.sameAs(question.keyboard, it, question.chosen, question.decisions) }
 }
+
+/**
+ * The restore dialog's top choice (owner 2026-10-11: "At the top should be a checkbox that says "Delete app data and
+ * restore from backup", checked by default. Which makes keyboard list greyed out. If unchecked, all keyboards'
+ * checkboxes become non-grey, and selected"). Checked ([wipe]): the keyboard list and the rows of the keyboard by
+ * keyboard restore are greyed out, the line under them is hidden, and OK asks before the full restore that wipes.
+ * Unchecked: every backup keyboard is ticked the first time, the user's ticks kept when it's checked and unchecked
+ * again; the line shows, and OK goes keyboard by keyboard. A backup without a keyboard list can only be restored
+ * whole: checked, and the checkbox can't be unchecked ([canPickKeyboards]).
+ */
+internal class RestoreDialogState(private val keyboards: List<SettingsSubtype>) {
+    enum class Ok { ConfirmWipe, KeyboardByKeyboard }
+
+    val canPickKeyboards = keyboards.isNotEmpty()
+    var wipe by mutableStateOf(true)
+        private set
+    /** The keyboards ticked for the keyboard by keyboard restore. */
+    val selected = androidx.compose.runtime.mutableStateListOf<SettingsSubtype>()
+    private var unchecked = false
+
+    fun check(on: Boolean) {
+        if (!on && !canPickKeyboards) return
+        wipe = on
+        if (!on && !unchecked) { unchecked = true; selected.clear(); selected.addAll(keyboards) }
+    }
+
+    /** The keyboard rows, and the rows that only mean something keyboard by keyboard, can be changed. */
+    val rowsEnabled get() = !wipe
+    /** "App data won't be deleted. Each selected keyboard will be merged or added, …" */
+    val showsMergeLine get() = !wipe
+    /** A keyboard row's tick: greyed out, every keyboard comes back. */
+    fun ticked(keyboard: SettingsSubtype) = wipe || keyboard in selected
+    fun ok() = if (wipe) Ok.ConfirmWipe else Ok.KeyboardByKeyboard
+}

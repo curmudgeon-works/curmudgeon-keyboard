@@ -374,14 +374,17 @@ private fun restoreLauncher(onError: (String) -> Unit, onChoose: (PendingRestore
             file.delete()
             return@filePicker
         }
-        // a backup without keyboards (older format) has nothing to choose from
-        if (pending.keyboards.isEmpty()) {
-            // (the file goes when the job is done with it)
-            if (!runRestore(ctx, onError, R.string.backup_restored, restoreSteps(pending)) {
-                try { restoreEverything(ctx, file) } finally { file.delete() }
-            }) file.delete()
-        } else onChoose(pending)
+        // (a backup without keyboards, older format, too: it can only be restored whole, the dialog's checkbox stays
+        // checked, and the wipe is asked about like any other, never in one tap)
+        onChoose(pending)
     }
+}
+
+/** The restore dialog for the backup [file] (tests). */
+@Composable
+internal fun RestoreChoiceDialogFrom(file: File, onDismiss: () -> Unit) {
+    val pending = remember(file) { readBackup(file) }
+    RestoreChoiceDialog(pending, onDismiss, onError = { })
 }
 
 @Composable
@@ -389,9 +392,12 @@ private fun RestoreChoiceDialog(pending: PendingRestore, onDismiss: () -> Unit, 
     val ctx = LocalContext.current
     // each backup keyboard as it would come in, its custom key layouts named as they would be (B4, R6), and the
     // questions: a keyboard whose language the phone has (switched-off keyboards too) is asked about, merged into one of
-    // those or kept separate (owner 2026-10-11: "only check if language is same"); the others are new and ticked
+    // those or kept separate (owner 2026-10-11: "only check if language is same"); the others are new
     val plan = remember(pending) { restorePlan(ctx, pending) }
-    val selected = remember(pending) { mutableStateListOf<SettingsSubtype>().apply { addAll(pending.keyboards.filter { !plan.asks(it) }) } }
+    // on top: "Delete app data and restore from backup", checked to start with (owner 2026-10-11); unchecked, every
+    // keyboard is ticked
+    val top = remember(pending) { RestoreDialogState(pending.keyboards) }
+    val selected = top.selected
     // after OK: the chosen keyboards still to be asked about, the phone keyboard picked for the first, and the answers
     var asking: List<SettingsSubtype>? by remember { mutableStateOf(null) }
     var choosing: SettingsSubtype? by remember { mutableStateOf(null) }
@@ -425,15 +431,15 @@ private fun RestoreChoiceDialog(pending: PendingRestore, onDismiss: () -> Unit, 
         asking = rest
         if (rest.isEmpty()) { start(); close() }
     }
-    // the full restore, its own choice (owner 2026-10-11: "User should be given the option to do a full restore which
-    // wipes, or partial keyboard by keyboard"): asked once, no questions per keyboard
+    // the full restore, the top checkbox checked (owner 2026-10-11: "User should be given the option to do a full restore
+    // which wipes, or partial keyboard by keyboard"): asked once before it wipes, no questions per keyboard
     var everything by remember { mutableStateOf(false) }
     if (everything) {
         ConfirmationDialog(
             onDismissRequest = { everything = false }, // (back to the restore dialog)
-            title = { Text(stringResource(R.string.restore_everything)) },
+            title = { Text(stringResource(R.string.restore_delete_and_restore)) },
             content = { Text(stringResource(R.string.saving_full_everything)) },
-            confirmButtonText = stringResource(R.string.restore_everything),
+            confirmButtonText = stringResource(R.string.restore_delete_and_restore),
             onConfirmed = {
                 started = runRestore(ctx, onError, R.string.backup_restored, restoreSteps(pending)) {
                     try { restoreEverything(ctx, pending.file) } finally { pending.file.delete() }
@@ -463,42 +469,49 @@ private fun RestoreChoiceDialog(pending: PendingRestore, onDismiss: () -> Unit, 
     }
     ThreeButtonAlertDialog(
         // (OK closes the dialog after onConfirmed: not while the questions come)
-        onDismissRequest = { if (asking == null) close() },
+        // (nor while the wipe is asked about)
+        onDismissRequest = { if (asking == null && !everything) close() },
         title = { Text(stringResource(R.string.button_restore)) },
         content = {
             Column {
-                Text(stringResource(R.string.restore_choice_message))
+                // (a backup without a keyboard list: checked, it can only be restored whole)
+                CheckRow(stringResource(R.string.restore_delete_app_data), top.wipe, top.canPickKeyboards) { top.check(it) }
+                // checked: greyed out, every row showing what the full restore brings (all of it); "bring them in as
+                // copies" means nothing then, it shows its own tick
+                val wipe = top.wipe
+                val rows = top.rowsEnabled
                 @Composable fun Heading(text: Int) = Text(stringResource(text), style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.padding(top = 12.dp, bottom = 2.dp))
-                Heading(R.string.restore_keyboards)
+                if (pending.keyboards.isNotEmpty()) Heading(R.string.restore_keyboards)
                 pending.keyboards.forEach { keyboard ->
                     val name = keyboardName(keyboard, ctx).let { if (plan.asks(keyboard)) it else stringResource(R.string.restore_keyboard_new, it) }
-                    CheckRow(name, keyboard in selected) { if (it) selected.add(keyboard) else selected.remove(keyboard) }
+                    CheckRow(name, top.ticked(keyboard), rows) { if (it) selected.add(keyboard) else selected.remove(keyboard) }
                 }
                 Heading(R.string.restore_with_keyboards)
-                CheckRow(stringResource(R.string.restore_settings), settings, withKeyboards) { settings = it }
+                CheckRow(stringResource(R.string.restore_settings), wipe || settings, rows && withKeyboards) { settings = it }
                 // (every keyboard too: a keyboard restore never wipes, owner 2026-10-11)
-                if (settings && withKeyboards)
-                    CheckRow(stringResource(R.string.restore_saved_items_as_copies), asCopies) { asCopies = it }
+                if (wipe || settings && withKeyboards)
+                    CheckRow(stringResource(R.string.restore_saved_items_as_copies), asCopies, rows) { asCopies = it }
                 if (pending.hasLearnedWords)
-                    CheckRow(stringResource(R.string.restore_learned_words), learnedWords, withKeyboards) { learnedWords = it }
+                    CheckRow(stringResource(R.string.restore_learned_words), wipe || learnedWords, rows && withKeyboards) { learnedWords = it }
                 if (pending.hasDictionaries)
-                    CheckRow(stringResource(R.string.restore_dictionaries), dictionaries, withKeyboards) { dictionaries = it }
+                    CheckRow(stringResource(R.string.restore_dictionaries), wipe || dictionaries, rows && withKeyboards) { dictionaries = it }
                 if (pending.hasCustomWords || pending.hasClipboard) {
                     Heading(R.string.restore_also)
-                    if (pending.hasCustomWords) CheckRow(stringResource(R.string.restore_custom_words), customWords) { customWords = it }
-                    if (pending.hasClipboard) CheckRow(stringResource(R.string.restore_clipboard), clipboard) { clipboard = it }
+                    if (pending.hasCustomWords) CheckRow(stringResource(R.string.restore_custom_words), wipe || customWords, rows) { customWords = it }
+                    if (pending.hasClipboard) CheckRow(stringResource(R.string.restore_clipboard), wipe || clipboard, rows) { clipboard = it }
                 }
-                Text(stringResource(R.string.restore_replaces_note), style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+                if (top.showsMergeLine)
+                    Text(stringResource(R.string.restore_merge_note), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
             }
         },
         scrollContent = true,
         confirmFirst = true,
-        neutralButtonText = stringResource(R.string.restore_everything),
-        onNeutral = { everything = true },
-        checkOk = { withKeyboards || (customWords && pending.hasCustomWords) || (clipboard && pending.hasClipboard) },
+        checkOk = { top.wipe || withKeyboards || (customWords && pending.hasCustomWords) || (clipboard && pending.hasClipboard) },
         onConfirmed = {
+            // checked: the wipe is asked about first (never in one tap)
+            if (top.ok() == RestoreDialogState.Ok.ConfirmWipe) { everything = true; return@ThreeButtonAlertDialog }
             // the chosen keyboards whose language the phone has are asked about first, one by one
             answers.clear()
             val ask = selected.filter { plan.asks(it) }
