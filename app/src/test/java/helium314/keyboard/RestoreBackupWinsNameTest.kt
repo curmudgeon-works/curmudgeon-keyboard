@@ -290,19 +290,31 @@ class RestoreBackupWinsNameTest {
             Settings.PREF_USER_COLORS_PREFIX + "Hot" to colorsA, looks(look("Sunset", 3.0)), presets(preset("Work", true))))
     }
 
+    /** The work still running in the background (on the keyboard executor, or posted to the main thread: another class's,
+     *  or the last restore's) done, so what the dry run is checked for writing is its own. */
+    private fun settle() = repeat(2) {
+        helium314.keyboard.latin.utils.ExecutorUtils.getBackgroundExecutor(helium314.keyboard.latin.utils.ExecutorUtils.KEYBOARD).submit { }.get()
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+    }
+
+    /** The keys stored differently in [a] and [b], each with its value in [a] and in [b]. */
+    private fun changed(a: Map<String, Any?>, b: Map<String, Any?>) = (a.keys + b.keys).filter { a[it] != b[it] }.associateWith { a[it] to b[it] }
+
     @Test fun `the dry run's names are the real run's, ticked and unticked, and it writes nothing`() {
         val keys = listOf(theme, layout, popups, slot)
         for (names in listOf(SavedItemsMerge.Choices(), unticked(Kind.PALETTES to "Hot", Kind.THEMES to "Sunset",
                 Kind.LAYOUTS to "Work", Kind.POPUP_SETS to "Mine"))) {
             real.edit().clear().commit()
             everythingClashes()
-            val before = real.all
+            settle()
+            val before = HashMap(real.all)
             val plan = readRestoreDialog(ctx, zip).plan
             assertEquals(setOf(Kind.PALETTES to "Hot", Kind.THEMES to "Sunset", Kind.LAYOUTS to "Work", Kind.POPUP_SETS to "Mine"),
                 plan.clashes.map { it.key }.toSet())
             val dry = plan.backupSettings(restored, names).filterKeys { it in keys }
             val dryPhone = plan.phoneSettings(keys.associateWith { phoneOwn(it) }, names)
-            assertEquals(before, real.all) // (nothing written)
+            // (nothing written; the keys that changed, with their values before and after, if any)
+            assertEquals(emptyMap(), changed(before, HashMap(real.all)), "the dry run wrote, $names")
             restore(names)
             assertEquals(dry, keys.associateWith { restoredOwn(it) }, "the restored keyboard's names, $names")
             assertEquals(dryPhone, keys.associateWith { phoneOwn(it) }, "the phone keyboard's names, $names")
