@@ -105,8 +105,9 @@ class RestoreClipboardSkipTest {
         return db.readBytes().also { db.delete() }
     }
 
-    /** A good backup of this build ([keyboard] listed, its delay 222) with [clipboard] as its clipboard database. */
-    private fun backup(clipboard: ByteArray) {
+    /** A good backup of this build ([keyboard] listed, its delay 222) with [clipboard] as its clipboard database (null:
+     *  none, as a device without one backs up). */
+    private fun backup(clipboard: ByteArray?) {
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("preferences.json"))
             settingsToJsonStream(mapOf<String?, Any?>(Settings.PREF_ENABLED_SUBTYPES to keyboard.toPref(),
@@ -114,7 +115,7 @@ class RestoreClipboardSkipTest {
                 KeyboardIdUpgrade.DONE to true, Settings.PREF_VERSION_CODE to helium314.keyboard.latin.BuildConfig.MIGRATION_VERSION,
                 idKey(1, Settings.PREF_KEY_LONGPRESS_TIMEOUT) to 222), z)
             z.closeEntry()
-            z.putNextEntry(ZipEntry(Database.NAME)); z.write(clipboard); z.closeEntry()
+            if (clipboard != null) { z.putNextEntry(ZipEntry(Database.NAME)); z.write(clipboard); z.closeEntry() }
             z.putNextEntry(ZipEntry("protected_preferences.json"))
             settingsToJsonStream(emptyMap<String?, Any?>(), z)
             z.closeEntry()
@@ -193,5 +194,34 @@ class RestoreClipboardSkipTest {
         } finally {
             w.execSQL("DROP TRIGGER IF EXISTS refuse_y")
         }
+    }
+
+    // ---- a leftover "heliboard.db_restored" of a failed restore (owner 2026-10-13, 20261013_L2). Fail before: the next
+    // restore of a backup with no clipboard database took the leftover's clips ----
+
+    /** A failed restore's leftover: the clips "x" and "y". */
+    private fun leftover() {
+        restoredDb.parentFile?.mkdirs()
+        restoredDb.writeBytes(clipboardDb(version = 2))
+    }
+
+    @Test fun `a leftover from a failed restore - a full restore of a backup without clips keeps the device's`() {
+        val dao = deviceClips()
+        leftover()
+        backup(null)
+        assertEquals(null, fullRestoreJob())
+        assertEquals(222, real.all[idKey(1, Settings.PREF_KEY_LONGPRESS_TIMEOUT)])
+        assertEquals(setOf("a", "b"), texts(dao), "the leftover's clips replaced the device's")
+        assertFalse(restoredDb.exists(), "the leftover is still there")
+    }
+
+    @Test fun `a leftover from a failed restore - a partial restore with the clipboard ticked, of a backup without clips, keeps the device's`() {
+        val dao = deviceClips()
+        leftover()
+        backup(null)
+        helium314.keyboard.settings.preferences.restoreChosenFrom(ctx, zip, emptyList(), settings = false, learnedWords = false,
+            io = helium314.keyboard.latin.personalization.BodyStoreIo(), clipboard = true)
+        assertEquals(setOf("a", "b"), texts(dao), "the leftover's clips were merged in")
+        assertFalse(restoredDb.exists(), "the leftover is still there")
     }
 }

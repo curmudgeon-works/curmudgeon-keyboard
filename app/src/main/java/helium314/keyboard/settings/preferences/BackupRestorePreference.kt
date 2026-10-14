@@ -1331,6 +1331,9 @@ private fun openBackup(file: File): OpenedBackup {
 
 private fun replaceEverythingChecked(ctx: Context, opened: OpenedBackup) = keepingPhoneChoices(ctx) {
     val restoredDb = ctx.getDatabasePath(Database.NAME + "_restored")
+    // one a failed restore left behind is never this backup's clipboard (owner 2026-10-13, 20261013_L2: a backup without
+    // one took another backup's clips over the device's)
+    restoredDb.delete()
     opened.zip.use { zip ->
         var entry: ZipEntry? = opened.first
         val filesDir = ctx.filesDir ?: return@keepingPhoneChoices
@@ -1472,6 +1475,8 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, plan: Res
             else entry.takeIf { choice.otherDictionaries }
     }
     val restoredDb = ctx.getDatabasePath(Database.NAME + "_restored")
+    // (one a failed restore left behind is never this backup's clipboard: owner 2026-10-13, 20261013_L2)
+    restoredDb.delete()
     var personalWords: String? = null
     if (filesDir != null) ZipInputStream(FileInputStream(pending.file)).use { zip ->
         var entry: ZipEntry? = zip.nextEntry
