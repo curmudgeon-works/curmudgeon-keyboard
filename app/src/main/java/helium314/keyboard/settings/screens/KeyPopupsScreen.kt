@@ -137,7 +137,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
         // a change made while a built-in set is selected is held here until the user names a set for it
         var pendingChange: Pair<String, List<String>?>? by remember { mutableStateOf(null) }
         var showSaveAsDialog by remember { mutableStateOf(false) }
-        val presets = popupPresets(keyboard, userSets)
+        val presets = popupPresets(keyboard, userSets, helium314.keyboard.settings.SavedItemDefaults.takeNewDefaults(ctx.realPrefs()))
         val accentsValue = keyboard.getExtraValueOf(ExtraValue.MORE_POPUPS)
             ?: prefs.getString(Settings.PREF_MORE_POPUP_KEYS, Defaults.PREF_MORE_POPUP_KEYS)!!
         val symbolsLayout = keyboard.layoutName(LayoutType.SYMBOLS)
@@ -210,7 +210,8 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
         /** [preset] on the keyboard: its accents level and symbols page, its arrangement (a built-in has none), the set's
          *  name, the letter-to-symbol map. */
         fun applyPreset(preset: Preset) {
-            var changed = keyboard.with(ExtraValue.MORE_POPUPS, preset.morePopups)
+            var changed = if (KeyPopupOverrides.ACCENTS in preset.follows) keyboard.without(ExtraValue.MORE_POPUPS)
+                else keyboard.with(ExtraValue.MORE_POPUPS, preset.morePopups)
             changed = if (preset.symbolsLayout == null) changed.withoutLayout(LayoutType.SYMBOLS)
                 else changed.withLayout(LayoutType.SYMBOLS, preset.symbolsLayout)
             // a preset with its own popup order sets it, and the keyboard's own order (if any) goes
@@ -218,8 +219,11 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
             KeyPopupOverrides.save(prefs, preset.overrides ?: emptyMap())
             prefs.edit().apply {
                 if (preset.userName != null) putString(KeyPopupOverrides.PREF_SELECTED_SET, preset.userName) else remove(KeyPopupOverrides.PREF_SELECTED_SET)
-                if (preset.symbolMap != null) putString(Settings.PREF_SYMBOL_POPUP_MAP, preset.symbolMap)
-                if (preset.popupOrder != null) putString(Settings.PREF_POPUP_KEYS_ORDER, preset.popupOrder)
+                // (a set's setting kept at its default, with "Saved items take new defaults" on: the default again)
+                if (KeyPopupOverrides.MAP in preset.follows) remove(Settings.PREF_SYMBOL_POPUP_MAP)
+                else if (preset.symbolMap != null) putString(Settings.PREF_SYMBOL_POPUP_MAP, preset.symbolMap)
+                if (KeyPopupOverrides.ORDER in preset.follows) remove(Settings.PREF_POPUP_KEYS_ORDER)
+                else if (preset.popupOrder != null) putString(Settings.PREF_POPUP_KEYS_ORDER, preset.popupOrder)
             }.apply()
             onKeyboardChanged(changed)
             generation++
@@ -284,7 +288,12 @@ private fun storePopupSet(ctx: Context, keyboard: SettingsSubtype, name: String,
     // last tapped built-in's)
     val symbolMap = prefs.getString(Settings.PREF_SYMBOL_POPUP_MAP, Defaults.PREF_SYMBOL_POPUP_MAP)!!
     val popupOrder = keyboard.getExtraValueOf(ExtraValue.POPUP_ORDER) ?: prefs.getString(Settings.PREF_POPUP_KEYS_ORDER, Defaults.PREF_POPUP_KEYS_ORDER)!!
-    val set = KeyPopupOverrides.UserSet(name, accentsValue, symbolsLayout, all, symbolMap, popupOrder)
+    // and which of them the keyboard reads at their default (not picked): see UserSet.atDefault
+    val atDefault = setOfNotNull(
+        KeyPopupOverrides.ACCENTS.takeIf { keyboard.getExtraValueOf(ExtraValue.MORE_POPUPS) == null && !prefs.contains(Settings.PREF_MORE_POPUP_KEYS) },
+        KeyPopupOverrides.MAP.takeIf { !prefs.contains(Settings.PREF_SYMBOL_POPUP_MAP) },
+        KeyPopupOverrides.ORDER.takeIf { keyboard.getExtraValueOf(ExtraValue.POPUP_ORDER) == null && !prefs.contains(Settings.PREF_POPUP_KEYS_ORDER) })
+    val set = KeyPopupOverrides.UserSet(name, accentsValue, symbolsLayout, all, symbolMap, popupOrder, atDefault)
     KeyPopupOverrides.saveSets(ctx.realPrefs(), KeyPopupOverrides.loadSets(ctx.realPrefs()).filter { it.name != name } + set)
     KeyPopupOverrides.save(prefs, all)
     prefs.edit().putString(KeyPopupOverrides.PREF_SELECTED_SET, name).apply()
@@ -295,7 +304,7 @@ private fun storePopupSet(ctx: Context, keyboard: SettingsSubtype, name: String,
 internal fun renamePopupSet(ctx: Context, oldName: String, name: String) {
     val real = ctx.realPrefs()
     KeyPopupOverrides.saveSets(real, KeyPopupOverrides.loadSets(real).map {
-        if (it.name == oldName) KeyPopupOverrides.UserSet(name, it.morePopups, it.symbolsLayout, it.overrides, it.symbolMap, it.popupOrder) else it
+        if (it.name == oldName) KeyPopupOverrides.UserSet(name, it.morePopups, it.symbolsLayout, it.overrides, it.symbolMap, it.popupOrder, it.atDefault) else it
     })
     KeyboardProfiles.replaceValueEverywhere(real, KeyPopupOverrides.PREF_SELECTED_SET, oldName, name)
     helium314.keyboard.settings.LayoutPresets.onPopupSetRenamed(real, oldName, name) // and the saved Layouts (review 2026-10-08 area 4 #4)
@@ -310,8 +319,9 @@ internal fun deletePopupSet(ctx: Context, name: String) {
     KeyboardProfiles.forgetValueEverywhere(real, KeyPopupOverrides.PREF_SELECTED_SET, name)
 }
 
-/** The presets the list offers [keyboard]: the built-ins, then the user's own [userSets]. */
-internal fun popupPresets(keyboard: SettingsSubtype, userSets: List<KeyPopupOverrides.UserSet>): List<Preset> =
+/** The presets the list offers [keyboard]: the built-ins, then the user's own [userSets]; what a set kept at its default
+ *  follows today's ([takeNew], "Saved items take new defaults") or is applied as saved. */
+internal fun popupPresets(keyboard: SettingsSubtype, userSets: List<KeyPopupOverrides.UserSet>, takeNew: Boolean = true): List<Preset> =
     listOf(
         // each built-in preset is a whole recipe: accents level, symbols page, symbol map, popup order (nothing is
         // kept from the one before; 2026-10-03)
@@ -329,7 +339,8 @@ internal fun popupPresets(keyboard: SettingsSubtype, userSets: List<KeyPopupOver
         // the Arabic-script symbols page only makes sense for keyboards of that script
         if (keyboard.locale.script() == ScriptUtils.SCRIPT_ARABIC) builtIn + Preset(R.string.key_popups_preset_arabic, POPUP_KEYS_NORMAL, "symbols_arabic", symbolMap = "", popupOrder = POPUP_KEYS_ORDER_DEFAULT)
         else builtIn
-    } + userSets.map { Preset(0, it.morePopups, it.symbolsLayout, it.name, it.overrides, symbolMap = it.symbolMap, popupOrder = it.popupOrder) }
+    } + userSets.map { Preset(0, it.morePopups, it.symbolsLayout, it.name, it.overrides, symbolMap = it.symbolMap, popupOrder = it.popupOrder,
+        follows = if (takeNew) it.atDefault else emptySet()) }
 
 /** The preset the presets row names for [keyboard] (settings [prefs], its own arrangement [overrides]): its chosen set
  *  of the user's own; else a built-in whose recipe it has, when it has no arrangement of its own (2026-10-08: a keyboard
@@ -568,7 +579,8 @@ fun TryItBar(keyboard: SettingsSubtype, state: TryItState, onFocus: (Boolean) ->
 internal data class Preset(val name: Int, val morePopups: String, val symbolsLayout: String?, // (data: equal by content, the list rebuilds them on every change)
                      val userName: String? = null, val overrides: Map<String, List<String>>? = null,
                      val symbolMap: String? = null, // the letter -> symbols map it sets; null = leaves the map as it is, "" = none (HeliBoard)
-                     val popupOrder: String? = null) // the popup order it sets; null = leaves the order as it is
+                     val popupOrder: String? = null, // the popup order it sets; null = leaves the order as it is
+                     val follows: Set<String> = emptySet()) // of UserSet's ACCENTS / MAP / ORDER: set back to the default instead
 
 private class KeyInfo(val label: String, val title: String, val popups: List<String>, val pool: List<String>, val overrideKey: String = label)
 

@@ -38,6 +38,7 @@ object KeyboardProfiles {
         "key_popup_sets", // saved popup sets are meant to be reused across keyboards
         "appearance_looks", // saved looks too
         "layout_presets", // and saved Layouts
+        helium314.keyboard.settings.SavedItemDefaults.PREF, // what saved items do with new defaults: one switch for all
     ) + Group.entries.map { it.prefKey } +
         // which pool of learned words each keyboard has, its buttons, the old switch (read by the update only)
         helium314.keyboard.latin.personalization.LearnedKeyboards.appWideKeys

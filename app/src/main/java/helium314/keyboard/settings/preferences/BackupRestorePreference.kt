@@ -516,11 +516,11 @@ private fun restoreEverything(ctx: Context, file: File) = LearnedKeyboards.withF
     LearnedKeyboards.updateOnce(ctx)
 }
 
-private fun replaceEverything(ctx: Context, file: File) {
+private fun replaceEverything(ctx: Context, file: File) = keepingPhoneChoices(ctx) {
     val restoredDb = ctx.getDatabasePath(Database.NAME + "_restored")
     ZipInputStream(FileInputStream(file)).use { zip ->
         var entry: ZipEntry? = zip.nextEntry
-        val filesDir = ctx.filesDir ?: return
+        val filesDir = ctx.filesDir ?: return@keepingPhoneChoices
         val deviceProtectedFilesDir = DeviceProtectedUtils.getFilesDir(ctx)
         filesDir.deleteRecursively()
         deviceProtectedFilesDir.deleteRecursively()
@@ -673,8 +673,20 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, choice: R
     LayoutUtilsCustom.onLayoutFileChanged()
 }
 
+/**
+ * Runs [restore], then puts back the phone's own choice of what saved items do with new defaults (owner 2026-10-11,
+ * whose switch decides on a restore: "Yes, the phone's").
+ */
+private fun keepingPhoneChoices(ctx: Context, restore: () -> Unit) {
+    val key = helium314.keyboard.settings.SavedItemDefaults.PREF
+    val phone = ctx.realPrefs().all[key] as? Boolean
+    try { restore() } finally {
+        ctx.realPrefs().edit(commit = true) { if (phone == null) remove(key) else putBoolean(key, phone) }
+    }
+}
+
 /** The backup's preferences replace the phone's, every keyboard's set included. */
-private fun restoreAllSettings(ctx: Context, pending: PendingRestore) {
+private fun restoreAllSettings(ctx: Context, pending: PendingRestore) = keepingPhoneChoices(ctx) {
     // which pool each keyboard's learned words are in names the phone's files: the phone's stays (the backup's words are
     // added keyboard by keyboard, restoreLearnedWords)
     val phone = LearnedKeyboards.phoneState(ctx.realPrefs())

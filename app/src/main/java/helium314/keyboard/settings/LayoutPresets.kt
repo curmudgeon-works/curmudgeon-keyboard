@@ -43,8 +43,10 @@ object LayoutPresets {
         Settings.PREF_SYMBOL_POPUP_MAP, KeyPopupOverrides.PREF, KeyPopupOverrides.PREF_SELECTED_SET)
 
     /** Equal by content, not name: the list's tapped one is still found after a rename (or a reload of the list).
-     *  [builtIn]: one that ships with the app ([builtIn]), not the user's. */
-    class Preset(val name: String, val values: Map<String, Any?>, val builtIn: Boolean = false) {
+     *  [builtIn]: one that ships with the app ([builtIn]), not the user's. [remembered]: the values its unpicked settings
+     *  (null) had when saved ([SavedItemDefaults]). */
+    class Preset(val name: String, val values: Map<String, Any?>, val builtIn: Boolean = false,
+                 val remembered: Map<String, Any> = emptyMap()) {
         override fun equals(other: Any?) = other is Preset && other.values == values
         override fun hashCode() = values.hashCode()
     }
@@ -91,7 +93,8 @@ object LayoutPresets {
     fun current(prefs: SharedPreferences): Map<String, Any?> = prefs.all.filterKeys { inScope(it) }
 
     /** What a Layout saves for [keyboard]: its keys, the settings set now (picked), and every other one as "not set"
-     *  (null: applying it puts the default back, whatever the default is then; 0.3.008, as for themes). */
+     *  (null), with the value it had remembered (Preset.remembered, [SavedItemDefaults]: today's default or as saved, by
+     *  the switch; 2026-10-11, as for themes). */
     fun snapshot(ctx: Context, keyboard: SettingsSubtype): Map<String, Any?> {
         val values = HashMap<String, Any?>()
         LayoutDraft.keys.filter { inScope(it) }.forEach { values[it] = null }
@@ -148,9 +151,14 @@ object LayoutPresets {
     /** Whether [preset]'s popups go on [keyboard]: saved with popups, from a keyboard of the same script. */
     private fun popupsFit(keyboard: SettingsSubtype, preset: Preset) = preset.builtIn || preset.values[SCRIPT] == keyboard.locale.script()
 
+    /** What [preset] applies: a built-in follows the defaults; a saved one its unpicked settings at today's default or
+     *  as saved, by the switch [SavedItemDefaults] ([takeNew]). */
+    fun applied(preset: Preset, takeNew: Boolean): Map<String, Any?> =
+        if (preset.builtIn) preset.values else SavedItemDefaults.applied(preset.values, preset.remembered, takeNew)
+
     /** The settings [preset] puts on [keyboard] (its popups only when they fit, see [popupsFit]). */
-    fun settingsFor(keyboard: SettingsSubtype, preset: Preset): Map<String, Any?> =
-        preset.values.filterKeys { inScope(it) && (it !in popupKeys || popupsFit(keyboard, preset)) }
+    fun settingsFor(keyboard: SettingsSubtype, preset: Preset, takeNew: Boolean = SavedItemDefaults.DEFAULT): Map<String, Any?> =
+        applied(preset, takeNew).filterKeys { inScope(it) && (it !in popupKeys || popupsFit(keyboard, preset)) }
 
     /** A Layout's popup set, if it names one of the user's and that set was deleted since: back in the sets list, so
      *  the keyboard's popups have their name again. Nothing there is replaced. */
@@ -163,14 +171,18 @@ object LayoutPresets {
         val overrides = (preset.values[KeyPopupOverrides.PREF] as? String)?.let { json ->
             runCatching { JSONObject(json).let { o -> o.keys().asSequence().associateWith { k ->
                 val a = o.getJSONArray(k); List(a.length()) { a.getString(it) } } } }.getOrNull() } ?: emptyMap()
-        // the set comes back whole: a value the Layout kept as "default" is written in as today's default, so it shows
-        // what it shows now and no later default change takes it away (review 2026-10-11: it came back without a map,
-        // the 0.3.012 popups bug again)
+        // the set comes back whole: a value the Layout kept as "default" is written in as it was when the Layout was saved
+        // (else today's) and marked as at its default, as the Layout has it (owner 2026-10-11: "Saved items take new
+        // defaults"; review 2026-10-11: it came back without a map, the 0.3.012 popups bug again)
+        fun kept(key: String, default: String) = preset.values[key] as? String ?: preset.remembered[key] as? String ?: default
+        val atDefault = setOfNotNull(KeyPopupOverrides.ACCENTS.takeIf { preset.values[MORE_POPUPS] == null },
+            KeyPopupOverrides.MAP.takeIf { preset.values[Settings.PREF_SYMBOL_POPUP_MAP] == null },
+            KeyPopupOverrides.ORDER.takeIf { preset.values[Settings.PREF_POPUP_KEYS_ORDER] == null })
         KeyPopupOverrides.saveSets(real, sets + KeyPopupOverrides.UserSet(name,
             preset.values[MORE_POPUPS] as? String ?: ctx.prefs().getString(Settings.PREF_MORE_POPUP_KEYS, Defaults.PREF_MORE_POPUP_KEYS)!!,
             preset.values[LAYOUT + LayoutType.SYMBOLS.name] as? String, overrides,
-            preset.values[Settings.PREF_SYMBOL_POPUP_MAP] as? String ?: Defaults.PREF_SYMBOL_POPUP_MAP,
-            preset.values[Settings.PREF_POPUP_KEYS_ORDER] as? String ?: Defaults.PREF_POPUP_KEYS_ORDER))
+            kept(Settings.PREF_SYMBOL_POPUP_MAP, Defaults.PREF_SYMBOL_POPUP_MAP),
+            kept(Settings.PREF_POPUP_KEYS_ORDER, Defaults.PREF_POPUP_KEYS_ORDER), atDefault))
     }
 
     /** [values] (settings part) replace the current ones: null and missing keys go back to their default. */
@@ -194,7 +206,8 @@ object LayoutPresets {
     /** Whether what [preset] sets differs from what is set now for [keyboard]. */
     fun isTweaked(ctx: Context, keyboard: SettingsSubtype, preset: Preset): Boolean {
         val now = ctx.prefs().all
-        if (preset.values.any { (key, value) -> inScope(key) && !KnownDefaults.same(key, now[key], value) }) return true
+        if (applied(preset, SavedItemDefaults.takeNewDefaults(ctx.realPrefs()))
+                .any { (key, value) -> inScope(key) && !KnownDefaults.same(key, now[key], value) }) return true
         if (preset.builtIn) return false // (its keys are the language's: not compared)
         // the keys by name only (this runs on every redraw: no layout file is read)
         return LayoutType.entries.mapNotNull { type -> keyboard.layoutName(type)?.let { LAYOUT + type.name to it } }.toMap() !=
@@ -209,7 +222,8 @@ object LayoutPresets {
                 val o = arr.getJSONObject(i)
                 val v = o.getJSONObject("values")
                 Preset(o.getString("name"), sizeKeys + v.keys().asSequence().associateWith { key ->
-                    v.getJSONObject(key).let { if (it.has("d")) null else AppearanceLooks.fromJson(it) } })
+                    v.getJSONObject(key).let { if (it.has("d")) null else AppearanceLooks.fromJson(it) } },
+                    remembered = AppearanceLooks.rememberedIn(v))
             }
         }.getOrDefault(emptyList())
     }
@@ -227,7 +241,7 @@ object LayoutPresets {
     private fun followValue(real: SharedPreferences, key: String, from: String, to: String?) {
         val presets = load(real)
         if (presets.none { it.values[key] == from }) return
-        save(real, presets.map { if (it.values[key] == from) Preset(it.name, it.values + (key to to)) else it })
+        save(real, presets.map { if (it.values[key] == from) Preset(it.name, it.values + (key to to), it.builtIn, it.remembered) else it })
     }
 
     /** User popup set [from] renamed to [to]. (A deleted one stays named: applying the Layout brings it back,
@@ -248,7 +262,7 @@ object LayoutPresets {
         for (preset in presets) arr.put(JSONObject().apply {
             put("name", preset.name)
             put("values", JSONObject().also { v -> preset.values.forEach { (key, value) ->
-                (if (value == null) JSONObject().put("d", true) else AppearanceLooks.toJson(value))?.let { v.put(key, it) } } })
+                (if (value == null) AppearanceLooks.atDefault(preset.remembered[key]) else AppearanceLooks.toJson(value))?.let { v.put(key, it) } } })
         })
         prefs.edit { putString(PREF, arr.toString()) }
     }

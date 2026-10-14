@@ -67,6 +67,8 @@ fun checkVersionUpgrade(context: Context) {
     heliBoardLayoutPins(context, context.realPrefs(), freshInstall = oldVersion == 0)
     ownSetUpgrades(context.realPrefs(), freshInstall = oldVersion == 0)
     keepUserPopupSetsSymbolMap(context.realPrefs())
+    // (last: after the steps above changed saved items) saved items remember what their unpicked settings show today
+    helium314.keyboard.settings.SavedItemDefaults.rememberToday(context.realPrefs())
 }
 
 /** Set once [keepUserPopupSetsSymbolMap] ran (a backup from before carries none: its restore runs it again). */
@@ -89,7 +91,7 @@ internal fun keepUserPopupSetsSymbolMap(real: SharedPreferences) {
         val selected = KeyPopupOverrides.PREF_SELECTED_SET
         val symbolMap = Settings.PREF_SYMBOL_POPUP_MAP
         KeyPopupOverrides.saveSets(real, sets.map {
-            if (it.name in lacking) KeyPopupOverrides.UserSet(it.name, it.morePopups, it.symbolsLayout, it.overrides, map, it.popupOrder) else it })
+            if (it.name in lacking) KeyPopupOverrides.UserSet(it.name, it.morePopups, it.symbolsLayout, it.overrides, map, it.popupOrder, it.atDefault) else it })
         val sharedHasMap = real.contains(symbolMap)
         val sharedGetsMap = real.getString(selected, null) in lacking && !sharedHasMap
         real.edit {
@@ -118,7 +120,7 @@ internal fun keepUserPopupSetsSymbolMap(real: SharedPreferences) {
         if (presets.any { it.values[selected] in lacking && it.values[symbolMap] == null })
             helium314.keyboard.settings.LayoutPresets.save(real, presets.map {
                 if (it.values[selected] in lacking && it.values[symbolMap] == null)
-                    helium314.keyboard.settings.LayoutPresets.Preset(it.name, it.values + (symbolMap to map), it.builtIn) else it })
+                    helium314.keyboard.settings.LayoutPresets.Preset(it.name, it.values + (symbolMap to map), it.builtIn, it.remembered) else it })
     }
     real.edit { putBoolean(USER_POPUP_SETS_MAP_DONE, true) }
 }
@@ -281,10 +283,11 @@ internal fun pickedOnlyUpgrade(real: SharedPreferences, freshInstall: Boolean) {
             }
         }
         AppearanceLooks.save(real, AppearanceLooks.load(real).map { look -> AppearanceLooks.Look(look.name,
-            look.values.mapValues { (key, value) -> if (atDefault(key, value, sharedNumpad, live = false)) null else value }) })
+            look.values.mapValues { (key, value) -> if (atDefault(key, value, sharedNumpad, live = false)) null else value }, look.remembered) })
         LayoutPresets.save(real, LayoutPresets.load(real).map { preset -> LayoutPresets.Preset(preset.name,
             preset.values.mapValues { (key, value) ->
-                if (atDefault(key, value, preset.values[numpad] as? Boolean ?: sharedNumpad, live = false)) null else value }) })
+                if (atDefault(key, value, preset.values[numpad] as? Boolean ?: sharedNumpad, live = false)) null else value },
+            preset.builtIn, preset.remembered) })
     }
     real.edit { putBoolean(PICKED_ONLY_DONE, true) }
 }

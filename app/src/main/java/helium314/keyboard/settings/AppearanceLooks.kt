@@ -31,8 +31,9 @@ object AppearanceLooks {
     const val PREF = "appearance_looks"
     const val PREF_SELECTED = "appearance_look_selected" // the theme last chosen (its name), for the Themes row
 
-    /** Equal by content, not name: the list's tapped one is still found after a rename (or a reload of the list). */
-    class Look(val name: String, val values: Map<String, Any?>) {
+    /** Equal by content, not name: the list's tapped one is still found after a rename (or a reload of the list).
+     *  [remembered]: the values its unpicked settings (null) had when saved ([SavedItemDefaults]). */
+    class Look(val name: String, val values: Map<String, Any?>, val remembered: Map<String, Any> = emptyMap()) {
         override fun equals(other: Any?) = other is Look && other.values == values
         override fun hashCode() = values.hashCode()
     }
@@ -162,7 +163,7 @@ object AppearanceLooks {
             // the folder goes only once every picture is in the library (review session 2026-10-07: a failed copy lost it)
             if (!complete) return@map look
             done.add(dir)
-            Look(look.name, look.values + (PICTURES to if (o.length() == 0) NO_PICTURES else LIB + o.toString()))
+            Look(look.name, look.values + (PICTURES to if (o.length() == 0) NO_PICTURES else LIB + o.toString()), look.remembered)
         }
         if (done.isEmpty()) return
         // the looks naming the library are on disk before their folders go (review 2026-10-08 area 4 #7: a folder went
@@ -210,7 +211,8 @@ object AppearanceLooks {
     /** Whether what [look] sets differs from what is set now (a value, or the background pictures). */
     fun isTweaked(ctx: Context, look: Look): Boolean {
         val now = ctx.prefs().all
-        if (look.values.any { (key, value) -> inScope(key) && !KnownDefaults.same(key, now[key], value) }) return true
+        if (applied(look, SavedItemDefaults.takeNewDefaults(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)))
+                .any { (key, value) -> inScope(key) && !KnownDefaults.same(key, now[key], value) }) return true
         val id = look.values[PICTURES] as? String ?: return false // saved before pictures were in themes: not compared
         // a picture by its size, a framing (a few bytes of the same length whatever it says) by its content
         fun sig(f: java.io.File): Any = if (f.name.endsWith(".framing")) f.readText() else f.length()
@@ -299,10 +301,10 @@ object AppearanceLooks {
         reload(ctx)
     }
 
-    /** What a theme saves: the values set now (picked), and every other theme setting as "not set" (null), so applying
-     *  the theme puts those back to their default, whatever the default is then (before 2026-10-02 a theme had only the
-     *  values set, and one left at its default kept whatever was there when the theme was applied; from 2026-10-02 to
-     *  0.3.008 the default values were written out, which froze them). */
+    /** What a theme saves: the values set now (picked), and every other theme setting as "not set" (null); the value
+     *  each had is remembered beside it (Look.remembered, [SavedItemDefaults]), and the switch "Saved items take new
+     *  defaults" decides which applies (2026-10-11; before 2026-10-02 a theme had only the values set, from 2026-10-02
+     *  to 0.3.008 the defaults were written out as picks, and from then to 2026-10-11 the defaults followed). */
     fun snapshot(prefs: SharedPreferences): Map<String, Any?> = keys.associateWith { null } + current(prefs)
 
     /** Everything that draws the keyboard reads the preferences again. */
@@ -323,7 +325,7 @@ object AppearanceLooks {
             (0 until arr.length()).map { i ->
                 val o = arr.getJSONObject(i)
                 val v = o.getJSONObject("values")
-                Look(o.getString("name"), v.keys().asSequence().associateWith { key -> fromJson(v.getJSONObject(key)) })
+                Look(o.getString("name"), v.keys().asSequence().associateWith { key -> fromJson(v.getJSONObject(key)) }, rememberedIn(v))
             }
         }.getOrDefault(emptyList())
     }
@@ -334,7 +336,7 @@ object AppearanceLooks {
         if (looks.none { look -> keys.any { look.values[it] == from } }) return
         save(prefs, looks.map { look ->
             if (keys.none { look.values[it] == from }) look
-            else Look(look.name, look.values.mapValues { (key, value) -> if (key in keys && value == from) to else value })
+            else Look(look.name, look.values.mapValues { (key, value) -> if (key in keys && value == from) to else value }, look.remembered)
         })
     }
 
@@ -355,10 +357,22 @@ object AppearanceLooks {
             put("name", look.name)
             // a value at its default is saved as {"d":true} (read back as null, see snapshot)
             put("values", JSONObject().also { v -> look.values.forEach { (key, value) ->
-                (if (value == null) JSONObject().put("d", true) else toJson(value))?.let { v.put(key, it) } } })
+                (if (value == null) atDefault(look.remembered[key]) else toJson(value))?.let { v.put(key, it) } } })
         })
         prefs.edit(commit = now) { putString(PREF, arr.toString()) }
     }
+
+    /** A saved item's setting at its default: {"d":true}, with the value it had when saved ({"d":true,"v":{…}}). */
+    internal fun atDefault(remembered: Any?): JSONObject =
+        JSONObject().put("d", true).also { o -> toJson(remembered)?.let { o.put("v", it) } }
+
+    /** The remembered values in a saved item's JSON values ([atDefault]). */
+    internal fun rememberedIn(values: JSONObject): Map<String, Any> = values.keys().asSequence().mapNotNull { key ->
+        values.getJSONObject(key).optJSONObject("v")?.let { fromJson(it) }?.let { key to it } }.toMap()
+
+    /** What [look] applies: its unpicked settings at today's default or as saved ([takeNew], [SavedItemDefaults]); a
+     *  built-in has none remembered, so it follows the defaults. */
+    fun applied(look: Look, takeNew: Boolean): Map<String, Any?> = SavedItemDefaults.applied(look.values, look.remembered, takeNew)
 
     internal fun toJson(value: Any?): JSONObject? = when (value) {
         is Boolean -> JSONObject().put("b", value)

@@ -107,7 +107,7 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
             // each tap starts from what was there when the list opened, so one previewed Layout never leaks into the next
             onItemHighlighted = {
                 previewed = it
-                LayoutPresets.applySettings(ctx, initial + LayoutPresets.settingsFor(initialKeyboard, it))
+                LayoutPresets.applySettings(ctx, initial + LayoutPresets.settingsFor(initialKeyboard, it, helium314.keyboard.settings.SavedItemDefaults.takeNewDefaults(ctx.realPrefs())))
                 setKeyboard(LayoutPresets.keyboardWith(ctx, initialKeyboard, it))
             },
             onItemSelected = { tapped ->
@@ -140,7 +140,8 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
             checkTextValid = { name -> name.isNotBlank() && all.none { it.name == name } },
             onConfirmed = { name ->
                 // what is on the keyboard now, a previewed Layout included
-                store(presets + LayoutPresets.Preset(name, LayoutPresets.snapshot(ctx, keyboard)))
+                store(presets + LayoutPresets.snapshot(ctx, keyboard).let { values ->
+                    LayoutPresets.Preset(name, values, remembered = helium314.keyboard.settings.SavedItemDefaults.remembered(values)) })
                 // what this keyboard has now is this Layout (from the list: only once it's OK'd)
                 if (!showList) prefs.edit { putString(LayoutPresets.PREF_SELECTED, name) }
             },
@@ -152,7 +153,7 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
             initialText = preset.name,
             checkTextValid = { name -> name.isNotBlank() && all.none { it !== preset && it.name == name } },
             onConfirmed = { name ->
-                store(presets.map { if (it === preset) LayoutPresets.Preset(name, it.values) else it })
+                store(presets.map { if (it === preset) LayoutPresets.Preset(name, it.values, it.builtIn, it.remembered) else it })
                 KeyboardProfiles.replaceValueEverywhere(ctx.realPrefs(), LayoutPresets.PREF_SELECTED, preset.name, name)
             },
         )

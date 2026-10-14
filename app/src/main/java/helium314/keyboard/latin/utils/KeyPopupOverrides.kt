@@ -36,9 +36,14 @@ object KeyPopupOverrides {
     const val PREF_SETS = "key_popup_sets"
 
     /** A set of the user's: the accents level, the symbols page, the per-key arrangement, and (since 2026-10-07) the
-     *  letter-to-symbol map and the popup order it was saved with (null in a set saved before: left as they are). */
+     *  letter-to-symbol map and the popup order it was saved with (null in a set saved before: left as they are).
+     *  [atDefault]: which of [ACCENTS], [MAP], [ORDER] were at their default when saved (not picked, owner 2026-10-11):
+     *  with "Saved items take new defaults" on they follow today's default, off the value kept here. */
     class UserSet(val name: String, val morePopups: String, val symbolsLayout: String?, val overrides: Map<String, List<String>>,
-                  val symbolMap: String? = null, val popupOrder: String? = null)
+                  val symbolMap: String? = null, val popupOrder: String? = null, val atDefault: Set<String> = emptySet())
+    const val ACCENTS = "morePopups"
+    const val MAP = "symbolMap"
+    const val ORDER = "popupOrder"
 
     /** Whether [text] can name a new set: not blank, and no set of the user's has it (re-review 2026-10-07: "Save as
      *  new set" replaced a same-named set without a word). */
@@ -53,7 +58,8 @@ object KeyPopupOverrides {
                 val ov = o.getJSONObject("overrides")
                 UserSet(o.getString("name"), o.getString("morePopups"), o.optString("symbolsLayout").ifEmpty { null },
                     ov.keys().asSequence().associateWith { k -> val a = ov.getJSONArray(k); List(a.length()) { a.getString(it) } },
-                    if (o.has("symbolMap")) o.getString("symbolMap") else null, if (o.has("popupOrder")) o.getString("popupOrder") else null)
+                    if (o.has("symbolMap")) o.getString("symbolMap") else null, if (o.has("popupOrder")) o.getString("popupOrder") else null,
+                    o.optJSONArray("atDefault")?.let { a -> (0 until a.length()).map { a.getString(it) }.toSet() } ?: emptySet())
             }
         } catch (e: Exception) { emptyList() }
     }
@@ -63,6 +69,7 @@ object KeyPopupOverrides {
         for (set in sets) arr.put(JSONObject().apply {
             put("name", set.name); put("morePopups", set.morePopups); put("symbolsLayout", set.symbolsLayout ?: "")
             set.symbolMap?.let { put("symbolMap", it) }; set.popupOrder?.let { put("popupOrder", it) }
+            if (set.atDefault.isNotEmpty()) put("atDefault", JSONArray(set.atDefault.sorted()))
             put("overrides", JSONObject().also { o -> set.overrides.forEach { (k, v) -> o.put(k, JSONArray(v)) } })
         })
         prefs.edit().putString(PREF_SETS, arr.toString()).apply()
