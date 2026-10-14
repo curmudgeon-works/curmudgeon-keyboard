@@ -167,18 +167,22 @@ class ReReview2R3Test {
         assertEquals("P", file(p).takeIf { it.exists() }?.readText())
     }
 
-    /** The phone: [english] on theme [phoneTheme] (gap [phoneGap]); the backup: [english] on [backupTheme] (gap [backupGap]). */
+    /** The phone: [english] on theme [phoneTheme] (gap [phoneGap]); the backup: [english] on [backupTheme] (gap [backupGap]).
+     *  Each keyboard holds its theme's gap, as choosing a theme copies it in. */
     private fun themes(phoneTheme: String, phoneGap: Float, backupTheme: String, backupGap: Float) {
         useKeyboards(ctx, real, english)
         AppearanceLooks.save(real, listOf(AppearanceLooks.Look(phoneTheme, mapOf(Settings.PREF_KEY_HORIZONTAL_GAP to phoneGap))), now = true)
         // (english's own choice, here and in the backup: no separate common set, owner 2026-10-11)
-        real.edit().putString(KeyboardProfiles.ownKey(KeyboardProfiles.idFor(real, english), AppearanceLooks.PREF_SELECTED), phoneTheme).commit()
+        val id = KeyboardProfiles.idFor(real, english)
+        real.edit().putString(KeyboardProfiles.ownKey(id, AppearanceLooks.PREF_SELECTED), phoneTheme)
+            .putFloat(KeyboardProfiles.ownKey(id, Settings.PREF_KEY_HORIZONTAL_GAP), phoneGap).commit()
         val look = JSONObject().put("name", backupTheme).put("values", JSONObject().put(Settings.PREF_KEY_HORIZONTAL_GAP, JSONObject().put("f", backupGap.toDouble())))
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("preferences.json"))
             settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to english.toPref(), Settings.PREF_ADDITIONAL_SUBTYPES to "",
                 "keyboard_profile_ids" to JSONObject().put(english.toPref(), 1).toString(), KeyboardProfiles.NO_COMMON_SET_DONE to true,
                 AppearanceLooks.PREF to JSONArray(listOf(look)).toString(), KeyboardProfiles.ownKey(1, AppearanceLooks.PREF_SELECTED) to backupTheme,
+                KeyboardProfiles.ownKey(1, Settings.PREF_KEY_HORIZONTAL_GAP) to backupGap,
                 helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
                 helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
             z.closeEntry()
@@ -187,7 +191,8 @@ class ReReview2R3Test {
     private fun appearanceRow(differences: List<RestoreMatch.Difference>) =
         differences.any { it == RestoreMatch.Difference.Menu(KeyboardProfiles.Group.APPEARANCE) }
 
-    // (owner 2026-10-11: backup wins the name if ticked; before, the backup's came in as Sunset 2)
+    // (owner 2026-10-11: backup wins the name if ticked; before, the backup's came in as Sunset 2, and the name alone
+    // differed; now both keyboards name "Sunset" either way, and the row comes from the keyboards' own looks)
     @Test fun `(c) the backup's Sunset with other content - Appearance differs, ticked or not`() {
         themes("Sunset", 1f, "Sunset", 3f)
         val before = real.all
@@ -196,6 +201,16 @@ class ReReview2R3Test {
             names = SavedItemsMerge.Choices(setOf(SavedItemsMerge.Kind.THEMES to "Sunset")))))
         assertEquals(before, real.all) // (nothing written)
         assertEquals(listOf("Sunset"), AppearanceLooks.load(real).map { it.name })
+    }
+
+    // (owner 2026-10-11: backup wins the name if ticked) the keyboards with the same look, both named "Sunset" after the
+    // restore whatever the tick: nothing of Appearance to restore
+    @Test fun `(c) the backup's Sunset with other content, the keyboards' own looks the same - no Appearance row, ticked or not`() {
+        themes("Sunset", 1f, "Sunset", 3f)
+        real.edit().putFloat(KeyboardProfiles.ownKey(KeyboardProfiles.idFor(real, english), Settings.PREF_KEY_HORIZONTAL_GAP), 3f).commit()
+        assertFalse(appearanceRow(restoreDifferencesFrom(ctx, zip, english, english)))
+        assertFalse(appearanceRow(restoreDifferencesFrom(ctx, zip, english, english,
+            names = SavedItemsMerge.Choices(setOf(SavedItemsMerge.Kind.THEMES to "Sunset")))))
     }
 
     // (owner 2026-10-11: backup wins the name if ticked) ticked, the phone's Sunset is Dawn after the restore: the phone
