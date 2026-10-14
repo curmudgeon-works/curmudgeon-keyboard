@@ -12,6 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /**
  * Review B4w.2: the app's own lists and layouts are written through a temporary file renamed over the old one
@@ -57,12 +58,48 @@ class AtomicFilesTest {
     // fail before: the blacklist was written in place (here the write goes through: the new list over the old)
     @Test fun `a blacklist write that can't be made leaves the old list whole`() {
         val file = File(dir, "blacklists${File.separator}Zzzz.txt").apply { parentFile!!.mkdirs(); writeText("teh\nhte\t2\n") }
-        // (the temporary file's place is taken: the write fails, as a full disk would make it)
-        File(file.parentFile, file.name + AtomicFiles.TMP_SUFFIX).apply { mkdirs(); File(this, "x").writeText("x") }
-        val list = RemovedWords.forFile(file)
-        list.ensureLoaded()
-        list.strike("adn")
-        list.reload() // (after the write it started)
+        // (the temporary files' folder can't be written: the write fails, as a full disk would make it)
+        AtomicFiles.init(ctx)
+        val tmpDir = File(ctx.noBackupFilesDir, "atomic_tmp").apply { mkdirs() }
+        assertTrue(tmpDir.setWritable(false))
+        try {
+            val list = RemovedWords.forFile(file)
+            list.ensureLoaded()
+            list.strike("adn")
+            list.reload() // (after the write it started)
+        } finally { tmpDir.setWritable(true) }
         assertEquals("teh\nhte\t2\n", file.readText())
+    }
+
+    // round-5 review 20261013_L20 (owner: "Ok, A"): the temporary file is in a folder of its own, outside both files
+    // folders (what a backup walks, what the lists show). Fail before: it was beside the target, "<name>.tmp"
+    @Test fun `the temporary file is in no folder a backup or a list walks`() {
+        AtomicFiles.init(ctx)
+        val roots = listOf(ctx.filesDir, DeviceProtectedUtils.getFilesDir(ctx))
+        val deDir = File(DeviceProtectedUtils.getFilesDir(ctx), "atomic-test-de")
+        try {
+            for (target in listOf(File(dir, "fonts${File.separator}Mine.ttf"),
+                    File(deDir, "layouts${File.separator}custom.mine."))) {
+                var during: List<File> = emptyList()
+                AtomicFiles.write(target) { out ->
+                    out.write("new".toByteArray())
+                    during = roots.flatMap { root -> root.walk().filter { it.isFile && it.name.endsWith(AtomicFiles.TMP_SUFFIX) }.toList() }
+                }
+                assertEquals(emptyList<File>(), during, "a temporary file a backup takes")
+                assertEquals("new", target.readText())
+            }
+        } finally { deDir.deleteRecursively() }
+        assertEquals(emptyList<File>(), File(ctx.noBackupFilesDir, "atomic_tmp").listFiles()?.toList() ?: emptyList(), "left behind")
+    }
+
+    // B4w.1 / 20261013_L20: a Layout & Typing put-back cut off left "layouts.restoring" beside the layouts, and the
+    // backups took it; the next start deletes it. Fail before: it stayed
+    @Test fun `a leftover layouts restoring folder goes at the next start`() {
+        val restoringDir = File(DeviceProtectedUtils.getFilesDir(ctx), "layouts.restoring")
+        File(restoringDir, "number_row${File.separator}custom.mine.").apply { parentFile!!.mkdirs(); writeText("1 2 3") }
+        try {
+            helium314.keyboard.settings.LayoutDraft.recoverAfterCrash(ctx)
+            assertFalse(restoringDir.exists())
+        } finally { restoringDir.deleteRecursively() }
     }
 }

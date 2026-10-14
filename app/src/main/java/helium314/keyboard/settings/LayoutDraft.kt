@@ -138,7 +138,7 @@ class LayoutDraft private constructor(
         // undo then deleted the draft's folder, the last copy)
         val live = layoutsDir(ctx)
         if (layoutsCopy != null) {
-            val incoming = File(live.parentFile, live.name + ".restoring").apply { deleteRecursively() }
+            val incoming = restoringDir(ctx).apply { deleteRecursively() }
             layoutsCopy.copyRecursively(incoming, overwrite = true)
             live.deleteRecursively()
             if (!incoming.renameTo(live)) { incoming.copyRecursively(live, overwrite = true); incoming.deleteRecursively() }
@@ -228,6 +228,8 @@ class LayoutDraft private constructor(
             ctx.realPrefs().all.filterKeys { inScope(plain(it)) || it in learnedKeys }
 
         private fun layoutsDir(ctx: Context) = File(DeviceProtectedUtils.getFilesDir(ctx), "layouts")
+        // the snapshot's layouts copied in beside the live folder before they are swapped in ([reject])
+        private fun restoringDir(ctx: Context) = File(DeviceProtectedUtils.getFilesDir(ctx), "layouts.restoring")
         /** relative path -> size and time, enough to tell a change without reading */
         private fun listing(dir: File?): Map<String, Pair<Long, Long>> =
             dir?.takeIf { it.isDirectory }?.walkTopDown()?.filter { it.isFile }
@@ -294,6 +296,9 @@ class LayoutDraft private constructor(
             if (active != null) return
             // (a Save's or Discard's delete of the snapshot cut off: nothing of it is put back, 20261013_L18)
             AtomicFiles.deleteFinished(dir(ctx))
+            // (a put-back of the layouts cut off: what it copied in beside goes, the snapshot's copy is still whole if
+            // one is left to put back; backups stopped carrying it, 20261013_L20)
+            restoringDir(ctx).deleteRecursively()
             if (File(dir(ctx), PREFS_FILE).exists()) helium314.keyboard.latin.utils.SettingsEventLog.log("Layout & Typing snapshot found at app start: recovering")
             val dir = dir(ctx)
             val json = runCatching { JSONObject(File(dir, PREFS_FILE).readText()) }.getOrNull()

@@ -82,6 +82,11 @@ public final class DeviceProtectedUtils {
         return getDeviceProtectedContext(context).getFilesDir();
     }
 
+    /** The device-protected storage's folder for files no backup takes (Android's own backup leaves it out too). */
+    public static File getNoBackupFilesDir(final Context context) {
+        return getDeviceProtectedContext(context).getNoBackupFilesDir();
+    }
+
     private DeviceProtectedUtils() {
         // This utility class is not publicly instantiable.
     }
