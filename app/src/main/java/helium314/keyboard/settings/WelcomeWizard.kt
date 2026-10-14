@@ -3,17 +3,16 @@ package helium314.keyboard.settings
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,6 +20,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
@@ -32,12 +33,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -51,7 +50,6 @@ import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.latin.utils.UncachedInputMethodManagerUtils
 import helium314.keyboard.latin.utils.previewDark
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /** The setup, always in Curmudgeon's Black with orange (2026-10-10; it had the phone's Dynamic colors, blue before
  *  Android 12), whatever colors the keyboard has. */
@@ -63,6 +61,37 @@ fun WelcomeWizard(
     WelcomeWizardSteps(close, finish)
 }
 
+/** The setup's checklist, the same rows on every screen (owner 2026-10-14: one list, the step's text in a card above). */
+internal enum class SetupRow { ENABLE, SWITCH, THEME, CONFIGURE, FINISH }
+
+/** How a row of the checklist looks: done (faded orange with a check), the step to take now (orange, framed), later
+ *  (faint), open (orange, as a step can be taken again), or the filled Finished. */
+internal enum class SetupRowLook { DONE, CURRENT, LATER, OPEN, FILLED }
+
+internal class SetupRowState(val look: SetupRowLook, val clickable: Boolean)
+
+/**
+ * Row [row] of the checklist on screen [step]: 1 the keyboard isn't enabled, 2 enabled but not the one in use, 3 in use.
+ * Configure looks faint until 3 but can be tapped from 2 on (owner 2026-10-14: "maybe even faded Configure button should
+ * let you go into our settings?"; on 1 the settings' Switch bar would open a picker without the keyboard in it);
+ * Finished only on 3.
+ */
+internal fun setupRowState(row: SetupRow, step: Int): SetupRowState = when (row) {
+    SetupRow.ENABLE -> if (step <= 1) SetupRowState(SetupRowLook.CURRENT, true) else SetupRowState(SetupRowLook.DONE, false)
+    SetupRow.SWITCH -> when {
+        step <= 1 -> SetupRowState(SetupRowLook.LATER, false)
+        step == 2 -> SetupRowState(SetupRowLook.CURRENT, true)
+        else -> SetupRowState(SetupRowLook.DONE, false)
+    }
+    SetupRow.THEME -> if (step >= 3) SetupRowState(SetupRowLook.OPEN, true) else SetupRowState(SetupRowLook.LATER, false)
+    SetupRow.CONFIGURE -> when {
+        step <= 1 -> SetupRowState(SetupRowLook.LATER, false)
+        step == 2 -> SetupRowState(SetupRowLook.LATER, true)
+        else -> SetupRowState(SetupRowLook.OPEN, true)
+    }
+    SetupRow.FINISH -> if (step >= 3) SetupRowState(SetupRowLook.FILLED, true) else SetupRowState(SetupRowLook.LATER, false)
+}
+
 @Composable
 private fun WelcomeWizardSteps(
     close: () -> Unit,
@@ -70,31 +99,33 @@ private fun WelcomeWizardSteps(
 ) {
     val ctx = LocalContext.current
     val imm = ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+    // (no Welcome picture screen since 2026-10-14, owner: "Perhaps we don't even need the first screen at all? Start with
+    // Enable in settings as screen 1")
     fun determineStep(): Int = when {
-        !UncachedInputMethodManagerUtils.isThisImeEnabled(ctx, imm) -> 0
+        !UncachedInputMethodManagerUtils.isThisImeEnabled(ctx, imm) -> 1
         !UncachedInputMethodManagerUtils.isThisImeCurrent(ctx, imm) -> 2
         else -> 3
     }
     var step by rememberSaveable { mutableIntStateOf(determineStep()) }
-    val scope = rememberCoroutineScope()
+    // the keyboard picker is a window over this screen: on 2, looked at until the keyboard is the one in use (closed
+    // without a switch, nothing changes)
     LaunchedEffect(step) {
-        if (step == 2)
-            scope.launch {
-                while (step == 2 && !UncachedInputMethodManagerUtils.isThisImeCurrent(ctx, imm)) {
-                    delay(50)
-                }
-                step = 3
-            }
+        if (step != 2) return@LaunchedEffect
+        while (!UncachedInputMethodManagerUtils.isThisImeCurrent(ctx, imm)) delay(50)
+        step = 3
     }
     val useWideLayout = isWideScreen()
-    // black, the steps a shade lighter, the title and what to tap in orange
+    // black, the rows a shade lighter, the title and what to tap in orange; the card's text a dimmer gray (owner
+    // 2026-10-14: "White text is too bright. It can be dimmer gray")
     val stepBackgroundColor = MaterialTheme.colorScheme.surfaceContainerHigh
     val textColor = MaterialTheme.colorScheme.primary
-    val textColorDim = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
     val titleColor = MaterialTheme.colorScheme.primary
+    val cardTitleColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+    val cardTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
     val appName = stringResource(ctx.applicationInfo.labelRes)
     @Composable fun bigText() {
-        val resource = if (step == 0) R.string.setup_welcome_title else R.string.setup_steps_title
+        // "Welcome to" on the first screen, "Setting up" on the later ones (owner 2026-10-14)
+        val resource = if (step <= 1) R.string.setup_welcome_title else R.string.setup_steps_title
         Column(Modifier.padding(bottom = 36.dp)) {
             Text(
                 stringResource(resource, appName),
@@ -104,103 +135,64 @@ private fun WelcomeWizardSteps(
             )
         }
     }
-    @Composable
-    fun ColumnScope.Step(step: Int, title: String, instruction: String, actionText: String, icon: Painter, action: () -> Unit) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("1", color = if (step == 1) titleColor else textColorDim)
-            Text("2", color = if (step == 2) titleColor else textColorDim)
-            Text("3", color = if (step == 3) titleColor else textColorDim)
+    @Composable fun card(title: String, text: String?) {
+        Column(Modifier.fillMaxWidth().background(color = stepBackgroundColor).padding(16.dp)) {
+            Text(title, color = cardTitleColor)
+            if (text != null)
+                Text(text, style = MaterialTheme.typography.bodyLarge.merge(color = cardTextColor))
         }
-        Column(Modifier
-            .background(color = stepBackgroundColor)
-            .padding(16.dp)
-        ) {
-            Text(title, color = MaterialTheme.colorScheme.onSurface)
-            Text(instruction, style = MaterialTheme.typography.bodyLarge.merge(color = MaterialTheme.colorScheme.onSurfaceVariant))
+    }
+    @Composable fun row(row: SetupRow, text: String, icon: Painter, action: () -> Unit) {
+        val state = setupRowState(row, step)
+        val primary = MaterialTheme.colorScheme.primary
+        val color = when (state.look) {
+            SetupRowLook.DONE -> primary.copy(alpha = 0.45f) // (owner 2026-10-14: "faded orange instead of faded gray")
+            SetupRowLook.CURRENT, SetupRowLook.OPEN -> primary
+            SetupRowLook.LATER -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+            SetupRowLook.FILLED -> MaterialTheme.colorScheme.onPrimary
         }
         Spacer(Modifier.height(4.dp))
         Row(
-            Modifier.clickable { action() }
-                .background(color = stepBackgroundColor)
+            Modifier.fillMaxWidth()
+                .then(if (state.clickable) Modifier.clickable { action() } else Modifier)
+                .background(color = if (state.look == SetupRowLook.FILLED) primary else stepBackgroundColor)
+                .then(if (state.look == SetupRowLook.CURRENT) Modifier.border(2.dp, primary) else Modifier)
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(icon, null, Modifier.padding(end = 6.dp).size(32.dp), tint = textColor)
-            Text(actionText, Modifier.weight(1f))
+            val shown = if (state.look == SetupRowLook.DONE) painterResource(R.drawable.ic_setup_check) else icon
+            Icon(shown, null, Modifier.padding(end = 6.dp).size(32.dp), tint = color)
+            Text(text, Modifier.weight(1f), color = color)
         }
     }
     @Composable fun steps() {
-        if (step == 0)
-            Step0 { step = 1 }
-        else
-            Column {
-                val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-                    step = determineStep()
-                }
-                if (step == 1) {
-                    Step(
-                        step,
-                        stringResource(R.string.setup_step1_title, appName),
-                        stringResource(R.string.setup_step1_instruction, appName),
-                        stringResource(R.string.setup_step1_action),
-                        painterResource(R.drawable.ic_setup_key)
-                    ) {
-                        val intent = Intent()
-                        intent.action = Settings.ACTION_INPUT_METHOD_SETTINGS
-                        intent.addCategory(Intent.CATEGORY_DEFAULT)
-                        launcher.launch(intent)
-                    }
-                } else if (step == 2) {
-                    Step(
-                        step,
-                        stringResource(R.string.setup_step2_title, appName),
-                        stringResource(R.string.setup_step2_instruction, appName),
-                        stringResource(R.string.setup_step2_action),
-                        painterResource(R.drawable.ic_setup_select),
-                        imm::showInputMethodPicker
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Row(
-                        Modifier.clickable { close() }
-                            .background(color = stepBackgroundColor)
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            painterResource(R.drawable.sym_keyboard_language_switch),
-                            null,
-                            Modifier.padding(end = 6.dp).size(32.dp),
-                            tint = textColor
-                        )
-                        Text(stringResource(R.string.setup_step3_action), Modifier.weight(1f))
-                    }
-                } else { // step 3
-                    Step(
-                        step,
-                        stringResource(R.string.setup_step3_title),
-                        stringResource(R.string.setup_step3_instruction, appName),
-                        stringResource(R.string.setup_step3_action),
-                        painterResource(R.drawable.sym_keyboard_language_switch),
-                        close
-                    )
-                    DictionaryDownloads(stepBackgroundColor, textColor)
-                    Spacer(Modifier.height(4.dp))
-                    Row(
-                        Modifier.clickable { finish() }
-                            .background(color = stepBackgroundColor)
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            painterResource(R.drawable.ic_setup_check),
-                            null,
-                            Modifier.padding(end = 6.dp).size(32.dp),
-                            tint = textColor
-                        )
-                        Text(stringResource(R.string.setup_finish_action), Modifier.weight(1f))
-                    }
-                }
+        Column(Modifier.verticalScroll(rememberScrollState())) {
+            val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+                step = determineStep()
             }
+            when (step) {
+                1 -> card(stringResource(R.string.setup_enable_card, appName), null)
+                2 -> card(stringResource(R.string.setup_switch_card), null)
+                else -> card(stringResource(R.string.setup_done_title), stringResource(R.string.setup_done_hint))
+            }
+            row(SetupRow.ENABLE, stringResource(R.string.setup_step1_action), painterResource(R.drawable.ic_setup_key)) {
+                val intent = Intent()
+                intent.action = Settings.ACTION_INPUT_METHOD_SETTINGS
+                intent.addCategory(Intent.CATEGORY_DEFAULT)
+                launcher.launch(intent)
+            }
+            row(SetupRow.SWITCH, stringResource(R.string.setup_step2_action), painterResource(R.drawable.ic_setup_select),
+                imm::showInputMethodPicker)
+            // (no Dynamic colors before Android 12: nothing to pick there, the keyboard is Curmudgeon's)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+                row(SetupRow.THEME, stringResource(R.string.setup_theme_title), painterResource(R.drawable.ic_settings_appearance)) { }
+            // (no "(optional)": owner 2026-10-14)
+            row(SetupRow.CONFIGURE, stringResource(R.string.setup_step3_action),
+                painterResource(R.drawable.sym_keyboard_language_switch), close)
+            if (step >= 3) DictionaryDownloads(stepBackgroundColor, textColor)
+            // on every screen, faint until the keyboard is in use
+            row(SetupRow.FINISH, stringResource(R.string.setup_finish_action), painterResource(R.drawable.ic_setup_check), finish)
+        }
     }
     Surface {
         CompositionLocalProvider(
@@ -226,23 +218,6 @@ private fun WelcomeWizardSteps(
                         steps()
                     }
             }
-        }
-    }
-}
-
-@Composable
-fun Step0(onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Image(painterResource(R.drawable.setup_welcome_image), null)
-        Row(Modifier.clickable { onClick() }
-            .padding(top = 4.dp, start = 4.dp, end = 4.dp)
-            //.background(color = MaterialTheme.colorScheme.primary)
-        ) {
-            Spacer(Modifier.weight(1f))
-            Text(
-                stringResource(R.string.setup_start_action),
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
         }
     }
 }

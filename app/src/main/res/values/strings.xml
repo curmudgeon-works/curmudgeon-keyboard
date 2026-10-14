@@ -1527,6 +1527,20 @@ language, hence "No language". -->
     <string name="setup_step3_action">Configure the keyboard</string>
     <!-- The label of the button that finishes the setup wizard. -->
     <string name="setup_finish_action">Finished</string>
+    <!-- The setup's card while the keyboard isn't enabled yet (its first screen). %s is the application name. -->
+    <string name="setup_enable_card">"Enable %s in your Languages &amp; Input settings"</string>
+    <!-- The setup's card while the keyboard is enabled but not the one in use. -->
+    <string name="setup_switch_card">Select it as your active text-input method</string>
+    <!-- The setup's card once the keyboard is in use (its last screen). -->
+    <string name="setup_done_title">"You're all set!"</string>
+    <!-- Below setup_done_title. -->
+    <string name="setup_done_hint">Pick a theme or configure settings (you can do these later too).</string>
+    <!-- The setup's last screen: the keyboard's colors, Dynamic or Curmudgeon. -->
+    <string name="setup_theme_title">Pick a theme</string>
+    <!-- Below the Dynamic theme's name in the setup. -->
+    <string name="setup_theme_dynamic_hint">matches your device</string>
+    <!-- Below the Curmudgeon theme's name in the setup. -->
+    <string name="setup_theme_curmudgeon_hint">black &amp; orange</string>
     <!-- Option to show setup wizard icon. Legacy setting only displayed for Android 9 and older. -->
     <string name="show_setup_wizard_icon">Show app icon</string>
     <!-- Description for the option to show setup wizard application icon of this IME in the launcher. -->
