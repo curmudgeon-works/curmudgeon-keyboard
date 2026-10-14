@@ -7,6 +7,7 @@ import androidx.test.core.app.ApplicationProvider
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
+import helium314.keyboard.latin.utils.LanguagePriority
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.settings.AppearanceDraft
 import helium314.keyboard.settings.AppearanceLooks
@@ -14,12 +15,24 @@ import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import java.util.Locale
+import android.os.Looper
+import helium314.keyboard.latin.R
+import helium314.keyboard.settings.preferences.BackupRestoreJob
+import helium314.keyboard.settings.preferences.restoreEverythingFrom
+import helium314.keyboard.settings.preferences.runRestore
+import helium314.keyboard.settings.preferences.settingsToJsonStream
+import helium314.keyboard.settings.preferences.startFactoryReset
+import java.io.File
+import java.io.FileOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /** The review of 2026-10-08 (0.3.007 to 0.3.010), fixed 2026-10-10: area 1 #4 and #5, area 2 #3. */
 @RunWith(RobolectricTestRunner::class)
@@ -86,5 +99,60 @@ class Review1010LearnTest {
         real.edit().apply { flags.forEach { putBoolean(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + it), true) } }.commit()
         KeyboardProfiles.disable(real, keyboard)
         for (flag in flags) assertTrue(real.getBoolean(flag, false), "$flag dropped: its move runs again")
+    }
+
+    // ---- area 2 #3: what the settings listener would have cleared stays stale after a restore or a reset ----
+
+    private val priorityKey = LanguagePriority.keys(Locale.US).first { LanguagePriority.isPriorityKey(it) }
+    private fun factor() = LanguagePriority.forSuggestions(Locale.US) { ctx.prefs() } // (cached once read)
+
+    @Suppress("UNCHECKED_CAST")
+    private fun pictureCache() = helium314.keyboard.latin.settings.Settings::class.java.getDeclaredField("sCachedBackgroundImages")
+        .apply { isAccessible = true }.get(null) as MutableMap<String, android.graphics.drawable.Drawable>
+    private fun typefaceLoaded() = helium314.keyboard.keyboard.KeyboardTypeface::class.java.getDeclaredField("customTypefaceLoaded")
+        .apply { isAccessible = true }
+    /** Caches as a keyboard in use leaves them: a picture shown, the key font looked up, the priorities read. */
+    private fun warmCaches(priority: Int) {
+        assertEquals(LanguagePriority.factor(priority), factor())
+        synchronized(pictureCache()) { pictureCache()["old picture"] = android.graphics.drawable.ColorDrawable() }
+        typefaceLoaded().setBoolean(helium314.keyboard.keyboard.KeyboardTypeface, true)
+    }
+    private fun assertCachesCleared(what: String, priority: Int) {
+        assertEquals(LanguagePriority.factor(priority), factor(), "$what: the old language priority stayed")
+        assertTrue(synchronized(pictureCache()) { pictureCache().isEmpty() }, "$what: the old background picture stayed")
+        assertFalse(typefaceLoaded().getBoolean(helium314.keyboard.keyboard.KeyboardTypeface), "$what: the old font stayed")
+    }
+
+    private fun idle(done: () -> Boolean) {
+        val until = System.currentTimeMillis() + 10_000
+        while (!done() && System.currentTimeMillis() < until) { shadowOf(Looper.getMainLooper()).idle(); Thread.sleep(10) }
+        shadowOf(Looper.getMainLooper()).idle()
+    }
+
+    @Test fun `a whole restore clears the caches of the settings it replaced`() {
+        val zip = File(ctx.cacheDir, "review1010.zip")
+        ZipOutputStream(FileOutputStream(zip)).use { out ->
+            out.putNextEntry(ZipEntry("preferences.json"))
+            settingsToJsonStream(mapOf<String?, Any?>(priorityKey to LanguagePriority.LOW), out)
+            out.closeEntry()
+        }
+        warmCaches(LanguagePriority.HIGH)
+        try {
+            assertTrue(runRestore(ctx, {}, R.string.backup_restored, 1) { restoreEverythingFrom(ctx, zip) })
+            idle { !BackupRestoreJob.isRunning }
+        } finally { zip.delete() }
+        assertEquals(LanguagePriority.LOW, real.getInt(priorityKey, 0), "not restored")
+        assertCachesCleared("restore", LanguagePriority.LOW)
+    }
+
+    @Test fun `a factory reset clears the caches of the settings it removed`() {
+        real.edit().putInt(priorityKey, LanguagePriority.LOW).commit()
+        warmCaches(LanguagePriority.LOW)
+        var done = false
+        startFactoryReset(ctx, keyboards = true, learnedWords = false, clipboard = false, custom = false) { done = true }
+        idle { done }
+        assertTrue(done, "the reset never ran")
+        assertFalse(real.contains(priorityKey), "not reset")
+        assertCachesCleared("reset", LanguagePriority.HIGH)
     }
 }

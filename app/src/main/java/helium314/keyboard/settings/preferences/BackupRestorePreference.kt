@@ -478,9 +478,23 @@ internal fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: In
     return true
 }
 
+/**
+ * What the settings listener clears on a change, cleared after a change made with it stopped (a restore, a factory
+ * reset): the language priorities read for suggestions (cleared there when the preferences are cleared), the background
+ * pictures shown and the fonts loaded (which also moves an old backup's font files into the font list now). Each path
+ * cleared its own part of it before (review 2026-10-08 area 2 #3: after a whole restore the old fonts, picture and
+ * language priorities stayed until a keyboard switch or restart).
+ */
+internal fun clearSettingsCaches() {
+    helium314.keyboard.latin.utils.LanguagePriority.clearCache()
+    Settings.clearCachedBackgroundImages()
+    helium314.keyboard.keyboard.KeyboardTypeface.clearCache()
+}
+
 /** What a restore changes, refreshed on the main thread: the keyboard's view of the settings and the open screens. */
 private fun restoreRefresh(ctx: Context) {
     LearnedStores.refresh(ctx.realPrefs()) // (the keyboard's learned words, as restored)
+    clearSettingsCaches()
     Settings.getInstance().startListener()
     SubtypeSettings.reloadEnabledSubtypes(ctx)
     val newDictBroadcast = Intent(DictionaryPackConstants.NEW_DICTIONARY_INTENT_ACTION)

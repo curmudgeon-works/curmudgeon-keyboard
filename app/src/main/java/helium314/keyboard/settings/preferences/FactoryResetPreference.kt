@@ -159,6 +159,7 @@ private fun factoryReset(ctx: Context, keyboards: Boolean, learnedWords: Boolean
         }
         LayoutUtilsCustom.onLayoutFileChanged()
     }
+    clearSettingsCaches() // (the fonts and language priorities too, ticked or not: review 2026-10-08 area 2 #3)
     Settings.getInstance().startListener()
     SubtypeSettings.reloadEnabledSubtypes(ctx)
     LayoutUtilsCustom.removeMissingLayouts(ctx)
