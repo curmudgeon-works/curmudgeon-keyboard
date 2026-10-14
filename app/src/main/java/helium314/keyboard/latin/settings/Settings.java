@@ -212,6 +212,8 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     // the settings event log (SettingsEventLog): its own switch since 2026-10-12 (before: PREF_SWIPE_METRICS)
     public static final String PREF_LOG_SETTINGS = "log_settings_changes";
     public static final String PREF_LEARNING_LOG = "learning_log";
+    // leaving a main settings screen (Back, or the app) keeps its changes, the Save button asks nothing (owner 2026-10-14)
+    public static final String PREF_LEAVING_KEEPS_CHANGES = "leaving_keeps_changes";
     // one pool of learned & blacklisted words for all keyboards, or one per keyboard (see LearnedStores)
     public static final String PREF_SHARE_LEARNED_WORDS = "share_learned_words";
     public static final String PREF_AUTO_PREVIEW_KEYBOARD = "auto_preview_keyboard";

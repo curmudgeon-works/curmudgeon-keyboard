@@ -269,6 +269,10 @@ class LayoutDraft private constructor(
          *  saved (owner 2026-10-11, S2: "yes let's keep saved subscreen changes"). */
         fun rejectOpen(ctx: Context) { active?.reject(ctx, keepSubScreenSaves = true) }
 
+        /** The app is left with the screen open and [leavingKeepsChanges] on: its changes are kept, as with Save (owner
+         *  2026-10-14). Customize popups' unsaved changes are undone before ([OpenEditors]). */
+        fun acceptOpen() { active?.accept() }
+
         /** [LayoutDraft.subScreenOpened] of the running draft, if there is one. */
         fun subScreenOpenedOpen(ctx: Context) { active?.subScreenOpened(ctx) }
 

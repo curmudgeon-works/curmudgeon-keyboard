@@ -108,6 +108,8 @@ class SubScreenSaveRealPathTest {
     @Before fun setUp() {
         settingsBefore = loadedSettings.get(Settings.getInstance())
         real.edit().clear()
+            // (Back asks, leaving the app undoes: the tests below of "Leaving a screen keeps your changes" turn it on)
+            .putBoolean(Settings.PREF_LEAVING_KEEPS_CHANGES, false)
             .putBoolean("separate_settings_per_keyboard", true)
             .putString(Settings.PREF_SELECTED_SUBTYPE, kb1.toPref())
             .putString(own(2, AppearanceLooks.PREF_SELECTED), "Sunset")
@@ -594,6 +596,125 @@ class SubScreenSaveRealPathTest {
         leaveApp()
         assertFalse(real.contains(own(1, KeyPopupOverrides.PREF)))
         assertEquals(listOf("Mine"), KeyPopupOverrides.loadSets(real).map { it.name })
+    }
+
+    // "Leaving a screen keeps your changes" on (owner 2026-10-14: "can it be only for main screen? Sub-items should
+    // still discard as per usual?", "don't prompt when hitting back, instead just save?", and for the Save button
+    // "agree with 1, that's a good idea"): the main screens keep their changes when left, Save asks nothing, Discard
+    // still asks; an editor opened from one keeps its own questions, and leaving the app undoes its unsaved changes.
+    // Fail before: no such switch (the main screens asked, and leaving the app undid their changes)
+    private fun leavingKeeps() { real.edit().putBoolean(Settings.PREF_LEAVING_KEEPS_CHANGES, true).commit() }
+
+    @Test fun `switch on - Appearance's change, then the app left - kept`() {
+        leavingKeeps()
+        appearance()
+        deleteSunsetOnAppearance()
+        leaveApp()
+        assertEquals(emptyList(), AppearanceLooks.load(real)) // the delete kept
+        assertFalse(real.getString(own(2, AppearanceLooks.PREF_SELECTED), null) == "Sunset")
+        assertEquals(null, AppearanceDraft.activeOrNull())
+    }
+
+    @Test fun `switch on - Appearance's Back keeps the change without asking, its tick saves without asking, Discard still asks`() {
+        leavingKeeps()
+        appearance()
+        deleteSunsetOnAppearance()
+        clickIcon(ctx.getString(R.string.appearance_reject))
+        shows(ctx.getString(R.string.appearance_reject_title)) // Discard asks
+        click(ctx.getString(R.string.appearance_keep_working))
+        clickIcon(ctx.getString(R.string.appearance_accept))
+        compose.onNodeWithText(ctx.getString(R.string.appearance_accept_title)).assertDoesNotExist() // Save doesn't
+        assertFalse(AppearanceDraft.activeOrNull()!!.hasChanges(ctx)) // (kept: the new starting point)
+        assertEquals(emptyList(), AppearanceLooks.load(real))
+        // Back with a change: kept, no question
+        AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Dusk", mapOf(Settings.PREF_THEME_COLORS to "Warm"))), now = true)
+        scenario!!.onActivity { it.prefChanged() }; idle()
+        assertTrue(AppearanceDraft.activeOrNull()!!.hasChanges(ctx))
+        systemBack()
+        compose.onNodeWithText(unsavedTitle).assertDoesNotExist()
+        assertEquals(null, AppearanceDraft.activeOrNull())
+        assertEquals(listOf("Dusk"), AppearanceLooks.load(real).map { it.name })
+    }
+
+    @Test fun `switch on - Layout and Typing's Back keeps the change without asking`() {
+        leavingKeeps()
+        layoutSetup()
+        layout { back -> CustomizePopupsScreen(kb1, back) }
+        deleteMineOnLayout()
+        systemBack()
+        compose.onNodeWithText(unsavedTitle).assertDoesNotExist()
+        assertFalse(LayoutDraft.isOpen())
+        assertEquals(emptyList(), KeyPopupOverrides.loadSets(real))
+    }
+
+    @Test fun `switch on - palette editor edited but not saved, then the app left - its edit undone, Appearance's change kept`() {
+        leavingKeeps()
+        appearance()
+        deleteSunsetOnAppearance() // the main screen's change
+        screen = SUB; idle()
+        editWarm() // the editor's, not saved
+        leaveApp()
+        assertEquals(before, ctx.prefs().getString(Settings.PREF_USER_COLORS_PREFIX + "Warm", null)) // the edit undone
+        assertEquals(emptyList(), AppearanceLooks.load(real)) // the delete kept
+        assertEquals(null, AppearanceDraft.activeOrNull())
+    }
+
+    @Test fun `switch off - palette editor edited but not saved, then the app left - all undone`() {
+        appearance()
+        deleteSunsetOnAppearance()
+        screen = SUB; idle()
+        editWarm()
+        leaveApp()
+        assertEquals(before, ctx.prefs().getString(Settings.PREF_USER_COLORS_PREFIX + "Warm", null))
+        assertEquals(listOf("Sunset"), AppearanceLooks.load(real).map { it.name })
+        assertEquals("Sunset", real.getString(own(2, AppearanceLooks.PREF_SELECTED), null))
+    }
+
+    @Test fun `switch on - palette editor saved, then the app left - all kept`() {
+        leavingKeeps()
+        appearance()
+        deleteSunsetOnAppearance()
+        screen = SUB; idle()
+        editWarm()
+        val edit = ctx.prefs().getString(Settings.PREF_USER_COLORS_PREFIX + "Warm", null)
+        arrowBack()
+        shows(unsavedTitle) // (the editor still asks)
+        click(ctx.getString(R.string.save_and_exit))
+        click(ctx.getString(R.string.save)) // (switched-off keyboard 2 uses Warm too: asked)
+        assertEquals(PARENT, screen)
+        leaveApp()
+        assertEquals(edit, ctx.prefs().getString(Settings.PREF_USER_COLORS_PREFIX + "Warm", null))
+        assertEquals(emptyList(), AppearanceLooks.load(real))
+    }
+
+    @Test fun `switch on - Customize popups edited but not saved, then the app left - its edit undone, the parent's set delete kept`() {
+        leavingKeeps()
+        layoutSetup()
+        layout { back -> CustomizePopupsScreen(kb1, back) }
+        deleteMineOnLayout() // the main screen's change
+        screen = SUB; idle()
+        editKeyP() // the editor's, not saved
+        leaveApp()
+        assertFalse(real.contains(own(1, KeyPopupOverrides.PREF))) // the edit undone
+        assertEquals(emptyList(), KeyPopupOverrides.loadSets(real)) // the delete kept
+        assertFalse(LayoutDraft.isOpen())
+    }
+
+    @Test fun `switch on - Customize popups saved, then edited again, then the app left - the saved edit stays, the later one is undone`() {
+        leavingKeeps()
+        layoutSetup()
+        layout { back -> CustomizePopupsScreen(kb1, back) }
+        deleteMineOnLayout()
+        screen = SUB; idle()
+        editKeyP()
+        clickIcon(ctx.getString(R.string.appearance_accept))
+        click(ctx.getString(R.string.appearance_accept_all)) // (the editor's Save still asks)
+        val saved = real.getString(own(1, KeyPopupOverrides.PREF), null)
+        compose.onNode(isToggleable()).performClick(); idle() // the popup on again: not saved
+        assertTrue(real.getString(own(1, KeyPopupOverrides.PREF), null) != saved)
+        leaveApp()
+        assertEquals(saved, real.getString(own(1, KeyPopupOverrides.PREF), null))
+        assertEquals(emptyList(), KeyPopupOverrides.loadSets(real))
     }
 
     companion object {

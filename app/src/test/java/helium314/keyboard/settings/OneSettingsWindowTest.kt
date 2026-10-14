@@ -84,6 +84,7 @@ class OneSettingsWindowTest {
     // fail before: onStop skipped the drafts (a file picker in front) and onDestroy didn't look at them: the draft stayed
     // running with its change, and the next screen's draft was this one
     @Test fun `a window closed while its file picker was in front leaves its open edit`() {
+        real.edit().putBoolean(Settings.PREF_LEAVING_KEEPS_CHANGES, false).commit() // (leaving undoes: seen in the value)
         window().use { scenario ->
             changeWithDraftOpen()
             @Suppress("DEPRECATION")
@@ -93,6 +94,20 @@ class OneSettingsWindowTest {
             scenario.moveToState(Lifecycle.State.DESTROYED) // closed (e.g. by the settings key's new window)
             assertFalse(PrefsDraft.anyOpen(), "the closed window's draft still running")
             assertEquals(true, ctx.prefs().getBoolean(key, true), "its change wasn't undone")
+        }
+    }
+
+    // the same with "Leaving a screen keeps your changes" on (the default): the change is kept, the draft gone
+    @Test fun `a window closed while its file picker was in front keeps its open edit with the switch on`() {
+        window().use { scenario ->
+            changeWithDraftOpen()
+            @Suppress("DEPRECATION")
+            scenario.onActivity { it.startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).setType("*/*"), 1) }
+            scenario.moveToState(Lifecycle.State.CREATED)
+            assertTrue(PrefsDraft.anyOpen())
+            scenario.moveToState(Lifecycle.State.DESTROYED)
+            assertFalse(PrefsDraft.anyOpen(), "the closed window's draft still running")
+            assertEquals(false, ctx.prefs().getBoolean(key, true), "its change wasn't kept")
         }
     }
 

@@ -96,6 +96,9 @@ fun AdvancedSettingsScreen(
         Settings.PREF_SAVE_SUBTYPE_PER_APP, // which keyboard comes up in an app (moved from Layout & Typing)
         // what saved Layouts, themes and popup sets do with settings saved at their default (2026-10-11)
         helium314.keyboard.settings.SavedItemDefaults.PREF,
+        // Back, Save and leaving the app keep a main screen's changes without asking (owner 2026-10-14: "yes, do add
+        // switch. App starts with switcch on yes. Advanced only."); beside the other saving rows
+        Settings.PREF_LEAVING_KEEPS_CHANGES,
         SettingsWithoutKey.HOW_SAVING_WORKS, // what each action does to each kind of thing, read only (2026-10-11)
         SettingsWithoutKey.BACKUP_RESTORE,
         SettingsWithoutKey.FACTORY_RESET,
@@ -124,10 +127,14 @@ fun AdvancedSettingsScreen(
         onClickBack = onClickBack,
         title = stringResource(R.string.settings_screen_advanced),
         settings = items,
-        // (no simple set: everything in it shows, untinted; its entry on the main screen shows in simple mode too since
-        // 2026-10-06)
+        // everything in it shows, untinted (its entry on the main screen shows in simple mode too since 2026-10-06), but
+        // the switch for leaving a screen: advanced only (owner 2026-10-14)
+        simpleModeKeys = items.filterIsInstance<String>().toSet() - advancedOnlyAppSettings,
     )
 }
+
+/** The App settings shown only in advanced mode. */
+internal val advancedOnlyAppSettings = setOf(Settings.PREF_LEAVING_KEEPS_CHANGES)
 
 @SuppressLint("ApplySharedPref")
 fun createAdvancedSettings(context: Context) = listOf(
@@ -144,6 +151,12 @@ fun createAdvancedSettings(context: Context) = listOf(
             description = stringResource(if (on) R.string.saved_items_take_new_defaults_on else R.string.saved_items_take_new_defaults_off),
         ) { on = it; explain = true; helium314.keyboard.settings.SavedItemDefaults.applySwitch(ctx, ctx.realPrefs(), it) }
         if (explain) helium314.keyboard.settings.dialogs.InfoDialog(stringResource(R.string.saved_items_take_new_defaults_when)) { explain = false }
+    },
+    // owner 2026-10-14: on, Back and leaving the app keep a main screen's changes (Appearance, Layout & typing, the
+    // screens with a Save and Discard of their own preferences) and Save asks nothing; Discard still asks, and the
+    // editors opened from them (palettes, layout files, popups) keep their own Save, Discard and Back question
+    Setting(context, Settings.PREF_LEAVING_KEEPS_CHANGES, R.string.leaving_keeps_changes, R.string.leaving_keeps_changes_summary) {
+        SwitchPreference(it, Defaults.PREF_LEAVING_KEEPS_CHANGES)
     },
     Setting(context, Settings.PREF_ALWAYS_INCOGNITO_MODE,
         R.string.prefs_force_incognito_mode_summary) // "Disable learning of new words" as the title, no subtext

@@ -976,6 +976,9 @@
     <string name="saved_items_take_new_defaults_on">Settings left at their default in saved Layouts, themes and popup sets take the latest defaults</string>
     <string name="saved_items_take_new_defaults_off">Saved Layouts, themes and popup sets apply every setting as saved, even after an update changes a default</string>
     <string name="saved_items_take_new_defaults_when">Applied now to the keyboards using your saved Layouts, themes and popup sets.</string>
+    <!-- App settings switch (advanced): Back, Save and leaving the app keep a screen's changes without asking -->
+    <string name="leaving_keeps_changes">Leaving a screen keeps your changes</string>
+    <string name="leaving_keeps_changes_summary">Off: leaving asks, or undoes unsaved changes</string>
     <!-- Title of the setting to show key hints -->
     <string name="show_hints">Hide symbols on keys</string>
     <!-- Description of the settings to show hints -->

@@ -224,8 +224,8 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
 
     override fun onStop() {
         prefs.unregisterOnSharedPreferenceChangeListener(this)
-        // leaving the app with Appearance open undoes its changes that weren't kept; a file picker we opened
-        // (background image, font) and rotating don't count
+        // leaving the app with Appearance open undoes its changes that weren't kept (or keeps them, see
+        // leaveOpenEdits); a file picker we opened (background image, font) and rotating don't count
         if (!isChangingConfigurations) { if (awaitingResult) editsLeftOpen = true else leaveOpenEdits() }
         super.onStop()
     }
@@ -236,11 +236,18 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
         // screen took them over, Layout & typing even for another keyboard). Only when its onStop left them running: a
         // window already left has none of its own, and a draft running now is another window's
         if (!isChangingConfigurations && editsLeftOpen) { editsLeftOpen = false; leaveOpenEdits() }
+        OpenEditors.forget(this)
         super.onDestroy()
     }
 
-    /** The settings are left with a Save/Discard edit open: its changes that weren't kept are undone. */
-    private fun leaveOpenEdits() { AppearanceDraft.rejectOpen(this); LayoutDraft.rejectOpen(this); PrefsDraft.rejectOpen(this) }
+    /** The settings are left with a Save/Discard edit open: an editor opened from a main screen undoes its unsaved
+     *  changes; the main screens' changes are kept with "Leaving a screen keeps your changes" on (owner 2026-10-14),
+     *  else undone. */
+    private fun leaveOpenEdits() {
+        OpenEditors.undoUnsaved() // (first: a main screen's undo or keep then covers what the editor put back)
+        if (leavingKeepsChanges(this)) { AppearanceDraft.acceptOpen(this); LayoutDraft.acceptOpen(); PrefsDraft.acceptOpen() }
+        else { AppearanceDraft.rejectOpen(this); LayoutDraft.rejectOpen(this); PrefsDraft.rejectOpen(this) }
+    }
 
     // an activity we started for a result (file pickers) is in front: this isn't leaving the app
     private var awaitingResult = false

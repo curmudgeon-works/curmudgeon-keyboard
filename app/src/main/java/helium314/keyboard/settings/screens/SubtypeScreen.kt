@@ -272,8 +272,15 @@ fun SubtypeScreen(
     DisposableEffect(Unit) { onDispose { (ctx.getActivity() as? SettingsActivity)?.touchPassFromY = Int.MAX_VALUE } }
     // (the named ones, and this keyboard's own unnamed copy of a deleted one)
     val customMainLayouts = LayoutUtilsCustom.listedLayoutNames(LayoutType.MAIN, ctx, currentSubtype.locale, currentSubtype.mainLayoutName())
-    // checked when leaving (the top bar's arrow may hold an older copy of this function)
-    fun leave() { if (draft.hasChanges(ctx)) askOnLeave = true else { LayoutDraft.close(); onClickBack() } }
+    // checked when leaving (the top bar's arrow may hold an older copy of this function); with "Leaving a screen keeps
+    // your changes" on, kept without asking (owner 2026-10-14: "don't prompt when hitting back, instead just save?")
+    fun leave() {
+        if (!draft.hasChanges(ctx)) { LayoutDraft.close(); onClickBack() }
+        else if (helium314.keyboard.settings.leavingKeepsChanges(ctx)) { draft.accept(); onClickBack() }
+        else askOnLeave = true
+    }
+    // the tick: with the switch on, kept without asking (owner 2026-10-14, "agree with 1, that's a good idea")
+    fun save() { draft.accept(); draft = LayoutDraft.of(ctx, currentSubtypeString) }
     fun discardChanges() {
         draft.reject(ctx)
         LayoutDraft.takeRejectedSubtype() // (handled right here)
@@ -282,7 +289,7 @@ fun SubtypeScreen(
         if (RichInputMethodManager.isInitialized())
             KeyboardSwitcher.getInstance().switchToSubtype(draft.subtype.toSettingsSubtype().toAdditionalSubtype())
     }
-    // back in the app after leaving it (the changes were undone then): a new snapshot of what is there now
+    // back in the app after leaving it (the changes were kept or undone then): a new snapshot of what is there now
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
@@ -298,7 +305,7 @@ fun SubtypeScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     if (askReject) DiscardChangesDialog({ askReject = false }, savedSubScreenNames(ctx, draft.savedSubScreens())) { discardChanges(); draft = LayoutDraft.of(ctx, currentSubtypeString) }
-    if (askAccept) SaveChangesDialog({ askAccept = false }) { draft.accept(); draft = LayoutDraft.of(ctx, currentSubtypeString) }
+    if (askAccept) SaveChangesDialog({ askAccept = false }) { save() }
     if (askDelete) DeleteKeyboardDialog(currentSubtype, onDismissRequest = { askDelete = false }) { mergeInto ->
         askDelete = false
         LayoutDraft.close() // deleting keeps the changes so far: a Discard mustn't bring the keyboard back
@@ -320,7 +327,7 @@ fun SubtypeScreen(
         leadingActions = {
             if (changed) {
                 IconButton({ askReject = true }) { Icon(painterResource(R.drawable.ic_close), stringResource(R.string.appearance_reject)) }
-                IconButton({ askAccept = true }) { Icon(painterResource(R.drawable.ic_check), stringResource(R.string.appearance_accept)) }
+                IconButton({ if (helium314.keyboard.settings.leavingKeepsChanges(ctx)) save() else askAccept = true }) { Icon(painterResource(R.drawable.ic_check), stringResource(R.string.appearance_accept)) }
             }
         },
         // asks first, as the keyboard list does (2026-10-10: its learned and blacklisted words go with it now); right of

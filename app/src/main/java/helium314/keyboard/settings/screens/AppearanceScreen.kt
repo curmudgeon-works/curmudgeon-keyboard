@@ -235,9 +235,16 @@ fun AppearanceScreen(
         }
     }
     // checked when leaving, not taken from this composition: the top bar's back arrow can hold an older copy of this
-    // function (from before the first change), and the back gesture and the arrow must both ask
-    fun leave() { if (draft.hasChanges(ctx)) askOnLeave = true else { AppearanceDraft.close(); onClickBack() } }
-    // back in the app after leaving it (the changes were undone then): a new snapshot of what is there now
+    // function (from before the first change), and the back gesture and the arrow must both ask. With "Leaving a screen
+    // keeps your changes" on, kept without asking (owner 2026-10-14: "don't prompt when hitting back, instead just save?")
+    fun leave() {
+        if (!draft.hasChanges(ctx)) { AppearanceDraft.close(); onClickBack() }
+        else if (helium314.keyboard.settings.leavingKeepsChanges(ctx)) { draft.accept(ctx); onClickBack() }
+        else askOnLeave = true
+    }
+    // the tick: with the switch on, kept without asking (owner 2026-10-14, "agree with 1, that's a good idea")
+    fun save() { draft.accept(ctx); draft = AppearanceDraft.of(ctx) }
+    // back in the app after leaving it (the changes were kept or undone then): a new snapshot of what is there now
     val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
@@ -263,7 +270,7 @@ fun AppearanceScreen(
         topActions = {
             if (changed) {
                 IconButton({ askReject = true }) { Icon(painterResource(R.drawable.ic_close), stringResource(R.string.appearance_reject)) }
-                IconButton({ askAccept = true }) { Icon(painterResource(R.drawable.ic_check), stringResource(R.string.appearance_accept)) }
+                IconButton({ if (helium314.keyboard.settings.leavingKeepsChanges(ctx)) save() else askAccept = true }) { Icon(painterResource(R.drawable.ic_check), stringResource(R.string.appearance_accept)) }
             }
         },
         bottomBar = { Box(Modifier.onGloballyPositioned {
@@ -277,7 +284,7 @@ fun AppearanceScreen(
         isPending = { tile -> tileChanged(tile, pendingKeys, pendingFiles) },
     )
     if (askReject) DiscardChangesDialog({ askReject = false }, appearanceAlsoUndoes(ctx, draft)) { draft.reject(ctx); draft = AppearanceDraft.of(ctx) }
-    if (askAccept) SaveChangesDialog({ askAccept = false }) { draft.accept(ctx); draft = AppearanceDraft.of(ctx) }
+    if (askAccept) SaveChangesDialog({ askAccept = false }) { save() }
     }
     if (askOnLeave) UnsavedChangesDialog(
         onKeepWorking = { askOnLeave = false },

@@ -335,6 +335,10 @@ class AppearanceDraft private constructor(
          *  but not what the palette editor saved (owner 2026-10-11, S2: "yes let's keep saved subscreen changes"). */
         fun rejectOpen(ctx: Context) { active?.reject(ctx, keepSubScreenSaves = true) }
 
+        /** The app is left with the screen open and [leavingKeepsChanges] on: its changes are kept, as with Save (owner
+         *  2026-10-14). The palette editor's unsaved changes are undone before ([OpenEditors]). */
+        fun acceptOpen(ctx: Context) { active?.accept(ctx) }
+
         private fun start(ctx: Context): AppearanceDraft {
             val dir = dir(ctx).apply { deleteRecursively(); mkdirs() }
             val setId = PrefsDraft.currentSetId(ctx)
