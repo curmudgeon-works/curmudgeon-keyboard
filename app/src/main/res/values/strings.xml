@@ -672,7 +672,7 @@
     <!-- the restore: the phone has keyboards of a chosen backup keyboard's language (owner 2026-10-11: restore matches by
          language and asks). The app can't tell which one is newer: never say newer or older. %s: the backup keyboard's name -->
     <string name="restore_merge_title">Restoring %s</string>
-    <string name="restore_merge_message">This phone has a keyboard of the same language. Merge the backup\'s keyboard into one of them, or keep it as a separate keyboard?</string>
+    <string name="restore_merge_message">This device has a keyboard of the same language. Merge the backup\'s keyboard into one of them, or keep it as a separate keyboard?</string>
     <string name="restore_keep_separate">Keep as a separate keyboard</string>
     <!-- after a phone keyboard on the restore's first question: it has the backup keyboard's id (a hint, nothing preselected) -->
     <string name="restore_same_keyboard_hint">(same keyboard as in the backup)</string>
@@ -682,9 +682,9 @@
     <!-- what to merge: %s the phone keyboard's name -->
     <string name="restore_differs_choose">What to merge into %s</string>
     <!-- what to merge: the backup keyboard's learned and blacklisted words, both, one row as the restore brings them -->
-    <string name="restore_learned_row">Learned &amp; blacklisted words (added to this phone\'s)</string>
+    <string name="restore_learned_row">Learned &amp; blacklisted words (added to this device\'s)</string>
     <!-- %s: the phone keyboard's name -->
-    <string name="restore_nothing_differs">Nothing differs: %s on this phone is the same as the backup\'s.</string>
+    <string name="restore_nothing_differs">Nothing differs: %s on this device is the same as the backup\'s.</string>
     <!-- nothing ticked; %s: the backup keyboard's name -->
     <string name="restore_nothing_ticked">Nothing to restore: %s will not be restored from the backup.</string>
     <string name="restore_dont_restore">Don\'t restore</string>
@@ -716,13 +716,13 @@
     </plurals>
     <!-- after a restore of the first keyboard while its settings are the common ones: %s the keyboard -->
     <string name="restore_settings_main">%s\'s settings were restored. All keyboards use them, as they\'re the common settings.</string>
-    <string name="restore_differs_choose_message">A ticked item takes the backup\'s. An unticked item keeps this phone\'s.</string>
+    <string name="restore_differs_choose_message">A ticked item takes the backup\'s. An unticked item keeps this device\'s.</string>
     <!-- what to merge, while something is ticked (owner 2026-10-11) -->
     <string name="restore_replaces_settings">Selected items replace this keyboard\'s settings, including any unsaved changes.</string>
     <!-- a row of "What to merge": %1$s what it is, %2$s this phone's value, %3$s the backup's -->
-    <string name="restore_differs_row">%1$s: this phone %2$s, backup %3$s</string>
+    <string name="restore_differs_row">%1$s: this device %2$s, backup %3$s</string>
     <!-- a row whose two values can't be shown apart in words -->
-    <string name="restore_differs_plain">%s: this phone and the backup differ</string>
+    <string name="restore_differs_plain">%s: this device and the backup differ</string>
     <!-- a row for a menu whose settings differ: %s the menu -->
     <string name="restore_differs_menu">%s settings</string>
     <string name="restore_part_keys">Keys</string>
