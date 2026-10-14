@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -218,14 +219,67 @@ private fun PicturePickerDialog(onDismiss: () -> Unit, onGallery: () -> Unit, on
         },
     )
     toForget?.let { picture ->
-        val themes = helium314.keyboard.settings.AppearanceLooks.looksUsingPicture(ctx.prefs(), picture.name)
-        ConfirmationDialog(
-            onDismissRequest = { toForget = null },
-            onConfirmed = { PictureLibrary.remove(picture); toForget = null; generation++ },
-            content = { Text(stringResource(R.string.background_picture_forget) +
-                if (themes > 0) " " + pluralStringResource(R.plurals.background_picture_forget_themes, themes, themes) else "") },
-        )
+        DeletePictureDialog(picture, onDismiss = { toForget = null }, onDeleted = { toForget = null; generation++ })
     }
+}
+
+/**
+ * A picture long-pressed in "Choose a picture": delete it from the list (2026-10-12, mockup "Picture Remove Question").
+ * The saved themes naming it are named; they keep it (each its own copy, made now) or lose it (their slot emptied).
+ * Keyboards keep their own copy either way. Buttons Cancel left, as everywhere.
+ */
+@Composable
+private fun DeletePictureDialog(picture: File, onDismiss: () -> Unit, onDeleted: () -> Unit) {
+    val ctx = LocalContext.current
+    val themes = remember(picture) { AppearanceLooks.namesUsingPicture(ctx.prefs(), picture.name) }
+    val thumb by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, picture) {
+        value = withContext(Dispatchers.IO) {
+            runCatching<androidx.compose.ui.graphics.ImageBitmap?> { PictureFraming.decode(picture, 300)?.asImageBitmap() }.getOrNull()
+        }
+    }
+    fun delete(keepInThemes: Boolean) {
+        AppearanceLooks.deleteFromList(ctx, picture, keepInThemes)
+        onDeleted()
+    }
+    ThreeButtonAlertDialog(
+        onDismissRequest = onDismiss,
+        onConfirmed = { },
+        confirmButtonText = null, // (the buttons are the content's last row: Cancel first, then the two deletes)
+        cancelButtonText = "",
+        title = { Text(stringResource(R.string.background_picture_delete_title)) },
+        content = {
+            Column {
+                Text(stringResource(R.string.background_picture_delete_gallery), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))
+                Box(Modifier.padding(bottom = 8.dp).width(72.dp).aspectRatio(1.5f)
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))) {
+                    thumb?.let {
+                        androidx.compose.foundation.Image(it, null, contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            modifier = Modifier.matchParentSize().clip(RoundedCornerShape(6.dp)))
+                    }
+                }
+                Text(stringResource(R.string.background_picture_delete_keyboards), Modifier.padding(bottom = 8.dp))
+                if (themes.isNotEmpty())
+                    Text(pluralStringResource(R.plurals.background_picture_delete_themes, themes.size, namesInSentence(ctx, themes)))
+                androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
+                    if (themes.isEmpty()) {
+                        TextButton(onClick = { delete(keepInThemes = false) }) { Text(stringResource(R.string.delete)) }
+                    } else {
+                        TextButton(onClick = { delete(keepInThemes = true) }) { Text(stringResource(R.string.background_picture_delete_keep)) }
+                        TextButton(onClick = { delete(keepInThemes = false) }) { Text(stringResource(R.string.background_picture_delete_from_themes)) }
+                    }
+                }
+            }
+        },
+    )
+}
+
+/** Names in a sentence: "Sunset", "Sunset and Dusk", "Sunset, Dusk and Work", beyond three "Sunset, Dusk, Work and 2 more". */
+internal fun namesInSentence(ctx: Context, names: List<String>): String = when {
+    names.size <= 1 -> names.firstOrNull().orEmpty()
+    names.size <= 3 -> ctx.getString(R.string.names_last_two, names.dropLast(1).joinToString(", "), names.last())
+    else -> ctx.getString(R.string.names_and_more, names.take(3).joinToString(", "), names.size - 3)
 }
 
 /**

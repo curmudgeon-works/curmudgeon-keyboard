@@ -235,7 +235,9 @@ fun ThreeButtonAlertDialog(
                                 ) { Text(confirmButtonText) }
                         }
                         if (confirmFirst) confirm()
-                        TextButton(onClick = onCancel ?: onDismissRequest) { Text(cancelButtonText) }
+                        // (no text: no button, e.g. a dialog whose content has its own row of buttons)
+                        if (cancelButtonText.isNotEmpty())
+                            TextButton(onClick = onCancel ?: onDismissRequest) { Text(cancelButtonText) }
                         if (!confirmFirst) confirm()
                     }
                 }

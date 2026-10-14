@@ -171,9 +171,74 @@ object AppearanceLooks {
         done.forEach { it.deleteRecursively() }
     }
 
-    /** How many saved looks name library picture [name]: the library's "forget" warns with it. */
-    fun looksUsingPicture(prefs: SharedPreferences, name: String): Int = load(prefs).count { look ->
-        (look.values[PICTURES] as? String)?.let { refsOf(it) }?.let { o -> o.keys().asSequence().any { o.getJSONObject(it).optString("p") == name } } == true
+    /** How many saved looks name library picture [name]. */
+    fun looksUsingPicture(prefs: SharedPreferences, name: String): Int = namesUsingPicture(prefs, name).size
+
+    /** The saved looks naming library picture [name], by name: the picture list's delete question names them (2026-10-12). */
+    fun namesUsingPicture(prefs: SharedPreferences, name: String): List<String> = load(prefs).filter { usesPicture(it, name) }.map { it.name }
+
+    private fun usesPicture(look: Look, name: String): Boolean =
+        (look.values[PICTURES] as? String)?.let { refsOf(it) }?.let { o -> o.keys().asSequence().any { o.optJSONObject(it)?.optString("p") == name } } == true
+
+    // ---- a picture a saved theme owns (2026-10-12): a slot {"t": file name in [ownedDir]} in place of the library's
+    // {"p": …}. Made only when a picture leaves the list and the themes using it keep it (owner: "let's do only when
+    // needed for the sake of space"): each such theme gets its own copy then. Applying the theme copies it into the
+    // keyboard's own picture file, as with a library picture. In the looks folder, so a backup carries it (looks/x/y).
+    private const val OWN = "own" // (saved looks name a uuid folder or the library; [HELD] is the list's Cancel)
+    private fun ownedDir(ctx: Context) = picturesDir(ctx, OWN)
+
+    /** The file a look's [slot] takes its picture from: its own copy, or the library's. */
+    private fun sourceOf(ctx: Context, slot: JSONObject): java.io.File =
+        if (slot.has("t")) java.io.File(ownedDir(ctx), slot.optString("t")) else PictureLibrary.file(ctx, slot.optString("p"))
+
+    /**
+     * Library picture [picture] leaves the list (the delete question of "Choose a picture"). The saved looks naming it:
+     * [keepInThemes] each gets its own copy of it, made now (one per look, shared by its slots naming it); otherwise
+     * their slots naming it are emptied, nothing of the picture left (a look with no slot left has no pictures).
+     * The keyboards' own pictures are never touched. False (nothing changed) if a copy couldn't be made.
+     */
+    fun deleteFromList(ctx: Context, picture: java.io.File, keepInThemes: Boolean): Boolean {
+        val prefs = ctx.prefs()
+        val name = picture.name
+        val looks = load(prefs)
+        val made = ArrayList<java.io.File>()
+        var failed = false
+        val changed = looks.map { look ->
+            if (failed || !usesPicture(look, name)) return@map look
+            val refs = refsOf(look.values[PICTURES] as String) ?: return@map look
+            var own: String? = null
+            for (key in refs.keys().asSequence().toList()) {
+                val slot = refs.optJSONObject(key) ?: continue
+                if (slot.optString("p") != name) continue
+                if (!keepInThemes) { refs.remove(key); continue }
+                if (own == null) {
+                    val target = java.io.File(ownedDir(ctx).apply { mkdirs() }, java.util.UUID.randomUUID().toString())
+                    if (!picture.isFile || runCatching { picture.copyTo(target) }.isFailure) { failed = true; return@map look }
+                    made.add(target)
+                    own = target.name
+                }
+                slot.remove("p")
+                slot.put("t", own)
+            }
+            Look(look.name, look.values + (PICTURES to if (refs.length() == 0) NO_PICTURES else LIB + refs.toString()), look.remembered)
+        }
+        if (failed) { made.forEach { it.delete() }; return false }
+        // the looks naming their copies are on disk before the library's picture goes (as in [migratePictureFolders])
+        if (changed != looks) save(prefs, changed, now = true)
+        PictureLibrary.remove(picture)
+        return true
+    }
+
+    /** The looks' own pictures ([ownedDir]) no saved look names any more (a theme deleted or saved again since):
+     *  removed at app start, once a crashed Appearance screen's changes are undone (a Discard can bring a deleted
+     *  theme back, so not at once). */
+    fun pruneOwnedPictures(ctx: Context, prefs: SharedPreferences) {
+        val files = ownedDir(ctx).listFiles()?.takeIf { it.isNotEmpty() } ?: return
+        val named = load(prefs).flatMap { look ->
+            val refs = (look.values[PICTURES] as? String)?.let { refsOf(it) } ?: return@flatMap emptyList()
+            refs.keys().asSequence().mapNotNull { k -> refs.optJSONObject(k)?.optString("t")?.takeIf { it.isNotEmpty() } }.toList()
+        }.toSet()
+        files.filter { it.name !in named }.forEach { it.delete() }
     }
 
     /** The look's pictures become the background ones (a built-in look: none); a look saved before pictures were
@@ -187,8 +252,8 @@ object AppearanceLooks {
                 val slot = refs[slotOf(live.name)]
                 val framing = PictureFraming.fileFor(live)
                 if (slot == null) { live.delete(); framing.delete(); continue }
-                val source = PictureLibrary.file(ctx, slot.optString("p"))
-                if (!source.isFile) continue // forgotten from the library: this slot stays as it is
+                val source = sourceOf(ctx, slot) // (the theme's own copy, or the library's)
+                if (!source.isFile) continue // forgotten from the library (before 2026-10-12): this slot stays as it is
                 source.copyTo(live, overwrite = true)
                 if (slot.has("f")) framing.writeText(slot.getString("f")) else framing.delete()
             }
@@ -218,7 +283,7 @@ object AppearanceLooks {
         refsOf(id)?.let { slotsOf(it) }?.let { refs ->
             val saved = HashMap<String, Any>()
             for ((slot, o) in refs) {
-                val lib = PictureLibrary.file(ctx, o.optString("p"))
+                val lib = sourceOf(ctx, o)
                 saved[slot] = if (lib.isFile) lib.length() else -1L
                 if (o.has("f")) saved["$slot.framing"] = o.getString("f")
             }

@@ -1265,12 +1265,21 @@ language, hence "No language". -->
     <string name="background_picture_other">Other picture</string>
     <string name="background_picture_choose">Choose a picture</string>
     <string name="background_picture_gallery">From gallery</string>
-    <string name="background_picture_forget">Remove this picture from the list? Keyboards that use it keep it.</string>
     <string name="background_picture_remove">Remove</string>
-    <plurals name="background_picture_forget_themes">
-        <item quantity="one">%d saved theme uses it and will leave the background as it is.</item>
-        <item quantity="other">%d saved themes use it and will leave the background as it is.</item>
+    <!-- "Choose a picture", a picture long-pressed: the question deleting it from the app's picture list -->
+    <string name="background_picture_delete_title">Delete this picture from the list?</string>
+    <string name="background_picture_delete_gallery">Your gallery isn\'t changed.</string>
+    <string name="background_picture_delete_keyboards">Keyboards that use it keep their own copy.</string>
+    <!-- %s = the saved themes' names, e.g. "Sunset and Dusk" or "Sunset, Dusk, Work and 2 more" -->
+    <plurals name="background_picture_delete_themes">
+        <item quantity="one">Saved theme %s uses it too.</item>
+        <item quantity="other">Saved themes %s use it too.</item>
     </plurals>
+    <!-- names in a sentence: the last two ("Dusk and Work"); the first three of more ("Sunset, Dusk, Work and 2 more") -->
+    <string name="names_last_two">%1$s and %2$s</string>
+    <string name="names_and_more">%1$s and %2$d more</string>
+    <string name="background_picture_delete_keep">Delete, but keep in themes</string>
+    <string name="background_picture_delete_from_themes">Delete from themes too</string>
     <!-- Title for customizing background image in landscape mode -->
     <string name="customize_background_image_landscape">Set background image (landscape)</string>
     <!-- Description for customize_background_image_landscape -->
