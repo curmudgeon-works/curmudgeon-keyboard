@@ -207,6 +207,27 @@ class HeldDeletesTest {
         assertFalse(other.exists())
     }
 
+    // round-7 review 20261013_L7_3 (owner 2026-10-14): the same for a picture: only one in the list when the screen
+    // opened, and not held already, is held; one added during the visit is deleted at once. Fail before: the added
+    // picture was held too, and Discard brought it back to "Choose a picture"
+    @Test fun `a picture added during the visit is deleted at once, the held original stays`() {
+        val picture = pictureInATheme()
+        AppearanceDraft.of(ctx) // the Appearance screen opens
+        assertTrue(AppearanceLooks.deleteFromList(ctx, picture, keepInThemes = false)) // held
+        val src = File(ctx.cacheDir, "src_added").apply { writeText("added") }
+        Thread.sleep(5) // (names come from the time: not the held one's name, its file is out of the list)
+        val added = PictureLibrary.file(ctx, PictureLibrary.nameOf(ctx, src)!!) // a new one, added during the visit
+        assertNotEquals(picture.name, added.name)
+        assertTrue(AppearanceLooks.deleteFromList(ctx, added, keepInThemes = false))
+        assertFalse(added.exists())
+        val held = File(DeviceProtectedUtils.getFilesDir(ctx), "appearance_draft${File.separator}held_pictures")
+        assertEquals(listOf(picture.name), held.list()!!.toList(), "only the picture of the open held")
+        AppearanceDraft.rejectOpen(ctx) // Discard
+        assertEquals("sunset", picture.readText(), "the original back")
+        assertFalse(added.exists(), "the picture added during the visit came back")
+        assertEquals(listOf(picture), PictureLibrary.list(ctx))
+    }
+
     // round-6 review 20261013_M1_2 (owner 2026-10-13): the snapshot folder is in the device-protected storage, with the
     // font and picture lists, so a held delete is a rename within one storage (on an encrypted device a rename between
     // the two storages is refused, and the file was deleted at once). Fail before: the folder was in the other storage

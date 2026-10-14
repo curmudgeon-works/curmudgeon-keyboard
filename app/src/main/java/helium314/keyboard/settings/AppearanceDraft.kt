@@ -65,9 +65,14 @@ class AppearanceDraft private constructor(
 
     /** Library picture [picture] deleted from "Choose a picture" with the screen open (the saved themes have let go of
      *  it, a prefs change Discard puts back): its file moves into the snapshot folder, out of the list (review H1, owner:
-     *  "make picture disappear yes"). False when it couldn't be moved: then it's deleted at once, as without the screen. */
+     *  "make picture disappear yes"). False when it couldn't be moved: then it's deleted at once, as without the screen.
+     *  Held only when it was in the list when the screen opened and isn't held already, as a font ([holdFontDelete]):
+     *  one added during the visit is deleted at once, so Discard doesn't bring it back (round-7 review 20261013_L7_3,
+     *  owner 2026-10-14; before, it came back to "Choose a picture"). */
     fun holdPictureDelete(picture: File): Boolean {
+        if (picturesAtStart != null && picture.name !in picturesAtStart) return false
         val target = File(File(dir, HELD_PICTURES), picture.name)
+        if (target.exists()) return false
         target.parentFile?.mkdirs()
         if (!picture.renameTo(target)) return false
         version.intValue++
