@@ -70,6 +70,13 @@ class RestoreTopCheckboxUiTest {
 
     private fun show() {
         scenario = ActivityScenario.launch(SettingsActivity::class.java).onActivity { it.setContent { RestoreChoiceDialogFrom(zip) { } } }
+        // (the backup is read off the main thread, "Reading backup…" meanwhile: R5, 2026-10-11)
+        val end = System.currentTimeMillis() + 10_000
+        while (compose.onAllNodesWithText(top).fetchSemanticsNodes().isEmpty()) {
+            assertTrue(System.currentTimeMillis() < end, "the restore dialog never came")
+            Thread.sleep(20)
+            compose.waitForIdle()
+        }
     }
 
     /** The checkbox of the row saying [text]. */

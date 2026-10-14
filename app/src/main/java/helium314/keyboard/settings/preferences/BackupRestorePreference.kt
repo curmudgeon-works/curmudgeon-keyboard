@@ -25,6 +25,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -87,6 +89,9 @@ import helium314.keyboard.settings.dialogs.InfoDialog
 import helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog
 import helium314.keyboard.settings.filePicker
 import helium314.keyboard.settings.screens.keyboardName
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.FileInputStream
@@ -110,8 +115,8 @@ fun BackupRestorePreference(setting: Setting) {
     val ctx = LocalContext.current
     var error: String? by rememberSaveable { mutableStateOf(null) }
     val backupLauncher = backupLauncher { error = it }
-    var pendingRestore: PendingRestore? by remember { mutableStateOf(null) }
-    val restoreLauncher = restoreLauncher(onError = { error = it }, onChoose = { pendingRestore = it })
+    var picked: PickedBackup? by remember { mutableStateOf(null) }
+    val restoreLauncher = restoreLauncher { picked = it }
     Preference(name = setting.title, onClick = { showDialog = true })
     if (showDialog) {
         ConfirmationDialog(
@@ -141,8 +146,11 @@ fun BackupRestorePreference(setting: Setting) {
             }
         )
     }
-    pendingRestore?.let { pending ->
-        RestoreChoiceDialog(pending, onDismiss = { pendingRestore = null }, onError = { error = it })
+    picked?.let { pick ->
+        androidx.compose.runtime.key(pick) {
+            RestoreChoiceDialogLoading(pick.file, load = { pick.copyIn(); readRestoreDialog(ctx, pick.file) },
+                onDismiss = { picked = null }, onError = { error = it })
+        }
     }
     BackupRestoreJob.progress?.let { ProgressDialog(it) }
     if (error != null) {
@@ -340,7 +348,7 @@ private fun ProgressDialog(progress: BackupRestoreJob.Progress) {
 }
 
 /** A picked backup, copied to the cache so it can be read twice: its preferences, the keyboards they list and its entries. */
-private class PendingRestore(val file: File, val prefs: Map<String, Any?>, val keyboards: List<SettingsSubtype>, val entries: Set<String>) {
+internal class PendingRestore(val file: File, val prefs: Map<String, Any?>, val keyboards: List<SettingsSubtype>, val entries: Set<String>) {
     private val plain = entries.map { it.substringAfter("unprotected${File.separator}") }
     val hasLearnedWords = plain.any { it.startsWith(UserHistoryDictionary.NAME) || it.startsWith("blacklists${File.separator}") }
     val hasDictionaries = plain.any { it.startsWith("dicts${File.separator}") && it.endsWith(DictionaryInfoUtils.USER_DICTIONARY_SUFFIX) }
@@ -359,41 +367,84 @@ private class RestoreChoice(
     val decisions: Map<SettingsSubtype, RestoreDecision> = emptyMap(),
 )
 
-@Composable
-private fun restoreLauncher(onError: (String) -> Unit, onChoose: (PendingRestore) -> Unit): ManagedActivityResultLauncher<Intent, ActivityResult> {
-    val ctx = LocalContext.current
-    return filePicker { uri ->
-        if (BackupRestoreJob.isRunning) return@filePicker // (its file is the one being restored)
-        val file = File(ctx.cacheDir, "restore.zip")
-        val pending = try {
-            ctx.getActivity()?.contentResolver?.openInputStream(uri)?.use { input -> FileOutputStream(file).use { input.copyTo(it) } }
-            readBackup(file)
-        } catch (t: Throwable) {
-            Log.w("AdvancedScreen", "error reading backup", t)
-            onError("r" + t.message)
-            file.delete()
-            return@filePicker
-        }
-        // (a backup without keyboards, older format, too: it can only be restored whole, the dialog's checkbox stays
-        // checked, and the wipe is asked about like any other, never in one tap)
-        onChoose(pending)
+/** A backup picked for restore, and the cache file it's copied to: its own per pick, so a read cancelled and still
+ *  running never meets the next pick's (review 2026-10-11 R5). */
+private class PickedBackup(private val resolver: android.content.ContentResolver?, private val uri: android.net.Uri, val file: File) {
+    /** Copies the picked backup to [file]; off the main thread. */
+    fun copyIn() {
+        resolver?.openInputStream(uri)?.use { input -> FileOutputStream(file).use { input.copyTo(it) } }
     }
 }
 
-/** The restore dialog for the backup [file] (tests). */
 @Composable
-internal fun RestoreChoiceDialogFrom(file: File, onDismiss: () -> Unit) {
-    val pending = remember(file) { readBackup(file) }
-    RestoreChoiceDialog(pending, onDismiss, onError = { })
+private fun restoreLauncher(onPick: (PickedBackup) -> Unit): ManagedActivityResultLauncher<Intent, ActivityResult> {
+    val ctx = LocalContext.current
+    return filePicker { uri ->
+        if (BackupRestoreJob.isRunning) return@filePicker // (its file is the one being restored)
+        // (copied and read by the restore dialog, off the main thread; R5)
+        onPick(PickedBackup(ctx.getActivity()?.contentResolver, uri, File(ctx.cacheDir, "restore-${System.nanoTime()}.zip")))
+    }
 }
 
+/** What the restore dialog shows of a backup: [pending], read, and the questions for its keyboards, [plan]. */
+internal class RestoreDialogData(val pending: PendingRestore, val plan: RestorePlan)
+
+/** Reads the backup [file] for the restore dialog: the zip read whole (the dry runs too), so never on the main thread
+ *  (review 2026-10-11 R5: done in composition, a large backup froze the screen). */
+internal fun readRestoreDialog(ctx: Context, file: File): RestoreDialogData =
+    readBackup(file).let { RestoreDialogData(it, restorePlan(ctx, it)) }
+
+/** The restore dialog for the backup [file] (tests); [load] reads it (off the main thread). */
 @Composable
-private fun RestoreChoiceDialog(pending: PendingRestore, onDismiss: () -> Unit, onError: (String) -> Unit) {
+internal fun RestoreChoiceDialogFrom(file: File, load: (Context, File) -> RestoreDialogData = ::readRestoreDialog, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
-    // each backup keyboard as it would come in, its custom key layouts named as they would be (B4, R6), and the
-    // questions: a keyboard whose language the phone has (switched-off keyboards too) is asked about, merged into one of
-    // those or kept separate (owner 2026-10-11: "only check if language is same"); the others are new
-    val plan = remember(pending) { restorePlan(ctx, pending) }
+    RestoreChoiceDialogLoading(file, load = { load(ctx, file) }, onDismiss, onError = { })
+}
+
+/**
+ * "Reading backup…" while [load] reads the backup [file] off the main thread, then the restore dialog (owner 2026-10-11,
+ * R5: "OK"). Cancel while reading closes it, nothing restored, [file] deleted once the read ends; a read that fails gives
+ * the restore error, as before.
+ */
+@Composable
+private fun RestoreChoiceDialogLoading(file: File, load: () -> RestoreDialogData, onDismiss: () -> Unit, onError: (String) -> Unit) {
+    var data: RestoreDialogData? by remember { mutableStateOf(null) }
+    LaunchedEffect(Unit) {
+        try {
+            data = withContext(Dispatchers.IO) { load() }
+        } catch (e: CancellationException) {
+            file.delete() // (closed while reading: withContext returns once the read ended)
+            throw e
+        } catch (t: Throwable) {
+            Log.w("AdvancedScreen", "error reading backup", t)
+            file.delete()
+            onDismiss()
+            onError("r" + t.message)
+        }
+    }
+    // (a backup without keyboards, older format, too: it can only be restored whole, the dialog's checkbox stays
+    // checked, and the wipe is asked about like any other, never in one tap)
+    data?.let { RestoreChoiceDialog(it.pending, it.plan, onDismiss, onError) } ?: ReadingDialog(onCancel = onDismiss)
+}
+
+/** "Reading backup…", Cancel only (R5). (No moving bar: an endless animation keeps Compose busy, and the UI tests with it.) */
+@Composable
+private fun ReadingDialog(onCancel: () -> Unit) = ThreeButtonAlertDialog(
+    onDismissRequest = onCancel,
+    onConfirmed = { },
+    confirmButtonText = null,
+    title = { Text(stringResource(R.string.restore_reading)) },
+)
+
+/**
+ * [plan]: each backup keyboard as it would come in, its custom key layouts named as they would be (B4, R6), and the
+ * questions: a keyboard whose language the phone has (switched-off keyboards too) is asked about, merged into one of
+ * those or kept separate (owner 2026-10-11: "only check if language is same"); the others are new. Read off the main
+ * thread ([readRestoreDialog], R5).
+ */
+@Composable
+private fun RestoreChoiceDialog(pending: PendingRestore, plan: RestorePlan, onDismiss: () -> Unit, onError: (String) -> Unit) {
+    val ctx = LocalContext.current
     // on top: "Delete app data and restore from backup", checked to start with (owner 2026-10-11); unchecked, every
     // keyboard is ticked
     val top = remember(pending) { RestoreDialogState(pending.keyboards) }
@@ -421,7 +472,6 @@ private fun RestoreChoiceDialog(pending: PendingRestore, onDismiss: () -> Unit, 
             try { hidden = restoreChosen(ctx, pending, choice) } finally { pending.file.delete() }
         }
     }
-    fun differences(keyboard: SettingsSubtype, phone: SettingsSubtype) = restoreDifferences(ctx, plan, keyboard, phone, settings, asCopies)
     // the next keyboard to ask about, or the restore when all are answered
     fun answered(keyboard: SettingsSubtype, decision: RestoreDecision) {
         answers[keyboard] = decision
@@ -458,10 +508,23 @@ private fun RestoreChoiceDialog(pending: PendingRestore, onDismiss: () -> Unit, 
                 onCancel = { asking = null; answers.clear() }, // back to the restore dialog, nothing restored (as before)
                 onNext = { pick -> if (pick.phone == null) answered(asked, question.separate) else choosing = pick.phone })
             else androidx.compose.runtime.key(target) {
-                RestoreChooseDialog(question, target, remember(settings, asCopies) { differences(asked, target) },
-                    wordsRow = learnedWords && pending.hasLearnedWords,
-                    onCancel = { choosing = null }, // back to the first question
-                    onConfirmed = { answered(asked, it) })
+                // worked out off the main thread, again when a tick it depends on changed (R5: it reads the backup's
+                // fonts and pictures); "Reading backup…" meanwhile, its Cancel back to the first question
+                val found by produceState<List<RestoreMatch.Difference>?>(null, settings, asCopies) {
+                    val withSettings = settings; val copies = asCopies
+                    value = try {
+                        withContext(Dispatchers.IO) { restoreDifferences(ctx, plan, asked, target, withSettings, copies) }
+                    } catch (e: CancellationException) { throw e } catch (t: Throwable) {
+                        Log.w("AdvancedScreen", "error reading backup", t)
+                        close(); onError("r" + t.message); null
+                    }
+                }
+                found?.let { differences ->
+                    RestoreChooseDialog(question, target, differences,
+                        wordsRow = learnedWords && pending.hasLearnedWords,
+                        onCancel = { choosing = null }, // back to the first question
+                        onConfirmed = { answered(asked, it) })
+                } ?: ReadingDialog(onCancel = { choosing = null })
             }
         }
         return
@@ -1151,13 +1214,14 @@ private fun restorePlan(ctx: Context, pending: PendingRestore): RestorePlan {
     val (enabled, off) = phoneKeyboards(real)
     val dry = dryLayouts(ctx, pending)
     val renames = HashMap<Boolean, SavedItemsMerge.Renames?>()
-    fun renames(asCopies: Boolean) = renames.getOrPut(asCopies) {
+    // (one at a time: "What to merge" works it out off the main thread, R5)
+    fun renames(asCopies: Boolean) = synchronized(renames) { renames.getOrPut(asCopies) {
         try {
             val files = restoreLibraryFiles(ctx, pending, write = false)
             SavedItemsMerge.merge(ctx, real, pending.prefs, asCopies, files.first, files.second, dry.renames,
                 pending.keyboards.map { KeyboardProfiles.effectiveSettingsIn(pending.prefs, it) }, real.all, write = false)
         } catch (e: Exception) { null } // (then compared as in the backup)
-    }
+    } }
     return RestorePlan(incomingKeyboards(pending, dry), enabled, off, nameOf = { keyboardName(it, ctx) }, sameLayout = dry::same,
         backupSettings = { keyboard, asCopies -> restoredSettings(ctx, pending.prefs, keyboard).let { renames(asCopies)?.apply(it) ?: it } })
 }
