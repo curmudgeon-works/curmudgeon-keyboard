@@ -67,9 +67,9 @@ class MainChangedMessageTest {
 
     @Test fun `separate settings on, the shared menus are named in the menus' order`() {
         separate(true, Group.SWIPE, Group.APPEARANCE)
-        assertEquals("$appearance, $swipe now come from $hiName", mainChangedMessage(ctx, hi))
+        assertEquals("$appearance and $swipe settings now come from $hiName", mainChangedMessage(ctx, hi))
         separate(true, Group.APPEARANCE)
-        assertEquals("$appearance now comes from $hiName", mainChangedMessage(ctx, hi))
+        assertEquals("$appearance settings now come from $hiName", mainChangedMessage(ctx, hi))
     }
 
     // fail before (90ae541a0): the toast said "Common settings now come from Hindi" with separate settings on too
@@ -79,6 +79,6 @@ class MainChangedMessageTest {
         useKeyboards(ctx, real, hi, en)
         onOrderChanged(ctx, mainBefore)
         shadowOf(Looper.getMainLooper()).idle()
-        assertEquals("$appearance, $swipe now come from $hiName", ShadowToast.getTextOfLatestToast())
+        assertEquals("$appearance and $swipe settings now come from $hiName", ShadowToast.getTextOfLatestToast())
     }
 }
