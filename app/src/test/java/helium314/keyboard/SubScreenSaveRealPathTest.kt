@@ -14,6 +14,7 @@ import androidx.compose.ui.test.hasParent
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.isEditable
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -30,6 +31,7 @@ import helium314.keyboard.latin.R
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
+import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.SubtypeUtilsAdditional
 import helium314.keyboard.latin.utils.prefs
@@ -85,7 +87,9 @@ class SubScreenSaveRealPathTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = ctx.realPrefs()
     private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
-    private val kb1 = SettingsSubtype(Locale.US, "") // the one edited (in use)
+    // the one edited (in use): the built-in keyboard as the keyboard list gives it back, with its extra values (a bare
+    // "en-US" came back with them, another identity, and the palette question listed the edited keyboard itself)
+    private val kb1 = SubtypeSettings.getResourceSubtypesForLocale(Locale.US).first().toSettingsSubtype()
     private val kb2 = SettingsSubtype(Locale.GERMANY, "") // switched off, with its own set
     private val before = """[{"name":"background","auto":false,"color":-1}]"""
     private var scenario: ActivityScenario<SettingsActivity>? = null
@@ -237,8 +241,8 @@ class SubScreenSaveRealPathTest {
         // (owner 2026-10-11: palettes are one app-wide list; switched-off keyboard 2 uses Warm too, so it's asked: was
         // nothing to ask, the edit went to keyboard 1's own copy)
         shows(ctx.getString(R.string.palette_edit_title, "Warm"))
-        click(ctx.getString(R.string.save)) // (keyboard 2 on the old colours, as "Warm 2": the starting choice)
-        assertEquals("Warm 2", real.getString(own(2, Settings.PREF_THEME_COLORS), null))
+        click(ctx.getString(R.string.save)) // (keyboard 2 on the new colours: the starting choice)
+        assertEquals("Warm", real.getString(own(2, Settings.PREF_THEME_COLORS), null))
         assertEquals(PARENT, screen)
         assertEquals(listOf("Warm"), AppearanceDraft.activeOrNull()!!.savedPalettes()) // the editor's save was recorded
         discardOnAppearanceAndCheck()
@@ -247,10 +251,14 @@ class SubScreenSaveRealPathTest {
     // the editor's save asks what each other user takes (owner 2026-10-11: "use the new edited; use app default; use
     // 'Warm N'"): switched-off keyboard 2 and saved theme Sunset, the three options each; Appearance's Discard undoes all
     private fun option(text: Int, user: Int, vararg args: Any) {
-        compose.onAllNodes(hasText(ctx.getString(text, *args)) and hasAnyAncestor(isDialog()))[user].performClick(); idle()
+        val row = compose.onAllNodes(hasText(ctx.getString(text, *args)) and hasAnyAncestor(isDialog()))[user]
+        row.performClick(); idle()
+        row.assertIsSelected()
     }
 
-    @Test fun `edit question - keyboard 2 and the saved theme take the new colours, Appearance's Discard puts them back`() {
+    // (owner 2026-10-11: "on second thought, yes let's do new colours as the default option"; and no "Warm 2" when
+    // nobody keeps the old colours)
+    @Test fun `edit question - all on the new colours, the starting choice - no Warm 2, Appearance's Discard puts it back`() {
         appearance()
         screen = SUB; idle()
         editWarm()
@@ -259,8 +267,7 @@ class SubScreenSaveRealPathTest {
         shows(ctx.getString(R.string.palette_edit_title, "Warm"))
         shows(ctx.getString(R.string.keyboard_switched_off, helium314.keyboard.settings.screens.keyboardName(kb2, ctx)))
         shows(ctx.getString(R.string.update_item_theme, "Sunset"))
-        option(R.string.palette_take_new, 0); option(R.string.palette_take_new, 1)
-        click(ctx.getString(R.string.save))
+        click(ctx.getString(R.string.save)) // (nothing picked: each on the new colours)
         assertEquals("Warm", real.getString(own(2, Settings.PREF_THEME_COLORS), null))
         assertEquals("Warm", AppearanceLooks.load(real).single().values[Settings.PREF_THEME_COLORS])
         assertFalse(real.contains(Settings.PREF_USER_COLORS_PREFIX + "Warm 2")) // (nobody keeps the old colours)
@@ -291,7 +298,8 @@ class SubScreenSaveRealPathTest {
         editWarm()
         arrowBack()
         click(ctx.getString(R.string.save_and_exit))
-        click(ctx.getString(R.string.save)) // (the starting choice: the old colours)
+        option(R.string.palette_take_old, 0, "Warm 2"); option(R.string.palette_take_old, 1, "Warm 2")
+        click(ctx.getString(R.string.save))
         assertEquals("Warm 2", real.getString(own(2, Settings.PREF_THEME_COLORS), null))
         assertEquals("Warm 2", AppearanceLooks.load(real).single().values[Settings.PREF_THEME_COLORS])
         assertEquals(listOf("Warm", "Warm 2").map { Settings.PREF_USER_COLORS_PREFIX + it },
@@ -538,9 +546,9 @@ class SubScreenSaveRealPathTest {
         assertTrue(edit != before)
         assertEquals(listOf("Sunset"), AppearanceLooks.load(real).map { it.name }) // the parent's delete is undone
         assertEquals("Sunset", real.getString(own(2, AppearanceLooks.PREF_SELECTED), null))
-        // (the question's answer was saved with the editor: keyboard 2 keeps the old colours as Warm 2)
-        assertEquals("Warm 2", real.getString(own(2, Settings.PREF_THEME_COLORS), null))
-        assertEquals(before, real.getString(Settings.PREF_USER_COLORS_PREFIX + "Warm 2", null))
+        // (the question's answer, the starting choice, saved with the editor: keyboard 2 on the new colours)
+        assertEquals("Warm", real.getString(own(2, Settings.PREF_THEME_COLORS), null))
+        assertFalse(real.contains(Settings.PREF_USER_COLORS_PREFIX + "Warm 2"))
         assertEquals(emptyList(), AppearanceDraft.savedPalettesOnDisk(ctx))
         assertEquals(null, AppearanceDraft.activeOrNull())
     }

@@ -182,8 +182,9 @@ class WholeFlowUpgradeRestoreTest {
         // goes; US and French, each with a set of its own, keep their sets as they are: not filled up from the common set
         // (owner 2026-10-11, the upgrade decided: no gap-filling; only a keyboard without a set gets a copy of it; owner
         // 2026-10-11: the common set's palettes are deleted at the upgrade, no copies; this phone's common set has none)
-        assertEquals(sortedSetOf(LayoutPresets.PREF, AppearanceLooks.PREF, SavedItemDefaults.REMEMBERED_DONE, KeyboardProfiles.NO_COMMON_SET_DONE)
-            + commonOf3afbeeebc, changedKeys(before, first), "the first upgrade changed more than the saved Layouts and themes")
+        // (owner 2026-10-11: palettes are one app-wide list: the one-time move's flag too; this phone has no palette)
+        assertEquals(sortedSetOf(LayoutPresets.PREF, AppearanceLooks.PREF, SavedItemDefaults.REMEMBERED_DONE, KeyboardProfiles.NO_COMMON_SET_DONE,
+            helium314.keyboard.settings.Palettes.CENTRAL_DONE) + commonOf3afbeeebc, changedKeys(before, first), "the first upgrade changed more than the saved Layouts and themes")
         assertEquals(true, first[SavedItemDefaults.REMEMBERED_DONE])
         assertFalse(first.containsKey(SavedItemDefaults.PREF), "the switch was written down")
         // no other keyboard's setting changed, and nothing written as a default

@@ -47,7 +47,9 @@ class CentralPalettesTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = ctx.realPrefs()
     private val a = withKeyboardName(SettingsSubtype(Locale.US, ""), "Work")
-    private val b = SubtypeSettings.getResourceSubtypesForLocale(Locale.FRANCE).first().toSettingsSubtype()
+    // (French: no built-in keyboard for fr-FR, the language's own locale has them; as GhostRecordsTest)
+    private val b = SubtypeSettings.getAvailableSubtypeLocales().first { it.language == "fr" }
+        .let { SubtypeSettings.getResourceSubtypesForLocale(it).first().toSettingsSubtype() }
     private val c = SubtypeSettings.getResourceSubtypesForLocale(Locale.GERMANY).first().toSettingsSubtype()
     private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
     private fun view(id: Int) = ProfilePreferences(real) { id }
@@ -120,6 +122,15 @@ class CentralPalettesTest {
         assertNull(Palettes.afterEdit(real, "Warm", old, mapOf(b to Choice.NEW), emptyMap()))
         assertEquals("Warm", real.getString(own(2, day), null)); assertEquals("Warm", real.getString(own(2, night), null))
         assertEquals(listOf(warm), paletteKeys())
+    }
+
+    // (owner 2026-10-11: "Would this still cause Warm 2 to be created if no users exist for it?": no)
+    @Test fun `edit - every user on the new colours, the question's starting choice - no Warm 2 on the list`() {
+        everyoneOnWarm()
+        assertNull(Palettes.afterEdit(real, "Warm", old, mapOf(b to Choice.NEW, c to Choice.NEW), mapOf("Sunset" to Choice.NEW)))
+        assertEquals(listOf(warm), paletteKeys())
+        assertEquals(listOf("Warm", "Warm", "Warm"), listOf(own(2, day), own(2, night), own(3, day)).map { real.getString(it, null) })
+        assertEquals("Warm", sunset().values[day])
     }
 
     @Test fun `edit - B goes to the default colours, both its slots`() {
