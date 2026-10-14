@@ -8,6 +8,7 @@ import androidx.test.core.app.ApplicationProvider
 import helium314.keyboard.dictionarypack.DictionaryPackConstants
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.gesture.GestureStats
+import helium314.keyboard.latin.personalization.LearnedStoreMigration
 import helium314.keyboard.latin.personalization.LearnedStores
 import helium314.keyboard.latin.personalization.LoadCountingHistory
 import helium314.keyboard.latin.personalization.RestoreGate
@@ -30,6 +31,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import java.io.File
+import java.util.concurrent.CountDownLatch
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlin.test.Test
@@ -70,6 +72,8 @@ class FullRestoreRaceTest {
 
     @After fun tearDown() {
         FullRestore.afterStep = null
+        FullRestore.afterCheck = null
+        LearnedStoreMigration.holdForTest(null)
         idleUntil { !BackupRestoreJob.isRunning }
         putStoreForTest("Latn", LearnedStores.SHARED, null)
         RestoreGate.setForTest(null)
@@ -175,6 +179,37 @@ class FullRestoreRaceTest {
         assertTrue("newstrike" in lines, "the strike made during the restore was lost: $lines")
         assertFalse("oldword" in lines, "the old device's word came back: $lines")
         assertEquals(setOf("backupword", "newstrike"), list.entries().keys, "the keyboard's list isn't the restored one")
+    }
+
+    /**
+     * Round-5 review B1, 20261013_L7: a Remove just before a full restore, its write queued but not run when the gate
+     * comes. Fail before: the write found the gate set and wrote nothing, the change stayed in memory as no restore change,
+     * and the re-read after the restore put the old list's count ("zorp" 3) on top of the restored file.
+     */
+    @Test fun `a strike whose write is still queued when the gate comes - written before the wipe, the restored file as in the backup`() {
+        backup(blacklist = "backupword\n")
+        val file = LearnedStores.blacklistFile(ctx.filesDir, "Latn", LearnedStores.SHARED)
+        file.parentFile!!.mkdirs()
+        file.writeText("oldword\nzorp\t2\n")
+        val list = RemovedWords.forFile(file)
+        list.reload() // (the keyboard holds the device's list, read)
+        val held = CountDownLatch(1)
+        FullRestore.afterCheck = {
+            // the list writer busy (a re-read waiting), so the Remove's write is queued behind it, not run, before the gate
+            LearnedStoreMigration.holdForTest(held)
+            list.reloadAsync()
+            assertEquals(3, list.strike("zorp"))
+            assertFalse(RestoreGate.isSet, "the Remove must come before the gate")
+            // the writer goes on once the gate is set (the restore waits for it before the wipe)
+            Thread {
+                while (!RestoreGate.isSet) Thread.sleep(1)
+                held.countDown(); LearnedStoreMigration.holdForTest(null)
+            }.start()
+        }
+        restoreEverythingFrom(ctx, zip)
+        val lines = file.readLines().filter { it.isNotEmpty() }.toSet()
+        assertEquals(setOf("backupword"), lines, "the old list's count was put on top of the restored file")
+        assertEquals(setOf("backupword"), list.entries().keys, "the keyboard's list isn't the restored one")
     }
 
     @Test fun `the swipe statistics after a full restore are the backup's, not the old ones in memory`() {

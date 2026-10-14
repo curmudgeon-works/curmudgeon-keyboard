@@ -57,8 +57,15 @@ object RemovedWords {
     /** The list objects held for files in [dir] (or below it). */
     fun cachedIn(dir: File): List<WordListFile> = (dir.absolutePath + File.separator).let { start -> lists.filterKeys { it.startsWith(start) }.values.toList() }
 
-    /** Waits for the list writes already started (a full restore, before its wipe: RestoreGate). */
+    /** Waits for the list writes already started. */
     fun awaitWrites() { io.submit { }.get() }
+
+    /** A full restore, its gate set and before its wipe (RestoreGate): every list's changes not written yet written now,
+     *  the gate bypassed, after the writes queued before (round-5 review B1, 20261013_L7: a write queued just before the
+     *  gate found it set and wrote nothing, and the change, recorded as no restore change, was put on top of the restored
+     *  file as the old list's count). A change made since the gate is recorded too ([WordListFile.takeGated]) and made
+     *  again after the restore; the files written here are replaced by the restore. */
+    fun writeAllPending() { for (list in lists.values) list.writePending() }
 
     // ------------------------------- the rule -------------------------------
 
@@ -433,7 +440,8 @@ object RemovedWords {
         }
 
         /** The changes kept in memory while a full restore ran (RestoreGate), written now, after what's being written;
-         *  nothing if there are none (call off the main thread, after [reload] put them on top of the restored file). */
+         *  nothing if there are none (call off the main thread, after [reload] put them on top of the restored file; or
+         *  before the restore's wipe, [writeAllPending]). */
         fun writePending() {
             io.submit { synchronized(lock) { if (pending.isNotEmpty()) writeLocked() } }.get()
         }

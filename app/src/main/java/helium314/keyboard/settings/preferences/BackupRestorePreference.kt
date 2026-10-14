@@ -1267,7 +1267,11 @@ private fun underRestoreGate(ctx: Context, work: () -> Unit) {
     RestoreGate.begin()
     try {
         PersonalizationHelper.reloadAllFromFiles()
-        RemovedWords.awaitWrites() // (one started before the gate lands before the wipe)
+        // the blacklist changes not written yet, written before the wipe with the gate bypassed: a write queued before
+        // the gate finds it set and writes nothing, so without this a change made just before the restore stayed in
+        // memory, unrecorded, and was put on top of the restored file as the old list's count (round-5 review B1,
+        // 20261013_L7). After begin(), so no change falls between the two: one made since is recorded and made again
+        RemovedWords.writeAllPending()
         work()
     } finally {
         val filesDir = ctx.filesDir
