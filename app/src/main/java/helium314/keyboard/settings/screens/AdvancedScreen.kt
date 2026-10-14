@@ -135,9 +135,24 @@ fun createAdvancedSettings(context: Context) = listOf(
         val ctx = LocalContext.current
         var on by remember { mutableStateOf(helium314.keyboard.settings.SavedItemDefaults.takeNewDefaults(ctx.realPrefs())) }
         var explain by remember { mutableStateOf(false) }
+        // review S3 2026-10-11: a flip that would make two keyboards the same asks first (owner: "K, alert first before
+        // rename -- that wth just happened, ok/cancel"); Cancel leaves the switch and the keyboards as they were
+        var asking by remember { mutableStateOf<Pair<Boolean, helium314.keyboard.settings.SavedItemDefaults.AccentsPlan>?>(null) }
         SwitchPreference(name = setting.title, key = setting.key, default = helium314.keyboard.settings.SavedItemDefaults.DEFAULT,
             description = stringResource(if (on) R.string.saved_items_take_new_defaults_on else R.string.saved_items_take_new_defaults_off),
+            allowCheckedChange = { to ->
+                val plan = helium314.keyboard.settings.SavedItemDefaults.accentsPlan(ctx.realPrefs(), to) { keyboardName(it, ctx) }
+                if (plan.renames.isEmpty()) true else { asking = to to plan; false }
+            },
         ) { on = it; explain = true; helium314.keyboard.settings.SavedItemDefaults.applySwitch(ctx, ctx.realPrefs(), it) }
+        asking?.let { (to, plan) ->
+            RenameToKeepApartDialog(renameLines(ctx, plan), onCancel = { asking = null }) {
+                asking = null
+                ctx.prefs().edit().putBoolean(setting.key, to).apply()
+                helium314.keyboard.settings.SavedItemDefaults.applySwitch(ctx, ctx.realPrefs(), to, plan)
+                on = to; explain = true
+            }
+        }
         if (explain) helium314.keyboard.settings.dialogs.InfoDialog(stringResource(R.string.saved_items_take_new_defaults_when)) { explain = false }
     },
     Setting(context, Settings.PREF_ALWAYS_INCOGNITO_MODE,
@@ -559,4 +574,25 @@ private fun UnitChoiceRow(setting: Setting, default: String) {
             }
         }
     }
+}
+
+/** What [plan] renames, one line each: "<name> will be renamed <new name>" (a switched-off one "<name> (switched off)"). */
+internal fun renameLines(ctx: Context, plan: helium314.keyboard.settings.SavedItemDefaults.AccentsPlan): List<String> =
+    plan.renames.map { change ->
+        val name = keyboardName(change.from, ctx)
+        ctx.getString(R.string.saved_items_rename_line,
+            if (change.switchedOff) ctx.getString(R.string.keyboard_switched_off, name) else name, change.newName)
+    }
+
+/** Review S3 2026-10-11: flipping "Saved items take new defaults" would make keyboards the same; asked before the lower
+ *  one of each pair is renamed ([lines]: [renameLines]). Cancel left, as everywhere. */
+@Composable
+internal fun RenameToKeepApartDialog(lines: List<String>, onCancel: () -> Unit, onOk: () -> Unit) {
+    ConfirmationDialog(
+        onDismissRequest = onCancel,
+        onConfirmed = onOk,
+        title = { Text(stringResource(R.string.saved_items_rename_title)) },
+        content = { Text(if (lines.size == 1) stringResource(R.string.saved_items_rename_one, lines.single())
+            else stringResource(R.string.saved_items_rename_many, lines.joinToString("\n"))) },
+    )
 }

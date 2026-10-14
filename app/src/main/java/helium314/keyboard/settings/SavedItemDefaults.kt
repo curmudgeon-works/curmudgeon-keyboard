@@ -10,9 +10,11 @@ import helium314.keyboard.latin.settings.ProfilePreferences
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
+import helium314.keyboard.latin.settings.SwitchedOffKeyboards
 import helium314.keyboard.latin.utils.KeyPopupOverrides
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.SubtypeUtilsAdditional
+import helium314.keyboard.settings.preferences.RestorePlan
 
 /**
  * What a saved Layout, theme or popup set does with the settings it holds at their default (not picked when saved),
@@ -68,9 +70,11 @@ object SavedItemDefaults {
      * still holds a value, else it holds nothing, as before it was turned off (review 2026-10-11 S4: it was marked
      * either way, so a value picked in the shared set later no longer reached it).
      * By value, no notes per keyboard (owner: a value set by hand to exactly the remembered one moves with the switch).
-     * A popup set's accents level is the keyboard's (in its identity): the keyboards in use get it.
+     * A popup set's accents level is the keyboard's (in its identity): the keyboards get it, switched-off ones too, as
+     * [plan] says (worked out before the switch is written: the screen asks first when it renames one).
      */
-    fun applySwitch(ctx: Context, real: SharedPreferences, takeNew: Boolean) {
+    fun applySwitch(ctx: Context, real: SharedPreferences, takeNew: Boolean,
+                    plan: AccentsPlan = accentsPlan(real, takeNew) { helium314.keyboard.settings.screens.keyboardName(it, ctx) }) {
         val before = real.all
         val layouts = LayoutPresets.load(real)
         val looks = AppearanceLooks.load(real)
@@ -128,22 +132,73 @@ object SavedItemDefaults {
             }
         }
         editor.commit()
-        // a popup set's accents level: in the keyboard's identity (each keyboard in use, by the set it reads now)
-        for (keyboard in enabled) {
-            val id = if (KeyboardProfiles.isSeparate(real)) KeyboardProfiles.anyIdIn(before, keyboard) ?: KeyboardProfiles.SHARED
-                else KeyboardProfiles.SHARED
-            val set = ProfilePreferences(real) { id }.getString(KeyPopupOverrides.PREF_SELECTED_SET, null)
-                ?.let { name -> sets.firstOrNull { it.name == name } }?.takeIf { KeyPopupOverrides.ACCENTS in it.atDefault } ?: continue
-            val accents = keyboard.getExtraValueOf(ExtraValue.MORE_POPUPS)
-            val to = when {
-                !takeNew && accents == null -> keyboard.with(ExtraValue.MORE_POPUPS, set.morePopups)
-                takeNew && accents == set.morePopups -> keyboard.without(ExtraValue.MORE_POPUPS)
-                else -> continue
-            }
-            SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, to, ctx)
+        // a popup set's accents level: in the keyboard's identity (review S3 2026-10-11: as [accentsPlan] says)
+        for (change in plan.changes) {
+            var from = change.from
+            if (change.newName != null) // (the Keyboards screen's Rename: its settings, pictures and words go with it)
+                from = helium314.keyboard.settings.screens.renameKeyboard(ctx, from, change.newName) ?: continue
+            if (from != change.to) SubtypeUtilsAdditional.changeAdditionalSubtype(from, change.to, ctx)
             changed = true
         }
         if (changed) AppearanceLooks.reload(ctx)
+    }
+
+    /** A keyboard the switch changes: [from] becomes [to]; [newName]: renamed first, as it would be another keyboard's
+     *  exact definition ([switchedOff]: not in the list). */
+    data class KeyboardChange(val from: SettingsSubtype, val to: SettingsSubtype, val newName: String? = null,
+                              val switchedOff: Boolean = false)
+
+    class AccentsPlan(val changes: List<KeyboardChange>) {
+        /** The keyboards renamed to keep them apart (the screen asks first). */
+        val renames get() = changes.filter { it.newName != null }
+    }
+
+    /**
+     * What flipping the switch to [takeNew] does to the keyboards' accents level, nothing written (review S3
+     * 2026-10-11: it could make two keyboards one identity, e.g. two unnamed English QWERTY keyboards differing only in
+     * accents: a duplicate in the list, one keyboard's set left behind; switched-off keyboards were left out). Each
+     * keyboard, the listed ones in their order then the switched-off ones, follows the popup set it reads; one that
+     * would be the exact definition of a keyboard above it gets the next free name, as the restore numbers them
+     * ([RestorePlan.nextFreeName]; owner 2026-10-11: "Or we could just rename the keyboard lower in order as english
+     * 2?", "K, alert first before rename"). [nameOf]: a keyboard's name as the screens show it.
+     */
+    fun accentsPlan(real: SharedPreferences, takeNew: Boolean, nameOf: (SettingsSubtype) -> String): AccentsPlan {
+        val before = real.all
+        val sets = KeyPopupOverrides.loadSets(real)
+        val separate = KeyboardProfiles.isSeparate(real)
+        val enabled = SubtypeSettings.createSettingsSubtypes(real.getString(Settings.PREF_ENABLED_SUBTYPES, "")!!).distinct()
+        val off = SwitchedOffKeyboards.list(real).filter { it !in enabled }
+        // [keyboard] (its set: the one it reads now) as [named] after the switch
+        fun followed(keyboard: SettingsSubtype, named: SettingsSubtype = keyboard): SettingsSubtype {
+            val id = if (separate) KeyboardProfiles.anyIdIn(before, keyboard) ?: KeyboardProfiles.SHARED else KeyboardProfiles.SHARED
+            val set = ProfilePreferences(real) { id }.getString(KeyPopupOverrides.PREF_SELECTED_SET, null)
+                ?.let { name -> sets.firstOrNull { it.name == name } }?.takeIf { KeyPopupOverrides.ACCENTS in it.atDefault }
+                ?: return named
+            val accents = keyboard.getExtraValueOf(ExtraValue.MORE_POPUPS)
+            return when {
+                !takeNew && accents == null -> named.with(ExtraValue.MORE_POPUPS, set.morePopups)
+                takeNew && accents == set.morePopups -> named.without(ExtraValue.MORE_POPUPS)
+                else -> named
+            }
+        }
+        val all = enabled + off
+        val targets = all.map { followed(it) }
+        val names = targets.mapTo(HashSet(), nameOf)
+        val taken = HashSet<SettingsSubtype>()
+        val changes = ArrayList<KeyboardChange>()
+        for ((i, keyboard) in all.withIndex()) {
+            var to = targets[i]
+            var newName: String? = null
+            if (to in taken) { // (a keyboard above has it: this one gets a name of its own, then follows like the rest)
+                newName = RestorePlan.nextFreeName(nameOf(keyboard), names)
+                names.add(newName)
+                val renamed = helium314.keyboard.settings.screens.withKeyboardName(keyboard, newName)
+                to = followed(keyboard, renamed)
+            }
+            taken.add(to)
+            if (to != keyboard || newName != null) changes.add(KeyboardChange(keyboard, to, newName, i >= enabled.size))
+        }
+        return AccentsPlan(changes)
     }
 
     /** Whether two saved items hold the same (review C6 2026-10-11): the same settings, each picked alike, and each

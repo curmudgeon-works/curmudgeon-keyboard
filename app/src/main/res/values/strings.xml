@@ -769,6 +769,11 @@
     <string name="saved_items_take_new_defaults_on">Settings left at their default in saved Layouts, themes and popup sets take the latest defaults</string>
     <string name="saved_items_take_new_defaults_off">Saved Layouts, themes and popup sets apply every setting as saved, even after an update changes a default</string>
     <string name="saved_items_take_new_defaults_when">Applied now to the keyboards using your saved Layouts, themes and popup sets.</string>
+    <!-- Asked before the switch above would make two keyboards the same (review S3 2026-10-11) -->
+    <string name="saved_items_rename_title">Rename to keep keyboards apart?</string>
+    <string name="saved_items_rename_one">Changing this makes two keyboards the same. %s so they stay separate.</string>
+    <string name="saved_items_rename_many">Changing this makes some keyboards the same. So they stay separate:\n%s</string>
+    <string name="saved_items_rename_line">%1$s will be renamed %2$s</string>
     <!-- Title of the setting to show key hints -->
     <string name="show_hints">Hide symbols on keys</string>
     <!-- Description of the settings to show hints -->
