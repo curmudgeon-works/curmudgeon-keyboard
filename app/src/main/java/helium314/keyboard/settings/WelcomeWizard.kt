@@ -53,8 +53,8 @@ import helium314.keyboard.latin.utils.previewDark
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** The setup, always in Curmudgeon's Black with orange (2026-10-10; it had the phone's Dynamic colours, blue before
- *  Android 12), whatever colours the keyboard has. */
+/** The setup, always in Curmudgeon's Black with orange (2026-10-10; it had the phone's Dynamic colors, blue before
+ *  Android 12), whatever colors the keyboard has. */
 @Composable
 fun WelcomeWizard(
     close: () -> Unit,

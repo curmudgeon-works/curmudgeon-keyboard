@@ -30,7 +30,7 @@ object SettingsSearch {
         listOf("sound", "audio", "click", "noise", "volume", "beep"),
         listOf("autocorrect", "autocorrection", "correction", "correct", "typo", "mistake", "fix"),
         listOf("symbol", "special", "punctuation", "character", "hint"),
-        listOf("theme", "color", "colour", "dark", "light", "night", "look", "appearance", "style"),
+        listOf("theme", "color", "color", "dark", "light", "night", "look", "appearance", "style"),
         listOf("size", "height", "scale", "big", "bigger", "large", "larger", "small", "smaller", "tiny"),
         listOf("spacing", "space", "gap", "padding", "tight", "compact", "dense", "pack"),
         listOf("language", "locale", "multilingual", "dictionary", "hindi", "hinglish"),

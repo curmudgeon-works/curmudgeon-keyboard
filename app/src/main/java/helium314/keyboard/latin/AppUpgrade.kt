@@ -61,7 +61,7 @@ fun checkVersionUpgrade(context: Context, restoring: Boolean = false) {
     if (oldVersion != BuildConfig.MIGRATION_VERSION)
         AppUpgrade.onUpgrade(context)
     curmudgeonUpgrades(prefs, freshInstall = oldVersion == 0)
-    ownSetRenames(prefs) // (before pickedOnlyUpgrade: it compares the sets' colours with the old defaults)
+    ownSetRenames(prefs) // (before pickedOnlyUpgrade: it compares the sets' colors with the old defaults)
     // saved themes name their pictures in the picture library (2026-10-07): older themes' copies join it
     helium314.keyboard.settings.AppearanceLooks.migratePictureFolders(context, prefs)
     pickedOnlyUpgrade(context.realPrefs(), freshInstall = oldVersion == 0)
@@ -203,7 +203,7 @@ private val defaultsBefore3008: Map<String, Any> = mapOf(
 )
 
 /** More defaults 0.3.008 changed (decided 2026-10-06: upgraders follow these too), for the live settings only: a saved
- *  theme or Layout is a look someone kept, it keeps its colours, light / dark and key sounds. */
+ *  theme or Layout is a look someone kept, it keeps its colors, light / dark and key sounds. */
 private val liveDefaultsBefore3008: Map<String, Any> = mapOf(
     Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_BLACK, // the Midnight look; Dynamic now
     Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_BLACK,
@@ -260,7 +260,7 @@ internal fun pickedOnlyUpgrade(real: SharedPreferences, freshInstall: Boolean) {
         val oldGaps = all[KEY_GAP_DEFAULTS_DONE] != true
         fun numpadOn(id: Int) = all[KeyboardProfiles.ownKey(id, numpad)] as? Boolean
             ?: (!all.containsKey(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + numpad)) && sharedNumpad)
-        // the sets whose colours went back to the default (null: the shared one): the theme they named (Midnight)
+        // the sets whose colors went back to the default (null: the shared one): the theme they named (Midnight)
         // isn't what they show any more, so they name none (the Themes row then shows the default, Dynamic)
         val colorsCleared = HashSet<Int?>()
         real.edit {
@@ -340,7 +340,7 @@ internal fun ownSetRenames(real: SharedPreferences) {
         for ((stored, value) in all) {
             val (id, key) = KeyboardProfiles.splitOwnKey(stored) ?: continue
             fun own(plain: String) = KeyboardProfiles.ownKey(id, plain)
-            // "midnight" became black (the colour list showed nothing chosen, and the old default's reset missed it)
+            // "midnight" became black (the color list showed nothing chosen, and the old default's reset missed it)
             if ((key == Settings.PREF_THEME_COLORS || key == Settings.PREF_THEME_COLORS_NIGHT) && value == "midnight")
                 putString(stored, KeyboardTheme.THEME_BLACK)
             // toolbar mode → Toolbar visibility + Show suggestions, from the set's own mode (reading through the set
@@ -397,7 +397,7 @@ internal fun curmudgeonUpgrades(prefs: SharedPreferences, freshInstall: Boolean)
             if (old == "TOOLBAR_KEYS" || old == "HIDDEN") putBoolean(Settings.PREF_SHOW_SUGGESTIONS, false)
         }
     }
-    // "midnight" was always black's colours under another name: the colour is black now (the Midnight theme stays)
+    // "midnight" was always black's colors under another name: the color is black now (the Midnight theme stays)
     for (key in listOf(Settings.PREF_THEME_COLORS, Settings.PREF_THEME_COLORS_NIGHT))
         if (prefs.getString(key, null) == "midnight") prefs.edit { putString(key, KeyboardTheme.THEME_BLACK) }
 }

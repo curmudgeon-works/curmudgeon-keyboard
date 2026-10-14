@@ -109,7 +109,7 @@ class AppearanceDraft private constructor(
         }
     }
 
-    /** The preferences whose value differs from the snapshot; a palette on the app-wide list too (its Colours rows). */
+    /** The preferences whose value differs from the snapshot; a palette on the app-wide list too (its Colors rows). */
     fun changedKeys(ctx: Context): Set<String> {
         val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
         val now = AppearanceLooks.screenValues(ProfilePreferences(real) { setId })
@@ -246,7 +246,7 @@ class AppearanceDraft private constructor(
         }
 
         /** A stored key beyond the edited set that the screen's saved items reach ([reached]): the saved themes, the
-         *  palettes (the app-wide list; a set's old copy too); in any set, the theme choice, the light and dark colours'
+         *  palettes (the app-wide list; a set's old copy too); in any set, the theme choice, the light and dark colors'
          *  choice; in every keyboard's own set, its theme settings. */
         private fun reachesBeyond(stored: String): Boolean {
             val own = KeyboardProfiles.splitOwnKey(stored)

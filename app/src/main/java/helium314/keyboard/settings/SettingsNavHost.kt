@@ -160,7 +160,7 @@ fun SettingsNavHost(
         screen(SettingsDestination.LayoutFiles + "{subtype}") {
             LayoutFilesScreen(keyboard = it.arguments?.getString("subtype")!!.toSettingsSubtype(), onClickBack = ::goBack)
         }
-        // made: the editor opened on a palette "Add your own" just made, with the colours selected before it (2026-10-10)
+        // made: the editor opened on a palette "Add your own" just made, with the colors selected before it (2026-10-10)
         screen(SettingsDestination.Colors + "{theme}", optional = listOf(SettingsDestination.MADE)) {
             ColorsScreen(isNight = false, theme = it.arguments?.getString("theme"), made = it.arguments?.getString(SettingsDestination.MADE), onClickBack = ::goBack)
         }
@@ -243,7 +243,7 @@ object SettingsDestination {
     internal const val NO_SET = -1
     /** [route] for the screens of keyboard set [setId] (null: no keyboard's own). */
     fun inSet(route: String, setId: Int?): String = if (setId == null) route else if ('?' in route) "$route&$SET=$setId" else "$route?$SET=$setId"
-    /** The Colors screens' argument: the palette was just made by "Add your own", these colours were selected before. */
+    /** The Colors screens' argument: the palette was just made by "Add your own", these colors were selected before. */
     const val MADE = "made"
     /** The keyboard set of a back stack entry, or null. */
     fun setIdOf(entry: NavBackStackEntry?): Int? = entry?.arguments?.getInt(SET, NO_SET)?.takeIf { it != NO_SET }

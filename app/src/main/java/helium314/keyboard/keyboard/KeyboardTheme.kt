@@ -53,15 +53,15 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
         // new themes that are just colors
         const val THEME_LIGHT = "light"
         const val THEME_HOLO_WHITE = "holo_white"
-        const val THEME_HOLO_LIGHT = "holo_light" // light twin of Holo White (the Holo classic theme's light colours)
+        const val THEME_HOLO_LIGHT = "holo_light" // light twin of Holo White (the Holo classic theme's light colors)
         const val THEME_DARK = "dark"
         const val THEME_DARKER = "darker"
         const val THEME_BLACK = "black"
         const val THEME_DYNAMIC = "dynamic"
-        /** What Dynamic (wallpaper colours, Android 12+) shows on an older phone: Midnight's black (decision 2026-10-07;
+        /** What Dynamic (wallpaper colors, Android 12+) shows on an older phone: Midnight's black (decision 2026-10-07;
          *  it fell back to Light, a white keyboard in dark mode too). */
         fun dynamicFallback(sdk: Int): String = if (sdk >= Build.VERSION_CODES.S) THEME_DYNAMIC else THEME_BLACK
-        // Black's colours with Curmudgeon's orange swipe trail (the suggestions follow the trail) (2026-10-06)
+        // Black's colors with Curmudgeon's orange swipe trail (the suggestions follow the trail) (2026-10-06)
         const val THEME_CURMUDGEON = "curmudgeon"
         const val THEME_BLUE_GRAY = "blue_gray"
         const val THEME_BROWN = "brown"
@@ -70,7 +70,7 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
         const val THEME_FOREST = "forest"
         const val THEME_INDIGO = "indigo"
         const val THEME_OCEAN = "ocean"
-        const val THEME_OCEAN_LIGHT = "ocean_light" // light twin of Ocean (the Rounded ocean theme's light colours)
+        const val THEME_OCEAN_LIGHT = "ocean_light" // light twin of Ocean (the Rounded ocean theme's light colors)
         const val THEME_PINK = "pink"
         const val THEME_SAND = "sand"
         const val THEME_VIOLETTE = "violette"
@@ -147,7 +147,7 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
         fun followsPhone(prefs: SharedPreferences) = prefs.getBoolean(Settings.PREF_THEME_DAY_NIGHT, Defaults.PREF_THEME_DAY_NIGHT)
 
         /** Dark or light: the phone's mode ([phoneNight]) when the keyboard follows it, else light (2026-10-06: one rule for
-         *  every theme, the Dynamic colours too). */
+         *  every theme, the Dynamic colors too). */
         @JvmStatic
         fun nightFor(phoneNight: Boolean, prefs: SharedPreferences) = followsPhone(prefs) && phoneNight
 
@@ -167,8 +167,8 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             val themeStyle = prefs.getString(Settings.PREF_THEME_STYLE, Defaults.PREF_THEME_STYLE)
 
             val themeColors = getThemeColors(themeName!!, themeStyle!!, context, prefs, isNight)
-            // the accent colour picked for the keyboard over the theme's, in the palette editor too (decided 2026-10-07: what
-            // the keyboard will show; the trail always read the picked colour)
+            // the accent color picked for the keyboard over the theme's, in the palette editor too (decided 2026-10-07: what
+            // the keyboard will show; the trail always read the picked color)
             val colors = if (prefs.contains(Settings.PREF_GESTURE_TRAIL_COLOR))
                 helium314.keyboard.latin.common.AccentOverride(themeColors,
                     prefs.getInt(Settings.PREF_GESTURE_TRAIL_COLOR, Defaults.PREF_GESTURE_TRAIL_COLOR))
@@ -216,7 +216,7 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                     keyboardBackground = backgroundImage
                 )
                 // the Holo key drawables are grey already, so Holo tints them white; the other styles paint their keys
-                // in these colours as they are, so they get the grey Holo keys look (white keys = white on white)
+                // in these colors as they are, so they get the grey Holo keys look (white keys = white on white)
                 THEME_HOLO_WHITE -> DefaultColors(
                     themeStyle,
                     hasBorders,
@@ -514,7 +514,7 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             }.toSortedSet()
 
         /**
-         * A new palette's colours (the Colors list's "Add your own", 2026-10-07): those of the scheme [fromTheme] as the
+         * A new palette's colors (the Colors list's "Add your own", 2026-10-07): those of the scheme [fromTheme] as the
          * keyboard shows it, each set (not "auto"), so the editor opens on a copy of what is selected.
          */
         fun seedUserColors(context: Context, prefs: SharedPreferences, fromTheme: String, isNight: Boolean): List<ColorSetting> {

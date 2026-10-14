@@ -29,7 +29,7 @@ class OwnSetRenamesTest {
     @Before fun setUp() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
     @After fun tearDown() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
 
-    // an upgrader from before 0.3.008 whose keyboard 1 has its own colours, "midnight" as both had then
+    // an upgrader from before 0.3.008 whose keyboard 1 has its own colors, "midnight" as both had then
     private fun midnightOnBoth(separate: Boolean) {
         real.edit {
             putInt(Settings.PREF_VERSION_CODE, 3901)
@@ -42,7 +42,7 @@ class OwnSetRenamesTest {
         checkVersionUpgrade(ctx)
     }
 
-    @Test fun `a keyboard's own midnight colours become black, then follow the defaults like the shared set`() {
+    @Test fun `a keyboard's own midnight colors become black, then follow the defaults like the shared set`() {
         midnightOnBoth(separate = true)
         assertNotEquals("midnight", real.all["p1/$colors"])
         assertNotEquals("midnight", real.all["p1/${Settings.PREF_THEME_COLORS_NIGHT}"])
@@ -51,7 +51,7 @@ class OwnSetRenamesTest {
         assertEquals(Defaults.PREF_THEME_COLORS, one.getString(colors, Defaults.PREF_THEME_COLORS))
     }
 
-    @Test fun `a hidden set's own midnight colours become black too`() {
+    @Test fun `a hidden set's own midnight colors become black too`() {
         midnightOnBoth(separate = false)
         assertNotEquals("midnight", real.all["p1/$colors"])
         assertNotEquals("midnight", real.all["p1/${Settings.PREF_THEME_COLORS_NIGHT}"])

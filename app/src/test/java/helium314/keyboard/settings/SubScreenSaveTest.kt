@@ -35,7 +35,7 @@ class SubScreenSaveTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
     private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
-    // a palette as the editor stores it (the keyboard reads it as it loads), before and after a colour change
+    // a palette as the editor stores it (the keyboard reads it as it loads), before and after a color change
     private val before = """[{"name":"background","auto":false,"color":-1}]"""
     private val edited = """[{"name":"background","auto":false,"color":-16777216}]"""
 
@@ -68,7 +68,7 @@ class SubScreenSaveTest {
         // Sunset deleted, as AppearanceScreen's delete dialog does it
         AppearanceLooks.save(real, emptyList(), now = true)
         AppearanceLooks.choiceRenamed(ctx, "Sunset", null)
-        // the palette editor: a colour of Warm changed, then "Save and exit"
+        // the palette editor: a color of Warm changed, then "Save and exit"
         real.edit().putString(Settings.PREF_USER_COLORS_PREFIX + "Warm", edited).commit()
         paletteEditorSaved("Warm", "Warm")
         assertTrue(AppearanceDraft.activeOrNull()!!.hasChanges(ctx)) // Appearance shows unsaved changes
@@ -76,7 +76,7 @@ class SubScreenSaveTest {
         assertEquals("Sunset", AppearanceLooks.load(real).single().name)
         assertEquals("Sunset", real.getString(own(2, AppearanceLooks.PREF_SELECTED), null))
         assertEquals("Warm", real.getString(own(2, Settings.PREF_THEME_COLORS), null))
-        assertEquals(before, real.getString(Settings.PREF_USER_COLORS_PREFIX + "Warm", null)) // the colour too
+        assertEquals(before, real.getString(Settings.PREF_USER_COLORS_PREFIX + "Warm", null)) // the color too
     }
 
     @Test fun `after the palette editor saved, Appearance still has the change to save, and its Save keeps it`() {

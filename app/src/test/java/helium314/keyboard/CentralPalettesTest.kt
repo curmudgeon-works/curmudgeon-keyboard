@@ -35,8 +35,8 @@ import kotlin.test.assertTrue
 
 /**
  * Palettes are one app-wide list (owner 2026-10-11: "palettes are one app-wide list", like saved themes and Layouts): a
- * keyboard's light and dark colours and a saved theme name one, nobody holds a copy. Edit: each other user takes the new
- * colours, the default ones, or the old ones as "Warm 2" (one for all keepers); delete: all to default, or only this
+ * keyboard's light and dark colors and a saved theme name one, nobody holds a copy. Edit: each other user takes the new
+ * colors, the default ones, or the old ones as "Warm 2" (one for all keepers); delete: all to default, or only this
  * keyboard; rename: everyone follows; Appearance's Discard undoes it all; the one-time move gathers the sets' and themes'
  * copies; the factory reset's 4th tick covers them.
  * Keyboard A ("Work", enabled, edited) = set 1, B (French, enabled) = set 2, C (German, switched off) = set 3; separate
@@ -81,7 +81,7 @@ class CentralPalettesTest {
         KeyboardProfiles.refreshImeId(real)
     }
 
-    /** "Warm" on the list with the new colours, chosen by A (day), B (day and night) and C (day); theme "Sunset" names it. */
+    /** "Warm" on the list with the new colors, chosen by A (day), B (day and night) and C (day); theme "Sunset" names it. */
     private fun everyoneOnWarm() {
         real.edit {
             putString(warm, "new")
@@ -117,7 +117,7 @@ class CentralPalettesTest {
 
     // ---- edit: three options each ----
 
-    @Test fun `edit - B takes the new colours`() {
+    @Test fun `edit - B takes the new colors`() {
         everyoneOnWarm()
         assertNull(Palettes.afterEdit(real, "Warm", old, mapOf(b to Choice.NEW), emptyMap()))
         assertEquals("Warm", real.getString(own(2, day), null)); assertEquals("Warm", real.getString(own(2, night), null))
@@ -125,7 +125,7 @@ class CentralPalettesTest {
     }
 
     // (owner 2026-10-11: "Would this still cause Warm 2 to be created if no users exist for it?": no)
-    @Test fun `edit - every user on the new colours, the question's starting choice - no Warm 2 on the list`() {
+    @Test fun `edit - every user on the new colors, the question's starting choice - no Warm 2 on the list`() {
         everyoneOnWarm()
         assertNull(Palettes.afterEdit(real, "Warm", old, mapOf(b to Choice.NEW, c to Choice.NEW), mapOf("Sunset" to Choice.NEW)))
         assertEquals(listOf(warm), paletteKeys())
@@ -133,16 +133,16 @@ class CentralPalettesTest {
         assertEquals("Warm", sunset().values[day])
     }
 
-    @Test fun `edit - B goes to the default colours, both its slots`() {
+    @Test fun `edit - B goes to the default colors, both its slots`() {
         everyoneOnWarm()
         Palettes.afterEdit(real, "Warm", old, mapOf(b to Choice.DEFAULT), emptyMap())
         assertNull(real.getString(own(2, day), null)); assertNull(real.getString(own(2, night), null))
         assertFalse(real.contains(mark(2, day))); assertFalse(real.contains(mark(2, night))) // (owner 2026-10-11: no default marks; nothing stored = the default)
-        assertEquals("Warm", real.getString(own(1, day), null)) // (the edited one: the new colours)
+        assertEquals("Warm", real.getString(own(1, day), null)) // (the edited one: the new colors)
         assertEquals(listOf(warm), paletteKeys())
     }
 
-    @Test fun `edit - B keeps the old colours as Warm 2, both its slots`() {
+    @Test fun `edit - B keeps the old colors as Warm 2, both its slots`() {
         everyoneOnWarm()
         assertEquals("Warm 2", Palettes.afterEdit(real, "Warm", old, mapOf(b to Choice.KEEP_OLD), emptyMap()))
         assertEquals("Warm 2", real.getString(own(2, day), null)); assertEquals("Warm 2", real.getString(own(2, night), null))
@@ -157,7 +157,7 @@ class CentralPalettesTest {
         assertEquals(listOf(warm, warm2), paletteKeys()) // (one palette for all of them)
     }
 
-    @Test fun `edit - a theme goes to the default colours or takes the new`() {
+    @Test fun `edit - a theme goes to the default colors or takes the new`() {
         everyoneOnWarm()
         AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Sunset", mapOf(day to "Warm")),
             AppearanceLooks.Look("Dusk", mapOf(day to "Warm", night to "Warm"))), now = true)
@@ -167,7 +167,7 @@ class CentralPalettesTest {
         assertEquals("Warm", AppearanceLooks.load(real).single { it.name == "Dusk" }.values[night])
     }
 
-    @Test fun `edit - the old colours' palette counts up past a taken Warm 2`() {
+    @Test fun `edit - the old colors' palette counts up past a taken Warm 2`() {
         everyoneOnWarm()
         real.edit { putString(warm2, "other") }
         assertEquals("Warm 3", Palettes.afterEdit(real, "Warm", old, mapOf(b to Choice.KEEP_OLD), emptyMap()))
@@ -229,7 +229,7 @@ class CentralPalettesTest {
 
     // ---- saved themes name palettes ----
 
-    @Test fun `a saved theme names the palette, with no copy of its colours`() {
+    @Test fun `a saved theme names the palette, with no copy of its colors`() {
         everyoneOnWarm()
         val values = AppearanceLooks.snapshot(view(1))
         assertEquals("Warm", values[day])
@@ -253,9 +253,9 @@ class CentralPalettesTest {
         val x = "[x]"; val y = "[y]"; val z = "[z]"; val k = "[k]"
         real.edit {
             putString(own(1, warm), x); putString(own(1, day), "Warm")
-            putString(own(2, warm), x); putString(own(2, day), "Warm") // same name, same colours: one
-            putString(own(3, warm), y); putString(own(3, day), "Warm") // other colours: numbered
-            putInt(own(3, Settings.PREF_USER_MORE_COLORS_PREFIX + "Warm"), 0) // ("main colours", the default: the same)
+            putString(own(2, warm), x); putString(own(2, day), "Warm") // same name, same colors: one
+            putString(own(3, warm), y); putString(own(3, day), "Warm") // other colors: numbered
+            putInt(own(3, Settings.PREF_USER_MORE_COLORS_PREFIX + "Warm"), 0) // ("main colors", the default: the same)
             putString(own(2, Settings.PREF_USER_COLORS_PREFIX + "~custom:1"), k); putString(own(2, night), "~custom:1") // a kept copy
             putBoolean(own(1, KeyboardProfiles.TOMBSTONE + Settings.PREF_USER_COLORS_PREFIX + "Gone"), true) // (an old mark of one)
         }
@@ -268,7 +268,7 @@ class CentralPalettesTest {
             Palettes.list(real.all).mapValues { it.value[Settings.PREF_USER_COLORS_PREFIX] })
         assertEquals(listOf("Warm", "Warm", "Warm 2"), (1..3).map { real.getString(own(it, day), null) })
         assertEquals("Palette 1", real.getString(own(2, night), null))
-        assertEquals("Warm 2", sunset().values[day]) // (its copy had Warm 2's colours)
+        assertEquals("Warm 2", sunset().values[day]) // (its copy had Warm 2's colors)
         assertTrue(sunset().values.keys.none { Palettes.isKey(it) })
         assertTrue(real.all.keys.none { k2 -> KeyboardProfiles.splitOwnKey(k2)?.second?.let { Palettes.isKey(it) } == true })
         // (the old mark: not the move's, the marks' cleanup after it takes it; (owner 2026-10-11: no default marks; nothing stored = the default))

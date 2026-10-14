@@ -588,16 +588,16 @@
     <string name="update_item_theme">Theme “%s”</string>
     <!-- the palette editor's Save when other keyboards or saved themes use the palette (owner 2026-10-11: palettes are one app-wide list); %s = its name -->
     <string name="palette_edit_title">Save “%s”?</string>
-    <string name="palette_edit_text">This keyboard takes the new colours. Choose what each one below takes.</string>
-    <string name="palette_take_new">The new colours</string>
-    <string name="palette_take_default">The default colours</string>
-    <!-- %s = the palette the old colours are kept as, the next free number: "Warm 2" -->
-    <string name="palette_take_old">The old colours, as “%s”</string>
+    <string name="palette_edit_text">This keyboard takes the new colors. Choose what each one below takes.</string>
+    <string name="palette_take_new">The new colors</string>
+    <string name="palette_take_default">The default colors</string>
+    <!-- %s = the palette the old colors are kept as, the next free number: "Warm 2" -->
+    <string name="palette_take_old">The old colors, as “%s”</string>
     <!-- the trash on a palette other keyboards or saved themes use; %s = its name -->
     <string name="palette_delete_title">Delete “%s”?</string>
     <!-- %s = the keyboards and saved themes using it, one per line -->
     <string name="palette_delete_users">Also used by:\n%s</string>
-    <string name="palette_delete_text">All to default: they and this keyboard go to the default colours, and “%1$s” leaves the list. Only this keyboard: this keyboard goes to the default colours, they keep “%1$s”.</string>
+    <string name="palette_delete_text">All to default: they and this keyboard go to the default colors, and “%1$s” leaves the list. Only this keyboard: this keyboard goes to the default colors, they keep “%1$s”.</string>
     <string name="palette_delete_all">All to default</string>
     <string name="palette_delete_only_here">Only this keyboard</string>
     <string name="update_item_icon">Update with this keyboard\'s settings</string>
@@ -933,7 +933,7 @@
     <string name="appearance_keep_message">Keep: the keyboard stays as it looks now. Discard: it goes back to how it looked when you opened Appearance.</string>
     <string name="appearance_keep">Keep</string>
     <string name="appearance_discard">Discard</string>
-    <!-- %s: the name the new colour theme gets unless renamed -->
+    <!-- %s: the name the new color theme gets unless renamed -->
     <string name="add_color_theme">Add your own</string>
     <string name="voice" tools:keep="@string/voice">Voice input</string>
     <string name="numpad" tools:keep="@string/numpad" translatable="false">@string/layout_numpad</string>
@@ -1097,7 +1097,7 @@
     <!-- About: entry naming where the built-in word lists come from -->
     <string name="dictionary_sources_title">Dictionary sources</string>
     <!-- About: description under "Dictionary sources" -->
-    <string name="dictionary_sources_summary">Where the built-in word lists come from, and their licences</string>
+    <string name="dictionary_sources_summary">Where the built-in word lists come from, and their licenses</string>
     <string name="subtype_hi_Latn">Hinglish</string>
     <!-- Description for Mansi (https://en.wikipedia.org/wiki/Mansi_languages) keyboard subtype -->
     <string name="subtype_mns">Mansi</string>

@@ -596,7 +596,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     }
 
     // a word removed 3 times comes back only when you say so, once typed often enough again (RemovedWords): a "+" right
-    // after the typed word, in its colour and size, is the say-so (tapping the word itself types it, as always)
+    // after the typed word, in its color and size, is the say-so (tapping the word itself types it, as always)
     private var confirmMarker: TextView? = null
 
     private fun addConfirmMarker() {

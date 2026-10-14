@@ -11,29 +11,29 @@ import helium314.keyboard.settings.preferences.RestorePlan
 
 /**
  * The user's palettes: one app-wide list, like the saved themes and Layouts (owner 2026-10-11: "palettes are one
- * app-wide list"). Stored plain, app-wide ([KeyboardProfiles.isAppWide]), in the colour formats of before: [prefixes]
- * + name. A keyboard's light and dark colours ([slots], in its set) and a saved theme name one; nobody holds a copy
+ * app-wide list"). Stored plain, app-wide ([KeyboardProfiles.isAppWide]), in the color formats of before: [prefixes]
+ * + name. A keyboard's light and dark colors ([slots], in its set) and a saved theme name one; nobody holds a copy
  * (owner: "agree with your suggestion", themes name palettes). The built-in palettes are code: an app update changing
  * one reaches every keyboard and theme naming it, nothing of them is stored.
  * Everything here is done at once; the open Appearance screen's Discard undoes it everywhere (its snapshot holds the
- * list, every set's colour choices and the saved themes; owner 2026-10-11: "everything shuld be held for save/discard").
+ * list, every set's color choices and the saved themes; owner 2026-10-11: "everything shuld be held for save/discard").
  */
 object Palettes {
     val prefixes = listOf(Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
-    /** A keyboard's (and a saved theme's) light and dark colours: a palette's name. */
+    /** A keyboard's (and a saved theme's) light and dark colors: a palette's name. */
     val slots = listOf(Settings.PREF_THEME_COLORS, Settings.PREF_THEME_COLORS_NIGHT)
 
     fun isKey(key: String) = prefixes.any { key.startsWith(it) }
     fun keys(name: String) = prefixes.map { it + name }
     private fun nameOf(key: String): String? = prefixes.firstOrNull { key.startsWith(it) }?.let { key.removePrefix(it) }
 
-    /** Palette [name]'s colours in [values] (plain keys), prefix -> value; "main colours" (the default of more colours)
+    /** Palette [name]'s colors in [values] (plain keys), prefix -> value; "main colors" (the default of more colors)
      *  left out, so two palettes compare by what they show. */
     fun colorsIn(values: Map<String, *>, name: String): Map<String, Any?> =
         prefixes.mapNotNull { p -> values[p + name]?.let { p to it } }
             .filter { (p, v) -> p != Settings.PREF_USER_MORE_COLORS_PREFIX || v != Defaults.PREF_USER_MORE_COLORS }.toMap()
 
-    /** The list in [values] (stored keys: the plain ones), name -> colours. */
+    /** The list in [values] (stored keys: the plain ones), name -> colors. */
     fun list(values: Map<String, *>): Map<String, Map<String, Any?>> =
         values.keys.mapNotNullTo(sortedSetOf<String>()) { if (KeyboardProfiles.splitOwnKey(it) == null) nameOf(it) else null }
             .associateWith { colorsIn(values, it) }
@@ -42,12 +42,12 @@ object Palettes {
         for ((prefix, value) in colors) KeyboardProfiles.put(editor, prefix + name, value)
     }
 
-    /** The saved themes naming one of [names] (light or dark colours). */
+    /** The saved themes naming one of [names] (light or dark colors). */
     fun themesUsing(real: SharedPreferences, names: Collection<String>): List<String> =
         AppearanceLooks.load(real).filter { look -> slots.any { look.values[it] in names } }.map { it.name }
 
     /** [look] with each slot naming [from] naming [to] (null: at its default, nothing remembered: the app's default
-     *  colours whatever "Saved items take new defaults" says). */
+     *  colors whatever "Saved items take new defaults" says). */
     private fun withSlots(look: AppearanceLooks.Look, from: String, to: String?): AppearanceLooks.Look {
         val naming = slots.filter { look.values[it] == from }
         if (naming.isEmpty()) return look
@@ -67,19 +67,19 @@ object Palettes {
      *  app default; use 'Warm N', not 'Custom N'"). */
     enum class Choice { NEW, DEFAULT, KEEP_OLD }
 
-    /** The name the keepers' copy of [name]'s old colours gets: the next free one counting up, "Warm 2" (owner
+    /** The name the keepers' copy of [name]'s old colors gets: the next free one counting up, "Warm 2" (owner
      *  2026-10-11: "keep the existing version called Warm 2"; [RestorePlan.nextFreeName]). */
     fun keeperName(real: SharedPreferences, name: String): String =
         RestorePlan.nextFreeName(name, list(real.all).keys + name)
 
     /**
-     * Palette [name] was saved with new colours in the palette editor; the keyboard edited takes them. [old]: its
-     * colours when the editor opened (prefix -> value). Each other keyboard ([keyboards]) and saved theme ([themes])
+     * Palette [name] was saved with new colors in the palette editor; the keyboard edited takes them. [old]: its
+     * colors when the editor opened (prefix -> value). Each other keyboard ([keyboards]) and saved theme ([themes])
      * using it takes what was chosen for it, in every slot naming it (owner 2026-10-11: "one palette, edits reach every
-     * slot using it"): the new colours (nothing to do), the app's default colours, or the old colours as one new palette
+     * slot using it"): the new colors (nothing to do), the app's default colors, or the old colors as one new palette
      * on the list shared by all keepers ([keeperName]); none keeping them, no such palette is made (owner 2026-10-11:
      * "Would this still cause Warm 2 to be created if no users exist for it?": no).
-     * @return the keepers' palette, null when nobody keeps the old colours
+     * @return the keepers' palette, null when nobody keeps the old colors
      */
     fun afterEdit(real: SharedPreferences, name: String, old: Map<String, Any?>,
                   keyboards: Map<SettingsSubtype, Choice>, themes: Map<String, Choice>): String? {
@@ -115,8 +115,8 @@ object Palettes {
     /**
      * Deletes palette [name] (owner 2026-10-11: "Move all to default, Or keep all on Warm and move this to default").
      * [onlyHere] false: every keyboard (each set, switched-off and hidden ones too) and saved theme naming it goes to
-     * the app's default colours, and it leaves the list; nobody else using it, this is the plain delete. True: only the
-     * keyboard edited ([prefs], its view) goes to the default colours, the palette stays for the others.
+     * the app's default colors, and it leaves the list; nobody else using it, this is the plain delete. True: only the
+     * keyboard edited ([prefs], its view) goes to the default colors, the palette stays for the others.
      */
     fun delete(real: SharedPreferences, prefs: SharedPreferences, name: String, onlyHere: Boolean) {
         if (onlyHere) {
@@ -157,9 +157,9 @@ object Palettes {
         if (name.startsWith(OLD_KEPT)) "$KEPT_BASE ${name.removePrefix(OLD_KEPT).toIntOrNull() ?: 1}" else name
 
     /**
-     * Where palette [name] with [colors] lands in [list] (added to it in place): [byContent], the one with these colours
+     * Where palette [name] with [colors] lands in [list] (added to it in place): [byContent], the one with these colors
      * whatever its name (a restore, as saved themes); else the one of that name, or one numbered from it ([origins]),
-     * with these colours. None: [name] when free (and not [reserved]), else the next free number counting up, "Warm 2".
+     * with these colors. None: [name] when free (and not [reserved]), else the next free number counting up, "Warm 2".
      * An old kept copy "~custom:N" is "Palette N".
      */
     private fun land(list: MutableMap<String, Map<String, Any?>>, origins: MutableMap<String, MutableSet<String>>, name: String,
@@ -174,20 +174,20 @@ object Palettes {
         return landed
     }
 
-    /** [values] (a keyboard's settings or a saved theme's, plain keys) without palette colours, its slots naming
+    /** [values] (a keyboard's settings or a saved theme's, plain keys) without palette colors, its slots naming
      *  palettes as [renames] says. */
     fun renamedIn(values: Map<String, Any?>, renames: Map<String, String>): Map<String, Any?> =
         values.filterKeys { !isKey(it) }.mapValues { (key, value) -> if (key in slots && value is String) renames[value] ?: value else value }
 
     /**
-     * Once (owner 2026-10-11: "Backward one-time move into the list: minimal; same name other colours → numbered"): the
+     * Once (owner 2026-10-11: "Backward one-time move into the list: minimal; same name other colors → numbered"): the
      * palettes in the keyboards' sets ("p<id>/user_*colors_*") and in the saved themes move into the list, in this
-     * order: the list as it is, the sets by id, the themes as listed. Same name and colours: one; same name, other
-     * colours: the later one numbered ("Warm 2"), and the set or theme naming it names that; an old kept copy
+     * order: the list as it is, the sets by id, the themes as listed. Same name and colors: one; same name, other
+     * colors: the later one numbered ("Warm 2"), and the set or theme naming it names that; an old kept copy
      * "~custom:N": "Palette N" (or the next free number), its users following. The copies go (their old marks with
      * [KeyboardProfiles.removeDefaultMarks], after this). After
      * [KeyboardProfiles.dropCommonSet] (the common set's palettes are deleted there, owner: "fine to delete due to our
-     * early stages"). Run again (stopped half way): what moved already is found by name and colours.
+     * early stages"). Run again (stopped half way): what moved already is found by name and colors.
      */
     fun centralize(real: SharedPreferences) {
         if (real.getBoolean(CENTRAL_DONE, false)) return
@@ -233,8 +233,8 @@ object Palettes {
 
     /**
      * Restoring some keyboards (until stage 3b: backup-wins naming and a Palettes section in the restore question come
-     * there): the backup's palettes come in like its saved themes, by content: one the phone has with the same colours,
-     * whatever its name, is the phone's; a name the phone uses for other colours gets the next number. From the
+     * there): the backup's palettes come in like its saved themes, by content: one the phone has with the same colors,
+     * whatever its name, is the phone's; a name the phone uses for other colors gets the next number. From the
      * backup's list ([backup], plain keys), and from an older backup its sets' and saved themes' copies ([backupLooks]),
      * the first of a name counting. [phone]: the phone's stored settings. [write]: the new ones are added to [real]
      * (else the names only, for the restore question). @return backup name -> name on the phone

@@ -26,8 +26,8 @@ import java.util.Locale
 import kotlin.test.assertEquals
 
 /** Owner 2026-10-11 ("should fix this fo sho"): a keyboard switched off on the Languages screen keeps its own set, and
- *  a palette saved with new colours reached it unasked; the update question names it, "<name> (switched off)", and
- *  keeping the old colours it gets them as "Warm 2" (owner 2026-10-11: palettes are one app-wide list; was "Custom N").
+ *  a palette saved with new colors reached it unasked; the update question names it, "<name> (switched off)", and
+ *  keeping the old colors it gets them as "Warm 2" (owner 2026-10-11: palettes are one app-wide list; was "Custom N").
  *  Keyboard A ("Work", enabled, edited) = set 1, B (German, switched off) = set 2, its own set chose "Warm". */
 @RunWith(RobolectricTestRunner::class)
 class ReReview2PaletteOffTest {
@@ -47,7 +47,7 @@ class ReReview2PaletteOffTest {
             putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a)))
             putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a)))
             putString(Settings.PREF_SELECTED_SUBTYPE, a.toPref())
-            putString(warm, "new") // (saved with new colours; the editor opened on "old")
+            putString(warm, "new") // (saved with new colors; the editor opened on "old")
             putString(KeyboardProfiles.ownKey(1, Settings.PREF_THEME_COLORS), "Warm")
             putString(bChoice, "Warm")
         }
@@ -69,7 +69,7 @@ class ReReview2PaletteOffTest {
         assertEquals(listOf(offName()), userNames(ctx, users()))
     }
 
-    @Test fun `keeping the old colours, the switched-off keyboard gets them as Warm 2 on the list`() {
+    @Test fun `keeping the old colors, the switched-off keyboard gets them as Warm 2 on the list`() {
         keepOld(users())
         assertEquals("Warm 2", real.getString(bChoice, null))
         assertEquals("old", real.getString(Settings.PREF_USER_COLORS_PREFIX + "Warm 2", null)) // (on the app-wide list)
@@ -77,7 +77,7 @@ class ReReview2PaletteOffTest {
         assertEquals("Warm", real.getString(KeyboardProfiles.ownKey(1, Settings.PREF_THEME_COLORS), null)) // (the edited one: new)
     }
 
-    @Test fun `with one set of settings it is named too, and its own choice keeps the old colours`() {
+    @Test fun `with one set of settings it is named too, and its own choice keeps the old colors`() {
         real.edit { putBoolean("separate_settings_per_keyboard", false) }
         assertEquals(listOf(offName()), userNames(ctx, users()))
         keepOld(users())

@@ -19,9 +19,9 @@ object SettingDefaults {
         Settings.PREF_FONT_FOLLOWS_KEY_TEXT, Settings.PREF_LANGUAGE_SWITCH_KEY, Settings.PREF_SOUND_ON,
         Settings.PREF_SPACE_HORIZONTAL_SWIPE, Settings.PREF_SPACE_VERTICAL_SWIPE, Settings.PREF_TOOLBAR_MODE,
         Settings.PREF_TOOLBAR_VISIBILITY, Settings.PREF_VIBRATE_ON,
-        // not set = the swipe trail's colour (0.3.008): a theme or a backup must not write the fallback orange down
+        // not set = the swipe trail's color (0.3.008): a theme or a backup must not write the fallback orange down
         Settings.PREF_SUGGESTION_TEXT_COLOR,
-        // not set = the theme's swipe trail colour (2026-10-07), the same way
+        // not set = the theme's swipe trail color (2026-10-07), the same way
         Settings.PREF_GESTURE_TRAIL_COLOR,
     )
 

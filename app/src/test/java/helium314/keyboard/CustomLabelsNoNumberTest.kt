@@ -30,7 +30,7 @@ import kotlin.test.assertTrue
 /**
  * Owner 2026-10-11: "Yes, repeats are fine." … "Ok, call them just Custom without number.": the label of a keyboard's
  * own copy of a Layout, theme or popups is "Custom" (with "· from X" while its item exists), a flag, not a number;
- * (the kept palettes "~custom:N", numbered, are gone: owner 2026-10-11, palettes are one app-wide list; the old colours
+ * (the kept palettes "~custom:N", numbered, are gone: owner 2026-10-11, palettes are one app-wide list; the old colors
  * are kept as a real palette "Warm 2", see CentralPalettesTest).
  */
 @RunWith(RobolectricTestRunner::class)
@@ -92,8 +92,8 @@ class CustomLabelsNoNumberTest {
         assertEquals(1, real.getInt(own(1, theme), 0))
     }
 
-    // (owner 2026-10-11: palettes are one app-wide list) the old colours' palette counts up from the name, unique
-    @Test fun `a palette's kept old colours are Warm 2, then Warm 3`() {
+    // (owner 2026-10-11: palettes are one app-wide list) the old colors' palette counts up from the name, unique
+    @Test fun `a palette's kept old colors are Warm 2, then Warm 3`() {
         assertEquals("Warm 2", helium314.keyboard.settings.Palettes.keeperName(real, "Warm"))
         real.edit().putString(Settings.PREF_USER_COLORS_PREFIX + "Warm 2", "[]").commit()
         assertEquals("Warm 3", helium314.keyboard.settings.Palettes.keeperName(real, "Warm"))

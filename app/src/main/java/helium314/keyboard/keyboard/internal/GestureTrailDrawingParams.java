@@ -42,7 +42,7 @@ final class GestureTrailDrawingParams {
     private static final int UNTIL_NEXT_TOUCH = 1_000_000_000; // millisecond, ~11 days
 
     public GestureTrailDrawingParams(final TypedArray mainKeyboardViewAttr) {
-        // the colour picked for this keyboard (Appearance), else the theme's
+        // the color picked for this keyboard (Appearance), else the theme's
         mTrailColor = helium314.keyboard.latin.utils.SuggestionColors.gestureTrailColor(
                 Settings.getInstance().getPrefs(), Settings.getValues().mColors);
         mThemeStartWidth = mainKeyboardViewAttr.getDimension(

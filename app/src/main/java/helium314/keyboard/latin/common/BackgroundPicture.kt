@@ -20,7 +20,7 @@ import kotlin.math.min
 
 /**
  * How a background picture sits on the keyboard. Normally it is scaled without distortion: at [zoom] 1 just enough to
- * cover the keyboard (the edges that don't fit are cut off), below 1 smaller (the rest is the theme's background colour),
+ * cover the keyboard (the edges that don't fit are cut off), below 1 smaller (the rest is the theme's background color),
  * the picture point ([cx], [cy], fractions of its width and height) at the keyboard's centre as far as the edges allow.
  * [stretch]: the whole picture squeezed onto the keyboard, as before 0.1.004.
  * Kept in a file next to the picture ([fileFor]), so themes, Save / Discard and backups carry it with the picture;

@@ -26,8 +26,8 @@ import kotlin.test.assertEquals
 
 /**
  * Restoring some keyboards: the backup's palettes come into the phone's one list by content (owner 2026-10-11: palettes
- * are one app-wide list; until stage 3b): the same colours, any name, are the phone's; a name the phone uses for other
- * colours gets the next number. An older backup's copies in a set or a saved theme come in the same way, its kept
+ * are one app-wide list; until stage 3b): the same colors, any name, are the phone's; a name the phone uses for other
+ * colors gets the next number. An older backup's copies in a set or a saved theme come in the same way, its kept
  * copies "~custom:N" as "Palette N" (before: renumbered "~custom:M"). Its "Custom" labels come in as they are (owner
  * 2026-10-11: labels are just "Custom", no number).
  */
@@ -95,7 +95,7 @@ class PartialRestoreCustomNumbersTest {
         assertEquals(3, restoredOwn(CustomLabels.Kind.THEME.key))
     }
 
-    @Test fun `an older backup's kept copy comes in as Palette 2 when the phone's Palette 1 has other colours`() {
+    @Test fun `an older backup's kept copy comes in as Palette 2 when the phone's Palette 1 has other colors`() {
         phone(own = mapOf(Settings.PREF_THEME_COLORS to "Palette 1"), shared = mapOf(Settings.PREF_USER_COLORS_PREFIX + "Palette 1" to "x"))
         backup(own = mapOf(Settings.PREF_USER_COLORS_PREFIX + hidden1 to "y", Settings.PREF_THEME_COLORS to hidden1,
             Settings.PREF_THEME_COLORS_NIGHT to hidden1))
@@ -108,7 +108,7 @@ class PartialRestoreCustomNumbersTest {
         assertEquals(null, restoredOwn(Settings.PREF_USER_COLORS_PREFIX + "Palette 2"))
     }
 
-    @Test fun `a restored palette with the phone's colours is the phone's, whatever its name`() {
+    @Test fun `a restored palette with the phone's colors is the phone's, whatever its name`() {
         phone(own = emptyMap(), shared = mapOf(Settings.PREF_USER_COLORS_PREFIX + "Warm" to "x"))
         backup(own = mapOf(Settings.PREF_THEME_COLORS to "Hot"), extra = mapOf(Settings.PREF_USER_COLORS_PREFIX + "Hot" to "x"))
         restoreKeyboardsFrom(ctx, zip, listOf(restored), withSettings = true)
@@ -116,7 +116,7 @@ class PartialRestoreCustomNumbersTest {
         assertEquals(null, palette("Hot")) // (not a second one)
     }
 
-    @Test fun `a restored palette whose name the phone uses for other colours comes in numbered`() {
+    @Test fun `a restored palette whose name the phone uses for other colors comes in numbered`() {
         phone(own = emptyMap(), shared = mapOf(Settings.PREF_USER_COLORS_PREFIX + "Warm" to "x"))
         backup(own = mapOf(Settings.PREF_THEME_COLORS to "Warm"), extra = mapOf(Settings.PREF_USER_COLORS_PREFIX + "Warm" to "y"))
         restoreKeyboardsFrom(ctx, zip, listOf(restored), withSettings = true)

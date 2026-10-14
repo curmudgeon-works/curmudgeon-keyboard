@@ -127,8 +127,8 @@ class DeleteKeepsCopiesTest {
     }
 
     // (owner 2026-10-11: palettes are one app-wide list; before, they kept it as Custom N, off the list)
-    @Test fun `a palette in use deleted for all - its keyboards and saved themes go to the default colours`() {
-        real.edit().putString(Settings.PREF_USER_COLORS_PREFIX + "Warm", "colours").putString(own(1, Settings.PREF_THEME_COLORS), "Warm")
+    @Test fun `a palette in use deleted for all - its keyboards and saved themes go to the default colors`() {
+        real.edit().putString(Settings.PREF_USER_COLORS_PREFIX + "Warm", "colors").putString(own(1, Settings.PREF_THEME_COLORS), "Warm")
             .putString(own(2, Settings.PREF_THEME_COLORS), "Warm").commit()
         AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Sunset", mapOf(Settings.PREF_THEME_COLORS to "Warm"))), now = true)
         helium314.keyboard.settings.Palettes.delete(real, view(1), "Warm", onlyHere = false)
@@ -143,11 +143,11 @@ class DeleteKeepsCopiesTest {
         helium314.keyboard.settings.Palettes.delete(real, view(1), "Cold", onlyHere = false)
         assertFalse(real.contains(Settings.PREF_USER_COLORS_PREFIX + "Cold"))
 
-        real.edit().putString(Settings.PREF_USER_COLORS_PREFIX + "Warm", "colours").putString(own(2, Settings.PREF_THEME_COLORS), "Warm").commit()
+        real.edit().putString(Settings.PREF_USER_COLORS_PREFIX + "Warm", "colors").putString(own(2, Settings.PREF_THEME_COLORS), "Warm").commit()
         AppearanceDraft.of(ctx)
         helium314.keyboard.settings.Palettes.delete(real, view(1), "Warm", onlyHere = false)
         AppearanceDraft.rejectOpen(ctx)
         assertEquals("Warm", real.getString(own(2, Settings.PREF_THEME_COLORS), null))
-        assertEquals("colours", real.getString(Settings.PREF_USER_COLORS_PREFIX + "Warm", null))
+        assertEquals("colors", real.getString(Settings.PREF_USER_COLORS_PREFIX + "Warm", null))
     }
 }

@@ -90,7 +90,7 @@ internal fun paletteUsers(ctx: Context, @Suppress("UNUSED_PARAMETER") prefs: Sha
     val editingId = helium314.keyboard.settings.PrefsDraft.currentSetId(ctx)
     val edited = helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(real, editingId)
     // (one without a set of its own yet reads the shared set: listed too, its set comes when it takes the default or the
-    // old colours; review 2026-10-11 C8. The switched-off ones whose own set chose it come last, whether or not separate
+    // old colors; review 2026-10-11 C8. The switched-off ones whose own set chose it come last, whether or not separate
     // settings is on: owner 2026-10-11, "<name> (switched off)")
     val keyboards = otherUsers(ctx, helium314.keyboard.settings.Palettes.slots, edited, helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE) { _, v -> v in names }
     return keyboards to themes
@@ -100,7 +100,7 @@ internal fun paletteUsers(ctx: Context, @Suppress("UNUSED_PARAMETER") prefs: Sha
 fun ColorsScreen(
     isNight: Boolean,
     theme: String?,
-    made: String? = null, // the palette was just made by "Add your own", these colours were selected before
+    made: String? = null, // the palette was just made by "Add your own", these colors were selected before
     onClickBack: () -> Unit
 ) {
     val ctx = LocalContext.current
@@ -114,8 +114,8 @@ fun ColorsScreen(
     var newThemeName by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue(themeName)) }
 
     // Back with changes asks Keep working / Discard and exit / Save and exit (2026-10-10, it saved silently): every
-    // change is live, so this is what the palette and the colours selections were when the editor opened; a palette
-    // just made counts as a change, its Discard deletes it and selects the colours from before
+    // change is live, so this is what the palette and the colors selections were when the editor opened; a palette
+    // just made counts as a change, its Discard deletes it and selects the colors from before
     val prefKey = if (isNight) Settings.PREF_THEME_COLORS_NIGHT else Settings.PREF_THEME_COLORS
     val openedName = rememberSaveable { themeName }
     // what is there as the editor opens (a palette just made: before "Add your own" made it, see AddColorRow): what it
@@ -138,7 +138,7 @@ fun ColorsScreen(
     // would stay what it was before the first change
     fun changed() = made != null || newThemeName.text != openedName || opened.changed()
     fun putBack() {
-        // only what changed goes back: a keyboard following the shared colours choice keeps following it (writing an
+        // only what changed goes back: a keyboard following the shared colors choice keeps following it (writing an
         // unchanged value through the keyboard's view would make it its own, review 2026-10-07 finding 10)
         // a rename goes back first, everyone naming it following back (palettes are one app-wide list, owner 2026-10-11)
         if (newThemeName.text != openedName && !KeyboardTheme.renameUserColors(newThemeName.text, openedName, prefs))
@@ -210,7 +210,7 @@ fun ColorsScreen(
         val uri = result.data?.data ?: return@rememberLauncherForActivityResult
         ctx.getActivity()?.contentResolver?.openOutputStream(uri)?.writer()?.use { it.write(getColorString(prefs, newThemeName.text)) }
     }
-    // a try-it box at the bottom, like Appearance's: the keyboard shows the colours being edited (forced while this
+    // a try-it box at the bottom, like Appearance's: the keyboard shows the colors being edited (forced while this
     // screen is open) and comes up for a moment after each change
     val tryIt = remember { TryItState() }
     val scope = rememberCoroutineScope()
@@ -323,7 +323,7 @@ fun ColorsScreen(
         // kept and back: Appearance's Save or Discard decides it (owner 2026-10-11, see paletteEditorSaved)
         onSaveAndExit = {
             askLeave = false
-            // other keyboards or saved themes using it: which get the new colours (2026-10-11), else saved at once
+            // other keyboards or saved themes using it: which get the new colors (2026-10-11), else saved at once
             if (made == null && paletteUsers().let { it.first.isNotEmpty() || it.second.isNotEmpty() }) askUpdate = true
             else saveAndBack()
         },
@@ -331,7 +331,7 @@ fun ColorsScreen(
     if (askUpdate) {
         val (keyboards, themes) = remember { paletteUsers() }
         val keeper = remember { helium314.keyboard.settings.Palettes.keeperName(ctx.realPrefs(), newThemeName.text) }
-        // each other keyboard and saved theme using it: the new colours, the default ones, or the old ones as "Warm 2"
+        // each other keyboard and saved theme using it: the new colors, the default ones, or the old ones as "Warm 2"
         // (owner 2026-10-11: "each affected keyboard and [theme] should have those options to also take this change, or
         // flip to default, or keep the existing version called Warm 2")
         helium314.keyboard.settings.dialogs.PaletteEditDialog(newThemeName.text, keeper,
@@ -348,7 +348,7 @@ fun ColorsScreen(
     }
     if (chosenColor != null) CompositionLocalProvider(helium314.keyboard.settings.dialogs.LocalPreviewKeyboard provides preview) {
         val oldAllColors = KeyboardTheme.readUserAllColors(prefs, newThemeName.text, null)
-        // the colour shows on the keyboard while it's picked; Cancel puts back what was there
+        // the color shows on the keyboard while it's picked; Cancel puts back what was there
         val opened = helium314.keyboard.settings.rememberPrefSnapshot(prefs, listOf(Settings.PREF_USER_COLORS_PREFIX + newThemeName.text,
             Settings.PREF_USER_ALL_COLORS_PREFIX + newThemeName.text), chosenColorString)
         var confirmed by remember(chosenColorString) { mutableStateOf(false) }
@@ -384,7 +384,7 @@ fun ColorsScreen(
         ) { color ->
             confirmed = true
             write(color)
-            preview.changed(emoji = false) // the new colour on the keyboard for a moment
+            preview.changed(emoji = false) // the new color on the keyboard for a moment
         }
     }
 }

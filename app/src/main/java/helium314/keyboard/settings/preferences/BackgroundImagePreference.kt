@@ -230,7 +230,7 @@ private fun PicturePickerDialog(onDismiss: () -> Unit, onGallery: () -> Unit, on
 
 /**
  * The picture in a frame shaped like the keyboard: pinch to zoom, drag to move (zoomed out as far as the whole picture,
- * the rest is the theme's background colour), or stretched onto the keyboard. Each change shows on the preview
+ * the rest is the theme's background color), or stretched onto the keyboard. Each change shows on the preview
  * keyboard below after a moment; Cancel puts the framing back as it was.
  */
 @Composable

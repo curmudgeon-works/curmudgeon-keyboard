@@ -155,12 +155,12 @@ fun AppearanceScreen(
         SettingsWithoutKey.APPEARANCE_LOOKS,
         SettingsWithoutKey.DIVIDER,
         R.string.appearance_group_theme,
-        // light / dark following the system first; when on, the light and the dark colours sit under it
+        // light / dark following the system first; when on, the light and the dark colors sit under it
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
             Settings.PREF_THEME_DAY_NIGHT else null,
         Settings.PREF_THEME_COLORS,
         if (dayNightMode) Settings.PREF_THEME_COLORS_NIGHT else null,
-        // the keyboard's accent over the theme's: trail, suggestions, enter key (advanced, under the colours; 2026-10-07)
+        // the keyboard's accent over the theme's: trail, suggestions, enter key (advanced, under the colors; 2026-10-07)
         Settings.PREF_GESTURE_TRAIL_COLOR,
         Settings.PREF_SUGGESTION_WORD_PADDING, // spacing between suggestions (advanced; saved with a theme)
         SettingsWithoutKey.FONTS, // keys, symbols, suggestions: one dialog
@@ -307,7 +307,7 @@ fun createAppearanceSettings(context: Context) = listOf(
                 Settings.PREF_SUGGESTION_TEXT_SIZE, Defaults.PREF_SUGGESTION_TEXT_SIZE.toFloat(), 10f..32f,
                 Settings.PREF_SUGGESTION_BOLD, { Defaults.PREF_SUGGESTION_BOLD }, Settings.PREF_SUGGESTION_ITALIC, Settings.PREF_SUGGESTION_UNDERLINE,
                 sizeIsInt = true, sizeText = { "${it.roundToInt()} dp" },
-                // their colour (part of themes), under the size
+                // their color (part of themes), under the size
                 extraKeys = listOf(Settings.PREF_SUGGESTION_TEXT_COLOR),
                 extra = { reload -> helium314.keyboard.settings.preferences.SuggestionColorRow(reload) }),
         ))
@@ -333,7 +333,7 @@ fun createAppearanceSettings(context: Context) = listOf(
             Defaults.PREF_ICON_STYLE,
             live = true,
         ) {
-            // (upstream reset Holo White colours on leaving the Holo style; they're allowed with every style now)
+            // (upstream reset Holo White colors on leaving the Holo style; they're allowed with every style now)
             KeyboardIconsSet.needsReload = true // only relevant for Settings.PREF_CUSTOM_ICON_NAMES
             KeyboardSwitcher.getInstance().setThemeNeedsReload()
         }
@@ -389,7 +389,7 @@ fun createAppearanceSettings(context: Context) = listOf(
                 onClick = { showDialog = true }
             )
         }
-        // back from the colour editor (the list's pencil or Add): the list again
+        // back from the color editor (the list's pencil or Add): the list again
         var reopen by rememberSaveable { mutableStateOf(false) }
         androidx.compose.runtime.LaunchedEffect(Unit) { if (reopen) { reopen = false; showDialog = true } }
         if (showDialog)
@@ -415,7 +415,7 @@ fun createAppearanceSettings(context: Context) = listOf(
                 onClick = { showDialog = true }
             )
         }
-        // back from the colour editor (the list's pencil or Add): the list again
+        // back from the color editor (the list's pencil or Add): the list again
         var reopen by rememberSaveable { mutableStateOf(false) }
         androidx.compose.runtime.LaunchedEffect(Unit) { if (reopen) { reopen = false; showDialog = true } }
         if (showDialog)
@@ -434,7 +434,7 @@ fun createAppearanceSettings(context: Context) = listOf(
         val prefs = LocalContext.current.prefs()
         SwitchPreference(setting, Defaults.PREF_THEME_DAY_NIGHT) { on ->
             // Midnight (black) or Daylight (light) with light / dark turned on: the pair, Daylight in light mode and
-            // Midnight in dark mode (the two themes differ only in their colours); off again: the one it came from
+            // Midnight in dark mode (the two themes differ only in their colors); off again: the one it came from
             val day = prefs.getString(Settings.PREF_THEME_COLORS, Defaults.PREF_THEME_COLORS)
             val night = prefs.getString(Settings.PREF_THEME_COLORS_NIGHT, Defaults.PREF_THEME_COLORS_NIGHT)
             val black = KeyboardTheme.THEME_BLACK; val light = KeyboardTheme.THEME_LIGHT
@@ -920,7 +920,7 @@ private fun tileChanged(tile: String, keys: Set<String>, files: Set<String>): Bo
     }
 }
 
-/** A row that belongs to the one above it (the colours under the light / dark switch): 8 dp closer to it. */
+/** A row that belongs to the one above it (the colors under the light / dark switch): 8 dp closer to it. */
 private fun Modifier.tuckedUnder(): Modifier = layout { measurable, constraints ->
     val placeable = measurable.measure(constraints)
     val pull = 8.dp.roundToPx()

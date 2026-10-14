@@ -86,7 +86,7 @@ class ProfilePreferencesTest {
         val defaults = SettingDefaults.all
         assert(defaults.size > 100) { "only ${defaults.size} defaults found" }
         assertEquals(helium314.keyboard.latin.settings.Defaults.PREF_AUTO_CORRECTION, defaults[helium314.keyboard.latin.settings.Settings.PREF_AUTO_CORRECTION])
-        assertFalse(defaults.containsKey(helium314.keyboard.latin.settings.Settings.PREF_SUGGESTION_TEXT_COLOR)) // its absence means something (the trail colour)
+        assertFalse(defaults.containsKey(helium314.keyboard.latin.settings.Settings.PREF_SUGGESTION_TEXT_COLOR)) // its absence means something (the trail color)
         assertEquals(false, defaults[helium314.keyboard.latin.settings.Settings.PREF_KEY_TEXT_BOLD]) // not set = not bold (2026-10-06)
         // the sizes, one key per screen state, are written out too (saved Layouts and themes use the same table)
         val D = helium314.keyboard.latin.settings.Defaults

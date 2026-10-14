@@ -28,18 +28,18 @@ class AppLookTest {
         prefs = ctx.getSharedPreferences("app_look_test_${System.nanoTime()}", Context.MODE_PRIVATE)
     }
 
-    @Test fun `the app is black and orange only when the colours in use are Black with orange`() {
+    @Test fun `the app is black and orange only when the colors in use are Black with orange`() {
         // nothing chosen: Dynamic
         assertFalse(AppLook.usesCurmudgeon(prefs, dark = true))
         assertFalse(AppLook.usesCurmudgeon(prefs, dark = false))
-        // dark mode follows the phone: the dark colours count in the dark, the light ones in the light
+        // dark mode follows the phone: the dark colors count in the dark, the light ones in the light
         prefs.edit {
             putBoolean(Settings.PREF_THEME_DAY_NIGHT, true)
             putString(Settings.PREF_THEME_COLORS_NIGHT, KeyboardTheme.THEME_CURMUDGEON)
         }
         assertTrue(AppLook.usesCurmudgeon(prefs, dark = true))
         assertFalse(AppLook.usesCurmudgeon(prefs, dark = false))
-        // not following the phone: the one colours setting counts, light or dark
+        // not following the phone: the one colors setting counts, light or dark
         prefs.edit {
             putBoolean(Settings.PREF_THEME_DAY_NIGHT, false)
             putString(Settings.PREF_THEME_COLORS, KeyboardTheme.THEME_CURMUDGEON)
@@ -55,7 +55,7 @@ class AppLookTest {
         assertEquals(Defaults.CURMUDGEON_ORANGE, AppLook.orange)
     }
 
-    @Test fun `the old fixed orange still counts as the strip colour's old default on upgrade`() {
+    @Test fun `the old fixed orange still counts as the strip color's old default on upgrade`() {
         assertTrue(withoutDefaults(mapOf(Settings.PREF_SUGGESTION_TEXT_COLOR to 0xFFFF8C00.toInt())).isEmpty())
         assertEquals(1, withoutDefaults(mapOf(Settings.PREF_SUGGESTION_TEXT_COLOR to 0xFF336699.toInt())).size)
     }

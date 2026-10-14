@@ -28,8 +28,8 @@ import helium314.keyboard.settings.dialogs.ColorPickerDialog
 
 /**
  * The keyboard's accent color (Appearance, advanced, under Colors; 2026-10-07): the swipe trail, the suggestion words
- * (unless theirs is picked) and the enter key, over the theme's. A row with the colour in use as a swatch; the picker
- * shows each colour on the preview keyboard as it's picked, Cancel puts back what was stored, Default = the theme's
+ * (unless theirs is picked) and the enter key, over the theme's. A row with the color in use as a swatch; the picker
+ * shows each color on the preview keyboard as it's picked, Cancel puts back what was stored, Default = the theme's
  * (the key removed: not set means the theme's, so no fixed default).
  */
 @Composable

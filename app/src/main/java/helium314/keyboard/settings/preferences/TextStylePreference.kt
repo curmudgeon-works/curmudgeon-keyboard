@@ -312,7 +312,7 @@ fun FontsPreference(setting: Setting, texts: List<Pair<Int, TextStyleKeys>>) {
         }
     }
 
-    // a dialog of its own opened from a row (the suggestions' colour): this one fades out meanwhile, still open, so
+    // a dialog of its own opened from a row (the suggestions' color): this one fades out meanwhile, still open, so
     // only one set of buttons shows; it comes back as it was
     val subDialogOpen = remember { mutableStateOf(false) }
     CompositionLocalProvider(LocalSubDialogOpen provides subDialogOpen) {
@@ -379,7 +379,7 @@ fun FontsPreference(setting: Setting, texts: List<Pair<Int, TextStyleKeys>>) {
                         },
                         valueRange = k.sizeRange,
                     )
-                    k.extra?.invoke(::reload) // e.g. the suggestions' colour
+                    k.extra?.invoke(::reload) // e.g. the suggestions' color
                 }
             }
         },
@@ -473,12 +473,12 @@ fun EmojiFontPreference(setting: Setting) {
 /** Set while a row's own dialog is open over the Fonts dialog, which then fades out (see FontsPreference). */
 val LocalSubDialogOpen = androidx.compose.runtime.compositionLocalOf<androidx.compose.runtime.MutableState<Boolean>?> { null }
 
-/** The suggestion strip words' colour (a theme setting; orange unless chosen): a swatch opening the colour picker. */
+/** The suggestion strip words' color (a theme setting; orange unless chosen): a swatch opening the color picker. */
 @Composable
 fun SuggestionColorRow(reload: () -> Unit) {
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
-    // (no fixed default noted: not set means the swipe trail's colour, so any colour picked, orange too, is a change)
+    // (no fixed default noted: not set means the swipe trail's color, so any color picked, orange too, is a change)
     var showPicker by remember { mutableStateOf(false) }
     // the Fonts dialog steps aside while the picker is up
     val parentHidden = LocalSubDialogOpen.current
@@ -486,7 +486,7 @@ fun SuggestionColorRow(reload: () -> Unit) {
         parentHidden?.value = showPicker
         onDispose { parentHidden?.value = false }
     }
-    // what the strip shows: the colour picked, else the theme's swipe trail colour (since 0.3.008), read again when a
+    // what the strip shows: the color picked, else the theme's swipe trail color (since 0.3.008), read again when a
     // setting changes (a theme change while this is open shows at once; review 2026-10-06: not on every redraw)
     val changed = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
     val color = remember(changed?.value) { helium314.keyboard.latin.utils.suggestionTextColor(prefs,

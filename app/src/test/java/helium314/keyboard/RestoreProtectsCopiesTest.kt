@@ -43,7 +43,7 @@ import kotlin.test.assertNull
  * A restore of some keyboards never trashes what the phone holds unsaved (owner 2026-10-11: "main concern is to make
  * sure nothing gets trashed"): (1) "What to merge" says once that selected items replace the keyboard's settings,
  * unsaved changes too (owner 2026-10-11: no per-copy warnings); (2) a palette the phone has under that name with other
- * colours is never written over: the backup's comes into the one list under the next number (owner 2026-10-11:
+ * colors is never written over: the backup's comes into the one list under the next number (owner 2026-10-11:
  * palettes are one app-wide list; an older backup's kept copy "~custom:1" is "Palette 1"; before, "~custom:2").
  */
 @RunWith(RobolectricTestRunner::class)
@@ -61,9 +61,9 @@ class RestoreProtectsCopiesTest {
     private val listed1 = Settings.PREF_USER_COLORS_PREFIX + "Palette 1"
     private val listed2 = Settings.PREF_USER_COLORS_PREFIX + "Palette 2"
     private var backupValues: Map<String, Any?> = emptyMap()
-    // two palettes' colours as the app stores them (a JSON list): since the first keyboard's own set is the common one
+    // two palettes' colors as the app stores them (a JSON list): since the first keyboard's own set is the common one
     // (owner 2026-10-11: no separate common set), the phone keyboard's palette is what the keyboard's settings read
-    // when they reload, so the colours must be readable (2026-10-11; "A" / "B" before broke that reload)
+    // when they reload, so the colors must be readable (2026-10-11; "A" / "B" before broke that reload)
     private val paletteA = """[{"name":"background","auto":false,"color":-16777216}]"""
     private val paletteB = """[{"name":"background","auto":false,"color":-1}]"""
 
@@ -212,7 +212,7 @@ class RestoreProtectsCopiesTest {
         assertEquals(paletteB, real.all[listed2])
     }
 
-    @Test fun `the same colours under the same name are the phone's palette - no second one`() {
+    @Test fun `the same colors under the same name are the phone's palette - no second one`() {
         phoneOnPalette1()
         backup(mapOf(dvorak to emptyMap(), colemak to mapOf(Settings.PREF_THEME_COLORS to hidden1, colors1 to paletteA)))
         restoreKeyboardsFrom(ctx, zip, listOf(dvorak, colemak), withSettings = true,

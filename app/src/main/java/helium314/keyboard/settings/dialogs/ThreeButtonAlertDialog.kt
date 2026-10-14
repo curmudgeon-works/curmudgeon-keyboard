@@ -130,7 +130,7 @@ fun ThreeButtonAlertDialog(
             SideEffect {
                 // the dialog stays focusable (back and outside taps work as usual) but tells the system it has no use
                 // for the keyboard, so the one below stays up; no dim, the keyboard is the preview
-                // (a text field being typed in takes the keyboard: the colour picker's hex box)
+                // (a text field being typed in takes the keyboard: the color picker's hex box)
                 if (fieldTyping) window?.clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
                 else window?.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
                 window?.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)

@@ -32,8 +32,8 @@ import org.robolectric.RobolectricTestRunner
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 
-/** Things to do are drawn in the action colour (2026-10-08: Rename / Delete on a keyboard's long-press menu were white
- *  under Black with orange, the list-text colour, while every other button there is orange). */
+/** Things to do are drawn in the action color (2026-10-08: Rename / Delete on a keyboard's long-press menu were white
+ *  under Black with orange, the list-text color, while every other button there is orange). */
 @RunWith(RobolectricTestRunner::class)
 class ActionColorsTest {
     @get:Rule val compose = createEmptyComposeRule()
@@ -55,14 +55,14 @@ class ActionColorsTest {
         assertNotEquals(scheme.primary, scheme.onSurface)
     }
 
-    /** The colour the node's text is laid out with. */
+    /** The color the node's text is laid out with. */
     private fun SemanticsNodeInteraction.textColor(): Color {
         val results = mutableListOf<TextLayoutResult>()
         fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action!!(results)
         return results.first().layoutInput.style.color
     }
 
-    @Test fun `long-press on a keyboard name shows Rename in the action colour`() {
+    @Test fun `long-press on a keyboard name shows Rename in the action color`() {
         val keyboard = SubtypeSettings.getEnabledSubtypes(true).first().toSettingsSubtype()
         compose.mainClock.autoAdvance = false // the screen never idles on its own under Robolectric: step the clock
         ActivityScenario.launch(SettingsActivity::class.java).onActivity {

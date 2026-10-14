@@ -175,7 +175,7 @@ object KeyboardProfiles {
     // (language priorities are the keyboard's since 2026-10-07: a keyboard's own set holds its own when settings are
     // separate; the plain value is what the shared set, and every keyboard without its own, reads)
     // (the palettes: one app-wide list, as saved themes and Layouts; owner 2026-10-11: "palettes are one app-wide list".
-    // A keyboard's light and dark colours name one; helium314.keyboard.settings.Palettes)
+    // A keyboard's light and dark colors name one; helium314.keyboard.settings.Palettes)
     private val globalPrefixes = listOf(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX, "share_user_history_", LanguagePriority.PREF_ADDED_PREFIX, "debug_", "gesture_stats",
         Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
 
@@ -800,7 +800,7 @@ object KeyboardProfiles {
      * restore"), its pictures too; then the common set's keyboard settings and pictures go. A keyboard with a set of its
      * own keeps it as it is, the main one and the others alike (owner 2026-10-11: "Main keyboard got the right treatment
      * when common was trashed. Other keyboards should havr gotten the same."): no gap-filling from the common set, and no
-     * copies of the common colour palettes either (owner 2026-10-11: deleted with the common set). An Add keyboard pick
+     * copies of the common color palettes either (owner 2026-10-11: deleted with the common set). An Add keyboard pick
      * kept for later ("keyboard_start_from", before 2026-10-11) is dropped, not applied (owner 2026-10-11: "don't care about keyboards before this update really").
      * App-wide keys and one-time flags stay.
      */

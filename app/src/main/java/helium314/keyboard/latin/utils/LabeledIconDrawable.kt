@@ -58,7 +58,7 @@ class LabeledIconDrawable(private val icon: Drawable, private val label: String,
     }
 
     // the toolbar tints its keys with a state list (normal / activated): the icon takes it as is, the word
-    // is drawn in the list's colour for the current state
+    // is drawn in the list's color for the current state
     private var tint: ColorStateList? = null
 
     override fun setTintList(tint: ColorStateList?) {

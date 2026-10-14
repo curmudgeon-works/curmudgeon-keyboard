@@ -59,7 +59,7 @@ class Review1010ThemesTest {
     }
 
     // (owner 2026-10-11: "Move all to default"; before, the hidden sets kept it as Custom N)
-    @Test fun `a palette deleted for all leaves every set, hidden ones too, at the default colours`() {
+    @Test fun `a palette deleted for all leaves every set, hidden ones too, at the default colors`() {
         hiddenSetsNamingMyTheme()
         helium314.keyboard.settings.Palettes.delete(real, set(1), "My theme", onlyHere = false) // (separate off: the main set)
         assertFalse(real.contains("${Settings.PREF_USER_COLORS_PREFIX}My theme"))

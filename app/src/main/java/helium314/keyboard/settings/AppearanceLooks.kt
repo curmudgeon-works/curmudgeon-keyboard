@@ -20,7 +20,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * A "look" (theme) is the keyboard's styling saved under a name: colours, background pictures, key borders and gaps,
+ * A "look" (theme) is the keyboard's styling saved under a name: colors, background pictures, key borders and gaps,
  * key and icon style, icons, fonts. Saved looks are one JSON list in the preferences, shared by all keyboards; a
  * look's background pictures are copies in their own folder (see [PICTURES]); also the symbols on the keys (the
  * hide-symbols switches) and the space bar text (since 2026-10-02: a theme saved before keeps the current ones), and the
@@ -61,7 +61,7 @@ object AppearanceLooks {
     private fun complete(values: Map<String, Any?>): Map<String, Any?> = keys.associateWith { null } + values
 
     // (keyboard height, split, numbers row, bottom row size and side padding are Layout & Typing's: not in themes; the
-    // palettes are one app-wide list a theme names by its light and dark colours, no copy: owner 2026-10-11, Palettes)
+    // palettes are one app-wide list a theme names by its light and dark colors, no copy: owner 2026-10-11, Palettes)
     fun inScope(key: String) = key in keys
 
     // on the Appearance screen but not in looks: its Save / Discard (AppearanceDraft) keeps them too
@@ -235,13 +235,13 @@ object AppearanceLooks {
     fun currentPictures(ctx: Context): Look = Look("", mapOf(PICTURES to savePictures(ctx)))
 
     /** The themes that ship with the app, each setting the whole Theme and Emoji groups ([complete]): Dynamic (the
-     *  default, Android 12+) first; Midnight and Daylight one colour set each; the others a light and a dark one
+     *  default, Android 12+) first; Midnight and Daylight one color set each; the others a light and a dark one
      *  following the system. Gaps not named are the default 1% / 2%. */
     fun builtIn(ctx: Context): List<Look> = listOfNotNull(
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S)
             Look(ctx.getString(R.string.theme_preset_dynamic), complete(mapOf(PICTURES to NO_PICTURES,
                 Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
-                // the phone's colours, light or dark as the phone is
+                // the phone's colors, light or dark as the phone is
                 Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_DYNAMIC, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_DYNAMIC,
                 Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to true)))
         else null,
@@ -253,12 +253,12 @@ object AppearanceLooks {
             Settings.PREF_SUGGESTION_WORD_PADDING to 5))),
         Look(ctx.getString(R.string.theme_preset_midnight), complete(mapOf(PICTURES to NO_PICTURES,
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
-            // one colour set, always (the light / dark switch off)
+            // one color set, always (the light / dark switch off)
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_BLACK, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_BLACK,
             Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to false))),
         Look(ctx.getString(R.string.theme_preset_daylight), complete(mapOf(PICTURES to NO_PICTURES,
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
-            // one colour set, always (the light / dark switch off)
+            // one color set, always (the light / dark switch off)
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_LIGHT, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_LIGHT,
             Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to false))),
         Look(ctx.getString(R.string.theme_preset_holo), complete(mapOf(PICTURES to NO_PICTURES,

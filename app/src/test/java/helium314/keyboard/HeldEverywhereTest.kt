@@ -40,7 +40,7 @@ class HeldEverywhereTest {
             .putString("keyboard_profile_ids", JSONObject().put("a", 1).put("b", 2).toString())
             .putString(own(2, AppearanceLooks.PREF_SELECTED), "Sunset")
             .putString(own(2, Settings.PREF_THEME_COLORS), "Warm")
-            .putString(Settings.PREF_USER_COLORS_PREFIX + "Warm", "colours")
+            .putString(Settings.PREF_USER_COLORS_PREFIX + "Warm", "colors")
             .putString(Settings.PREF_THEME_COLORS, "Warm")
             .commit()
         // (a theme names its palette, no copy: owner 2026-10-11, palettes are one app-wide list)
@@ -71,12 +71,12 @@ class HeldEverywhereTest {
         assertTrue(KeyboardTheme.renameUserColors("Warm", "Hot", real))
         val theme = AppearanceLooks.load(real).single()
         assertEquals("Hot", theme.values[Settings.PREF_THEME_COLORS])
-        assertEquals("colours", real.getString(Settings.PREF_USER_COLORS_PREFIX + "Hot", null)) // (the list's)
+        assertEquals("colors", real.getString(Settings.PREF_USER_COLORS_PREFIX + "Hot", null)) // (the list's)
         assertEquals("Hot", real.getString(own(2, Settings.PREF_THEME_COLORS), null))
         AppearanceDraft.rejectOpen(ctx)
         assertEquals("Warm", AppearanceLooks.load(real).single().values[Settings.PREF_THEME_COLORS])
         assertEquals("Warm", real.getString(own(2, Settings.PREF_THEME_COLORS), null))
-        assertEquals("colours", real.getString(Settings.PREF_USER_COLORS_PREFIX + "Warm", null))
+        assertEquals("colors", real.getString(Settings.PREF_USER_COLORS_PREFIX + "Warm", null))
         assertFalse(real.contains(Settings.PREF_USER_COLORS_PREFIX + "Hot"))
     }
 

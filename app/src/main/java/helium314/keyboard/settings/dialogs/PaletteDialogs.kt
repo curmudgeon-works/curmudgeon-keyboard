@@ -24,9 +24,9 @@ import helium314.keyboard.settings.Palettes
 /**
  * The palette editor's Save when other keyboards or saved themes ([others], their names in order) use the palette
  * [name] (owner 2026-10-11: "Each keyboard using it should have three options -- use the new edited; use app default;
- * use 'Warm N', not 'Custom N'"): each takes the new colours, the default ones, or the old ones as [keeper] ("Warm 2",
- * one for all that keep them, made only when one does). Each starts on the new colours (owner 2026-10-11: "on second
- * thought, yes let's do new colours as the default option").
+ * use 'Warm N', not 'Custom N'"): each takes the new colors, the default ones, or the old ones as [keeper] ("Warm 2",
+ * one for all that keep them, made only when one does). Each starts on the new colors (owner 2026-10-11: "on second
+ * thought, yes let's do new colors as the default option").
  */
 @Composable
 fun PaletteEditDialog(
@@ -70,7 +70,7 @@ fun PaletteEditDialog(
 /**
  * The trash on a palette that other keyboards or saved themes ([others], their names) use (owner 2026-10-11: "Move all
  * to default, Or keep all on Warm and move this to default"): [onAll] every one of them and this keyboard go to the
- * default colours and the palette leaves the list; [onOnlyHere] only this keyboard does, the others keep it.
+ * default colors and the palette leaves the list; [onOnlyHere] only this keyboard does, the others keep it.
  */
 @Composable
 fun PaletteDeleteDialog(name: String, others: List<String>, onDismissRequest: () -> Unit, onAll: () -> Unit, onOnlyHere: () -> Unit) {

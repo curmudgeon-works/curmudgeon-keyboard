@@ -59,7 +59,7 @@ fun ColorPickerDialog(
     title: String,
     showDefault: Boolean,
     onDefault: () -> Unit,
-    // set: the colour shows on the preview keyboard as it's picked (a moment after the finger stops), the keyboard stays
+    // set: the color shows on the preview keyboard as it's picked (a moment after the finger stops), the keyboard stays
     // up and the dialog stays clear of it (smaller wheel; the hex box types on that keyboard)
     onPreview: ((Int) -> Unit)? = null,
     onConfirmed: (Int) -> Unit,

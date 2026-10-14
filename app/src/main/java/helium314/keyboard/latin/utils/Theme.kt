@@ -25,10 +25,10 @@ import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.settings.SettingsActivity
 
 /**
- * The settings app's colours: the phone's own (the wallpaper's Material You colours on Android 12+, a fixed accent
- * below) — unless the keyboard's colours in use are Black with orange, when the whole app is black and orange too
+ * The settings app's colors: the phone's own (the wallpaper's Material You colors on Android 12+, a fixed accent
+ * below) — unless the keyboard's colors in use are Black with orange, when the whole app is black and orange too
  * (decided 2026-10-07: that theme carries its look everywhere). Read again when a setting changes, so picking the
- * theme recolours the app at once. [keyboardId]: the keyboard set of the screen on top (null: the main choice, see
+ * theme recolors the app at once. [keyboardId]: the keyboard set of the screen on top (null: the main choice, see
  * KeyboardProfiles.mainEditingId), so opening a keyboard's menu shows that keyboard's look.
  */
 @Composable
@@ -63,8 +63,8 @@ object AppLook {
     /** Curmudgeon's orange, the one the Black with orange theme uses on the keyboard. */
     const val orange = Defaults.CURMUDGEON_ORANGE
 
-    /** Whether the colours the keyboard shows for the app's current mode ([dark]) are Black with orange: the dark
-     *  colours when dark mode follows the phone and the app is dark, else the one colours setting. */
+    /** Whether the colors the keyboard shows for the app's current mode ([dark]) are Black with orange: the dark
+     *  colors when dark mode follows the phone and the app is dark, else the one colors setting. */
     fun usesCurmudgeon(prefs: SharedPreferences, dark: Boolean): Boolean {
         val dayNight = prefs.getBoolean(Settings.PREF_THEME_DAY_NIGHT, Defaults.PREF_THEME_DAY_NIGHT)
         val name = if (dayNight && dark) prefs.getString(Settings.PREF_THEME_COLORS_NIGHT, Defaults.PREF_THEME_COLORS_NIGHT)

@@ -40,9 +40,9 @@
 
     <!-- Choose -->
     <string name="saving_choose_layouts">Puts all its settings and keys on this keyboard. The built-in Layouts always follow the latest defaults.</string>
-    <string name="saving_choose_themes">Puts its colours, fonts, pictures and look on this keyboard.</string>
+    <string name="saving_choose_themes">Puts its colors, fonts, pictures and look on this keyboard.</string>
     <string name="saving_choose_popups">Puts its popups, accents, symbol map and popup order on this keyboard.</string>
-    <string name="saving_choose_palettes">This keyboard\'s light or dark colours. One list of palettes for every keyboard; a saved theme names its palettes, it holds no copy.</string>
+    <string name="saving_choose_palettes">This keyboard\'s light or dark colors. One list of palettes for every keyboard; a saved theme names its palettes, it holds no copy.</string>
     <string name="saving_choose_fonts">This keyboard\'s font for that text.</string>
     <string name="saving_choose_pictures">This keyboard\'s background picture.</string>
     <string name="saving_choose_key_layouts">This keyboard\'s keys for that kind of layout.</string>
@@ -51,7 +51,7 @@
     <!-- Edit -->
     <string name="saving_edit_items">Changes stay on this keyboard, shown as \"Custom · from Sunset\". The saved item changes only with its save icon in the list, which asks which other keyboards using it get the change. Everything waits for the screen\'s Save; Discard undoes it everywhere.</string>
     <string name="saving_edit_popups">Key edits stay on this keyboard, as for Layouts and themes; the set changes only with its save icon. Saved Layouts holding the set are listed with ticks too.</string>
-    <string name="saving_edit_palettes">Edited in the palette editor: every keyboard and saved theme using it changes. If others use it, its Save asks for each, switched-off keyboards too: the new colours, the default ones, or the old ones kept as the next number, \"Warm 2\", one for all that keep them. Discard there, or on Appearance, undoes it all.</string>
+    <string name="saving_edit_palettes">Edited in the palette editor: every keyboard and saved theme using it changes. If others use it, its Save asks for each, switched-off keyboards too: the new colors, the default ones, or the old ones kept as the next number, \"Warm 2\", one for all that keep them. Discard there, or on Appearance, undoes it all.</string>
     <string name="saving_edit_key_layouts">Edits the layout file: every keyboard using it changes. Layout &amp; Typing\'s Discard undoes it.</string>
     <string name="saving_edit_keyboards">With separate settings, each keyboard\'s settings are its own; with one set of settings (the first keyboard\'s), a change reaches every keyboard.</string>
 
@@ -67,7 +67,7 @@
     <!-- Delete -->
     <string name="saving_delete_items">Off the list only. Keyboards using it keep its settings, shown as Custom; nothing goes back to the default. The dialog names them. Waits for the screen\'s Save.</string>
     <string name="saving_delete_popups">Off the list. Keyboards using it keep its popups as Custom; saved Layouts keep its popups without the name, and it never comes back by itself.</string>
-    <string name="saving_delete_palettes">One nothing else uses is deleted. Else you choose: all to default (every keyboard and saved theme using it goes to the default colours, and it leaves the list), or only this keyboard (it goes to the default colours, the others keep the palette). Appearance\'s Discard undoes it.</string>
+    <string name="saving_delete_palettes">One nothing else uses is deleted. Else you choose: all to default (every keyboard and saved theme using it goes to the default colors, and it leaves the list), or only this keyboard (it goes to the default colors, the others keep the palette). Appearance\'s Discard undoes it.</string>
     <string name="saving_delete_fonts">The file goes. Every keyboard and saved theme using it goes back to the default font; you\'re asked first, and the question names them, or says nothing uses it. Waits for the screen\'s Save.</string>
     <string name="saving_delete_pictures">Off the picture list; keyboards and themes keep their copies.</string>
     <string name="saving_delete_key_layouts">Off the list. Every keyboard using it keeps its keys as an unsaved layout of its own, whether it chose it or had it as the default for that part.</string>
@@ -105,7 +105,7 @@
     <string name="saving_partial_keyboards">Untick \"Delete app data and restore from backup\" and choose keyboards (all ticked to start with): one whose language no keyboard on this phone has is marked new and comes in added. For one whose language this phone has, switched-off keyboards included, you\'re asked first: merge it into one of those keyboards (one only, nothing picked for you), or keep it as a separate keyboard. Merging lists only what differs (each part of the keyboard, each menu whose settings differ; its learned and blacklisted words, ticked to start with): a ticked item takes the backup\'s, an unticked one keeps this phone\'s, and nothing ticked restores nothing of it. Either way you can name it; a name another keyboard has gets the next number (counting up one it ends with), and a keyboard that would be the same as another one can\'t be restored until its name or what you merge differs.</string>
     <string name="saving_partial_items">Come in unless one with the same content is here already (then that one is used). A name in use gets the next free number, \"Sunset 2\"; with \"bring them in as copies\" off, it is not brought in, and the restored keyboards that chose it keep its look but name no item: they show \"Custom\" (a Layout that held such a popup set keeps its popups and names no set). A Layout\'s popup set is matched first, and the keyboards point at what their items became.</string>
     <!-- (until stage 3b: by content, as saved themes) -->
-    <string name="saving_partial_palettes">Come in by their colours: one this phone has with the same colours, whatever its name, is used; a name in use for other colours gets the next number, \"Warm 2\". The restored keyboards and themes name that one.</string>
+    <string name="saving_partial_palettes">Come in by their colors: one this phone has with the same colors, whatever its name, is used; a name in use for other colors gets the next number, \"Warm 2\". The restored keyboards and themes name that one.</string>
     <string name="saving_partial_files">Come in like the saved items: the same file here already is used; a name in use for another file gets the next free number, \"Mine 2\", and the restored keyboards, themes (fonts, pictures) and Layouts (key layouts) name that one. This phone\'s file is never replaced, so its other keyboards keep it.</string>
     <string name="saving_partial_words">Added to this phone\'s, never replacing them.</string>
     <string name="saving_partial_switch">The phone\'s \"Saved items take new defaults\" switch stays as it is.</string>

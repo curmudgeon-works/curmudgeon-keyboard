@@ -25,7 +25,7 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /** The settings batch of 2026-10-07 afternoon: palettes (add seeded from the selected scheme, delete that sticks), the
- *  accent colour, the Curmudgeon Layout's defaults, and two review findings on the last commits (Cancel writing a
+ *  accent color, the Curmudgeon Layout's defaults, and two review findings on the last commits (Cancel writing a
  *  shared value into a keyboard's own set; one slot for the keyboard-switch callback). */
 @RunWith(RobolectricTestRunner::class)
 class Batch1007Test {
@@ -52,7 +52,7 @@ class Batch1007Test {
         helium314.keyboard.settings.Palettes.delete(real, prefs, name, onlyHere = false) // (nobody else uses it: the plain delete; owner 2026-10-11: palettes are one app-wide list)
         assertTrue(palette(name).isEmpty(), "still there after the delete: ${palette(name)}")
         assertNotEquals(name, prefs.getString(Settings.PREF_THEME_COLORS, null))
-        assertNotEquals(name, prefs.getString(Settings.PREF_THEME_COLORS_NIGHT, null), "the dark colours still named it")
+        assertNotEquals(name, prefs.getString(Settings.PREF_THEME_COLORS_NIGHT, null), "the dark colors still named it")
         AppearanceDraft.rejectOpen(ctx) // the cross, or Discard and exit
         assertTrue(palette(name).isNotEmpty(), "the cross didn't bring it back")
         assertEquals(name, prefs.getString(Settings.PREF_THEME_COLORS, null))
@@ -70,7 +70,7 @@ class Batch1007Test {
         assertTrue(palette(name).isEmpty())
     }
 
-    @Test fun `a new palette starts from the colours of the scheme selected`() {
+    @Test fun `a new palette starts from the colors of the scheme selected`() {
         val prefs = ctx.prefs()
         val from = KeyboardTheme.THEME_CURMUDGEON
         val seeded = KeyboardTheme.seedUserColors(ctx, prefs, from, false)
@@ -84,9 +84,9 @@ class Batch1007Test {
         assertEquals(Defaults.CURMUDGEON_ORANGE, copy.get(ColorType.ACTION_KEY_BACKGROUND))
     }
 
-    // ---- the accent colour ----
+    // ---- the accent color ----
 
-    @Test fun `the accent colour picked colours the trail and the enter key, else the theme's`() {
+    @Test fun `the accent color picked colors the trail and the enter key, else the theme's`() {
         val prefs = ctx.prefs()
         val theme = KeyboardTheme.getColorsForCurrentTheme(ctx)
         val picked = 0xFF22AA66.toInt()
@@ -105,9 +105,9 @@ class Batch1007Test {
         val own = ProfilePreferences(real) { 1 }
         val key = Settings.PREF_GESTURE_TRAIL_COLOR
         val snapshot = RawPrefSnapshot(real, 1, listOf(key))
-        own.edit { putInt(key, 0xFF00FF00.toInt()) } // the picker previews a colour
+        own.edit { putInt(key, 0xFF00FF00.toInt()) } // the picker previews a color
         snapshot.restore() // Cancel
-        assertFalse(real.contains("p1/$key"), "the shared colour was written into keyboard 1's own set")
+        assertFalse(real.contains("p1/$key"), "the shared color was written into keyboard 1's own set")
         assertFalse(real.contains("p1/${KeyboardProfiles.TOMBSTONE}$key"))
         // (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones: nothing of its
         // own is the default, not a common value)

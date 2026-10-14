@@ -75,7 +75,7 @@ fun ColorThemePickerDialog(
     setting: Setting,
     isNight: Boolean,
     default: String,
-    /** The pencil or Add left for the colour editor: the list is closed (what's chosen kept) and the caller shows it
+    /** The pencil or Add left for the color editor: the list is closed (what's chosen kept) and the caller shows it
      *  again on coming back. */
     onOpenEditor: () -> Unit = onDismissRequest,
 ) {
@@ -115,7 +115,7 @@ fun ColorThemePickerDialog(
     var deleted by remember { mutableStateOf(emptySet<String>()) }
     val close = { confirmed = true; onOpenEditor() }
     ThreeButtonAlertDialog(
-        // the keyboard stays up below the dialog (a tap shows the colours on it), the dialog sits above it
+        // the keyboard stays up below the dialog (a tap shows the colors on it), the dialog sits above it
         keepKeyboard = true,
         onDismissRequest = {
             // (a set deleted here isn't put back: the keyboard stays on what it shows now)
@@ -192,7 +192,7 @@ private fun AddColorRow(onDismissRequest: () -> Unit, targetScreen: String, pref
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
     val defaultName = KeyboardTheme.getUnusedThemeName(stringResource(R.string.theme_name_user), prefs)
-    // straight into the editor (2026-10-07; the name can be changed there), starting from the colours selected now: a
+    // straight into the editor (2026-10-07; the name can be changed there), starting from the colors selected now: a
     // tap in this list selects at once, so that is the one last tapped
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -211,7 +211,7 @@ private fun AddColorRow(onDismissRequest: () -> Unit, targetScreen: String, pref
         }.padding(start = 10.dp, top = 12.dp, bottom = 12.dp)
     ) {
         // (18 dp, like the Keys row's plus: the full 24 looked too big next to the text)
-        // (in the action colour, like the other "+ save / add" rows)
+        // (in the action color, like the other "+ save / add" rows)
         Icon(painterResource(R.drawable.ic_plus), stringResource(R.string.add), Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
         Text(stringResource(R.string.add_color_theme), Modifier.padding(start = 8.dp), color = MaterialTheme.colorScheme.primary)
     }

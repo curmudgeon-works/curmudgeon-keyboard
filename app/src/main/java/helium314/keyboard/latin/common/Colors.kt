@@ -87,7 +87,7 @@ interface Colors {
 @RequiresApi(Build.VERSION_CODES.S)
 class DynamicColors(context: Context, override val themeStyle: String, override val hasKeyBorders: Boolean,
         // light or dark as the keyboard is (KeyboardTheme.isNight), not straight from the phone: "Dark mode follows phone"
-        // off and the colour editor's preview apply to the Dynamic theme too (2026-10-06)
+        // off and the color editor's preview apply to the Dynamic theme too (2026-10-06)
         private val isNight: Boolean, private var keyboardBackground: Drawable? = null) : Colors {
 
     private val accent = getAccent(context)
@@ -384,8 +384,8 @@ class DefaultColors (
     private val adjustedSuggestionText = brightenOrDarken(suggestionText, true)
 
     private val backgroundFilter = colorFilter(background)
-    /** With key borders off the keys keep their colour and the gaps go: the keyboard's background is painted in
-     *  the key colour (the keys themselves stay transparent). With borders on it is the background colour. */
+    /** With key borders off the keys keep their color and the gaps go: the keyboard's background is painted in
+     *  the key color (the keys themselves stay transparent). With borders on it is the background color. */
     private val mainBackground = if (hasKeyBorders) background else keyBackground
     private val mainBackgroundFilter = colorFilter(mainBackground)
     private val adjustedBackgroundFilter: ColorFilter
@@ -454,9 +454,9 @@ class DefaultColors (
         } else {
             // need to set color to background if key borders are disabled, or there will be ugly keys
             backgroundStateList = pressedStateList(brightenOrDarken(background, true), background)
-            // the keys are transparent on a background in their colour, so a press must differ from it
+            // the keys are transparent on a background in their color, so a press must differ from it
             keyStateList = pressedStateList(brightenOrDarken(keyBackground, true), Color.TRANSPARENT)
-            // shift, backspace and the like keep their own colour when the theme gives them one
+            // shift, backspace and the like keep their own color when the theme gives them one
             functionalKeyStateList = if (functionalKey == keyBackground) keyStateList
                 else pressedStateList(brightenOrDarken(functionalKey, true), functionalKey)
             actionKeyStateList = if (themeStyle == STYLE_HOLO) functionalKeyStateList
@@ -464,7 +464,7 @@ class DefaultColors (
             spaceBarStateList = pressedStateList(brightenOrDarken(spaceBar, true), spaceBar)
         }
         keyTextFilter = colorFilter(keyText)
-        // the action key's icon is in the key text colour, like every other key's (upstream: white, or dark grey on
+        // the action key's icon is in the key text color, like every other key's (upstream: white, or dark grey on
         // a bright accent)
         actionKeyIconColorFilter = keyTextFilter
     }
@@ -668,7 +668,7 @@ fun ColorType.default() = ColorUtils.setAlphaComponent(name.hashCode() and 0xfff
 
 /**
  * A background picture shown whole ("Show the whole picture", Appearance): the keys are clear on it and only show
- * their colour, lighter, while pressed; everything else is [base]'s.
+ * their color, lighter, while pressed; everything else is [base]'s.
  */
 class SeeThroughKeys(private val base: Colors) : Colors by base {
     private val keyTypes = setOf(KEY_BACKGROUND, FUNCTIONAL_KEY_BACKGROUND, SPACE_BAR_BACKGROUND, ACTION_KEY_BACKGROUND)
@@ -688,8 +688,8 @@ class SeeThroughKeys(private val base: Colors) : Colors by base {
 }
 
 /**
- * The accent colour picked for the keyboard (Appearance, "Accent color", 2026-10-07) over the theme's: the swipe trail,
- * the enter / send key (the suggestion words follow the trail where their own colour isn't picked). Everything else
+ * The accent color picked for the keyboard (Appearance, "Accent color", 2026-10-07) over the theme's: the swipe trail,
+ * the enter / send key (the suggestion words follow the trail where their own color isn't picked). Everything else
  * is the theme's. Holo keeps its own enter key (it isn't drawn in the accent there).
  */
 class AccentOverride(private val base: Colors, @ColorInt private val accent: Int) : Colors by base {

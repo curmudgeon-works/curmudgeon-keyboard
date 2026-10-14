@@ -77,7 +77,7 @@ class BackOncePerScreenTest {
     @Test fun `one Back leaves a screen that redraws while it opens`() = launch { activity ->
         assertEquals(1, shown(mainTitle), "the settings didn't open on the main screen")
         // a row's tap: navigateTo keeps the target set for 50 ms; held here by hand (no race with the real clock), with a
-        // few redraws in that time, as a setting change or the opened keyboard's recolour make them
+        // few redraws in that time, as a setting change or the opened keyboard's recolor make them
         SettingsDestination.navTarget.value = SettingsDestination.About
         repeat(4) {
             activity.runOnUiThread { activity.prefChanged() }

@@ -161,8 +161,8 @@ class CopyModelTest {
         picture.delete()
     }
 
-    // (owner 2026-10-11: palettes are one app-wide list; the old colours are kept as "Warm 2" on the list, was Custom N)
-    @Test fun `a palette saved with new colours - keepers share one Warm 2, a theme taking the new names Warm still`() {
+    // (owner 2026-10-11: palettes are one app-wide list; the old colors are kept as "Warm 2" on the list, was Custom N)
+    @Test fun `a palette saved with new colors - keepers share one Warm 2, a theme taking the new names Warm still`() {
         val warm = Settings.PREF_USER_COLORS_PREFIX + "Warm"
         // (one set of settings: keyboard 2 reads US's, the common one)
         real.edit().putBoolean("separate_settings_per_keyboard", false).putString(warm, "new").putString(own(1, Settings.PREF_THEME_COLORS), "Warm").commit()
@@ -173,7 +173,7 @@ class CopyModelTest {
             mapOf("Kept" to helium314.keyboard.settings.Palettes.Choice.KEEP_OLD, "Updated" to helium314.keyboard.settings.Palettes.Choice.NEW))
         assertEquals("Warm 2", real.getString(own(2, Settings.PREF_THEME_COLORS), null))
         assertEquals("old", real.getString(Settings.PREF_USER_COLORS_PREFIX + "Warm 2", null)) // (on the list)
-        assertEquals("new", real.getString(warm, null)) // (the palette itself: the new colours)
+        assertEquals("new", real.getString(warm, null)) // (the palette itself: the new colors)
         val looks = AppearanceLooks.load(real).associateBy { it.name }
         assertEquals("Warm 2", looks.getValue("Kept").values[Settings.PREF_THEME_COLORS])
         assertEquals("Warm", looks.getValue("Updated").values[Settings.PREF_THEME_COLORS])
@@ -215,7 +215,7 @@ class CopyModelTest {
         assertEquals("Mine", real.getString(own(3, KeyPopupOverrides.PREF_SELECTED_SET), null))
     }
 
-    @Test fun `a palette saved with new colours - a keeper with no set of its own yet keeps the old ones`() {
+    @Test fun `a palette saved with new colors - a keeper with no set of its own yet keeps the old ones`() {
         val warm = Settings.PREF_USER_COLORS_PREFIX + "Warm"
         // (one set of settings: de reads US's, the common one)
         real.edit().putBoolean("separate_settings_per_keyboard", false).putString(warm, "new").putString(own(1, Settings.PREF_THEME_COLORS), "Warm").commit()

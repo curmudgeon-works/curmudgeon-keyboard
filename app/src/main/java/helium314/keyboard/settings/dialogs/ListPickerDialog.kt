@@ -55,7 +55,7 @@ fun <T: Any> ListPickerDialog(
     footer: (@Composable () -> Unit)? = null,
     /** Without [confirmImmediately]: called on every tap, so the choice can show before OK. */
     onItemHighlighted: ((T) -> Unit)? = null,
-    /** The items are things to do (e.g. Rename, Delete), not choices: drawn in the action colour, like buttons. */
+    /** The items are things to do (e.g. Rename, Delete), not choices: drawn in the action color, like buttons. */
     itemsAreActions: Boolean = false,
     summonKeyboard: Boolean = true, // see ThreeButtonAlertDialog
     /** A long press on an item's row (2026-10-11: renames the user's own saved items). */

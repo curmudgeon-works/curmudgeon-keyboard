@@ -320,7 +320,7 @@ final class SuggestionStripLayoutHelper {
         int indexInSuggestedWords;
         // looked up once, not per word: finding the preferences is the slow part
         final SharedPreferences prefs = KtxKt.prefs(mWordViews.get(0).getContext());
-        // the colour picked in Appearance → Fonts, else the theme's swipe trail colour (since 0.3.008)
+        // the color picked in Appearance → Fonts, else the theme's swipe trail color (since 0.3.008)
         final int suggestionColor = SuggestionColors.suggestionTextColor(prefs, Settings.getValues().mColors);
         for (indexInSuggestedWords = 0; indexInSuggestedWords < suggestedWords.size()
                 && positionInStrip < maxSuggestionInStrip; indexInSuggestedWords++) {
