@@ -20,6 +20,17 @@ private fun alsoUndoesLine(res: Int, alsoUndoes: List<String>): (@Composable () 
 fun savedPaletteNames(ctx: android.content.Context, palettes: List<String>): List<String> =
     palettes.map { ctx.getString(R.string.discard_also_undoes_palette, it) }
 
+/** The fonts [fonts] (file names) and pictures [pictures] added to their lists since the screen opened, for that line
+ *  (review 2026-10-12 B5): each font by name, the pictures counted (a picture has no name the list shows). */
+fun addedLibraryNames(ctx: android.content.Context, fonts: List<String>, pictures: List<String>): List<String> =
+    fonts.map { ctx.getString(R.string.discard_also_undoes_font, it) } +
+        listOfNotNull(pictures.size.takeIf { it > 0 }?.let { ctx.resources.getQuantityString(R.plurals.discard_also_undoes_pictures, it, it) })
+
+/** What Appearance's Discard also undoes, for that line: the palettes saved in the palette editor, the fonts and
+ *  pictures added to their lists. */
+fun appearanceAlsoUndoes(ctx: android.content.Context, draft: helium314.keyboard.settings.AppearanceDraft): List<String> =
+    savedPaletteNames(ctx, draft.savedPalettes()) + addedLibraryNames(ctx, draft.addedFonts(ctx), draft.addedPictures(ctx))
+
 /** The names of the Layout & Typing sub-screens [saved] for that line, as their rows show them. */
 fun savedSubScreenNames(ctx: android.content.Context, saved: List<helium314.keyboard.settings.LayoutDraft.SubScreen>): List<String> =
     saved.map { ctx.getString(when (it) {

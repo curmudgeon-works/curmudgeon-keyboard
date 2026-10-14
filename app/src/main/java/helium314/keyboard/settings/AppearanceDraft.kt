@@ -6,6 +6,7 @@ import helium314.keyboard.latin.common.PictureFraming
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.ProfilePreferences
 import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.latin.utils.prefs
 import org.json.JSONObject
 import java.io.File
 
@@ -33,6 +34,10 @@ class AppearanceDraft private constructor(
     // what the palette editor wrote with its Save: kept when the app is left (owner 2026-10-11, S2: "yes let's keep
     // saved subscreen changes"), undone by Appearance's own Discard
     private val writes: SubScreenWrites = SubScreenWrites(dir, null) { false },
+    // the fonts and pictures in their lists when the screen opened (file names): one there now and not then was added
+    // with the screen open (review 2026-10-12 B5). Null: not known (a snapshot recovered after a crash), none counts
+    private val fontsAtStart: Set<String>? = null,
+    private val picturesAtStart: Set<String>? = null,
 ) {
     /** A copy of a custom file, with the size and time the live one had (enough to tell a change, no reading). */
     class Saved(val copy: File, val length: Long, val modified: Long)
@@ -98,9 +103,24 @@ class AppearanceDraft private constructor(
         writeAtomically(File(dir, SUB_SAVES_FILE), org.json.JSONArray(savedPalettes.toList()).toString())
     }
 
-    /** True when a preference or file in the snapshot's scope differs from it, or something was deleted. */
+    /** The fonts added to the font list since the screen opened (file names); one deleted (held) and added again
+     *  under its name too. Appearance's Discard removes them, but one something outside the edit uses (review
+     *  2026-10-12 B5); leaving the app, or the undo after a crash, keeps them, like the palette editor's saves. */
+    fun addedFonts(ctx: Context): List<String> = added(fontsAtStart, helium314.keyboard.keyboard.FontLibrary.dir(ctx), FONT)
+
+    /** The pictures added to the list of "Choose a picture" since the screen opened (file names), as [addedFonts]. */
+    fun addedPictures(ctx: Context): List<String> = added(picturesAtStart, helium314.keyboard.latin.common.PictureLibrary.dir(ctx), PICTURE)
+
+    private fun added(atStart: Set<String>?, folder: File, kind: String): List<String> {
+        atStart ?: return emptyList()
+        return libraryNames(folder).filter { it !in atStart || (kind + it) in held }
+    }
+
+    /** True when a preference or file in the snapshot's scope differs from it, something was deleted, or a font or
+     *  picture was added to its list (B5). */
     fun hasChanges(ctx: Context): Boolean {
         if (held.isNotEmpty()) return true
+        if (addedFonts(ctx).isNotEmpty() || addedPictures(ctx).isNotEmpty()) return true
         if (reachedChanged(ctx)) return true
         if (changedKeys(ctx).isNotEmpty()) return true
         return files.any { (live, saved) ->
@@ -139,10 +159,14 @@ class AppearanceDraft private constructor(
     }.keys.mapTo(HashSet()) { it.name }
 
     /** Back to the snapshot; the live keyboard reloads. [keepSubScreenSaves] (the app left, or the undo after a crash):
-     *  what the palette editor saved stays as saved (a key Appearance changed too: the editor's saved value);
-     *  Appearance's Discard: undone too. */
+     *  what the palette editor saved stays as saved (a key Appearance changed too: the editor's saved value), and so do
+     *  the fonts and pictures added to their lists; Appearance's Discard: undone too, the added fonts and pictures
+     *  removed from their lists but one something outside the edit uses (B5). */
     fun reject(ctx: Context, keepSubScreenSaves: Boolean = false) {
         val keep = keepSubScreenSaves && !writes.isEmpty()
+        // (listed before anything is put back: a held font or picture coming back is no addition)
+        val fontsAdded = if (keepSubScreenSaves) emptyList() else addedFonts(ctx)
+        val picturesAdded = if (keepSubScreenSaves) emptyList() else addedPictures(ctx)
         helium314.keyboard.latin.utils.SettingsEventLog.log("Appearance draft put back" + if (keep) ", palette editor saves kept" else "")
         for ((live, saved) in files) {
             if (saved == null) live.delete()
@@ -158,7 +182,32 @@ class AppearanceDraft private constructor(
         AppearanceLooks.applyScreen(ctx, prefs, ProfilePreferences(real) { setId })
         labels?.putBack(real, LABELS)
         if (keep) { writes.writeTo(real); AppearanceLooks.reload(ctx) }
+        // the fonts and pictures added: out of their lists, once the edit's choices and themes are back as they were;
+        // one still named then is used outside the edit and stays. A held one whose name an addition took comes back now
+        if (removeUnused(ctx, fontsAdded, picturesAdded)) { putHeldBack(ctx, dir, held); AppearanceLooks.reload(ctx) }
         discard()
+    }
+
+    /** The fonts [fonts] and pictures [pictures] (file names) that nothing names now leave their lists: a font no
+     *  keyboard's setting or saved theme chooses, a picture no saved theme names (the keyboards' pictures are their own
+     *  copies). @return whether one was removed */
+    private fun removeUnused(ctx: Context, fonts: List<String>, pictures: List<String>): Boolean {
+        if (fonts.isEmpty() && pictures.isEmpty()) return false
+        val all = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx).all
+        val prefs = ctx.prefs()
+        val looks = AppearanceLooks.load(prefs)
+        var removed = false
+        for (name in fonts) {
+            val value = helium314.keyboard.keyboard.FontLibrary.PREFIX + name
+            if (all.values.any { it == value } || looks.any { look -> look.values.values.any { it == value } }) continue
+            if (File(helium314.keyboard.keyboard.FontLibrary.dir(ctx), name).delete()) removed = true
+        }
+        for (name in pictures) {
+            if (AppearanceLooks.namesUsingPicture(prefs, name).isNotEmpty()) continue
+            if (helium314.keyboard.latin.common.PictureLibrary.file(ctx, name).delete()) removed = true
+        }
+        if (removed) helium314.keyboard.latin.utils.SettingsEventLog.log("Appearance draft: fonts or pictures added since it opened removed")
+        return removed
     }
 
     // (no rebase: the palette editor's "Save and exit" leaves this snapshot as it is, so Appearance's Save or Discard
@@ -199,6 +248,10 @@ class AppearanceDraft private constructor(
         // a list of files kept by name: only the choices change, preferences)
 
         private fun dir(ctx: Context) = File(ctx.filesDir, "appearance_draft")
+
+        // the files of a font or picture list (its pending folder is no file)
+        private fun libraryNames(folder: File): List<String> =
+            folder.listFiles()?.filter { it.isFile }?.map { it.name }?.sorted() ?: emptyList()
         private const val PREFS_FILE = "draft_prefs.json" // written last: its presence means a complete snapshot
         private const val HELD_FILE = "held_deletes.json"
         private const val HELD_FONTS = "held_fonts"
@@ -284,7 +337,9 @@ class AppearanceDraft private constructor(
             val reached = reachedNow(ctx)
             val labels = CustomLabels.Opened.of(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx), LABELS)
             writeSnapshot(dir, setId, prefs, files, reached, labels)
-            return AppearanceDraft(prefs, files, dir, setId, reached, labels, SubScreenWrites(dir, null, ::recorded))
+            return AppearanceDraft(prefs, files, dir, setId, reached, labels, SubScreenWrites(dir, null, ::recorded),
+                libraryNames(helium314.keyboard.keyboard.FontLibrary.dir(ctx)).toSet(),
+                libraryNames(helium314.keyboard.latin.common.PictureLibrary.dir(ctx)).toSet())
         }
 
         /** A stored key beyond the edited set that the screen's saved items reach ([reached]): the saved themes, the

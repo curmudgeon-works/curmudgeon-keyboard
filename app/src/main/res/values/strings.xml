@@ -982,6 +982,13 @@
     <string name="discard_and_exit_also_undoes">Discard and exit also undoes what you saved in: %s</string>
     <!-- One entry of that line: a palette saved in the palette editor. %s: its name as shown -->
     <string name="discard_also_undoes_palette">palette \"%s\"</string>
+    <!-- One entry of that line: a font added to the font list while the screen was open (Discard removes it). %s: its name -->
+    <string name="discard_also_undoes_font">added font \"%s\"</string>
+    <!-- One entry of that line: the pictures added to the picture list while the screen was open (Discard removes them) -->
+    <plurals name="discard_also_undoes_pictures">
+        <item quantity="one">%d added picture</item>
+        <item quantity="other">%d added pictures</item>
+    </plurals>
     <string name="appearance_keep_working">Keep working</string>
     <string name="appearance_reject">Discard changes</string>
     <string name="appearance_reject_message">The keyboard goes back to how it looked when you opened Appearance.</string>
