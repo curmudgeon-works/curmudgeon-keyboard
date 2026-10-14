@@ -29,6 +29,11 @@ import helium314.keyboard.settings.screens.Kind
 import helium314.keyboard.settings.screens.LearnedWordsScreen
 import helium314.keyboard.settings.screens.buildWordLists
 import helium314.keyboard.settings.screens.deleteWords
+import helium314.keyboard.settings.screens.asksAboutPersonalDictionary
+import helium314.keyboard.settings.screens.PersonalEntry
+import helium314.keyboard.settings.screens.Word
+import helium314.keyboard.latin.utils.PersonalDictionaryChoice
+import kotlin.test.assertFalse
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -228,5 +233,43 @@ class LearnedWordsBatchDeleteTest {
         val black = lists.blacklisted.filter { it.word != "adn" }.map { Item(it, Kind.BLACKLISTED) }
         deleteWords(ctx, "Latn", pool, listOf(Locale.US), black)
         assertEquals(setOf("adn"), blacklist.entries().keys)
+    }
+
+    // owner 2026-10-11 "DM21 ALLOWED HERE": a delete from Learned words forgets the count only
+    @Test fun `a delete on Learned words forgets the count and keeps the allowed row`() {
+        learn("zorp")
+        blacklist.allow("zorp", 2)
+        val lists = buildWordLists("Latn", store.counts.map { it.key to it.value }, emptyList(), blacklist.entries())
+        assertEquals(listOf("adn", "hte", "teh"), lists.blacklisted.map { it.word }) // (not listed as blacklisted)
+        deleteWords(ctx, "Latn", pool, listOf(Locale.US), lists.yours.map { Item(it, Kind.YOURS) })
+        assertTrue(store.counts.isEmpty(), "still learned")
+        blacklist.reload()
+        assertEquals(mapOf("zorp" to 2), blacklist.allowedEntries())
+        assertEquals(setOf("teh", "hte", "adn"), blacklist.entries().keys)
+    }
+
+    // owner 2026-10-12 "DM22 STRIP REMOVE": "Also delete them from your device's personal dictionary", ticked by default,
+    // shown only when a selected word is in Android's dictionary
+    @Test fun `the delete's personal dictionary box is ticked by default and unticked keeps Android's rows`() {
+        learn("zorp", "plain")
+        val inPersonal = PersonalEntry(Word("zorp", null, 250), Locale.US)
+        val lists = buildWordLists("Latn", store.counts.map { it.key to it.value }, listOf(inPersonal to "Latn"), blacklist.entries())
+        val zorp = lists.yours.filter { it.word == "zorp" }.map { Item(it, Kind.YOURS) }
+        val plain = lists.yours.filter { it.word == "plain" }.map { Item(it, Kind.YOURS) }
+        assertTrue(PersonalDictionaryChoice.SETTINGS_DEFAULT)
+        assertTrue(asksAboutPersonalDictionary(zorp))
+        assertTrue(asksAboutPersonalDictionary(zorp + plain))
+        assertFalse(asksAboutPersonalDictionary(plain), "no word in Android's dictionary: no box")
+        assertFalse(asksAboutPersonalDictionary(lists.blacklisted.map { Item(it, Kind.BLACKLISTED) }))
+        val deleted = mutableListOf<String>()
+        // unticked: Android's row stays, the count goes
+        deleteWords(ctx, "Latn", pool, listOf(Locale.US), zorp, alsoFromPersonalDictionary = false) { _, p -> deleted.add(p.word.word) }
+        assertEquals(emptyList(), deleted)
+        assertFalse(store.counts.containsKey("zorp"))
+        // ticked (the default): Android's row goes too, as before
+        learn("zorp")
+        deleteWords(ctx, "Latn", pool, listOf(Locale.US), zorp) { _, p -> deleted.add(p.word.word) }
+        assertEquals(listOf("zorp"), deleted)
+        assertFalse(store.counts.containsKey("zorp"))
     }
 }

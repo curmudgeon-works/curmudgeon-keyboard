@@ -3,6 +3,7 @@ package helium314.keyboard.settings.screens
 
 import android.content.Context
 import android.provider.UserDictionary
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Checkbox
@@ -20,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -38,6 +40,7 @@ import helium314.keyboard.latin.utils.FrequentLongWords
 import helium314.keyboard.latin.utils.HotWords
 import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.NextScreenIcon
+import helium314.keyboard.latin.utils.PersonalDictionaryChoice
 import helium314.keyboard.latin.utils.RemovedWords
 import helium314.keyboard.latin.utils.ScriptUtils
 import helium314.keyboard.latin.utils.ScriptUtils.script
@@ -61,7 +64,9 @@ import java.util.Locale
  *   their letters; the personal dictionary stays per language, Android's), each word once (case-insensitive, shown in
  *   its most typed spelling). Delete: gone as if never typed (owner 2026-10-10: "Just as if the word never existed on
  *   the list"): out of the learned words and the Android personal dictionary, its recent uses forgotten, NOT blacklisted
- *   (long-press Remove in the strip is what blacklists)
+ *   (long-press Remove in the strip is what blacklists). A word in Android's personal dictionary: the dialog's box "Also
+ *   delete them from your device's personal dictionary" (ticked) says whether it goes from there too (owner 2026-10-12).
+ *   An allowed row (RemovedWords: a borrowed block lifted on this keyboard) stays: the delete forgets the count only.
  * - Blacklisted words: the script's long-press Remove list (see RemovedWords), with how often each was removed (its
  *   strikes, which say how it comes back). Delete: the word and its strikes, as if never removed.
  * A further section (another list of the kind) is one more Kind with its action and one more section() in rows().
@@ -160,12 +165,34 @@ fun LearnedWordsScreen(onClickBack: () -> Unit, script: String, blacklisted: Boo
     // the search term the list was last shown for (Select all ticks what's shown)
     val shownTerm = remember { arrayOf("") }
 
+    // the delete dialog's "Also delete them from your device's personal dictionary" (owner 2026-10-12 "DM22 STRIP
+    // REMOVE"): ticked each time a dialog opens, shown only when a word to delete is in Android's personal dictionary
+    var alsoPersonal by remember { mutableStateOf(PersonalDictionaryChoice.SETTINGS_DEFAULT) }
+
     fun run(items: List<Item>) {
+        val personal = PersonalDictionaryChoice.deletesFromPersonal(asksAboutPersonalDictionary(items), alsoPersonal)
         // one job for all of them, off the main thread
         scope.launch {
-            withContext(Dispatchers.IO) { deleteWords(ctx, script, pool, locales, items) }
+            withContext(Dispatchers.IO) { deleteWords(ctx, script, pool, locales, items, alsoFromPersonalDictionary = personal) }
             picked = emptySet()
             reload++
+        }
+    }
+    @Composable
+    fun DeleteContent(message: Int, items: List<Item>) {
+        Column {
+            Text(stringResource(message))
+            if (asksAboutPersonalDictionary(items)) {
+                androidx.compose.foundation.layout.Row(
+                    Modifier.padding(top = 8.dp).clickable { alsoPersonal = !alsoPersonal },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(checked = alsoPersonal, onCheckedChange = { alsoPersonal = it })
+                    Text(stringResource(R.string.learned_words_delete_also_personal))
+                }
+                if (!alsoPersonal) Text(stringResource(R.string.learned_words_delete_personal_stays),
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
     fun toggle(key: String) { picked = if (key in picked) picked - key else picked + key }
@@ -187,7 +214,8 @@ fun LearnedWordsScreen(onClickBack: () -> Unit, script: String, blacklisted: Boo
             if (selecting) {
                 IconButton({ picked = WordLists.matching(listEntries, shownTerm[0]).mapTo(HashSet()) { it.key } }) {
                     Icon(painterResource(R.drawable.ic_select_all), stringResource(R.string.learned_words_select_all)) }
-                IconButton({ askDelete = true }) { Icon(painterResource(R.drawable.ic_bin), stringResource(R.string.delete)) }
+                IconButton({ alsoPersonal = PersonalDictionaryChoice.SETTINGS_DEFAULT; askDelete = true }) {
+                    Icon(painterResource(R.drawable.ic_bin), stringResource(R.string.delete)) }
                 IconButton({ picked = emptySet() }) {
                     Icon(painterResource(R.drawable.ic_close), stringResource(R.string.learned_words_selection_close)) }
             }
@@ -207,7 +235,8 @@ fun LearnedWordsScreen(onClickBack: () -> Unit, script: String, blacklisted: Boo
                     val key = row.entry.key
                     Preference(name = row.entry.word, description = row.description(),
                         // (the state at the time of the tap)
-                        onClick = { if (picked.isNotEmpty()) toggle(key) else selected = row },
+                        onClick = { if (picked.isNotEmpty()) toggle(key)
+                            else { alsoPersonal = PersonalDictionaryChoice.SETTINGS_DEFAULT; selected = row } },
                         onLongClick = { if (picked.isNotEmpty()) toggle(key) else picked = setOf(key) },
                         value = if (!selecting) null else ({ Checkbox(checked = key in picked, onCheckedChange = { toggle(key) }) }),
                     )
@@ -221,8 +250,8 @@ fun LearnedWordsScreen(onClickBack: () -> Unit, script: String, blacklisted: Boo
             onDismissRequest = { selected = null },
             onConfirmed = { run(listOf(item)) },
             title = { Text(item.entry.word) },
-            content = { Text(stringResource(if (item.kind == Kind.YOURS) R.string.learned_words_delete_message
-                else R.string.learned_words_unblacklist_message)) },
+            content = { DeleteContent(if (item.kind == Kind.YOURS) R.string.learned_words_delete_message
+                else R.string.learned_words_unblacklist_message, listOf(item)) },
             confirmButtonText = stringResource(R.string.delete),
         )
     }
@@ -235,8 +264,8 @@ fun LearnedWordsScreen(onClickBack: () -> Unit, script: String, blacklisted: Boo
                 if (listEntries.all { it.key in picked }) askDeleteAll = true else run(pickedItems())
             },
             title = { Text(pluralStringResource(R.plurals.learned_words_delete_selected, n, n)) },
-            content = { Text(stringResource(if (blacklisted) R.string.learned_words_unblacklist_message
-                else R.string.learned_words_delete_message)) },
+            content = { DeleteContent(if (blacklisted) R.string.learned_words_unblacklist_message
+                else R.string.learned_words_delete_message, pickedItems()) },
             confirmButtonText = stringResource(R.string.delete),
         )
     }
@@ -247,7 +276,7 @@ fun LearnedWordsScreen(onClickBack: () -> Unit, script: String, blacklisted: Boo
             onDismissRequest = { askDeleteAll = false },
             onConfirmed = { run(pickedItems()) },
             title = { Text(pluralStringResource(R.plurals.learned_words_delete_all_title, n, n, list, scriptName(script))) },
-            content = { Text(stringResource(R.string.learned_words_delete_all_message)) },
+            content = { DeleteContent(R.string.learned_words_delete_all_message, pickedItems()) },
             confirmButtonText = stringResource(R.string.learned_words_delete_all_button),
         )
     }
@@ -412,12 +441,34 @@ internal fun buildWordLists(script: String, learned: List<Pair<String, Int>>, pe
 // (PersonalizationHelper's cache), the personal dictionary is watched by its UserBinaryDictionary, and the blacklists
 // are the same RemovedWords objects it checks (settings and keyboard: one process).
 
-/** Deletes [items], each exactly as the single delete does (call off the main thread). */
-internal fun deleteWords(context: Context, script: String, pool: Int, scriptLocales: List<Locale>, items: List<Item>) {
-    for (item in items) apply(context, script, pool, scriptLocales, item)
+/** The delete dialog shows "Also delete them from your device's personal dictionary": a word of [items] (Your words) is
+ *  in Android's personal dictionary. */
+internal fun asksAboutPersonalDictionary(items: List<Item>): Boolean =
+    items.any { it.kind == Kind.YOURS && it.entry.personal.isNotEmpty() }
+
+/** A row of Android's personal dictionary deleted (for its language, or for all languages). */
+private fun deletePersonalRow(context: Context, p: PersonalEntry) {
+    if (p.locale == null)
+        context.contentResolver.delete(UserDictionary.Words.CONTENT_URI,
+            "${UserDictionary.Words.WORD}=? AND ${UserDictionary.Words.LOCALE} is null", arrayOf(p.word.word))
+    else
+        context.contentResolver.delete(UserDictionary.Words.CONTENT_URI,
+            "${UserDictionary.Words.WORD}=? AND ${UserDictionary.Words.LOCALE}=?", arrayOf(p.word.word, p.locale.toString()))
 }
 
-private fun apply(context: Context, script: String, pool: Int, scriptLocales: List<Locale>, item: Item) {
+/**
+ * Deletes [items], each exactly as the single delete does (call off the main thread). [alsoFromPersonalDictionary]
+ * false (the dialog's box unticked): Android's personal dictionary keeps them, in the keyboard's copy too.
+ * [deletePersonal]: how a row of it is deleted (tests).
+ */
+internal fun deleteWords(context: Context, script: String, pool: Int, scriptLocales: List<Locale>, items: List<Item>,
+                         alsoFromPersonalDictionary: Boolean = true,
+                         deletePersonal: (Context, PersonalEntry) -> Unit = ::deletePersonalRow) {
+    for (item in items) apply(context, script, pool, scriptLocales, item, alsoFromPersonalDictionary, deletePersonal)
+}
+
+private fun apply(context: Context, script: String, pool: Int, scriptLocales: List<Locale>, item: Item,
+                  alsoFromPersonalDictionary: Boolean, deletePersonal: (Context, PersonalEntry) -> Unit) {
     val entry = item.entry
     when (item.kind) {
         Kind.YOURS -> {
@@ -431,19 +482,16 @@ private fun apply(context: Context, script: String, pool: Int, scriptLocales: Li
                         LearningEventLog.log(LearningEventLog.REMOVED, LearningEventLog.SETTINGS, word, "",
                             LearnedStores.label(script, pool), counts)
                 }
-                DictionaryFacilitatorImpl.removeWords(context, script, pool, locales, entry.spellings, blacklist = false)
+                DictionaryFacilitatorImpl.removeWords(context, script, pool, locales, entry.spellings, blacklist = false,
+                    personal = alsoFromPersonalDictionary)
             } catch (e: Exception) {
                 Log.w("LearnedWordsScreen", "could not remove a word of $script", e)
             }
-            // and its rows in the Android personal dictionary (each spelling found, for its language or all)
-            for (p in entry.personal) {
-                if (p.locale == null)
-                    context.contentResolver.delete(UserDictionary.Words.CONTENT_URI,
-                        "${UserDictionary.Words.WORD}=? AND ${UserDictionary.Words.LOCALE} is null", arrayOf(p.word.word))
-                else
-                    context.contentResolver.delete(UserDictionary.Words.CONTENT_URI,
-                        "${UserDictionary.Words.WORD}=? AND ${UserDictionary.Words.LOCALE}=?", arrayOf(p.word.word, p.locale.toString()))
-            }
+            // and its rows in the Android personal dictionary (each spelling found, for its language or all), unless
+            // the box was unticked (they stay there, and so on this list); an allowed row (RemovedWords) stays either
+            // way: this forgets the count only
+            if (alsoFromPersonalDictionary) for (p in entry.personal)
+                try { deletePersonal(context, p) } catch (e: Exception) { Log.w("LearnedWordsScreen", "could not delete a personal dictionary word", e) }
             // its recent and frequent uses go too (as LatinIME.removeSuggestion)
             entry.spellings.forEach { HotWords.forget(it); FrequentLongWords.forget(it) }
         }

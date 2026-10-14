@@ -24,6 +24,8 @@ import android.view.View
 import android.view.View.OnLongClickListener
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityEvent
+import android.content.res.ColorStateList
+import android.widget.CheckBox
 import android.widget.ImageButton
 import android.widget.HorizontalScrollView
 import android.graphics.Typeface
@@ -55,6 +57,7 @@ import helium314.keyboard.latin.settings.DebugSettings
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.Log
+import helium314.keyboard.latin.utils.PersonalDictionaryChoice
 import helium314.keyboard.latin.utils.ToolbarKey
 import helium314.keyboard.latin.utils.ToolbarMode
 import helium314.keyboard.latin.utils.addPinnedKey
@@ -85,8 +88,11 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     interface Listener {
         fun pickSuggestionManually(word: SuggestedWordInfo?)
         fun onCodeInput(primaryCode: Int, x: Int, y: Int, isKeyRepeat: Boolean)
-        /** [word] was removed (long-press card): [remaining] are the suggestions without it, also for what space commits. */
-        fun removeSuggestion(word: String?, remaining: SuggestedWords)
+        /** [word] was removed (long-press card): [remaining] are the suggestions without it, also for what space commits;
+         *  [alsoFromPersonalDictionary] false: Android's personal dictionary keeps it. */
+        fun removeSuggestion(word: String?, remaining: SuggestedWords, alsoFromPersonalDictionary: Boolean)
+        /** [word] is in Android's personal dictionary (Remove then asks whether it goes there too). */
+        fun isInPersonalDictionary(word: String): Boolean
         /** [word] was removed 3 times and typed often enough since: the strip shows a "+" after it ([confirmRemovedWord]). */
         fun awaitsConfirmation(word: String): Boolean
         /** The "+" after [word] was tapped: it's back. */
@@ -523,12 +529,33 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         return true
     }
 
-    /**
-     * A keyboard-themed card in the middle of the keyboard, clear of the strip: "Remove “word”?", what removing means,
-     * Cancel / Remove. It doesn't take the focus: a focused window without a text field made Android hide the keyboard,
-     * which hid the card, gave the focus back and showed the keyboard again, in a loop (seen in the settings' preview).
-     */
+    /** The card ([showCard]): "Remove “word” from suggestions?", what removing means, Cancel / Remove. */
     private fun showRemoveSuggestionCard(wordView: TextView, word: String) {
+        showCard(wordView, context.getString(R.string.remove_suggestion, word), context.getString(R.string.remove_suggestion_message),
+            null) { _ ->
+            // a word in Android's personal dictionary: asked once more, whether it goes there too (owner 2026-10-12
+            // "DM22 STRIP REMOVE", unticked by default); any other word: removed at once, as before
+            if (PersonalDictionaryChoice.stripAsks(listener.isInPersonalDictionary(word))) showPersonalDictionaryQuestion(wordView, word)
+            else removeSuggestion(word, PersonalDictionaryChoice.deletesFromPersonal(asked = false, ticked = false))
+        }
+    }
+
+    /** "Remove “word”?", with "Also delete it from your device's personal dictionary" (unticked), Cancel / Remove. */
+    private fun showPersonalDictionaryQuestion(wordView: TextView, word: String) {
+        wordView.isPressed = true // (the first card's dismissal let go of it)
+        showCard(wordView, context.getString(R.string.remove_word_question, word), null,
+            context.getString(R.string.remove_also_from_personal_dictionary)) { ticked ->
+            removeSuggestion(word, PersonalDictionaryChoice.deletesFromPersonal(asked = true, ticked = ticked))
+        }
+    }
+
+    /**
+     * A keyboard-themed card in the middle of the keyboard, clear of the strip: [title], [message], a [checkbox] with
+     * its text (unticked) if given, Cancel / Remove; [onRemove] gets whether the box is ticked. It doesn't take the
+     * focus: a focused window without a text field made Android hide the keyboard, which hid the card, gave the focus
+     * back and showed the keyboard again, in a loop (seen in the settings' preview).
+     */
+    private fun showCard(wordView: TextView, title: String, message: String?, checkbox: String?, onRemove: (Boolean) -> Unit) {
         val colors = Settings.getValues().mColors
         val density = resources.displayMetrics.density
         fun dp(v: Int) = (v * density).toInt()
@@ -550,21 +577,29 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             colors.setColor(this, ColorType.REMOVE_SUGGESTION_ICON)
             layoutParams = LinearLayout.LayoutParams(dp(24), dp(24)).apply { marginEnd = dp(12) }
         }
-        val title = TextView(context).apply {
-            text = context.getString(R.string.remove_suggestion, word)
+        val titleView = TextView(context).apply {
+            text = title
             setTextColor(colors.get(ColorType.KEY_TEXT))
             textSize = 19f
         }
         titleRow.addView(icon)
-        titleRow.addView(title)
+        titleRow.addView(titleView)
         // what removing means: it comes back when typed, and what it had learned is gone
-        val message = TextView(context).apply {
-            text = context.getString(R.string.remove_suggestion_message)
+        val messageView = message?.let { TextView(context).apply {
+            text = it
             setTextColor(colors.get(ColorType.KEY_TEXT))
             alpha = 0.75f
             textSize = 14f
             setPadding(0, dp(10), dp(8), dp(4))
-        }
+        } }
+        val box = checkbox?.let { CheckBox(context).apply {
+            text = it
+            isChecked = PersonalDictionaryChoice.STRIP_DEFAULT
+            setTextColor(colors.get(ColorType.KEY_TEXT))
+            buttonTintList = ColorStateList.valueOf(colors.get(ColorType.SUGGESTION_AUTO_CORRECT))
+            textSize = 14f
+            setPadding(dp(4), dp(8), dp(8), dp(8))
+        } }
         fun button(textId: Int, accent: Boolean, onClick: () -> Unit) = TextView(context).apply {
             text = context.getString(textId).uppercase()
             setTextColor(colors.get(if (accent) ColorType.SUGGESTION_AUTO_CORRECT else ColorType.KEY_TEXT))
@@ -579,10 +614,11 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             gravity = Gravity.END
             // Cancel left, the action right
             addView(button(android.R.string.cancel, false) { popup.dismiss() })
-            addView(button(R.string.remove, true) { removeSuggestion(word); popup.dismiss() })
+            addView(button(R.string.remove, true) { val ticked = box?.isChecked == true; popup.dismiss(); onRemove(ticked) })
         }
         card.addView(titleRow)
-        card.addView(message)
+        messageView?.let { card.addView(it) }
+        box?.let { card.addView(it) }
         card.addView(buttons)
         popup.isOutsideTouchable = true // a tap elsewhere closes it (it gets told without having the focus)
         popup.setOnDismissListener { wordView.isPressed = false }
@@ -658,7 +694,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         KeyboardSwitcher.getInstance().showToast(text, true)
     }
 
-    private fun removeSuggestion(word: String) {
+    private fun removeSuggestion(word: String, alsoFromPersonalDictionary: Boolean) {
         moreSuggestionsView.dismissPopupKeysPanel()
         // the suggestions without the removed word
         val suggestedWordInfos = ArrayList<SuggestedWordInfo>()
@@ -676,7 +712,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             willAutoCorrect, suggestedWords.mIsObsoleteSuggestions, suggestedWords.mInputStyle, suggestedWords.mSequenceNumber
         )
         // the keyboard takes them (what space commits) and shows them
-        listener.removeSuggestion(word, newSuggestedWords)
+        listener.removeSuggestion(word, newSuggestedWords, alsoFromPersonalDictionary)
         suggestionsStrip.isVisible = true
     }
 

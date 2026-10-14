@@ -490,17 +490,19 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         val isValid = inAnyDictionary && !isRemovedWord(wordToUse)
         // on another keyboard's blacklist this keyboard uses: the uses so far, before this one is stored (asynchronously)
         val lists = blacklistFor(word)
-        val borrowed = lists?.takeIf { it.borrowed.isNotEmpty() }?.borrowedEntry(word)
+        val borrowed = lists?.activeBorrowedEntry(word) // (allowed here already: nothing to do)
         val countBefore = if (borrowed != null) learnedCount(word) else -1
         UserHistoryDictionary.addToDictionary(userHistoryDictionary, ngramContext, wordToUse, isValid, timeStampInSeconds)
         // each further use raises the word's level once more (the word alone: the word pair was counted above)
         repeat(extraUses) {
             UserHistoryDictionary.addToDictionary(userHistoryDictionary, NgramContext.EMPTY_PREV_WORDS_INFO, wordToUse, isValid, timeStampInSeconds)
         }
-        // typed often enough to be back (the rule of a keyboard's own list, counted here): taken off the other keyboard's
-        // list it came from, so it's back there too (2026-10-10). A 3rd strike waits for the strip's "+" as usual.
+        // typed often enough to be back (the rule of a keyboard's own list, counted here): allowed on this keyboard, an
+        // allowed row on its own list; the other keyboard's list it came from stays as it is (owner 2026-10-11 "DM21
+        // ALLOWED HERE": borrowing is read-only; 2026-10-10 to 2026-10-11 it was taken off that list). A 3rd strike waits
+        // for the strip's "+" as usual.
         if (lists != null && borrowed != null
-            && !RemovedWords.isRemoved(lists.entryFor(word), maxOf(countBefore, -1) + 1 + extraUses) && lists.takeOffBorrowed(word)) {
+            && !RemovedWords.isRemoved(lists.entryFor(word), maxOf(countBefore, -1) + 1 + extraUses) && lists.allowHere(word)) {
             GestureDecoderVocabulary.onWordUnblacklisted(dictionaryGroup.locale, word) // (its dictionary copy: one rebuild)
         }
         GestureDecoderVocabulary.onWordLearned(userHistoryDictionary.mContext, scriptOf(wordToUse), wordToUse)
@@ -819,9 +821,10 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         val list = lists.own
         val lower = word.lowercase(dictionaryGroups[0].locale)
         val listed = if (list.contains(word)) word else lower
-        // (its own list's entry confirmed; on another keyboard's list it came from: taken off it, as typing does)
+        // (its own list's entry confirmed; on another keyboard's list it came from: allowed here, as typing does)
         val confirmed = list.entryFor(word) != null && list.confirm(listed)
-        if (!lists.takeOffBorrowed(word) && !confirmed) return
+        val allowed = lists.activeBorrowedEntry(word) != null && lists.allowHere(word)
+        if (!allowed && !confirmed) return
         val history = historyFor(word) ?: return
         // the learned copy carries it now (in the vocabularies built so far it was left out)
         val learned = listOf(word, lower).firstOrNull { history.getLearnedCount(it) >= 0 } ?: return
@@ -883,8 +886,22 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         return lists.isRemoved(word) { learnedCount(word) } // (the usual case, not listed: no counts read)
     }
 
-    override fun removeWord(word: String) {
-        removeWords(listOf(word))
+    // (the personal dictionary's copy the keyboard holds: Android's words, in any capitalization)
+    override fun isInPersonalDictionary(word: String): Boolean {
+        if (word.isEmpty()) return false
+        return dictionaryGroups.any { group ->
+            val user = group.getSubDict(Dictionary.TYPE_USER) ?: return@any false
+            val lower = word.lowercase(group.locale)
+            linkedSetOf(word, lower, word.uppercase(group.locale), lower.replaceFirstChar { it.titlecase(group.locale) })
+                .any { user.isInDictionary(it) }
+        }
+    }
+
+    override fun removeWord(word: String, alsoFromPersonalDictionary: Boolean) {
+        // (unticked, owner 2026-10-12 "DM22 STRIP REMOVE": blocked on this keyboard only, Android's copy stays, in memory
+        // too: the blacklist keeps it out of the suggestions until it's back)
+        removeWords(listOf(word), personal = alsoFromPersonalDictionary)
+        if (!alsoFromPersonalDictionary) return
         // and out of Android's personal dictionary for real: the in-memory copy alone came back with its next reload
         // (2026-10-04; taken out 2026-10-10 by mistake, back 2026-10-11, owner: "previous behavior was fine. Remove would
         // delete words out of android dict")
@@ -899,7 +916,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
      * apps) and gives each one more strike on its script's blacklist. Spellings of one word ("The", "the") are one
      * Remove: one strike; and one per word, not one per language (the languages of a script share the list).
      */
-    private fun removeWords(words: Collection<String>, blacklist: Boolean = true) {
+    private fun removeWords(words: Collection<String>, blacklist: Boolean = true, personal: Boolean = true) {
         val struck = LinkedHashSet<String>()
         // (the swipe lists are the keyboard in use's: not touched for the words of another keyboard, e.g. through the
         // spell checker's facilitator still set up for it)
@@ -907,7 +924,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         for (word in words) {
             val history = historyFor(word)
             // each language's dictionaries say how the word is listed: as written if one of them has it so, else lowercase
-            val spellings = dictionaryGroups.map { it.removeEverywhere(word, history, swipe, learnedPool) }
+            val spellings = dictionaryGroups.map { it.removeEverywhere(word, history, swipe, learnedPool, personal) }
             struck.add(if (word in spellings) word else spellings.firstOrNull() ?: word.lowercase())
         }
         if (!blacklist) { // (a plain delete: a dictionary word's copy is swiped again, as if never learned)
@@ -915,7 +932,8 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
             return
         }
         for (spelling in struck) {
-            blacklistFor(spelling)?.own?.strike(spelling) ?: continue
+            // (a word allowed here: its own strike row, at least the borrowed strikes it overrode, see RemovedWords.Lists)
+            blacklistFor(spelling)?.strike(spelling) ?: continue
             if (swipe) for (group in dictionaryGroups) GestureDecoderVocabulary.onWordBlacklisted(group.locale, spelling)
         }
     }
@@ -966,17 +984,17 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
          */
         @JvmStatic
         fun removeWords(context: Context, script: String, pool: Int, locales: Collection<Locale>, words: Collection<String>,
-                        blacklist: Boolean = true) {
+                        blacklist: Boolean = true, personal: Boolean = true) {
             val live = synchronized(liveFacilitators) { liveFacilitators.toList() }.firstOrNull { f ->
                 f.learnedPool == pool && f.dictionaryGroups.any { it.locale in locales && it.hasDict(Dictionary.TYPE_MAIN) } }
-            if (live != null) return live.removeWords(words, blacklist)
+            if (live != null) return live.removeWords(words, blacklist, personal)
             val history = PersonalizationHelper.getUserHistoryDictionary(context, script, pool)
             val groups = locales.map { DictionaryGroup(it, DictionaryFactory.createMainDictionaryCollection(context, it, false)) }
             val swipe = inUseReads(pool)
             try {
                 val struck = LinkedHashSet<String>()
                 for (word in words) {
-                    val spellings = groups.map { it.removeEverywhere(word, history, swipe, pool) }
+                    val spellings = groups.map { it.removeEverywhere(word, history, swipe, pool, personal) }
                     struck.add(if (word in spellings || spellings.isEmpty()) word else spellings.first())
                 }
                 if (!blacklist) { // (a plain delete from the Learned words list: no strike)
@@ -1124,14 +1142,15 @@ private class DictionaryGroup(
      * @return the spelling its blacklist entry has
      */
     fun removeEverywhere(word: String, history: ExpandableBinaryDictionary?, swipe: Boolean = true,
-                         pool: Int = helium314.keyboard.latin.personalization.LearnedStores.currentPool): String {
-        // from the learned words and the personal dictionary in every capitalization ("Hello" at a sentence start was
-        // learned as "hello"; "HELLO" with caps lock)
+                         pool: Int = helium314.keyboard.latin.personalization.LearnedStores.currentPool,
+                         personal: Boolean = true): String {
+        // from the learned words and (unless [personal] is false: Android's copy kept, owner 2026-10-12) the personal
+        // dictionary in every capitalization ("Hello" at a sentence start was learned as "hello"; "HELLO" with caps lock)
         val lower = word.lowercase(locale)
         val forms = linkedSetOf(word, lower, word.uppercase(locale), lower.replaceFirstChar { it.titlecase(locale) })
         for (form in forms) {
             history?.removeUnigramEntryDynamically(form)
-            getSubDict(Dictionary.TYPE_USER)?.removeUnigramEntryDynamically(form)
+            if (personal) getSubDict(Dictionary.TYPE_USER)?.removeUnigramEntryDynamically(form)
         }
         // and from the swipe vocabularies already built (the removed words list keeps it out of rebuilds), when they are
         // [history]'s keyboard's ([swipe]); the learned copy of [pool] only

@@ -393,10 +393,12 @@ object LearnedKeyboards {
         for (script in scripts) {
             val entries = LearnedStoreFiles.read(io, filesDir, script, LearnedStores.SHARED) ?: return false
             // (read again: a restore may have replaced the file under the list the keyboard holds)
-            val list = blacklist(filesDir, script, LearnedStores.SHARED).apply { reload() }.entries()
+            val shared = blacklist(filesDir, script, LearnedStores.SHARED).apply { reload() }
+            val list = shared.entries()
+            val allowed = shared.allowedEntries() // (its allowed rows go with it, RemovedWords)
             for (pool in pools) {
                 if (!LearnedStoreFiles.write(io, filesDir, script, pool, entries)) return false
-                blacklist(filesDir, script, pool).apply { reload() }.replaceAll(list)
+                blacklist(filesDir, script, pool).apply { reload() }.replaceAll(list, allowed)
             }
             Log.i(TAG, "$script: ${countsOf(entries)}, ${list.size} blacklisted, copied to ${pools.size} keyboards")
         }
