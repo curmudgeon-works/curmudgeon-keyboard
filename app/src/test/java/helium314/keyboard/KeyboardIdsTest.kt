@@ -423,7 +423,7 @@ class KeyboardIdsTest {
         assertEquals(listOf(de), storedEnabled(real))
         assertFalse(added().any { it.keyboardId == "k1" })
         assertFalse(real.all.keys.any { it.startsWith("pk1/") })
-        assertEquals(mapOf("k2" to 12), storedPools(real))
+        assertEquals(mapOf("k2" to 11), storedPools(real))
         assertEquals(setOf("k2"), storedButton(real, LearnedKeyboards.PREF_USE_OTHERS_LEARNED))
         assertNull(real.getString(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX + "org.app", null))
         assertEquals(emptyList(), SwitchedOffKeyboards.list(real))

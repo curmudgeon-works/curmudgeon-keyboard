@@ -23,6 +23,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 /** The phone's language list, as a test sets it. */
 @Implements(LocaleManagerCompat::class)
@@ -67,7 +68,7 @@ class DefaultKeyboardTest {
         assertEquals(stored(), SubtypeSettings.getEnabledSubtypes(false).map { with(SettingsSubtype) { it.toSettingsSubtype() } })
         // (owner 2026-10-11: keyboards have unique ids; the default is stored with a new one, in the added list too)
         assertNotNull(stored().single().keyboardId)
-        assertEquals(stored(), SubtypeSettings.createSettingsSubtypes(real.getString(Settings.PREF_ADDITIONAL_SUBTYPES, "")!!))
+        assertTrue(stored().single() in SubtypeSettings.createSettingsSubtypes(real.getString(Settings.PREF_ADDITIONAL_SUBTYPES, "")!!))
     }
 
     @Test fun `a language-level dictionary counts`() {

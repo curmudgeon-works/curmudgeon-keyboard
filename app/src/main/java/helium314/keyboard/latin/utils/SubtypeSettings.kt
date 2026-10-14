@@ -232,14 +232,39 @@ object SubtypeSettings {
     }
 
     fun reloadEnabledSubtypes(context: Context) {
-        enabledSubtypes.clear()
-        loadAdditionalSubtypes(context.prefs())
-        // the net (owner 2026-10-11), not for a default stored as the list was found empty: in a reload that is a moment
-        // of a list being rewritten (cleared, reset, restored), and records for it stayed behind as a switched-off
-        // keyboard once the list was written; a default that stays gets them at the next start, load or add
-        if (!loadEnabledSubtypes(context)) KeyboardProfiles.ensureListedRecords(context.realPrefs())
+        loadingOnce {
+            enabledSubtypes.clear()
+            loadAdditionalSubtypes(context.prefs())
+            // the net (owner 2026-10-11), not for a default stored as the list was found empty: in a reload that is a
+            // moment of a list being rewritten (cleared, reset, restored), and records for it stayed behind as a
+            // switched-off keyboard once the list was written; a default that stays gets them at the next start, load or add
+            if (!loadEnabledSubtypes(context)) KeyboardProfiles.ensureListedRecords(context.realPrefs())
+        }
         if (RichInputMethodManager.isInitialized())
             RichInputMethodManager.getInstance().refreshSubtypeCaches()
+    }
+
+    // (2026-10-12, a hang at the first start: a load writes the lists (the net's ids, a default), the write's listener
+    // (Settings) asked for a load inside the load, and so on. A load asked for while one runs is done once after it,
+    // a few rounds at most; never nested)
+    @Volatile private var loading = false
+    @Volatile private var loadAgain = false
+
+    @Synchronized
+    private fun loadingOnce(load: () -> Unit) {
+        if (loading) { loadAgain = true; return }
+        loading = true
+        try {
+            var rounds = 0
+            do {
+                loadAgain = false
+                load()
+            } while (loadAgain && ++rounds < 3)
+            if (loadAgain) Log.w(TAG, "the keyboard list kept changing while it was loaded")
+        } finally {
+            loading = false
+            loadAgain = false
+        }
     }
 
     fun createSettingsSubtypes(prefSubtypes: String): List<SettingsSubtype> =
@@ -264,9 +289,11 @@ object SubtypeSettings {
         DictionaryInfoUtils.getAssetsDictionaryList(context).orEmpty().filter { it.startsWith(DictionaryInfoUtils.MAIN_DICT_PREFIX) }
             .mapNotNullTo(builtInDictLocales) { runCatching { DictionaryInfoUtils.extractLocaleFromAssetsDictionaryFile(it) }.getOrNull() }
         systemSubtypes.clear()
-        loadAdditionalSubtypes(context.prefs())
-        enabledSubtypes.clear() // loading twice must not list a keyboard twice
-        loadEnabledSubtypes(context)
+        loadingOnce {
+            loadAdditionalSubtypes(context.prefs())
+            enabledSubtypes.clear() // loading twice must not list a keyboard twice
+            loadEnabledSubtypes(context)
+        }
     }
 
     /**

@@ -265,7 +265,7 @@ class RestoreMergeTest {
     }
 
     @Test fun `(h) a keyboard whose language the phone has none of comes in as new, unasked`() {
-        val german = available("de-DE")
+        val german = available("de-DE").withId(4)
         phoneAndBackup(listOf(qwerty), listOf(german))
         val plan = restorePlanFrom(ctx, zip)
         assertFalse(plan.asks(german))

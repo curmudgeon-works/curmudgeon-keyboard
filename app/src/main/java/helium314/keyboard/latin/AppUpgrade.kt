@@ -442,6 +442,11 @@ private object AppUpgrade {
         // counted as one of its own and got none of them; owner 2026-10-11, no separate common set)
         val prefs = context.realPrefs()
         val oldVersion = prefs.getInt(Settings.PREF_VERSION_CODE, 0)
+        // (2026-10-12) keyboards in this version's form, with ids (a first start stores its default keyboard before this
+        // runs): upstream's conversions of older keyboard strings below would mangle them ("MAIN:qwerty" -> "MAIN§qwerty",
+        // the id dropped), so they don't run on them
+        val oldKeyboardStrings = listOf(Settings.PREF_ENABLED_SUBTYPES, Settings.PREF_SELECTED_SUBTYPE, Settings.PREF_ADDITIONAL_SUBTYPES)
+            .none { prefs.getString(it, "")!!.contains(ExtraValue.KEYBOARD_ID + "=") }
         // clear extracted dictionaries, in case updated version contains newer ones
         DictionaryInfoUtils.getCacheDirectories(context).forEach {
             for (file in it.listFiles()!!) {
@@ -714,7 +719,7 @@ private object AppUpgrade {
                     }
                 }
             }
-            if (prefs.contains(Settings.PREF_ADDITIONAL_SUBTYPES))
+            if (oldKeyboardStrings && prefs.contains(Settings.PREF_ADDITIONAL_SUBTYPES))
                 prefs.edit {
                     putString(
                         Settings.PREF_ADDITIONAL_SUBTYPES, prefs.getString(Settings.PREF_ADDITIONAL_SUBTYPES, "")!!
@@ -751,7 +756,7 @@ private object AppUpgrade {
                 val newValue = prefs.getString(it, "")!!.replace(",", Separators.KV).replace(";", Separators.ENTRY)
                 prefs.edit { putString(it, newValue) }
             }
-            listOf(Settings.PREF_ENABLED_SUBTYPES, Settings.PREF_SELECTED_SUBTYPE, Settings.PREF_ADDITIONAL_SUBTYPES).forEach {
+            if (oldKeyboardStrings) listOf(Settings.PREF_ENABLED_SUBTYPES, Settings.PREF_SELECTED_SUBTYPE, Settings.PREF_ADDITIONAL_SUBTYPES).forEach {
                 if (!prefs.contains(it)) return@forEach
                 val value = prefs.getString(it, "")!!.replace(":", Separators.SET)
                 prefs.edit { putString(it, value) }
@@ -761,7 +766,7 @@ private object AppUpgrade {
                 prefs.edit { putString(it, newValue) }
             }
         }
-        if (oldVersion <= 2306) {
+        if (oldVersion <= 2306 && oldKeyboardStrings) {
             // upgrade additional, enabled, and selected subtypes to same format of locale and (filtered) extra value
             if (prefs.contains(Settings.PREF_ADDITIONAL_SUBTYPES)) {
                 val new = prefs.getString(Settings.PREF_ADDITIONAL_SUBTYPES, "")!!
@@ -823,7 +828,7 @@ private object AppUpgrade {
                 prefs.edit { putString(it, prefs.getString(it, "")!!.replace("popup_keys_", "")) }
             }
         }
-        if (oldVersion <= 2308) {
+        if (oldVersion <= 2308 && oldKeyboardStrings) {
             SubtypeSettings.reloadEnabledSubtypes(context)
             prefs.all.keys.toList().forEach { key ->
                 if (key.startsWith(Settings.PREF_POPUP_KEYS_ORDER+"_")) {

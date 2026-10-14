@@ -106,6 +106,16 @@ object KeyboardIds {
      * Before the list is loaded (SubtypeSettings). @return whether anything was written
      */
     fun ensureListedIds(real: SharedPreferences): Boolean {
+        // (never inside itself: its write's listeners load the keyboards, which run it; 2026-10-12, a first-start hang)
+        if (inNet) return false
+        inNet = true
+        try { return giveListedIds(real) } finally { inNet = false }
+    }
+
+    @Volatile private var inNet = false
+
+    // [ensureListedIds]: written only when something differs, so a second pass writes nothing
+    private fun giveListedIds(real: SharedPreferences): Boolean {
         val enabledPref = real.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!
         val enabled = definitions(enabledPref)
         val added = definitions(real.getString(Settings.PREF_ADDITIONAL_SUBTYPES, Defaults.PREF_ADDITIONAL_SUBTYPES))
@@ -121,8 +131,12 @@ object KeyboardIds {
         val newAdded = added.map { a -> given[a] ?: a }.filter { a -> listed.none { it.sameKeyboard(a) && it != a } }.toMutableList()
         for (kb in listed) if (newAdded.none { it == kb }) newAdded.add(kb)
         val editor = real.edit()
-        editor.putString(Settings.PREF_ENABLED_SUBTYPES, listed.map { it.toPref() }.distinct().joinToString(Separators.SETS))
-        editor.putString(Settings.PREF_ADDITIONAL_SUBTYPES, newAdded.map { it.toPref() }.distinct().joinToString(Separators.SETS))
+        val newEnabledPref = listed.map { it.toPref() }.distinct().joinToString(Separators.SETS)
+        val newAddedPref = newAdded.map { it.toPref() }.distinct().joinToString(Separators.SETS)
+        if (given.isEmpty() && newEnabledPref == enabledPref && newAddedPref == real.getString(Settings.PREF_ADDITIONAL_SUBTYPES, Defaults.PREF_ADDITIONAL_SUBTYPES))
+            return false // (nothing to change: written as it is)
+        if (newEnabledPref != enabledPref) editor.putString(Settings.PREF_ENABLED_SUBTYPES, newEnabledPref)
+        editor.putString(Settings.PREF_ADDITIONAL_SUBTYPES, newAddedPref)
         val selected = real.getString(Settings.PREF_SELECTED_SUBTYPE, null)?.let { runCatching { it.toSettingsSubtype() }.getOrNull() }
         selected?.let { s -> given[s]?.let { editor.putString(Settings.PREF_SELECTED_SUBTYPE, it.toPref()) } }
         for ((key, value) in all) if (key.startsWith(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX))
@@ -199,7 +213,11 @@ object KeyboardIdUpgrade {
             else {
                 val androidIds = taken.mapTo(HashSet()) { KeyboardIds.androidSubtypeId(it) }
                 var id: String
-                do { id = KeyboardIds.source() } while (!KeyboardIds.isId(id) || id in taken || KeyboardIds.androidSubtypeId(id) in androidIds)
+                var tries = 0
+                do {
+                    id = KeyboardIds.source()
+                    check(++tries < 1000) { "no free keyboard id" }
+                } while (!KeyboardIds.isId(id) || id in taken || KeyboardIds.androidSubtypeId(id) in androidIds)
                 taken.add(id)
                 kb.withKeyboardId(id).toPref().toSettingsSubtype()
             }
@@ -321,7 +339,7 @@ object KeyboardIdUpgrade {
         val out = LinkedHashMap<String, Int>()
         val o = try { JSONObject(json ?: "{}") } catch (e: Exception) { return out }
         for (k in o.keys()) {
-            if (KeyboardIds.isId(k) || Separators.SET !in k) continue
+            if (KeyboardIds.isId(k)) continue
             val pref = runCatching { k.toSettingsSubtype().toPref() }.getOrNull() ?: continue
             out[pref] = o.optInt(k)
         }
