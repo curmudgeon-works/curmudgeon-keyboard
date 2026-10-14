@@ -3,18 +3,27 @@ package helium314.keyboard
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import helium314.keyboard.latin.common.Constants.Subtype.ExtraValue
 import helium314.keyboard.latin.settings.Defaults
+import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.latin.settings.KeyboardScopeContext
+import helium314.keyboard.latin.settings.ProfilePreferences
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
+import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.KeyPopupOverrides
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.settings.AppearanceLooks
 import helium314.keyboard.settings.LayoutPresets
+import helium314.keyboard.settings.AppearanceDraft
 import helium314.keyboard.settings.SavedItemDefaults
 import helium314.keyboard.settings.preferences.restoreEverythingFrom
 import helium314.keyboard.settings.preferences.settingsToJsonStream
+import helium314.keyboard.settings.screens.applySetToOther
 import helium314.keyboard.settings.screens.popupPresets
+import helium314.keyboard.settings.screens.storePopupSet
+import org.json.JSONObject
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -43,7 +52,7 @@ class SavedItemDefaultsTest {
     private val keyboard = SettingsSubtype(Locale.US, "")
 
     @Before fun setUp() { real.edit().clear().commit() }
-    @After fun tearDown() { real.edit().clear().commit() }
+    @After fun tearDown() { AppearanceDraft.close(); real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
 
     @Test fun `a saved Layout remembers its unpicked settings' values, and keeps them when stored`() {
         val values = mapOf<String, Any?>(longPress to null, Settings.PREF_SHOW_NUMBER_ROW to true)
@@ -135,5 +144,119 @@ class SavedItemDefaultsTest {
         helium314.keyboard.latin.settings.ProfilePreferences(real) { 5 }.edit().putBoolean(SavedItemDefaults.PREF, false).commit()
         assertEquals(false, real.all[SavedItemDefaults.PREF])
         assertFalse(SavedItemDefaults.takeNewDefaults(real))
+    }
+
+    // ---- review 2026-10-11 A1-A3: flipping the switch acts on the keyboards at once, and Update keeps what is still at
+    // the chosen item's remembered default as default ----
+
+    private val fr = SettingsSubtype(Locale.FRANCE, "")
+    private val de = SettingsSubtype(Locale.GERMANY, "")
+    private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
+    private fun mark(id: Int, key: String) = KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + key)
+    private fun view(id: Int) = ProfilePreferences(real) { id }
+
+    /** Separate settings, keyboards 1 (US), 2 (French), 3 (German); saved Layout Work (long press at its default, 300 when
+     *  saved: today's is 150) and theme Sunset (gap at its default, 0.5 when saved). */
+    private fun separateWithWorkAndSunset() {
+        real.edit().putBoolean("separate_settings_per_keyboard", true)
+            .putString("keyboard_profile_ids", JSONObject().put(keyboard.toPref(), 1).put(fr.toPref(), 2).put(de.toPref(), 3).toString())
+            .commit()
+        KeyboardProfiles.loadGroups(real)
+        LayoutPresets.save(real, listOf(LayoutPresets.Preset("Work", mapOf(longPress to null), remembered = mapOf(longPress to 300))))
+        AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Sunset", mapOf(gap to null), mapOf(gap to 0.5f))), now = true)
+    }
+    /** [kb] chooses Work and Sunset, as their lists do (with the switch as it is). */
+    private fun choose(kb: SettingsSubtype) {
+        LayoutPresets.applyToOther(ctx, kb, LayoutPresets.load(real).single())
+        AppearanceLooks.applyToOther(ctx, kb, AppearanceLooks.load(real).single())
+    }
+    /** The App settings switch flipped: what its row does (the value stored, then its onCheckedChange). */
+    private fun flip(on: Boolean) {
+        real.edit().putBoolean(SavedItemDefaults.PREF, on).commit()
+        SavedItemDefaults.applySwitch(ctx, real, on)
+    }
+
+    @Test fun `A1 - switch off, Update keeps a setting still at the chosen item's remembered default as default`() {
+        separateWithWorkAndSunset()
+        flip(false)
+        choose(keyboard); choose(de)
+        assertEquals(300, real.getInt(own(1, longPress), 0)) // (off: written as saved)
+        view(3).edit().putInt(longPress, 400).commit() // (keyboard 3 picks its own)
+        val work = LayoutPresets.load(real).single()
+        val updated = LayoutPresets.saved(KeyboardScopeContext(ctx, 1), keyboard, "Work", work)
+        assertNull(updated.values[longPress], "Update made the remembered default a pick")
+        assertEquals(300, updated.remembered[longPress])
+        assertEquals(400, LayoutPresets.saved(KeyboardScopeContext(ctx, 3), de, "Work", work).values[longPress]) // (a pick stays one)
+        val sunset = AppearanceLooks.load(real).single()
+        val look = AppearanceLooks.saved(KeyboardScopeContext(ctx, 1), "Sunset", sunset)
+        assertNull(look.values[gap], "Update made the theme's remembered gap a pick")
+        assertEquals(0.5f, look.remembered[gap])
+        // switch on: a stored value equal to it was picked by hand (the switch took the others off), so it is saved as one
+        real.edit().putBoolean(SavedItemDefaults.PREF, true).commit()
+        assertEquals(300, LayoutPresets.saved(KeyboardScopeContext(ctx, 1), keyboard, "Work", work).values[longPress])
+    }
+
+    @Test fun `A1 - a popup set updated with the switch off keeps its remembered map and accents at their default`() {
+        separateWithWorkAndSunset()
+        flip(false)
+        KeyPopupOverrides.saveSets(real, listOf(KeyPopupOverrides.UserSet("Mine", "all", null, emptyMap(), "q!", "x",
+            setOf(KeyPopupOverrides.MAP, KeyPopupOverrides.ACCENTS))))
+        applySetToOther(ctx, fr, KeyPopupOverrides.loadSets(real).single(), takeNew = false)
+        assertEquals("q!", real.getString(own(2, Settings.PREF_SYMBOL_POPUP_MAP), null)) // (off: written as saved)
+        val frNow = fr.with(ExtraValue.MORE_POPUPS, "all")
+        storePopupSet(KeyboardScopeContext(ctx, 2), frNow, "Mine", "all", null, emptyMap())
+        val set = KeyPopupOverrides.loadSets(real).single()
+        assertEquals(setOf(KeyPopupOverrides.MAP, KeyPopupOverrides.ACCENTS), set.atDefault, "Update made the set's remembered defaults picks")
+        assertEquals("q!", set.symbolMap)
+    }
+
+    @Test fun `A2 - switch off, choose, flip on - the written values go, the keyboards read the default, a pick stays`() {
+        separateWithWorkAndSunset()
+        flip(false)
+        choose(keyboard); choose(fr); choose(de)
+        view(3).edit().putInt(longPress, 400).commit()
+        assertEquals(300, real.getInt(own(2, longPress), 0))
+        flip(true)
+        for (id in listOf(1, 2)) {
+            assertFalse(real.contains(own(id, longPress)), "set $id kept the value written with the switch off")
+            assertTrue(real.contains(mark(id, longPress))) // (the default, not the shared value)
+            assertEquals(Defaults.PREF_KEY_LONGPRESS_TIMEOUT, view(id).getInt(longPress, Defaults.PREF_KEY_LONGPRESS_TIMEOUT))
+            assertFalse(real.contains(own(id, gap)), "set $id kept the theme's gap")
+        }
+        assertEquals(400, real.getInt(own(3, longPress), 0)) // (its own pick)
+        assertFalse(LayoutPresets.isTweaked(KeyboardScopeContext(ctx, 1), keyboard, LayoutPresets.load(real).single()))
+        // a popup set's map and accents too
+        KeyPopupOverrides.saveSets(real, listOf(KeyPopupOverrides.UserSet("Mine", "all", null, emptyMap(), "q!", "x",
+            setOf(KeyPopupOverrides.MAP, KeyPopupOverrides.ACCENTS))))
+        flip(false)
+        real.edit().putString(Settings.PREF_ENABLED_SUBTYPES, fr.toPref()).commit()
+        applySetToOther(ctx, fr, KeyPopupOverrides.loadSets(real).single(), takeNew = false)
+        flip(true)
+        assertFalse(real.contains(own(2, Settings.PREF_SYMBOL_POPUP_MAP)), "the set's map stayed on the keyboard")
+        val frNow = KeyboardProfiles.idEntries(real).entries.single { it.value == 2 }.key.toSettingsSubtype()
+        assertNull(frNow.getExtraValueOf(ExtraValue.MORE_POPUPS), "the set's accents stayed on the keyboard")
+    }
+
+    @Test fun `A3 - switch on, choose, flip off - the remembered values are written, so a new default doesn't reach them`() {
+        separateWithWorkAndSunset()
+        // the shared set picked a long press; keyboard 4 reads it, and chooses Work through its own entry only
+        real.edit().putInt(longPress, 200).putString(own(4, LayoutPresets.PREF_SELECTED), "Work").commit()
+        choose(keyboard); choose(fr); choose(de)
+        view(3).edit().putInt(longPress, 400).commit()
+        assertFalse(real.contains(own(1, longPress))) // (on: nothing stored, at the default: marked)
+        flip(false)
+        for (id in listOf(1, 2)) {
+            assertEquals(300, real.getInt(own(id, longPress), 0), "set $id doesn't hold Work's long press: a new default reaches it")
+            assertFalse(real.contains(mark(id, longPress)))
+            assertEquals(0.5f, real.getFloat(own(id, gap), 0f), "set $id doesn't hold Sunset's gap")
+        }
+        assertEquals(400, real.getInt(own(3, longPress), 0)) // (its own pick)
+        assertFalse(real.contains(own(4, longPress))) // (the shared pick it reads stays)
+        assertEquals(200, real.getInt(longPress, 0))
+        assertFalse(LayoutPresets.isTweaked(KeyboardScopeContext(ctx, 1), keyboard, LayoutPresets.load(real).single()))
+        // and back on: gone again
+        flip(true)
+        assertFalse(real.contains(own(1, longPress)))
+        assertEquals(400, real.getInt(own(3, longPress), 0))
     }
 }

@@ -728,8 +728,8 @@ private fun SavedLooksPreference(setting: Setting) {
             // the built-in's place, and renaming it renamed every keyboard's built-in choice)
             checkTextValid = { name -> name.isNotBlank() && (builtIn + looks).none { it.name == name } },
             onConfirmed = { name ->
-                val values = AppearanceLooks.snapshot(prefs) + (AppearanceLooks.PICTURES to AppearanceLooks.savePictures(ctx))
-                store(looks + AppearanceLooks.Look(name, values, helium314.keyboard.settings.SavedItemDefaults.remembered(values)))
+                // (a setting still at what the theme on it, a previewed one included, keeps for its default stays at its default)
+                store(looks + AppearanceLooks.saved(ctx, name, previewed ?: chosen))
                 // what's on the keyboard now (a previewed theme included) is this theme; from the list: only once it's OK'd
                 if (!showList) prefs.edit { putString(AppearanceLooks.PREF_SELECTED, name) }
             },
@@ -755,8 +755,7 @@ private fun SavedLooksPreference(setting: Setting) {
         helium314.keyboard.settings.dialogs.UpdateSavedItemDialog(look.name, others.map { keyboardName(it, ctx) }, sameAs,
             onDismissRequest = { toUpdate = null },
         ) { ticked ->
-            val values = AppearanceLooks.snapshot(prefs) + (AppearanceLooks.PICTURES to AppearanceLooks.savePictures(ctx))
-            val updated = AppearanceLooks.Look(look.name, values, helium314.keyboard.settings.SavedItemDefaults.remembered(values))
+            val updated = AppearanceLooks.saved(ctx, look.name, chosen)
             store(looks.map { if (it === look) updated else it })
             prefs.edit { putString(AppearanceLooks.PREF_SELECTED, look.name) } // (this keyboard is that theme now)
             helium314.keyboard.settings.CustomLabels.clear(prefs, helium314.keyboard.settings.CustomLabels.Kind.THEME)

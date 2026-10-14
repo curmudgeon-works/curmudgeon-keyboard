@@ -46,7 +46,7 @@
     <string name="saving_choose_fonts">This keyboard\'s font for that text.</string>
     <string name="saving_choose_pictures">This keyboard\'s background picture.</string>
     <string name="saving_choose_key_layouts">This keyboard\'s keys for that kind of layout.</string>
-    <string name="saving_choose_saved_defaults">A saved item\'s settings that were at their default when saved: with \"Saved items take new defaults\" on they take today\'s defaults, off they apply as saved.</string>
+    <string name="saving_choose_saved_defaults">A saved item\'s settings that were at their default when saved: with \"Saved items take new defaults\" on they take today\'s defaults, off they apply as saved. Flipping the switch changes the keyboards using them at once. With it off, a setting still at the value the keyboard\'s chosen item kept for its default is saved at its default again (the save icon, Save as new).</string>
 
     <!-- Edit -->
     <string name="saving_edit_items">Changes stay on this keyboard, shown as \"Custom 1 · from Sunset\". The saved item changes only with its save icon in the list, which asks which other keyboards using it get the change. Everything waits for the screen\'s Save; Discard undoes it everywhere.</string>
@@ -113,7 +113,7 @@
 
     <!-- App update -->
     <string name="saving_update_keyboards">What you picked stays; what you never picked follows the new defaults.</string>
-    <string name="saving_update_items">With \"Saved items take new defaults\" on, settings saved at their default take the new ones the next time you choose the item; off, the update changes no keyboard. Built-ins always follow.</string>
+    <string name="saving_update_items">With \"Saved items take new defaults\" on, the keyboards using a saved item take the new defaults for the settings it saved at their default; off, the update changes no keyboard. Built-ins always follow.</string>
     <string name="saving_update_files">Stay as they are.</string>
     <string name="saving_update_words">Stay as they are.</string>
 

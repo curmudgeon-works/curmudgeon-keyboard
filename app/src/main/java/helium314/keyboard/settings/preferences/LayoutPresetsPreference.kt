@@ -160,8 +160,8 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
             confirmButtonText = stringResource(if (sameAsNow != null) R.string.save_anyway else android.R.string.ok),
             onConfirmed = { name ->
                 // what is on the keyboard now, a previewed Layout included
-                store(presets + LayoutPresets.snapshot(ctx, keyboard).let { values ->
-                    LayoutPresets.Preset(name, values, remembered = helium314.keyboard.settings.SavedItemDefaults.remembered(values)) })
+                // (a setting still at what the Layout on it, a previewed one included, keeps for its default stays at its default)
+                store(presets + LayoutPresets.saved(ctx, keyboard, name, previewed ?: chosen))
                 // what this keyboard has now is this Layout (from the list: only once it's OK'd)
                 if (!showList) prefs.edit { putString(LayoutPresets.PREF_SELECTED, name) }
             },
@@ -187,8 +187,7 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
             others.map { helium314.keyboard.settings.screens.keyboardName(it, ctx) }, sameAs,
             onDismissRequest = { toUpdate = null },
         ) { ticked ->
-            val values = LayoutPresets.snapshot(ctx, initialKeyboard)
-            val updated = LayoutPresets.Preset(preset.name, values, remembered = helium314.keyboard.settings.SavedItemDefaults.remembered(values))
+            val updated = LayoutPresets.saved(ctx, initialKeyboard, preset.name, chosen)
             store(presets.map { if (it.name == preset.name) updated else it })
             prefs.edit { putString(LayoutPresets.PREF_SELECTED, preset.name) } // (this keyboard is that Layout now)
             helium314.keyboard.settings.CustomLabels.clear(prefs, helium314.keyboard.settings.CustomLabels.Kind.LAYOUT)

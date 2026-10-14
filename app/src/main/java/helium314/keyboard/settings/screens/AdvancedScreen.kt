@@ -129,14 +129,15 @@ fun AdvancedSettingsScreen(
 @SuppressLint("ApplySharedPref")
 fun createAdvancedSettings(context: Context) = listOf(
     // owner 2026-10-11: on, a saved item's settings left at their default take the latest defaults; off, every saved
-    // value applies as saved; the subtext says which, and a dialog says when it takes effect
+    // value applies as saved; the subtext says which; flipping it applies to the keyboards at once (review 2026-10-11
+    // A2/A3: it waited for an item to be chosen), and a dialog says so
     Setting(context, helium314.keyboard.settings.SavedItemDefaults.PREF, R.string.saved_items_take_new_defaults) { setting ->
         val ctx = LocalContext.current
         var on by remember { mutableStateOf(helium314.keyboard.settings.SavedItemDefaults.takeNewDefaults(ctx.realPrefs())) }
         var explain by remember { mutableStateOf(false) }
         SwitchPreference(name = setting.title, key = setting.key, default = helium314.keyboard.settings.SavedItemDefaults.DEFAULT,
             description = stringResource(if (on) R.string.saved_items_take_new_defaults_on else R.string.saved_items_take_new_defaults_off),
-        ) { on = it; explain = true }
+        ) { on = it; explain = true; helium314.keyboard.settings.SavedItemDefaults.applySwitch(ctx, ctx.realPrefs(), it) }
         if (explain) helium314.keyboard.settings.dialogs.InfoDialog(stringResource(R.string.saved_items_take_new_defaults_when)) { explain = false }
     },
     Setting(context, Settings.PREF_ALWAYS_INCOGNITO_MODE,

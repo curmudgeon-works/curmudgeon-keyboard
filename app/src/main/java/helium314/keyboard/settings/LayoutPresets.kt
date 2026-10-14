@@ -111,6 +111,21 @@ object LayoutPresets {
         return values
     }
 
+    /** Layout [name] as Save as new or Update saves it from [keyboard] ([snapshot]), [chosen] the Layout on it: what is
+     *  still at the value [chosen] remembered for its default stays at its default ([SavedItemDefaults.forSave]). */
+    fun saved(ctx: Context, keyboard: SettingsSubtype, name: String, chosen: Preset?): Preset {
+        val (values, remembered) = SavedItemDefaults.forSave(snapshot(ctx, keyboard),
+            chosen?.let { rememberedFor(it, listOf(keyboard)) } ?: emptyMap(), SavedItemDefaults.takeNewDefaults(ctx.realPrefs()))
+        return Preset(name, values, remembered = remembered)
+    }
+
+    /** What [preset] holds at its default with the value it remembered, as it applies on [keyboards] (its popups on one
+     *  of them, see [popupsFit]); a built-in none (it follows the defaults). */
+    fun rememberedFor(preset: Preset, keyboards: Collection<SettingsSubtype>): Map<String, Any> =
+        if (preset.builtIn) emptyMap()
+        else preset.remembered.filterKeys { key -> preset.values.containsKey(key) && preset.values[key] == null && inScope(key)
+            && (key !in popupKeys || keyboards.any { popupsFit(it, preset) }) }
+
     /** [keyboard] with [preset]'s keys: a type it has none for goes back to the default; main keys that don't suit the
      *  keyboard's language (QWERTY on a Hindi keyboard) stay as they are; custom keys whose layout changed or went
      *  come back as the keyboard's own unnamed copy. */

@@ -321,6 +321,20 @@ object AppearanceLooks {
      *  to 0.3.008 the defaults were written out as picks, and from then to 2026-10-11 the defaults followed). */
     fun snapshot(prefs: SharedPreferences): Map<String, Any?> = keys.associateWith { null } + current(prefs)
 
+    /** Theme [name] as Save as new or Update saves it from the edited keyboard ([snapshot], its pictures), [chosen] the
+     *  theme on it: what is still at the value [chosen] remembered for its default stays at its default
+     *  ([SavedItemDefaults.forSave]). */
+    fun saved(ctx: Context, name: String, chosen: Look?): Look {
+        val (values, remembered) = SavedItemDefaults.forSave(snapshot(ctx.prefs()) + (PICTURES to savePictures(ctx)),
+            chosen?.let { rememberedOf(it) } ?: emptyMap(),
+            SavedItemDefaults.takeNewDefaults(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)))
+        return Look(name, values, remembered)
+    }
+
+    /** What [look] holds at its default with the value it remembered (a built-in remembers none: it follows). */
+    fun rememberedOf(look: Look): Map<String, Any> =
+        look.remembered.filterKeys { look.values.containsKey(it) && look.values[it] == null && inScope(it) }
+
     /** Everything that draws the keyboard reads the preferences again. */
     fun reload(ctx: Context) {
         helium314.keyboard.keyboard.emoji.SupportedEmojis.load(ctx) // which emojis show (the emoji version)

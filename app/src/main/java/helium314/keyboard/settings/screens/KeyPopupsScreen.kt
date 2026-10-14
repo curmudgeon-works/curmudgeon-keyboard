@@ -330,17 +330,25 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
 }
 
 /** Every arrangement belongs to a set of the user's own: stores [all] as set [name] and selects it. */
-private fun storePopupSet(ctx: Context, keyboard: SettingsSubtype, name: String, accentsValue: String, symbolsLayout: String?, all: Map<String, List<String>>) {
+internal fun storePopupSet(ctx: Context, keyboard: SettingsSubtype, name: String, accentsValue: String, symbolsLayout: String?, all: Map<String, List<String>>) {
     val prefs = ctx.prefs()
     // with the letter-to-symbol map and the popup order as they are (re-review 2026-10-07: a set without them took the
     // last tapped built-in's)
     val symbolMap = prefs.getString(Settings.PREF_SYMBOL_POPUP_MAP, Defaults.PREF_SYMBOL_POPUP_MAP)!!
     val popupOrder = keyboard.getExtraValueOf(ExtraValue.POPUP_ORDER) ?: prefs.getString(Settings.PREF_POPUP_KEYS_ORDER, Defaults.PREF_POPUP_KEYS_ORDER)!!
-    // and which of them the keyboard reads at their default (not picked): see UserSet.atDefault
+    // and which of them the keyboard reads at their default (not picked): see UserSet.atDefault; with "Saved items take
+    // new defaults" off, also what is still at the value the chosen set kept for its default (review 2026-10-11 A1: Update
+    // made it a pick)
+    val chosen = prefs.getString(KeyPopupOverrides.PREF_SELECTED_SET, null)?.let { n -> KeyPopupOverrides.loadSets(ctx.realPrefs()).firstOrNull { it.name == n } }
+        ?.takeIf { !helium314.keyboard.settings.SavedItemDefaults.takeNewDefaults(ctx.realPrefs()) }
+    val kept = chosen?.let { helium314.keyboard.settings.SavedItemDefaults.remembered(it) } ?: emptyMap()
+    fun keptAtDefault(key: String) = helium314.keyboard.settings.SavedItemDefaults.atChosenDefault(key, prefs.getString(key, null), kept)
     val atDefault = setOfNotNull(
-        KeyPopupOverrides.ACCENTS.takeIf { keyboard.getExtraValueOf(ExtraValue.MORE_POPUPS) == null && !prefs.contains(Settings.PREF_MORE_POPUP_KEYS) },
-        KeyPopupOverrides.MAP.takeIf { !prefs.contains(Settings.PREF_SYMBOL_POPUP_MAP) },
-        KeyPopupOverrides.ORDER.takeIf { keyboard.getExtraValueOf(ExtraValue.POPUP_ORDER) == null && !prefs.contains(Settings.PREF_POPUP_KEYS_ORDER) })
+        KeyPopupOverrides.ACCENTS.takeIf { keyboard.getExtraValueOf(ExtraValue.MORE_POPUPS)?.let { chosen != null && KeyPopupOverrides.ACCENTS in chosen.atDefault
+            && it == chosen.morePopups } ?: !prefs.contains(Settings.PREF_MORE_POPUP_KEYS) },
+        KeyPopupOverrides.MAP.takeIf { !prefs.contains(Settings.PREF_SYMBOL_POPUP_MAP) || keptAtDefault(Settings.PREF_SYMBOL_POPUP_MAP) },
+        KeyPopupOverrides.ORDER.takeIf { keyboard.getExtraValueOf(ExtraValue.POPUP_ORDER) == null
+            && (!prefs.contains(Settings.PREF_POPUP_KEYS_ORDER) || keptAtDefault(Settings.PREF_POPUP_KEYS_ORDER)) })
     val set = KeyPopupOverrides.UserSet(name, accentsValue, symbolsLayout, all, symbolMap, popupOrder, atDefault)
     KeyPopupOverrides.saveSets(ctx.realPrefs(), KeyPopupOverrides.loadSets(ctx.realPrefs()).filter { it.name != name } + set)
     KeyPopupOverrides.save(prefs, all)
