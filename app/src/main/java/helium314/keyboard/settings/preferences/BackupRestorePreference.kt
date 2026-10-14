@@ -1806,6 +1806,18 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, plan: Re
             SubtypeUtilsAdditional.changeAdditionalSubtype(device, renamed, ctx, action = "renamed")
         }
     }
+    // one a ticked row replaces with another layout, unused by every other keyboard then and with other keys than the
+    // backup's: its keys saved under the name the warning showed, a copy (owner 2026-10-12: "give it same treatment of
+    // temp_MMDD ig."; before, it went with the cleanup); the keyboard takes the backup's as answered.
+    // Copied before the renames below: one of its name the restore also brings moves it away first, and the cleanup then
+    // took the moved file, unused (round-5 review)
+    for ((key, save) in unsavedSaves) {
+        val (type, name) = key
+        if (save.first == name) continue
+        val from = LayoutUtilsCustom.getLayoutFile(name, type, ctx)
+        val to = LayoutUtilsCustom.getLayoutFile(save.second, type, ctx)
+        if (from.isFile && !to.exists()) { changing(); from.copyTo(to); LayoutUtilsCustom.onLayoutFileChanged() }
+    }
     // the device's key layout files of a name the restore brings with other keys: renamed first, as the editor's rename
     // does, every keyboard (its identity), default and saved Layout using it following (owner 2026-10-12: "Backup's My
     // numrow; yours becomes My numrow 2"; before, the backup's came in as "My numrow 2")
@@ -1816,16 +1828,6 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, plan: Re
     for ((type, name) in wanted) {
         val to = unsavedSaves[type to name]?.takeIf { it.first == name }?.second ?: keyLayouts.deviceRename(type, name)
         to?.let { changing(); renamePhoneLayoutFile(ctx, SavedItemsMerge.FileClash(type, name, it)) }
-    }
-    // one a ticked row replaces with another layout, unused by every other keyboard then and with other keys than the
-    // backup's: its keys saved under the name the warning showed, a copy (owner 2026-10-12: "give it same treatment of
-    // temp_MMDD ig."; before, it went with the cleanup); the keyboard takes the backup's as answered
-    for ((key, save) in unsavedSaves) {
-        val (type, name) = key
-        if (save.first == name) continue
-        val from = LayoutUtilsCustom.getLayoutFile(name, type, ctx)
-        val to = LayoutUtilsCustom.getLayoutFile(save.second, type, ctx)
-        if (from.isFile && !to.exists()) { changing(); from.copyTo(to); LayoutUtilsCustom.onLayoutFileChanged() }
     }
     // the merge targets as they are now (R4: their key layouts renamed; a new id)
     fun mapTargets() {

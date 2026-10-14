@@ -302,6 +302,37 @@ class RestoreSameNameLayoutTest {
         assertEquals("A", file(temp, type).readText(), "the device's keys, saved")
     }
 
+    // fail before (round-5 review): the device's unsaved one was renamed away first (another backup keyboard brings one of
+    // its name with other keys), the copy found nothing, and the cleanup took the renamed file: the keys were lost
+    @Test fun `(d) ticked, the device's unsaved name also in another backup keyboard - the device's keys still saved as temp_1012`() {
+        val type = LayoutType.NUMBER_ROW
+        val a = unsaved("A", type)
+        val other = LayoutUtilsCustom.newPrivateLayoutName(type, "") { it == a }
+        val phone = hindi.withLayout(type, a).withId(1)
+        val inBackup = hindi.withLayout(type, other).withId(1)
+        val second = english.withLayout(type, a).withId(5) // (the backup's own unsaved one of the device's name)
+        deviceAndBackup(listOf(phone), inBackup, type, other, "B")
+        val list = SubtypeSettings.createPrefSubtypes(listOf(inBackup, second))
+        ZipOutputStream(zip.outputStream()).use { z ->
+            z.putNextEntry(ZipEntry("preferences.json"))
+            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to list, Settings.PREF_ADDITIONAL_SUBTYPES to list,
+                KeyboardIdUpgrade.DONE to true, KeyboardProfiles.NO_COMMON_SET_DONE to true,
+                helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
+                helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
+            z.closeEntry()
+            for ((name, keys) in listOf(other to "B", a to "C")) {
+                z.putNextEntry(ZipEntry("unprotected/layouts/${type.name.lowercase()}/$name")); z.write(keys.toByteArray()); z.closeEntry()
+            }
+        }
+        val differences = restoreDifferencesFrom(ctx, zip, inBackup, phone)
+        val decision = restorePlanFrom(ctx, zip).mergeDecision(phone, differences, differences,
+            learnedRow = false, learnedTicked = false, name = null)
+        restoreKeyboardsFrom(ctx, zip, listOf(inBackup, second), withSettings = true, decisions = mapOf(inBackup to decision))
+        assertEquals("B", file(listed(1).layoutName(type)!!, type).readText())
+        assertEquals("A", file(LayoutUtilsCustom.getLayoutName("temp_1012", type), type).readText(), "the device's keys, saved")
+        assertEquals("C", file(listed(5).layoutName(type)!!, type).readText())
+    }
+
     @Test fun `(d) an unsaved number row another keyboard still uses - no warning, nothing saved, it keeps its keys`() {
         val type = LayoutType.NUMBER_ROW
         val a = unsaved("A", type)
