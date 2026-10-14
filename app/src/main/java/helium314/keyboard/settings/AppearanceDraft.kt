@@ -2,7 +2,6 @@
 package helium314.keyboard.settings
 
 import android.content.Context
-import helium314.keyboard.latin.common.PictureFraming
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.ProfilePreferences
 import helium314.keyboard.latin.settings.KeyboardProfiles
@@ -241,11 +240,15 @@ class AppearanceDraft private constructor(
         private fun currentPrefs(ctx: Context, setId: String): Map<String, Any?> = AppearanceLooks.screenValues(
             ProfilePreferences(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)) { setId })
 
-        private fun liveFiles(ctx: Context) = listOf(
-            Settings.getCustomBackgroundFile(ctx, false, false), Settings.getCustomBackgroundFile(ctx, false, true),
-            Settings.getCustomBackgroundFile(ctx, true, false), Settings.getCustomBackgroundFile(ctx, true, true),
-        ).flatMap { listOf(it, PictureFraming.fileFor(it)) } // each picture with its framing (the fonts, emoji too, are
-        // a list of files kept by name: only the choices change, preferences)
+        /** The background pictures of set [setId], the edited one (as [currentPrefs]; review L5.2: read through the
+         *  context, which outside the settings screens is the keyboard in use), each with its framing; the main
+         *  keyboard's while Appearance is common to all keyboards. (The fonts, emoji too, are a list of files kept by
+         *  name: only the choices change, preferences.) */
+        private fun liveFiles(ctx: Context, setId: String): List<File> {
+            val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
+            val id = if (KeyboardProfiles.isShared(real, KeyboardProfiles.Group.APPEARANCE)) KeyboardProfiles.SHARED else setId
+            return KeyboardProfiles.pictureFiles(ctx, id)
+        }
 
         private fun dir(ctx: Context) = File(ctx.filesDir, "appearance_draft")
 
@@ -329,10 +332,10 @@ class AppearanceDraft private constructor(
 
         private fun start(ctx: Context): AppearanceDraft {
             val dir = dir(ctx).apply { deleteRecursively(); mkdirs() }
-            val files = liveFiles(ctx).associateWith { live ->
+            val setId = PrefsDraft.currentSetId(ctx)
+            val files = liveFiles(ctx, setId).associateWith { live ->
                 if (live.exists()) Saved(live.copyTo(File(dir, live.name), overwrite = true), live.length(), live.lastModified()) else null
             }
-            val setId = PrefsDraft.currentSetId(ctx)
             val prefs = currentPrefs(ctx, setId)
             val reached = reachedNow(ctx)
             val labels = CustomLabels.Opened.of(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx), LABELS)
