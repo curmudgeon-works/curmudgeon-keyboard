@@ -136,15 +136,18 @@ class CustomLabelOriginTest {
     @Test fun `shared Appearance - one label and one origin, a hidden own choice gets its own`() {
         saveWork()
         real.edit().putString(own(2, AppearanceLooks.PREF_SELECTED), "Work").commit() // (its own, hidden once shared)
-        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.APPEARANCE, true, 1)
-        real.edit().putString(AppearanceLooks.PREF_SELECTED, "Work").commit() // (the shared choice)
+        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.APPEARANCE, true)
+        // (owner 2026-10-11: no separate common set) the shared choice: the main keyboard's own
+        val main = KeyboardProfiles.mainId(real)
+        real.edit().putString(own(main, AppearanceLooks.PREF_SELECTED), "Work").commit()
         deleteTheme("Work")
-        assertEquals(1, real.getInt(theme.key, 0))
-        assertEquals("Work", real.getString(theme.fromKey, null))
+        assertEquals(1, real.getInt(own(main, theme.key), 0))
+        assertEquals("Work", real.getString(own(main, theme.fromKey), null))
+        assertFalse(real.contains(theme.key)); assertFalse(real.contains(theme.fromKey)) // (no common set)
         assertEquals(List(3) { "Custom · from Work" }, (1..3).map { themeRow(view(it)) })
         assertFalse(real.contains(own(1, theme.key))); assertFalse(real.contains(own(1, theme.fromKey)))
         assertEquals("Work", real.getString(own(2, theme.fromKey), null)) // (hidden, back when per keyboard)
-        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.APPEARANCE, false, KeyboardProfiles.SHARED)
+        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.APPEARANCE, false)
         assertEquals("Custom · from Work", themeRow(view(2)))
     }
 
@@ -215,10 +218,11 @@ class CustomLabelOriginTest {
 
     @Test fun `shared Layout menu - one popups label and one origin`() {
         KeyPopupOverrides.saveSets(real, listOf(KeyPopupOverrides.UserSet("Mine", "all", null, mapOf("a" to listOf("à")))))
-        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.LAYOUT, true, 1)
-        real.edit().putString(KeyPopupOverrides.PREF_SELECTED_SET, "Mine").commit()
+        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.LAYOUT, true)
+        val main = KeyboardProfiles.mainId(real) // (the shared choice: the main keyboard's own, no separate common set)
+        real.edit().putString(own(main, KeyPopupOverrides.PREF_SELECTED_SET), "Mine").commit()
         deletePopupSet(ctx, "Mine")
-        assertEquals(setOf(popups.key, popups.fromKey), CustomLabels.stored(real, listOf(popups)))
+        assertEquals(setOf(own(main, popups.key), own(main, popups.fromKey)), CustomLabels.stored(real, listOf(popups)))
         assertEquals(List(3) { "Custom · from Mine" }, (1..3).map { popupsRow(view(it)) })
     }
 }

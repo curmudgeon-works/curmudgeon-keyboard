@@ -78,7 +78,7 @@ class CustomLabelsDiscardTest {
     @Test fun `a Custom label alone is no unsaved change on Appearance, and Discard takes it back`() {
         val draft = AppearanceDraft.of(ctx)
         CustomLabels.mark(ProfilePreferences(real) { 2 }, CustomLabels.Kind.THEME)
-        CustomLabels.mark(real, CustomLabels.Kind.THEME) // (the shared set too)
+        CustomLabels.mark(real, CustomLabels.Kind.THEME) // (a plain one too, as the old common set had; no common set since 2026-10-11)
         assertFalse(draft.hasChanges(ctx))
         AppearanceDraft.rejectOpen(ctx)
         assertFalse(real.contains(own(2, theme)))

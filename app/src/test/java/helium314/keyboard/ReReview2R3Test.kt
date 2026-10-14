@@ -75,12 +75,14 @@ class ReReview2R3Test {
         useKeyboards(ctx, real, *keyboards.toTypedArray())
         if (off != null) profileIds(real, (keyboards + off).withIndex().associate { it.value to it.index + 1 }, keyboards.size + 2)
         else keyboards.forEach { KeyboardProfiles.idFor(real, it) }
-        real.edit().putFloat(Settings.PREF_KEY_HORIZONTAL_GAP, 1f).commit()
+        // (owner 2026-10-11: no separate common set) each keyboard's own gap, here and in the backup
+        real.edit().apply { for (k in keyboards) putFloat(KeyboardProfiles.ownKey(KeyboardProfiles.idFor(real, k), Settings.PREF_KEY_HORIZONTAL_GAP), 1f) }.commit()
         val list = SubtypeSettings.createPrefSubtypes(listOf(inBackup))
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("preferences.json"))
             settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to list, Settings.PREF_ADDITIONAL_SUBTYPES to list,
-                Settings.PREF_KEY_HORIZONTAL_GAP to 3f,
+                "keyboard_profile_ids" to JSONObject().put(inBackup.toPref(), 1).toString(), KeyboardProfiles.NO_COMMON_SET_DONE to true,
+                KeyboardProfiles.ownKey(1, Settings.PREF_KEY_HORIZONTAL_GAP) to 3f,
                 helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
                 helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
             z.closeEntry()
@@ -149,7 +151,10 @@ class ReReview2R3Test {
         val list = SubtypeSettings.createPrefSubtypes(listOf(hindi))
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("preferences.json"))
-            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to list, Settings.PREF_LAYOUT_PREFIX + type.name to p,
+            // (hindi's own set: no separate common set, owner 2026-10-11)
+            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to list,
+                "keyboard_profile_ids" to JSONObject().put(hindi.toPref(), 1).toString(), KeyboardProfiles.NO_COMMON_SET_DONE to true,
+                KeyboardProfiles.ownKey(1, Settings.PREF_LAYOUT_PREFIX + type.name) to p,
                 helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
                 helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
             z.closeEntry()
@@ -164,12 +169,14 @@ class ReReview2R3Test {
     private fun themes(phoneTheme: String, phoneGap: Float, backupTheme: String, backupGap: Float) {
         useKeyboards(ctx, real, english)
         AppearanceLooks.save(real, listOf(AppearanceLooks.Look(phoneTheme, mapOf(Settings.PREF_KEY_HORIZONTAL_GAP to phoneGap))), now = true)
-        real.edit().putString(AppearanceLooks.PREF_SELECTED, phoneTheme).commit()
+        // (english's own choice, here and in the backup: no separate common set, owner 2026-10-11)
+        real.edit().putString(KeyboardProfiles.ownKey(KeyboardProfiles.idFor(real, english), AppearanceLooks.PREF_SELECTED), phoneTheme).commit()
         val look = JSONObject().put("name", backupTheme).put("values", JSONObject().put(Settings.PREF_KEY_HORIZONTAL_GAP, JSONObject().put("f", backupGap.toDouble())))
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("preferences.json"))
             settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to english.toPref(), Settings.PREF_ADDITIONAL_SUBTYPES to "",
-                AppearanceLooks.PREF to JSONArray(listOf(look)).toString(), AppearanceLooks.PREF_SELECTED to backupTheme,
+                "keyboard_profile_ids" to JSONObject().put(english.toPref(), 1).toString(), KeyboardProfiles.NO_COMMON_SET_DONE to true,
+                AppearanceLooks.PREF to JSONArray(listOf(look)).toString(), KeyboardProfiles.ownKey(1, AppearanceLooks.PREF_SELECTED) to backupTheme,
                 helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
                 helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
             z.closeEntry()
