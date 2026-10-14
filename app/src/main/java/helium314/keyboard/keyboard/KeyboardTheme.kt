@@ -186,12 +186,10 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                 "daylight", "paper" -> getThemeColors(THEME_LIGHT, themeStyle, context, prefs, isNight) // short-lived palettes
                 "midnight" -> getThemeColors(THEME_BLACK, themeStyle, context, prefs, isNight) // was black under another name
                 "classic" -> getThemeColors(THEME_HOLO_WHITE, themeStyle, context, prefs, isNight)
-                // the phone's colours with Curmudgeon's orange as the accent: swipe trail, suggestions, enter key (2026-10-10;
-                // the phone's accent before), below Android 12 too
-                THEME_DYNAMIC -> helium314.keyboard.latin.common.AccentOverride(
+                THEME_DYNAMIC -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) DynamicColors(context, themeStyle, hasBorders, isNight, backgroundImage)
-                    else getThemeColors(dynamicFallback(Build.VERSION.SDK_INT), themeStyle, context, prefs, isNight),
-                    Defaults.CURMUDGEON_ORANGE)
+                    else getThemeColors(dynamicFallback(Build.VERSION.SDK_INT), themeStyle, context, prefs, isNight)
+                }
                 THEME_LIGHT -> DefaultColors(
                     themeStyle,
                     hasBorders,
