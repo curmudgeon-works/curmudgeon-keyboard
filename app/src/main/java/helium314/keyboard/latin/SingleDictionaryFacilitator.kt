@@ -133,7 +133,7 @@ class SingleDictionaryFacilitator(private val dict: Dictionary) : DictionaryFaci
     override fun getMainDictionaryFrequency(word: String, locale: Locale) =
         if (locale == dict.mLocale) dict.getFrequency(word) else -1
 
-    override fun removeWord(word: String, alsoFromPersonalDictionary: Boolean) {}
+    override fun removeWord(word: String) {}
 
     override fun clearUserHistoryDictionary(context: Context) {}
 
