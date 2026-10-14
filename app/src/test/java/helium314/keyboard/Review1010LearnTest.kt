@@ -48,21 +48,32 @@ class Review1010LearnTest {
 
     // ---- area 1 #4: Discard after a saved theme was renamed or deleted on the open Appearance screen ----
 
-    @Test fun `Discard after renaming the chosen theme keeps the new name`() {
+    // (2026-10-11: Discard undoes a rename or delete everywhere, the saved themes list with it: "Every action on an
+    // editing screen ... is held until Save; Discard undoes it everywhere it reached". Before, the rename stayed and
+    // the snapshot followed it, so Discard never named a theme that was gone; the list now comes back with the name.)
+    @Test fun `Discard after renaming the chosen theme brings back the old name, in the list too`() {
+        val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
+        AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Mine", emptyMap())), now = true)
         ctx.prefs().edit { putString(AppearanceLooks.PREF_SELECTED, "Mine") }
         val draft = AppearanceDraft.of(ctx) // the Appearance screen opens
-        AppearanceLooks.choiceRenamed(ctx, "Mine", "Work") // Themes -> rename
-        assertFalse(draft.hasChanges(ctx), "the rename alone counted as a change of the screen")
+        AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Work", emptyMap())), now = true) // Themes -> rename
+        AppearanceLooks.choiceRenamed(ctx, "Mine", "Work")
+        assertTrue(draft.hasChanges(ctx))
         AppearanceDraft.rejectOpen(ctx) // the cross, or leaving the app
-        assertEquals("Work", ctx.prefs().getString(AppearanceLooks.PREF_SELECTED, null))
+        assertEquals("Mine", ctx.prefs().getString(AppearanceLooks.PREF_SELECTED, null))
+        assertEquals("Mine", AppearanceLooks.load(real).single().name)
     }
 
-    @Test fun `Discard after deleting the chosen theme doesn't name it again`() {
+    @Test fun `Discard after deleting the chosen theme brings it back, chosen`() {
+        val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
+        AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Mine", emptyMap())), now = true)
         ctx.prefs().edit { putString(AppearanceLooks.PREF_SELECTED, "Mine") }
         AppearanceDraft.of(ctx)
-        AppearanceLooks.choiceRenamed(ctx, "Mine", null) // Themes -> delete
+        AppearanceLooks.save(real, emptyList(), now = true) // Themes -> delete
+        AppearanceLooks.choiceRenamed(ctx, "Mine", null)
         AppearanceDraft.rejectOpen(ctx)
-        assertNull(ctx.prefs().getString(AppearanceLooks.PREF_SELECTED, null))
+        assertEquals("Mine", ctx.prefs().getString(AppearanceLooks.PREF_SELECTED, null))
+        assertEquals("Mine", AppearanceLooks.load(real).single().name)
     }
 
     @Test fun `Discard still puts back another theme chosen on the screen`() {

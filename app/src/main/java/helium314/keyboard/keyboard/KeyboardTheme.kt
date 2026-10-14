@@ -607,7 +607,26 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                     putString(Settings.PREF_THEME_COLORS_NIGHT, to)
             }
             followInHiddenSets(prefs, from, to)
+            // and the saved themes that name it, with their copies of its colours (owner 2026-10-11: rename = every
+            // keyboard and saved item naming it follows; "palette rename (a) update the saved theme")
+            renameInSavedThemes((prefs as? ProfilePreferences)?.underlying ?: prefs, from, to)
             return true
+        }
+
+        /** Saved themes naming palette [from] (light or dark colours) name [to], their copies of its colours too. */
+        internal fun renameInSavedThemes(real: SharedPreferences, from: String, to: String) {
+            val prefixes = listOf(Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
+            val looks = helium314.keyboard.settings.AppearanceLooks.load(real)
+            fun names(look: helium314.keyboard.settings.AppearanceLooks.Look) = look.values[Settings.PREF_THEME_COLORS] == from
+                || look.values[Settings.PREF_THEME_COLORS_NIGHT] == from || prefixes.any { look.values.containsKey(it + from) }
+            if (looks.none { names(it) }) return
+            helium314.keyboard.settings.AppearanceLooks.save(real, looks.map { look ->
+                if (!names(look)) look
+                else helium314.keyboard.settings.AppearanceLooks.Look(look.name, look.values.entries.associate { (key, value) ->
+                    val renamed = prefixes.firstOrNull { key == it + from }?.let { it + to } ?: key
+                    renamed to if ((key == Settings.PREF_THEME_COLORS || key == Settings.PREF_THEME_COLORS_NIGHT) && value == from) to else value
+                }, look.remembered)
+            }, now = true)
         }
 
         fun determineUserColor(colors: List<ColorSetting>, context: Context, colorName: String, isNight: Boolean): Int {

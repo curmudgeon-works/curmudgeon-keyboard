@@ -347,7 +347,7 @@ object AppearanceLooks {
         val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
         if (new == null) KeyboardProfiles.forgetValueEverywhere(real, PREF_SELECTED, old)
         else KeyboardProfiles.replaceValueEverywhere(real, PREF_SELECTED, old, new)
-        AppearanceDraft.followThemeOpen(old, new) // (and the open screen's Discard: review 2026-10-08 area 1 #4)
+        // (the open screen's Discard undoes it everywhere: its snapshot holds every keyboard's choice, 2026-10-11)
     }
 
     fun save(prefs: SharedPreferences, looks: List<Look>, now: Boolean = false) {

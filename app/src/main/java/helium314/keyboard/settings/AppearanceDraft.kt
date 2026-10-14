@@ -22,6 +22,10 @@ class AppearanceDraft private constructor(
     private val files: Map<File, Saved?>, // the live file -> its saved copy, null when it didn't exist
     private val dir: File,
     private val setId: Int = KeyboardProfiles.SHARED, // the set the screen edited (see PrefsDraft)
+    // what the screen's saved items reach beyond the edited set, as stored (every keyboard's own set too): the saved
+    // themes, each set's theme choice and palettes, so Discard undoes a rename or delete everywhere it reached (owner
+    // 2026-10-11: "Every action on an editing screen ... is held until Save; Discard undoes it everywhere it reached")
+    private var reached: Map<String, Any?> = emptyMap(),
 ) {
     /** A copy of a custom file, with the size and time the live one had (enough to tell a change, no reading). */
     class Saved(val copy: File, val length: Long, val modified: Long)
@@ -54,6 +58,7 @@ class AppearanceDraft private constructor(
     /** True when a preference or file in the snapshot's scope differs from it, or something was deleted. */
     fun hasChanges(ctx: Context): Boolean {
         if (held.isNotEmpty()) return true
+        if (reachedNow(ctx) != reached) return true
         if (changedKeys(ctx).isNotEmpty()) return true
         return files.any { (live, saved) ->
             if (saved == null) live.exists() else !live.exists() || live.length() != saved.length || live.lastModified() != saved.modified
@@ -84,8 +89,13 @@ class AppearanceDraft private constructor(
             val live = File(helium314.keyboard.keyboard.FontLibrary.dir(ctx), name)
             if (!live.exists()) File(File(dir, HELD_FONTS), name).renameTo(live)
         }
-        AppearanceLooks.applyScreen(ctx, prefs,
-            ProfilePreferences(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)) { setId })
+        val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
+        val now = reachedNow(ctx)
+        if (now != reached) real.edit().apply {
+            for (key in now.keys) if (key !in reached) remove(key)
+            for ((key, value) in reached) if (now[key] != value) KeyboardProfiles.put(this, key, value)
+        }.commit()
+        AppearanceLooks.applyScreen(ctx, prefs, ProfilePreferences(real) { setId })
         discard()
     }
 
@@ -95,21 +105,11 @@ class AppearanceDraft private constructor(
         val now = AppearanceLooks.screenValues(
             ProfilePreferences(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)) { setId })
         prefs = prefs.filterKeys { it !in keys } + now.filterKeys { it in keys }
-        writeSnapshot(dir, setId, prefs, files)
+        // (the palette editor's "Save and exit" keeps a palette's rename too, wherever it reached)
+        if (keys.any { reachesBeyond(it) }) reached = reachedNow(ctx)
+        writeSnapshot(dir, setId, prefs, files, reached)
         version.intValue++
         helium314.keyboard.latin.utils.SettingsEventLog.log("Appearance snapshot rebased: $keys")
-    }
-
-    /** A saved theme renamed to [new] or deleted (null) while the screen is open: the list of themes is no part of the
-     *  snapshot (the rename or delete stays), so the snapshot's choice follows it, as every keyboard's did; else Discard
-     *  or leaving the app named a theme that no longer exists (review 2026-10-08 area 1 #4). Another theme chosen on the
-     *  screen since is still put back. */
-    private fun followTheme(old: String, new: String?) {
-        if (prefs[AppearanceLooks.PREF_SELECTED] != old) return
-        // (absent: put back as "nothing chosen", in a keyboard's own set with its mark, as forgetValueEverywhere left it)
-        prefs = if (new == null) prefs - AppearanceLooks.PREF_SELECTED else prefs + (AppearanceLooks.PREF_SELECTED to new)
-        writeSnapshot(dir, setId, prefs, files)
-        version.intValue++
     }
 
     /** Keeps what is on the phone now; only the snapshot goes. Deletes made on the screen are done for good now: every
@@ -172,8 +172,6 @@ class AppearanceDraft private constructor(
         /** [AppearanceDraft.rebase] of the running draft, if there is one. */
         fun rebaseOpen(ctx: Context, keys: Set<String>) { active?.rebase(ctx, keys) }
 
-        /** [AppearanceDraft.followTheme] of the running draft, if there is one. */
-        fun followThemeOpen(old: String, new: String?) { active?.followTheme(old, new) }
 
         /** The app is left (or the screen goes to the background) with the screen open: changes not accepted are undone. */
         fun rejectOpen(ctx: Context) { active?.reject(ctx) }
@@ -185,13 +183,27 @@ class AppearanceDraft private constructor(
             }
             val prefs = currentPrefs(ctx)
             val setId = PrefsDraft.currentSetId(ctx)
-            writeSnapshot(dir, setId, prefs, files)
-            return AppearanceDraft(prefs, files, dir, setId)
+            val reached = reachedNow(ctx)
+            writeSnapshot(dir, setId, prefs, files, reached)
+            return AppearanceDraft(prefs, files, dir, setId, reached)
         }
 
-        private fun writeSnapshot(dir: File, setId: Int, prefs: Map<String, Any?>, files: Map<File, Saved?>) {
+        /** A stored key beyond the edited set that the screen's saved items reach ([reached]): the saved themes; in
+         *  any set, the theme choice, the light and dark colours' choice, the palettes, and their "at default" marks. */
+        private fun reachesBeyond(stored: String): Boolean {
+            val plain = (KeyboardProfiles.splitOwnKey(stored)?.second ?: stored).removePrefix(KeyboardProfiles.TOMBSTONE)
+            return plain == AppearanceLooks.PREF || plain == AppearanceLooks.PREF_SELECTED
+                || plain == Settings.PREF_THEME_COLORS || plain == Settings.PREF_THEME_COLORS_NIGHT
+                || plain.startsWith(Settings.PREF_USER_COLORS_PREFIX) || plain.startsWith(Settings.PREF_USER_ALL_COLORS_PREFIX)
+                || plain.startsWith(Settings.PREF_USER_MORE_COLORS_PREFIX)
+        }
+        private fun reachedNow(ctx: Context): Map<String, Any?> =
+            helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx).all.filterKeys { reachesBeyond(it) }
+
+        private fun writeSnapshot(dir: File, setId: Int, prefs: Map<String, Any?>, files: Map<File, Saved?>, reached: Map<String, Any?>) {
             val json = JSONObject().put("set", setId)
             json.put("prefs", JSONObject().also { o -> prefs.forEach { (k, v) -> AppearanceLooks.toJson(v)?.let { o.put(k, it) } } })
+            json.put("reached", JSONObject().also { o -> reached.forEach { (k, v) -> AppearanceLooks.toJson(v)?.let { o.put(k, it) } } })
             json.put("files", JSONObject().also { o -> files.forEach { (live, saved) ->
                 o.put(live.path, saved?.let { JSONObject().put("length", it.length).put("modified", it.modified) } ?: JSONObject.NULL)
             } })
@@ -212,7 +224,11 @@ class AppearanceDraft private constructor(
                     val live = File(path)
                     live to (f.optJSONObject(path)?.let { Saved(File(dir, live.name), it.getLong("length"), it.getLong("modified")) })
                 }
-                val draft = AppearanceDraft(prefs, files, dir, json.optInt("set", KeyboardProfiles.SHARED))
+                // (a snapshot from before 2026-10-11 has no "reached": what it reached then stays as it is now)
+                val r = json.optJSONObject("reached")
+                val reached = r?.keys()?.asSequence()?.associateWith { AppearanceLooks.fromJson(r.getJSONObject(it)) }
+                    ?: reachedNow(ctx)
+                val draft = AppearanceDraft(prefs, files, dir, json.optInt("set", KeyboardProfiles.SHARED), reached)
                 // (the deletes made before the crash: undone too, their fonts moved back)
                 runCatching { org.json.JSONArray(File(dir, HELD_FILE).readText()) }.getOrNull()
                     ?.let { a -> for (i in 0 until a.length()) draft.held += a.getString(i) }

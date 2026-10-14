@@ -115,7 +115,10 @@ fun ColorsScreen(
             }
         }.apply()
         // the hidden sets that followed the rename go back with it (review 2026-10-08 area 4 #3)
-        if (newThemeName.text != openedName) KeyboardTheme.followInHiddenSets(prefs, newThemeName.text, openedName)
+        if (newThemeName.text != openedName) {
+            KeyboardTheme.followInHiddenSets(prefs, newThemeName.text, openedName)
+            KeyboardTheme.renameInSavedThemes(ctx.realPrefs(), newThemeName.text, openedName) // (and the saved themes)
+        }
         helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().setThemeNeedsReload()
     }
     var askLeave by rememberSaveable { mutableStateOf(false) }
