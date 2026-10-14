@@ -25,7 +25,8 @@ import kotlin.test.assertTrue
 /**
  * Review 2026-10-12 B5: a picture or font added to its list with Appearance open stayed in the list after Discard,
  * and adding one alone was no change (leaving didn't ask). Now Discard (the cross, or "Discard and exit") removes every
- * font and picture added during the edit, but one something outside the edit uses; the Discard question names them;
+ * font and picture added during the edit (round-5 review 20261013_L21: one something outside the edit used stayed; now
+ * what names it lets go of it); the Discard question names them;
  * an addition is a change; leaving the app or a crash keeps them, like the palette editor's saves.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -121,7 +122,9 @@ class AppearanceAddedFilesTest {
         assertEquals("added font \"Added.ttf\"", appearanceAlsoUndoes(ctx, draft).first())
     }
 
-    @Test fun `a font something outside the edit uses survives Discard, an unused picture goes`() {
+    // round-5 review 20261013_L21 (owner: "D"): Discard removes every font and picture added during the edit, through
+    // their plain deletes: what names one outside the edit lets go of it. Fail before: the font stayed, still chosen
+    @Test fun `a font something outside the edit uses goes with Discard too, and the choice lets go of it`() {
         val draft = AppearanceDraft.of(ctx)
         addFont()
         val picture = addPicture()
@@ -129,8 +132,8 @@ class AppearanceAddedFilesTest {
         // snapshot, as a use outside the edit is)
         real.edit().putString(Settings.PREF_KEY_FONT, FontLibrary.PREFIX + "Added.ttf").commit()
         draft.reject(ctx)
-        assertTrue(font.exists(), "a font still chosen outside the edit went")
-        assertEquals(FontLibrary.PREFIX + "Added.ttf", real.getString(Settings.PREF_KEY_FONT, null))
+        assertFalse(font.exists(), "a font chosen outside the edit stayed")
+        assertEquals("default", real.getString(Settings.PREF_KEY_FONT, null))
         assertFalse(picture.exists())
     }
 

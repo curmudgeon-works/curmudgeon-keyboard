@@ -199,6 +199,23 @@ object AppearanceLooks {
      * The keyboards' own pictures are never touched. False (nothing changed) if a copy couldn't be made.
      */
     fun deleteFromList(ctx: Context, picture: java.io.File, keepInThemes: Boolean): Boolean {
+        if (!letGoOfPicture(ctx, picture, keepInThemes)) return false
+        // with Appearance open the picture waits for its Save: the file is held, Discard brings it back with the themes
+        // as they were (review H1)
+        if (AppearanceDraft.activeOrNull()?.holdPictureDelete(picture) != true) PictureLibrary.remove(picture)
+        return true
+    }
+
+    /** Library picture [picture] out of the list as without Appearance open, the saved themes naming it letting go of
+     *  it (their slots emptied): Appearance's Discard of a picture added during its edit (20261013_L21). */
+    fun removeFromList(ctx: Context, picture: java.io.File) {
+        letGoOfPicture(ctx, picture, keepInThemes = false)
+        PictureLibrary.remove(picture)
+    }
+
+    // the saved looks naming [picture] let go of it, as [deleteFromList] says; false (nothing changed) if a copy couldn't
+    // be made
+    private fun letGoOfPicture(ctx: Context, picture: java.io.File, keepInThemes: Boolean): Boolean {
         val prefs = ctx.prefs()
         val name = picture.name
         val looks = load(prefs)
@@ -226,9 +243,6 @@ object AppearanceLooks {
         if (failed) { made.forEach { it.delete() }; return false }
         // the looks naming their copies are on disk before the library's picture goes (as in [migratePictureFolders])
         if (changed != looks) save(prefs, changed, now = true)
-        // with Appearance open the picture waits for its Save: the file is held, Discard brings it back with the themes
-        // as they were (review H1)
-        if (AppearanceDraft.activeOrNull()?.holdPictureDelete(picture) != true) PictureLibrary.remove(picture)
         return true
     }
 

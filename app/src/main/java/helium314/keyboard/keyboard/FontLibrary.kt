@@ -100,6 +100,12 @@ object FontLibrary {
             prefs.edit().apply { fontPrefs.forEach { if (prefs.getString(it, null) == PREFIX + name) putString(it, "default") } }.apply()
             return
         }
+        deleteNow(ctx, name)
+    }
+
+    /** The delete without Appearance open (and Appearance's Discard of a font added during its edit, 20261013_L21): the
+     *  file goes, and every keyboard and saved theme that chose it lets go of it ([forgetEverywhere]). */
+    fun deleteNow(ctx: Context, name: String) {
         File(dir(ctx), name).delete()
         forgetEverywhere(ctx, name)
     }
