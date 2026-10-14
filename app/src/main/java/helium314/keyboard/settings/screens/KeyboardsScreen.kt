@@ -4,6 +4,7 @@ package helium314.keyboard.settings.screens
 import android.content.Context
 import helium314.keyboard.latin.common.Constants.Subtype.ExtraValue
 import helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog
+import helium314.keyboard.settings.dialogs.ImportWordsDialog
 import java.util.Locale
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -89,6 +90,8 @@ fun KeyboardsScreen(
     var keyboardMenu: SettingsSubtype? by remember { mutableStateOf(null) } // press and hold: Rename, Delete
     var keyboardToRename: SettingsSubtype? by remember { mutableStateOf(null) }
     var newKeyboard: SettingsSubtype? by remember { mutableStateOf(null) } // added, asks where its settings come from
+    // added: asks once whether it starts with other keyboards' words (2026-10-10); second: a copy's source
+    var importInto: Pair<SettingsSubtype, SettingsSubtype?>? by remember { mutableStateOf(null) }
     val real = ctx.realPrefs()
     // the switch is on App settings > Per keyboard now: read again whenever a setting changes (coming back from there)
     val changed = (ctx.getActivity() as? helium314.keyboard.settings.SettingsActivity)?.prefChanged?.collectAsState()
@@ -285,6 +288,7 @@ fun KeyboardsScreen(
                 onItemSelected = { from ->
                     addNewKeyboard(ctx, added, (from as? SettingsSubtype) ?: SettingsSubtype(Locale.ROOT, DEFAULTS_ONLY))
                     newKeyboard = null
+                    importInto = added to null
                     generation++
                 },
                 title = { Text(stringResource(R.string.new_keyboard_copy_settings, keyboardName(added, ctx))) },
@@ -301,7 +305,7 @@ fun KeyboardsScreen(
                         showAddKeyboard = false
                         // with one set of settings for all there is nothing to choose: the copy has them too
                         if (separate) keyboardToCopy = item.keyboard
-                        else { copyKeyboard(ctx, item.keyboard, withOwnSettings = false); generation++ }
+                        else { importInto = copyKeyboard(ctx, item.keyboard, withOwnSettings = false) to item.keyboard; generation++ }
                         return@ListPickerDialog
                     }
                     val locale = item as Locale
@@ -312,7 +316,7 @@ fun KeyboardsScreen(
                     showAddKeyboard = false
                     // with its own settings, it asks which keyboard's settings to start from; else it has the shared ones
                     if (separate) newKeyboard = settingsSubtype
-                    else { addNewKeyboard(ctx, settingsSubtype, null); generation++ } // stays here, it appears at the end
+                    else { addNewKeyboard(ctx, settingsSubtype, null); importInto = settingsSubtype to null; generation++ } // stays here, it appears at the end
                 },
                 title = { Text(stringResource(R.string.add_keyboard)) },
                 // copies of the keyboards first, then a new keyboard for any language
@@ -323,15 +327,18 @@ fun KeyboardsScreen(
         keyboardToCopy?.let { source ->
             ThreeButtonAlertDialog(
                 onDismissRequest = { keyboardToCopy = null },
-                onConfirmed = { copyKeyboard(ctx, source, withOwnSettings = true); generation++ },
+                onConfirmed = { importInto = copyKeyboard(ctx, source, withOwnSettings = true) to source; generation++ },
                 title = { Text(stringResource(R.string.copy_of_keyboard, keyboardName(source, ctx))) },
                 content = { Text(stringResource(R.string.copy_keyboard_message)) },
                 confirmButtonText = stringResource(R.string.copy_keyboard_with_settings),
                 neutralButtonText = stringResource(R.string.copy_keyboard_common_settings),
                 // (the neutral button doesn't close the dialog by itself: re-review 2026-10-07, every tap added a copy)
-                onNeutral = { copyKeyboard(ctx, source, withOwnSettings = false); generation++; keyboardToCopy = null },
+                onNeutral = { importInto = copyKeyboard(ctx, source, withOwnSettings = false) to source; generation++; keyboardToCopy = null },
                 confirmFirst = true,
             )
+        }
+        importInto?.let { (added, copyOf) ->
+            ImportWordsDialog(added, copyOf) { importInto = null }
         }
     }
 }
@@ -353,12 +360,14 @@ private fun nextNumbered(source: SettingsSubtype): SettingsSubtype {
     return base.with(ExtraValue.KEYBOARD_COPY, number.toString())
 }
 
-private fun copyKeyboard(ctx: Context, source: SettingsSubtype, withOwnSettings: Boolean) {
+/** @return the copy */
+private fun copyKeyboard(ctx: Context, source: SettingsSubtype, withOwnSettings: Boolean): SettingsSubtype {
     val real = ctx.realPrefs()
     val copy = LayoutUtilsCustom.withOwnPrivateLayouts(nextNumbered(source), ctx) // (its own unnamed keys, not the source's file)
     SubtypeUtilsAdditional.changeAdditionalSubtype(copy, copy, ctx) // registers it
     SubtypeSettings.addEnabledSubtype(ctx.prefs(), copy.toAdditionalSubtype())
     ownSetSourceFor(real, source, withOwnSettings)?.let { KeyboardProfiles.copy(real, it, KeyboardProfiles.idFor(real, copy)) }
+    return copy
 }
 
 /** The set a copied keyboard's own set starts from: the source's or the shared one; null with one set of settings for

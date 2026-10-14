@@ -45,6 +45,7 @@ import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.settings.SearchScreen
 import helium314.keyboard.settings.SettingsActivity
 import helium314.keyboard.settings.SettingsDestination
+import helium314.keyboard.settings.dialogs.ImportWordsDialog
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.settings.initPreview
 import helium314.keyboard.latin.utils.previewDark
@@ -95,6 +96,7 @@ private fun SubtypeRow(subtype: InputMethodSubtype, isEnabled: Boolean) {
             .padding(vertical = 6.dp, horizontal = 16.dp)
     ) {
         var showNoDictDialog by remember { mutableStateOf(false) }
+        var askImport by remember { mutableStateOf(false) } // switched on: start it with other keyboards' words? (2026-10-10)
         Column(modifier = Modifier.weight(1f)) {
             Text(subtype.displayName(), style = MaterialTheme.typography.bodyLarge)
             val description = if (SubtypeSettings.isAdditionalSubtype(subtype)) {
@@ -114,12 +116,14 @@ private fun SubtypeRow(subtype: InputMethodSubtype, isEnabled: Boolean) {
             onCheckedChange = {
                 if (it && !dictsAvailable(subtype.locale(), ctx))
                     showNoDictDialog = true
-                if (it) SubtypeSettings.addEnabledSubtype(ctx.prefs(), subtype)
+                if (it) { SubtypeSettings.addEnabledSubtype(ctx.prefs(), subtype); askImport = true }
                 else SubtypeSettings.removeEnabledSubtype(ctx, subtype)
             }
         )
         if (showNoDictDialog)
             MissingDictionaryDialog({ showNoDictDialog = false }, subtype.locale())
+        else if (askImport) // (after the missing dictionary note)
+            ImportWordsDialog(subtype.toSettingsSubtype(), null) { askImport = false }
     }
 }
 

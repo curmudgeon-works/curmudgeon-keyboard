@@ -123,6 +123,13 @@ object LearnedStores {
         return PersonalizationHelper.getUserHistoryDictionary(context, script, pool)
     }
 
+    /** [pool]'s words were changed from outside the keyboard (words imported into a new keyboard, 2026-10-10): what is
+     *  built from them is rebuilt. Always, not only for the pool in use (it may be read as another keyboard's). Main thread. */
+    fun notifyPoolChanged(pool: Int) {
+        Log.i(TAG, "pool $pool changed")
+        listeners.forEach { it() }
+    }
+
     /** The script whose store [word] is learned in, blacklisted in and read from; [fallback] for a word without letters. */
     @JvmStatic
     fun scriptOf(word: CharSequence, fallback: Locale): String = ScriptUtils.scriptOfWord(word, fallback.script())
