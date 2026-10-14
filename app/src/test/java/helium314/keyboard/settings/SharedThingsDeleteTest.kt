@@ -23,7 +23,8 @@ import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.dialogs.dictionaryUsers
 import org.json.JSONArray
-import org.json.JSONObject
+import helium314.keyboard.poolsJson
+import helium314.keyboard.withId
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -47,9 +48,9 @@ class SharedThingsDeleteTest {
     private val real = ctx.realPrefs()
     private val ce: File get() = ctx.filesDir
     private val io = BodyStoreIo()
-    private val a by lazy { available("en-US") }
-    private val b by lazy { available("de-DE") }
-    private val c by lazy { available("fr") }
+    private val a by lazy { available("en-US").withId(1) }
+    private val b by lazy { available("de-DE").withId(2) }
+    private val c by lazy { available("fr").withId(3) }
 
     @Before fun setUp() {
         deleteLearnedFiles(ce)
@@ -69,9 +70,9 @@ class SharedThingsDeleteTest {
     private fun threeKeyboards() {
         useKeyboards(ctx, real, a, b, c)
         real.edit().putBoolean(LearnedKeyboards.PREF_DONE, true)
-            .putString(LearnedKeyboards.PREF_POOLS, JSONObject(mapOf(a.toPref() to 5, b.toPref() to 6, c.toPref() to 7)).toString())
+            .putString(LearnedKeyboards.PREF_POOLS, poolsJson(mapOf(a to 5, b to 6, c to 7)))
             .putInt(LearnedKeyboards.PREF_POOL_NEXT, 8)
-            .putString(LearnedKeyboards.PREF_USE_OTHERS_LEARNED, JSONArray(listOf(b.toPref())).toString()).commit()
+            .putString(LearnedKeyboards.PREF_USE_OTHERS_LEARNED, JSONArray(listOf(b.keyboardId)).toString()).commit()
     }
 
     @Test fun `the delete dialog names the keyboards reading the lists`() {
@@ -96,7 +97,7 @@ class SharedThingsDeleteTest {
         // (A on pool 9 here: nothing another test's background task logs about pool 5 can end the wait early)
         useKeyboards(ctx, real, a, b, c)
         real.edit().putBoolean(LearnedKeyboards.PREF_DONE, true)
-            .putString(LearnedKeyboards.PREF_POOLS, JSONObject(mapOf(a.toPref() to 9, b.toPref() to 6, c.toPref() to 7)).toString())
+            .putString(LearnedKeyboards.PREF_POOLS, poolsJson(mapOf(a to 9, b to 6, c to 7)))
             .putInt(LearnedKeyboards.PREF_POOL_NEXT, 10).commit()
         io.store(ce, "Latn", 9, word("alpha", 2, 100))
         io.store(ce, "Cyrl", 9, word("бета", 3, 120))
@@ -131,9 +132,7 @@ class SharedThingsDeleteTest {
 
     @Test fun `an added dictionary's other users - a second language counts, the asking keyboard doesn't`() {
         val withEnglish = b.with(ExtraValue.SECONDARY_LOCALES, "en_US")
-        real.edit().putString(helium314.keyboard.latin.settings.Settings.PREF_ADDITIONAL_SUBTYPES,
-            SubtypeSettings.createPrefSubtypes(listOf(withEnglish))).commit() // (a keyboard with a second language is an added one)
-        useKeyboards(ctx, real, a, withEnglish, c)
+        useKeyboards(ctx, real, a, withEnglish, c) // (all in the added list, with their ids)
         assertEquals(listOf(withEnglish), dictionaryUsers(ctx, Locale.US, a))
         assertEquals(listOf(a), dictionaryUsers(ctx, Locale.US, withEnglish))
         assertEquals(emptyList(), dictionaryUsers(ctx, Locale.FRENCH, c)) // (only French keyboard: it can go)

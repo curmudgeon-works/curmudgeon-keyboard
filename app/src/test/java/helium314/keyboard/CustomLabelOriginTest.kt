@@ -16,7 +16,6 @@ import helium314.keyboard.settings.CustomLabels
 import helium314.keyboard.settings.LayoutDraft
 import helium314.keyboard.settings.LayoutPresets
 import helium314.keyboard.settings.screens.deletePopupSet
-import org.json.JSONObject
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -36,8 +35,9 @@ import kotlin.test.assertNull
 class CustomLabelOriginTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
-    private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
-    private fun view(id: Int) = ProfilePreferences(real) { id }
+    private fun own(n: Int, key: String) = idKey(n, key) // (keyboard "k<n>"'s own set)
+    private fun own(id: String, key: String) = KeyboardProfiles.ownKey(id, key)
+    private fun view(n: Int) = ProfilePreferences(real) { kid(n) }
     private val theme = CustomLabels.Kind.THEME
     private val layout = CustomLabels.Kind.LAYOUT
     private val popups = CustomLabels.Kind.POPUPS
@@ -45,14 +45,19 @@ class CustomLabelOriginTest {
     @Before fun setUp() {
         real.edit().clear()
             .putBoolean("separate_settings_per_keyboard", true)
-            .putString("keyboard_profile_ids", JSONObject().put("a", 1).put("b", 2).put("c", 3).toString())
-            .putInt("keyboard_profile_next_id", 4)
             .commit()
         KeyboardProfiles.loadGroups(real)
     }
     @After fun tearDown() {
         AppearanceDraft.close(); LayoutDraft.close()
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
+    }
+
+    // (owner 2026-10-11: keyboards have unique ids) the main keyboard is the first listed: "k4" here, so its set is none
+    // of keyboards 1 to 3's
+    private fun listWithMain(): String {
+        storeKeyboards(ctx, real, listOf(4, 1, 2, 3).map { helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.US, "").withId(it) })
+        return KeyboardProfiles.mainId(real).also { assertEquals(kid(4), it) }
     }
 
     // the rows as they draw it: the chosen item's name while it exists, a label shown when the keyboard has one
@@ -138,7 +143,7 @@ class CustomLabelOriginTest {
         real.edit().putString(own(2, AppearanceLooks.PREF_SELECTED), "Work").commit() // (its own, hidden once shared)
         KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.APPEARANCE, true)
         // (owner 2026-10-11: no separate common set) the shared choice: the main keyboard's own
-        val main = KeyboardProfiles.mainId(real)
+        val main = listWithMain()
         real.edit().putString(own(main, AppearanceLooks.PREF_SELECTED), "Work").commit()
         deleteTheme("Work")
         assertEquals(1, real.getInt(own(main, theme.key), 0))
@@ -155,31 +160,33 @@ class CustomLabelOriginTest {
         saveWork()
         real.edit().putString(own(1, AppearanceLooks.PREF_SELECTED), "Work").commit()
         deleteTheme("Work")
-        KeyboardProfiles.copy(real, 1, 3)
+        KeyboardProfiles.copy(real, kid(1), kid(3))
         assertEquals("Work", real.getString(own(3, theme.fromKey), null))
         assertEquals("Custom · from Work", themeRow(view(3)))
     }
 
     @Test fun `a restored keyboard brings its label with its origin`() {
-        val restored = helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.US, "")
+        // (owner 2026-10-11: keyboards have unique ids) the backup's keyboard comes in with its id "k5" and its set
+        val restored = helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.US, "").withId(5)
         val zip = java.io.File(ctx.cacheDir, "origin-${System.nanoTime()}.zip")
         val values = HashMap<String?, Any?>()
         values[Settings.PREF_ENABLED_SUBTYPES] = restored.toPref()
+        values[Settings.PREF_ADDITIONAL_SUBTYPES] = restored.toPref()
         values["separate_settings_per_keyboard"] = true
-        values["keyboard_profile_ids"] = JSONObject().put(restored.toPref(), 1).toString()
+        values[helium314.keyboard.latin.settings.KeyboardIdUpgrade.DONE] = true
         values[helium314.keyboard.latin.PICKED_ONLY_DONE] = true
         values[helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE] = true
         values[helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE] = true
-        values[own(1, theme.key)] = 1
-        values[own(1, theme.fromKey)] = "Work"
+        values[own(5, theme.key)] = 1
+        values[own(5, theme.fromKey)] = "Work"
         java.util.zip.ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(java.util.zip.ZipEntry("preferences.json"))
             helium314.keyboard.settings.preferences.settingsToJsonStream(values, z); z.closeEntry() }
         try { helium314.keyboard.settings.preferences.restoreKeyboardsFrom(ctx, zip, listOf(restored), withSettings = true) }
         finally { zip.delete() }
-        val id = KeyboardProfiles.idEntries(real).getValue(restored.toPref())
-        assertEquals("Work", real.getString(own(id, theme.fromKey), null))
-        assertEquals("Custom · from Work", themeRow(view(id)))
+        kotlin.test.assertNotNull(listedById(real, kid(5)))
+        assertEquals("Work", real.getString(own(5, theme.fromKey), null))
+        assertEquals("Custom · from Work", themeRow(view(5)))
     }
 
     @Test fun `deleted Layout Work keeps "from Work", Discard on Layout and Typing puts it back`() {
@@ -219,7 +226,7 @@ class CustomLabelOriginTest {
     @Test fun `shared Layout menu - one popups label and one origin`() {
         KeyPopupOverrides.saveSets(real, listOf(KeyPopupOverrides.UserSet("Mine", "all", null, mapOf("a" to listOf("à")))))
         KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.LAYOUT, true)
-        val main = KeyboardProfiles.mainId(real) // (the shared choice: the main keyboard's own, no separate common set)
+        val main = listWithMain() // (the shared choice: the main keyboard's own, no separate common set)
         real.edit().putString(own(main, KeyPopupOverrides.PREF_SELECTED_SET), "Mine").commit()
         deletePopupSet(ctx, "Mine")
         assertEquals(setOf(own(main, popups.key), own(main, popups.fromKey)), CustomLabels.stored(real, listOf(popups)))

@@ -26,6 +26,9 @@ class App : Application() {
         helium314.keyboard.latin.personalization.LearnedStoreMigration.startIfNeeded(this)
         DebugFlags.init(this)
         FoldableUtils.init(this)
+        // once (owner 2026-10-11, "do IDs now"): every keyboard its id, its set under it; before the settings listen (a
+        // list's write would load the keyboards) and before the keyboards are loaded, so the net finds them with theirs
+        helium314.keyboard.latin.settings.KeyboardIdUpgrade.upgrade(this)
         Settings.init(this)
         helium314.keyboard.latin.utils.SettingsEventLog.init(this) // first: the crash recoveries below are what it watches
         // the keyboard list first: the Layout & Typing recovery below reloads it, and the other way round the list

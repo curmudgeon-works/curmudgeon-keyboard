@@ -12,7 +12,6 @@ import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.settings.AppearanceLooks
 import helium314.keyboard.settings.CustomLabels
 import helium314.keyboard.settings.SavedItemDefaults
-import org.json.JSONObject
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -28,7 +27,7 @@ import kotlin.test.assertTrue
  * A menu made shared keeps each keyboard's own settings for it, as the main switch does, and made per keyboard again
  * each keyboard reads its own (owner 2026-10-11: "Deleting should not happen. Behavior should be same"). (owner
  * 2026-10-11: no separate common set; the first keyboard's own settings are the common ones: US, set 1, first in the
- * list; nothing is copied either way.)
+ * list; nothing is copied either way.) (owner 2026-10-11: keyboards have unique ids) set n is keyboard "k<n>"'s, no id map.
  */
 @RunWith(RobolectricTestRunner::class)
 class ShareMenuKeepsOwnTest {
@@ -37,18 +36,17 @@ class ShareMenuKeepsOwnTest {
     private val appearance = KeyboardProfiles.Group.APPEARANCE
     private val gap = Settings.PREF_KEY_HORIZONTAL_GAP
     private val label = CustomLabels.Kind.THEME.key
-    private val us = SettingsSubtype(Locale.US, "")
-    private val fr = SettingsSubtype(Locale.FRANCE, "")
-    private val de = SettingsSubtype(Locale.GERMANY, "")
-    private fun view(id: Int) = ProfilePreferences(real) { id }
-    private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
+    private val us = SettingsSubtype(Locale.US, "").withId(1)
+    private val fr = SettingsSubtype(Locale.FRANCE, "").withId(2)
+    private val de = SettingsSubtype(Locale.GERMANY, "").withId(3)
+    private fun view(n: Int) = ProfilePreferences(real) { kid(n) }
+    private fun own(n: Int, key: String) = idKey(n, key)
 
     @Before fun setUp() {
         real.edit().clear()
             .putBoolean("separate_settings_per_keyboard", true)
-            .putString("keyboard_profile_ids", JSONObject().put(us.toPref(), 1).put(fr.toPref(), 2).put(de.toPref(), 3).toString())
-            .putInt("keyboard_profile_next_id", 4)
             .putString(Settings.PREF_ENABLED_SUBTYPES, helium314.keyboard.latin.utils.SubtypeSettings.createPrefSubtypes(listOf(us, fr, de)))
+            .putString(Settings.PREF_ADDITIONAL_SUBTYPES, helium314.keyboard.latin.utils.SubtypeSettings.createPrefSubtypes(listOf(us, fr, de)))
             .commit()
         KeyboardProfiles.loadGroups(real)
         KeyboardProfiles.filesDir = DeviceProtectedUtils.getFilesDir(ctx)
@@ -103,7 +101,7 @@ class ShareMenuKeepsOwnTest {
 
     @Test fun `pictures come back per keyboard, the shared ones only where a keyboard has none`() {
         val dir = KeyboardProfiles.filesDir!!
-        fun pic(id: Int) = File(dir, "custom_background_image" + if (id == KeyboardProfiles.SHARED) "" else "_p$id")
+        fun pic(n: Int) = File(dir, "custom_background_image_p" + kid(n))
         view(1).edit().putFloat(gap, 2f).commit()
         view(2).edit().putFloat(gap, 4f).commit()
         pic(1).writeText("one"); pic(2).writeText("two")

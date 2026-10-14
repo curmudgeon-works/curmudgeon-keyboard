@@ -832,14 +832,16 @@ public class LatinIME extends InputMethodService implements
             return;
         }
         InputMethodSubtype oldSubtype = mRichImm.getCurrentSubtype().getRawSubtype();
-        if (subtype.equals(oldSubtype)) {
+        // (the definition too: a keyboard changed in the settings is the same Android subtype, its id, with other keys;
+        // owner 2026-10-11, keyboards have unique ids)
+        if (subtype.equals(oldSubtype) && subtype.getExtraValue().equals(oldSubtype.getExtraValue())) {
             // onStartInput may be called more than once, resulting in duplicate subtype switches
             return;
         }
 
         mSubtypeState.onSubtypeChanged(oldSubtype, subtype);
         StatsUtils.onSubtypeChanged(oldSubtype, subtype);
-        final int settingsSetBefore = helium314.keyboard.latin.settings.KeyboardProfiles.INSTANCE.getImeId();
+        final String settingsSetBefore = helium314.keyboard.latin.settings.KeyboardProfiles.INSTANCE.getImeId();
         mRichImm.onSubtypeChanged(subtype); // (switches to the new keyboard's own settings, if it has any)
         mInputLogic.onSubtypeChanged(SubtypeLocaleUtils.getCombiningRulesExtraValue(subtype),
                 mSettings.getCurrent());

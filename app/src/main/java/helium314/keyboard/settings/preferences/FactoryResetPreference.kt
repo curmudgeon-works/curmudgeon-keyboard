@@ -157,7 +157,8 @@ internal fun startFactoryReset(ctx: Context, keep: ResetKeep, onDone: () -> Unit
  * What survives the settings reset: the version and every one-time step's flag (else they run again on a reset phone:
  * review 2026-10-06, the 0.3.002 step brought back the 0.5% / 0.75% gaps), and what [keep] keeps (owner 2026-10-11:
  * ticks mean keep):
- * - keyboards: the list, its languages (each keyboard's priorities too), which set is whose and how they're read
+ * - keyboards: the list (each keyboard's id with it: its set, pictures and words stay its own; owner 2026-10-11), its
+ *   languages (each keyboard's priorities too) and how the sets are read
  * - own: the saved popup sets, themes, Layouts and palettes; with the keyboards also each keyboard's use of them
  *   (data-model #6: [isOwnItemUse]; [value] is the stored value, [ownPalettes] the user's palettes' names)
  */
@@ -195,9 +196,9 @@ internal fun isOwnItemUse(plain: String, value: Any?, ownPalettes: Set<String>):
 private val reappliedChoices = listOf(helium314.keyboard.settings.LayoutPresets.PREF_SELECTED,
     KeyPopupOverrides.PREF_SELECTED_SET, helium314.keyboard.settings.AppearanceLooks.PREF_SELECTED)
 
-/** Each set's chosen saved Layout, popup set and theme in [all] (the stored preferences): set id -> key -> name. */
-internal fun chosenItems(all: Map<String, *>): Map<Int, Map<String, String>> {
-    val result = HashMap<Int, HashMap<String, String>>()
+/** Each set's chosen saved Layout, popup set and theme in [all] (the stored preferences): keyboard id -> key -> name. */
+internal fun chosenItems(all: Map<String, *>): Map<String, Map<String, String>> {
+    val result = HashMap<String, HashMap<String, String>>()
     for ((key, value) in all) {
         val (id, plain) = KeyboardProfiles.splitOwnKey(key) ?: continue
         if (plain in reappliedChoices && value is String) result.getOrPut(id) { HashMap() }[plain] = value
@@ -212,12 +213,12 @@ internal fun chosenItems(all: Map<String, *>): Map<Int, Map<String, String>> {
  * defaults" as set): the Layout (settings and keys), then the popup set, then the theme (settings and pictures).
  * Tweaks on top of an item go back to its values; an item gone since is skipped.
  */
-private fun reapplyChosenItems(ctx: Context, chosen: Map<Int, Map<String, String>>) {
+private fun reapplyChosenItems(ctx: Context, chosen: Map<String, Map<String, String>>) {
     if (chosen.isEmpty()) return
     val real = ctx.realPrefs()
-    // (looked up again each time: a Layout or popup set can change the keyboard's identity, its set id stays)
-    fun keyboardOf(id: Int) = KeyboardProfiles.idEntries(real).entries.firstOrNull { it.value == id }?.key?.toSettingsSubtype()
-        ?.takeIf { KeyboardProfiles.isListed(real, it) }
+    // (looked up again each time: a Layout or popup set can change the keyboard's definition, its id stays)
+    fun keyboardOf(id: String) = SubtypeSettings.createSettingsSubtypes(
+        real.getString(Settings.PREF_ENABLED_SUBTYPES, helium314.keyboard.latin.settings.Defaults.PREF_ENABLED_SUBTYPES)!!).firstOrNull { it.keyboardId == id }
     val layouts = helium314.keyboard.settings.LayoutPresets.builtIn(ctx) + helium314.keyboard.settings.LayoutPresets.load(real)
     val looks = helium314.keyboard.settings.AppearanceLooks.builtIn(ctx) + helium314.keyboard.settings.AppearanceLooks.load(real)
     val sets = KeyPopupOverrides.loadSets(real)

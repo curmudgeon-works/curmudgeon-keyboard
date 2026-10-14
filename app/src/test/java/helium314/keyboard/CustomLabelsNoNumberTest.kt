@@ -13,7 +13,6 @@ import helium314.keyboard.settings.AppearanceLooks
 import helium314.keyboard.settings.CustomLabels
 import helium314.keyboard.settings.preferences.restoreKeyboardsFrom
 import helium314.keyboard.settings.preferences.settingsToJsonStream
-import org.json.JSONObject
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -37,15 +36,13 @@ import kotlin.test.assertTrue
 class CustomLabelsNoNumberTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
-    private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
-    private fun view(id: Int) = ProfilePreferences(real) { id }
+    private fun own(n: Int, key: String) = idKey(n, key) // (keyboard "k<n>"'s own set)
+    private fun view(n: Int) = ProfilePreferences(real) { kid(n) }
     private val theme = CustomLabels.Kind.THEME.key
 
     @Before fun setUp() {
         real.edit().clear()
             .putBoolean("separate_settings_per_keyboard", true)
-            .putString("keyboard_profile_ids", JSONObject().put("a", 1).put("b", 2).put("c", 3).toString())
-            .putInt("keyboard_profile_next_id", 4)
             .commit()
         KeyboardProfiles.loadGroups(real)
     }
@@ -74,21 +71,23 @@ class CustomLabelsNoNumberTest {
 
     @Test fun `a restore takes a keyboard's label as it is, not renumbered`() {
         real.edit().putInt(own(1, theme), 1).commit()
-        val restored = SettingsSubtype(Locale.US, "")
+        // (owner 2026-10-11: keyboards have unique ids) the backup's keyboard has its id and set "pk5/"; it keeps both
+        val restored = SettingsSubtype(Locale.US, "").withId(5)
         val zip = File(ctx.cacheDir, "nonum-${System.nanoTime()}.zip")
         val values = HashMap<String?, Any?>()
         values[Settings.PREF_ENABLED_SUBTYPES] = restored.toPref()
+        values[Settings.PREF_ADDITIONAL_SUBTYPES] = restored.toPref()
         values["separate_settings_per_keyboard"] = true
-        values["keyboard_profile_ids"] = JSONObject().put(restored.toPref(), 1).toString()
+        values[helium314.keyboard.latin.settings.KeyboardIdUpgrade.DONE] = true
         values[helium314.keyboard.latin.PICKED_ONLY_DONE] = true
         values[helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE] = true
         values[helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE] = true
-        values[own(1, theme)] = 1
+        values[own(5, theme)] = 1
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("preferences.json")); settingsToJsonStream(values, z); z.closeEntry() }
         try { restoreKeyboardsFrom(ctx, zip, listOf(restored), withSettings = true) } finally { zip.delete() }
-        val id = KeyboardProfiles.idEntries(real).getValue(restored.toPref())
-        assertEquals(1, real.getInt(own(id, theme), 0))
+        assertTrue(listedById(real, kid(5)) != null) // (it came in with the backup's id)
+        assertEquals(1, real.getInt(own(5, theme), 0))
         assertEquals(1, real.getInt(own(1, theme), 0))
     }
 

@@ -14,12 +14,13 @@ import androidx.compose.ui.test.performClick
 import androidx.core.content.edit
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
+import helium314.keyboard.idKey
 import helium314.keyboard.keyboard.FontLibrary
+import helium314.keyboard.kid
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.common.PictureLibrary
 import helium314.keyboard.latin.database.ClipboardDao
 import helium314.keyboard.latin.personalization.available
-import helium314.keyboard.latin.personalization.profileIds
 import helium314.keyboard.latin.personalization.useKeyboards
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
@@ -36,6 +37,8 @@ import helium314.keyboard.settings.preferences.ResetKeep
 import helium314.keyboard.settings.preferences.keptOnReset
 import helium314.keyboard.settings.preferences.runBackup
 import helium314.keyboard.settings.preferences.startFactoryReset
+import helium314.keyboard.storedEnabled
+import helium314.keyboard.withId
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -47,6 +50,7 @@ import java.io.FileOutputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -54,6 +58,8 @@ import kotlin.test.assertTrue
  * The factory reset runs to the end from the dialog's button, with the learned words' files off the screen thread.
  * Owner 2026-10-11: ticks mean keep; all unticked = full reset ("Select items you DON'T want to reset:"). The learned
  * words' part (merge into the default keyboard's): LearnedKeyboardsResetRestoreTest.
+ * (owner 2026-10-11: keyboards have unique ids; sets are "p<id>/", kept keyboards keep their ids, a reset one is a new
+ * default with a new id)
  */
 @RunWith(RobolectricTestRunner::class)
 class FactoryResetTest {
@@ -64,11 +70,11 @@ class FactoryResetTest {
     private val filesDirBefore = KeyboardProfiles.filesDir
     private var scenario: ActivityScenario<SettingsActivity>? = null
 
-    private val a by lazy { available("en-US") }
-    private val b by lazy { available("de-DE") }
+    private val a by lazy { available("en-US").withId(1) }
+    private val b by lazy { available("de-DE").withId(2) }
     private val symbols = "custom.mine."
-    private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
-    private fun picture(id: Int) = File(de, "custom_background_image_p$id")
+    private fun own(id: Int, key: String) = idKey(id, key)
+    private fun picture(id: Int) = File(de, "custom_background_image_p${kid(id)}")
     private val libraryPicture get() = File(PictureLibrary.dir(ctx), "picture_1")
     private val font get() = File(FontLibrary.dir(ctx), "Mine.ttf")
     private val layoutFile get() = LayoutUtilsCustom.getLayoutFile(symbols, LayoutType.SYMBOLS, ctx)
@@ -98,11 +104,10 @@ class FactoryResetTest {
     private fun resetClipboard() =
         ClipboardDao::class.java.getDeclaredField("instance").apply { isAccessible = true }.set(null, null)
 
-    /** Two keyboards with their own sets (b: 2), separate settings on; b uses own items: popups and a popup set, a
+    /** Two keyboards with their own sets (b: k2), separate settings on; b uses own items: popups and a popup set, a
      *  custom symbols layout, a palette, a font, pictures; and settings of the plain kind. Own items and files, a clip. */
     private fun phone() {
         useKeyboards(ctx, real, a, b)
-        profileIds(real, mapOf(a to 1, b to 2), next = 3)
         layoutFile.writeText("[[{\"label\": \"x\"}]]")
         LayoutUtilsCustom.onLayoutFileChanged()
         libraryPicture.apply { parentFile!!.mkdirs(); writeText("picture") }
@@ -154,11 +159,14 @@ class FactoryResetTest {
         phone()
         reset(ResetKeep())
         assertEquals(1, listed().size, "back to the one default keyboard: ${listed()}")
+        val fresh = storedEnabled(real).single().keyboardId
+        assertNotNull(fresh, "the default: a new keyboard with its own id")
+        assertTrue(fresh != kid(1) && fresh != kid(2), fresh)
         for (key in listOf(KeyPopupOverrides.PREF_SETS, AppearanceLooks.PREF, LayoutPresets.PREF,
                 Settings.PREF_USER_COLORS_PREFIX + "Warm", "separate_settings_per_keyboard",
                 Settings.PREF_KEY_LONGPRESS_TIMEOUT) + ownItemUses())
             assertFalse(real.contains(key), key)
-        assertFalse(real.all.keys.any { KeyboardProfiles.splitOwnKey(it)?.first == 2 }, "${real.all.keys}")
+        assertFalse(real.all.keys.any { KeyboardProfiles.splitOwnKey(it)?.first == kid(2) }, "${real.all.keys}")
         for (file in listOf(picture(2), libraryPicture, font, layoutFile)) assertFalse(file.exists(), file.path)
         assertEquals(0, clips())
     }
@@ -167,7 +175,7 @@ class FactoryResetTest {
         phone()
         reset(ResetKeep(keyboards = true))
         assertEquals(listOf(a.toPref(), b.toPref()), listed())
-        assertEquals(2, KeyboardProfiles.idOrNull(real, b), "which set is whose stays")
+        assertEquals(listOf(a, b), storedEnabled(real), "which set is whose stays: the ids")
         assertFalse(real.contains(KeyPopupOverrides.PREF_SETS))
         for (key in ownItemUses() + own(2, Settings.PREF_KEY_LONGPRESS_TIMEOUT)) assertFalse(real.contains(key), key)
         for (file in listOf(picture(2), libraryPicture, font, layoutFile)) assertFalse(file.exists(), file.path)
@@ -190,7 +198,7 @@ class FactoryResetTest {
         for (file in listOf(libraryPicture, font, layoutFile)) assertTrue(file.exists(), file.path)
         assertFalse(picture(2).exists(), "a reset keyboard is a new one: no old picture")
         assertEquals(1, listed().size)
-        assertFalse(real.all.keys.any { KeyboardProfiles.splitOwnKey(it)?.first == 2 }, "${real.all.keys}")
+        assertFalse(real.all.keys.any { KeyboardProfiles.splitOwnKey(it)?.first == kid(2) }, "${real.all.keys}")
         assertEquals(0, clips())
     }
 
@@ -198,7 +206,7 @@ class FactoryResetTest {
         phone()
         reset(ResetKeep(keyboards = true, own = true))
         assertEquals(listOf(a.toPref(), b.toPref()), listed())
-        assertEquals(2, KeyboardProfiles.idOrNull(real, b))
+        assertEquals(listOf(a, b), storedEnabled(real))
         assertEquals("{\"a\":\"b\"}", real.getString(own(2, KeyPopupOverrides.PREF), null))
         assertEquals("Mine", real.getString(own(2, KeyPopupOverrides.PREF_SELECTED_SET), null))
         assertEquals(symbols, real.getString(own(2, Settings.PREF_LAYOUT_PREFIX + LayoutType.SYMBOLS.name), null))
@@ -214,11 +222,10 @@ class FactoryResetTest {
 
     // ---- chosen items applied again (owner 2026-10-11: "yes, c is good for both ticked") ----
 
-    /** One keyboard (set 1, separate settings off) on saved Layout Work (backspace repeat 70 ms) and saved theme Sunset
+    /** One keyboard (set k1, separate settings off) on saved Layout Work (backspace repeat 70 ms) and saved theme Sunset
      *  (key gap 3%), both tweaked since (90 ms, 5%: "Custom · from …"), and a setting of no item. */
     private fun onWorkAndSunset(): Pair<LayoutPresets.Preset, AppearanceLooks.Look> {
         useKeyboards(ctx, real, a)
-        profileIds(real, mapOf(a to 1), next = 2)
         val keys = LayoutType.entries.mapNotNull { type -> a.layoutName(type)?.let { "layout:" + type.name to it } }.toMap()
         LayoutPresets.save(real, listOf(LayoutPresets.Preset("Work", keys + mapOf(Settings.PREF_BACKSPACE_REPEAT_INTERVAL to 70))))
         AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Sunset", mapOf(Settings.PREF_KEY_HORIZONTAL_GAP to 3f))), now = true)

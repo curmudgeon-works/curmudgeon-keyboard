@@ -188,12 +188,13 @@ fun SubtypeScreen(
         // the keyboard being edited must be one in the list: after the app was killed (an update) and the screen came
         // back, or after an undo, it can hold an older definition; changing that one added a second keyboard. Then
         // the change replaces the list's keyboard of the same language instead.
+        // (by its id: the list's entry is the keyboard as it is now; owner 2026-10-11, keyboards have unique ids)
         val enabled = SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }
-        val from = if (currentSubtype in enabled) currentSubtype
-            else enabled.firstOrNull { it.locale == currentSubtype.locale }?.also {
+        val from = enabled.firstOrNull { it.sameKeyboard(currentSubtype) }
+            ?: enabled.firstOrNull { it.locale == currentSubtype.locale }?.also {
                 Log.w("SubtypeScreen", "edited keyboard not in the list (${currentSubtype.toPref()}), changing ${it.toPref()} instead")
             } ?: currentSubtype
-        if (!mayChangeKeyboard(ctx, from, subtype)) return // (another keyboard is that one already, switched off too)
+        // (owner 2026-10-11, keyboards have unique ids: no "already set up like this" block, the change is always made)
         SubtypeUtilsAdditional.changeAdditionalSubtype(from, subtype, ctx)
         currentSubtypeString = subtype.toPref()
         holdPreview()

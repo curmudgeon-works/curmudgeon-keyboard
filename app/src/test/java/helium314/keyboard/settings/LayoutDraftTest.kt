@@ -3,6 +3,8 @@ package helium314.keyboard.settings
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import helium314.keyboard.idKey
+import helium314.keyboard.kid
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
@@ -10,7 +12,9 @@ import helium314.keyboard.latin.utils.LayoutType
 import helium314.keyboard.latin.utils.SubtypeUtilsAdditional
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.latin.utils.realPrefs
-import org.json.JSONObject
+import helium314.keyboard.listedById
+import helium314.keyboard.storeKeyboards
+import helium314.keyboard.withId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -42,40 +46,40 @@ class LayoutDraftTest {
     // review 2026-10-07: Discard after a layout change (separate settings on, the keyboard loaded) put the keyboard list
     // back first and the keyboard in use after: the reload in between gave the changed keyboard a new empty set, which
     // stayed, and the same change made again and kept then opened on that empty set
+    // (owner 2026-10-11: keyboards have unique ids) the change keeps the id: no set moves, no other set appears
     @Test fun discardAfterALayoutChangeLeavesNoStrayKeyboardEntry() {
         val ctx = ApplicationProvider.getApplicationContext<Context>()
         val real = ctx.realPrefs()
         real.edit().clear().commit()
-        val a = SettingsSubtype(java.util.Locale.US, "")
+        val a = SettingsSubtype(java.util.Locale.US, "").withId(1)
         val changed = a.withLayout(LayoutType.MAIN, "dvorak")
         try {
-            real.edit().putBoolean("separate_settings_per_keyboard", true)
-                .putString(Settings.PREF_ENABLED_SUBTYPES, a.toPref()).putString(Settings.PREF_SELECTED_SUBTYPE, a.toPref()).commit()
-            val id = KeyboardProfiles.idFor(real, a)
-            real.edit().putInt(KeyboardProfiles.prefixedKey(real, id, Settings.PREF_KEY_LONGPRESS_TIMEOUT), 333).commit() // its own
+            real.edit().putBoolean("separate_settings_per_keyboard", true).commit()
+            storeKeyboards(ctx, real, listOf(a))
+            real.edit().putInt(idKey(1, Settings.PREF_KEY_LONGPRESS_TIMEOUT), 333).commit() // its own
             Settings.init(ctx) // (the keyboard loaded: its listener reloads on every change)
             Settings.getInstance().loadSettings(ctx, java.util.Locale.US,
                 helium314.keyboard.latin.InputAttributes(android.view.inputmethod.EditorInfo(), false, ctx.packageName))
-            assertEquals(id, KeyboardProfiles.imeId)
+            assertEquals(kid(1), KeyboardProfiles.imeId)
 
             // a layout chosen on Layout & Typing, the preview on the changed keyboard (RichInputMethodManager.onSubtypeChanged)
             val draft = LayoutDraft.of(ctx, a.toPref())
             SubtypeUtilsAdditional.changeAdditionalSubtype(a, changed, ctx)
             real.edit().putString(Settings.PREF_SELECTED_SUBTYPE, changed.toPref()).commit()
             KeyboardProfiles.refreshImeId(real)
-            assertEquals(id, KeyboardProfiles.imeId) // its set went with it
+            assertEquals(kid(1), KeyboardProfiles.imeId) // the same keyboard, the same set
             draft.reject(ctx) // Discard
-            val ids = JSONObject(real.getString("keyboard_profile_ids", "{}")!!)
-            assertFalse("stray entry: $ids", ids.has(changed.toPref()))
+            assertEquals("stray set", setOf(kid(1)), KeyboardProfiles.setIds(real.all))
             assertEquals(a.toPref(), real.getString(Settings.PREF_SELECTED_SUBTYPE, null))
-            assertEquals(id, KeyboardProfiles.imeId) // the keyboard in use reads its own set again
+            assertEquals(kid(1), KeyboardProfiles.imeId) // the keyboard in use reads its own set again
 
             // the same change again, kept: the keyboard still has its own settings
             val again = LayoutDraft.of(ctx, a.toPref())
             SubtypeUtilsAdditional.changeAdditionalSubtype(a, changed, ctx)
             again.accept()
-            assertEquals(id, KeyboardProfiles.idFor(real, changed))
-            assertEquals(333, real.getInt(KeyboardProfiles.prefixedKey(real, KeyboardProfiles.idFor(real, changed), Settings.PREF_KEY_LONGPRESS_TIMEOUT), -1))
+            assertEquals("dvorak", listedById(real, kid(1))?.layoutName(LayoutType.MAIN)) // the same keyboard, changed
+            assertEquals(333, real.getInt(idKey(1, Settings.PREF_KEY_LONGPRESS_TIMEOUT), -1))
+            assertEquals(setOf(kid(1)), KeyboardProfiles.setIds(real.all))
         } finally {
             real.edit().clear().commit()
             KeyboardProfiles.refreshImeId(real)
@@ -90,16 +94,15 @@ class LayoutDraftTest {
         val real = ctx.realPrefs()
         real.edit().clear().commit()
         val first = SettingsSubtype(java.util.Locale.GERMANY, "")
-            .with(helium314.keyboard.latin.common.Constants.Subtype.ExtraValue.SECONDARY_LOCALES, "fr")
+            .with(helium314.keyboard.latin.common.Constants.Subtype.ExtraValue.SECONDARY_LOCALES, "fr").withId(1)
+        // a built-in keyboard's definition (owner 2026-10-11: keyboards have unique ids; every listed one has an id and
+        // is in the added list)
         val a = helium314.keyboard.latin.utils.SubtypeSettings.getResourceSubtypesForLocale(java.util.Locale.US).first()
-            .toSettingsSubtype() // a plain built-in keyboard
+            .toSettingsSubtype().withId(2)
         val changed = a.withLayout(LayoutType.MAIN, "dvorak")
         try {
-            real.edit().putBoolean("separate_settings_per_keyboard", true)
-                .putString(Settings.PREF_ADDITIONAL_SUBTYPES, first.toPref())
-                .putString(Settings.PREF_ENABLED_SUBTYPES, helium314.keyboard.latin.utils.SubtypeSettings.createPrefSubtypes(listOf(first, a)))
-                .putString(Settings.PREF_SELECTED_SUBTYPE, a.toPref()).commit()
-            helium314.keyboard.latin.utils.SubtypeSettings.reloadEnabledSubtypes(ctx)
+            real.edit().putBoolean("separate_settings_per_keyboard", true).commit()
+            storeKeyboards(ctx, real, listOf(first, a), selected = a)
             Settings.init(ctx)
             Settings.getInstance().loadSettings(ctx, java.util.Locale.US,
                 helium314.keyboard.latin.InputAttributes(android.view.inputmethod.EditorInfo(), false, ctx.packageName))

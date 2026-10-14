@@ -10,6 +10,7 @@ import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
+import helium314.keyboard.latin.settings.SwitchedOffKeyboards
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.SubtypeUtilsAdditional
 import helium314.keyboard.latin.utils.realPrefs
@@ -28,17 +29,20 @@ import org.robolectric.shadows.ShadowToast
 import java.util.Locale
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
-/** Audit rows 15-17 (owner 2026-10-11: switched-off keyboards count like switched-on ones): a switched-off keyboard's
- *  definition is taken. Copy and Add number past it, rename onto it is blocked; its own set and pool stay its own. */
+/** Audit rows 15-17 (owner 2026-10-11: switched-off keyboards count like switched-on ones): Copy and Add number past a
+ *  switched-off keyboard set up the same; its own set and pool stay its own. (owner 2026-10-11: keyboards have unique
+ *  ids) A rename onto another keyboard's setup is no longer blocked ("Not changed: ... already set up like this" is
+ *  gone): the renamed keyboard keeps its id, both stay apart with their own set and pool. Enabled k1.., off k9. */
 @RunWith(RobolectricTestRunner::class)
 class SwitchedOffNamesTakenTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = ctx.realPrefs()
-    private val en = SubtypeUtilsAdditional.createDefaultSubtype(Locale.US).toSettingsSubtype()
-    private val de = SubtypeSettings.getResourceSubtypesForLocale(Locale.GERMANY).first().toSettingsSubtype()
+    private val enPlain = SubtypeUtilsAdditional.createDefaultSubtype(Locale.US).toSettingsSubtype()
+    private val dePlain = SubtypeSettings.getResourceSubtypesForLocale(Locale.GERMANY).first().toSettingsSubtype()
 
     @Before fun setUp() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
     @After fun tearDown() {
@@ -47,76 +51,89 @@ class SwitchedOffNamesTakenTest {
         KeyboardProfiles.refreshImeId(real)
     }
 
-    /** [enabled] in the list, each with its own set and pool; [off] switched off with its own set (a value in it) and pool. */
-    private fun keyboards(enabled: List<SettingsSubtype>, off: SettingsSubtype) {
+    /** [enabled] (k1..) in the list, each with its pool; [off] (k9) switched off with its own set (a value in it) and pool. */
+    private fun keyboards(enabled: List<SettingsSubtype>, off: SettingsSubtype): List<SettingsSubtype> {
+        val listed = enabled.mapIndexed { i, k -> k.withId(i + 1) }
+        offKeyboard = off.withId(9)
         real.edit {
             putBoolean("separate_settings_per_keyboard", true)
             putBoolean(LearnedKeyboards.PREF_DONE, true)
-            putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes((enabled + off).filter { !it.isSameAsDefault() }))
-            putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(enabled))
+            putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listed + offKeyboard))
+            putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(listed))
+            putString(Settings.PREF_SELECTED_SUBTYPE, listed.first().toPref())
         }
         SubtypeSettings.reloadEnabledSubtypes(ctx)
-        val ids = enabled.map { KeyboardProfiles.idFor(real, it) }
-        enabledPools = enabled.map { LearnedKeyboards.poolFor(real, it) }.toSet()
-        offId = KeyboardProfiles.idFor(real, off)
-        offPool = LearnedKeyboards.poolFor(real, off)
-        assertFalse(offId in ids); assertFalse(offPool in enabledPools)
+        enabledPools = listed.map { LearnedKeyboards.poolFor(real, it) }.toSet()
+        offPool = LearnedKeyboards.poolFor(real, offKeyboard)
+        assertFalse(offPool in enabledPools)
         real.edit { putString(ownKey, "font:Mine.ttf") }
+        assertEquals(listOf(offKeyboard), SwitchedOffKeyboards.list(real))
+        return listed
     }
-    private var offId = 0
+    private var offKeyboard = enPlain
     private var offPool = 0
     private var enabledPools = emptySet<Int>()
-    private val ownKey get() = "p$offId/${Settings.PREF_KEY_FONT}"
+    private val ownKey = idKey(9, Settings.PREF_KEY_FONT)
 
     private fun enabledNow() = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }
 
+    /** The switched-off keyboard as it was: listed as switched off, its set and pool its own. */
+    private fun assertOffUntouched() {
+        assertEquals(listOf(offKeyboard), SwitchedOffKeyboards.list(real))
+        assertEquals("font:Mine.ttf", real.getString(ownKey, null))
+        assertEquals(offPool, LearnedKeyboards.poolOrNull(real, offKeyboard))
+    }
+
     @Test fun `copy of English while a switched-off English 2 exists is English 3, the leftover's set and pool untouched`() {
-        val en2 = en.with(ExtraValue.KEYBOARD_COPY, "2")
-        keyboards(listOf(en), en2)
+        val (en) = keyboards(listOf(enPlain), enPlain.with(ExtraValue.KEYBOARD_COPY, "2"))
         val added = nextNumbered(ctx, en)
         assertEquals("3", added.getExtraValueOf(ExtraValue.KEYBOARD_COPY))
+        assertNull(added.keyboardId) // (it gets one when it is added)
         val copy = createKeyboard(ctx, added, en, StartSettings.Defaults)
         assertEquals("3", copy.getExtraValueOf(ExtraValue.KEYBOARD_COPY))
+        assertEquals(kid(1), copy.keyboardFrom) // (a copy: a new id, came from the original's)
+        assertNotEquals(kid(1), assertNotNull(copy.keyboardId))
         assertEquals(listOf(en, copy), enabledNow())
-        assertEquals(offId, KeyboardProfiles.idFor(real, en2))
-        assertEquals("font:Mine.ttf", real.getString(ownKey, null))
-        assertEquals(offPool, LearnedKeyboards.poolFor(real, en2))
-        assertFalse(LearnedKeyboards.poolFor(real, copy) in enabledPools + offPool)
+        assertOffUntouched()
+        assertFalse(assertNotNull(LearnedKeyboards.poolOrNull(real, copy)) in enabledPools + offPool)
     }
 
     @Test fun `add English while a switched-off plain English exists gets a copy number, the leftover stays off and untouched`() {
-        keyboards(listOf(de), en)
+        val (de) = keyboards(listOf(dePlain), enPlain)
         val added = newKeyboardFor(ctx, Locale.US)
         assertEquals("2", added.getExtraValueOf(ExtraValue.KEYBOARD_COPY))
-        createKeyboard(ctx, added, null, StartSettings.Defaults)
-        assertEquals(listOf(de, added), enabledNow())
-        assertEquals(offId, KeyboardProfiles.idFor(real, en))
-        assertEquals("font:Mine.ttf", real.getString(ownKey, null))
-        assertEquals(offPool, LearnedKeyboards.poolFor(real, en))
+        val created = createKeyboard(ctx, added, null, StartSettings.Defaults)
+        assertEquals(added, created.withoutIds())
+        assertNull(created.keyboardFrom) // (Add: a new keyboard, from none)
+        assertEquals(listOf(de, created), enabledNow())
+        assertOffUntouched()
     }
 
-    @Test fun `renaming to a switched-off keyboard's exact definition is blocked, nothing changes`() {
-        val work = withKeyboardName(en, "Work")
-        keyboards(listOf(en), work)
-        val ids = KeyboardProfiles.idEntries(real)
+    // (owner 2026-10-11: keyboards have unique ids) before: blocked with "Not changed: Work (switched off) is already set
+    // up like this"; now the rename goes through, the two keyboards set up alike stay apart by their ids
+    @Test fun `renaming to a switched-off keyboard's setup goes through, both keep their own set and pool`() {
+        val (en) = keyboards(listOf(enPlain), withKeyboardName(enPlain, "Work"))
         val pools = real.getString(LearnedKeyboards.PREF_POOLS, null)
-        val additional = real.getString(Settings.PREF_ADDITIONAL_SUBTYPES, null)
-        assertNull(renameKeyboard(ctx, en, "Work"))
-        assertEquals("Not changed: Work (switched off) is already set up like this", ShadowToast.getTextOfLatestToast())
-        assertEquals(listOf(en), enabledNow())
-        assertEquals(ids, KeyboardProfiles.idEntries(real))
-        assertEquals(pools, real.getString(LearnedKeyboards.PREF_POOLS, null))
-        assertEquals(additional, real.getString(Settings.PREF_ADDITIONAL_SUBTYPES, null))
-        assertEquals("font:Mine.ttf", real.getString(ownKey, null))
+        val renamed = renameKeyboard(ctx, en, "Work")
+        assertNull(ShadowToast.getTextOfLatestToast())
+        assertEquals(kid(1), renamed.keyboardId)
+        assertEquals(offKeyboard.withoutIds(), renamed.withoutIds())
+        assertEquals(listOf(renamed), enabledNow())
+        assertEquals(pools, real.getString(LearnedKeyboards.PREF_POOLS, null)) // (nothing moved)
+        assertOffUntouched()
     }
 
-    @Test fun `renaming to another enabled keyboard's exact definition is blocked too, a free name goes through`() {
-        val work = withKeyboardName(en, "Work")
-        keyboards(listOf(en, work), de)
-        assertNull(renameKeyboard(ctx, en, "Work"))
-        assertEquals("Not changed: Work is already set up like this", ShadowToast.getTextOfLatestToast())
-        assertEquals(listOf(en, work), enabledNow())
-        val home = assertNotNull(renameKeyboard(ctx, en, "Home"))
+    // (owner 2026-10-11: keyboards have unique ids) before: blocked with "Not changed: Work is already set up like this"
+    @Test fun `renaming to another enabled keyboard's setup goes through too, and a free name`() {
+        val (en, work) = keyboards(listOf(enPlain, withKeyboardName(enPlain, "Work")), dePlain)
+        val renamed = renameKeyboard(ctx, en, "Work")
+        assertNull(ShadowToast.getTextOfLatestToast())
+        assertEquals(work.withoutIds(), renamed.withoutIds())
+        assertNotEquals(work, renamed)
+        assertEquals(listOf(renamed, work), enabledNow())
+        val home = renameKeyboard(ctx, renamed, "Home")
+        assertEquals(kid(1), home.keyboardId)
         assertEquals(listOf(home, work), enabledNow())
+        assertOffUntouched()
     }
 }

@@ -9,6 +9,8 @@ import helium314.keyboard.latin.PICKED_ONLY_DONE
 import helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE
 import helium314.keyboard.latin.checkVersionUpgrade
 import helium314.keyboard.latin.settings.Defaults
+import helium314.keyboard.latin.settings.KeyboardIdUpgrade
+import helium314.keyboard.latin.settings.KeyboardIds
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
@@ -19,6 +21,7 @@ import helium314.keyboard.settings.AppearanceLooks
 import helium314.keyboard.settings.LayoutPresets
 import helium314.keyboard.settings.SavedItemDefaults
 import helium314.keyboard.settings.SettingDefaults
+import helium314.keyboard.settings.preferences.RestoreDecision
 import helium314.keyboard.settings.preferences.restoreEverythingFrom
 import helium314.keyboard.settings.preferences.restoreFollowUp
 import helium314.keyboard.settings.preferences.restoreKeyboardsFrom
@@ -45,6 +48,9 @@ import kotlin.test.assertTrue
  * upgraded twice at app start, and its backup restored in full and in part on a phone of this build. Regression guards:
  * the first upgrade only adds what this batch means to (saved Layouts and themes remember their unpicked settings'
  * values, the one-time flag), the second changes nothing, no keyboard's setting changes and no default is written down.
+ * (owner 2026-10-11: keyboards have unique ids) The old build's keyboards get ids at the upgrade (its backup's when it is
+ * read or restored in full): their sets "p<n>/" become "p<id>/"; the checks compare with the old settings as the ids'
+ * upgrade leaves them.
  */
 @RunWith(RobolectricTestRunner::class)
 class WholeFlowUpgradeRestoreTest {
@@ -60,11 +66,14 @@ class WholeFlowUpgradeRestoreTest {
     private val numberRow = Settings.PREF_SHOW_NUMBER_ROW
     private val symbolMap = Settings.PREF_SYMBOL_POPUP_MAP
     private val selectedSet = KeyPopupOverrides.PREF_SELECTED_SET
-    private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
-    private fun mark(id: Int, key: String) = KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + key)
+    private fun own(id: String, key: String) = KeyboardProfiles.ownKey(id, key)
+    private fun mark(id: String, key: String) = KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + key)
+    // (the old build's set keys: set number n)
+    private fun oldOwn(n: Int, key: String) = "p$n/$key"
+    private fun oldMark(n: Int, key: String) = oldOwn(n, KeyboardProfiles.TOMBSTONE + key)
 
     @Before fun setUp() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
-    @After fun tearDown() { zip.delete(); real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
+    @After fun tearDown() { randomIds(); zip.delete(); real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
 
     // ---- what the 3afbeeebc build stores on a phone ----
 
@@ -97,7 +106,8 @@ class WholeFlowUpgradeRestoreTest {
         Settings.PREF_ENABLED_SUBTYPES to SubtypeSettings.createPrefSubtypes(listOf(us, fr)),
         Settings.PREF_SELECTED_SUBTYPE to us.toPref(),
         "separate_settings_per_keyboard" to true,
-        "keyboard_profile_ids" to JSONObject().put(us.toPref(), 1).put(fr.toPref(), 2).toString(),
+        // (the old map, definition -> set number: gone since keyboards have ids)
+        KeyboardIdUpgrade.OLD_IDS to JSONObject().put(us.toPref(), 1).put(fr.toPref(), 2).toString(),
         "keyboard_profile_next_id" to 3,
         // the shared set
         Settings.PREF_VIBRATE_ON to false, Settings.PREF_SOUND_ON to false, gap to 0.5f, Settings.PREF_THEME_DAY_NIGHT to true,
@@ -106,13 +116,13 @@ class WholeFlowUpgradeRestoreTest {
         AppearanceLooks.PREF to JSONArray(listOf(oldSunset())).toString(),
         KeyPopupOverrides.PREF_SETS to JSONArray(listOf(oldMine())).toString(),
         // US's own set: on Work, Sunset (its look written) and Mine (its map written)
-        own(1, LayoutPresets.PREF_SELECTED) to "Work", own(1, numberRow) to true,
-        own(1, AppearanceLooks.PREF_SELECTED) to "Sunset", own(1, gap) to 3f, own(1, Settings.PREF_THEME_COLORS) to "black",
-        own(1, selectedSet) to "Mine", own(1, symbolMap) to Defaults.CURMUDGEON_SYMBOL_POPUP_MAP,
-        own(1, "fonts_follow_migrated") to true, own(1, "trail_thickness_migrated") to true,
+        oldOwn(1, LayoutPresets.PREF_SELECTED) to "Work", oldOwn(1, numberRow) to true,
+        oldOwn(1, AppearanceLooks.PREF_SELECTED) to "Sunset", oldOwn(1, gap) to 3f, oldOwn(1, Settings.PREF_THEME_COLORS) to "black",
+        oldOwn(1, selectedSet) to "Mine", oldOwn(1, symbolMap) to Defaults.CURMUDGEON_SYMBOL_POPUP_MAP,
+        oldOwn(1, "fonts_follow_migrated") to true, oldOwn(1, "trail_thickness_migrated") to true,
         // French's own set
-        own(2, longPress) to 400, mark(2, gap) to true, own(2, Settings.PREF_THEME_COLORS) to "dark",
-        own(2, "fonts_follow_migrated") to true, own(2, "trail_thickness_migrated") to true,
+        oldOwn(2, longPress) to 400, oldMark(2, gap) to true, oldOwn(2, Settings.PREF_THEME_COLORS) to "dark",
+        oldOwn(2, "fonts_follow_migrated") to true, oldOwn(2, "trail_thickness_migrated") to true,
         // the one-time flags of 3afbeeebc's app start (curmudgeonUpgrades, the picked-only, pins and popup map steps, the
         // settings moves, the files and pictures moves, the learned words per keyboard)
         "fonts_follow_migrated" to true, "trail_thickness_migrated" to true, "key_gap_defaults_migrated" to true,
@@ -131,8 +141,9 @@ class WholeFlowUpgradeRestoreTest {
         KeyboardProfiles.loadGroups(real)
     }
 
-    /** What app start runs on the settings (App.onCreate: the settings moves, then the version upgrade). */
+    /** What app start runs on the settings (App.onCreate: the keyboards' ids, the settings moves, then the version upgrade). */
     private fun appStart() {
+        KeyboardIdUpgrade.upgrade(ctx)
         KeyboardProfiles.settingsMoves(real)
         checkVersionUpgrade(ctx)
     }
@@ -145,6 +156,19 @@ class WholeFlowUpgradeRestoreTest {
         return !KeyboardProfiles.isAppWide(plain)
     }
     private fun live(all: Map<String, *>) = all.filterKeys { isLive(it) }
+
+    /** [prefs] as the keyboards' ids upgrade leaves them, the keyboards getting [ids] in list order. */
+    private fun idsUpgraded(prefs: Map<String, Any?>, ids: List<String>): Map<String, Any?> {
+        val map = HashMap<String, Any?>(prefs)
+        val next = ids.iterator()
+        KeyboardIds.source = { next.next() }
+        try { KeyboardIdUpgrade.upgrade(map) } finally { randomIds() }
+        return map
+    }
+
+    /** The ids of US and French in the stored list. */
+    private fun usAndFrenchIds(): List<String> = listOf(us, fr).map { kb ->
+        storedEnabled(real).single { it.withoutIds() == kb }.keyboardId!! }
 
     private fun changedKeys(before: Map<String, *>, after: Map<String, *>) =
         (before.keys + after.keys).filterTo(sortedSetOf()) { before[it] != after[it] }
@@ -178,6 +202,15 @@ class WholeFlowUpgradeRestoreTest {
 
         appStart()
         val first = HashMap(real.all)
+        // (owner 2026-10-11: keyboards have unique ids) the keyboards got ids, their sets moved to them, the old map went
+        val (usId, frId) = usAndFrenchIds()
+        assertNotEquals(usId, frId)
+        val upgraded = idsUpgraded(before, listOf(usId, frId))
+        assertEquals("Work", first[own(usId, LayoutPresets.PREF_SELECTED)])
+        assertEquals(400, first[own(frId, longPress)])
+        assertNull(first[KeyboardIdUpgrade.OLD_IDS])
+        assertTrue(first.keys.none { it.startsWith("p1/") || it.startsWith("p2/") }, "an old set key is left")
+        assertEquals(true, first[KeyboardIdUpgrade.DONE])
         // (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones) the common set
         // goes; US and French, each with a set of its own, keep their sets as they are: not filled up from the common set
         // (owner 2026-10-11, the upgrade decided: no gap-filling; only a keyboard without a set gets a copy of it; owner
@@ -185,12 +218,12 @@ class WholeFlowUpgradeRestoreTest {
         // (owner 2026-10-11: no default marks; nothing stored = the default: French's mark goes, once; the palettes' move
         // sets its flag too)
         assertEquals(sortedSetOf(LayoutPresets.PREF, AppearanceLooks.PREF, SavedItemDefaults.REMEMBERED_DONE, KeyboardProfiles.NO_COMMON_SET_DONE,
-            helium314.keyboard.settings.Palettes.CENTRAL_DONE, KeyboardProfiles.NO_DEFAULT_MARKS_DONE, mark(2, gap))
-            + commonOf3afbeeebc, changedKeys(before, first), "the first upgrade changed more than the saved Layouts and themes")
+            helium314.keyboard.settings.Palettes.CENTRAL_DONE, KeyboardProfiles.NO_DEFAULT_MARKS_DONE, mark(frId, gap))
+            + commonOf3afbeeebc, changedKeys(upgraded, first), "the first upgrade changed more than the ids, the saved Layouts and themes")
         assertEquals(true, first[SavedItemDefaults.REMEMBERED_DONE])
         assertFalse(first.containsKey(SavedItemDefaults.PREF), "the switch was written down")
         // no other keyboard's setting changed, and nothing written as a default
-        assertEquals(live(before) - commonOf3afbeeebc - mark(2, gap), live(first))
+        assertEquals(live(upgraded) - commonOf3afbeeebc - mark(frId, gap), live(first))
         // the saved items: picked values as they were, unpicked ones remember today's default
         val layouts = LayoutPresets.load(real)
         assertEquals(oldLayouts.map { it.name to it.values }, layouts.map { it.name to it.values })
@@ -215,10 +248,11 @@ class WholeFlowUpgradeRestoreTest {
 
     // ---- 2: full restore ----
 
-    /** A phone of this build: one keyboard (German), the switch off, its own saved Layout remembering a value. */
+    /** A phone of this build: one keyboard (German, id k1), the switch off, its own saved Layout remembering a value. */
     private fun newPhoneSwitchOff() {
-        val de = SettingsSubtype(Locale.GERMANY, "")
-        real.edit().putString(Settings.PREF_ENABLED_SUBTYPES, de.toPref()).putString(Settings.PREF_SELECTED_SUBTYPE, de.toPref())
+        val de = SettingsSubtype(Locale.GERMANY, "").withId(1)
+        real.edit().putString(Settings.PREF_ENABLED_SUBTYPES, de.toPref()).putString(Settings.PREF_ADDITIONAL_SUBTYPES, de.toPref())
+            .putString(Settings.PREF_SELECTED_SUBTYPE, de.toPref()).putBoolean(KeyboardIdUpgrade.DONE, true)
             .putBoolean(SavedItemDefaults.PREF, false).putBoolean(SavedItemDefaults.REMEMBERED_DONE, true)
             .putBoolean(PICKED_ONLY_DONE, true).putBoolean(HELIBOARD_LAYOUT_PINS_DONE, true).putBoolean(USER_POPUP_SETS_MAP_DONE, true)
             .putInt(Settings.PREF_VERSION_CODE, BuildConfig.MIGRATION_VERSION).putInt(longPress, 250).commit()
@@ -249,9 +283,13 @@ class WholeFlowUpgradeRestoreTest {
         // every keyboard's settings as in the backup: nothing of the phone's left, nothing written down with the switch off
         // (the backup's common set dropped: owner 2026-10-11, "fine to trash common set with upgrade and restore")
         // (owner 2026-10-11: no default marks; nothing stored = the default: French's mark goes)
-        assertEquals(live(old) - commonOf3afbeeebc - mark(2, gap), live(real.all), "live settings differ from the backup's")
-        assertEquals(old["keyboard_profile_ids"], real.all["keyboard_profile_ids"])
-        assertEquals(old[Settings.PREF_ENABLED_SUBTYPES], real.all[Settings.PREF_ENABLED_SUBTYPES])
+        // (owner 2026-10-11: keyboards have unique ids) the backup's keyboards got ids, their sets under them, the old map gone
+        val (usId, frId) = usAndFrenchIds()
+        val upgraded = idsUpgraded(old, listOf(usId, frId))
+        assertEquals(live(upgraded) - commonOf3afbeeebc - mark(frId, gap), live(real.all), "live settings differ from the backup's")
+        assertNull(real.all[KeyboardIdUpgrade.OLD_IDS])
+        assertEquals(upgraded[Settings.PREF_ENABLED_SUBTYPES], real.all[Settings.PREF_ENABLED_SUBTYPES])
+        assertEquals("Work", real.all[own(usId, LayoutPresets.PREF_SELECTED)])
 
         // the next app start changes nothing more
         val after = HashMap(real.all)
@@ -261,31 +299,38 @@ class WholeFlowUpgradeRestoreTest {
 
     // ---- 3: partial restore ----
 
-    /** A phone of this build: French only (set 1, its own long press, on the phone's Layout "Work": number row off). */
+    /** A phone of this build: French only (id k1, its own long press, on the phone's Layout "Work": number row off). */
     private fun newPhoneWithOtherWork() {
-        real.edit().putString(Settings.PREF_ENABLED_SUBTYPES, fr.toPref()).putString(Settings.PREF_SELECTED_SUBTYPE, fr.toPref())
-            .putBoolean("separate_settings_per_keyboard", true)
-            .putString("keyboard_profile_ids", JSONObject().put(fr.toPref(), 1).toString()).putInt("keyboard_profile_next_id", 2)
+        val phoneFr = fr.withId(1)
+        real.edit().putString(Settings.PREF_ENABLED_SUBTYPES, phoneFr.toPref()).putString(Settings.PREF_ADDITIONAL_SUBTYPES, phoneFr.toPref())
+            .putString(Settings.PREF_SELECTED_SUBTYPE, phoneFr.toPref())
+            .putBoolean("separate_settings_per_keyboard", true).putBoolean(KeyboardIdUpgrade.DONE, true)
             .putBoolean(SavedItemDefaults.REMEMBERED_DONE, true)
             .putBoolean(PICKED_ONLY_DONE, true).putBoolean(HELIBOARD_LAYOUT_PINS_DONE, true).putBoolean(USER_POPUP_SETS_MAP_DONE, true)
             .putInt(Settings.PREF_VERSION_CODE, BuildConfig.MIGRATION_VERSION)
-            .putInt(own(1, longPress), 250).putString(own(1, LayoutPresets.PREF_SELECTED), "Work").putBoolean(own(1, numberRow), false)
+            .putInt(idKey(1, longPress), 250).putString(idKey(1, LayoutPresets.PREF_SELECTED), "Work").putBoolean(idKey(1, numberRow), false)
             // (its own set's flags, as this build's app start leaves them)
-            .putBoolean(own(1, "fonts_follow_migrated"), true).putBoolean(own(1, "trail_thickness_migrated"), true)
+            .putBoolean(idKey(1, "fonts_follow_migrated"), true).putBoolean(idKey(1, "trail_thickness_migrated"), true)
             .commit()
         LayoutPresets.save(real, listOf(LayoutPresets.Preset("Work", mapOf(numberRow to false, longPress to null),
             remembered = mapOf(longPress to Defaults.PREF_KEY_LONGPRESS_TIMEOUT))))
         KeyboardProfiles.loadGroups(real)
+        SubtypeSettings.reloadEnabledSubtypes(ctx) // (the list as stored, not an earlier test's)
     }
 
     // (owner 2026-10-11: backup wins the name if ticked; before, the backup's Work came in as "Work 2")
+    // (owner 2026-10-11: keyboards have unique ids) the old backup's keyboards get ids when it is read (counted here: US
+    // k1000, French k1001); unasked, US comes in as a keyboard of its own with its id; the second restore merges it into
+    // the phone's US (unasked, it would come in as a second US keyboard)
     @Test fun `US restored on its own from a 3afbeeebc backup - its Work wins the name, the phone's is Work 2, again adds nothing, French untouched`() {
         backupOf(phoneOn3afbeeebc())
         newPhoneWithOtherWork()
         val phoneWork = LayoutPresets.load(real).single()
-        val french = real.all.filterKeys { it.startsWith("p1/") }
+        val french = real.all.filterKeys { it.startsWith(idKey(1, "")) }
+        val backupUs = us.withId(1000)
 
-        restoreKeyboardsFrom(ctx, zip, listOf(us), withSettings = true)
+        countingIds()
+        restoreKeyboardsFrom(ctx, zip, listOf(backupUs), withSettings = true)
         restoreFollowUp(ctx)
 
         val layouts = LayoutPresets.load(real)
@@ -296,25 +341,32 @@ class WholeFlowUpgradeRestoreTest {
         assertNull(layouts[1].values[longPress])
         assertEquals(listOf("Mine"), KeyPopupOverrides.loadSets(real).map { it.name })
         assertEquals(listOf("Sunset"), AppearanceLooks.load(real).map { it.name })
-        val usId = KeyboardProfiles.idFor(real, us)
-        assertNotEquals(1, usId)
+        val usId = kid(1000)
+        val phoneUs = listedById(real, usId)
+        assertEquals(us, phoneUs?.withoutIds(), "US isn't listed with the backup's id")
+        assertNotEquals(kid(1), usId)
         assertEquals("Work", real.getString(own(usId, LayoutPresets.PREF_SELECTED), null))
         assertEquals("Mine", real.getString(own(usId, selectedSet), null))
         assertEquals("Sunset", real.getString(own(usId, AppearanceLooks.PREF_SELECTED), null))
         assertEquals(true, real.all[own(usId, numberRow)])
         assertEquals(3f, real.all[own(usId, gap)])
         // (French still names "Work", the backup's now; its own values as they were)
-        assertEquals(french, real.all.filterKeys { it.startsWith("p1/") }, "the phone's French keyboard changed")
+        assertEquals(fr.withId(1), listedById(real, kid(1)), "the phone's French keyboard changed")
+        assertEquals(french, real.all.filterKeys { it.startsWith(idKey(1, "")) }, "the phone's French keyboard changed")
         val saved = listOf(LayoutPresets.PREF, AppearanceLooks.PREF, KeyPopupOverrides.PREF_SETS).associateWith { real.all[it] }
 
-        restoreKeyboardsFrom(ctx, zip, listOf(us), withSettings = true)
+        countingIds()
+        restoreKeyboardsFrom(ctx, zip, listOf(backupUs), withSettings = true,
+            decisions = mapOf(backupUs to RestoreDecision.Merge(phoneUs!!)))
         restoreFollowUp(ctx)
 
         assertEquals(listOf("Work 2", "Work"), LayoutPresets.load(real).map { it.name }, "the second restore added a Layout")
         assertEquals(1, KeyPopupOverrides.loadSets(real).size, "the second restore added a popup set")
         assertEquals(1, AppearanceLooks.load(real).size, "the second restore added a theme")
         assertEquals(saved, listOf(LayoutPresets.PREF, AppearanceLooks.PREF, KeyPopupOverrides.PREF_SETS).associateWith { real.all[it] })
-        assertEquals("Work", real.getString(own(KeyboardProfiles.idFor(real, us), LayoutPresets.PREF_SELECTED), null))
-        assertEquals(french, real.all.filterKeys { it.startsWith("p1/") }, "the phone's French keyboard changed")
+        assertEquals(2, storedEnabled(real).size, "the second restore added a keyboard")
+        assertEquals(us, listedById(real, usId)?.withoutIds(), "the merge didn't keep the phone US's id")
+        assertEquals("Work", real.getString(own(usId, LayoutPresets.PREF_SELECTED), null))
+        assertEquals(french, real.all.filterKeys { it.startsWith(idKey(1, "")) }, "the phone's French keyboard changed")
     }
 }

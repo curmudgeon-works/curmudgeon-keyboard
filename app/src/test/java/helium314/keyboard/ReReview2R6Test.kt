@@ -41,9 +41,9 @@ class ReReview2R6Test {
     private fun file(name: String) = LayoutUtilsCustom.getLayoutFile(name, type, ctx)
     private val folder get() = file(numrow).parentFile!!
 
-    private val phoneKeyboard = SettingsSubtype(Locale.GERMANY, "").withLayout(type, numrow)
-    private val first = SettingsSubtype(Locale.US, "").withLayout(type, numrow)
-    private val second = SettingsSubtype(Locale.UK, "").withLayout(type, numrow2)
+    private val phoneKeyboard = SettingsSubtype(Locale.GERMANY, "").withLayout(type, numrow).withId(3)
+    private val first = SettingsSubtype(Locale.US, "").withLayout(type, numrow).withId(1)
+    private val second = SettingsSubtype(Locale.UK, "").withLayout(type, numrow2).withId(2)
 
     @Before fun setUp() {
         real.edit().clear().commit()
@@ -62,14 +62,15 @@ class ReReview2R6Test {
         SubtypeSettings.reloadEnabledSubtypes(ctx)
     }
 
-    /** The backup: [first] on "My numrow" (keys B), [second] on "My numrow 2" (keys C). */
+    /** The backup: [first] on "My numrow" (keys B), [second] on "My numrow 2" (keys C); a backup with ids (owner
+     *  2026-10-11: keyboards have unique ids), so the keyboards come in as these. */
     private fun backup() {
         val keyboards = SubtypeSettings.createPrefSubtypes(listOf(first, second))
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("preferences.json"))
             settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to keyboards, Settings.PREF_ADDITIONAL_SUBTYPES to keyboards,
                 helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
-                helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
+                helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true, helium314.keyboard.latin.settings.KeyboardIdUpgrade.DONE to true), z)
             z.closeEntry()
             val dir = "unprotected/layouts/${type.name.lowercase()}"
             z.putNextEntry(ZipEntry("$dir/$numrow")); z.write("B".toByteArray()); z.closeEntry()

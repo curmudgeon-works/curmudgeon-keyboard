@@ -38,12 +38,12 @@ class FineTuneLearningSplitTest {
         real.edit().putBoolean("separate_settings_per_keyboard", true)
             .putBoolean(KeyboardProfiles.Group.REFINE.prefKey, false)
             .putInt(Settings.PREF_TRUST_TYPED_COUNT, 3) // the shared value
-            .putInt("p2/" + Settings.PREF_TRUST_TYPED_COUNT, 7) // keyboard 2's own
+            .putInt(idKey(2, Settings.PREF_TRUST_TYPED_COUNT), 7) // keyboard 2's own (owner 2026-10-11: keyboards have unique ids, "pk2/")
             .commit()
         KeyboardProfiles.loadGroups(real)
         KeyboardProfiles.splitLearningFromRefine(real)
         assertFalse(KeyboardProfiles.isShared(real, KeyboardProfiles.Group.LEARNING))
-        assertEquals(7, ProfilePreferences(real) { 2 }.getInt(Settings.PREF_TRUST_TYPED_COUNT, 0))
+        assertEquals(7, ProfilePreferences(real) { kid(2) }.getInt(Settings.PREF_TRUST_TYPED_COUNT, 0))
         assertTrue(real.getBoolean("learning_group_split_done", false))
     }
 

@@ -4,9 +4,11 @@ package helium314.keyboard.settings
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.test.core.app.ApplicationProvider
+import helium314.keyboard.idKey
 import helium314.keyboard.latin.ClipboardHistoryEntry
 import helium314.keyboard.latin.database.ClipboardDao
 import helium314.keyboard.latin.database.Database
+import helium314.keyboard.latin.settings.KeyboardIdUpgrade
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
@@ -17,6 +19,7 @@ import helium314.keyboard.latin.utils.protectedPrefs
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.preferences.restoreEverythingFrom
 import helium314.keyboard.settings.preferences.settingsToJsonStream
+import helium314.keyboard.withId
 import helium314.keyboard.latin.personalization.LearnedStoreIo
 import org.junit.After
 import org.junit.Before
@@ -42,8 +45,8 @@ class RestoreProtectedPrefsTest {
     private lateinit var real: SharedPreferences
     private lateinit var zip: File
 
-    private val a = SettingsSubtype(Locale.US, "")
-    private val b = SettingsSubtype(Locale.GERMANY, "")
+    private val a = SettingsSubtype(Locale.US, "").withId(1)
+    private val b = SettingsSubtype(Locale.GERMANY, "").withId(2)
     private val keyboards get() = SubtypeSettings.createSettingsSubtypes(SubtypeSettings.createPrefSubtypes(listOf(a, b)))
     private val pinnedClips = """[{"timeStamp":1700000000000,"content":"pinned text","isPinned":true}]"""
 
@@ -92,14 +95,15 @@ class RestoreProtectedPrefsTest {
     private fun protectedEntry(values: Map<String?, Any?>) =
         java.io.ByteArrayOutputStream().also { settingsToJsonStream(values, it) }.toString()
 
-    /** Two keyboards, separate settings, keyboard 1's own key: what the app writes today. */
+    /** Two keyboards, separate settings, keyboard k1's own key: what the app writes today (owner 2026-10-11: keyboards
+     *  have unique ids; their sets are under them, the old id map is gone). */
     private fun currentSettings(): Map<String?, Any?> = mapOf(
         Settings.PREF_ENABLED_SUBTYPES to SubtypeSettings.createPrefSubtypes(listOf(a, b)),
+        Settings.PREF_ADDITIONAL_SUBTYPES to SubtypeSettings.createPrefSubtypes(listOf(a, b)),
         Settings.PREF_VERSION_CODE to 3010,
         "separate_settings_per_keyboard" to true,
-        "keyboard_profile_ids" to """{"${a.toPref()}":1,"${b.toPref()}":2}""",
-        "keyboard_profile_next_id" to 3,
-        "p1/${Settings.PREF_KEY_LONGPRESS_TIMEOUT}" to 450,
+        KeyboardIdUpgrade.DONE to true,
+        idKey(1, Settings.PREF_KEY_LONGPRESS_TIMEOUT) to 450,
     )
 
     /** An upstream HeliBoard backup from before the keyboard list: some settings, pinned clips in the protected file. */
@@ -113,7 +117,7 @@ class RestoreProtectedPrefsTest {
         assertEquals(SubtypeSettings.createPrefSubtypes(listOf(a, b)), all[Settings.PREF_ENABLED_SUBTYPES], "settings gone: $all")
         assertEquals(3010, all[Settings.PREF_VERSION_CODE])
         assertEquals(true, all["separate_settings_per_keyboard"])
-        assertEquals(450, all["p1/${Settings.PREF_KEY_LONGPRESS_TIMEOUT}"])
+        assertEquals(450, all[idKey(1, Settings.PREF_KEY_LONGPRESS_TIMEOUT)])
     }
 
     private fun clipsInDatabase(): List<ClipboardHistoryEntry> {

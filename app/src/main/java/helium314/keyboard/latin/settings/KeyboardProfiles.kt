@@ -6,11 +6,11 @@ import android.content.SharedPreferences
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.latin.utils.LanguagePriority
 import helium314.keyboard.latin.utils.Log
-import org.json.JSONObject
+import helium314.keyboard.latin.common.Constants.Separators
 
 /**
- * Separate settings per keyboard. Every keyboard (subtype) has a stable profile id and its own set of settings, under
- * keys "p<id>/<key>" in the same preferences file; the plain keys are the app-wide ones only. There is no common set
+ * Separate settings per keyboard. Every keyboard has its own set of settings under its id (KeyboardIds; owner
+ * 2026-10-11: "do IDs now"), keys "p<id>/<key>" in the same preferences file; the plain keys are the app-wide ones only. There is no common set
  * (owner 2026-10-11: "I think we shouldn't have separate common settings. Just keep main keyboard's settings and othrr
  * keyboards point to it. Creating a separate set just creates risk and it's not intended behavior."): the common
  * settings are the main keyboard's own ([mainKeyboard], the first in the list), read by every keyboard while separate
@@ -22,11 +22,12 @@ import org.json.JSONObject
  */
 object KeyboardProfiles {
     /** "The common settings": no set of its own, the main keyboard's ([mainId]); its pictures too. */
-    const val SHARED = 0
+    const val SHARED = "shared"
 
     private const val PREF_SEPARATE = "separate_settings_per_keyboard"
-    private const val PREF_IDS = "keyboard_profile_ids" // json: subtype pref string -> id
-    private const val PREF_NEXT_ID = "keyboard_profile_next_id"
+    // (the old map, definition -> set number, and its next number: read by the one-time upgrade only, KeyboardIdUpgrade)
+    private const val OLD_IDS = KeyboardIdUpgrade.OLD_IDS
+    private const val OLD_NEXT_ID = "keyboard_profile_next_id"
     private const val PREFIX = "p"
     private const val SEPARATOR = "/"
 
@@ -39,7 +40,7 @@ object KeyboardProfiles {
         Settings.PREF_CLIPBOARD_HISTORY_SIZE, Settings.PREF_CLIPBOARD_HISTORY_PINNED_FIRST,
         Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_SWIPE_METRICS, Settings.PREF_AUTO_PREVIEW_KEYBOARD, // logs of the user's swiping: one file, one switch
         Settings.PREF_LEARNING_LOG, // and of what corrections do to the learned words
-        PREF_SEPARATE, PREF_IDS, PREF_NEXT_ID, PREF_START_FROM, PREF_SHARED_FROM, // (the last two: old bookkeeping)
+        PREF_SEPARATE, OLD_IDS, OLD_NEXT_ID, PREF_START_FROM, PREF_SHARED_FROM, // (all but the first: old bookkeeping)
         "key_popup_sets", // saved popup sets are meant to be reused across keyboards
         "appearance_looks", // saved looks too
         "layout_presets", // and saved Layouts
@@ -115,10 +116,10 @@ object KeyboardProfiles {
         helium314.keyboard.latin.utils.SettingsEventLog.log("group ${group.name} ${if (shared) "shared, the main keyboard's" else "per keyboard"}")
     }
 
-    /** What a factory reset keeping the keyboards keeps of their sets (owner 2026-10-11, ticks mean keep): which set is
-     *  whose, the next id, separate settings and the shared menus, so each keyboard reads its set as before (owner
-     *  2026-10-11: "yes, OK"). */
-    val setStructureKeys: Set<String> get() = setOf(PREF_IDS, PREF_NEXT_ID, PREF_SEPARATE) + Group.entries.map { it.prefKey }
+    /** What a factory reset keeping the keyboards keeps of their sets (owner 2026-10-11, ticks mean keep): separate
+     *  settings and the shared menus, so each keyboard reads its set as before (owner 2026-10-11: "yes, OK"); which set
+     *  is whose is the keyboards' ids, in the list. */
+    val setStructureKeys: Set<String> get() = setOf(PREF_SEPARATE) + Group.entries.map { it.prefKey }
 
     /** "keyboard_shared_from", the old record of where shared settings came from (before 2026-10-11): unread. */
     private const val PREF_SHARED_FROM = "keyboard_shared_from"
@@ -135,24 +136,21 @@ object KeyboardProfiles {
             ?: real.getString(Settings.PREF_SELECTED_SUBTYPE, Defaults.PREF_SELECTED_SUBTYPE)!!.toSettingsSubtype()
     }
 
-    /** The set id of [mainKeyboard], given one if it has none yet ([create]; else [NO_SET]: a read gives out no id). */
-    fun mainId(real: SharedPreferences, create: Boolean = true): Int {
+    /** The id of [mainKeyboard], [NO_SET] when it has none (not given one yet by the net: a read gives out no set). */
+    fun mainId(real: SharedPreferences): String {
         val enabled = real.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)
-        val idsNow = real.getString(PREF_IDS, null)
-        mainIdMemo?.let { if (it.selected == enabled && it.ids == idsNow && !enabled.isNullOrEmpty()) return it.id }
-        val keyboard = mainKeyboard(real)
-        // (create: a write to the common settings; the main keyboard is the first listed, the net's own)
-        val id = if (create) idFor(real, keyboard) else idOrNull(real, keyboard) ?: return NO_SET
-        mainIdMemo = MainMemo(enabled ?: "", real.getString(PREF_IDS, null), id) // (idFor may have added it)
+        mainIdMemo?.let { if (it.selected == enabled && !enabled.isNullOrEmpty()) return it.id }
+        val id = mainKeyboard(real).keyboardId ?: return NO_SET
+        mainIdMemo = MainMemo(enabled ?: "", id)
         return id
     }
 
     /** No set: nothing is stored under it (a keyboard without an id, for a read); a write to it is dropped. */
-    const val NO_SET = Int.MIN_VALUE
-    // (every preference read asks: the list and the ids aren't parsed again while neither changed)
+    const val NO_SET = "none"
+    // (every preference read asks: the list isn't parsed again while it didn't change)
     @Volatile private var mainIdMemo: MainMemo? = null
 
-    fun isMain(real: SharedPreferences, keyboard: SettingsSubtype) = keyboard == mainKeyboard(real)
+    fun isMain(real: SharedPreferences, keyboard: SettingsSubtype) = keyboard.sameKeyboard(mainKeyboard(real))
 
     /** Whether some keyboard reads the main keyboard's settings now: separate settings off, or a menu shared. */
     fun mainIsCommon(real: SharedPreferences) = !isSeparate(real) || Group.entries.any { isShared(real, it) }
@@ -194,17 +192,17 @@ object KeyboardProfiles {
 
     fun isSeparate(real: SharedPreferences) = real.getBoolean(PREF_SEPARATE, false)
 
-    /** A stored key of a keyboard's own set as its set id and plain key; null for an app-wide one. */
-    fun splitOwnKey(stored: String): Pair<Int, String>? {
+    /** A stored key of a keyboard's own set as its keyboard id and plain key; null for an app-wide one. */
+    fun splitOwnKey(stored: String): Pair<String, String>? {
         if (!stored.startsWith(PREFIX)) return null
         val sep = stored.indexOf(SEPARATOR)
         if (sep < 0) return null
-        val id = stored.substring(PREFIX.length, sep).toIntOrNull() ?: return null
+        val id = stored.substring(PREFIX.length, sep).takeIf { KeyboardIds.isId(it) } ?: return null
         return id to stored.substring(sep + 1)
     }
 
-    /** [key] in keyboard set [id], whether or not the key is shared now (as stored, unlike [prefixedKey]). */
-    fun ownKey(id: Int, key: String) = "$PREFIX$id$SEPARATOR$key"
+    /** [key] in the set of keyboard [id], whether or not the key is shared now (as stored, unlike [prefixedKey]). */
+    fun ownKey(id: String, key: String) = "$PREFIX$id$SEPARATOR$key"
 
     /** A key stored plain, never in a set: [isAppWide], a one-time step's flag. */
     private fun isPlain(key: String) = isAppWide(key) || isOneTimeFlag(key)
@@ -214,28 +212,28 @@ object KeyboardProfiles {
      * common settings, i.e. [SHARED], every per-keyboard setting while separate settings is off (not with [ownSet]: a
      * keyboard's own set as it is), and a shared menu's settings; else [id]'s own.
      */
-    fun setOf(real: SharedPreferences, id: Int, key: String, ownSet: Boolean = false, create: Boolean = true): Int? {
+    fun setOf(real: SharedPreferences, id: String, key: String, ownSet: Boolean = false): String? {
         if (isPlain(key)) return null
-        return if (id == SHARED || sharedByGroups(key) || (!ownSet && !isSeparate(real))) mainId(real, create) else id
+        return if (id == SHARED || sharedByGroups(key) || (!ownSet && !isSeparate(real))) mainId(real) else id
     }
 
-    /** [key] as stored for set [id] ([setOf]; [create] false: for a read). */
-    fun prefixedKey(real: SharedPreferences, id: Int, key: String, ownSet: Boolean = false, create: Boolean = true): String =
-        setOf(real, id, key, ownSet, create)?.let { ownKey(it, key) } ?: key
+    /** [key] as stored for set [id] ([setOf]). */
+    fun prefixedKey(real: SharedPreferences, id: String, key: String, ownSet: Boolean = false): String =
+        setOf(real, id, key, ownSet)?.let { ownKey(it, key) } ?: key
 
     /** The key as the app knows it, or null if [key] belongs to another profile than [id]. */
-    fun unprefixedKey(id: Int, key: String): String? {
-        if (!key.startsWith(PREFIX)) return key
-        val sep = key.indexOf(SEPARATOR)
-        if (sep < 0) return key
-        val keyId = key.substring(PREFIX.length, sep).toIntOrNull() ?: return key
-        return if (keyId == id) key.substring(sep + 1) else null
+    fun unprefixedKey(id: String, key: String): String? {
+        val (keyId, plain) = splitOwnKey(key) ?: return key
+        return if (keyId == id) plain else null
     }
 
-    // ---- ids ----
+    // ---- ids (the keyboards' own, in their definitions: KeyboardIds) ----
 
-    private fun ids(real: SharedPreferences): JSONObject =
-        try { JSONObject(real.getString(PREF_IDS, "{}")!!) } catch (e: Exception) { JSONObject() }
+    /** [keyboard]'s id, the name of its set (null: a definition without one, a built-in keyboard). A lookup. */
+    fun idOf(keyboard: SettingsSubtype): String? = keyboard.keyboardId
+
+    /** The ids with a set of their own in [all] (stored preferences): entries under "p<id>/". */
+    fun setIds(all: Map<String, *>): Set<String> = all.keys.mapNotNullTo(LinkedHashSet()) { splitOwnKey(it)?.first }
 
     /** Every stored copy of [key] (each keyboard's own, the main's for all; a plain one of before) that reads [old] becomes [new] (null: removed):
      *  a saved theme, Layout or popup set renamed or deleted is followed by every keyboard that chose it, not only the
@@ -244,7 +242,7 @@ object KeyboardProfiles {
         val editor = real.edit()
         for ((stored, value) in real.all) {
             if (value != old) continue
-            if (stored != key && unprefixedKey(stored, key) == null) continue
+            if (stored != key && splitOwnKey(stored)?.second != key) continue
             if (new == null) editor.remove(stored) else editor.putString(stored, new)
         }
         editor.apply()
@@ -253,15 +251,13 @@ object KeyboardProfiles {
     /** The keyboards (in [keyboards]' order) that use a saved item through [keys], for the delete warnings (2026-10-08):
      *  what each reads now (separate settings off or the menu shared: the main keyboard's value), or what its own set
      *  keeps, hidden or not (nothing stored there: nothing chosen, not asked again). [matches] gets the plain key and the
-     *  value (null: nothing chosen). Reads only: no keyboard gets an id here. [edited]: the keyboard a settings screen edits and the
-     *  set it edits ([editingId]), which wins over the ids map: while a Layout is previewed the keyboard has the
-     *  previewed identity, and an old entry for that identity names another set ([onKeyboardChanged] moves nothing). */
+     *  value (null: nothing chosen). Reads only. [edited]: the keyboard a settings screen edits and the set it edits
+     *  ([editingId]), which wins over the keyboard's own id (the screen's set). */
     fun keyboardsUsing(real: SharedPreferences, keyboards: List<SettingsSubtype>, keys: Collection<String>,
-                       edited: Pair<SettingsSubtype, Int>? = null,
+                       edited: Pair<SettingsSubtype, String>? = null,
                        matches: (key: String, value: String?) -> Boolean): List<SettingsSubtype> {
-        val all = real.all
         return keyboards.filter { keyboard ->
-            val id = edited?.takeIf { it.first == keyboard }?.second ?: anyIdIn(all, keyboard) ?: SHARED
+            val id = edited?.takeIf { it.first.sameKeyboard(keyboard) }?.second ?: keyboard.keyboardId ?: SHARED
             val now = ProfilePreferences(real) { id } // (separate settings off or a shared menu: the main's set)
             keys.any { key ->
                 if (matches(key, now.getString(key, null))) return@any true
@@ -272,119 +268,76 @@ object KeyboardProfiles {
         }
     }
 
-    // [stored] is "p<id>/[key]" for some id (or [key] itself)
-    private fun unprefixedKey(stored: String, key: String): String? =
-        if (stored.startsWith(PREFIX) && stored.endsWith("$SEPARATOR$key") && stored.substring(PREFIX.length, stored.length - key.length - SEPARATOR.length).toIntOrNull() != null) key else null
-
     /** Whether set [id] has anything stored of its own. */
-    fun hasOwnEntries(real: SharedPreferences, id: Int): Boolean = real.all.keys.any { it.startsWith("$PREFIX$id$SEPARATOR") }
+    fun hasOwnEntries(real: SharedPreferences, id: String): Boolean = real.all.keys.any { it.startsWith("$PREFIX$id$SEPARATOR") }
 
-    /** Profile id of a keyboard, created if it has none. Only at the explicit moments (owner 2026-10-11: lookups never
-     *  create records; only add/copy/restore/upgrade and the net do): adding or copying a keyboard, a restore that brings
-     *  one, the one-time upgrades, the net ([ensureListedRecords]). Every reader: [idOrNull]. */
-    @Synchronized
-    fun idFor(real: SharedPreferences, keyboard: SettingsSubtype): Int {
-        val map = ids(real)
-        val pref = keyboard.toPref()
-        if (map.has(pref)) return map.getInt(pref)
-        // (never one in use: a map without its next id, an old backup's, gave the next keyboard another one's set)
-        val id = maxOf(real.getInt(PREF_NEXT_ID, 1), (map.keys().asSequence().maxOfOrNull { map.optInt(it, SHARED) } ?: 0) + 1)
-        map.put(pref, id)
-        real.edit().putString(PREF_IDS, map.toString()).putInt(PREF_NEXT_ID, id + 1).apply()
-        return id
-    }
-
-    /** [keyboard]'s profile id, null when it has none (a lookup: never creates one). */
-    fun idOrNull(real: SharedPreferences, keyboard: SettingsSubtype): Int? =
-        ids(real).let { map -> keyboard.toPref().takeIf { map.has(it) }?.let { map.getInt(it) } }
-
-    /** Whether [keyboard] is in the keyboard list as stored, by identity (its pref string, what the records are keyed by;
-     *  two Locale objects of one tag can differ). */
-    fun isListed(real: SharedPreferences, keyboard: SettingsSubtype): Boolean = keyboard.toPref().let { key ->
+    /** Whether [keyboard] is in the keyboard list as stored, by its id (a definition without one: by its definition). */
+    fun isListed(real: SharedPreferences, keyboard: SettingsSubtype): Boolean =
         helium314.keyboard.latin.utils.SubtypeSettings.createSettingsSubtypes(
-            real.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!).any { it.toPref() == key } }
+            real.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!).any { it.sameKeyboard(keyboard) }
 
-    /** [keyboard]'s id for a write a user asked for (a screen's tap, an update dialog): its own, else one now if it's in
-     *  the list (the net, for one keyboard); null for a keyboard neither listed nor with an id (nothing is written).
-     *  Never from a preference listener: one runs while a changed keyboard's records are on their way. */
-    fun idForListed(real: SharedPreferences, keyboard: SettingsSubtype): Int? =
-        idOrNull(real, keyboard) ?: if (isListed(real, keyboard)) idFor(real, keyboard) else null
+    /** Whether [keyboard] is one of the phone's: in the list, or switched off (in the added list only). */
+    fun isOnPhone(real: SharedPreferences, keyboard: SettingsSubtype): Boolean =
+        KeyboardIds.phoneKeyboards(real).any { it.sameKeyboard(keyboard) }
+
+    /** [keyboard]'s set for a write a user asked for (a screen's tap, an update dialog): its id while it is one of the
+     *  phone's keyboards ([isOnPhone]); null for a keyboard gone or without an id (nothing is written: no ghost set). */
+    fun idForListed(real: SharedPreferences, keyboard: SettingsSubtype): String? =
+        keyboard.keyboardId?.takeIf { isOnPhone(real, keyboard) }
 
     /**
-     * The net (owner 2026-10-11: "Ok, A + net"): every keyboard in the list without an id or a pool gets them, at app
-     * start (App.onCreate) and when the list is loaded again or added to (SubtypeSettings.reloadEnabledSubtypes,
-     * addEnabledSubtype). The only automatic creation: a keyboard not
-     * in the list never gets records here, so a lookup's ghost can't appear. Not under this object's lock (the pools take
+     * The net (owner 2026-10-11: "Ok, A + net"): every keyboard in the list without an id gets one (KeyboardIds, before
+     * the list is loaded), and without a pool one, at app start (App.onCreate) and when the list is loaded again or added
+     * to (SubtypeSettings.reloadEnabledSubtypes, addEnabledSubtype). The only automatic creation: a keyboard not in the
+     * list never gets records here, so a lookup's ghost can't appear. Not under this object's lock (the pools take
      * LearnedKeyboards' own). @return whether anything was created
      */
     fun ensureListedRecords(real: SharedPreferences): Boolean {
+        val gaveIds = KeyboardIds.ensureListedIds(real)
+        var created = gaveIds
         val listed = helium314.keyboard.latin.utils.SubtypeSettings.createSettingsSubtypes(
             real.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!).distinct()
-        if (listed.isEmpty()) return false
-        val selected = selectedKeyboard(real)
-        var created = false
-        var selectedGotId = false
-        for (keyboard in listed) {
-            if (idOrNull(real, keyboard) == null) {
-                idFor(real, keyboard)
-                created = true
-                if (keyboard.toPref() == selected.toPref()) selectedGotId = true
-            }
+        for (keyboard in listed)
             if (helium314.keyboard.latin.personalization.LearnedKeyboards.ensurePool(real, keyboard)) created = true
-        }
         if (created) Log.i("KeyboardProfiles", "the net: records for listed keyboards without them")
-        // (the keyboard in use kept the id of before while it had none: its own now)
-        if (selectedGotId && isSeparate(real)) refreshImeId(real)
+        // (the keyboard in use may have had none: its own id now)
+        if (gaveIds && isSeparate(real)) refreshImeId(real)
         return created
-    }
-
-    /** The next profile id to be given out. */
-    fun nextProfileId(real: SharedPreferences): Int = real.getInt(PREF_NEXT_ID, 1)
-
-    /** Every keyboard identity with its profile id (reads only). */
-    fun idEntries(real: SharedPreferences): Map<String, Int> = ids(real).let { map -> map.keys().asSequence().associateWith { map.optInt(it, SHARED) } }
-
-    /** A keyboard changed identity (layout, languages ...): its settings follow it, and its learned words. */
-    @Synchronized
-    fun onKeyboardChanged(real: SharedPreferences, from: SettingsSubtype, to: SettingsSubtype) {
-        if (from == to) return
-        helium314.keyboard.latin.personalization.LearnedKeyboards.onKeyboardChanged(real, from, to)
-        val map = ids(real)
-        val fromPref = from.toPref()
-        if (!map.has(fromPref)) return
-        // it became a keyboard that already has a set (a preview of another keyboard's keys, a layout renamed or
-        // deleted): both sets stay as they are, nothing moves or goes; changed back (Cancel), it finds its own again
-        if (map.has(to.toPref())) return
-        val id = map.getInt(fromPref)
-        map.remove(fromPref)
-        map.put(to.toPref(), id)
-        real.edit().putString(PREF_IDS, map.toString()).apply()
     }
 
     /** A keyboard was deleted: its set goes with it (and which learned words it had). */
     @Synchronized
     fun onKeyboardDeleted(real: SharedPreferences, keyboard: SettingsSubtype) {
         helium314.keyboard.latin.personalization.LearnedKeyboards.onKeyboardDeleted(real, keyboard)
-        val map = ids(real)
-        val pref = keyboard.toPref()
         // apps that remembered it remember nothing now (review 2026-10-07: the entry stayed, naming a deleted keyboard)
-        real.all.filter { (k, v) -> k.startsWith(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX) && v.toString().toSettingsSubtype() == keyboard }
+        real.all.filter { (k, v) -> k.startsWith(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX) && v.toString().toSettingsSubtype().sameKeyboard(keyboard) }
             .keys.takeIf { it.isNotEmpty() }?.let { gone -> real.edit().apply { gone.forEach { remove(it) } }.apply() }
-        if (!map.has(pref)) return
-        val id = map.getInt(pref)
-        map.remove(pref)
-        val editor = real.edit().putString(PREF_IDS, map.toString())
-        real.all.keys.filter { unprefixedKey(id, it) != null && it.startsWith("$PREFIX$id$SEPARATOR") }.forEach { editor.remove(it) }
+        val id = keyboard.keyboardId ?: return
+        val editor = real.edit()
+        real.all.keys.filter { it.startsWith("$PREFIX$id$SEPARATOR") }.forEach { editor.remove(it) }
         editor.apply()
         deleteFiles(id) // its own pictures: no keyboard uses them any more
     }
 
-    fun hasOwnSettings(real: SharedPreferences, keyboard: SettingsSubtype): Boolean {
-        val map = ids(real)
-        val pref = keyboard.toPref()
-        if (!map.has(pref)) return false
-        val start = "$PREFIX${map.getInt(pref)}$SEPARATOR"
-        return real.all.keys.any { it.startsWith(start) }
+    fun hasOwnSettings(real: SharedPreferences, keyboard: SettingsSubtype): Boolean =
+        keyboard.keyboardId?.let { hasOwnEntries(real, it) } == true
+
+    /** The set of keyboard id [from] becomes [to]'s (a restore gave the phone's keyboard a new id, KeyboardIds.giveNewId):
+     *  its entries and its pictures move; what [to] had goes. */
+    @Synchronized
+    fun moveSet(real: SharedPreferences, from: String, to: String) {
+        if (from == to) return
+        val all = real.all
+        val editor = real.edit()
+        all.keys.filter { it.startsWith("$PREFIX$to$SEPARATOR") }.forEach { editor.remove(it) }
+        for ((stored, value) in all) {
+            val (id, plain) = splitOwnKey(stored) ?: continue
+            if (id != from) continue
+            editor.remove(stored)
+            put(editor, ownKey(to, plain), value)
+        }
+        editor.commit()
+        filesDir?.let { moveFiles(it, from, to) }
     }
 
     // ---- copying sets ----
@@ -392,7 +345,7 @@ object KeyboardProfiles {
     /** Set [toId] becomes what set [fromId] reads as its own: its entries, a shared menu's from the main keyboard's set,
      *  its pictures; [SHARED] is the main's. What [toId] had goes. */
     @Synchronized
-    fun copy(real: SharedPreferences, fromId: Int, toId: Int) {
+    fun copy(real: SharedPreferences, fromId: String, toId: String) {
         val from = if (fromId == SHARED) mainId(real) else fromId
         val to = if (toId == SHARED) mainId(real) else toId
         if (from == to) return
@@ -423,7 +376,7 @@ object KeyboardProfiles {
 
     /** Set [id] at every default: nothing of its own (a keyboard added with "every default"). */
     @Synchronized
-    fun clearSet(real: SharedPreferences, id: Int) {
+    fun clearSet(real: SharedPreferences, id: String) {
         val editor = real.edit()
         real.all.keys.filter { it.startsWith("$PREFIX$id$SEPARATOR") }.forEach { editor.remove(it) }
         editor.commit()
@@ -440,8 +393,8 @@ object KeyboardProfiles {
      * [settings] lacks is removed: nothing stored, the default (owner 2026-10-11: no default marks).
      */
     @Synchronized
-    fun restoreSet(real: SharedPreferences, id: Int, settings: Map<String, Any?>, takes: (String) -> Boolean = { true }) {
-        if (id == SHARED) return
+    fun restoreSet(real: SharedPreferences, id: String, settings: Map<String, Any?>, takes: (String) -> Boolean = { true }) {
+        if (id == SHARED || id == NO_SET) return
         val editor = real.edit()
         for (stored in real.all.keys) {
             val plain = splitOwnKey(stored)?.takeIf { it.first == id }?.second ?: continue
@@ -465,24 +418,14 @@ object KeyboardProfiles {
 
     // ---- reading a backup's preference map (keys as stored, i.e. prefixed) ----
 
-    /** [keyboard]'s own set inside a backed-up preference map, plain keys; null when the backup kept no set for it. An
-     *  older backup's default marks ([TOMBSTONE]) are left out: nothing stored (owner 2026-10-11: no default marks). */
+    /** [keyboard]'s own set inside a backed-up preference map (or the phone's), plain keys, by its id (a backup is
+     *  given ids when it is read, KeyboardIdUpgrade); null for a keyboard without one. An older backup's default marks
+     *  ([TOMBSTONE]) are left out: nothing stored (owner 2026-10-11: no default marks). */
     fun ownSettingsIn(backup: Map<String, Any?>, keyboard: SettingsSubtype): Map<String, Any?>? {
-        val id = anyIdIn(backup, keyboard) ?: return null
+        val id = keyboard.keyboardId ?: return null
         val start = "$PREFIX$id$SEPARATOR"
         return backup.filterKeys { it.startsWith(start) }.mapKeys { it.key.substring(start.length) }
             .filterKeys { !isPlain(it) && !it.startsWith(TOMBSTONE) }
-    }
-
-    /** [keyboard]'s set id inside a backed-up preference map, or null when the backup has none for it (every keyboard
-     *  has its own set now, whether its settings were separate or not). */
-    fun idIn(backup: Map<String, Any?>, keyboard: SettingsSubtype): Int? = anyIdIn(backup, keyboard)
-
-    /** [keyboard]'s profile id inside a backed-up preference map, whether or not its settings were separate (the id
-     *  also names a keyboard's own learned words, see LearnedStores); null if the backup has none for it. */
-    fun anyIdIn(backup: Map<String, Any?>, keyboard: SettingsSubtype): Int? {
-        val map = try { JSONObject(backup[PREF_IDS] as? String ?: "{}") } catch (e: Exception) { JSONObject() }
-        return keyboard.toPref().takeIf { map.has(it) }?.let { map.getInt(it) }
     }
 
     /** What [keyboard]'s own set holds in a backed-up preference map (or the phone's): plain keys, shared
@@ -504,12 +447,12 @@ object KeyboardProfiles {
     private const val PREF_START_FROM = "keyboard_start_from"
 
     /** Start from every default rather than another set. */
-    const val START_DEFAULTS = -1
+    const val START_DEFAULTS = "defaults"
 
     /** Keyboard set [id] starts from set [from] ([SHARED]: the main keyboard's; [START_DEFAULTS]: every default), at once,
      *  whether settings are separate or not (owner 2026-10-11: every keyboard always has its own set); [noPopups]: not
      *  the source's popups, which are for another script's letters. */
-    fun startKeyboardFrom(real: SharedPreferences, id: Int, from: Int, noPopups: Boolean) {
+    fun startKeyboardFrom(real: SharedPreferences, id: String, from: String, noPopups: Boolean) {
         if (from == START_DEFAULTS) clearSet(real, id) else copy(real, from, id)
         real.edit().apply {
             remove(PREF_START_FROM)
@@ -526,61 +469,59 @@ object KeyboardProfiles {
     }
 
     /** Profile of the keyboard in use (the IME's view). Refreshed on every keyboard switch. */
-    @Volatile var imeId: Int = SHARED
+    @Volatile var imeId: String = SHARED
         private set
 
     /** The set the settings screen of [context] edits: the keyboard of the screen's own navigation entry
      *  ([KeyboardScopeContext]), else [mainEditingId]. No global that screens set (2026-10-09: "who drew last wins" left
      *  a screen editing another keyboard during a slide). Navigation keeps the entry's keyboard over process death. */
-    fun editingId(context: android.content.Context): Int {
+    fun editingId(context: android.content.Context): String {
         val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(context)
         return KeyboardScopeContext.idOf(context)?.let { scopedId(real, it) } ?: mainEditingId(real)
     }
 
     /** Where no keyboard's own screen is (the main screen, App settings, their search): the keyboard in use when settings
      *  are separate, else the common settings ([SHARED]: the main keyboard's set). Worked out on every call, never stored. */
-    fun mainEditingId(real: SharedPreferences): Int {
+    fun mainEditingId(real: SharedPreferences): String {
         if (!isSeparate(real)) return SHARED
         val selected = real.getString(Settings.PREF_SELECTED_SUBTYPE, Defaults.PREF_SELECTED_SUBTYPE)!!
-        val idsNow = real.getString(PREF_IDS, null)
-        mainMemo?.let { if (it.selected == selected && it.ids == idsNow) return it.id }
-        // a lookup (owner 2026-10-11: lookups never create records). None while a changed keyboard's records are on
-        // their way (the set moved, the selected keyboard not yet): no set, reads give defaults, writes are dropped (the
-        // net gives every listed keyboard one)
-        val id = idOrNull(real, selected.toSettingsSubtype()) ?: return NO_SET
-        mainMemo = MainMemo(selected, idsNow, id)
+        mainMemo?.let { if (it.selected == selected) return it.id }
+        // its id, a lookup (owner 2026-10-11: lookups never create records); none yet (the net gives every listed keyboard
+        // one): no set, reads give defaults, writes are dropped
+        val id = selected.toSettingsSubtype().keyboardId ?: return NO_SET
+        mainMemo = MainMemo(selected, id)
         return id
     }
-    // (every preference read asks: the ids aren't parsed again while neither changed)
-    private class MainMemo(val selected: String, val ids: String?, val id: Int)
+    // (every preference read asks: the selected keyboard isn't parsed again while it didn't change)
+    private class MainMemo(val selected: String, val id: String)
 
     @Volatile private var mainMemo: MainMemo? = null
 
-    /** Set [id] of a keyboard's screen while a keyboard has it; one that is gone (the keyboard deleted, a factory reset or
-     *  a restore) gives [mainEditingId], so nothing is written under an id no keyboard has. */
-    fun scopedId(real: SharedPreferences, id: Int): Int {
+    /** Set [id] of a keyboard's screen while one of the phone's keyboards has it (listed or switched off); one that is
+     *  gone (the keyboard deleted, a factory reset or a restore) gives [mainEditingId], so nothing is written under an id
+     *  no keyboard has. */
+    fun scopedId(real: SharedPreferences, id: String): String {
         if (!isSeparate(real)) return SHARED
-        val idsNow = real.getString(PREF_IDS, null)
-        val known = knownMemo?.takeIf { it.first == idsNow }?.second
-            ?: ids(real).let { map -> map.keys().asSequence().map { map.optInt(it, SHARED) }.toHashSet() }
-                .also { knownMemo = idsNow to it }
+        val lists = real.getString(Settings.PREF_ENABLED_SUBTYPES, null) + Separators.SETS + real.getString(Settings.PREF_ADDITIONAL_SUBTYPES, null)
+        val known = knownMemo?.takeIf { it.first == lists }?.second
+            ?: KeyboardIds.phoneKeyboards(real).mapNotNullTo(HashSet()) { it.keyboardId }.also { knownMemo = lists to it }
         if (id in known) return id
         if (goneLogged.add(id)) Log.i("KeyboardProfiles", "set $id is gone: its screens edit the main set")
         return mainEditingId(real)
     }
 
-    @Volatile private var knownMemo: Pair<String?, Set<Int>>? = null
-    private val goneLogged: MutableSet<Int> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+    @Volatile private var knownMemo: Pair<String, Set<String>>? = null
+    private val goneLogged: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
     /** Whether the look (Appearance settings and background pictures) of set [a] differs from set [b]'s: a keyboard
      *  switch reloads the theme only then (re-review 2026-10-07: it reloaded, with a blink, on every switch). Shared
      *  Appearance: never. */
-    fun looksDiffer(real: SharedPreferences, a: Int, b: Int): Boolean {
+    fun looksDiffer(real: SharedPreferences, a: String, b: String): Boolean {
         if (a == b || !isSeparate(real) || Group.APPEARANCE in sharedGroups) return false
-        fun look(id: Int): Map<String, Any?> = ProfilePreferences(real) { id }.all.filterKeys { helium314.keyboard.settings.AppearanceLooks.onScreen(it) }
+        fun look(id: String): Map<String, Any?> = ProfilePreferences(real) { id }.all.filterKeys { helium314.keyboard.settings.AppearanceLooks.onScreen(it) }
         if (look(a) != look(b)) return true
         val dir = filesDir ?: return false
-        fun pictures(id: Int) = profileFileNames.map { name -> java.io.File(dir, name + suffix(id)).let { if (it.isFile) it.length() to it.lastModified() else null } }
+        fun pictures(id: String) = profileFileNames.map { name -> java.io.File(dir, name + suffix(id)).let { if (it.isFile) it.length() to it.lastModified() else null } }
         return pictures(a) != pictures(b)
     }
 
@@ -589,10 +530,8 @@ object KeyboardProfiles {
         // the learned words of the keyboard in use too, when each keyboard has its own
         helium314.keyboard.latin.personalization.LearnedStores.refresh(real)
         val old = imeId
-        // (a lookup, owner 2026-10-11: none while a changed keyboard's records are on their way: the one of before while a
-        // keyboard has it, which a rename keeps, else no set; the net gives a listed keyboard its own)
-        imeId = if (!isSeparate(real)) SHARED else idOrNull(real, selectedKeyboard(real))
-            ?: old.takeIf { it == SHARED || it in idEntries(real).values } ?: NO_SET
+        // (its id, a lookup, owner 2026-10-11; a rename keeps it; none yet: no set, the net gives a listed keyboard its own)
+        imeId = if (!isSeparate(real)) SHARED else selectedKeyboard(real).keyboardId ?: NO_SET
         if (imeId != old) helium314.keyboard.latin.utils.LanguagePriority.clearCache() // (priorities are per keyboard)
         // another keyboard's background picture (see profileFile) and emoji font choice (emoji_font: the fonts are shared,
         // FontLibrary, but each keyboard picks its own)
@@ -627,15 +566,15 @@ object KeyboardProfiles {
         // a settings screen, which can write the picture, gives one)
         val id = if (!isSeparate(real) || Group.APPEARANCE in sharedGroups) SHARED
             else if (context.getActivity() != null || KeyboardScopeContext.idOf(context) != null) editingId(context) else imeId
-        return java.io.File(dir, name + suffix(if (id == SHARED) mainId(real, create = context.getActivity() != null) else id))
+        return java.io.File(dir, name + suffix(if (id == SHARED) mainId(real) else id))
     }
 
     /** "_p<id>"; the plain names ([SHARED]) are the old common set's pictures, read only by the steps of before. */
-    private fun suffix(id: Int) = if (id == SHARED) "" else "_p$id"
+    private fun suffix(id: String) = if (id == SHARED) "" else "_p$id"
 
     /** Set [id]'s background picture files, each followed by its framing file (whether they exist or not); [SHARED]:
      *  the main keyboard's. */
-    fun pictureFiles(context: android.content.Context, id: Int): List<java.io.File> {
+    fun pictureFiles(context: android.content.Context, id: String): List<java.io.File> {
         val dir = helium314.keyboard.latin.utils.DeviceProtectedUtils.getFilesDir(context)
         val set = if (id == SHARED) mainId(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(context)) else id
         return profileFileNames.flatMap { name -> java.io.File(dir, name + suffix(set)).let {
@@ -643,7 +582,7 @@ object KeyboardProfiles {
     }
 
     /** The files of set [fromId] over those of [toId] (one missing in [fromId] is removed in [toId]). */
-    private fun copyFiles(fromId: Int, toId: Int) {
+    private fun copyFiles(fromId: String, toId: String) {
         val dir = filesDir ?: return
         for (name in profileFileNames) for (ext in listOf("", ".framing")) {
             val from = java.io.File(dir, name + suffix(fromId) + ext)
@@ -652,13 +591,13 @@ object KeyboardProfiles {
         }
     }
 
-    private fun hasOwnFiles(id: Int): Boolean {
+    private fun hasOwnFiles(id: String): Boolean {
         val dir = filesDir ?: return false
         return profileFileNames.any { java.io.File(dir, it + suffix(id)).exists() }
     }
 
     /** The files of set [id] (not the shared set's). */
-    fun deleteFiles(id: Int) {
+    fun deleteFiles(id: String) {
         if (id == SHARED) return
         val dir = filesDir ?: return
         for (name in profileFileNames) for (ext in listOf("", ".framing")) java.io.File(dir, name + suffix(id) + ext).delete()
@@ -670,19 +609,30 @@ object KeyboardProfiles {
         dir.listFiles { f -> profileFileNames.any { f.name.startsWith(it) } }?.forEach { it.delete() }
     }
 
+    /** Set [from]'s pictures (with their framing) in [dir] become set [to]'s ([from]: an id, or an old set number as
+     *  text, KeyboardIdUpgrade); what [to] had goes. */
+    fun moveFiles(dir: java.io.File, from: String, to: String) {
+        if (from == to) return
+        for (name in profileFileNames) for (ext in listOf("", ".framing")) {
+            val source = java.io.File(dir, name + suffix(from) + ext)
+            val target = java.io.File(dir, name + suffix(to) + ext)
+            runCatching { if (source.exists()) { source.copyTo(target, overwrite = true); source.delete() } else target.delete() }
+        }
+    }
+
     /** The backup file names [restoreFiles] can use for set [fromId] (its own, and the plain ones). */
-    fun restoreFileNames(fromId: Int): Set<String> =
+    fun restoreFileNames(fromId: String): Set<String> =
         profileFileNames.flatMap { n -> listOf("", ".framing").flatMap { e -> listOf(n + suffix(fromId) + e, n + e) } }.toSet()
 
     /** Backup restore of one keyboard: its pictures from the backup's files (named for the backup's id [fromId]; null:
      *  the backup has no set for it), given as name -> bytes, become set [toId]'s. */
-    fun restoreFiles(files: Map<String, ByteArray>, fromId: Int?, toId: Int, perKeyboardBackup: Boolean) {
+    fun restoreFiles(files: Map<String, ByteArray>, fromId: String?, toId: String, perKeyboardBackup: Boolean) {
         val dir = filesDir ?: return
         // a backup made since the pictures are per keyboard ([perKeyboardBackup]: it has "profile_files_migrated") says
         // exactly what the keyboard had, a missing file = no picture (no set of its own: none, the backup's common
         // pictures are ignored, as its common settings); an older one has only the plain pictures (what every keyboard
         // showed then), and without any the phone's are kept
-        val source = if (perKeyboardBackup) fromId ?: -1 else SHARED
+        val source = if (perKeyboardBackup) fromId ?: NO_SET else SHARED
         if (!perKeyboardBackup && profileFileNames.none { files.containsKey(it + suffix(source)) }) return
         for (name in profileFileNames) for (ext in listOf("", ".framing")) {
             val to = java.io.File(dir, name + suffix(toId) + ext)
@@ -698,8 +648,8 @@ object KeyboardProfiles {
 
     /** Moves the value [inUse] (a keyboard's id) has for [key] to the plain settings: its value, or the default if it was
      *  reset there (the plain value goes). A value beats a marker, as everywhere else in this file. */
-    private fun SharedPreferences.Editor.takeOwn(all: Map<String, *>, inUse: Int, key: String) {
-        if (inUse == SHARED) return
+    private fun SharedPreferences.Editor.takeOwn(all: Map<String, *>, inUse: String, key: String) {
+        if (inUse == SHARED || inUse == NO_SET) return
         when (val v = all["$PREFIX$inUse$SEPARATOR$key"]) {
             is Boolean -> putBoolean(key, v)
             is Int -> putInt(key, v)
@@ -723,7 +673,7 @@ object KeyboardProfiles {
      *  in use (with separate settings), and the keyboards' own copies go. */
     fun migrateLearningSwiping(real: SharedPreferences) {
         if (real.getBoolean("learning_swiping_global", false)) return
-        val inUse = if (isSeparate(real)) idFor(real, selectedKeyboard(real)) else SHARED
+        val inUse = if (isSeparate(real)) selectedKeyboard(real).keyboardId ?: NO_SET else SHARED
         val all = real.all
         real.edit().apply {
             for (key in learningSwipingKeys) {
@@ -745,7 +695,7 @@ object KeyboardProfiles {
 
     fun migrateSuggestionsToRefine(real: SharedPreferences) {
         if (real.getBoolean("suggestions_refine_moved", false)) return
-        val inUse = if (isSeparate(real)) idFor(real, selectedKeyboard(real)) else SHARED
+        val inUse = if (isSeparate(real)) selectedKeyboard(real).keyboardId ?: NO_SET else SHARED
         val all = real.all
         real.edit().apply {
             for (key in movedToRefine) {
@@ -784,10 +734,7 @@ object KeyboardProfiles {
     /** Once: keyboards that got their own set before the files were per keyboard get a copy of the plain ones. */
     fun migrateFiles(real: SharedPreferences) {
         if (real.getBoolean("profile_files_migrated", false)) return
-        val map = ids(real)
-        for (key in map.keys()) {
-            val id = map.optInt(key, SHARED)
-            if (id == SHARED) continue
+        for (id in setIds(real.all)) {
             val dir = filesDir ?: return
             if (profileFileNames.none { java.io.File(dir, it + suffix(id)).exists() }) copyFiles(SHARED, id)
         }
@@ -814,7 +761,7 @@ object KeyboardProfiles {
         if (real.getBoolean(NO_COMMON_SET_DONE, false)) return
         val keyboards = helium314.keyboard.latin.utils.SubtypeSettings.createSettingsSubtypes(
             real.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!).ifEmpty { listOf(mainKeyboard(real)) }
-        val without = keyboards.filter { !hasOwnSettings(real, it) }.map { idFor(real, it) }
+        val without = keyboards.filter { !hasOwnSettings(real, it) }.mapNotNull { it.keyboardId }
         val main = mainId(real)
         val all = real.all
         // (one-time flags too, as a copy always took them: a set's own steps mustn't run again on it)
@@ -859,11 +806,11 @@ object KeyboardProfiles {
     private fun isPaletteKey(key: String) = key.startsWith(Settings.PREF_USER_COLORS_PREFIX)
         || key.startsWith(Settings.PREF_USER_ALL_COLORS_PREFIX) || key.startsWith(Settings.PREF_USER_MORE_COLORS_PREFIX)
 
-    /** The keyboard whose settings set [id] holds (separate settings on), or null (shared settings). */
-    fun editingKeyboard(real: SharedPreferences, id: Int): SettingsSubtype? {
+    /** The keyboard whose settings set [id] holds (separate settings on): the phone's keyboard with that id, as it is
+     *  now; or null (shared settings, or none has it). */
+    fun editingKeyboard(real: SharedPreferences, id: String): SettingsSubtype? {
         if (id == SHARED || !isSeparate(real)) return null
-        val map = ids(real)
-        return map.keys().asSequence().firstOrNull { map.optInt(it, -1) == id }?.toSettingsSubtype()
+        return KeyboardIds.phoneKeyboards(real).firstOrNull { it.keyboardId == id }
     }
 
     fun selectedKeyboard(real: SharedPreferences): SettingsSubtype =
@@ -878,12 +825,12 @@ object KeyboardProfiles {
  * No fallback to another set (owner 2026-10-11: no separate common set): what a set doesn't store is at its default.
  */
 class ProfilePreferences(private val real: SharedPreferences, private val ownSet: Boolean,
-                         private val activeId: () -> Int) : SharedPreferences {
-    constructor(real: SharedPreferences, activeId: () -> Int) : this(real, false, activeId)
+                         private val activeId: () -> String) : SharedPreferences {
+    constructor(real: SharedPreferences, activeId: () -> String) : this(real, false, activeId)
 
     private fun id() = activeId()
     // (a read gives out no set id: a main keyboard without one yet reads nothing)
-    private fun k(key: String) = KeyboardProfiles.prefixedKey(real, id(), key, ownSet, create = false)
+    private fun k(key: String) = KeyboardProfiles.prefixedKey(real, id(), key, ownSet)
 
     override fun getAll(): MutableMap<String, *> {
         // what the reads give: the plain app-wide keys, and for every other key the set it is read from
@@ -892,11 +839,11 @@ class ProfilePreferences(private val real: SharedPreferences, private val ownSet
         for ((key, value) in real.all) {
             val own = KeyboardProfiles.splitOwnKey(key)
             if (own == null) {
-                if (KeyboardProfiles.setOf(real, id, key, ownSet, create = false) == null) result[key] = value
+                if (KeyboardProfiles.setOf(real, id, key, ownSet) == null) result[key] = value
                 continue
             }
             val (set, plain) = own
-            if (KeyboardProfiles.setOf(real, id, plain, ownSet, create = false) == set) result[plain] = value
+            if (KeyboardProfiles.setOf(real, id, plain, ownSet) == set) result[plain] = value
         }
         return result
     }
@@ -910,7 +857,7 @@ class ProfilePreferences(private val real: SharedPreferences, private val ownSet
 
     override fun edit(): SharedPreferences.Editor = Editor(real.edit(), id())
 
-    private inner class Editor(private val e: SharedPreferences.Editor, private val id: Int) : SharedPreferences.Editor {
+    private inner class Editor(private val e: SharedPreferences.Editor, private val id: String) : SharedPreferences.Editor {
         private fun k(key: String) = KeyboardProfiles.prefixedKey(real, id, key, ownSet)
         // (a keyboard without a set: nothing written, owner 2026-10-11: lookups never create records)
         private fun noSet(key: String) = (KeyboardProfiles.setOf(real, id, key, ownSet) == KeyboardProfiles.NO_SET)
@@ -935,7 +882,7 @@ class ProfilePreferences(private val real: SharedPreferences, private val ownSet
             // a set's key: only that of the set this view reads it from; a plain key always
             val own = if (key == null) null else KeyboardProfiles.splitOwnKey(key)
             val plain = if (own == null) key
-                else own.second.takeIf { KeyboardProfiles.setOf(real, id(), it, ownSet, create = false) == own.first }
+                else own.second.takeIf { KeyboardProfiles.setOf(real, id(), it, ownSet) == own.first }
             if (key == null || plain != null) listener.onSharedPreferenceChanged(this, plain)
         }
         // registered again (a restore restarts the listener without stopping it): one callback, not two
@@ -952,14 +899,14 @@ class ProfilePreferences(private val real: SharedPreferences, private val ownSet
     val underlying: SharedPreferences get() = real
 
     /** The set [key] is read from here (null: plain; [KeyboardProfiles.setOf]). */
-    fun setOf(key: String): Int? = KeyboardProfiles.setOf(real, id(), key, ownSet, create = false)
+    fun setOf(key: String): String? = KeyboardProfiles.setOf(real, id(), key, ownSet)
 
     /** Whether [key] written here is what other keyboards read too: app-wide, or the main keyboard's set as the common
      *  settings (separate settings off, its menu shared), not a keyboard's own. */
     fun writesShared(key: String): Boolean {
-        val set = KeyboardProfiles.setOf(real, id(), key, ownSet, create = false) ?: return true
+        val set = KeyboardProfiles.setOf(real, id(), key, ownSet) ?: return true
         val id = id()
-        return set == KeyboardProfiles.mainId(real, create = false) && (id == KeyboardProfiles.SHARED || (!ownSet && !KeyboardProfiles.isSeparate(real))
+        return set == KeyboardProfiles.mainId(real) && (id == KeyboardProfiles.SHARED || (!ownSet && !KeyboardProfiles.isSeparate(real))
             || KeyboardProfiles.isGlobal(key))
     }
 }

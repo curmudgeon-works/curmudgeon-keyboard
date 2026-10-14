@@ -80,7 +80,7 @@ fun LanguageListScreen(
     val severalKeyboards = remember(keyboard, generation) {
         SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype().toPref() }.distinct().size > 1 }
     fun setKeyboard(new: SettingsSubtype) {
-        if (!mayChangeKeyboard(ctx, keyboard, new)) { generation++; return } // (another keyboard is that one already)
+        // (owner 2026-10-11, keyboards have unique ids: no "already set up like this" block, the change is always made)
         SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, new, ctx)
         keyboard = new
         generation++

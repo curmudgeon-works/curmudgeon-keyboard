@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
+import helium314.keyboard.idKey
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.personalization.available
 import helium314.keyboard.latin.personalization.useKeyboards
@@ -21,6 +22,7 @@ import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.dialogs.StartSettings
 import helium314.keyboard.settings.screens.KeyboardsScreen
 import helium314.keyboard.settings.screens.startSettings
+import helium314.keyboard.withId
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -37,11 +39,12 @@ class AddKeyboardTest {
     @get:Rule val compose = createEmptyComposeRule()
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = ctx.realPrefs()
-    private val a by lazy { available("en-US") }
-    private val b by lazy { available("de-DE") }
-    private val added by lazy { available("fr") }
+    // (owner 2026-10-11: keyboards have unique ids; the keyboard added has its own, as createKeyboard gives it)
+    private val a by lazy { available("en-US").withId(1) }
+    private val b by lazy { available("de-DE").withId(2) }
+    private val added by lazy { available("fr").withId(3) }
     private fun set(keyboard: helium314.keyboard.latin.settings.SettingsSubtype) =
-        ProfilePreferences(real) { KeyboardProfiles.idFor(real, keyboard) }
+        ProfilePreferences(real) { keyboard.keyboardId!! }
     private fun numberRow(keyboard: helium314.keyboard.latin.settings.SettingsSubtype) = set(keyboard).getBoolean(Settings.PREF_SHOW_NUMBER_ROW, false)
 
     @Before fun setUp() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real); SubtypeSettings.init(ctx); useKeyboards(ctx, real, a, b) }
@@ -49,7 +52,7 @@ class AddKeyboardTest {
 
     /** B has its own number row on (kept from a time with separate settings), the common settings don't. */
     private fun bWithItsOwn() {
-        real.edit().putBoolean(KeyboardProfiles.ownKey(KeyboardProfiles.idFor(real, b), Settings.PREF_SHOW_NUMBER_ROW), true)
+        real.edit().putBoolean(idKey(2, Settings.PREF_SHOW_NUMBER_ROW), true)
             .putBoolean(Settings.PREF_SHOW_NUMBER_ROW, false).commit()
     }
     private fun separateOn() = KeyboardProfiles.enable(real)
@@ -66,14 +69,14 @@ class AddKeyboardTest {
         bWithItsOwn()
         startSettings(ctx, added, StartSettings.From(b))
         assertTrue(KeyboardProfiles.hasOwnSettings(real, added)) // its own at once
-        assertFalse(ProfilePreferences(real) { KeyboardProfiles.idFor(real, added) }.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, false)) // (A's for now)
+        assertFalse(set(added).getBoolean(Settings.PREF_SHOW_NUMBER_ROW, false)) // (A's for now)
         separateOn()
         assertTrue(numberRow(added))
         assertFalse(numberRow(a)) // (the others as before: the common settings)
     }
 
     @Test fun `one set for all - defaults picked, the keyboard starts at every default once separate`() {
-        real.edit().putBoolean(KeyboardProfiles.ownKey(KeyboardProfiles.idFor(real, a), Settings.PREF_SHOW_NUMBER_ROW), true).commit() // the common settings, A's: number row on
+        real.edit().putBoolean(idKey(1, Settings.PREF_SHOW_NUMBER_ROW), true).commit() // the common settings, A's: number row on
 
         startSettings(ctx, added, StartSettings.Defaults)
         separateOn()

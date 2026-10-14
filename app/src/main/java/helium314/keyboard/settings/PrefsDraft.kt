@@ -35,7 +35,7 @@ import java.io.File
  * when the app is left ([rejectOpen]) or, after a crash, when it starts again ([recoverAfterCrash]).
  */
 class PrefsDraft private constructor(private val name: String, private val values: Map<String, Any?>, private val file: File,
-                                     private val setId: Int) {
+                                     private val setId: String) {
     // the set the screen edited (a keyboard's own, or the shared one): crash recovery at app start puts the snapshot
     // back there, not into whatever set the app start reads
     private fun prefs(ctx: Context): android.content.SharedPreferences =
@@ -74,7 +74,7 @@ class PrefsDraft private constructor(private val name: String, private val value
         private val active = HashMap<String, PrefsDraft>()
 
         /** The set the settings screen of [ctx] edits (its own keyboard's, see KeyboardScopeContext). */
-        fun currentSetId(ctx: Context): Int = if (KeyboardProfiles.isSeparate(
+        fun currentSetId(ctx: Context): String = if (KeyboardProfiles.isSeparate(
             helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx))) KeyboardProfiles.editingId(ctx) else KeyboardProfiles.SHARED
 
         private fun file(ctx: Context, name: String) = File(ctx.filesDir, "$PREFIX$name.json")
@@ -106,7 +106,7 @@ class PrefsDraft private constructor(private val name: String, private val value
                     val json = JSONObject(file.readText())
                     val p = json.getJSONObject("prefs")
                     val values = p.keys().asSequence().associateWith { key -> p.optJSONObject(key)?.let { AppearanceLooks.fromJson(it) } }
-                    PrefsDraft(name, values, file, json.optInt("set", KeyboardProfiles.SHARED)).reject(ctx)
+                    PrefsDraft(name, values, file, json.optString("set", KeyboardProfiles.SHARED)).reject(ctx)
                 }.onFailure { file.delete() }
             }
         }

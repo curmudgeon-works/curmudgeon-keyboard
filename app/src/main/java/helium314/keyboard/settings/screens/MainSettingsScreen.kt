@@ -103,8 +103,8 @@ fun keyboardName(keyboard: SettingsSubtype, ctx: Context): String =
 
 /** [keyboards] as the update and delete questions name them: a switched-off one "<name> (switched off)". */
 fun userNames(ctx: Context, keyboards: List<SettingsSubtype>): List<String> {
-    val enabled = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.toSet()
-    return keyboards.map { if (it in enabled) keyboardName(it, ctx) else ctx.getString(R.string.keyboard_switched_off, keyboardName(it, ctx)) }
+    val enabled = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }
+    return keyboards.map { kb -> if (enabled.any { it.sameKeyboard(kb) }) keyboardName(kb, ctx) else ctx.getString(R.string.keyboard_switched_off, keyboardName(kb, ctx)) }
 }
 
 /** The keyboards, in the Keyboards screen's order, that use a saved item (a Layout, theme, popup set or font) through
@@ -112,7 +112,7 @@ fun userNames(ctx: Context, keyboards: List<SettingsSubtype>): List<String> {
  *  ([switchedOffUsing]): the ones its delete warning names. */
 fun keyboardsUsing(ctx: Context, keys: Collection<String>, edited: SettingsSubtype? = null,
                    matches: (key: String, value: String?) -> Boolean): List<SettingsSubtype> {
-    // [edited]: the keyboard the screen edits, which reads the set being edited whatever identity it has now
+    // [edited]: the keyboard the screen edits, which reads the set being edited
     val editingId = helium314.keyboard.latin.settings.KeyboardProfiles.editingId(ctx)
     return helium314.keyboard.latin.settings.KeyboardProfiles.keyboardsUsing(ctx.realPrefs(),
         SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }, keys,
@@ -129,14 +129,13 @@ fun switchedOffUsing(ctx: Context, keys: Collection<String>, edited: SettingsSub
     val real = ctx.realPrefs()
     val editingId = helium314.keyboard.latin.settings.KeyboardProfiles.editingId(ctx)
     // (which keyboards are switched off: the one helper, [SwitchedOffKeyboards.list]; 2026-10-11)
-    val off = helium314.keyboard.latin.settings.SwitchedOffKeyboards.list(real).toHashSet()
-    return helium314.keyboard.latin.settings.KeyboardProfiles.idEntries(real).mapNotNull { (pref, id) ->
-        if (id == helium314.keyboard.latin.settings.KeyboardProfiles.SHARED || id == editingId) return@mapNotNull null
-        val keyboard = runCatching { pref.toSettingsSubtype() }.getOrNull() ?: return@mapNotNull null
-        if (keyboard !in off || keyboard == edited) return@mapNotNull null
+    val off = helium314.keyboard.latin.settings.SwitchedOffKeyboards.list(real)
+    return off.mapNotNull { keyboard ->
+        val id = keyboard.keyboardId ?: return@mapNotNull null
+        if (id == editingId || keyboard.sameKeyboard(edited)) return@mapNotNull null
         keyboard.takeIf { keys.any { key -> val own = helium314.keyboard.latin.settings.KeyboardProfiles.ownKey(id, key)
             real.contains(own) && matches(key, real.getString(own, null)) } }
-    }.distinct()
+    }
 }
 
 /** The other keyboards whose chosen saved item through [keys] [matches], for the update dialog's ticks (2026-10-11):
@@ -147,7 +146,7 @@ fun otherUsers(ctx: Context, keys: Collection<String>, edited: SettingsSubtype?,
     val real = ctx.realPrefs()
     if (helium314.keyboard.latin.settings.KeyboardProfiles.isShared(real, group)) return emptyList()
     if (!helium314.keyboard.latin.settings.KeyboardProfiles.isSeparate(real) || edited == null) return switchedOffUsing(ctx, keys, edited, matches)
-    return keyboardsUsing(ctx, keys, edited, matches).filter { it != edited }
+    return keyboardsUsing(ctx, keys, edited, matches).filter { !it.sameKeyboard(edited) }
 }
 
 /** [otherUsers] of the saved item [name] chosen under [key]. */
@@ -171,7 +170,7 @@ fun deleteKeepersText(ctx: Context, @androidx.annotation.PluralsRes id: Int, key
  *  [setId]: the keyboard set the opened screens edit, asked at the tap (null: this screen's own, see KeyboardScopeContext). */
 @Composable
 fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modifier, showLanguages: Boolean = true,
-    showAdvanced: Boolean = true, setId: () -> Int? = { null },
+    showAdvanced: Boolean = true, setId: () -> String? = { null },
     // which menus (with separate settings: a keyboard's own ones, or the shared ones once below the keyboards); null: all
     groups: ((helium314.keyboard.latin.settings.KeyboardProfiles.Group) -> Boolean)? = null, showRefine: Boolean = false) {
     fun shows(group: helium314.keyboard.latin.settings.KeyboardProfiles.Group) = groups?.invoke(group) ?: true
@@ -230,7 +229,7 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
 
 /** "Fine-tune suggestions" (advanced only): once for all keyboards, or under each keyboard when it keeps its own. */
 @Composable
-fun RefineEntry(setId: () -> Int? = { null }) {
+fun RefineEntry(setId: () -> String? = { null }) {
     if (!helium314.keyboard.settings.REFINE_MENU_SHOWN) return // (not in the public build yet)
     val ctx = LocalContext.current
     val advanced by SettingsMode.state(ctx)
@@ -246,7 +245,7 @@ fun RefineEntry(setId: () -> Int? = { null }) {
 
 /** "Fine-tune learning" (advanced only, 2026-10-10): once for all keyboards, or under each keyboard when it keeps its own. */
 @Composable
-fun LearningEntry(setId: () -> Int? = { null }) {
+fun LearningEntry(setId: () -> String? = { null }) {
     if (!helium314.keyboard.settings.REFINE_MENU_SHOWN) return // (not in the public build yet, like Fine-tune suggestions)
     val ctx = LocalContext.current
     val advanced by SettingsMode.state(ctx)
@@ -263,7 +262,7 @@ fun LearningEntry(setId: () -> Int? = { null }) {
 /** The entries the same for every keyboard: "Fine-tune suggestions" and "Fine-tune learning" (advanced only, each when
  *  shared) and the app's own settings (App settings, once named Advanced; shown in simple mode too since 2026-10-06). */
 @Composable
-fun AdvancedEntry(setId: () -> Int? = { null }, showRefine: Boolean = true) {
+fun AdvancedEntry(setId: () -> String? = { null }, showRefine: Boolean = true) {
     if (showRefine) RefineEntry(setId)
     val ctx = LocalContext.current
     // (Fine-tune learning decides by its own group, so the callers' showRefine is about Fine-tune suggestions only)

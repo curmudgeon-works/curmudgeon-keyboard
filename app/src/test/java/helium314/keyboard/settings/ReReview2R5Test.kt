@@ -14,12 +14,14 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
+import helium314.keyboard.kid
 import helium314.keyboard.latin.personalization.available
 import helium314.keyboard.latin.personalization.useKeyboards
+import helium314.keyboard.latin.settings.KeyboardIdUpgrade
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
-import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
+import helium314.keyboard.withId
 import helium314.keyboard.latin.utils.LayoutType
 import helium314.keyboard.latin.utils.LayoutUtilsCustom
 import helium314.keyboard.latin.utils.SubtypeSettings
@@ -30,7 +32,6 @@ import helium314.keyboard.settings.preferences.SavedItemsMerge
 import helium314.keyboard.settings.preferences.readRestoreDialog
 import helium314.keyboard.settings.preferences.restorePlanFrom
 import helium314.keyboard.settings.preferences.settingsToJsonStream
-import org.json.JSONObject
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -80,22 +81,20 @@ class ReReview2R5Test {
         SubtypeSettings.reloadEnabledSubtypes(ctx)
     }
 
-    /** The phone: Hindi with an unsaved number row "A"; the backup: the same keyboard, that name with other keys (so it
-     *  comes in renamed: the dry runs matter), and French. */
+    /** The phone: Hindi (k1) with an unsaved number row "A"; the backup: the same keyboard (its id), that name with other
+     *  keys (so it comes in renamed: the dry runs matter), and French (k2). (owner 2026-10-11: keyboards have unique ids;
+     *  the backup's sets are its keyboards' ids, no id map) */
     private fun phoneAndBackup() {
         val a = LayoutUtilsCustom.makePrivateLayout("A", type, "", ctx)
-        val hindi = available("hi").withLayout(type, a).toPref().toSettingsSubtype()
-        val fr = available("fr")
-        real.edit().putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(hindi))).commit()
+        val hindi = available("hi").withLayout(type, a).withId(1)
+        val fr = available("fr").withId(2)
         useKeyboards(ctx, real, hindi)
-        KeyboardProfiles.idFor(real, hindi)
         val list = SubtypeSettings.createPrefSubtypes(listOf(hindi, fr))
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("preferences.json"))
             settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to list, Settings.PREF_ADDITIONAL_SUBTYPES to list,
-                Settings.PREF_SELECTED_SUBTYPE to hindi.toPref(),
-                "keyboard_profile_ids" to JSONObject().put(hindi.toPref(), 1).put(fr.toPref(), 2).toString(),
-                KeyboardProfiles.NO_COMMON_SET_DONE to true, KeyboardProfiles.ownKey(1, Settings.PREF_KEY_HORIZONTAL_GAP) to 3f), z)
+                Settings.PREF_SELECTED_SUBTYPE to hindi.toPref(), KeyboardIdUpgrade.DONE to true,
+                KeyboardProfiles.NO_COMMON_SET_DONE to true, KeyboardProfiles.ownKey(kid(1), Settings.PREF_KEY_HORIZONTAL_GAP) to 3f), z)
             z.closeEntry()
             z.putNextEntry(ZipEntry("unprotected/layouts/${type.name.lowercase()}/$a")); z.write("B".toByteArray()); z.closeEntry()
         }

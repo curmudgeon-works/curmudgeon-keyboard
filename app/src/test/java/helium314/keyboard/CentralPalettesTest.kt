@@ -40,20 +40,20 @@ import kotlin.test.assertTrue
  * colors, the default ones, or the old ones as "Warm 2" (one for all keepers); delete: all to default, or only this
  * keyboard; rename: everyone follows; Appearance's Discard undoes it all; the one-time move gathers the sets' and themes'
  * copies; the factory reset's 4th tick covers them.
- * Keyboard A ("Work", enabled, edited) = set 1, B (French, enabled) = set 2, C (German, switched off) = set 3; separate
+ * Keyboard A ("Work", enabled, edited) = id k1, B (French, enabled) = k2, C (German, switched off) = k3; separate
  * settings, Appearance per keyboard.
  */
 @RunWith(RobolectricTestRunner::class)
 class CentralPalettesTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = ctx.realPrefs()
-    private val a = withKeyboardName(SettingsSubtype(Locale.US, ""), "Work")
+    private val a = withKeyboardName(SettingsSubtype(Locale.US, ""), "Work").withId(1)
     // (French: no built-in keyboard for fr-FR, the language's own locale has them; as GhostRecordsTest)
     private val b = SubtypeSettings.getAvailableSubtypeLocales().first { it.language == "fr" }
-        .let { SubtypeSettings.getResourceSubtypesForLocale(it).first().toSettingsSubtype() }
-    private val c = SubtypeSettings.getResourceSubtypesForLocale(Locale.GERMANY).first().toSettingsSubtype()
-    private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
-    private fun view(id: Int) = ProfilePreferences(real) { id }
+        .let { SubtypeSettings.getResourceSubtypesForLocale(it).first().toSettingsSubtype() }.withId(2)
+    private val c = SubtypeSettings.getResourceSubtypesForLocale(Locale.GERMANY).first().toSettingsSubtype().withId(3)
+    private fun own(id: Int, key: String) = idKey(id, key)
+    private fun view(id: Int) = ProfilePreferences(real) { kid(id) }
     private val day = Settings.PREF_THEME_COLORS
     private val night = Settings.PREF_THEME_COLORS_NIGHT
     private val warm = Settings.PREF_USER_COLORS_PREFIX + "Warm"
@@ -64,12 +64,10 @@ class CentralPalettesTest {
 
     @Before fun setUp() {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
-        assertEquals(1, KeyboardProfiles.idFor(real, a))
-        assertEquals(2, KeyboardProfiles.idFor(real, b))
-        assertEquals(3, KeyboardProfiles.idFor(real, c))
+        // (owner 2026-10-11: keyboards have unique ids; the sets are the ids', C switched off = in the added list only)
         real.edit {
             putBoolean("separate_settings_per_keyboard", true)
-            putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a)))
+            putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a, b, c)))
             putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a, b)))
             putString(Settings.PREF_SELECTED_SUBTYPE, a.toPref())
         }

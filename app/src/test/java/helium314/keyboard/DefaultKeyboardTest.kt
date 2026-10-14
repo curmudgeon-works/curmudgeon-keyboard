@@ -21,6 +21,8 @@ import org.robolectric.annotation.Implements
 import java.util.Locale
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 
 /** The phone's language list, as a test sets it. */
 @Implements(LocaleManagerCompat::class)
@@ -63,6 +65,9 @@ class DefaultKeyboardTest {
         assertEquals(listOf("fr"), stored().map { it.locale.language })
         assertEquals(stored().single().toPref(), real.getString(Settings.PREF_SELECTED_SUBTYPE, null))
         assertEquals(stored(), SubtypeSettings.getEnabledSubtypes(false).map { with(SettingsSubtype) { it.toSettingsSubtype() } })
+        // (owner 2026-10-11: keyboards have unique ids; the default is stored with a new one, in the added list too)
+        assertNotNull(stored().single().keyboardId)
+        assertEquals(stored(), SubtypeSettings.createSettingsSubtypes(real.getString(Settings.PREF_ADDITIONAL_SUBTYPES, "")!!))
     }
 
     @Test fun `a language-level dictionary counts`() {
@@ -80,11 +85,12 @@ class DefaultKeyboardTest {
         val default = stored().single()
         assertEquals(default, KeyboardProfiles.mainKeyboard(real))
         ProfilePreferences(real) { KeyboardProfiles.SHARED }.edit().putFloat(Settings.PREF_KEY_HORIZONTAL_GAP, 3f).commit()
-        assertEquals(3f, real.getFloat(KeyboardProfiles.ownKey(KeyboardProfiles.idFor(real, default), Settings.PREF_KEY_HORIZONTAL_GAP), 0f))
+        assertEquals(3f, real.getFloat(KeyboardProfiles.ownKey(default.keyboardId!!, Settings.PREF_KEY_HORIZONTAL_GAP), 0f))
     }
 
     @Test fun `a stored list is left as it is, and one found empty gets the default again`() {
         firstStart(Locale.FRANCE)
+        val firstId = stored().single().keyboardId
         val de = SubtypeSettings.getResourceSubtypesForLocale(Locale.GERMAN).first()
         SubtypeSettings.addEnabledSubtype(real, de)
         assertEquals(listOf("fr", "de"), stored().map { it.locale.language }) // (the default stays first)
@@ -93,5 +99,8 @@ class DefaultKeyboardTest {
         real.edit().putString(Settings.PREF_ENABLED_SUBTYPES, "").commit()
         SubtypeSettings.reloadEnabledSubtypes(ctx)
         assertEquals(listOf("fr"), stored().map { it.locale.language })
+        // (a new keyboard: a new id, 2026-10-11)
+        assertNotNull(stored().single().keyboardId)
+        assertNotEquals(firstId, stored().single().keyboardId)
     }
 }

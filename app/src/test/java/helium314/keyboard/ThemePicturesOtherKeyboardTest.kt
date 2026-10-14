@@ -24,15 +24,16 @@ import kotlin.test.assertTrue
 
 /** Review 2026-10-08 M5: a saved theme named its pictures by the saving keyboard's files (custom_background_image_p1),
  *  so on another keyboard none matched and applying it deleted that keyboard's pictures. Since 2026-10-10 the slots
- *  are the plain names; themes saved before (with the _p<id> names) still apply. Keyboard A = set 1, B = set 2. */
+ *  are the plain names; themes saved before (with the _p<id> names) still apply. Keyboard A = id k1, B = id k2 (owner
+ *  2026-10-11: keyboards have unique ids; their files are "_pk1", "_pk2"). */
 @RunWith(RobolectricTestRunner::class)
 class ThemePicturesOtherKeyboardTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
-    private val a = SettingsSubtype(Locale.US, "")
-    private val b = SettingsSubtype(Locale.GERMANY, "")
-    private val screenA = KeyboardScopeContext(ctx, 1) // (the screens editing each keyboard)
-    private val screenB = KeyboardScopeContext(ctx, 2)
+    private val a = SettingsSubtype(Locale.US, "").withId(1)
+    private val b = SettingsSubtype(Locale.GERMANY, "").withId(2)
+    private val screenA = KeyboardScopeContext(ctx, kid(1)) // (the screens editing each keyboard)
+    private val screenB = KeyboardScopeContext(ctx, kid(2))
 
     private fun live(c: Context) = Settings.getCustomBackgroundFile(c, false, false)
     private fun clearPictures() = DeviceProtectedUtils.getFilesDir(ctx).listFiles { f -> f.name.startsWith("custom_background_image") }
@@ -40,10 +41,8 @@ class ThemePicturesOtherKeyboardTest {
 
     @Before fun setUp() {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
-        assertEquals(1, KeyboardProfiles.idFor(real, a))
-        assertEquals(2, KeyboardProfiles.idFor(real, b))
         real.edit { putBoolean("separate_settings_per_keyboard", true) } // (Appearance per keyboard by default)
-        real.edit { putString(Settings.PREF_ENABLED_SUBTYPES, helium314.keyboard.latin.utils.SubtypeSettings.createPrefSubtypes(listOf(a, b))) } // (A first)
+        storeKeyboards(ctx, real, listOf(a, b)) // (A first)
         clearPictures()
     }
     @After fun tearDown() {
@@ -53,7 +52,7 @@ class ThemePicturesOtherKeyboardTest {
     }
 
     @Test fun `a theme saved on one keyboard puts its picture on another and leaves it untweaked`() {
-        assertEquals("custom_background_image_p1", live(screenA).name)
+        assertEquals("custom_background_image_pk1", live(screenA).name)
         live(screenA).apply { parentFile?.mkdirs(); writeText("picture A") }
         PictureFraming.fileFor(live(screenA)).writeText("framing A")
         val look = AppearanceLooks.Look("Photo", mapOf(AppearanceLooks.PICTURES to AppearanceLooks.savePictures(screenA)))
@@ -66,7 +65,7 @@ class ThemePicturesOtherKeyboardTest {
         // and with separate settings off (the first keyboard's files, A's: owner 2026-10-11, no separate common set; the
         // first keyboard's own settings are the common ones): the same theme applies there too
         real.edit { putBoolean("separate_settings_per_keyboard", false) }
-        assertEquals("custom_background_image_p1", live(ctx).name)
+        assertEquals("custom_background_image_pk1", live(ctx).name)
 
         AppearanceLooks.applyPictures(ctx, look)
         assertEquals("picture A", live(ctx).readText())

@@ -29,8 +29,8 @@ class ReviewLowTest1007 {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
 
-    @Before fun setUp() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real); HotWords.usePool(KeyboardProfiles.SHARED); HotWords.clear() }
-    @After fun tearDown() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real); HotWords.usePool(KeyboardProfiles.SHARED); HotWords.clear() }
+    @Before fun setUp() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real); HotWords.usePool(helium314.keyboard.latin.personalization.LearnedStores.SHARED); HotWords.clear() }
+    @After fun tearDown() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real); HotWords.usePool(helium314.keyboard.latin.personalization.LearnedStores.SHARED); HotWords.clear() }
 
     // b: a word typed three times on one keyboard isn't "hot" on a keyboard with its own learned words
     @Test fun `frequently typed words belong to the learned words in use`() {
@@ -45,8 +45,8 @@ class ReviewLowTest1007 {
 
     // c: a deleted keyboard isn't remembered for apps any more
     @Test fun `deleting a keyboard forgets it for each app`() {
-        val gone = SettingsSubtype(Locale.US, "MainLayout=dvorak")
-        val kept = SettingsSubtype(Locale.US, "")
+        val gone = SettingsSubtype(Locale.US, "MainLayout=dvorak").withId(1) // (owner 2026-10-11: keyboards have unique ids)
+        val kept = SettingsSubtype(Locale.US, "").withId(2)
         real.edit {
             putString(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX + "com.a", gone.toPref())
             putString(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX + "com.b", kept.toPref())
@@ -58,8 +58,8 @@ class ReviewLowTest1007 {
 
     // d: the keyboard in use deleted while the keyboard isn't running: the next one is selected, not a deleted one
     @Test fun `deleting the keyboard in use selects another even with the keyboard closed`() {
-        val a = SettingsSubtype(Locale.US, "")
-        val b = SettingsSubtype(Locale.GERMANY, "")
+        val a = SettingsSubtype(Locale.US, "").withId(1)
+        val b = SettingsSubtype(Locale.GERMANY, "").withId(2)
         real.edit {
             putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a, b)))
             putString(Settings.PREF_SELECTED_SUBTYPE, a.toPref())

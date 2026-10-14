@@ -21,6 +21,9 @@ import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.preferences.FontDeleteButton
 import helium314.keyboard.settings.screens.keyboardName
 import helium314.keyboard.settings.screens.withKeyboardName
+import helium314.keyboard.idKey
+import helium314.keyboard.storeKeyboards
+import helium314.keyboard.withId
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -35,28 +38,22 @@ import kotlin.test.assertTrue
 
 /** Owner 2026-10-11: global delete ("Global only let's do. With warning telling where it's being used, or mentioning
  *  it's not used anywhere"): the trash on a font always asks first; the question names every keyboard (the one being
- *  edited too) and saved theme that goes back to the default font, or says nothing uses it. Keyboard A ("Work") = set 1,
- *  B (German) = set 2. */
+ *  edited too) and saved theme that goes back to the default font, or says nothing uses it. Keyboard A ("Work") = id k1,
+ *  B (German) = id k2 (owner 2026-10-11: keyboards have unique ids). */
 @RunWith(RobolectricTestRunner::class)
 class FontDeleteTest {
     @get:Rule val compose = createEmptyComposeRule()
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = ctx.realPrefs()
-    private val a = withKeyboardName(SettingsSubtype(Locale.US, ""), "Work")
-    private val b = SubtypeSettings.getResourceSubtypesForLocale(Locale.GERMANY).first().toSettingsSubtype()
+    private val a = withKeyboardName(SettingsSubtype(Locale.US, ""), "Work").withId(1)
+    private val b = SubtypeSettings.getResourceSubtypesForLocale(Locale.GERMANY).first().toSettingsSubtype().withId(2)
     private val font get() = File(FontLibrary.dir(ctx), "Mine.ttf")
     private val value = FontLibrary.PREFIX + "Mine.ttf"
 
     @Before fun setUp() {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
-        assertEquals(1, KeyboardProfiles.idFor(real, a))
-        assertEquals(2, KeyboardProfiles.idFor(real, b))
-        real.edit {
-            putBoolean("separate_settings_per_keyboard", true)
-            putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a)))
-            putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a, b)))
-        }
-        SubtypeSettings.reloadEnabledSubtypes(ctx)
+        real.edit { putBoolean("separate_settings_per_keyboard", true) }
+        storeKeyboards(ctx, real, listOf(a, b)) // (A in use: the keyboard being edited)
         FontLibrary.dir(ctx).mkdirs(); font.writeText("not really a font")
     }
     @After fun tearDown() {
@@ -72,8 +69,8 @@ class FontDeleteTest {
 
     @Test fun `a font in use - the question names its keyboards and saved themes, Delete sends them all to the default`() {
         real.edit {
-            putString("p1/${Settings.PREF_KEY_FONT}", value) // (A, the keyboard being edited: named too)
-            putString("p2/${Settings.PREF_SUGGESTION_FONT}", value)
+            putString(idKey(1, Settings.PREF_KEY_FONT), value) // (A, the keyboard being edited: named too)
+            putString(idKey(2, Settings.PREF_SUGGESTION_FONT), value)
         }
         AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Sunset", mapOf(Settings.PREF_HINT_FONT to value))), now = true)
         open().use {
@@ -85,8 +82,8 @@ class FontDeleteTest {
             compose.waitForIdle()
         }
         assertFalse(font.exists())
-        assertEquals("default", real.getString("p1/${Settings.PREF_KEY_FONT}", null))
-        assertEquals("default", real.getString("p2/${Settings.PREF_SUGGESTION_FONT}", null))
+        assertEquals("default", real.getString(idKey(1, Settings.PREF_KEY_FONT), null))
+        assertEquals("default", real.getString(idKey(2, Settings.PREF_SUGGESTION_FONT), null))
         assertEquals("default", AppearanceLooks.load(real).single().values[Settings.PREF_HINT_FONT])
         assertFalse("Mine.ttf" in FontLibrary.names(ctx))
     }

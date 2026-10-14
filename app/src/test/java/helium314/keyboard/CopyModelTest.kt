@@ -38,22 +38,19 @@ import kotlin.test.assertTrue
 class CopyModelTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
-    private val us = SettingsSubtype(Locale.US, "")
-    private val fr = "fr:".toSettingsSubtype()
-    /** Enabled, never opened or picked: no set of its own yet, it reads the shared set (review 2026-10-11 C8). */
-    private val de = "de:".toSettingsSubtype()
-    private fun view(id: Int) = ProfilePreferences(real) { id }
-    private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
+    private val us = SettingsSubtype(Locale.US, "").withId(1)
+    private val fr = "fr:".toSettingsSubtype().withId(2)
+    /** Enabled, never opened or picked: no set entries of its own yet (review 2026-10-11 C8). */
+    private val de = "de:".toSettingsSubtype().withId(3)
+    // (owner 2026-10-11: keyboards have unique ids) k1..k3, sets "pk<n>/"; no id map
+    private fun view(n: Int) = ProfilePreferences(real) { kid(n) }
+    private fun own(n: Int, key: String) = idKey(n, key)
 
     @Before fun setUp() {
-        real.edit().clear()
-            .putBoolean("separate_settings_per_keyboard", true)
-            .putString("keyboard_profile_ids", JSONObject().put(us.toPref(), 1).put(fr.toPref(), 2).toString())
-            .putInt("keyboard_profile_next_id", 3)
-            // (US first: its set is the common one; owner 2026-10-11: no separate common set; the first keyboard's own
-            // settings are the common ones)
-            .putString(Settings.PREF_ENABLED_SUBTYPES, helium314.keyboard.latin.utils.SubtypeSettings.createPrefSubtypes(listOf(us, fr, de)))
-            .commit()
+        real.edit().clear().putBoolean("separate_settings_per_keyboard", true).commit()
+        // (US first: its set is the common one; owner 2026-10-11: no separate common set; the first keyboard's own
+        // settings are the common ones)
+        storeKeyboards(ctx, real, listOf(us, fr, de), selected = null, reload = false)
         KeyboardProfiles.loadGroups(real)
     }
     @After fun tearDown() { AppearanceDraft.close(); helium314.keyboard.settings.LayoutDraft.close(); real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
@@ -150,7 +147,7 @@ class CopyModelTest {
     }
 
     @Test fun `a theme's pictures on a ticked keyboard come back on Discard`() {
-        val picture = KeyboardProfiles.pictureFiles(ctx, 2).first()
+        val picture = KeyboardProfiles.pictureFiles(ctx, kid(2)).first()
         picture.parentFile?.mkdirs(); picture.writeText("old picture")
         val noPictures = AppearanceLooks.Look("Plain", mapOf(AppearanceLooks.PICTURES to ""))
         AppearanceDraft.of(ctx)
@@ -191,7 +188,7 @@ class CopyModelTest {
     @Test fun `an updated Layout reaches a ticked keyboard that has no set of its own yet`() {
         real.edit().putString(own(1, LayoutPresets.PREF_SELECTED), "Work").commit() // (US's: the common one)
         LayoutPresets.applyToOther(ctx, de, LayoutPresets.Preset("Work", mapOf(Settings.PREF_SHOW_NUMBER_ROW to true)))
-        assertEquals(3, KeyboardProfiles.anyIdIn(real.all, de))
+        assertTrue(KeyboardProfiles.hasOwnEntries(real, kid(3))) // (its set: under its own id)
         assertEquals(true, real.all[own(3, Settings.PREF_SHOW_NUMBER_ROW)])
         assertEquals("Work", real.getString(own(3, LayoutPresets.PREF_SELECTED), null))
         assertNull(real.all[own(1, Settings.PREF_SHOW_NUMBER_ROW)]) // (US's: not changed)
@@ -200,7 +197,7 @@ class CopyModelTest {
     @Test fun `an updated theme reaches a ticked keyboard that has no set of its own yet`() {
         real.edit().putString(own(1, AppearanceLooks.PREF_SELECTED), "Sunset").commit()
         AppearanceLooks.applyToOther(ctx, de, AppearanceLooks.Look("Sunset", mapOf(Settings.PREF_KEY_HORIZONTAL_GAP to 3f)))
-        assertEquals(3, KeyboardProfiles.anyIdIn(real.all, de))
+        assertTrue(KeyboardProfiles.hasOwnEntries(real, kid(3))) // (its set: under its own id)
         assertEquals(3f, real.all[own(3, Settings.PREF_KEY_HORIZONTAL_GAP)])
         assertEquals("Sunset", real.getString(own(3, AppearanceLooks.PREF_SELECTED), null))
     }
@@ -208,8 +205,9 @@ class CopyModelTest {
     @Test fun `an updated popup set reaches a ticked keyboard that has no set of its own yet`() {
         real.edit().putString(own(1, KeyPopupOverrides.PREF_SELECTED_SET), "Mine").commit()
         applySetToOther(ctx, de, KeyPopupOverrides.UserSet("Mine", "all", null, mapOf("e" to listOf("é")), "q!", "x"), takeNew = true)
-        // (its identity took the set's accents level: the set moved with it)
-        assertEquals(3, KeyboardProfiles.idEntries(real)[de.with(helium314.keyboard.latin.common.Constants.Subtype.ExtraValue.MORE_POPUPS, "all").toPref()])
+        // (it took the set's accents level, its id kept: the set stays its own; owner 2026-10-11: keyboards have unique
+        // ids, before the set moved to the changed identity)
+        assertEquals(de.with(helium314.keyboard.latin.common.Constants.Subtype.ExtraValue.MORE_POPUPS, "all"), listedById(real, kid(3)))
         assertEquals(mapOf("e" to listOf("é")), KeyPopupOverrides.load(view(3)))
         assertEquals("q!", real.getString(own(3, Settings.PREF_SYMBOL_POPUP_MAP), null))
         assertEquals("Mine", real.getString(own(3, KeyPopupOverrides.PREF_SELECTED_SET), null))
@@ -221,7 +219,7 @@ class CopyModelTest {
         real.edit().putBoolean("separate_settings_per_keyboard", false).putString(warm, "new").putString(own(1, Settings.PREF_THEME_COLORS), "Warm").commit()
         helium314.keyboard.settings.Palettes.afterEdit(real, "Warm", mapOf(Settings.PREF_USER_COLORS_PREFIX to "old"),
             mapOf(de to helium314.keyboard.settings.Palettes.Choice.KEEP_OLD), emptyMap())
-        assertEquals(3, KeyboardProfiles.anyIdIn(real.all, de))
+        assertTrue(KeyboardProfiles.hasOwnEntries(real, kid(3))) // (its set: under its own id)
         assertEquals("Warm 2", real.getString(own(3, Settings.PREF_THEME_COLORS), null))
         assertEquals("old", real.getString(Settings.PREF_USER_COLORS_PREFIX + "Warm 2", null))
         assertEquals("Warm", real.getString(own(1, Settings.PREF_THEME_COLORS), null)) // (US's, the common one: still the palette)

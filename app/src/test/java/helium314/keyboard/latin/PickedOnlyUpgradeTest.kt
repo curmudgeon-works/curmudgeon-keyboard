@@ -5,13 +5,17 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import androidx.test.core.app.ApplicationProvider
+import helium314.keyboard.idKey
+import helium314.keyboard.kid
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.KeyboardProfiles.TOMBSTONE
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.settings.AppearanceLooks
 import helium314.keyboard.settings.LayoutPresets
 import helium314.keyboard.settings.SettingDefaults
+import helium314.keyboard.withId
 import org.junit.Before
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -31,8 +35,9 @@ class PickedOnlyUpgradeTest {
     private val color = Settings.PREF_SUGGESTION_TEXT_COLOR
     private val symbolAction = Settings.PREF_LONG_PRESS_SYMBOL_ACTION
     private val numpad = Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD
-    private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
-    private fun mark(id: Int, key: String) = KeyboardProfiles.ownKey(id, TOMBSTONE + key)
+    // (owner 2026-10-11: keyboards have unique ids; a set is "p<id>/", found by its stored entries, no id map)
+    private fun own(id: Int, key: String) = idKey(id, key)
+    private fun mark(id: Int, key: String) = KeyboardProfiles.ownKey(kid(id), TOMBSTONE + key)
 
     @Before fun setUp() {
         prefs = ctx.getSharedPreferences("picked_only_test_${System.nanoTime()}", Context.MODE_PRIVATE)
@@ -67,7 +72,6 @@ class PickedOnlyUpgradeTest {
     // (owner 2026-10-11: no default marks; nothing stored = the default)
     @Test fun `every keyboard's own set, in use or not, is unset too - no mark`() {
         prefs.edit {
-            putString("keyboard_profile_ids", """{"en_US:":1,"hi_ZZ:":2}""")
             putBoolean("separate_settings_per_keyboard", false) // the sets are kept in the background
             putString(popups, "more") // the shared set: a pick
             putString(own(1, popups), "all") // keyboard 1: at the old default
@@ -85,7 +89,6 @@ class PickedOnlyUpgradeTest {
 
     @Test fun `long-press ?123 stays where the old numpad switch is on`() {
         prefs.edit {
-            putString("keyboard_profile_ids", """{"en_US:":1,"hi_ZZ:":2}""")
             putBoolean(numpad, true) // shared: on
             putString(symbolAction, "none")
             putBoolean(own(1, numpad), false) // keyboard 1: off
@@ -130,7 +133,6 @@ class PickedOnlyUpgradeTest {
     @Test fun `the older look and key sounds follow the new defaults too, saved themes and Layouts keep theirs`() {
         val black = helium314.keyboard.keyboard.KeyboardTheme.THEME_BLACK
         prefs.edit {
-            putString("keyboard_profile_ids", """{"en_US:":1}""")
             putString(Settings.PREF_THEME_COLORS, black); putString(Settings.PREF_THEME_COLORS_NIGHT, black)
             putBoolean(Settings.PREF_THEME_DAY_NIGHT, false)
             putBoolean(Settings.PREF_VIBRATE_ON, true); putBoolean(Settings.PREF_SOUND_ON, false) // sound off: a pick (not the old default)
@@ -164,6 +166,7 @@ class PickedOnlyUpgradeTest {
     @Test fun `long press 300, no backspace speed-up and portrait bottom padding 100 percent follow the defaults from 0_3_007`() {
         val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
         fun padding(i: Int) = helium314.keyboard.latin.settings.createPrefKeyForBooleanSettings(Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX, i, 2)
+        val en = helium314.keyboard.latin.utils.SubtypeUtilsAdditional.createDefaultSubtype(java.util.Locale.US).toSettingsSubtype()
         val old = mapOf<String, Any>(Settings.PREF_KEY_LONGPRESS_TIMEOUT to 300, Settings.PREF_BACKSPACE_SPEED_UP to false,
             padding(0) to 1f, padding(1) to 0f, padding(2) to 1f, padding(3) to 0f)
         fun store(e: SharedPreferences.Editor, key: String, value: Any) =
@@ -173,20 +176,25 @@ class PickedOnlyUpgradeTest {
             real.edit().clear().commit()
             real.edit {
                 putInt(Settings.PREF_VERSION_CODE, 3007)
-                putString("keyboard_profile_ids", """{"en_US:":2}""")
+                putString(Settings.PREF_ENABLED_SUBTYPES, en.withId(2).toPref())
+                putString(Settings.PREF_ADDITIONAL_SUBTYPES, en.withId(2).toPref())
                 for ((key, value) in old) { store(this, key, value); store(this, own(2, key), value) }
             }
             checkVersionUpgrade(ctx)
             for (key in old.keys) {
                 assertFalse(real.contains(key), key)
-                assertFalse(real.contains(own(2, key)), "p2/$key")
+                assertFalse(real.contains(own(2, key)), "pk2/$key")
             }
             for (key in listOf(Settings.PREF_KEY_LONGPRESS_TIMEOUT, Settings.PREF_BACKSPACE_SPEED_UP, padding(0), padding(2)))
-                assertFalse(real.contains(mark(2, key)), "p2/~$key") // (owner 2026-10-11: no default marks; nothing stored = the default)
+                assertFalse(real.contains(mark(2, key)), "pk2/~$key") // (owner 2026-10-11: no default marks; nothing stored = the default)
 
             // a phone that went through 0.3.008: 300 since then is a pick, and stays
             real.edit().clear().commit()
-            real.edit { putInt(Settings.PREF_VERSION_CODE, 3008); putBoolean(PICKED_ONLY_DONE, true); for ((key, value) in old) store(this, key, value) }
+            real.edit {
+                putInt(Settings.PREF_VERSION_CODE, 3008); putBoolean(PICKED_ONLY_DONE, true); for ((key, value) in old) store(this, key, value)
+                putString(Settings.PREF_ENABLED_SUBTYPES, en.withId(1).toPref())
+                putString(Settings.PREF_ADDITIONAL_SUBTYPES, en.withId(1).toPref())
+            }
             checkVersionUpgrade(ctx)
             // (in the first keyboard's set now, which had none: owner 2026-10-11, no separate common set; the first
             // keyboard's own settings are the common ones)
@@ -194,9 +202,9 @@ class PickedOnlyUpgradeTest {
             for ((key, value) in old.filterKeys { it != padding(1) && it != padding(3) }) assertEquals(value, first[key], key)
         } finally { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
         // one keyboard restored on its own from a 0.3.007 backup
-        val keyboard = helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.US, "")
-        val restored = helium314.keyboard.settings.preferences.restoredSettings(ctx,
-            old.mapKeys { "p1/${it.key}" } + ("keyboard_profile_ids" to """{"${keyboard.toPref()}":1}"""), keyboard)
+        // (a backup's old "p<n>/" sets get ids when it is read: here as read)
+        val keyboard = helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.US, "").withId(1)
+        val restored = helium314.keyboard.settings.preferences.restoredSettings(ctx, old.mapKeys { idKey(1, it.key) }, keyboard)
 
         for (key in old.keys) assertNull(restored[key], key)
     }

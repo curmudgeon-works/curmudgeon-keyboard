@@ -9,7 +9,6 @@ import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.settings.CustomLabels
-import org.json.JSONObject
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -25,7 +24,8 @@ import kotlin.test.assertFalse
  * their own back (owner 2026-10-11: "Edits made while a menu is shared should only affect the main keyboard who's menu
  * is indeed being changed. So B."). For one menu and for the main switch alike. (owner 2026-10-11: no separate common
  * set; the first keyboard's own settings are the common ones: English, first in the list, is that keyboard, its own set
- * the one edited meanwhile; nothing is handed back.)
+ * the one edited meanwhile; nothing is handed back.) (owner 2026-10-11: keyboards have unique ids) English is "k1",
+ * Hindi "k2"; no id map.
  */
 @RunWith(RobolectricTestRunner::class)
 class SharedEditsStayTest {
@@ -34,16 +34,15 @@ class SharedEditsStayTest {
     private val appearance = KeyboardProfiles.Group.APPEARANCE
     private val gap = Settings.PREF_KEY_HORIZONTAL_GAP
     private val label = CustomLabels.Kind.THEME.key
-    private val english = SettingsSubtype(Locale.US, "")
-    private val hindi = SettingsSubtype(Locale.forLanguageTag("hi-IN"), "")
-    private fun view(id: Int) = ProfilePreferences(real) { id }
+    private val english = SettingsSubtype(Locale.US, "").withId(1)
+    private val hindi = SettingsSubtype(Locale.forLanguageTag("hi-IN"), "").withId(2)
+    private fun view(n: Int) = ProfilePreferences(real) { kid(n) }
 
     @Before fun setUp() {
         real.edit().clear()
             .putBoolean("separate_settings_per_keyboard", true)
-            .putString("keyboard_profile_ids", JSONObject().put(english.toPref(), 1).put(hindi.toPref(), 2).toString())
-            .putInt("keyboard_profile_next_id", 3)
             .putString(Settings.PREF_ENABLED_SUBTYPES, helium314.keyboard.latin.utils.SubtypeSettings.createPrefSubtypes(listOf(english, hindi)))
+            .putString(Settings.PREF_ADDITIONAL_SUBTYPES, helium314.keyboard.latin.utils.SubtypeSettings.createPrefSubtypes(listOf(english, hindi)))
             .commit()
         KeyboardProfiles.loadGroups(real)
         KeyboardProfiles.filesDir = DeviceProtectedUtils.getFilesDir(ctx)
@@ -78,7 +77,7 @@ class SharedEditsStayTest {
         KeyboardProfiles.onKeyboardDeleted(real, english)
         unshare()
         assertEquals(4f, view(2).getFloat(gap, 0f))
-        assertEquals(false, real.contains(KeyboardProfiles.ownKey(1, gap)))
+        assertEquals(false, real.contains(idKey(1, gap)))
     }
 
     // (owner 2026-10-11: labels are just "Custom", no number; only kept palettes are numbered)
@@ -89,13 +88,13 @@ class SharedEditsStayTest {
         CustomLabels.mark(view(1), CustomLabels.Kind.THEME)
         unshare()
         assertEquals(CustomLabels.SET, view(1).getInt(label, 0))
-        assertEquals(CustomLabels.SET, real.getInt(KeyboardProfiles.ownKey(1, label), 0), "English lost the label") // (its own, not a fallback)
+        assertEquals(CustomLabels.SET, real.getInt(idKey(1, label), 0), "English lost the label") // (its own, not a fallback)
         assertEquals(CustomLabels.SET, view(2).getInt(label, 0))
     }
 
     @Test fun `a picture changed while shared goes to the keyboard shared from`() {
         val dir = KeyboardProfiles.filesDir!!
-        fun pic(id: Int) = File(dir, "custom_background_image" + if (id == KeyboardProfiles.SHARED) "" else "_p$id")
+        fun pic(n: Int) = File(dir, "custom_background_image_p" + kid(n))
         pic(1).writeText("one"); pic(2).writeText("two")
         share(1)
         assertEquals(pic(1), KeyboardProfiles.profileFile(ctx, "custom_background_image")) // (the shared picture: English's)

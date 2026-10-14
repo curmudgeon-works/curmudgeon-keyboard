@@ -13,7 +13,6 @@ import helium314.keyboard.settings.AppearanceDraft
 import helium314.keyboard.settings.AppearanceLooks
 import helium314.keyboard.settings.LayoutPresets
 import helium314.keyboard.settings.SavedItemDefaults
-import org.json.JSONObject
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -37,23 +36,22 @@ class ReReview2S4Test {
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
     private val longPress = Settings.PREF_KEY_LONGPRESS_TIMEOUT
     private val gap = Settings.PREF_KEY_HORIZONTAL_GAP
-    private val us = SettingsSubtype(Locale.US, "")
-    private val fr = SettingsSubtype(Locale.FRANCE, "")
+    private val us = SettingsSubtype(Locale.US, "").withId(1)
+    private val fr = SettingsSubtype(Locale.FRANCE, "").withId(2)
 
     @Before fun setUp() { real.edit().clear().commit() }
     @After fun tearDown() { AppearanceDraft.close(); real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
 
-    private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
-    private fun mark(id: Int, key: String) = KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + key)
-    private fun view(id: Int) = ProfilePreferences(real) { id }
+    private fun own(id: Int, key: String) = idKey(id, key)
+    private fun mark(id: Int, key: String) = idKey(id, KeyboardProfiles.TOMBSTONE + key)
+    private fun view(id: Int) = ProfilePreferences(real) { kid(id) }
 
-    /** Separate settings, keyboard 1 (US); saved Layout Work (long press at its default, 300 when saved) and theme
-     *  Sunset (gap at its default, 0.5 when saved). */
+    /** Separate settings, keyboards k1 (US) and k2 (French) listed (owner 2026-10-11: keyboards have unique ids; a set is
+     *  its keyboard id's, no id map); saved Layout Work (long press at its default, 300 when saved) and theme Sunset (gap
+     *  at its default, 0.5 when saved). */
     private fun separateWithWorkAndSunset() {
-        real.edit().putBoolean("separate_settings_per_keyboard", true)
-            .putString("keyboard_profile_ids", JSONObject().put(us.toPref(), 1).put(fr.toPref(), 2).toString())
-            .putString(Settings.PREF_ENABLED_SUBTYPES, helium314.keyboard.latin.utils.SubtypeSettings.createPrefSubtypes(listOf(us, fr)))
-            .commit()
+        real.edit().putBoolean("separate_settings_per_keyboard", true).commit()
+        storeKeyboards(ctx, real, listOf(us, fr))
         KeyboardProfiles.loadGroups(real)
         LayoutPresets.save(real, listOf(LayoutPresets.Preset("Work", mapOf(longPress to null), remembered = mapOf(longPress to 300))))
         AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Sunset", mapOf(gap to null), mapOf(gap to 0.5f))), now = true)

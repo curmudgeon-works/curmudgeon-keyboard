@@ -22,6 +22,7 @@ import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.RemovedWords
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.reviveComposeMainDispatcher
+import helium314.keyboard.withId
 import helium314.keyboard.settings.SettingsActivity
 import helium314.keyboard.settings.screens.Item
 import helium314.keyboard.settings.screens.Kind
@@ -82,7 +83,7 @@ class LearnedWordsBatchDeleteTest {
         deleteLearnedFiles(ctx.filesDir)
         real.edit().clear().commit()
         SubtypeSettings.init(ctx)
-        useKeyboards(ctx, real, available("en-US"))
+        useKeyboards(ctx, real, available("en-US").withId(1))
         store = RemovableHistory(ctx, "Latn", pool)
         PersonalizationHelper.setForTest("Latn", pool, store)
         LearnedStores.storeFile(ctx.filesDir, "Latn", pool).mkdirs()

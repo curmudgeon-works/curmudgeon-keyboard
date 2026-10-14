@@ -180,7 +180,9 @@ class SubtypeState(private val switchToSubtype: (InputMethodSubtype?) -> Unit) {
 
     fun switchSubtype(richImm: RichInputMethodManager) {
         val currentSubtype = richImm.currentSubtype.rawSubtype
-        val lastActiveSubtype = lastActiveSubtype
+        // (the keyboard as it is now: one changed since is the same subtype, its id, with other keys; owner 2026-10-11,
+        // keyboards have unique ids)
+        val lastActiveSubtype = lastActiveSubtype?.let { last -> SubtypeSettings.getEnabledSubtypes(true).firstOrNull { it == last } ?: last }
         val oldCurrentSubtypeHasBeenUsed = currentSubtypeHasBeenUsed
         if (oldCurrentSubtypeHasBeenUsed) {
             this@SubtypeState.lastActiveSubtype = currentSubtype

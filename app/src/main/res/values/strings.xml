@@ -635,8 +635,6 @@
     <string name="font_delete_theme">theme %s</string>
     <!-- a keyboard in that list, or in a palette's update question, switched off on the Languages screen (its own settings kept); %s = its name -->
     <string name="keyboard_switched_off">%s (switched off)</string>
-    <!-- rename, languages or layout would make a keyboard exactly another one (its settings and words would mix): not changed; %s = that keyboard's name, maybe "<name> (switched off)" -->
-    <string name="keyboard_definition_taken">Not changed: %s is already set up like this</string>
     <!-- deleting an added dictionary other keyboards use: not allowed -->
     <string name="dictionary_in_use_title">“%s” is in use</string>
     <string name="dictionary_in_use_message">These keyboards use it too, so it stays:\n%s</string>
@@ -663,11 +661,11 @@
     <string name="restore_merge_title">Restoring %s</string>
     <string name="restore_merge_message">This phone has a keyboard of the same language. Merge the backup\'s keyboard into one of them, or keep it as a separate keyboard?</string>
     <string name="restore_keep_separate">Keep as a separate keyboard</string>
+    <!-- after a phone keyboard on the restore's first question: it has the backup keyboard's id (a hint, nothing preselected) -->
+    <string name="restore_same_keyboard_hint">(same keyboard as in the backup)</string>
     <string name="restore_next">Next</string>
     <!-- the name box of a merged or separate keyboard -->
     <string name="restore_name">Name</string>
-    <!-- %s: the other keyboard's name -->
-    <string name="restore_same_as">This would be the same as your other %s keyboard: change the name or what you merge</string>
     <!-- what to merge: %s the phone keyboard's name -->
     <string name="restore_differs_choose">What to merge into %s</string>
     <!-- what to merge: the backup keyboard's learned and blacklisted words, both, one row as the restore brings them -->
@@ -826,11 +824,6 @@
     <string name="saved_items_take_new_defaults_on">Settings left at their default in saved Layouts, themes and popup sets take the latest defaults</string>
     <string name="saved_items_take_new_defaults_off">Saved Layouts, themes and popup sets apply every setting as saved, even after an update changes a default</string>
     <string name="saved_items_take_new_defaults_when">Applied now to the keyboards using your saved Layouts, themes and popup sets.</string>
-    <!-- Asked before the switch above would make two keyboards the same (review S3 2026-10-11) -->
-    <string name="saved_items_rename_title">Rename to keep keyboards apart?</string>
-    <string name="saved_items_rename_one">Changing this makes two keyboards the same. %s so they stay separate.</string>
-    <string name="saved_items_rename_many">Changing this makes some keyboards the same. So they stay separate:\n%s</string>
-    <string name="saved_items_rename_line">%1$s will be renamed %2$s</string>
     <!-- Title of the setting to show key hints -->
     <string name="show_hints">Hide symbols on keys</string>
     <!-- Description of the settings to show hints -->

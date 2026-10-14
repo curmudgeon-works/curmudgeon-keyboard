@@ -11,9 +11,10 @@ import helium314.keyboard.latin.common.Constants.Separators
 import helium314.keyboard.latin.common.Constants.Subtype.ExtraValue
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Defaults.default
-import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.latin.settings.KeyboardIds
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
+import helium314.keyboard.latin.settings.SettingsSubtype.Companion.getExtraValueOf
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.latin.utils.LayoutType.Companion.toExtraValue
 import helium314.keyboard.latin.utils.ScriptUtils.script
@@ -31,7 +32,10 @@ object SubtypeUtilsAdditional {
         val mainLayoutName = LayoutType.getMainLayoutFromExtraValue(extraValue) ?: "qwerty"
         val nameId = getNameResId(locale, mainLayoutName)
         val fullExtraValue = extraValue + "," + getAdditionalExtraValues(locale, mainLayoutName, isAsciiCapable, isEmojiCapable)
-        val subtypeId = getSubtypeId(locale, fullExtraValue, isAsciiCapable)
+        // a keyboard with an id: Android's subtype id from it, so a rename or other keys keep it the same keyboard
+        // (owner 2026-10-11, keyboards have unique ids); a built-in definition: from the definition, as before
+        val subtypeId = extraValue.getExtraValueOf(ExtraValue.KEYBOARD_ID)?.let { KeyboardIds.androidSubtypeId(it) }
+            ?: getSubtypeId(locale, fullExtraValue, isAsciiCapable)
         val builder = InputMethodSubtypeBuilder()
             .setSubtypeNameResId(nameId)
             .setSubtypeIconResId(R.drawable.ic_ime_switcher)
@@ -70,7 +74,7 @@ object SubtypeUtilsAdditional {
         val oldAdditionalSubtypesString = prefs.getString(Settings.PREF_ADDITIONAL_SUBTYPES, Defaults.PREF_ADDITIONAL_SUBTYPES)!!
         val oldAdditionalSubtypes = SubtypeSettings.createSettingsSubtypes(oldAdditionalSubtypesString)
         val settingsSubtype = subtype.toSettingsSubtype()
-        val newAdditionalSubtypes = oldAdditionalSubtypes.filter { it != settingsSubtype }
+        val newAdditionalSubtypes = oldAdditionalSubtypes.filter { !it.sameKeyboard(settingsSubtype) } // (by its id)
         val newAdditionalSubtypesString = SubtypeSettings.createPrefSubtypes(newAdditionalSubtypes)
         prefs.edit { putString(Settings.PREF_ADDITIONAL_SUBTYPES, newAdditionalSubtypesString) }
         LayoutUtilsCustom.removeUnusedPrivateLayouts(context) // its own copy of a deleted layout goes with it
@@ -88,19 +92,25 @@ object SubtypeUtilsAdditional {
         return k
     }
 
-    fun changeAdditionalSubtype(from: SettingsSubtype, to: SettingsSubtype, context: Context) {
+    /**
+     * Keyboard [from] becomes [to] (rename, keys, languages, accents), in its place in the lists, the selected keyboard
+     * and the apps' memory. It keeps its id (owner 2026-10-11, keyboards have unique ids: its settings, pictures and
+     * learned words are found by it, nothing moves; [to] without one gets [from]'s). [from] == [to]: registers it.
+     */
+    fun changeAdditionalSubtype(from: SettingsSubtype, givenTo: SettingsSubtype, context: Context) {
+        val to = if (givenTo.keyboardId == null && from.keyboardId != null) givenTo.withIdOf(from).toPref().toSettingsSubtype() else givenTo
         helium314.keyboard.latin.utils.SettingsEventLog.log("keyboard changed: ${from.toPref()} -> ${to.toPref()}")
         if (from != to) { changedTo.remove(to.toPref()); changedTo[from.toPref()] = to.toPref() }
         val prefs = context.prefs()
-        KeyboardProfiles.onKeyboardChanged(context.realPrefs(), from, to)
         // read now because there may be an intermediate state where the subtype is invalid and thus removed
-        val isSelected = prefs.getString(Settings.PREF_SELECTED_SUBTYPE, Defaults.PREF_SELECTED_SUBTYPE)!!.toSettingsSubtype() == from
+        // (by its id: the lists may hold it as it was before an earlier change)
+        val isSelected = prefs.getString(Settings.PREF_SELECTED_SUBTYPE, Defaults.PREF_SELECTED_SUBTYPE)!!.toSettingsSubtype().sameKeyboard(from)
         val isEnabled = prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!.split(Separators.SETS)
-            .any { it.toSettingsSubtype() == from }
+            .any { it.isNotEmpty() && it.toSettingsSubtype().sameKeyboard(from) }
         val additionalSubtypes = SubtypeSettings.createSettingsSubtypes(prefs.getString(Settings.PREF_ADDITIONAL_SUBTYPES, Defaults.PREF_ADDITIONAL_SUBTYPES)!!)
             .toMutableList()
-        additionalSubtypes.remove(from)
-        if (!to.isSameAsDefault() && to !in additionalSubtypes) { // (once: it can be another keyboard's definition)
+        additionalSubtypes.removeAll { it.sameKeyboard(from) || it.sameKeyboard(to) }
+        if (!to.isSameAsDefault() && to !in additionalSubtypes) {
             // We only add the "to" subtype if it's not equal to a resource subtype.
             // This means we make additional subtype disappear as magically as it was added if all settings are default.
             // If we don't do this, enabling the base subtype will result in the additional subtype being enabled,
@@ -116,12 +126,13 @@ object SubtypeUtilsAdditional {
             val enabled = SubtypeSettings.createSettingsSubtypes(prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!)
                 .toMutableList()
             // a changed keyboard keeps its place in the list (the order is also the switching order)
-            val index = enabled.indexOf(from)
+            val index = enabled.indexOfFirst { it.sameKeyboard(from) }
             if (index >= 0) enabled[index] = to else enabled.add(to)
             editor.putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(enabled))
         }
+        // (the apps find it by its id anyway: their entries name it as it is now)
         prefs.all.filterKeys { it.startsWith(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX) }
-            .filterValues { it.toString().toSettingsSubtype() == from }.forEach { editor.putString(it.key, to.toPref()) }
+            .filterValues { it.toString().toSettingsSubtype().sameKeyboard(from) }.forEach { editor.putString(it.key, to.toPref()) }
         editor.apply()
         SubtypeSettings.reloadEnabledSubtypes(context)
         LayoutUtilsCustom.removeUnusedPrivateLayouts(context) // switched away from its own copy of a deleted layout

@@ -16,7 +16,6 @@ import helium314.keyboard.settings.AppearanceDraft
 import helium314.keyboard.settings.AppearanceLooks
 import helium314.keyboard.settings.LayoutPresets
 import helium314.keyboard.settings.SavedItemDefaults
-import org.json.JSONObject
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -32,6 +31,7 @@ import kotlin.test.assertTrue
  * read a mark meant what nothing stored means: the default. A remove just removes; a pick equal to the default is stored
  * (owner 2026-10-06, "stored = picked"); the one-time step removes the old marks. Keyboard 1 (US) is the first in the
  * list: its own set is the common settings; keyboard 2 (French).
+ * (owner 2026-10-11: keyboards have unique ids) keyboard n is "k<n>", its set "pk<n>/"; no id map.
  */
 @RunWith(RobolectricTestRunner::class)
 class NoDefaultMarksTest {
@@ -39,20 +39,19 @@ class NoDefaultMarksTest {
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
     private val longPress = Settings.PREF_KEY_LONGPRESS_TIMEOUT
     private val gap = Settings.PREF_KEY_HORIZONTAL_GAP
-    private val us = SettingsSubtype(Locale.US, "")
-    private val fr = SettingsSubtype(Locale.FRANCE, "")
+    private val us = SettingsSubtype(Locale.US, "").withId(1)
+    private val fr = SettingsSubtype(Locale.FRANCE, "").withId(2)
 
-    private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
-    private fun mark(id: Int, key: String) = KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + key)
-    private fun view(id: Int) = ProfilePreferences(real) { id }
+    private fun own(n: Int, key: String) = idKey(n, key)
+    private fun mark(n: Int, key: String) = KeyboardProfiles.ownKey(kid(n), KeyboardProfiles.TOMBSTONE + key)
+    private fun view(n: Int) = ProfilePreferences(real) { kid(n) }
     private fun marks() = real.all.keys.filter { KeyboardProfiles.splitOwnKey(it)?.second?.startsWith(KeyboardProfiles.TOMBSTONE) == true }
 
     @Before fun setUp() {
         real.edit().clear()
             .putBoolean("separate_settings_per_keyboard", true)
-            .putString("keyboard_profile_ids", JSONObject().put(us.toPref(), 1).put(fr.toPref(), 2).toString())
-            .putInt("keyboard_profile_next_id", 3)
             .putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(us, fr)))
+            .putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(us, fr)))
             .commit()
         KeyboardProfiles.loadGroups(real)
     }
@@ -84,7 +83,7 @@ class NoDefaultMarksTest {
         assertEquals(default, real.getInt(own(2, longPress), -1))
         val changedDefault = default + 100 // (a later release's default: what the reader passes)
         assertEquals(default, view(2).getInt(longPress, changedDefault), "the pick followed the new default")
-        KeyboardProfiles.copy(real, 2, 1) // (a copy keeps it a pick)
+        KeyboardProfiles.copy(real, kid(2), kid(1)) // (a copy keeps it a pick)
         assertEquals(default, real.getInt(own(1, longPress), -1))
         // "Default" makes it follow again
         view(2).edit().remove(longPress).commit()
@@ -164,19 +163,18 @@ class NoDefaultMarksTest {
     // (e)
     @Test fun `a keyboard restored from a backup lacking a key - the key leaves the target set, no mark`() {
         real.edit().putInt(own(2, longPress), 400).putFloat(own(2, gap), 3f).commit()
-        // an older backup: French with its own gap, its long press marked at the default
-        val backup = mapOf<String, Any?>("keyboard_profile_ids" to JSONObject().put(fr.toPref(), 7).toString(),
-            own(7, gap) to 1f, mark(7, longPress) to true)
-        val settings = KeyboardProfiles.effectiveSettingsIn(backup, fr)
+        // an older backup: French ("k7" there) with its own gap, its long press marked at the default
+        val backup = mapOf<String, Any?>(own(7, gap) to 1f, mark(7, longPress) to true)
+        val settings = KeyboardProfiles.effectiveSettingsIn(backup, fr.withoutIds().withId(7))
         assertEquals(mapOf<String, Any?>(gap to 1f), settings)
-        KeyboardProfiles.restoreSet(real, 2, settings)
+        KeyboardProfiles.restoreSet(real, kid(2), settings)
         assertFalse(real.contains(own(2, longPress)), "the phone's long press stayed")
         assertEquals(1f, real.getFloat(own(2, gap), 0f))
         assertEquals(emptyList(), marks())
         assertEquals(Defaults.PREF_KEY_LONGPRESS_TIMEOUT, view(2).getInt(longPress, Defaults.PREF_KEY_LONGPRESS_TIMEOUT))
         // partly: only the menus taken; a key of another menu stays
         real.edit().putInt(own(2, longPress), 400).commit()
-        KeyboardProfiles.restoreSet(real, 2, mapOf(gap to 2f)) { it == gap }
+        KeyboardProfiles.restoreSet(real, kid(2), mapOf(gap to 2f)) { it == gap }
         assertEquals(400, real.getInt(own(2, longPress), 0))
         assertEquals(2f, real.getFloat(own(2, gap), 0f))
     }

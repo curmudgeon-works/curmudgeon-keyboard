@@ -173,8 +173,8 @@ private fun DictionaryDetails(dict: File, locale: Locale, keyboard: helium314.ke
  *  asking: the old Dictionaries screen, which nothing opens; there all but one, so a dictionary one keyboard uses can go.) */
 internal fun dictionaryUsers(context: android.content.Context, locale: Locale,
                              keyboard: helium314.keyboard.latin.settings.SettingsSubtype?): List<helium314.keyboard.latin.settings.SettingsSubtype> {
-    val users = allDictionaryUsers(context, locale)
-    return if (keyboard != null) users.filter { it != keyboard } else if (users.size < 2) emptyList() else users
+    val users = allDictionaryUsers(context, locale) // (the edited keyboard left out by its id)
+    return if (keyboard != null) users.filter { !it.sameKeyboard(keyboard) } else if (users.size < 2) emptyList() else users
 }
 
 /** Every keyboard with [locale] as its language or a second one: the enabled ones, then the switched-off ones (owner

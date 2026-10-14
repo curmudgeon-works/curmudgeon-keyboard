@@ -4,8 +4,8 @@ package helium314.keyboard
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import helium314.keyboard.latin.personalization.available
-import helium314.keyboard.latin.personalization.profileIds
 import helium314.keyboard.latin.personalization.useKeyboards
+import helium314.keyboard.latin.settings.KeyboardIdUpgrade
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.ProfilePreferences
 import helium314.keyboard.latin.settings.Settings
@@ -17,7 +17,6 @@ import helium314.keyboard.settings.preferences.hiddenSettingsNote
 import helium314.keyboard.settings.preferences.restoreKeyboardsFrom
 import helium314.keyboard.settings.preferences.settingsToJsonStream
 import helium314.keyboard.settings.screens.keyboardName
-import org.json.JSONObject
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -46,17 +45,16 @@ class ReReview2R7Test {
     private lateinit var en: SettingsSubtype
     private lateinit var hi: SettingsSubtype
     private val de get() = available("de-DE")
-    private fun view(id: Int) = ProfilePreferences(real) { id }
-    private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
+    private fun view(id: Int) = ProfilePreferences(real) { kid(id) }
+    private fun own(id: Int, key: String) = idKey(id, key)
 
     @Before fun setUp() {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real); KeyboardProfiles.filesDir = null
         SubtypeSettings.init(ctx)
-        en = available("en-US"); hi = available("hi")
-        // the phone: English (1) and Hindi (2) on one set for all (gap 2, auto-caps off): English's, the first keyboard's
+        en = available("en-US").withId(1); hi = available("hi").withId(2)
+        // the phone: English (k1) and Hindi (k2) on one set for all (gap 2, auto-caps off): English's, the first keyboard's
         // (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones)
         useKeyboards(ctx, real, en, hi)
-        profileIds(real, mapOf(en to 1, hi to 2), 3)
         real.edit().putFloat(own(1, gap), 2f).putBoolean(own(1, autoCap), false).commit()
         KeyboardProfiles.disable(real)
 
@@ -64,12 +62,18 @@ class ReReview2R7Test {
     }
     @After fun tearDown() { zip.delete(); real.edit().clear().commit(); KeyboardProfiles.loadGroups(real); SubtypeSettings.reloadEnabledSubtypes(ctx) }
 
+    // the backup's (another phone's) English and Hindi: ids k6 and k7 (owner 2026-10-11: keyboards have unique ids; the
+    // sets are the ids', no id map)
+    private val enInBackup get() = en.withId(6)
+    private val hiInBackup get() = hi.withId(7)
+
     private fun backup() {
+        val list = SubtypeSettings.createPrefSubtypes(listOf(enInBackup, hiInBackup))
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("preferences.json"))
-            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to SubtypeSettings.createPrefSubtypes(listOf(en, hi)),
-                Settings.PREF_SELECTED_SUBTYPE to en.toPref(), "separate_settings_per_keyboard" to true,
-                "keyboard_profile_ids" to JSONObject().put(en.toPref(), 6).put(hi.toPref(), 7).toString(), "keyboard_profile_next_id" to 8,
+            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to list, Settings.PREF_ADDITIONAL_SUBTYPES to list,
+                Settings.PREF_SELECTED_SUBTYPE to enInBackup.toPref(), "separate_settings_per_keyboard" to true,
+                KeyboardIdUpgrade.DONE to true,
                 gap to 3f, own(7, gap) to 5f, own(7, autoCap) to true,
                 helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
                 helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
@@ -79,12 +83,12 @@ class ReReview2R7Test {
 
     /** Everything outside Hindi's own set that is a keyboard's setting: the common set and the other keyboards' sets. */
     private fun outsideHindi() = real.all.filterKeys { stored ->
-        KeyboardProfiles.splitOwnKey(stored)?.let { it.first != 2 } ?: !KeyboardProfiles.isAppWide(stored) }
+        KeyboardProfiles.splitOwnKey(stored)?.let { it.first != kid(2) } ?: !KeyboardProfiles.isAppWide(stored) }
 
     @Test fun `with one set for all, Hindi's settings wait in its own set, separate settings stay off, and come on with them`() {
         backup()
         val before = outsideHindi()
-        val (_, hidden) = restoreKeyboardsFrom(ctx, zip, listOf(hi), withSettings = true, decisions = mapOf(hi to RestoreDecision.Merge(hi)))
+        val (_, hidden) = restoreKeyboardsFrom(ctx, zip, listOf(hiInBackup), withSettings = true, decisions = mapOf(hiInBackup to RestoreDecision.Merge(hi)))
         assertFalse(KeyboardProfiles.isSeparate(real), "the restore turned separate settings on")
         assertEquals(before, outsideHindi())
         assertEquals(2f, view(1).getFloat(gap, 0f)); assertEquals(2f, view(2).getFloat(gap, 0f)) // (one set for all)
@@ -111,7 +115,7 @@ class ReReview2R7Test {
     @Test fun `with separate settings on, nothing to say`() {
         real.edit().putBoolean("separate_settings_per_keyboard", true).commit()
         backup()
-        val (_, hidden) = restoreKeyboardsFrom(ctx, zip, listOf(hi), withSettings = true, decisions = mapOf(hi to RestoreDecision.Merge(hi)))
+        val (_, hidden) = restoreKeyboardsFrom(ctx, zip, listOf(hiInBackup), withSettings = true, decisions = mapOf(hiInBackup to RestoreDecision.Merge(hi)))
         assertEquals(emptyList(), hidden)
         assertNull(hiddenSettingsNote(ctx, hidden))
     }

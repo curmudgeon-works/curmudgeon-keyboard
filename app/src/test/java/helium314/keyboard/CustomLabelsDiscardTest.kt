@@ -14,7 +14,6 @@ import helium314.keyboard.settings.CustomLabels
 import helium314.keyboard.settings.LayoutDraft
 import helium314.keyboard.settings.LayoutPresets
 import helium314.keyboard.settings.screens.deletePopupSet
-import org.json.JSONObject
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -34,7 +33,7 @@ import kotlin.test.assertTrue
 class CustomLabelsDiscardTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
-    private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
+    private fun own(n: Int, key: String) = idKey(n, key) // (keyboard "k<n>"'s own set)
     private val theme = CustomLabels.Kind.THEME.key
     private val layout = CustomLabels.Kind.LAYOUT.key
     private val popups = CustomLabels.Kind.POPUPS.key
@@ -44,7 +43,6 @@ class CustomLabelsDiscardTest {
     @Before fun setUp() {
         real.edit().clear()
             .putBoolean("separate_settings_per_keyboard", true)
-            .putString("keyboard_profile_ids", JSONObject().put("a", 1).put("b", 2).toString())
             .putString(own(2, AppearanceLooks.PREF_SELECTED), "Sunset")
             .putString(own(2, LayoutPresets.PREF_SELECTED), "Work")
             .putString(own(2, KeyPopupOverrides.PREF_SELECTED_SET), "Mine")
@@ -77,7 +75,7 @@ class CustomLabelsDiscardTest {
 
     @Test fun `a Custom label alone is no unsaved change on Appearance, and Discard takes it back`() {
         val draft = AppearanceDraft.of(ctx)
-        CustomLabels.mark(ProfilePreferences(real) { 2 }, CustomLabels.Kind.THEME)
+        CustomLabels.mark(ProfilePreferences(real) { kid(2) }, CustomLabels.Kind.THEME)
         CustomLabels.mark(real, CustomLabels.Kind.THEME) // (a plain one too, as the old common set had; no common set since 2026-10-11)
         assertFalse(draft.hasChanges(ctx))
         AppearanceDraft.rejectOpen(ctx)
@@ -118,7 +116,7 @@ class CustomLabelsDiscardTest {
 
     @Test fun `a Custom label alone is no unsaved change on Layout and Typing`() {
         val draft = LayoutDraft.of(ctx, "en_US:")
-        CustomLabels.mark(ProfilePreferences(real) { 2 }, CustomLabels.Kind.LAYOUT)
+        CustomLabels.mark(ProfilePreferences(real) { kid(2) }, CustomLabels.Kind.LAYOUT)
         assertFalse(draft.hasChanges(ctx))
         LayoutDraft.rejectOpen(ctx)
         assertFalse(real.contains(own(2, layout)))

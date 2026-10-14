@@ -28,31 +28,23 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /** The delete questions of a Layout, theme or popup set name the keyboards that use it (2026-10-08): what each reads now,
- *  or what its own set keeps, hidden or not; one per line, never "all keyboards". Keyboard A (named "Work") = set 1,
- *  B (languages only) = set 2. */
+ *  or what its own set keeps, hidden or not; one per line, never "all keyboards". Keyboard A (named "Work") = id k1,
+ *  B (languages only) = id k2 (owner 2026-10-11: keyboards have unique ids). */
 @RunWith(RobolectricTestRunner::class)
 class DeleteWarningTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
-    private val a = withKeyboardName(SettingsSubtype(Locale.US, ""), "Work")
-    private val b = SubtypeSettings.getResourceSubtypesForLocale(Locale.GERMANY).first().toSettingsSubtype()
+    private val a = withKeyboardName(SettingsSubtype(Locale.US, ""), "Work").withId(1)
+    private val b = SubtypeSettings.getResourceSubtypesForLocale(Locale.GERMANY).first().toSettingsSubtype().withId(2)
     private val layout = LayoutPresets.PREF_SELECTED
 
     private fun using(keyboards: List<SettingsSubtype>, key: String, name: String) =
         KeyboardProfiles.keyboardsUsing(real, keyboards, listOf(key)) { _, value -> value == name }
 
-    private fun enable(vararg keyboards: SettingsSubtype) {
-        real.edit {
-            putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes((listOf(a) + keyboards).filter { it != b }))
-            putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(keyboards.toList()))
-        }
-        SubtypeSettings.reloadEnabledSubtypes(ctx)
-    }
+    private fun enable(vararg keyboards: SettingsSubtype) = storeKeyboards(ctx, real, keyboards.toList())
 
     @Before fun setUp() {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
-        assertEquals(1, KeyboardProfiles.idFor(real, a))
-        assertEquals(2, KeyboardProfiles.idFor(real, b))
         enable(a, b) // (A first: its set is the common one with one set for all or a shared menu)
         real.edit { putBoolean("separate_settings_per_keyboard", true) }
     }
@@ -65,17 +57,17 @@ class DeleteWarningTest {
     // (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones: A's, set 1. A
     // plain value is no one's)
     @Test fun `separate settings on - each keyboard's own choice, nobody reads the shared one`() {
-        real.edit { putString(layout, "Y"); putString("p1/$layout", "X"); putString("p2/$layout", "X") }
+        real.edit { putString(layout, "Y"); putString(idKey(1, layout), "X"); putString(idKey(2, layout), "X") }
         assertEquals(listOf(a, b), using(listOf(a, b), layout, "X"))
         assertEquals(listOf(b, a), using(listOf(b, a), layout, "X")) // the list's order
         assertEquals(emptyList(), using(listOf(a, b), layout, "Y"))
-        real.edit { remove("p2/$layout") } // B has nothing of its own: nothing chosen, not A's
+        real.edit { remove(idKey(2, layout)) } // B has nothing of its own: nothing chosen, not A's
         assertEquals(listOf(a), using(listOf(a, b), layout, "X"))
         assertEquals(emptyList(), using(listOf(a, b), layout, "Y"))
     }
 
     @Test fun `separate settings off - every keyboard reads the shared one, and a hidden own set still counts`() {
-        real.edit { putBoolean("separate_settings_per_keyboard", false); putString("p1/$layout", "Y"); putString("p2/$layout", "X") }
+        real.edit { putBoolean("separate_settings_per_keyboard", false); putString(idKey(1, layout), "Y"); putString(idKey(2, layout), "X") }
         assertEquals(listOf(a, b), using(listOf(a, b), layout, "Y"))
         assertEquals(listOf(b), using(listOf(a, b), layout, "X"))
     }
@@ -83,7 +75,7 @@ class DeleteWarningTest {
     @Test fun `a shared menu - both read the shared value, an own value hidden behind it still counts`() {
         real.edit { putBoolean(KeyboardProfiles.Group.LAYOUT.prefKey, true) }
         KeyboardProfiles.loadGroups(real)
-        real.edit { putString("p1/${KeyPopupOverrides.PREF_SELECTED_SET}", "S"); putString("p2/${KeyPopupOverrides.PREF_SELECTED_SET}", "T") }
+        real.edit { putString(idKey(1, KeyPopupOverrides.PREF_SELECTED_SET), "S"); putString(idKey(2, KeyPopupOverrides.PREF_SELECTED_SET), "T") }
         assertEquals(listOf(a, b), using(listOf(a, b), KeyPopupOverrides.PREF_SELECTED_SET, "S"))
         assertEquals(listOf(b), using(listOf(a, b), KeyPopupOverrides.PREF_SELECTED_SET, "T"))
     }
@@ -91,31 +83,35 @@ class DeleteWarningTest {
     // (owner 2026-10-11: no default marks; nothing stored = the default)
     @Test fun `nothing stored - the keyboard reads nothing chosen, not the shared one`() {
         val key = AppearanceLooks.PREF_SELECTED
-        real.edit { putString("p1/$key", "X") }
+        real.edit { putString(idKey(1, key), "X") }
         assertEquals(listOf(a), using(listOf(a, b), key, "X"))
         real.edit { putBoolean("separate_settings_per_keyboard", false) } // the mark hidden: B reads A's
         assertEquals(listOf(a, b), using(listOf(a, b), key, "X"))
     }
 
+    // (owner 2026-10-11: keyboards have unique ids; the old id map is gone: a lookup writes nothing at all)
     @Test fun `no ids are made`() {
         val c = SettingsSubtype(Locale.FRANCE, "")
-        val ids = real.getString("keyboard_profile_ids", null)
-        real.edit { putString("p1/$layout", "X") }
-        assertEquals(listOf(c), using(listOf(c), layout, "X")) // (no set of its own: it reads the common settings)
-        assertEquals(ids, real.getString("keyboard_profile_ids", null))
+        real.edit { putString(idKey(1, layout), "X") }
+        val before = real.all.toMap()
+        assertEquals(listOf(c), using(listOf(c), layout, "X")) // (no id, no set of its own: it reads the common settings)
+        assertEquals(before, real.all.toMap())
+        assertNull(c.keyboardId)
     }
 
-    // review A4: while a Layout is previewed the edited keyboard has the previewed identity; an old entry for that
-    // identity in the ids map names another set, so the keyboard was left out
+    // review A4: while a Layout is previewed the edited keyboard has the previewed definition; an old ids-map entry for
+    // it named another set, so the keyboard was left out. (owner 2026-10-11: keyboards have unique ids; the previewed
+    // definition keeps A's id, so it is named with or without the edited keyboard)
     @Test fun `a previewed keyboard with an old ids entry is still named, through the set being edited`() {
         val previewed = a.withLayout(helium314.keyboard.latin.utils.LayoutType.MAIN, "dvorak")
-        assertEquals(3, KeyboardProfiles.idFor(real, previewed)) // the old entry
+        assertEquals(kid(1), previewed.keyboardId)
         enable(previewed, b)
-        val screenOfSet1 = helium314.keyboard.latin.settings.KeyboardScopeContext(ctx, 1) // (the screen editing set 1)
-        real.edit { putString("p1/$layout", "X") }
+        val screenOfA = helium314.keyboard.latin.settings.KeyboardScopeContext(ctx, kid(1)) // (the screen editing A's set)
+        real.edit { putString(idKey(1, layout), "X") }
         assertEquals("This keyboard keeps its settings, shown as Custom. Nothing goes back to the default:\nWork",
-            deleteKeepersText(screenOfSet1, R.plurals.delete_keeps_layout, layout, "X", edited = previewed))
-        assertNull(deleteKeepersText(screenOfSet1, R.plurals.delete_keeps_layout, layout, "X")) // no keyboard edited: the map
+            deleteKeepersText(screenOfA, R.plurals.delete_keeps_layout, layout, "X", edited = previewed))
+        assertEquals("This keyboard keeps its settings, shown as Custom. Nothing goes back to the default:\nWork",
+            deleteKeepersText(screenOfA, R.plurals.delete_keeps_layout, layout, "X")) // no keyboard edited: by its id
     }
 
     @Test fun `the text names each keyboard - its name, or its languages`() {
@@ -132,17 +128,17 @@ class DeleteWarningTest {
     @Test fun `the dialog text lists the enabled keyboards using it, in the Keyboards screen's order`() {
         enable(b, a)
         val bName = keyboardName(b, ctx)
-        real.edit { putString("p1/$layout", "X"); putString("p2/$layout", "X"); putString(layout, "Y") }
+        real.edit { putString(idKey(1, layout), "X"); putString(idKey(2, layout), "X"); putString(layout, "Y") }
         assertEquals("These keyboards keep its settings, shown as Custom. Nothing goes back to the default:\n$bName\nWork",
             deleteKeepersText(ctx, R.plurals.delete_keeps_layout, layout, "X"))
         assertNull(deleteKeepersText(ctx, R.plurals.delete_keeps_layout, layout, "Y"))
         // separate settings off: every enabled keyboard reads the first one's (B's), each named
-        real.edit { putBoolean("separate_settings_per_keyboard", false); putString("p2/$layout", "Y") }
+        real.edit { putBoolean("separate_settings_per_keyboard", false); putString(idKey(2, layout), "Y") }
 
         assertEquals("These keyboards keep its settings, shown as Custom. Nothing goes back to the default:\n$bName\nWork",
             deleteKeepersText(ctx, R.plurals.delete_keeps_layout, layout, "Y"))
         val set = KeyPopupOverrides.PREF_SELECTED_SET
-        real.edit { putString("p1/$set", "S") } // hidden
+        real.edit { putString(idKey(1, set), "S") } // hidden
         assertEquals("This keyboard keeps its popups, shown as Custom:\nWork",
             deleteKeepersText(ctx, R.plurals.delete_keeps_popup_set, set, "S"))
     }

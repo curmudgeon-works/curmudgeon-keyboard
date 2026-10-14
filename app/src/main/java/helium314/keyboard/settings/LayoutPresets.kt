@@ -53,7 +53,8 @@ object LayoutPresets {
 
     // the saved popup sets (app-wide), the keyboard list, and what an entry of its own covers
     private val notInPresets = setOf("key_popup_sets", PREF_SELECTED,
-        Settings.PREF_ADDITIONAL_SUBTYPES, Settings.PREF_ENABLED_SUBTYPES, Settings.PREF_SELECTED_SUBTYPE, "keyboard_profile_ids")
+        Settings.PREF_ADDITIONAL_SUBTYPES, Settings.PREF_ENABLED_SUBTYPES, Settings.PREF_SELECTED_SUBTYPE,
+        helium314.keyboard.latin.settings.KeyboardIdUpgrade.OLD_IDS) // (the old id map: read by the one-time upgrade only)
     private val prefixes = LayoutDraft.prefixes.filter { it != Settings.PREF_SAVED_APP_SUBTYPE_PREFIX }
 
     fun inScope(key: String) = !KeyboardProfiles.isAppWide(key) && key !in notInPresets

@@ -28,27 +28,26 @@ import kotlin.test.assertEquals
 /** Owner 2026-10-11 ("should fix this fo sho"): a keyboard switched off on the Languages screen keeps its own set, and
  *  a palette saved with new colors reached it unasked; the update question names it, "<name> (switched off)", and
  *  keeping the old colors it gets them as "Warm 2" (owner 2026-10-11: palettes are one app-wide list; was "Custom N").
- *  Keyboard A ("Work", enabled, edited) = set 1, B (German, switched off) = set 2, its own set chose "Warm". */
+ *  Keyboard A ("Work", enabled, edited) = id k1, B (German, switched off) = id k2 (owner 2026-10-11: keyboards have
+ *  unique ids), its own set chose "Warm". */
 @RunWith(RobolectricTestRunner::class)
 class ReReview2PaletteOffTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = ctx.realPrefs()
-    private val a = withKeyboardName(SettingsSubtype(Locale.US, ""), "Work")
-    private val b = SubtypeSettings.getResourceSubtypesForLocale(Locale.GERMANY).first().toSettingsSubtype()
+    private val a = withKeyboardName(SettingsSubtype(Locale.US, ""), "Work").withId(1)
+    private val b = SubtypeSettings.getResourceSubtypesForLocale(Locale.GERMANY).first().toSettingsSubtype().withId(2)
     private val warm = Settings.PREF_USER_COLORS_PREFIX + "Warm"
-    private val bChoice = KeyboardProfiles.ownKey(2, Settings.PREF_THEME_COLORS)
+    private val bChoice = idKey(2, Settings.PREF_THEME_COLORS)
 
     @Before fun setUp() {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
-        assertEquals(1, KeyboardProfiles.idFor(real, a))
-        assertEquals(2, KeyboardProfiles.idFor(real, b))
         real.edit {
             putBoolean("separate_settings_per_keyboard", true)
-            putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a)))
+            putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a, b))) // (B switched off: in the added list only)
             putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a)))
             putString(Settings.PREF_SELECTED_SUBTYPE, a.toPref())
             putString(warm, "new") // (saved with new colors; the editor opened on "old")
-            putString(KeyboardProfiles.ownKey(1, Settings.PREF_THEME_COLORS), "Warm")
+            putString(idKey(1, Settings.PREF_THEME_COLORS), "Warm")
             putString(bChoice, "Warm")
         }
         SubtypeSettings.reloadEnabledSubtypes(ctx)
@@ -74,7 +73,7 @@ class ReReview2PaletteOffTest {
         assertEquals("Warm 2", real.getString(bChoice, null))
         assertEquals("old", real.getString(Settings.PREF_USER_COLORS_PREFIX + "Warm 2", null)) // (on the app-wide list)
         assertEquals("new", real.getString(warm, null))
-        assertEquals("Warm", real.getString(KeyboardProfiles.ownKey(1, Settings.PREF_THEME_COLORS), null)) // (the edited one: new)
+        assertEquals("Warm", real.getString(idKey(1, Settings.PREF_THEME_COLORS), null)) // (the edited one: new)
     }
 
     @Test fun `with one set of settings it is named too, and its own choice keeps the old colors`() {

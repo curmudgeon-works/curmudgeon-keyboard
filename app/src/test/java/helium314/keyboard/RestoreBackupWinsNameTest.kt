@@ -3,6 +3,7 @@ package helium314.keyboard
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import helium314.keyboard.latin.settings.KeyboardIdUpgrade
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
@@ -42,13 +43,14 @@ import kotlin.test.assertFalse
  * (b) the same content under another name: ticked, the phone's is renamed to the backup's name everywhere; unticked,
  * nothing renamed, the restored keyboard names the phone's.
  * The restore dialog's dry run names them as the real run does (R3, R6).
+ * (owner 2026-10-11: keyboards have unique ids) The phone's keyboard is "k1", the backup's "k2"; their sets "pk1/", "pk2/".
  */
 @RunWith(RobolectricTestRunner::class)
 class RestoreBackupWinsNameTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
-    private val phoneKeyboard = SettingsSubtype(Locale.GERMANY, "")
-    private val restored = SettingsSubtype(Locale.US, "")
+    private val phoneKeyboard = SettingsSubtype(Locale.GERMANY, "").withId(1)
+    private val restored = SettingsSubtype(Locale.US, "").withId(2)
     private val zip by lazy { File(ctx.cacheDir, "backup-wins-${System.nanoTime()}.zip") }
     private val gap = Settings.PREF_KEY_HORIZONTAL_GAP
     private val numberRow = Settings.PREF_SHOW_NUMBER_ROW
@@ -66,7 +68,7 @@ class RestoreBackupWinsNameTest {
         SubtypeSettings.reloadEnabledSubtypes(ctx)
     }
 
-    /** The phone: [phoneKeyboard] (set 1) with [own] in its set, [extra] app-wide; the keyboard list and its
+    /** The phone: [phoneKeyboard] ("k1") with [own] in its set, [extra] app-wide; the keyboard list and its
      *  registration in one write (no listener between them). */
     private fun phone(own: Map<String, Any?>, extra: Map<String, Any?> = emptyMap()) {
         real.edit().apply {
@@ -74,26 +76,25 @@ class RestoreBackupWinsNameTest {
             putString(Settings.PREF_ADDITIONAL_SUBTYPES, phoneKeyboard.toPref())
             putString(Settings.PREF_SELECTED_SUBTYPE, phoneKeyboard.toPref())
             putBoolean("separate_settings_per_keyboard", true)
-            putString("keyboard_profile_ids", JSONObject().put(phoneKeyboard.toPref(), 1).toString())
-            putInt("keyboard_profile_next_id", 2)
-            for ((key, value) in own) KeyboardProfiles.put(this, KeyboardProfiles.ownKey(1, key), value)
+            for ((key, value) in own) KeyboardProfiles.put(this, idKey(1, key), value)
             for ((key, value) in extra) KeyboardProfiles.put(this, key, value)
         }.commit()
         KeyboardProfiles.loadGroups(real); KeyboardProfiles.refreshImeId(real)
         SubtypeSettings.reloadEnabledSubtypes(ctx)
     }
 
-    /** The backup: [restored] with a set of its own (id 1) holding [own], plus [extra] backup-wide. */
+    /** The backup: [restored] ("k2") with a set of its own holding [own], plus [extra] backup-wide. */
     private fun backup(own: Map<String, Any?>, extra: Map<String, Any?> = emptyMap()) {
         val values = HashMap<String?, Any?>()
         values[Settings.PREF_ENABLED_SUBTYPES] = restored.toPref()
+        values[Settings.PREF_ADDITIONAL_SUBTYPES] = restored.toPref()
         values["separate_settings_per_keyboard"] = true
-        values["keyboard_profile_ids"] = JSONObject().put(restored.toPref(), 1).toString()
+        values[KeyboardIdUpgrade.DONE] = true
         values[KeyboardProfiles.NO_COMMON_SET_DONE] = true
         values[helium314.keyboard.latin.PICKED_ONLY_DONE] = true
         values[helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE] = true
         values[helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE] = true
-        for ((key, value) in own) values[KeyboardProfiles.ownKey(1, key)] = value
+        for ((key, value) in own) values[idKey(2, key)] = value
         values.putAll(extra)
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("preferences.json"))
@@ -112,16 +113,16 @@ class RestoreBackupWinsNameTest {
         .put("overrides", JSONObject().put("a", JSONArray(listOf(a))))
     private fun sets(vararg s: JSONObject) = KeyPopupOverrides.PREF_SETS to JSONArray(s.toList()).toString()
 
-    private fun restoredId() = KeyboardProfiles.idEntries(real).getValue(restored.toPref())
-    private fun restoredOwn(key: String) = real.all[KeyboardProfiles.ownKey(restoredId(), key)]
-    private fun phoneOwn(key: String) = real.all[KeyboardProfiles.ownKey(1, key)]
+    private fun restoredOwn(key: String) = real.all[idKey(2, key)] // (it keeps the backup's id)
+    private fun phoneOwn(key: String) = real.all[idKey(1, key)]
     /** Every stored choice of [key] (any set) naming [name]. */
     private fun naming(key: String, name: String) = real.all.filter { (k, v) -> v == name && (k == key || k.endsWith("/$key")) }.keys
     private fun unticked(vararg keys: Pair<Kind, String>) = SavedItemsMerge.Choices(keys.toSet())
-    /** Restores [restored] as [names] says; once on the phone, merged into itself (else it would be the same keyboard
-     *  as the phone's, and not restored). */
+    /** Restores [restored] as [names] says; once on the phone, merged into itself, as it is there (unanswered it would
+     *  come in as another keyboard with its id, and the phone's would get a new one; owner 2026-10-11: keyboards have
+     *  unique ids). */
     private fun restore(names: SavedItemsMerge.Choices = SavedItemsMerge.Choices()) {
-        val decisions = if (KeyboardProfiles.idEntries(real).containsKey(restored.toPref())) mapOf(restored to RestoreDecision.Merge(restored)) else emptyMap()
+        val decisions = listedById(real, kid(2))?.let { mapOf(restored to RestoreDecision.Merge(it)) } ?: emptyMap()
         restoreKeyboardsFrom(ctx, zip, listOf(restored), withSettings = true, names = names, decisions = decisions)
     }
 

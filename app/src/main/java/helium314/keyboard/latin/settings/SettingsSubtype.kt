@@ -68,14 +68,43 @@ data class SettingsSubtype(val locale: Locale, val extraValues: String) {
         else with(KEYBOARD_LAYOUT_SET, map.toExtraValue())
     }
 
+    // (a keyboard with an id: by its id, whatever its definition now; owner 2026-10-11, keyboards have unique ids)
     fun isAdditionalSubtype(prefs: SharedPreferences) =
         prefs.getString(Settings.PREF_ADDITIONAL_SUBTYPES, Defaults.PREF_ADDITIONAL_SUBTYPES)!!
-            .split(Separators.SETS).contains(toPref())
+            .split(Separators.SETS).any { it.isNotEmpty() && it.toSettingsSubtype().sameKeyboard(this) }
 
     fun isSameAsDefault() = SubtypeSettings.getResourceSubtypesForLocale(locale).any { it.toSettingsSubtype() == this.toPref().toSettingsSubtype() }
 
     fun toEnabledSubtype(): InputMethodSubtype? =
-        SubtypeSettings.getEnabledSubtypes().firstOrNull { it.toSettingsSubtype() == this }
+        SubtypeSettings.getEnabledSubtypes().firstOrNull { it.toSettingsSubtype().sameKeyboard(this) }
+
+    /** The keyboard's id (owner 2026-10-11: "do IDs now"), null for a definition without one (a built-in keyboard of the
+     *  language list). Equality stays the definition: [sameKeyboard] is "this keyboard". */
+    val keyboardId: String? get() = getExtraValueOf(ExtraValue.KEYBOARD_ID)
+
+    /** The id of the keyboard this one came from (a copy's original), null if none: kept, not used. */
+    val keyboardFrom: String? get() = getExtraValueOf(ExtraValue.KEYBOARD_FROM)
+
+    /** Whether [other] is the same keyboard: the same id; two definitions without one, the same definition. */
+    fun sameKeyboard(other: SettingsSubtype?): Boolean {
+        if (other == null) return false
+        val id = keyboardId
+        val otherId = other.keyboardId
+        return if (id != null || otherId != null) id == otherId else this == other
+    }
+
+    /** This definition with keyboard id [id] and came-from [from] (none: no KeyboardFrom). */
+    fun withKeyboardId(id: String, from: String? = null): SettingsSubtype =
+        with(ExtraValue.KEYBOARD_ID, id).let { if (from == null) it.without(ExtraValue.KEYBOARD_FROM) else it.with(ExtraValue.KEYBOARD_FROM, from) }
+
+    /** This definition with the id and came-from of [keyboard] (what a change of a keyboard keeps). */
+    fun withIdOf(keyboard: SettingsSubtype): SettingsSubtype {
+        val id = keyboard.keyboardId ?: return without(ExtraValue.KEYBOARD_ID).without(ExtraValue.KEYBOARD_FROM)
+        return withKeyboardId(id, keyboard.keyboardFrom)
+    }
+
+    /** The definition without its id and came-from: what the keyboard is set up as. */
+    fun withoutIds(): SettingsSubtype = without(ExtraValue.KEYBOARD_ID).without(ExtraValue.KEYBOARD_FROM)
 
     companion object {
         fun String.toSettingsSubtype(): SettingsSubtype =

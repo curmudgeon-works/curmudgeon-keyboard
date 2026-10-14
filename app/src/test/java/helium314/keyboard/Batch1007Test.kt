@@ -102,24 +102,24 @@ class Batch1007Test {
 
     @Test fun `Cancel leaves a keyboard's own set as it was, the shared value not copied in`() {
         real.edit().putBoolean("separate_settings_per_keyboard", true).putInt(Settings.PREF_GESTURE_TRAIL_COLOR, 0xFF0000FF.toInt()).commit()
-        val own = ProfilePreferences(real) { 1 }
+        val own = ProfilePreferences(real) { kid(1) }
         val key = Settings.PREF_GESTURE_TRAIL_COLOR
-        val snapshot = RawPrefSnapshot(real, 1, listOf(key))
+        val snapshot = RawPrefSnapshot(real, kid(1), listOf(key))
         own.edit { putInt(key, 0xFF00FF00.toInt()) } // the picker previews a color
         snapshot.restore() // Cancel
-        assertFalse(real.contains("p1/$key"), "the shared color was written into keyboard 1's own set")
-        assertFalse(real.contains("p1/${KeyboardProfiles.TOMBSTONE}$key"))
+        assertFalse(real.contains(idKey(1, key)), "the shared color was written into keyboard 1's own set")
+        assertFalse(real.contains(idKey(1, KeyboardProfiles.TOMBSTONE + key)))
         // (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones: nothing of its
         // own is the default, not a common value)
         assertEquals(0, own.getInt(key, 0), "keyboard 1 isn't at its default")
 
         // and a keyboard's own value comes back as its own
         own.edit { putInt(key, 0xFF111111.toInt()) }
-        val again = RawPrefSnapshot(real, 1, listOf(key))
+        val again = RawPrefSnapshot(real, kid(1), listOf(key))
         own.edit { remove(key) }
         again.restore()
-        assertEquals(0xFF111111.toInt(), real.getInt("p1/$key", 0))
-        assertFalse(real.contains("p1/${KeyboardProfiles.TOMBSTONE}$key"))
+        assertEquals(0xFF111111.toInt(), real.getInt(idKey(1, key), 0))
+        assertFalse(real.contains(idKey(1, KeyboardProfiles.TOMBSTONE + key)))
     }
 
     // (review finding 11, one slot for the editing callback: the callback and the global it watched are gone, 2026-10-09;

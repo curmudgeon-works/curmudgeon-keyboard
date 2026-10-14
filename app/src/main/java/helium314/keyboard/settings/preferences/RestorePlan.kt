@@ -50,15 +50,16 @@ internal sealed class RestoreDecision {
         }
 
         /** What the phone's keyboard becomes merged with [incoming] (the backup's keyboard as it comes in), before its name
-         *  box: the ticked parts the backup's, its name and copy number the phone's. */
+         *  box: the ticked parts the backup's, its name and copy number the phone's, and its id (owner 2026-10-11: a merge
+         *  keeps the phone keyboard's id). */
         fun merged(merge: Merge, incoming: SettingsSubtype): SettingsSubtype {
             val keyboard = RestoreMatch.definition(merge.replace, incoming)
-            if (merge.parts != null) return keyboard
+            if (merge.parts != null) return keyboard.withIdOf(merge.phone).toPref().toSettingsSubtype()
             // (the backup's whole: under the phone keyboard's name, as the name box shows it)
             var kb = keyboard
             for (key in listOf(ExtraValue.KEYBOARD_NAME, ExtraValue.KEYBOARD_COPY))
                 kb = merge.phone.getExtraValueOf(key)?.let { kb.with(key, it) } ?: kb.without(key)
-            return kb.toPref().toSettingsSubtype() // (sorted, as stored)
+            return kb.withIdOf(merge.phone).toPref().toSettingsSubtype() // (sorted, as stored)
         }
 
         /** The keyboard [decision] makes of [incoming] (null: not restored). */
@@ -93,7 +94,11 @@ internal class RestorePlan(
 ) {
     val phone = (enabled + switchedOff).distinct()
 
-    fun isSwitchedOff(keyboard: SettingsSubtype) = keyboard !in enabled
+    fun isSwitchedOff(keyboard: SettingsSubtype) = enabled.none { it.sameKeyboard(keyboard) }
+
+    /** Whether the phone's [phone] is the backup's [keyboard] itself, the same id: a hint on the first question, nothing
+     *  picked by it (owner 2026-10-11). */
+    fun sameKeyboard(keyboard: SettingsSubtype, phone: SettingsSubtype) = keyboard.keyboardId != null && keyboard.keyboardId == phone.keyboardId
 
     private fun sameLanguage(a: SettingsSubtype, b: SettingsSubtype) = a.locale.toLanguageTag() == b.locale.toLanguageTag()
 
@@ -104,7 +109,7 @@ internal class RestorePlan(
      *  into ([decisions]): one keyboard each. */
     fun candidates(keyboard: SettingsSubtype, decisions: Map<SettingsSubtype, RestoreDecision>): List<SettingsSubtype> {
         val taken = decisions.filterKeys { it != keyboard }.values.mapNotNull { (it as? RestoreDecision.Merge)?.phone }.toSet()
-        return phone.filter { sameLanguage(it, keyboard) && it !in taken }
+        return phone.filter { sameLanguage(it, keyboard) && taken.none { t -> t.sameKeyboard(it) } } // (by id)
     }
 
     /** The keyboard [decision] makes of [keyboard] (null: not restored). */
@@ -120,12 +125,12 @@ internal class RestorePlan(
         val rest = chosen.filter { it != keyboard }
         val targets = rest.mapNotNull { (decisions[it] as? RestoreDecision.Merge)?.phone }.toSet() +
             listOfNotNull((decision as? RestoreDecision.Merge)?.phone)
-        return phone.filter { it !in targets } + rest.mapNotNull { other ->
+        return phone.filter { p -> targets.none { it.sameKeyboard(p) } } + rest.mapNotNull { other ->
             if (other in decisions) result(other, decisions[other]) else if (!asks(other)) result(other, null) else null }
     }
 
     /** The name box's first text: the keyboard's name ([decision] with its name unchanged), or the next free one when
-     *  another keyboard after the restore has it ([nextFreeName], among the keyboards [sameAs] compares with; owner
+     *  another keyboard after the restore has it ([nextFreeName], among the keyboards there are then, [others]; owner
      *  2026-10-11: "same Name (or language in absence of name) makes it <name> 2"). */
     fun prefillName(keyboard: SettingsSubtype, decision: RestoreDecision, chosen: Collection<SettingsSubtype>,
                     decisions: Map<SettingsSubtype, RestoreDecision>): String {
@@ -138,13 +143,8 @@ internal class RestorePlan(
         return nextFreeName(name, others(keyboard, decision, chosen, decisions).map(nameOf).toSet())
     }
 
-    /** The other keyboard [decision] would make [keyboard] the same as (the same definition: one identity for two,
-     *  blocked; owner 2026-10-11: "Yes, keep fully identical block"), or null. */
-    fun sameAs(keyboard: SettingsSubtype, decision: RestoreDecision, chosen: Collection<SettingsSubtype>,
-               decisions: Map<SettingsSubtype, RestoreDecision>): SettingsSubtype? {
-        val result = result(keyboard, decision) ?: return null
-        return others(keyboard, decision, chosen, decisions).firstOrNull { it == result }
-    }
+    // (owner 2026-10-11, keyboards have unique ids: no "fully identical" block any more, a result set up like another
+    // keyboard is another keyboard; its name box starts at the next free name, [prefillName])
 
     companion object {
         private val copyNumber = Regex("""^(.*) \((\d+)\)$""")
@@ -197,9 +197,9 @@ internal class MergeQuestion(val plan: RestorePlan, val keyboard: SettingsSubtyp
     data class Pick(val phone: SettingsSubtype?)
 
     val separate get() = RestoreDecision.Separate(separateName)
-    /** The keyboard keeping it apart would be the same as (blocked), or null. */
-    val separateSameAs get() = plan.sameAs(keyboard, separate, chosen, decisions)
-    val canGoOn get() = picked.let { it != null && (it.phone != null || separateSameAs == null) }
+    val canGoOn get() = picked != null
+    /** Whether the phone's [phone] is this backup keyboard itself (its id): "(same keyboard as in the backup)". */
+    fun isSameKeyboard(phone: SettingsSubtype) = plan.sameKeyboard(keyboard, phone)
 }
 
 /**
@@ -223,8 +223,6 @@ internal class MergeChoice(val question: MergeQuestion, val target: SettingsSubt
     val name: String get() = typed ?: decision(null).let {
         if (it is RestoreDecision.Skip) "" else plan.prefillName(question.keyboard, it, question.chosen, question.decisions) }
     val decision get() = decision(name)
-    /** The keyboard it would be the same as (blocked), or null. */
-    val sameAs get() = decision.let { if (it is RestoreDecision.Skip) null else plan.sameAs(question.keyboard, it, question.chosen, question.decisions) }
 
     /** The line near the top whenever something is ticked, else null (owner 2026-10-11: one line, no per-copy warnings:
      *  "If someone is overwriting items they should generally know what they're talking about"). */

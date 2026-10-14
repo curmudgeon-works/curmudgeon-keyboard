@@ -33,28 +33,29 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** A saved name (Layout, popup set, font, theme, custom key layout) renamed or deleted from one keyboard is followed by
- *  every keyboard's set (2026-10-07). Keyboard A = set 1 (being edited), B = set 2, C = set 3, the first in the list:
+ *  every keyboard's set (2026-10-07). Keyboard A = k1 (in use, being edited), B = k2, C = k3, the first in the list:
  *  its own set is the common settings (owner 2026-10-11: no separate common set; the first keyboard's own settings are
- *  the common ones), what the tests called the shared set. */
+ *  the common ones), what the tests called the shared set. (owner 2026-10-11: keyboards have unique ids) Sets are
+ *  "pk<n>/", the ids in the definitions; no id map. */
 @RunWith(RobolectricTestRunner::class)
 class NamesEverywhereTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
-    private fun set(id: Int) = ProfilePreferences(real) { id }
-    private fun mark(id: Int, key: String) = KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + key)
+    private fun set(n: Int) = ProfilePreferences(real) { kid(n) }
+    private fun mark(n: Int, key: String) = KeyboardProfiles.ownKey(kid(n), KeyboardProfiles.TOMBSTONE + key)
 
     @Before fun setUp() {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
         real.edit().putBoolean("separate_settings_per_keyboard", true).commit()
-        // (the test's context is no activity: its prefs() is the keyboard in use's, the first set made: 1; given here, owner
-        // 2026-10-11: lookups never create records; only add/copy/restore/upgrade and the net do)
-        KeyboardProfiles.idFor(real, KeyboardProfiles.selectedKeyboard(real))
+        // (the test's context is no activity: its prefs() is the keyboard in use's, A's)
+        val a = keyboard.withId(1)
+        val b = SettingsSubtype(java.util.Locale.FRANCE, "").withId(2)
+        val c = SettingsSubtype(java.util.Locale.GERMANY, "").withId(3)
+        real.edit().putString(Settings.PREF_ENABLED_SUBTYPES, c.toPref())
+            .putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(c, a, b)))
+            .putString(Settings.PREF_SELECTED_SUBTYPE, a.toPref()).commit()
         KeyboardProfiles.refreshImeId(real)
-        assertEquals(1, KeyboardProfiles.imeId)
-        assertEquals(2, KeyboardProfiles.idFor(real, SettingsSubtype(java.util.Locale.FRANCE, "")))
-        val c = SettingsSubtype(java.util.Locale.GERMANY, "")
-        assertEquals(3, KeyboardProfiles.idFor(real, c))
-        real.edit().putString(Settings.PREF_ENABLED_SUBTYPES, c.toPref()).commit()
+        assertEquals(kid(1), KeyboardProfiles.imeId)
     }
     @After fun tearDown() {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
@@ -66,10 +67,10 @@ class NamesEverywhereTest {
     @Test fun `a deleted Layout is forgotten by every keyboard, not only the one being edited`() {
         val key = LayoutPresets.PREF_SELECTED
         LayoutPresets.save(real, listOf(LayoutPresets.Preset("X", mapOf("a" to 1)), LayoutPresets.Preset("Y", mapOf("a" to 2))))
-        real.edit().putString("p3/$key", "Y").putString("p1/$key", "X").putString("p2/$key", "X").commit()
+        real.edit().putString("pk3/$key", "Y").putString("pk1/$key", "X").putString("pk2/$key", "X").commit()
         LayoutPresets.delete(real, "X") // from A's Layouts list
         assertEquals(listOf("Y"), LayoutPresets.load(real).map { it.name })
-        assertFalse(real.contains("p2/$key"))
+        assertFalse(real.contains("pk2/$key"))
         assertFalse(real.contains(mark(2, key))) // (owner 2026-10-11: no default marks; nothing stored = the default)
         assertNull(set(2).getString(key, null), "B reads the shared Layout instead of none")
         assertEquals("Y", set(3).getString(key, null)) // C's, the common one, untouched
@@ -81,9 +82,9 @@ class NamesEverywhereTest {
     @Test fun `a deleted Layout chosen in the shared set is forgotten by the keyboards reading it`() {
         val key = LayoutPresets.PREF_SELECTED
         LayoutPresets.save(real, listOf(LayoutPresets.Preset("X", mapOf("a" to 1)), LayoutPresets.Preset("Y", mapOf("a" to 2))))
-        real.edit().putString("p3/$key", "X").putString("p2/$key", "Y").commit()
+        real.edit().putString("pk3/$key", "X").putString("pk2/$key", "Y").commit()
         LayoutPresets.delete(real, "X")
-        assertFalse(real.contains("p3/$key"))
+        assertFalse(real.contains("pk3/$key"))
         assertNull(set(3).getString(key, null))
         assertEquals("Y", set(2).getString(key, null))
     }
@@ -99,15 +100,15 @@ class NamesEverywhereTest {
     @Test fun `a deleted popup set is forgotten by every keyboard, and each keeps its popups shown as Custom`() {
         val key = KeyPopupOverrides.PREF_SELECTED_SET
         saveSetsST()
-        real.edit().putString("p3/$key", "T").putString("p1/$key", "S").putString("p2/$key", "S")
-            .putString("p1/${KeyPopupOverrides.PREF}", popups).putString("p2/${KeyPopupOverrides.PREF}", popups).commit()
+        real.edit().putString("pk3/$key", "T").putString("pk1/$key", "S").putString("pk2/$key", "S")
+            .putString("pk1/${KeyPopupOverrides.PREF}", popups).putString("pk2/${KeyPopupOverrides.PREF}", popups).commit()
         assertEquals("S", row(set(1))?.userName)
         deletePopupSet(ctx, "S") // from A's popup list: A had it
         assertEquals(listOf("T"), KeyPopupOverrides.loadSets(real).map { it.name })
         assertEquals(popups, set(1).getString(KeyPopupOverrides.PREF, null), "A lost its popups")
         assertEquals(popups, set(2).getString(KeyPopupOverrides.PREF, null))
         assertNull(set(1).getString(key, null))
-        assertFalse(real.contains("p2/$key"))
+        assertFalse(real.contains("pk2/$key"))
         assertFalse(real.contains(mark(2, key))) // (owner 2026-10-11: no default marks; nothing stored = the default)
         assertNull(set(2).getString(key, null), "B reads the shared set instead of none")
         assertEquals("T", set(3).getString(key, null))
@@ -119,7 +120,7 @@ class NamesEverywhereTest {
 
     @Test fun `a keyboard with no popups of its own and no set still shows the built-in it matches`() {
         assertEquals(R.string.key_popups_preset_heliboard_packed, row(set(3))?.name) // the defaults: the HeliBoard extra set
-        real.edit().putString("p3/${KeyPopupOverrides.PREF}", popups).commit()
+        real.edit().putString("pk3/${KeyPopupOverrides.PREF}", popups).commit()
         assertNull(row(set(3))) // its own popups: Custom
     }
 
@@ -128,13 +129,13 @@ class NamesEverywhereTest {
         val hidden = "{\"c\":[\"d\"]}"
         saveSetsST()
         real.edit().putBoolean("separate_settings_per_keyboard", false)
-            .putString("p3/$key", "S").putString("p3/${KeyPopupOverrides.PREF}", popups)
-            .putString("p2/$key", "S").putString("p2/${KeyPopupOverrides.PREF}", hidden).commit() // B's hidden set
+            .putString("pk3/$key", "S").putString("pk3/${KeyPopupOverrides.PREF}", popups)
+            .putString("pk2/$key", "S").putString("pk2/${KeyPopupOverrides.PREF}", hidden).commit() // B's hidden set
         deletePopupSet(ctx, "S") // every keyboard reads the shared set
-        assertEquals(popups, real.getString("p3/${KeyPopupOverrides.PREF}", null), "every keyboard lost its popups")
-        assertFalse(real.contains("p3/$key"))
-        assertEquals(hidden, real.getString("p2/${KeyPopupOverrides.PREF}", null))
-        assertFalse(real.contains("p2/$key"))
+        assertEquals(popups, real.getString("pk3/${KeyPopupOverrides.PREF}", null), "every keyboard lost its popups")
+        assertFalse(real.contains("pk3/$key"))
+        assertEquals(hidden, real.getString("pk2/${KeyPopupOverrides.PREF}", null))
+        assertFalse(real.contains("pk2/$key"))
         assertNull(row(ctx.prefs()))
         assertNull(row(set(1)))
         real.edit().putBoolean("separate_settings_per_keyboard", true).commit() // B's set shown again: its popups, Custom
@@ -146,7 +147,7 @@ class NamesEverywhereTest {
         val key = KeyPopupOverrides.PREF_SELECTED_SET
         KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.LAYOUT, true)
         saveSetsST()
-        real.edit().putString("p3/$key", "S").putString("p3/${KeyPopupOverrides.PREF}", popups).commit()
+        real.edit().putString("pk3/$key", "S").putString("pk3/${KeyPopupOverrides.PREF}", popups).commit()
         deletePopupSet(ctx, "S")
         assertEquals(popups, set(1).getString(KeyPopupOverrides.PREF, null), "A lost its popups")
         assertEquals(popups, set(2).getString(KeyPopupOverrides.PREF, null), "B lost its popups")
@@ -157,9 +158,9 @@ class NamesEverywhereTest {
     @Test fun `Discard on Layout and Typing after a popup set delete puts back the list and the names`() {
         val key = KeyPopupOverrides.PREF_SELECTED_SET
         saveSetsST()
-        real.edit().putString("p3/$key", "T").putString("p1/$key", "S").putString("p2/$key", "S")
-            .putString("p1/${KeyPopupOverrides.PREF}", popups).putString("p2/${KeyPopupOverrides.PREF}", popups).commit()
-        val draft = LayoutDraft.of(ctx, keyboard.toPref())
+        real.edit().putString("pk3/$key", "T").putString("pk1/$key", "S").putString("pk2/$key", "S")
+            .putString("pk1/${KeyPopupOverrides.PREF}", popups).putString("pk2/${KeyPopupOverrides.PREF}", popups).commit()
+        val draft = LayoutDraft.of(ctx, keyboard.withId(1).toPref()) // (A's)
         try {
             deletePopupSet(ctx, "S")
             assertTrue(draft.changedKeys(ctx).isNotEmpty())
@@ -176,8 +177,8 @@ class NamesEverywhereTest {
     }
 
     @Test fun `a deleted font goes back to the default in every keyboard, not only the one being edited`() {
-        real.edit().putString("p3/${Settings.PREF_KEY_FONT}", "font:Y").putString("p1/${Settings.PREF_KEY_FONT}", "font:X")
-            .putString("p2/${Settings.PREF_KEY_FONT}", "font:X").putString("p2/${Settings.PREF_EMOJI_FONT}", "font:X").commit()
+        real.edit().putString("pk3/${Settings.PREF_KEY_FONT}", "font:Y").putString("pk1/${Settings.PREF_KEY_FONT}", "font:X")
+            .putString("pk2/${Settings.PREF_KEY_FONT}", "font:X").putString("pk2/${Settings.PREF_EMOJI_FONT}", "font:X").commit()
         FontLibrary.delete(ctx, "X") // from A's text style dialog
         assertEquals("default", set(1).getString(Settings.PREF_KEY_FONT, null))
         assertEquals("default", set(2).getString(Settings.PREF_KEY_FONT, null), "B kept the deleted font")
@@ -187,7 +188,7 @@ class NamesEverywhereTest {
 
     @Test fun `a deleted theme leaves a keyboard that had it at none, not the shared theme`() {
         val key = AppearanceLooks.PREF_SELECTED
-        real.edit().putString("p3/$key", "Other").putString("p2/$key", "Mine").commit()
+        real.edit().putString("pk3/$key", "Other").putString("pk2/$key", "Mine").commit()
 
         KeyboardProfiles.replaceValueEverywhere(real, key, "Mine", null)
         assertNull(set(2).getString(key, null))
@@ -206,7 +207,7 @@ class NamesEverywhereTest {
     @Test fun `a custom key layout renamed from one keyboard is renamed in every keyboard's set`() {
         val x = custom("x"); val y = custom("y")
         file(x).writeText("1 2 3"); LayoutUtilsCustom.onLayoutFileChanged()
-        real.edit().putString("p1/$numberRow", x).putString("p2/$numberRow", x).commit()
+        real.edit().putString("pk1/$numberRow", x).putString("pk2/$numberRow", x).commit()
         // as the layout editor renames it (from A): the old file goes, the names follow, the new file is written
         file(x).delete()
         SubtypeSettings.onRenameLayout(LayoutType.NUMBER_ROW, x, y, ctx)
@@ -218,24 +219,24 @@ class NamesEverywhereTest {
 
     @Test fun `a custom key layout without its file is forgotten in every keyboard's set`() {
         val x = custom("x")
-        real.edit().putString(numberRow, x).putString("p2/$numberRow", x).putString("p3/$numberRow", "number_row").commit()
-        LayoutUtilsCustom.removeMissingLayouts(ctx) // (A, set 1, reads the shared x)
+        real.edit().putString(numberRow, x).putString("pk2/$numberRow", x).putString("pk3/$numberRow", "number_row").commit()
+        LayoutUtilsCustom.removeMissingLayouts(ctx) // (A, k1, reads the shared x)
         assertFalse(real.contains(numberRow))
-        assertFalse(real.contains("p2/$numberRow"))
+        assertFalse(real.contains("pk2/$numberRow"))
         assertFalse(real.contains(mark(2, numberRow))) // (owner 2026-10-11: no default marks; nothing stored = the default)
-        val builtIn = Settings.readDefaultLayoutName(LayoutType.NUMBER_ROW, ProfilePreferences(real) { 9 })
+        val builtIn = Settings.readDefaultLayoutName(LayoutType.NUMBER_ROW, ProfilePreferences(real) { kid(9) })
         assertEquals(builtIn, Settings.readDefaultLayoutName(LayoutType.NUMBER_ROW, set(2)))
         assertEquals(builtIn, Settings.readDefaultLayoutName(LayoutType.NUMBER_ROW, set(1)))
-        assertEquals("number_row", real.getString("p3/$numberRow", null))
+        assertEquals("number_row", real.getString("pk3/$numberRow", null))
         file(x).writeText("4 5 6"); LayoutUtilsCustom.onLayoutFileChanged() // a layout saved later under that name
         assertEquals(builtIn, Settings.readDefaultLayoutName(LayoutType.NUMBER_ROW, set(2)))
     }
 
     @Test fun `a custom key layout only another keyboard names is found missing too`() {
         val x = custom("x")
-        real.edit().putString("p2/$numberRow", x).commit()
-        LayoutUtilsCustom.removeMissingLayouts(ctx) // A (set 1) names none: before, only A's own was checked
-        assertFalse(real.contains("p2/$numberRow"), "B still names a layout without a file")
+        real.edit().putString("pk2/$numberRow", x).commit()
+        LayoutUtilsCustom.removeMissingLayouts(ctx) // A (k1) names none: before, only A's own was checked
+        assertFalse(real.contains("pk2/$numberRow"), "B still names a layout without a file")
         assertFalse(real.contains(mark(2, numberRow))) // (owner 2026-10-11: no default marks; nothing stored = the default)
     }
 }

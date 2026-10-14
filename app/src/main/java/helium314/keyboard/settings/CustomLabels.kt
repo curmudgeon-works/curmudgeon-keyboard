@@ -45,7 +45,7 @@ object CustomLabels {
     /** Set [id]'s own label for [kind]: in its own set also while the menu is shared, hidden then (owner 2026-10-11:
      *  "Deleting should not happen. Behavior should be same": it comes back when the menu is per keyboard again),
      *  never the shared set's. [from]: the deleted origin's name, stored with it. */
-    fun markOwn(real: SharedPreferences, id: Int, kind: Kind, from: String? = null) {
+    fun markOwn(real: SharedPreferences, id: String, kind: Kind, from: String? = null) {
         val own = KeyboardProfiles.ownKey(id, kind.key)
         if (real.getInt(own, 0) > 0 && from == null) return
         real.edit(commit = true) {

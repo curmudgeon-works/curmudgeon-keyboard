@@ -46,7 +46,7 @@ object LearnedImport {
         // (the keyboard just added: the net gave it one; the sources are lookups, owner 2026-10-11)
         val pool = LearnedKeyboards.poolForListed(real, keyboard) ?: return
         if (pool == LearnedStores.SHARED) return // (before the update: no keyboard has its own words yet)
-        fun poolsOf(keyboards: Collection<SettingsSubtype>) = keyboards.filter { it != keyboard }
+        fun poolsOf(keyboards: Collection<SettingsSubtype>) = keyboards.filter { !it.sameKeyboard(keyboard) }
             .mapNotNull { LearnedKeyboards.poolOrNull(real, it) }.filter { it != pool && it != LearnedStores.SHARED }.distinct()
         val learned = poolsOf(learnedFrom)
         val lists = poolsOf(blacklistedFrom)

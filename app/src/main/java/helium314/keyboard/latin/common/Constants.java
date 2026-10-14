@@ -95,6 +95,15 @@ public final class Constants {
             /** The name the user gave the keyboard (URL-encoded: it goes into the keyboard's definition string) */
             public static final String KEYBOARD_NAME = "KeyboardName";
 
+            /** The keyboard's own id (owner 2026-10-11: "do IDs now"): "k" and random characters, never shown, never
+             *  compared as a difference, kept through every change of the keyboard (see KeyboardIds) */
+            public static final String KEYBOARD_ID = "KeyboardId";
+
+            /** The id of the keyboard this one came from (a copy's original, a phone keyboard's id before a restore gave
+             *  it a new one): written once with the id, never changed, never shown (owner 2026-10-11: "not for anything
+             *  rn, but just to retain this info") */
+            public static final String KEYBOARD_FROM = "KeyboardFrom";
+
             /** Overrides the general "more popups" setting */
             public static final String MORE_POPUPS = "MorePopups";
 

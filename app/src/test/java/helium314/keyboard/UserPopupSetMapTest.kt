@@ -11,7 +11,6 @@ import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.KeyPopupOverrides
 import helium314.keyboard.settings.LayoutPresets
-import org.json.JSONObject
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -26,17 +25,17 @@ import kotlin.test.assertNull
 class UserPopupSetMapTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
-    private fun map(id: Int) = ProfilePreferences(real) { id }.getString(Settings.PREF_SYMBOL_POPUP_MAP, Defaults.PREF_SYMBOL_POPUP_MAP)
+    private fun map(id: Int) = ProfilePreferences(real) { kid(id) }.getString(Settings.PREF_SYMBOL_POPUP_MAP, Defaults.PREF_SYMBOL_POPUP_MAP)
 
-    /** As on the owner's phone on 2026-10-10: separate settings, keyboard 1 on "Revamped popups" (no map in the set, none stored). */
+    /** As on the owner's phone on 2026-10-10: separate settings, keyboard 1 on "Revamped popups" (no map in the set, none stored).
+     *  (owner 2026-10-11: keyboards have unique ids; the sets "pk1/", "pk2/" found by their entries, no id map) */
     @Before fun setUp() {
         real.edit().clear()
             .putBoolean("separate_settings_per_keyboard", true)
-            .putString("keyboard_profile_ids", JSONObject().put("a", 1).put("b", 2).toString())
             .putString(KeyPopupOverrides.PREF_SETS, """[{"name":"Revamped popups","morePopups":"all","symbolsLayout":"","overrides":{}}]""")
-            .putString(KeyboardProfiles.ownKey(1, KeyPopupOverrides.PREF_SELECTED_SET), "Revamped popups")
-            .putBoolean(KeyboardProfiles.ownKey(1, "~key_popups"), true)
-            .putBoolean(KeyboardProfiles.ownKey(2, "~key_popups"), true) // (keyboard 2: its own settings, no popup set)
+            .putString(idKey(1, KeyPopupOverrides.PREF_SELECTED_SET), "Revamped popups")
+            .putBoolean(idKey(1, "~key_popups"), true)
+            .putBoolean(idKey(2, "~key_popups"), true) // (keyboard 2: its own settings, no popup set)
             .commit()
         LayoutPresets.save(real, listOf(LayoutPresets.Preset("Mine", mapOf(KeyPopupOverrides.PREF_SELECTED_SET to "Revamped popups"))))
         KeyboardProfiles.loadGroups(real)
@@ -52,18 +51,18 @@ class UserPopupSetMapTest {
     }
 
     @Test fun `a keyboard that never picked a set follows the default, and a picked map is never overwritten`() {
-        real.edit().putString(KeyboardProfiles.ownKey(1, Settings.PREF_SYMBOL_POPUP_MAP), "q! w?").commit()
+        real.edit().putString(idKey(1, Settings.PREF_SYMBOL_POPUP_MAP), "q! w?").commit()
         keepUserPopupSetsSymbolMap(real)
         assertEquals("", map(2)) // not picked: the default
-        assertNull(real.getString(KeyboardProfiles.ownKey(2, Settings.PREF_SYMBOL_POPUP_MAP), null))
+        assertNull(real.getString(idKey(2, Settings.PREF_SYMBOL_POPUP_MAP), null))
         assertEquals("q! w?", map(1)) // its own pick stays
     }
 
     @Test fun `it runs once`() {
         keepUserPopupSetsSymbolMap(real)
-        real.edit().remove(KeyboardProfiles.ownKey(1, Settings.PREF_SYMBOL_POPUP_MAP)).commit() // (the user cleared it since)
+        real.edit().remove(idKey(1, Settings.PREF_SYMBOL_POPUP_MAP)).commit() // (the user cleared it since)
         keepUserPopupSetsSymbolMap(real)
-        assertNull(real.getString(KeyboardProfiles.ownKey(1, Settings.PREF_SYMBOL_POPUP_MAP), null))
+        assertNull(real.getString(idKey(1, Settings.PREF_SYMBOL_POPUP_MAP), null))
     }
 
     @Test fun `a keyboard restored on its own from an older backup gets its picked set's map - a built-in set's keyboard nothing`() {
@@ -88,8 +87,8 @@ class UserPopupSetMapTest {
 
     @Test fun `a keyboard that chose no set keeps the default when the common settings get the set's map`() {
         real.edit().putString(KeyPopupOverrides.PREF_SELECTED_SET, "Revamped popups") // (the common settings chose it)
-            .remove(KeyboardProfiles.ownKey(1, KeyPopupOverrides.PREF_SELECTED_SET))
-            .putBoolean(KeyboardProfiles.ownKey(1, KeyboardProfiles.TOMBSTONE + KeyPopupOverrides.PREF_SELECTED_SET), true) // (keyboard 1: no set)
+            .remove(idKey(1, KeyPopupOverrides.PREF_SELECTED_SET))
+            .putBoolean(idKey(1, KeyboardProfiles.TOMBSTONE + KeyPopupOverrides.PREF_SELECTED_SET), true) // (keyboard 1: no set)
             .commit()
         keepUserPopupSetsSymbolMap(real)
         assertEquals(Defaults.CURMUDGEON_SYMBOL_POPUP_MAP, real.getString(Settings.PREF_SYMBOL_POPUP_MAP, null))

@@ -4,6 +4,9 @@ package helium314.keyboard.latin.personalization
 import android.content.Context
 import android.os.UserManager
 import androidx.test.core.app.ApplicationProvider
+import helium314.keyboard.countingIds
+import helium314.keyboard.kid
+import helium314.keyboard.latin.settings.KeyboardIdUpgrade
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
@@ -11,6 +14,8 @@ import helium314.keyboard.latin.utils.LayoutType
 import helium314.keyboard.latin.utils.RemovedWords
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.SubtypeUtilsAdditional
+import helium314.keyboard.randomIds
+import helium314.keyboard.withId
 import helium314.keyboard.settings.screens.scriptRows
 import org.junit.After
 import org.junit.Before
@@ -29,6 +34,8 @@ import kotlin.test.assertTrue
  * Every keyboard its own learned words (2026-10-10): the one-time update at app start (LearnedKeyboards.startUpdate, what
  * App.onCreate calls), and the pools following a keyboard's identity. CE: the app's files (credential storage), DE: the
  * device-protected folder, which must get nothing.
+ * (owner 2026-10-11: keyboards have unique ids) The pools are keyed by keyboard id; with sharing off the ids' upgrade
+ * (KeyboardIdUpgrade) does the update from the old set numbers; a change of a keyboard keeps its id, nothing moves.
  */
 @RunWith(RobolectricTestRunner::class)
 class LearnedKeyboardsUpdateTest {
@@ -57,11 +64,12 @@ class LearnedKeyboardsUpdateTest {
         SubtypeSettings.reloadEnabledSubtypes(ctx)
         LearnedStores.refresh(real)
         KeyboardProfiles.filesDir = filesDirBefore
+        randomIds()
     }
 
-    private val a by lazy { available("en-US") }
-    private val b by lazy { available("de-DE") }
-    private val c by lazy { available("fr") }
+    private val a by lazy { available("en-US").withId(1) }
+    private val b by lazy { available("de-DE").withId(2) }
+    private val c by lazy { available("fr").withId(3) }
 
     private fun sharedWords() {
         io.store(ce, "Latn", 0, word("hai", 9, 100), after("ok", word = "hai", count = 4, time = 100), word("ok", 5, 90))
@@ -76,7 +84,7 @@ class LearnedKeyboardsUpdateTest {
 
     @Test fun `sharing on - each keyboard gets its own copy of the shared words and lists, both buttons on`() {
         useKeyboards(ctx, real, a, b, c)
-        profileIds(real, mapOf(a to 1, b to 2, c to 3), next = 4)
+        real.edit().putInt(LearnedKeyboards.PREF_POOL_NEXT, 4).commit()
         sharedWords()
         val shared = snapshot(ce)
 
@@ -84,9 +92,9 @@ class LearnedKeyboardsUpdateTest {
 
         assertTrue(LearnedKeyboards.isDone(real))
         val pools = storedPools(real)
-        assertEquals(setOf(a.toPref(), b.toPref(), c.toPref()), pools.keys)
+        assertEquals(setOf(kid(1), kid(2), kid(3)), pools.keys)
         assertEquals(3, pools.values.toSet().size, "one pool each: $pools")
-        assertTrue(pools.values.all { it >= 4 }, "fresh numbers, above the profile ids: $pools")
+        assertTrue(pools.values.all { it >= 4 }, "fresh numbers, from the next pool number: $pools")
         for (pool in pools.values) {
             assertEquals(io.read(ce, "Latn", 0), io.read(ce, "Latn", pool))
             assertEquals(io.read(ce, "Deva", 0), io.read(ce, "Deva", pool))
@@ -99,27 +107,59 @@ class LearnedKeyboardsUpdateTest {
         assertEquals(shared, snapshot(ce).filterKeys { it in shared.keys })
         assertTrue(snapshot(de).isEmpty(), "written to DE: ${snapshot(de).keys}")
         // and the keyboard learns into its own pool now
-        assertEquals(pools.getValue(a.toPref()), LearnedStores.currentPool)
-        assertEquals(LearnedStores.blacklistFile(ce, "Latn", pools.getValue(a.toPref())), RemovedWords.blacklist(ctx, "Latn").file)
+        assertEquals(pools.getValue(kid(1)), LearnedStores.currentPool)
+        assertEquals(LearnedStores.blacklistFile(ce, "Latn", pools.getValue(kid(1))), RemovedWords.blacklist(ctx, "Latn").file)
     }
 
+    // (owner 2026-10-11: keyboards have unique ids) the update no longer knows the set numbers: the ids' upgrade finishes
+    // it from the old id map, each keyboard's pool its set number of before
     @Test fun `sharing off - every keyboard keeps its own pool, buttons off, nothing copied`() {
-        useKeyboards(ctx, real, a, b)
-        profileIds(real, mapOf(a to 5, b to 6), next = 7)
-        real.edit().putBoolean(Settings.PREF_SHARE_LEARNED_WORDS, false).commit()
+        // a phone of before: keyboards without ids, the old map definition -> set number (only the enabled list written:
+        // a write of the added list loads the keyboards, whose net would give them ids first)
+        val a0 = available("en-US")
+        val b0 = available("de-DE")
+        real.edit().putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a0, b0)))
+            .putString(Settings.PREF_SELECTED_SUBTYPE, a0.toPref())
+            .putString(KeyboardIdUpgrade.OLD_IDS, org.json.JSONObject(mapOf(a0.toPref() to 5, b0.toPref() to 6) as Map<*, *>).toString())
+            .putInt("keyboard_profile_next_id", 7)
+            .putBoolean(Settings.PREF_SHARE_LEARNED_WORDS, false).commit()
         sharedWords()
         io.store(ce, "Latn", 5, word("mine", 3, 50))
         writeList(ce, "Latn", 6, "bad\n")
         val files = snapshot(ce)
+        countingIds(1) // (the enabled list first: a0 gets k1, b0 k2)
 
+        assertTrue(KeyboardIdUpgrade.upgrade(real, null)) // (no pictures to rename)
+        SubtypeSettings.reloadEnabledSubtypes(ctx)
+        assertTrue(LearnedKeyboards.isDone(real), "the ids' upgrade did the update")
         runUpdate()
 
-        assertEquals(mapOf(a.toPref() to 5, b.toPref() to 6), storedPools(real))
+        assertEquals(mapOf(kid(1) to 5, kid(2) to 6), storedPools(real))
         for (pref in LearnedKeyboards.buttonPrefs) assertFalse(real.contains(pref))
         assertEquals(files, snapshot(ce), "a file was written")
         assertTrue(snapshot(de).isEmpty())
+        LearnedStores.refresh(real)
         assertEquals(5, LearnedStores.currentPool)
         assertTrue(real.getInt(LearnedKeyboards.PREF_POOL_NEXT, 0) >= 7)
+    }
+
+    // (owner 2026-10-11: keyboards have unique ids) not done by the ids' upgrade (it ran with sharing on): the update has
+    // no set numbers, each listed keyboard gets a new pool, nothing copied, buttons off
+    @Test fun `sharing off, not done by the ids' upgrade - each keyboard a new pool, nothing copied`() {
+        useKeyboards(ctx, real, a, b)
+        real.edit().putBoolean(Settings.PREF_SHARE_LEARNED_WORDS, false).commit()
+        sharedWords()
+        val files = snapshot(ce)
+
+        runUpdate()
+
+        val pools = storedPools(real)
+        assertEquals(setOf(kid(1), kid(2)), pools.keys)
+        assertEquals(2, pools.values.toSet().size, "one pool each: $pools")
+        assertFalse(LearnedStores.SHARED in pools.values)
+        for (pref in LearnedKeyboards.buttonPrefs) assertFalse(real.contains(pref))
+        assertEquals(files, snapshot(ce), "a file was written")
+        assertFalse(real.contains(LearnedKeyboards.PREF_PLAN))
     }
 
     @Test fun `killed mid-copy - the old pool stays in use, the next start redoes it with the same plan`() {
@@ -173,38 +213,44 @@ class LearnedKeyboardsUpdateTest {
         }
         runUpdate()
         val pools = storedPools(real)
-        assertEquals(setOf(a.toPref(), b.toPref(), c.toPref()), pools.keys)
-        assertEquals(io.read(ce, "Latn", 0), io.read(ce, "Latn", pools.getValue(c.toPref())))
-        assertEquals(mapOf("teh" to RemovedWords.Entry(2)), readList(ce, "Latn", pools.getValue(c.toPref())))
-        for (pref in LearnedKeyboards.buttonPrefs) assertTrue(c.toPref() in storedButton(real, pref))
+        assertEquals(setOf(kid(1), kid(2), kid(3)), pools.keys)
+        assertEquals(io.read(ce, "Latn", 0), io.read(ce, "Latn", pools.getValue(kid(3))))
+        assertEquals(mapOf("teh" to RemovedWords.Entry(2)), readList(ce, "Latn", pools.getValue(kid(3))))
+        for (pref in LearnedKeyboards.buttonPrefs) assertTrue(kid(3) in storedButton(real, pref))
     }
 
-    @Test fun `a keyboard keeps its words through a rename, a language edit and a layout change, not through a preview`() {
+    // (owner 2026-10-11: keyboards have unique ids) a changed keyboard keeps its id: its pool and buttons stay, nothing
+    // moves (the record moves on each change, and the preview check, went with onKeyboardChanged)
+    @Test fun `a keyboard keeps its words through a rename, a language edit and a layout change`() {
         useKeyboards(ctx, real, a, b)
         sharedWords()
         runUpdate()
         val pool = LearnedKeyboards.poolFor(real, a)
         val poolB = LearnedKeyboards.poolFor(real, b)
+        val before = storedPools(real)
+        val buttons = LearnedKeyboards.buttonPrefs.associateWith { storedButton(real, it) }
         // languages
         val a2 = a.with(helium314.keyboard.latin.common.Constants.Subtype.ExtraValue.SECONDARY_LOCALES, "de")
-        KeyboardProfiles.onKeyboardChanged(real, a, a2)
-        assertEquals(pool, LearnedKeyboards.poolFor(real, a2))
+        SubtypeUtilsAdditional.changeAdditionalSubtype(a, a2, ctx)
+        assertEquals(pool, LearnedKeyboards.poolOrNull(real, a2))
         // a layout of its own
         val a3 = a2.withLayout(LayoutType.MAIN, "qwertz")
-        KeyboardProfiles.onKeyboardChanged(real, a2, a3)
-        assertEquals(pool, LearnedKeyboards.poolFor(real, a3))
+        SubtypeUtilsAdditional.changeAdditionalSubtype(a2, a3, ctx)
+        assertEquals(pool, LearnedKeyboards.poolOrNull(real, a3))
         // a rename, through the screens' path
         val a4 = a3.with(helium314.keyboard.latin.common.Constants.Subtype.ExtraValue.KEYBOARD_NAME, "Mine")
         SubtypeUtilsAdditional.changeAdditionalSubtype(a3, a4, ctx)
-        assertEquals(pool, LearnedKeyboards.poolFor(real, a4))
-        for (pref in LearnedKeyboards.buttonPrefs) assertTrue(a4.toPref() in storedButton(real, pref) && a.toPref() !in storedButton(real, pref))
-        // previewing another keyboard's keys: both keep their own
-        KeyboardProfiles.onKeyboardChanged(real, a4, b)
-        assertEquals(pool, storedPools(real)[a4.toPref()])
-        assertEquals(poolB, LearnedKeyboards.poolFor(real, b))
+        assertEquals(kid(1), a4.keyboardId)
+        assertEquals(pool, LearnedKeyboards.poolOrNull(real, a4))
+        assertEquals(before, storedPools(real), "a record moved")
+        for (pref in LearnedKeyboards.buttonPrefs) {
+            assertEquals(buttons.getValue(pref), storedButton(real, pref), pref)
+            assertTrue(kid(1) in storedButton(real, pref), pref)
+        }
+        assertEquals(poolB, LearnedKeyboards.poolOrNull(real, b))
         // deleted: the entry goes, a keyboard added again later starts with a pool of its own
         KeyboardProfiles.onKeyboardDeleted(real, b)
-        assertFalse(b.toPref() in storedPools(real))
+        assertFalse(kid(2) in storedPools(real))
         assertNotEquals(poolB, LearnedKeyboards.poolFor(real, b))
     }
 

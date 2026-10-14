@@ -15,7 +15,6 @@ import helium314.keyboard.latin.personalization.word
 import helium314.keyboard.latin.personalization.writeList
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.realPrefs
-import org.json.JSONObject
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -37,8 +36,8 @@ class ReReview2S9Test {
     private val real = ctx.realPrefs()
     private val ce: File get() = ctx.filesDir
     private val io = BodyStoreIo()
-    private val a by lazy { available("en-US") }
-    private val b by lazy { available("de-DE") }
+    private val a by lazy { available("en-US").withId(1) }
+    private val b by lazy { available("de-DE").withId(2) }
 
     @Before fun setUp() {
         deleteLearnedFiles(ce)
@@ -58,7 +57,7 @@ class ReReview2S9Test {
     private fun twoKeyboards(pool: Int) {
         useKeyboards(ctx, real, a, b)
         real.edit().putBoolean(LearnedKeyboards.PREF_DONE, true)
-            .putString(LearnedKeyboards.PREF_POOLS, JSONObject(mapOf(a.toPref() to pool, b.toPref() to 6)).toString())
+            .putString(LearnedKeyboards.PREF_POOLS, poolsJson(mapOf(a to pool, b to 6)))
             .putInt(LearnedKeyboards.PREF_POOL_NEXT, pool + 1).commit()
         io.store(ce, "Latn", pool, word("alpha", 2, 100))
         io.store(ce, "Latn", 6, word("beta", 1, 50))

@@ -45,7 +45,7 @@ fun rememberPrefSnapshot(prefs: SharedPreferences, keys: Collection<String>, key
  * reading the values through the keyboard's view gave the shared value, and putting that back made it the keyboard's
  * own (review 2026-10-07, finding 10).
  */
-class RawPrefSnapshot(private val real: SharedPreferences, private val setId: Int, keys: Collection<String>) {
+class RawPrefSnapshot(private val real: SharedPreferences, private val setId: String, keys: Collection<String>) {
     private val stored: Map<String, Any?> = real.all.let { all -> keys.map { KeyboardProfiles.prefixedKey(real, setId, it) }.associateWith { all[it] } }
 
     /** Puts back what was stored; true when anything had changed, so the caller reloads. */

@@ -35,13 +35,14 @@ import kotlin.test.assertTrue
  *  delete restore upgrade etc."): the Update question of a saved Layout, theme or popup set offers a tick for a
  *  switched-off keyboard whose own set chose it, and the delete warning names it, "<name> (switched off)", whether or
  *  not separate settings is on; ticked, its own set gets the update and it stays switched off. Keyboard A ("Work",
- *  enabled, edited) = set 1, B (German, switched off) = set 2. */
+ *  enabled, edited) = k1, B (German, switched off: in the added list only) = k2 (owner 2026-10-11: keyboards have
+ *  unique ids; no id map). */
 @RunWith(RobolectricTestRunner::class)
 class SwitchedOffUsersTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = ctx.realPrefs()
-    private val a = withKeyboardName(SettingsSubtype(Locale.US, ""), "Work")
-    private val b = SubtypeSettings.getResourceSubtypesForLocale(Locale.GERMANY).first().toSettingsSubtype()
+    private val a = withKeyboardName(SettingsSubtype(Locale.US, ""), "Work").withId(1)
+    private val b = SubtypeSettings.getResourceSubtypesForLocale(Locale.GERMANY).first().toSettingsSubtype().withId(2)
 
     private enum class Kind(val key: String, val group: KeyboardProfiles.Group, val plural: Int) {
         LAYOUT(LayoutPresets.PREF_SELECTED, KeyboardProfiles.Group.LAYOUT, R.plurals.delete_keeps_layout),
@@ -51,24 +52,20 @@ class SwitchedOffUsersTest {
 
     @Before fun setUp() {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
-        // (the ids written, not given out: with one set of settings a write anywhere, the app's start work too, gives the
-        // first keyboard its set id; owner 2026-10-11: no separate common set; the first keyboard's own settings are the
-        // common ones)
+        // (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones)
         real.edit {
-            putString("keyboard_profile_ids", org.json.JSONObject().put(a.toPref(), 1).put(b.toPref(), 2).toString())
-            putInt("keyboard_profile_next_id", 3)
             putBoolean("separate_settings_per_keyboard", true)
-            putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a)))
+            putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a, b)))
             putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a)))
             putString(Settings.PREF_SELECTED_SUBTYPE, a.toPref())
             for (kind in Kind.entries) {
-                putString(KeyboardProfiles.ownKey(1, kind.key), "Mine")
-                putString(KeyboardProfiles.ownKey(2, kind.key), "Mine")
+                putString(idKey(1, kind.key), "Mine")
+                putString(idKey(2, kind.key), "Mine")
             }
         }
         SubtypeSettings.reloadEnabledSubtypes(ctx)
-        assertEquals(1, KeyboardProfiles.idFor(real, a))
-        assertEquals(2, KeyboardProfiles.idFor(real, b))
+        assertEquals(kid(1), KeyboardProfiles.idForListed(real, a))
+        assertEquals(kid(2), KeyboardProfiles.idForListed(real, b)) // (switched off: one of the phone's all the same)
     }
     @After
  fun tearDown() {
@@ -101,7 +98,7 @@ class SwitchedOffUsersTest {
 
     @Test fun `only following the shared choice it is not asked, nor named twice`() {
         // (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones: A's choice)
-        real.edit { for (kind in Kind.entries) remove(KeyboardProfiles.ownKey(2, kind.key)) }
+        real.edit { for (kind in Kind.entries) remove(idKey(2, kind.key)) }
         for (kind in Kind.entries) {
             assertEquals(emptyList(), others(kind), kind.name)
             assertEquals(listOf("Work"), deleteKeepersText(ctx, kind.plural, kind.key, "Mine", a)!!.substringAfter("\n").lines())
@@ -120,16 +117,16 @@ class SwitchedOffUsersTest {
         val (layoutUser, themeUser, popupsUser) = Kind.entries.map { others(it).single() }
         val layout = LayoutPresets.Preset("Mine", mapOf(Settings.PREF_SOUND_ON to true))
         LayoutPresets.applyToOther(ctx, layoutUser, layout)
-        assertEquals(true, real.getBoolean(KeyboardProfiles.ownKey(2, Settings.PREF_SOUND_ON), false))
+        assertEquals(true, real.getBoolean(idKey(2, Settings.PREF_SOUND_ON), false))
         val look = AppearanceLooks.Look("Mine", mapOf(Settings.PREF_KEY_TEXT_BOLD to true))
         AppearanceLooks.applyToOther(ctx, themeUser, look)
-        assertEquals(true, real.getBoolean(KeyboardProfiles.ownKey(2, Settings.PREF_KEY_TEXT_BOLD), false))
+        assertEquals(true, real.getBoolean(idKey(2, Settings.PREF_KEY_TEXT_BOLD), false))
         val set = KeyPopupOverrides.UserSet("Mine", "normal", null, emptyMap(), popupOrder = "the order")
         applySetToOther(ctx, popupsUser, set, false)
-        assertEquals("the order", real.getString(KeyboardProfiles.ownKey(2, Settings.PREF_POPUP_KEYS_ORDER), null))
+        assertEquals("the order", real.getString(idKey(2, Settings.PREF_POPUP_KEYS_ORDER), null))
         // (the shared set and the edited keyboard's set are untouched, and it stays switched off)
         for (key in listOf(Settings.PREF_SOUND_ON, Settings.PREF_KEY_TEXT_BOLD, Settings.PREF_POPUP_KEYS_ORDER)) {
-            assertFalse(real.contains(key), key); assertFalse(real.contains(KeyboardProfiles.ownKey(1, key)), key)
+            assertFalse(real.contains(key), key); assertFalse(real.contains(idKey(1, key)), key)
         }
         assertEquals(listOf(a), enabled())
         assertTrue(enabled().none { it.locale == b.locale })

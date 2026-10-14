@@ -34,7 +34,9 @@ import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.screens.KeyboardsScreen
 import helium314.keyboard.settings.screens.keyboardName
-import org.json.JSONObject
+import helium314.keyboard.kid
+import helium314.keyboard.poolsJson
+import helium314.keyboard.withId
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -75,9 +77,9 @@ class DeleteKeyboardWordsTest {
         }
     }
     private val filesDirBefore = KeyboardProfiles.filesDir
-    private val a by lazy { available("en-US") }
-    private val b by lazy { available("de-DE") }
-    private val c by lazy { available("fr") }
+    private val a by lazy { available("en-US").withId(1) }
+    private val b by lazy { available("de-DE").withId(2) }
+    private val c by lazy { available("fr").withId(3) }
 
     @Before fun setUp() {
         deleteLearnedFiles(ce)
@@ -101,7 +103,7 @@ class DeleteKeyboardWordsTest {
     /** Keyboards A, B, C with pools 5, 6, 7, words and a blacklist in each, and the shared ones of before (pool 0). */
     private fun phone() {
         useKeyboards(ctx, real, a, b, c)
-        real.edit().putString(LearnedKeyboards.PREF_POOLS, JSONObject(mapOf(a.toPref() to 5, b.toPref() to 6, c.toPref() to 7)).toString())
+        real.edit().putString(LearnedKeyboards.PREF_POOLS, poolsJson(mapOf(a to 5, b to 6, c to 7)))
             .putInt(LearnedKeyboards.PREF_POOL_NEXT, 8).putBoolean(LearnedKeyboards.PREF_DONE, true).commit()
         for (pool in listOf(0, 5, 6, 7)) {
             body.store(ce, "Latn", pool, word("w$pool", 2, 100))
@@ -129,7 +131,7 @@ class DeleteKeyboardWordsTest {
         assertFalse(LearnedStores.storeFile(ce, "Cyrl", 6).exists())
         assertFalse(File(ce, "${LearnedStores.BLACKLIST_DIR}/k6").exists())
         assertEquals(others, snapshot(ce).filterKeys { !it.startsWith(LearnedStoreFiles.WORK_DIR) }, "another keyboard's files changed")
-        assertFalse(b.toPref() in storedPools(real))
+        assertFalse(kid(2) in storedPools(real))
         assertEquals(setOf(5, 7), LearnedStores.keyboardPoolsOnDisk(ce))
         assertEquals(setOf("w0"), body.words(ce, "Latn", 0))
     }

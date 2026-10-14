@@ -12,11 +12,12 @@ import helium314.keyboard.settings.AppearanceDraft
 import helium314.keyboard.settings.AppearanceLooks
 import helium314.keyboard.settings.LayoutDraft
 import helium314.keyboard.settings.LayoutPresets
-import org.json.JSONObject
+import helium314.keyboard.latin.settings.SettingsSubtype
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.util.Locale
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -31,13 +32,17 @@ import kotlin.test.assertTrue
 class HeldEverywhereTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
-    private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
+    private fun own(n: Int, key: String) = idKey(n, key)
+    // (owner 2026-10-11: keyboards have unique ids) keyboard 1 = k1 (in use), 2 = k2; no id map
+    private val one = SettingsSubtype(Locale.US, "").withId(1)
+    private val two = SettingsSubtype(Locale.GERMANY, "").withId(2)
 
     /** Separate settings, keyboard 1 edited; keyboard 2 also on theme "Sunset" and palette "Warm" (read from the shared set). */
     @Before fun setUp() {
-        real.edit().clear()
+        real.edit().clear().commit()
+        storeKeyboards(ctx, real, listOf(one, two), reload = false)
+        real.edit()
             .putBoolean("separate_settings_per_keyboard", true)
-            .putString("keyboard_profile_ids", JSONObject().put("a", 1).put("b", 2).toString())
             .putString(own(2, AppearanceLooks.PREF_SELECTED), "Sunset")
             .putString(own(2, Settings.PREF_THEME_COLORS), "Warm")
             .putString(Settings.PREF_USER_COLORS_PREFIX + "Warm", "colors")
@@ -97,7 +102,7 @@ class HeldEverywhereTest {
 
     // (already so before 2026-10-11: the saved Layouts list is in LayoutDraft by its "layout_" prefix; kept as a guard)
     @Test fun `a saved Layout renamed with Layout and Typing open comes back on Discard, with every keyboard's choice`() {
-        LayoutDraft.of(ctx, "en_US:")
+        LayoutDraft.of(ctx, one.toPref())
         LayoutPresets.save(real, listOf(LayoutPresets.Preset("Office", mapOf(Settings.PREF_SHOW_NUMBER_ROW to true))))
         KeyboardProfiles.replaceValueEverywhere(real, LayoutPresets.PREF_SELECTED, "Work", "Office")
         assertEquals("Office", real.getString(own(2, LayoutPresets.PREF_SELECTED), null))
@@ -108,7 +113,7 @@ class HeldEverywhereTest {
 
     @Test fun `the edited keyboard's own changes still come back as before`() {
         AppearanceDraft.of(ctx)
-        ProfilePreferences(real) { 1 }.edit().putFloat(Settings.PREF_KEY_HORIZONTAL_GAP, 3f).commit()
+        ProfilePreferences(real) { kid(1) }.edit().putFloat(Settings.PREF_KEY_HORIZONTAL_GAP, 3f).commit()
         AppearanceDraft.rejectOpen(ctx)
         assertFalse(real.contains(own(1, Settings.PREF_KEY_HORIZONTAL_GAP)))
     }
@@ -117,10 +122,10 @@ class HeldEverywhereTest {
     @Test fun `another keyboard's switch turned on and off again is no change, a different value is`() {
         val draft = AppearanceDraft.of(ctx)
         assertFalse(draft.hasChanges(ctx))
-        ProfilePreferences(real) { 2 }.edit().putBoolean(Settings.PREF_KEY_TEXT_BOLD, false).commit() // its default
+        ProfilePreferences(real) { kid(2) }.edit().putBoolean(Settings.PREF_KEY_TEXT_BOLD, false).commit() // its default
         assertTrue(real.contains(own(2, Settings.PREF_KEY_TEXT_BOLD))) // (stored as picked)
         assertFalse(draft.hasChanges(ctx))
-        ProfilePreferences(real) { 2 }.edit().putBoolean(Settings.PREF_KEY_TEXT_BOLD, true).commit()
+        ProfilePreferences(real) { kid(2) }.edit().putBoolean(Settings.PREF_KEY_TEXT_BOLD, true).commit()
         assertTrue(draft.hasChanges(ctx))
     }
 }

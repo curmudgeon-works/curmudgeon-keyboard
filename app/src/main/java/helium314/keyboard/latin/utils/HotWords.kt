@@ -18,7 +18,7 @@ object HotWords {
     // one window per learned-words pool (review 2026-10-07: one for all, so a word hot on one keyboard was hot on a
     // keyboard with learned words of its own); the pool in use is set by LearnedStores
     private val windows = HashMap<Int, ArrayDeque<String>>()
-    private var recent = ArrayDeque<String>(WINDOW).also { windows[helium314.keyboard.latin.settings.KeyboardProfiles.SHARED] = it }
+    private var recent = ArrayDeque<String>(WINDOW).also { windows[helium314.keyboard.latin.personalization.LearnedStores.SHARED] = it }
 
     /** The learned-words pool now in use: its own recent words count from here on. */
     @Synchronized

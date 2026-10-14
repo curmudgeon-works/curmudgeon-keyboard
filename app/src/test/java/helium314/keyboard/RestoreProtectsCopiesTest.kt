@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import helium314.keyboard.latin.personalization.available
 import helium314.keyboard.latin.personalization.useKeyboards
+import helium314.keyboard.latin.settings.KeyboardIdUpgrade
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
@@ -45,6 +46,8 @@ import kotlin.test.assertNull
  * unsaved changes too (owner 2026-10-11: no per-copy warnings); (2) a palette the phone has under that name with other
  * colors is never written over: the backup's comes into the one list under the next number (owner 2026-10-11:
  * palettes are one app-wide list; an older backup's kept copy "~custom:1" is "Palette 1"; before, "~custom:2").
+ * (owner 2026-10-11: keyboards have unique ids) The phone's QWERTY is "k1", the backup's Dvorak "k2" and Colemak "k3";
+ * a merge keeps the phone keyboard's id, one kept separate the backup's.
  */
 @RunWith(RobolectricTestRunner::class)
 class RestoreProtectsCopiesTest {
@@ -70,9 +73,9 @@ class RestoreProtectsCopiesTest {
     @Before fun setUp() {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real); KeyboardProfiles.filesDir = null
         SubtypeSettings.init(ctx)
-        qwerty = available("en-US")
-        dvorak = qwerty.withLayout(LayoutType.MAIN, "dvorak").toPref().toSettingsSubtype()
-        colemak = qwerty.withLayout(LayoutType.MAIN, "colemak").toPref().toSettingsSubtype()
+        qwerty = available("en-US").withId(1)
+        dvorak = available("en-US").withLayout(LayoutType.MAIN, "dvorak").withId(2)
+        colemak = available("en-US").withLayout(LayoutType.MAIN, "colemak").withId(3)
         english = keyboardName(qwerty, ctx)
     }
     @After fun tearDown() {
@@ -89,12 +92,11 @@ class RestoreProtectsCopiesTest {
         real.edit().putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(qwerty)))
             .putBoolean("separate_settings_per_keyboard", true).apply { for ((k, v) in list) KeyboardProfiles.put(this, k, v) }.commit()
         useKeyboards(ctx, real, qwerty)
-        val id = KeyboardProfiles.idFor(real, qwerty)
-        real.edit().apply { for ((key, value) in own) KeyboardProfiles.put(this, KeyboardProfiles.ownKey(id, key), value) }.commit()
+        real.edit().apply { for ((key, value) in own) KeyboardProfiles.put(this, idKey(1, key), value) }.commit()
         KeyboardProfiles.loadGroups(real)
     }
-    private fun phoneId() = KeyboardProfiles.idEntries(real).getValue(qwerty.toPref())
-    private fun own(id: Int, key: String) = real.all[KeyboardProfiles.ownKey(id, key)]
+    private fun phoneId() = kid(1)
+    private fun own(id: String, key: String) = real.all[KeyboardProfiles.ownKey(id, key)]
 
     /** The backup: [sets] (each keyboard with its own set), separate settings on, [extra] backup-wide. */
     private fun backup(sets: Map<SettingsSubtype, Map<String, Any?>>, extra: Map<String, Any?> = emptyMap()) {
@@ -104,13 +106,11 @@ class RestoreProtectsCopiesTest {
         values[Settings.PREF_ADDITIONAL_SUBTYPES] = SubtypeSettings.createPrefSubtypes(keyboards)
         values[Settings.PREF_SELECTED_SUBTYPE] = keyboards.first().toPref()
         values["separate_settings_per_keyboard"] = true
-        val ids = JSONObject()
-        keyboards.forEachIndexed { i, kb -> ids.put(kb.toPref(), i + 1) }
-        values["keyboard_profile_ids"] = ids.toString()
+        values[KeyboardIdUpgrade.DONE] = true
         values[helium314.keyboard.latin.PICKED_ONLY_DONE] = true
         values[helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE] = true
         values[helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE] = true
-        keyboards.forEachIndexed { i, kb -> for ((key, value) in sets.getValue(kb)) values[KeyboardProfiles.ownKey(i + 1, key)] = value }
+        for (kb in keyboards) for ((key, value) in sets.getValue(kb)) values[KeyboardProfiles.ownKey(kb.keyboardId!!, key)] = value
         values.putAll(extra)
         backupValues = values
         ZipOutputStream(zip.outputStream()).use { z ->
@@ -128,6 +128,7 @@ class RestoreProtectsCopiesTest {
             { RestoreMatch.phoneSettings(real, qwerty) }, { restoredSettings(ctx, backupValues, dvorak) })
         return MergeChoice(question, qwerty, differences, wordsRow = false)
     }
+    private fun enabled() = SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }
     private fun MergeChoice.menu(group: KeyboardProfiles.Group) = differences.single { it == RestoreMatch.Difference.Menu(group) }
     private fun MergeChoice.keys() = differences.single { it is RestoreMatch.Difference.Definition && it.part == RestoreMatch.Part.Layout(LayoutType.MAIN) }
 
@@ -150,7 +151,8 @@ class RestoreProtectsCopiesTest {
         // confirmed, the unsaved theme is replaced
         choice.ticked.add(appearance)
         restoreKeyboardsFrom(ctx, zip, listOf(dvorak), withSettings = true, decisions = mapOf(dvorak to choice.decision))
-        val merged = KeyboardProfiles.idEntries(real).values.single { it != KeyboardProfiles.SHARED }
+        val merged = enabled().single().keyboardId!! // (the phone keyboard's id, kept)
+        assertEquals(phoneId(), merged)
         assertEquals("y", own(merged, Settings.PREF_THEME_COLORS))
         assertFalse(CustomLabels.has(helium314.keyboard.latin.settings.ProfilePreferences(real) { merged }, CustomLabels.Kind.THEME))
     }
@@ -177,11 +179,12 @@ class RestoreProtectsCopiesTest {
         backup(mapOf(dvorak to emptyMap(), colemak to mapOf(Settings.PREF_THEME_COLORS to hidden1, colors1 to paletteB)))
         restoreKeyboardsFrom(ctx, zip, listOf(dvorak, colemak), withSettings = true,
             decisions = mapOf(dvorak to keysOnly, colemak to RestoreDecision.Separate()))
-        val ids = KeyboardProfiles.idEntries(real)
-        val merged = ids.getValue(dvorak.toPref())
+        val merged = phoneId() // (a merge keeps the phone keyboard's id)
+        assertEquals(merged, listedById(real, merged)?.keyboardId)
         assertEquals("Palette 1", own(merged, Settings.PREF_THEME_COLORS))
         assertEquals(paletteA, real.all[listed1])
-        val added = ids.getValue(colemak.toPref())
+        val added = colemak.keyboardId!! // (kept separate: the backup's id)
+        assertEquals(colemak, listedById(real, added))
         assertEquals("Palette 2", own(added, Settings.PREF_THEME_COLORS))
         assertEquals(paletteB, real.all[listed2])
         assertNull(own(added, colors1)) // (no copy in a set)
@@ -207,7 +210,8 @@ class RestoreProtectsCopiesTest {
         restoreKeyboardsFrom(ctx, zip, listOf(dvorak), withSettings = true, decisions = mapOf(dvorak to RestoreDecision.Separate()))
         assertEquals("Palette 1", own(phoneId(), Settings.PREF_THEME_COLORS))
         assertEquals(paletteA, real.all[listed1])
-        val added = KeyboardProfiles.idEntries(real).getValue(dvorak.toPref())
+        val added = dvorak.keyboardId!! // (kept separate: the backup's id)
+        assertEquals(dvorak, listedById(real, added))
         assertEquals("Palette 2", own(added, Settings.PREF_THEME_COLORS))
         assertEquals(paletteB, real.all[listed2])
     }
@@ -217,7 +221,8 @@ class RestoreProtectsCopiesTest {
         backup(mapOf(dvorak to emptyMap(), colemak to mapOf(Settings.PREF_THEME_COLORS to hidden1, colors1 to paletteA)))
         restoreKeyboardsFrom(ctx, zip, listOf(dvorak, colemak), withSettings = true,
             decisions = mapOf(dvorak to keysOnly, colemak to RestoreDecision.Separate()))
-        val added = KeyboardProfiles.idEntries(real).getValue(colemak.toPref())
+        val added = colemak.keyboardId!!
+        assertEquals(colemak, listedById(real, added))
         assertEquals("Palette 1", own(added, Settings.PREF_THEME_COLORS))
         assertFalse(real.all.keys.any { it.endsWith(listed2) })
     }

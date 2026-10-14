@@ -194,7 +194,7 @@ fun SettingsNavHost(
 /** [optional]: more query arguments of the route, strings, null when not given. */
 private fun NavGraphBuilder.screen(route: String, optional: List<String> = emptyList(), content: @Composable (NavBackStackEntry) -> Unit) =
     composable("$route?${SettingsDestination.SET}={${SettingsDestination.SET}}" + optional.joinToString("") { "&$it={$it}" },
-        arguments = listOf(navArgument(SettingsDestination.SET) { type = NavType.IntType; defaultValue = SettingsDestination.NO_SET }) +
+        arguments = listOf(navArgument(SettingsDestination.SET) { type = NavType.StringType; nullable = true; defaultValue = null }) +
             optional.map { navArgument(it) { type = NavType.StringType; nullable = true; defaultValue = null } }
     ) { entry ->
         KeyboardScope(SettingsDestination.setIdOf(entry)) { content(entry) }
@@ -202,7 +202,7 @@ private fun NavGraphBuilder.screen(route: String, optional: List<String> = empty
 
 /** [content] edits keyboard set [keyboardId] (null: as it is): the context it gets is a [KeyboardScopeContext]. */
 @Composable
-fun KeyboardScope(keyboardId: Int?, content: @Composable () -> Unit) {
+fun KeyboardScope(keyboardId: String?, content: @Composable () -> Unit) {
     if (keyboardId == null) return content()
     val base = LocalContext.current
     val scoped = remember(base, keyboardId) { KeyboardScopeContext(base, keyboardId) }
@@ -238,15 +238,15 @@ object SettingsDestination {
     const val Dictionaries = "dictionaries"
     val navTarget = MutableStateFlow(Keyboards)
 
-    /** The route argument with the keyboard set a screen edits (a keyboard's own menus; absent: the main choice). */
+    /** The route argument with the keyboard set a screen edits (a keyboard's own menus, its keyboard id; absent: the
+     *  main choice). */
     const val SET = "set"
-    internal const val NO_SET = -1
     /** [route] for the screens of keyboard set [setId] (null: no keyboard's own). */
-    fun inSet(route: String, setId: Int?): String = if (setId == null) route else if ('?' in route) "$route&$SET=$setId" else "$route?$SET=$setId"
+    fun inSet(route: String, setId: String?): String = if (setId == null) route else if ('?' in route) "$route&$SET=$setId" else "$route?$SET=$setId"
     /** The Colors screens' argument: the palette was just made by "Add your own", these colors were selected before. */
     const val MADE = "made"
     /** The keyboard set of a back stack entry, or null. */
-    fun setIdOf(entry: NavBackStackEntry?): Int? = entry?.arguments?.getInt(SET, NO_SET)?.takeIf { it != NO_SET }
+    fun setIdOf(entry: NavBackStackEntry?): String? = entry?.arguments?.getString(SET)?.takeIf { it.isNotEmpty() }
     /** [target] opened from a screen with context [from]: it edits the same keyboard (Colors from that keyboard's
      *  Appearance, Learned words from its Text correction). */
     fun navigateTo(target: String, from: android.content.Context) = navigateTo(inSet(target, KeyboardScopeContext.idOf(from)))

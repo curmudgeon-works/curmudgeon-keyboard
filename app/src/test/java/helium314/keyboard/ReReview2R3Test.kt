@@ -4,8 +4,8 @@ package helium314.keyboard
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import helium314.keyboard.latin.personalization.available
-import helium314.keyboard.latin.personalization.profileIds
 import helium314.keyboard.latin.personalization.useKeyboards
+import helium314.keyboard.latin.settings.KeyboardIdUpgrade
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
@@ -57,7 +57,8 @@ class ReReview2R3Test {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
         SubtypeSettings.init(ctx)
         folder.deleteRecursively(); folder.mkdirs(); LayoutUtilsCustom.onLayoutFileChanged()
-        hindi = available("hi"); english = available("en-US")
+        // (owner 2026-10-11: keyboards have unique ids; a backup keyboard with a phone keyboard's id is that keyboard)
+        hindi = available("hi").withId(1); english = available("en-US").withId(2)
     }
     @After fun tearDown() {
         zip.delete(); folder.deleteRecursively(); LayoutUtilsCustom.onLayoutFileChanged()
@@ -68,23 +69,25 @@ class ReReview2R3Test {
     private fun unsaved(keys: String) = LayoutUtilsCustom.makePrivateLayout(keys, type, "", ctx)
     private fun enabled() = SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }
 
-    /** The phone: [keyboards] (separate settings on, gaps 1), plus [off] switched off; the backup: [inBackup] with the
-     *  number row files [files] (name to keys), gaps 3. */
+    /** The phone: [keyboards] (with their ids; separate settings on, gaps 1), plus [off] switched off (in the added list
+     *  only); the backup: [inBackup] (the id a phone keyboard has: the same keyboard) with the number row files [files]
+     *  (name to keys), gaps 3. (owner 2026-10-11: keyboards have unique ids; no id map, here or in the backup) */
     private fun phoneAndBackup(keyboards: List<SettingsSubtype>, inBackup: SettingsSubtype, files: Map<String, String>,
                                off: SettingsSubtype? = null) {
-        real.edit().putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(keyboards + listOfNotNull(off)))
-            .putBoolean("separate_settings_per_keyboard", true).commit()
+        real.edit().putBoolean("separate_settings_per_keyboard", true).commit()
         useKeyboards(ctx, real, *keyboards.toTypedArray())
-        if (off != null) profileIds(real, (keyboards + off).withIndex().associate { it.value to it.index + 1 }, keyboards.size + 2)
-        else keyboards.forEach { KeyboardProfiles.idFor(real, it) }
+        if (off != null) {
+            real.edit().putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(keyboards + off)).commit()
+            SubtypeSettings.reloadEnabledSubtypes(ctx)
+        }
         // (owner 2026-10-11: no separate common set) each keyboard's own gap, here and in the backup
-        real.edit().apply { for (k in keyboards) putFloat(KeyboardProfiles.ownKey(KeyboardProfiles.idFor(real, k), Settings.PREF_KEY_HORIZONTAL_GAP), 1f) }.commit()
+        real.edit().apply { for (k in keyboards) putFloat(KeyboardProfiles.ownKey(k.keyboardId!!, Settings.PREF_KEY_HORIZONTAL_GAP), 1f) }.commit()
         val list = SubtypeSettings.createPrefSubtypes(listOf(inBackup))
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("preferences.json"))
             settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to list, Settings.PREF_ADDITIONAL_SUBTYPES to list,
-                "keyboard_profile_ids" to JSONObject().put(inBackup.toPref(), 1).toString(), KeyboardProfiles.NO_COMMON_SET_DONE to true,
-                KeyboardProfiles.ownKey(1, Settings.PREF_KEY_HORIZONTAL_GAP) to 3f,
+                KeyboardIdUpgrade.DONE to true, KeyboardProfiles.NO_COMMON_SET_DONE to true,
+                KeyboardProfiles.ownKey(inBackup.keyboardId!!, Settings.PREF_KEY_HORIZONTAL_GAP) to 3f,
                 helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
                 helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
             z.closeEntry()
@@ -99,7 +102,7 @@ class ReReview2R3Test {
 
     @Test fun `(a) other keys under the same unsaved name - a number row row, unticked the phone keeps its keys`() {
         val a = unsaved("A")
-        val phone = hindi.withLayout(type, a).toPref().toSettingsSubtype()
+        val phone = hindi.withLayout(type, a).withId(1)
         phoneAndBackup(listOf(phone), phone, mapOf(a to "B"))
         val differences = restoreDifferencesFrom(ctx, zip, phone, phone)
         val row = numberRowRow(differences)
@@ -116,8 +119,8 @@ class ReReview2R3Test {
 
     @Test fun `(a) ticked the keyboard gets the backup's keys, and the phone's unused unsaved file goes, a switched-off one's stays`() {
         val a = unsaved("A"); val c = unsaved("C")
-        val phone = hindi.withLayout(type, a).toPref().toSettingsSubtype()
-        val off = english.withLayout(type, c).toPref().toSettingsSubtype()
+        val phone = hindi.withLayout(type, a).withId(1)
+        val off = english.withLayout(type, c).withId(2)
         phoneAndBackup(listOf(phone), phone, mapOf(a to "B"), off = off)
         val differences = restoreDifferencesFrom(ctx, zip, phone, phone)
         assertTrue(numberRowRow(differences) != null, "no number row row: $differences")
@@ -134,9 +137,9 @@ class ReReview2R3Test {
 
     @Test fun `(b) the same keys under another unsaved name - no row`() {
         val a = unsaved("A")
-        val phone = hindi.withLayout(type, a).toPref().toSettingsSubtype()
+        val phone = hindi.withLayout(type, a).withId(1)
         val other = a.replace("~", "~z") // (an unsaved name the phone doesn't have)
-        val backup = hindi.withLayout(type, other).toPref().toSettingsSubtype()
+        val backup = hindi.withLayout(type, other).withId(1) // (the same keyboard, other keys)
         phoneAndBackup(listOf(phone), backup, mapOf(other to "A"))
         val differences = restoreDifferencesFrom(ctx, zip, backup, phone)
         assertEquals(null, numberRowRow(differences), "$differences")
@@ -155,8 +158,8 @@ class ReReview2R3Test {
             z.putNextEntry(ZipEntry("preferences.json"))
             // (hindi's own set: no separate common set, owner 2026-10-11)
             settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to list,
-                "keyboard_profile_ids" to JSONObject().put(hindi.toPref(), 1).toString(), KeyboardProfiles.NO_COMMON_SET_DONE to true,
-                KeyboardProfiles.ownKey(1, Settings.PREF_LAYOUT_PREFIX + type.name) to p,
+                KeyboardIdUpgrade.DONE to true, KeyboardProfiles.NO_COMMON_SET_DONE to true,
+                KeyboardProfiles.ownKey(hindi.keyboardId!!, Settings.PREF_LAYOUT_PREFIX + type.name) to p,
                 helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
                 helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
             z.closeEntry()
@@ -173,16 +176,16 @@ class ReReview2R3Test {
         useKeyboards(ctx, real, english)
         AppearanceLooks.save(real, listOf(AppearanceLooks.Look(phoneTheme, mapOf(Settings.PREF_KEY_HORIZONTAL_GAP to phoneGap))), now = true)
         // (english's own choice, here and in the backup: no separate common set, owner 2026-10-11)
-        val id = KeyboardProfiles.idFor(real, english)
+        val id = english.keyboardId!!
         real.edit().putString(KeyboardProfiles.ownKey(id, AppearanceLooks.PREF_SELECTED), phoneTheme)
             .putFloat(KeyboardProfiles.ownKey(id, Settings.PREF_KEY_HORIZONTAL_GAP), phoneGap).commit()
         val look = JSONObject().put("name", backupTheme).put("values", JSONObject().put(Settings.PREF_KEY_HORIZONTAL_GAP, JSONObject().put("f", backupGap.toDouble())))
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("preferences.json"))
-            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to english.toPref(), Settings.PREF_ADDITIONAL_SUBTYPES to "",
-                "keyboard_profile_ids" to JSONObject().put(english.toPref(), 1).toString(), KeyboardProfiles.NO_COMMON_SET_DONE to true,
-                AppearanceLooks.PREF to JSONArray(listOf(look)).toString(), KeyboardProfiles.ownKey(1, AppearanceLooks.PREF_SELECTED) to backupTheme,
-                KeyboardProfiles.ownKey(1, Settings.PREF_KEY_HORIZONTAL_GAP) to backupGap,
+            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to english.toPref(), Settings.PREF_ADDITIONAL_SUBTYPES to english.toPref(),
+                KeyboardIdUpgrade.DONE to true, KeyboardProfiles.NO_COMMON_SET_DONE to true,
+                AppearanceLooks.PREF to JSONArray(listOf(look)).toString(), KeyboardProfiles.ownKey(id, AppearanceLooks.PREF_SELECTED) to backupTheme,
+                KeyboardProfiles.ownKey(id, Settings.PREF_KEY_HORIZONTAL_GAP) to backupGap,
                 helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
                 helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
             z.closeEntry()
@@ -207,7 +210,7 @@ class ReReview2R3Test {
     // restore whatever the tick: nothing of Appearance to restore
     @Test fun `(c) the backup's Sunset with other content, the keyboards' own looks the same - no Appearance row, ticked or not`() {
         themes("Sunset", 1f, "Sunset", 3f)
-        real.edit().putFloat(KeyboardProfiles.ownKey(KeyboardProfiles.idFor(real, english), Settings.PREF_KEY_HORIZONTAL_GAP), 3f).commit()
+        real.edit().putFloat(KeyboardProfiles.ownKey(english.keyboardId!!, Settings.PREF_KEY_HORIZONTAL_GAP), 3f).commit()
         assertFalse(appearanceRow(restoreDifferencesFrom(ctx, zip, english, english)))
         assertFalse(appearanceRow(restoreDifferencesFrom(ctx, zip, english, english,
             names = SavedItemsMerge.Choices(setOf(SavedItemsMerge.Kind.THEMES to "Sunset")))))

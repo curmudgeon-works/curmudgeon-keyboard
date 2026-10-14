@@ -3,6 +3,7 @@ package helium314.keyboard
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import helium314.keyboard.latin.settings.KeyboardIdUpgrade
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
@@ -12,6 +13,7 @@ import helium314.keyboard.latin.utils.LayoutType
 import helium314.keyboard.latin.utils.LayoutUtilsCustom
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.settings.LayoutPresets
+import helium314.keyboard.settings.preferences.RestoreDecision
 import helium314.keyboard.settings.preferences.restoreKeyboardsFrom
 import helium314.keyboard.settings.preferences.settingsToJsonStream
 import org.json.JSONArray
@@ -33,6 +35,8 @@ import kotlin.test.assertTrue
  * pattern of fonts and pictures): the same keys are the phone's file; other keys come in as "My numrow 2" and the
  * restored keyboard, its default for the type and the restored Layouts name that one. The phone's file, and every other
  * keyboard using it, keep their keys (before: the backup's file was written over the phone's).
+ * (owner 2026-10-11: keyboards have unique ids) The keyboards have ids (phone German k1, backup US k2); a restore again
+ * merges into the keyboard the first one brought (unasked, it would come in as a second keyboard).
  */
 @RunWith(RobolectricTestRunner::class)
 class PartialRestoreLayoutsTest {
@@ -46,8 +50,8 @@ class PartialRestoreLayoutsTest {
     private fun file(name: String) = LayoutUtilsCustom.getLayoutFile(name, type, ctx)
     private val folder get() = file(numrow).parentFile!!
 
-    private val phoneKeyboard = SettingsSubtype(Locale.GERMANY, "").withLayout(type, numrow)
-    private val backupKeyboard = SettingsSubtype(Locale.US, "").withLayout(type, numrow)
+    private val phoneKeyboard = SettingsSubtype(Locale.GERMANY, "").withLayout(type, numrow).withId(1)
+    private val backupKeyboard = SettingsSubtype(Locale.US, "").withLayout(type, numrow).withId(2)
 
     @Before fun setUp() {
         real.edit().clear().commit()
@@ -85,8 +89,8 @@ class PartialRestoreLayoutsTest {
             settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to backupKeyboard.toPref(),
                 Settings.PREF_ADDITIONAL_SUBTYPES to backupKeyboard.toPref(),
                 // (its own set: owner 2026-10-11, no separate common set; a backup's common set is ignored)
-                LayoutPresets.PREF to JSONArray(listOf(work)).toString(), "p1/$defaultKey" to numrow,
-                "keyboard_profile_ids" to JSONObject().put(backupKeyboard.toPref(), 1).toString(),
+                LayoutPresets.PREF to JSONArray(listOf(work)).toString(), idKey(2, defaultKey) to numrow,
+                KeyboardIdUpgrade.DONE to true, // (a backup of this build: its keyboards have ids)
                 helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
                 helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
             z.closeEntry()
@@ -96,13 +100,13 @@ class PartialRestoreLayoutsTest {
     private fun LayoutType.folderName() = "layouts/${name.lowercase()}"
 
     private fun enabled() = SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }
-    private fun ownDefault(keyboard: SettingsSubtype) = real.getString(KeyboardProfiles.ownKey(KeyboardProfiles.idFor(real, keyboard), defaultKey), null)
+    private fun ownDefault(keyboard: SettingsSubtype) = real.getString(KeyboardProfiles.ownKey(keyboard.keyboardId!!, defaultKey), null)
 
 
     @Test fun `other keys under a name the phone has come in numbered, and only the restored keyboard uses them`() {
         file(numrow).writeText("A")
         backup("B")
-        restoreKeyboardsFrom(ctx, zip, listOf(SettingsSubtype(Locale.US, "").withLayout(type, numrow)), withSettings = true)
+        restoreKeyboardsFrom(ctx, zip, listOf(backupKeyboard), withSettings = true)
         assertEquals("A", file(numrow).readText()) // (the phone's file kept its keys)
         assertEquals("B", file(numrow2).readText())
         assertEquals("My numrow 2", LayoutUtilsCustom.getDisplayName(numrow2))
@@ -115,8 +119,8 @@ class PartialRestoreLayoutsTest {
         assertEquals(numrow2, preset.values["layout:${type.name}"])
         assertEquals(numrow2, preset.values[defaultKey])
 
-        // again: nothing new
-        restoreKeyboardsFrom(ctx, zip, listOf(backupKeyboard), withSettings = true)
+        // again, merged into the restored keyboard: nothing new
+        restoreKeyboardsFrom(ctx, zip, listOf(backupKeyboard), withSettings = true, decisions = mapOf(backupKeyboard to RestoreDecision.Merge(restored)))
         assertEquals(setOf(numrow, numrow2), folder.list()!!.toSet())
         assertEquals("A", file(numrow).readText())
         assertEquals(listOf(phoneKeyboard, restored), enabled().sortedBy { it.locale.toLanguageTag() })
@@ -140,7 +144,7 @@ class PartialRestoreLayoutsTest {
         backup("B")
         // (owner 2026-10-11: restore matches by language and asks: answered "merge into the phone's", all ticked)
         restoreKeyboardsFrom(ctx, zip, listOf(backupKeyboard), withSettings = true,
-            decisions = mapOf(backupKeyboard to helium314.keyboard.settings.preferences.RestoreDecision.Merge(backupKeyboard)))
+            decisions = mapOf(backupKeyboard to RestoreDecision.Merge(backupKeyboard)))
         assertEquals("A", file(numrow).readText())
         assertEquals("B", file(numrow2).readText())
         assertEquals(listOf(backupKeyboard.withLayout(type, numrow2), phoneKeyboard), enabled())
@@ -158,11 +162,11 @@ class PartialRestoreLayoutsTest {
     @Test fun `an unsaved layout with other keys under its name gets a new unsaved one, reused on a second restore`() {
         val private = "custom.~abc."
         file(private).writeText("A")
-        phoneKeyboards(phoneKeyboard, SettingsSubtype(Locale.UK, "").withLayout(type, private)) // (a phone keyboard's own)
-        val kb = SettingsSubtype(Locale.US, "").withLayout(type, private)
+        phoneKeyboards(phoneKeyboard, SettingsSubtype(Locale.UK, "").withLayout(type, private).withId(3)) // (a phone keyboard's own)
+        val kb = SettingsSubtype(Locale.US, "").withLayout(type, private).withId(4)
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("preferences.json"))
-            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to kb.toPref(), Settings.PREF_ADDITIONAL_SUBTYPES to kb.toPref(),
+            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to kb.toPref(), Settings.PREF_ADDITIONAL_SUBTYPES to kb.toPref(), KeyboardIdUpgrade.DONE to true,
                 helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
                 helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
             z.closeEntry()
@@ -174,7 +178,8 @@ class PartialRestoreLayoutsTest {
         val name = restored.layoutName(type)!!
         assertTrue(LayoutUtilsCustom.isPrivateLayout(name) && name != private, name)
         assertEquals("B", file(name).readText())
-        restoreKeyboardsFrom(ctx, zip, listOf(kb), withSettings = true) // (again: the same keyboard, no new file)
+        restoreKeyboardsFrom(ctx, zip, listOf(kb), withSettings = true, // (again, merged into it: the same keyboard, no new file)
+            decisions = mapOf(kb to RestoreDecision.Merge(restored)))
         assertEquals(listOf(restored), enabled().filter { it.locale == Locale.US })
         assertEquals(setOf(private, name), folder.list()!!.toSet())
     }

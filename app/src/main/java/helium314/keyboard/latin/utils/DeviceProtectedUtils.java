@@ -25,13 +25,13 @@ public final class DeviceProtectedUtils {
     // KeyboardScopeContext), and the other settings screens (the main choice, worked out on every read)
     private static SharedPreferences imePrefs;
     private static SharedPreferences mainPrefs;
-    private static final ConcurrentHashMap<Integer, SharedPreferences> keyboardPrefs = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, SharedPreferences> keyboardPrefs = new ConcurrentHashMap<>();
 
     public static SharedPreferences getSharedPreferences(final Context context) {
         final SharedPreferences real = getRealSharedPreferences(context);
-        final Integer keyboardId = KeyboardScopeContext.idOf(context);
+        final String keyboardId = KeyboardScopeContext.idOf(context);
         if (keyboardId != null) {
-            final int id = keyboardId;
+            final String id = keyboardId;
             final SharedPreferences cached = keyboardPrefs.get(id);
             if (cached != null) return cached;
             final SharedPreferences made = new ProfilePreferences(real, () -> KeyboardProfiles.INSTANCE.scopedId(real, id));

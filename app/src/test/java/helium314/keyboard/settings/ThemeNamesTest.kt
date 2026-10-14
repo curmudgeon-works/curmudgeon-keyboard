@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings
 
+import helium314.keyboard.idKey
 import android.content.Context
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.hasScrollAction
@@ -68,7 +69,7 @@ class ThemeNamesTest {
 
     @Test fun `rename doesn't take a built-in theme's name, so keyboards with the built-in keep it`() {
         AppearanceLooks.save(ctx.prefs(), listOf(AppearanceLooks.Look("Mine", mapOf(Settings.PREF_THEME_STYLE to "Rounded"))))
-        real.edit().putString("p1/${AppearanceLooks.PREF_SELECTED}", curmudgeon).commit() // a keyboard with the built-in
+        real.edit().putString(idKey(1, AppearanceLooks.PREF_SELECTED), curmudgeon).commit() // a keyboard with the built-in
         open().use {
             compose.onNodeWithText(ctx.getString(R.string.appearance_looks)).performClick()
             compose.onNode(hasScrollAction()).performScrollToNode(hasText("Mine")) // (after the built-in ones)
@@ -78,6 +79,6 @@ class ThemeNamesTest {
             typeAndOk("Work")
             assertEquals(listOf("Work"), names())
         }
-        assertEquals(curmudgeon, real.getString("p1/${AppearanceLooks.PREF_SELECTED}", null))
+        assertEquals(curmudgeon, real.getString(idKey(1, AppearanceLooks.PREF_SELECTED), null))
     }
 }

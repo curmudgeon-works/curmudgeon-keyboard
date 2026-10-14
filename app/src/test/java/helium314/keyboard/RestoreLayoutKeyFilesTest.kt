@@ -3,6 +3,7 @@ package helium314.keyboard
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import helium314.keyboard.latin.settings.KeyboardIdUpgrade
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
@@ -42,6 +43,8 @@ import kotlin.test.assertTrue
  * phone's. Other keys: the Layout's tick (backup wins the name if ticked): ticked, the Layout's keys take the name and
  * the phone's file gets the next number, every keyboard and saved Layout using it following; unticked, nothing changes
  * (the Layout keeps its keys as its own copy). Before: the Layout kept the name, which pointed at the phone's other keys.
+ * (owner 2026-10-11: keyboards have unique ids) The phone's German is k1, the backup's US k2; a layout rename keeps the
+ * keyboard's id (nothing moves); a restore again merges into the keyboard the first one brought.
  */
 @RunWith(RobolectricTestRunner::class)
 class RestoreLayoutKeyFilesTest {
@@ -56,8 +59,8 @@ class RestoreLayoutKeyFilesTest {
     private val layoutKey = "layout:${type.name}"
 
     // the phone's keyboard on My numrow; the restored keyboard uses none (its Layout names it)
-    private val phoneKeyboard = SettingsSubtype(Locale.GERMANY, "").withLayout(type, numrow).toPref().toSettingsSubtype()
-    private val restored = SettingsSubtype(Locale.US, "")
+    private val phoneKeyboard = SettingsSubtype(Locale.GERMANY, "").withLayout(type, numrow).withId(1)
+    private val restored = SettingsSubtype(Locale.US, "").withId(2)
 
     @Before fun setUp() {
         real.edit().clear().commit()
@@ -72,7 +75,7 @@ class RestoreLayoutKeyFilesTest {
         SubtypeSettings.reloadEnabledSubtypes(ctx)
     }
 
-    /** The phone: [phoneKeyboard] (set 1), its list and registration in one write; its saved Layout "Home" on My
+    /** The phone: [phoneKeyboard] (k1), its list and registration in one write; its saved Layout "Home" on My
      *  numrow, holding [homeKeys]. */
     private fun phone(homeKeys: String) {
         val home = LayoutPresets.Preset("Home", mapOf(layoutKey to numrow, "layoutText:${type.name}" to homeKeys))
@@ -81,8 +84,6 @@ class RestoreLayoutKeyFilesTest {
             .putString(Settings.PREF_ENABLED_SUBTYPES, phoneKeyboard.toPref())
             .putString(Settings.PREF_SELECTED_SUBTYPE, phoneKeyboard.toPref())
             .putBoolean("separate_settings_per_keyboard", true)
-            .putString("keyboard_profile_ids", JSONObject().put(phoneKeyboard.toPref(), 1).toString())
-            .putInt("keyboard_profile_next_id", 2)
             .commit()
         LayoutPresets.save(real, listOf(home))
         KeyboardProfiles.loadGroups(real)
@@ -98,8 +99,8 @@ class RestoreLayoutKeyFilesTest {
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("preferences.json"))
             settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to restored.toPref(),
-                LayoutPresets.PREF to JSONArray(listOf(work)).toString(), "p1/${LayoutPresets.PREF_SELECTED}" to "Work",
-                "keyboard_profile_ids" to JSONObject().put(restored.toPref(), 1).toString(), KeyboardProfiles.NO_COMMON_SET_DONE to true,
+                LayoutPresets.PREF to JSONArray(listOf(work)).toString(), idKey(2, LayoutPresets.PREF_SELECTED) to "Work",
+                KeyboardIdUpgrade.DONE to true, KeyboardProfiles.NO_COMMON_SET_DONE to true,
                 helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
                 helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
             z.closeEntry()
@@ -110,7 +111,8 @@ class RestoreLayoutKeyFilesTest {
     private fun enabled() = SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }
     private fun preset(name: String) = LayoutPresets.load(real).single { it.name == name }
     private fun restore(names: SavedItemsMerge.Choices = SavedItemsMerge.Choices()) {
-        val decisions = if (KeyboardProfiles.idEntries(real).containsKey(restored.toPref())) mapOf(restored to RestoreDecision.Merge(restored)) else emptyMap()
+        // (again: merged into the keyboard the first restore brought, as it is on the phone)
+        val decisions = listedById(real, restored.keyboardId!!)?.let { mapOf(restored to RestoreDecision.Merge(it)) } ?: emptyMap()
         restoreKeyboardsFrom(ctx, zip, listOf(restored), withSettings = true, names = names, decisions = decisions)
     }
 
@@ -150,7 +152,7 @@ class RestoreLayoutKeyFilesTest {
         val renamed = phoneKeyboard.withLayout(type, numrow2).toPref().toSettingsSubtype()
         assertTrue(renamed in enabled(), "${enabled()}")
         assertFalse(phoneKeyboard in enabled())
-        assertEquals(1, KeyboardProfiles.idEntries(real)[renamed.toPref()]) // (its set went with it)
+        assertEquals(renamed, listedById(real, kid(1))) // (its id kept: its set is still its own, nothing moved)
         assertEquals(numrow2, preset("Home").values[layoutKey])
 
         // again: nothing new

@@ -34,7 +34,7 @@ import kotlin.test.assertTrue
 class Review1010ThemesTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
-    private fun set(id: Int) = ProfilePreferences(real) { id }
+    private fun set(id: Int) = ProfilePreferences(real) { kid(id) }
     private val colors = Settings.PREF_THEME_COLORS
     private val night = Settings.PREF_THEME_COLORS_NIGHT
 
@@ -46,15 +46,18 @@ class Review1010ThemesTest {
     // separate settings off; keyboard 1's own set (kept from earlier) and keyboard 2's name the palette "My theme", as
     // keyboard 3's, the first in the list (owner 2026-10-11: palettes are one app-wide list, no set has a copy; before,
     // keyboard 2 had its own "My theme" and a set following a rename got a copy)
-    private val first = helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.FRANCE, "")
+    // (owner 2026-10-11: keyboards have unique ids: k1 and k2 switched off, in the added list only, k3 listed; no id map)
+    private val first = helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.FRANCE, "").withId(3)
     private fun hiddenSetsNamingMyTheme() {
+        val off = listOf(helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.US, "").withId(1),
+            helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.GERMANY, "").withId(2))
         real.edit()
-            .putString("keyboard_profile_ids", """{"en_US:":1,"de_DE:":2,"${first.toPref()}":3}""")
+            .putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(off + first))
             .putString(Settings.PREF_ENABLED_SUBTYPES, first.toPref())
             .putString("${Settings.PREF_USER_COLORS_PREFIX}My theme", "[]")
-            .putString("p3/$colors", "My theme")
-            .putString("p1/$colors", "My theme").putString("p1/$night", "My theme")
-            .putString("p2/$colors", "My theme")
+            .putString(idKey(3, colors), "My theme")
+            .putString(idKey(1, colors), "My theme").putString(idKey(1, night), "My theme")
+            .putString(idKey(2, colors), "My theme")
             .commit()
     }
 
@@ -63,9 +66,9 @@ class Review1010ThemesTest {
         hiddenSetsNamingMyTheme()
         helium314.keyboard.settings.Palettes.delete(real, set(1), "My theme", onlyHere = false) // (separate off: the main set)
         assertFalse(real.contains("${Settings.PREF_USER_COLORS_PREFIX}My theme"))
-        for (id in 1..3) assertEquals(null, real.getString("p$id/$colors", null))
-        assertFalse(real.contains("p1/~$colors")) // (owner 2026-10-11: no default marks; nothing stored = the default)
-        assertEquals(null, real.getString("p1/$night", null))
+        for (id in 1..3) assertEquals(null, real.getString(idKey(id, colors), null))
+        assertFalse(real.contains(idKey(1, "~$colors"))) // (owner 2026-10-11: no default marks; nothing stored = the default)
+        assertEquals(null, real.getString(idKey(1, night), null))
         // a new palette that takes the free name later is not picked up by keyboard 1 when separate settings come back
         real.edit().putString("${Settings.PREF_USER_COLORS_PREFIX}My theme", "[]").putBoolean("separate_settings_per_keyboard", true).commit()
         assertEquals(null, set(1).getString(colors, null))
@@ -76,19 +79,19 @@ class Review1010ThemesTest {
         assertTrue(KeyboardTheme.renameUserColors("My theme", "Work", set(1)))
         assertEquals("[]", real.getString("${Settings.PREF_USER_COLORS_PREFIX}Work", null))
         assertFalse(real.contains("${Settings.PREF_USER_COLORS_PREFIX}My theme"))
-        assertEquals("Work", real.getString("p3/$colors", null))
-        assertEquals("Work", real.getString("p1/$colors", null))
-        assertEquals("Work", real.getString("p1/$night", null))
-        assertEquals("Work", real.getString("p2/$colors", null))
+        assertEquals("Work", real.getString(idKey(3, colors), null))
+        assertEquals("Work", real.getString(idKey(1, colors), null))
+        assertEquals("Work", real.getString(idKey(1, night), null))
+        assertEquals("Work", real.getString(idKey(2, colors), null))
     }
 
     @Test fun `the palette editor's Discard after a rename takes every set back too`() {
         hiddenSetsNamingMyTheme()
         KeyboardTheme.renameUserColors("My theme", "Work", set(1))
         KeyboardTheme.renameUserColors("Work", "My theme", set(1)) // (what the editor's putBack does)
-        assertEquals("My theme", real.getString("p1/$colors", null))
-        assertEquals("My theme", real.getString("p1/$night", null))
-        assertEquals("My theme", real.getString("p2/$colors", null))
+        assertEquals("My theme", real.getString(idKey(1, colors), null))
+        assertEquals("My theme", real.getString(idKey(1, night), null))
+        assertEquals("My theme", real.getString(idKey(2, colors), null))
     }
 
     // (owner 2026-10-11: "keep all on Warm and move this to default")
@@ -96,9 +99,9 @@ class Review1010ThemesTest {
         hiddenSetsNamingMyTheme()
         real.edit().putBoolean("separate_settings_per_keyboard", true).commit()
         helium314.keyboard.settings.Palettes.delete(real, set(2), "My theme", onlyHere = true)
-        assertEquals(null, real.getString("p2/$colors", null))
-        assertEquals("My theme", real.getString("p1/$colors", null))
-        assertEquals("My theme", real.getString("p3/$colors", null))
+        assertEquals(null, real.getString(idKey(2, colors), null))
+        assertEquals("My theme", real.getString(idKey(1, colors), null))
+        assertEquals("My theme", real.getString(idKey(3, colors), null))
         assertTrue(real.contains("${Settings.PREF_USER_COLORS_PREFIX}My theme"))
     }
 

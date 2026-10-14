@@ -23,14 +23,15 @@ import java.util.concurrent.locks.ReentrantLock
 
 /**
  * Every keyboard has its own learned words and blacklist (2026-10-10; the switch "Share learned & blacklisted words
- * across keyboards" is gone): a pool (see LearnedStores) per keyboard, found by the keyboard's identity
- * (SettingsSubtype.toPref), not its profile id (a factory reset starts the ids again, a restore brings the backup's).
+ * across keyboards" is gone): a pool (see LearnedStores) per keyboard, found by the keyboard's id (KeyboardIds; owner
+ * 2026-10-11: "do IDs now"; the pools keep their numbers and files).
  *
  * Preferences (app-wide, never a keyboard's own):
- * - [PREF_POOLS]: identity -> pool; [PREF_POOL_NEXT]: the next pool number, never lower (a reset keeps both)
+ * - [PREF_POOLS]: keyboard id -> pool; [PREF_POOL_NEXT]: the next pool number, never lower (a reset keeps both)
  * - [PREF_USE_OTHERS_LEARNED], [PREF_USE_OTHERS_BLACKLISTED]: the keyboards set to use the other keyboards' lists
  * - [PREF_DONE]: the one-time update below is done. Until then the old rule applies: the shared pool 0 with the switch
- *   on, else the keyboard's profile id. So the pools the update copies into are in no one's use while it runs.
+ *   on (with it off, the keyboard ids' upgrade did the update: KeyboardIdUpgrade). So the pools the update copies into
+ *   are in no one's use while it runs.
  *
  * The one-time update ([updateOnce]), once the user is unlocked (the files are in credential storage): with sharing on
  * each keyboard gets a fresh pool holding a copy of the shared words and blacklists, and both buttons on; with sharing off
@@ -75,11 +76,12 @@ object LearnedKeyboards {
      *  create records; only add/copy/restore/upgrade and the net do); every reader: [poolOrNull]. Before the update: the
      *  old rule (see the class). Prefs only: safe before unlock and on the main thread. [real]: the preferences as stored. */
     fun poolFor(real: SharedPreferences, keyboard: SettingsSubtype): Int {
-        if (!isDone(real)) return if (shared(real)) LearnedStores.SHARED else KeyboardProfiles.idFor(real, keyboard)
+        if (!isDone(real) && shared(real)) return LearnedStores.SHARED
+        // (a keyboard without an id, never a listed one after the net: the old shared pool, which nothing else writes)
+        val key = keyboard.keyboardId ?: return LearnedStores.SHARED.also { Log.w(TAG, "a keyboard without an id: no pool of its own") }
         // (never calls into KeyboardProfiles while holding this: its hooks call in here)
         synchronized(this) {
             val map = pools(real)
-            val key = keyboard.toPref()
             if (map.has(key)) return map.getInt(key)
             val pool = nextFree(real, map)
             map.put(key, pool)
@@ -89,11 +91,12 @@ object LearnedKeyboards {
         }
     }
 
-    /** The pool of [keyboard], null when it has none (a lookup: never creates one). Before the update: the old rule, the
-     *  profile id only if it has one. */
+    /** The pool of [keyboard], by its id; null when it has none (a lookup: never creates one). Before the update: the old
+     *  rule. */
     fun poolOrNull(real: SharedPreferences, keyboard: SettingsSubtype): Int? {
-        if (!isDone(real)) return if (shared(real)) LearnedStores.SHARED else KeyboardProfiles.idOrNull(real, keyboard)
-        return synchronized(this) { pools(real).let { map -> keyboard.toPref().takeIf { map.has(it) }?.let { map.getInt(it) } } }
+        if (!isDone(real) && shared(real)) return LearnedStores.SHARED
+        val key = keyboard.keyboardId ?: return null
+        return synchronized(this) { pools(real).let { map -> key.takeIf { map.has(it) }?.let { map.getInt(it) } } }
     }
 
     /** [keyboard]'s pool for a write a user asked for: its own, else one now if it's in the list (the net, for one
@@ -104,7 +107,7 @@ object LearnedKeyboards {
     /** The net's part (KeyboardProfiles.ensureListedRecords): [keyboard] gets a pool if it has none, once the update is
      *  done (before it the profile id is the pool). @return whether one was created */
     internal fun ensurePool(real: SharedPreferences, keyboard: SettingsSubtype): Boolean {
-        if (!isDone(real) || poolOrNull(real, keyboard) != null) return false
+        if (!isDone(real) || keyboard.keyboardId == null || poolOrNull(real, keyboard) != null) return false
         poolFor(real, keyboard)
         return true
     }
@@ -112,31 +115,39 @@ object LearnedKeyboards {
     private fun nextFree(real: SharedPreferences, map: JSONObject): Int =
         maxOf(real.getInt(PREF_POOL_NEXT, 1), (map.keys().asSequence().maxOfOrNull { map.optInt(it) } ?: 0) + 1, 1)
 
-    /** Every keyboard identity with its pool (reads only). */
+    /** Every keyboard id with its pool (reads only). */
     fun poolEntries(real: SharedPreferences): Map<String, Int> =
         synchronized(this) { pools(real).let { map -> map.keys().asSequence().associateWith { map.optInt(it) } } }
 
-    private fun pools(real: SharedPreferences): JSONObject =
-        try { JSONObject(real.getString(PREF_POOLS, null) ?: "{}") } catch (e: Exception) { JSONObject() }
+    /** [poolEntries] of stored preferences [all] (a backup's, or the phone's read once). */
+    fun poolEntries(all: Map<String, *>): Map<String, Int> =
+        pools(all[PREF_POOLS] as? String).let { map -> map.keys().asSequence().associateWith { map.optInt(it) } }
 
-    /** The keyboards (pref strings) with a pool, switched-off ones too. */
+    private fun pools(real: SharedPreferences): JSONObject = pools(real.getString(PREF_POOLS, null))
+
+    private fun pools(json: String?): JSONObject =
+        try { JSONObject(json ?: "{}") } catch (e: Exception) { JSONObject() }
+
+    /** The keyboard ids with a pool, switched-off ones too. */
     fun poolKeys(real: SharedPreferences): Set<String> = pools(real).keys().asSequence().toSet()
 
-    /** Whether [keyboard] uses the other keyboards' lists of button [pref] (one of [buttonPrefs]). */
-    fun usesOthers(real: SharedPreferences, pref: String, keyboard: SettingsSubtype) = keyboard.toPref() in ids(real.getString(pref, null))
+    /** Whether [keyboard] uses the other keyboards' lists of button [pref] (one of [buttonPrefs]): its id is in it. */
+    fun usesOthers(real: SharedPreferences, pref: String, keyboard: SettingsSubtype) =
+        keyboard.keyboardId?.let { it in ids(real.getString(pref, null)) } == true
 
     /** [keyboard]'s button [pref] on or off (the keyboard's screen); the view follows (LearnedStores' listener). */
     fun setUsesOthers(real: SharedPreferences, pref: String, keyboard: SettingsSubtype, on: Boolean) {
+        val id = keyboard.keyboardId ?: return
         synchronized(this) {
             val set = ids(real.getString(pref, null))
-            val changed = if (on) set.add(keyboard.toPref()) else set.remove(keyboard.toPref())
+            val changed = if (on) set.add(id) else set.remove(id)
             if (changed) real.edit().also { it.putIds(pref, set) }.apply()
         }
     }
 
     /** The pools of the listed keyboards other than [keyboard] (whose pool is [own]): what its buttons read. */
     fun otherPools(real: SharedPreferences, keyboard: SettingsSubtype, own: Int): List<Int> =
-        listedKeyboards(real).filter { it.toPref() != keyboard.toPref() }.mapNotNull { poolOrNull(real, it) }.distinct().filter { it != own }
+        listedKeyboards(real).filter { !it.sameKeyboard(keyboard) }.mapNotNull { poolOrNull(real, it) }.distinct().filter { it != own }
 
     private fun ids(json: String?): LinkedHashSet<String> = try {
         JSONArray(json ?: "[]").let { a -> (0 until a.length()).mapTo(LinkedHashSet()) { a.getString(it) } }
@@ -147,39 +158,32 @@ object LearnedKeyboards {
     }
 
     // ---------------- keyboards changed ----------------
+    // (a keyboard changed, renamed or given other keys, keeps its id: nothing moves; owner 2026-10-11, keyboards have
+    // unique ids. Before, its pool and buttons followed its definition here.)
 
-    /** [from] became [to] (rename, languages, layout; KeyboardProfiles.onKeyboardChanged): its words and buttons follow.
-     *  As there: [to] has a pool already (a preview of another keyboard) → nothing moves. */
+    /** Keyboard id [from]'s pool, buttons (and the update's plan entry) become [to]'s (a restore gave the phone's keyboard a
+     *  new id: KeyboardIds.giveNewId). */
     @Synchronized
-    fun onKeyboardChanged(real: SharedPreferences, from: SettingsSubtype, to: SettingsSubtype) {
+    fun moveRecords(real: SharedPreferences, from: String, to: String) {
         if (from == to) return
-        val fromKey = from.toPref()
-        val toKey = to.toPref()
         val editor = real.edit()
-        var changed = false
         val map = pools(real)
-        if (!map.has(toKey)) {
-            if (map.has(fromKey)) {
-                map.put(toKey, map.getInt(fromKey)); map.remove(fromKey)
-                editor.putString(PREF_POOLS, map.toString()); changed = true
-            }
-            for (pref in buttonPrefs) {
-                val set = ids(real.getString(pref, null))
-                if (set.remove(fromKey)) { set.add(toKey); editor.putIds(pref, set); changed = true }
-            }
+        if (map.has(from)) { map.put(to, map.getInt(from)); map.remove(from) } else map.remove(to)
+        editor.putString(PREF_POOLS, map.toString())
+        for (pref in buttonPrefs) {
+            val set = ids(real.getString(pref, null))
+            set.remove(to)
+            if (set.remove(from)) set.add(to)
+            editor.putIds(pref, set)
         }
-        // while the update runs: its plan too
-        readPlan(real)?.let { plan ->
-            if (plan.pools.containsKey(toKey)) return@let
-            plan.pools.remove(fromKey)?.let { plan.pools[toKey] = it; editor.putString(PREF_PLAN, plan.json()); changed = true }
-        }
-        if (changed) editor.apply()
+        readPlan(real)?.let { plan -> plan.pools.remove(from)?.let { plan.pools[to] = it; editor.putString(PREF_PLAN, plan.json()) } }
+        editor.commit()
     }
 
     /** [keyboard] was deleted: its entry and buttons go (its files stay on disk). */
     @Synchronized
     fun onKeyboardDeleted(real: SharedPreferences, keyboard: SettingsSubtype) {
-        val key = keyboard.toPref()
+        val key = keyboard.keyboardId ?: return
         val editor = real.edit()
         var changed = false
         val map = pools(real)
@@ -200,7 +204,7 @@ object LearnedKeyboards {
     fun deleteKeyboard(context: Context, keyboard: SettingsSubtype, mergeInto: SettingsSubtype? = null) {
         val real = DeviceProtectedUtils.getRealSharedPreferences(context)
         val pool = if (!isDone(real)) null else synchronized(this) {
-            pools(real).let { map -> keyboard.toPref().takeIf { map.has(it) }?.let { map.getInt(it) } }
+            pools(real).let { map -> keyboard.keyboardId?.takeIf { map.has(it) }?.let { map.getInt(it) } }
         }
         // [mergeInto] (picked in the delete dialog, 2026-10-11: "Merge these lists into one of those keyboards and refer
         // from others"): it takes the lists, merged into its own, before they're deleted, in the same task
@@ -233,7 +237,7 @@ object LearnedKeyboards {
      *  dialog names them and offers to merge the lists into one. */
     fun listReaders(real: SharedPreferences, keyboard: SettingsSubtype): List<SettingsSubtype> =
         SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.distinct()
-            .filter { it != keyboard && buttonPrefs.any { pref -> usesOthers(real, pref, it) } }
+            .filter { !it.sameKeyboard(keyboard) && buttonPrefs.any { pref -> usesOthers(real, pref, it) } }
 
     /** [pool]'s stores and lists deleted, unless a keyboard has it (again). Background only. */
     internal fun deleteWordsOf(context: Context, pool: Int) = withFiles {
@@ -316,7 +320,7 @@ object LearnedKeyboards {
             }
             val shared = shared(real)
             val earlier = readPlan(real)
-            val plan = earlier ?: newPlan(real, filesDir, shared)
+            val plan = earlier ?: newPlan(real, filesDir)
             // (nothing to copy: no shared words, or sharing off)
             val copy = shared && (earlier != null || LearnedStores.scriptsOnDisk(filesDir, LearnedStores.SHARED).isNotEmpty())
             if (earlier == null) {
@@ -326,17 +330,16 @@ object LearnedKeyboards {
             }
             if (copy && !copyShared(filesDir, storeIo, plan.pools.values.distinct())) return@withFiles false
             repeat(20) {
-                val listed = listedKeyboards(real)
-                // (the profile ids outside the lock below: KeyboardProfiles calls in here holding its own)
-                val ids = if (shared) emptyMap() else listed.associate { it.toPref() to KeyboardProfiles.idFor(real, it) }
                 val added = synchronized(this) {
-                    val now = readPlan(real) ?: plan // (a hook may have moved an entry)
-                    val keys = listedKeyboards(real).map { it.toPref() }
+                    val now = readPlan(real) ?: plan // (a restore may have moved an entry)
+                    val keys = listedKeyboards(real).mapNotNull { it.keyboardId }.distinct()
                     val missing = keys.filter { it !in now.pools }
                     if (missing.isEmpty()) { finish(real, now, shared, keys); return@synchronized null }
                     val pools = ArrayList<Int>()
                     for (key in missing) {
-                        val pool = if (shared) now.next else ids[key] ?: continue // (not known yet: next round)
+                        // (sharing off: the keyboard ids' upgrade did the update, KeyboardIdUpgrade; a keyboard here has
+                        // no pool of before: a new one)
+                        val pool = now.next
                         now.pools[key] = pool
                         now.next = maxOf(now.next, pool + 1)
                         pools.add(pool)
@@ -359,18 +362,12 @@ object LearnedKeyboards {
         }
     }
 
-    private fun newPlan(real: SharedPreferences, filesDir: File, shared: Boolean): Plan {
+    private fun newPlan(real: SharedPreferences, filesDir: File): Plan {
         val onDisk = (LearnedStores.keyboardPoolsOnDisk(filesDir).maxOrNull() ?: 0) + 1
         val pools = LinkedHashMap<String, Int>()
-        var next = maxOf(KeyboardProfiles.nextProfileId(real), onDisk, 1)
-        if (shared) {
-            for (keyboard in listedKeyboards(real)) pools.getOrPut(keyboard.toPref()) { next++ }
-        } else {
-            // each keyboard its own pool of before, the keyboards with an id not in the list too (switched off)
-            for (keyboard in listedKeyboards(real)) pools[keyboard.toPref()] = KeyboardProfiles.idFor(real, keyboard)
-            for ((key, id) in KeyboardProfiles.idEntries(real)) if (id != LearnedStores.SHARED) pools.putIfAbsent(key, id)
-            next = maxOf(next, (pools.values.maxOrNull() ?: 0) + 1, KeyboardProfiles.nextProfileId(real))
-        }
+        var next = maxOf(real.getInt(PREF_POOL_NEXT, 1), onDisk, 1)
+        // (by keyboard id; sharing off, the keyboard ids' upgrade did the update with each keyboard's pool of before)
+        for (keyboard in listedKeyboards(real)) keyboard.keyboardId?.let { pools.getOrPut(it) { next++ } }
         return Plan(pools, next)
     }
 
@@ -426,7 +423,7 @@ object LearnedKeyboards {
     fun keepOnly(context: Context, keyboards: List<SettingsSubtype>) = withFiles {
         val real = DeviceProtectedUtils.getRealSharedPreferences(context)
         if (!isDone(real)) return@withFiles
-        val keep = keyboards.map { it.toPref() }.toSet()
+        val keep = keyboards.mapNotNull { it.keyboardId }.toSet()
         val kept = synchronized(this) {
             val map = pools(real)
             map.keys().asSequence().toList().filter { it !in keep }.forEach { map.remove(it) }
@@ -450,7 +447,7 @@ object LearnedKeyboards {
         val real = DeviceProtectedUtils.getRealSharedPreferences(context)
         if (!isDone(real)) return@withFiles
         val first = keyboards.firstOrNull() ?: return@withFiles
-        val keep = keyboards.map { it.toPref() }.toSet()
+        val keep = keyboards.mapNotNull { it.keyboardId }.toSet()
         val target = poolFor(real, first) // (a merge: an explicit moment, it may give the keyboard left its pool)
         val goneEntries = synchronized(this) { poolEntries(real).filterKeys { it !in keep } }
         val keptPools = synchronized(this) { poolEntries(real).filterKeys { it in keep }.values.toSet() }
@@ -526,22 +523,22 @@ object LearnedKeyboards {
             val set = ids(real.getString(pref, null))
             val inBackup = ids(backup[pref] as? String)
             for (keyboard in keyboards) {
-                val key = (onPhone[keyboard] ?: keyboard).toPref()
-                if (if (withButtons) keyboard.toPref() in inBackup else shared) set.add(key) else set.remove(key)
+                val key = (onPhone[keyboard] ?: keyboard).keyboardId ?: continue
+                if (if (withButtons) keyboard.keyboardId in inBackup else shared) set.add(key) else set.remove(key)
             }
             editor.putIds(pref, set)
         }
         editor.commit()
     }
 
-    /** The pool whose words [keyboard] had in [backup] (its preferences): its own; in a backup from before, the shared one
-     *  (a copy for each keyboard, as the update does) or its profile id's; null: none. */
+    /** The pool whose words [keyboard] had in [backup] (its preferences, given ids when read): its own, by its id; in a
+     *  backup from before, the shared one (a copy for each keyboard, as the update does; with sharing off the keyboard ids'
+     *  upgrade did the update on it); null: none. */
     fun poolIn(backup: Map<String, Any?>, keyboard: SettingsSubtype): Int? {
         if (backup[PREF_DONE] == true) {
-            val map = try { JSONObject(backup[PREF_POOLS] as? String ?: "{}") } catch (e: Exception) { JSONObject() }
-            return keyboard.toPref().takeIf { map.has(it) }?.let { map.getInt(it) }
+            val map = pools(backup[PREF_POOLS] as? String)
+            return keyboard.keyboardId?.takeIf { map.has(it) }?.let { map.getInt(it) }
         }
-        if (backup[Settings.PREF_SHARE_LEARNED_WORDS] != false) return LearnedStores.SHARED
-        return KeyboardProfiles.anyIdIn(backup, keyboard) ?: LearnedStores.SHARED
+        return LearnedStores.SHARED
     }
 }

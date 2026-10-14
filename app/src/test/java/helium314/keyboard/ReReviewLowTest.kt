@@ -37,8 +37,8 @@ class ReReviewLowTest {
         val lp = helium314.keyboard.latin.utils.LanguagePriority
         val hi = java.util.Locale.forLanguageTag("hi")
         real.edit().putBoolean("separate_settings_per_keyboard", true).commit()
-        val own = helium314.keyboard.latin.settings.ProfilePreferences(real) { 2 }
-        val other = helium314.keyboard.latin.settings.ProfilePreferences(real) { 3 }
+        val own = helium314.keyboard.latin.settings.ProfilePreferences(real) { kid(2) }
+        val other = helium314.keyboard.latin.settings.ProfilePreferences(real) { kid(3) }
         lp.set(other, hi, lp.LOW)
         // nothing of its own: the default, not another set's (owner 2026-10-11: no separate common set; the first
         // keyboard's own settings are the common ones)
@@ -47,7 +47,7 @@ class ReReviewLowTest {
         assertEquals(lp.HIGH, lp.get(own, hi))
         assertEquals(lp.LOW, lp.get(other, hi)) // the other one unchanged
 
-        assertTrue(real.contains("p2/language_priority_hi"))
+        assertTrue(real.contains(idKey(2, "language_priority_hi")))
         assertFalse(KeyboardProfiles.isGlobal("language_priority_hi"))
     }
 
@@ -112,7 +112,7 @@ class ReReviewLowTest {
     // T4 (owner 2026-10-11: no default marks; nothing stored = the default: the moved-markers cleanup is gone, every
     // mark goes once, Refine per keyboard or not)
     @Test fun `the default marks cleanup removes a mark also while Refine is per keyboard`() {
-        val mark = "p3/~" + Settings.PREF_GESTURE_TURN_WEIGHT
+        val mark = idKey(3, "~" + Settings.PREF_GESTURE_TURN_WEIGHT)
         real.edit().putBoolean(mark, true).putBoolean(KeyboardProfiles.Group.REFINE.prefKey, false).commit()
         KeyboardProfiles.removeDefaultMarks(real)
         assertFalse(real.contains(mark))
@@ -157,16 +157,16 @@ class ReReviewLowTest {
 
     // C4
     @Test fun `a renamed or deleted theme is followed in every keyboard's set`() {
-        real.edit().putString(AppearanceLooks.PREF_SELECTED, "Mine").putString("p2/" + AppearanceLooks.PREF_SELECTED, "Mine")
-            .putString("p3/" + AppearanceLooks.PREF_SELECTED, "Other").putString("p4/other_key", "Mine").commit()
+        real.edit().putString(AppearanceLooks.PREF_SELECTED, "Mine").putString(idKey(2, AppearanceLooks.PREF_SELECTED), "Mine")
+            .putString(idKey(3, AppearanceLooks.PREF_SELECTED), "Other").putString(idKey(4, "other_key"), "Mine").commit()
         KeyboardProfiles.replaceValueEverywhere(real, AppearanceLooks.PREF_SELECTED, "Mine", "Yours")
         assertEquals("Yours", real.getString(AppearanceLooks.PREF_SELECTED, null))
-        assertEquals("Yours", real.getString("p2/" + AppearanceLooks.PREF_SELECTED, null))
-        assertEquals("Other", real.getString("p3/" + AppearanceLooks.PREF_SELECTED, null))
-        assertEquals("Mine", real.getString("p4/other_key", null))
+        assertEquals("Yours", real.getString(idKey(2, AppearanceLooks.PREF_SELECTED), null))
+        assertEquals("Other", real.getString(idKey(3, AppearanceLooks.PREF_SELECTED), null))
+        assertEquals("Mine", real.getString(idKey(4, "other_key"), null))
         KeyboardProfiles.replaceValueEverywhere(real, AppearanceLooks.PREF_SELECTED, "Yours", null)
         assertFalse(real.contains(AppearanceLooks.PREF_SELECTED))
-        assertFalse(real.contains("p2/" + AppearanceLooks.PREF_SELECTED))
-        assertEquals("Other", real.getString("p3/" + AppearanceLooks.PREF_SELECTED, null))
+        assertFalse(real.contains(idKey(2, AppearanceLooks.PREF_SELECTED)))
+        assertEquals("Other", real.getString(idKey(3, AppearanceLooks.PREF_SELECTED), null))
     }
 }

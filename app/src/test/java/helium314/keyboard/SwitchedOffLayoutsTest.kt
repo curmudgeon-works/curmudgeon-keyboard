@@ -29,8 +29,9 @@ import kotlin.test.assertTrue
 
 /** Owner 2026-10-11: switched-off keyboards are treated like switched-on ones. A custom key layout renamed (or removed
  *  as missing) or edited reached only the enabled keyboards: a switched-off one's set and learned words stayed under its
- *  old definition, and an edit gave it the new keys unasked. A ("Work", enabled, edited) = set 1, B (German, switched
- *  off, own settings + learned words) = set 2; both pick "My numrow". */
+ *  old definition, and an edit gave it the new keys unasked. A ("Work", enabled, edited) = k1, B (German, switched
+ *  off, own settings + learned words) = k2; both pick "My numrow". (owner 2026-10-11: keyboards have unique ids) A
+ *  layout change keeps B's id: its set and learned words stay its own, nothing moves. */
 @RunWith(RobolectricTestRunner::class)
 class SwitchedOffLayoutsTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
@@ -38,9 +39,9 @@ class SwitchedOffLayoutsTest {
     private val type = LayoutType.NUMBER_ROW
     private val numrow = LayoutUtilsCustom.getLayoutName("My numrow", type)
     private val renamed = LayoutUtilsCustom.getLayoutName("Row two", type)
-    private val a = withKeyboardName(SettingsSubtype(Locale.US, ""), "Work").withLayout(type, numrow)
-    private val b = SubtypeSettings.getResourceSubtypesForLocale(Locale.GERMANY).first().toSettingsSubtype().withLayout(type, numrow)
-    private val own = KeyboardProfiles.ownKey(2, Settings.PREF_AUTO_CAP)
+    private val a = withKeyboardName(SettingsSubtype(Locale.US, ""), "Work").withLayout(type, numrow).withId(1)
+    private val b = SubtypeSettings.getResourceSubtypesForLocale(Locale.GERMANY).first().toSettingsSubtype().withLayout(type, numrow).withId(2)
+    private val own = idKey(2, Settings.PREF_AUTO_CAP)
     private fun file(name: String) = LayoutUtilsCustom.getLayoutFile(name, type, ctx)
     private val folder get() = file(numrow).parentFile!!
     private var pool = 0
@@ -50,8 +51,6 @@ class SwitchedOffLayoutsTest {
         folder.deleteRecursively(); folder.mkdirs()
         file(numrow).writeText("old keys")
         LayoutUtilsCustom.onLayoutFileChanged()
-        assertEquals(1, KeyboardProfiles.idFor(real, a))
-        assertEquals(2, KeyboardProfiles.idFor(real, b))
         real.edit { putBoolean(LearnedKeyboards.PREF_DONE, true) } // (learned words per keyboard: B has a pool of its own)
         pool = LearnedKeyboards.poolFor(real, b)
         real.edit {
@@ -73,32 +72,34 @@ class SwitchedOffLayoutsTest {
     private fun additional() = SubtypeSettings.createSettingsSubtypes(real.getString(Settings.PREF_ADDITIONAL_SUBTYPES, "")!!)
     private fun pools() = JSONObject(real.getString(LearnedKeyboards.PREF_POOLS, "{}")!!)
 
-    /** [to]: B's definition now; its set (id 2, its own setting) and its learned words follow it, nothing stays behind. */
-    private fun assertMoved(to: SettingsSubtype) {
-        val ids = KeyboardProfiles.idEntries(real)
-        assertEquals(2, ids[to.toPref()], ids.toString())
-        assertFalse(b.toPref() in ids, ids.toString())
-        assertFalse(real.getBoolean(KeyboardProfiles.ownKey(KeyboardProfiles.idFor(real, to), Settings.PREF_AUTO_CAP), true))
-        assertEquals(pool, pools().optInt(to.toPref(), -1), pools().toString())
-        assertFalse(pools().has(b.toPref()), pools().toString())
+    /** [to]: B's definition now, its id kept (the only B in the added list); its set (its own setting) and its learned
+     *  words are still its own, no other id got any. */
+    private fun assertKept(to: SettingsSubtype) {
+        assertEquals(kid(2), to.keyboardId)
+        assertEquals(listOf(to), additional().filter { it.keyboardId == kid(2) }, additional().toString())
+        assertFalse(real.getBoolean(own, true))
+        assertEquals(pool, pools().optInt(kid(2), -1), pools().toString())
+        assertEquals(setOf(kid(1), kid(2)), pools().keys().asSequence().toSet(), pools().toString())
     }
 
-    @Test fun `renaming the layout renames it in the switched-off keyboard, its set and learned words follow`() {
+    @Test fun `renaming the layout renames it in the switched-off keyboard, its set and learned words stay its own`() {
         file(numrow).delete() // (as the edit dialog renames)
         SubtypeSettings.onRenameLayout(type, numrow, renamed, ctx)
         file(renamed).writeText("old keys")
         val bNow = b.withLayout(type, renamed)
         assertTrue(bNow in additional(), additional().toString())
         assertFalse(b in additional())
-        assertMoved(bNow)
+        assertKept(bNow)
     }
 
-    @Test fun `a missing layout removed, the switched-off keyboard now a built-in one keeps its set`() {
+    // (owner 2026-10-11: keyboards have unique ids) before, B set up as the built-in one left the added list and its set
+    // moved to the built-in definition; now it stays in the added list with its id
+    @Test fun `a missing layout removed, the switched-off keyboard now set up as a built-in one keeps its set`() {
         SubtypeSettings.onRenameLayout(type, numrow, null, ctx) // (removeMissingLayouts after a restore)
         val bNow = b.withoutLayout(type)
-        assertTrue(bNow.isSameAsDefault())
-        assertFalse(additional().any { it.locale == Locale.GERMANY }, additional().toString())
-        assertMoved(bNow)
+        assertTrue(bNow.withoutIds().isSameAsDefault())
+        assertTrue(bNow in additional(), additional().toString())
+        assertKept(bNow)
     }
 
     @Test fun `editing the keys asks about the switched-off keyboard, named so`() {
@@ -116,7 +117,7 @@ class SwitchedOffLayoutsTest {
         val bNow = b.withLayout(type, old)
         assertTrue(bNow in additional(), additional().toString())
         assertEquals("old keys", file(old).readText())
-        assertMoved(bNow)
+        assertKept(bNow)
     }
 
     @Test fun `the delete warning names the switched-off keyboard`() {

@@ -89,15 +89,16 @@ class Review1010LearnTest {
 
     private val flags = listOf("learning_swiping_global", "suggestions_refine_moved", "moved_markers_removed")
 
+    // (owner 2026-10-11: keyboards have unique ids) the set is the keyboard's id, no idFor lookup
     private fun separateWithFlags(): SettingsSubtype {
-        val keyboard = SettingsSubtype(Locale.US, "")
+        val keyboard = SettingsSubtype(Locale.US, "").withId(1)
         real.edit().putBoolean("separate_settings_per_keyboard", true).apply { flags.forEach { putBoolean(it, true) } }.commit()
         return keyboard
     }
 
     @Test fun `a keyboard with only defaults doesn't mark the one-time flags`() {
         val keyboard = separateWithFlags()
-        val id = KeyboardProfiles.idFor(real, keyboard)
+        val id = keyboard.keyboardId!!
         KeyboardProfiles.clearSet(real, id) // Add keyboard -> "defaults only"
         for (flag in flags) assertFalse(real.contains(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + flag)), flag)
         KeyboardProfiles.disable(real) // separate settings OFF, shared from that keyboard
@@ -106,7 +107,7 @@ class Review1010LearnTest {
 
     @Test fun `separate OFF keeps the one-time flags a keyboard marked before the fix`() {
         val keyboard = separateWithFlags()
-        val id = KeyboardProfiles.idFor(real, keyboard)
+        val id = keyboard.keyboardId!!
         real.edit().apply { flags.forEach { putBoolean(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + it), true) } }.commit()
         KeyboardProfiles.disable(real)
         for (flag in flags) assertTrue(real.getBoolean(flag, false), "$flag dropped: its move runs again")
@@ -146,11 +147,13 @@ class Review1010LearnTest {
             out.putNextEntry(ZipEntry("preferences.json"))
             // (the first keyboard's own set: owner 2026-10-11, no separate common set; the first keyboard's own settings
             // are the common ones, and an old backup's common set is dropped)
-            val first = helium314.keyboard.latin.settings.SettingsSubtype(Locale.US, "")
+            // (owner 2026-10-11: keyboards have unique ids) its set under its id, no old id map
+            val first = helium314.keyboard.latin.settings.SettingsSubtype(Locale.US, "").withId(1)
             settingsToJsonStream(mapOf<String?, Any?>(helium314.keyboard.latin.settings.Settings.PREF_ENABLED_SUBTYPES to first.toPref(),
-                "keyboard_profile_ids" to """{"${first.toPref()}":1}""", "keyboard_profile_next_id" to 2,
+                helium314.keyboard.latin.settings.Settings.PREF_ADDITIONAL_SUBTYPES to first.toPref(),
+                helium314.keyboard.latin.settings.KeyboardIdUpgrade.DONE to true,
                 helium314.keyboard.latin.settings.Settings.PREF_VERSION_CODE to helium314.keyboard.latin.BuildConfig.MIGRATION_VERSION,
-                "p1/$priorityKey" to LanguagePriority.LOW), out)
+                idKey(1, priorityKey) to LanguagePriority.LOW), out)
             out.closeEntry()
         }
         warmCaches(LanguagePriority.HIGH)

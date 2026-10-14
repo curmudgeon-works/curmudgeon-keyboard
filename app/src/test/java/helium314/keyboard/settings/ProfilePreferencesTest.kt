@@ -5,6 +5,9 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.ProfilePreferences
+import helium314.keyboard.idKey
+import helium314.keyboard.kid
+import helium314.keyboard.withId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -14,7 +17,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /** A keyboard's own settings set: "Default" there means the default, and copying a set copies what it reads as.
- *  (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones): keyboard 1 is the first in the list, the main one. */
+ *  (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones): keyboard 1 is the first in the list, the main one.
+ *  (owner 2026-10-11: keyboards have unique ids) sets are named by the keyboards' ids ("pk1/..."), no id map. */
 @RunWith(RobolectricTestRunner::class)
 class ProfilePreferencesTest {
     private lateinit var real: android.content.SharedPreferences
@@ -22,11 +26,11 @@ class ProfilePreferencesTest {
     @Before fun setUp() {
         real = ApplicationProvider.getApplicationContext<Context>().getSharedPreferences("profile_test", Context.MODE_PRIVATE)
         // keyboards 1, 2 and 3, in that order: 1 is the main keyboard
-        val keyboards = listOf(java.util.Locale.US, java.util.Locale.FRANCE, java.util.Locale.GERMANY).map { helium314.keyboard.latin.settings.SettingsSubtype(it, "") }
+        val keyboards = listOf(java.util.Locale.US, java.util.Locale.FRANCE, java.util.Locale.GERMANY).withIndex().map { (i, l) -> helium314.keyboard.latin.settings.SettingsSubtype(l, "").withId(i + 1) }
         real.edit().clear().putBoolean("separate_settings_per_keyboard", true)
             .putString(helium314.keyboard.latin.settings.Settings.PREF_ENABLED_SUBTYPES, helium314.keyboard.latin.utils.SubtypeSettings.createPrefSubtypes(keyboards))
-            .putString("keyboard_profile_ids", org.json.JSONObject(keyboards.withIndex().associate { (i, k) -> k.toPref() to i + 1 }).toString())
-            .putInt("keyboard_profile_next_id", 4).commit()
+            .putString(helium314.keyboard.latin.settings.Settings.PREF_ADDITIONAL_SUBTYPES, helium314.keyboard.latin.utils.SubtypeSettings.createPrefSubtypes(keyboards))
+            .commit()
         KeyboardProfiles.loadGroups(real) // the menus back to their defaults (only Refine swipe and learning shared)
     }
 
@@ -35,14 +39,18 @@ class ProfilePreferencesTest {
         KeyboardProfiles.loadGroups(real)
     }
 
-    private fun set(id: Int) = ProfilePreferences(real) { id }
+    private fun set(id: String) = ProfilePreferences(real) { id }
+    private fun set(n: Int) = set(kid(n))
 
     // "Advanced learning and swiping" is the same for every keyboard: once, the keyboard in use gives its values
     @Test fun learningSwipingBecomesCommonWithTheKeyboardInUsesValues() {
         val turn = helium314.keyboard.latin.settings.Settings.PREF_GESTURE_TURN_WEIGHT
         val trust = helium314.keyboard.latin.settings.Settings.PREF_TRUST_TYPED_COUNT
-        val inUse = KeyboardProfiles.idFor(real, KeyboardProfiles.selectedKeyboard(real))
-        val other = inUse + 1
+        // keyboard 2 in use, keyboard 3 another
+        real.edit().putString(helium314.keyboard.latin.settings.Settings.PREF_SELECTED_SUBTYPE,
+            helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.FRANCE, "").withId(2).toPref()).commit()
+        val inUse = kid(2)
+        val other = kid(3)
         real.edit().putFloat(turn, 0.5f).putFloat("p$inUse/$turn", 1.2f).putFloat("p$other/$turn", 0.1f)
             .putInt("p$inUse/$trust", 7).commit()
         KeyboardProfiles.migrateLearningSwiping(real)
@@ -53,11 +61,11 @@ class ProfilePreferencesTest {
         // from now on every keyboard reads and writes the common value: the main keyboard's (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones)
         set(other).edit().putFloat(turn, 0.9f).commit()
         assertEquals(0.9f, set(inUse).getFloat(turn, 0f))
-        assertEquals(0.9f, real.getFloat("p1/$turn", 0f))
+        assertEquals(0.9f, real.getFloat(idKey(1, turn), 0f))
     }
 
     @Test fun removedInOwnSetReadsDefaultNotShared() {
-        real.edit().putInt("p1/some_size", 5).commit() // the main keyboard's
+        real.edit().putInt(idKey(1, "some_size"), 5).commit() // the main keyboard's
         val own = set(2)
         assertEquals(1, own.getInt("some_size", 1)) // nothing of its own: the default (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones)
         own.edit().putInt("some_size", 7).commit()
@@ -73,8 +81,8 @@ class ProfilePreferencesTest {
 
     @Test fun restoredSetReadsBackupDefaultsNotPhoneShared() {
         // the main keyboard has auto-correct off; the backup's keyboard left it at its default (not stored)
-        real.edit().putBoolean("p1/auto_correction", false).putInt("p1/theme_size", 3).putBoolean("fonts_follow_migrated", true).commit()
-        KeyboardProfiles.restoreSet(real, 2, mapOf("theme_size" to 5))
+        real.edit().putBoolean(idKey(1, "auto_correction"), false).putInt(idKey(1, "theme_size"), 3).putBoolean("fonts_follow_migrated", true).commit()
+        KeyboardProfiles.restoreSet(real, kid(2), mapOf("theme_size" to 5))
         val own = set(2)
         assertEquals(true, own.getBoolean("auto_correction", true)) // the default, not the main keyboard's false
         assertEquals(5, own.getInt("theme_size", 0)) // the backup's value
@@ -127,45 +135,46 @@ class ProfilePreferencesTest {
     @Test fun keyboardBecomingAnotherKeepsBothSets() {
         val qwerty = helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.US, "KeyboardLayoutSet=MAIN:qwerty")
         val colemak = helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.US, "KeyboardLayoutSet=MAIN:colemak")
-        val q = KeyboardProfiles.idFor(real, qwerty); val c = KeyboardProfiles.idFor(real, colemak)
+        // (owner 2026-10-11: keyboards have unique ids) a layout change keeps the id: the set stays, nothing moves
+        val q = KeyboardProfiles.idOf(qwerty.withId(4))!!; val c = KeyboardProfiles.idOf(colemak.withId(5))!!
         set(q).edit().putInt("theme_size", 1).commit(); set(c).edit().putInt("theme_size", 2).commit()
-        KeyboardProfiles.onKeyboardChanged(real, qwerty, colemak) // previewing Colemak on the QWERTY keyboard
-        KeyboardProfiles.onKeyboardChanged(real, colemak, qwerty) // Cancel
-        assertEquals(q, KeyboardProfiles.idFor(real, qwerty)); assertEquals(c, KeyboardProfiles.idFor(real, colemak))
+        val previewing = colemak.withIdOf(qwerty.withId(4)) // previewing Colemak on the QWERTY keyboard
+        assertEquals(q, KeyboardProfiles.idOf(previewing))
+        assertEquals(1, set(KeyboardProfiles.idOf(previewing)!!).getInt("theme_size", 0))
         assertEquals(1, set(q).getInt("theme_size", 0)); assertEquals(2, set(c).getInt("theme_size", 0)) // both sets kept
     }
 
     @Test fun copyTakesOwnValuesOverShared() {
         // (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones)
-        real.edit().putInt("p1/a", 1).putInt("p1/b", 2).putInt("p1/c", 3).commit()
-        real.edit().putInt("p2/a", 10).putInt("p2/b", 20).commit()
+        real.edit().putInt(idKey(1, "a"), 1).putInt(idKey(1, "b"), 2).putInt(idKey(1, "c"), 3).commit()
+        real.edit().putInt(idKey(2, "a"), 10).putInt(idKey(2, "b"), 20).commit()
         set(2).edit().remove("c").commit()
-        KeyboardProfiles.copy(real, 2, 3)
+        KeyboardProfiles.copy(real, kid(2), kid(3))
         val copy = set(3)
         assertEquals(10, copy.getInt("a", 0)) // its own, not the main keyboard's 1
         assertEquals(20, copy.getInt("b", 0))
         assertEquals(0, copy.getInt("c", 0)) // at its default in the source: at its default in the copy
         // a shared menu's settings: what the source reads, the main keyboard's
-        real.edit().putBoolean("p1/$autoCap", false).putBoolean("p2/$autoCap", true).commit()
+        real.edit().putBoolean(idKey(1, autoCap), false).putBoolean(idKey(2, autoCap), true).commit()
         KeyboardProfiles.setGroupShared(real, correction, true)
-        KeyboardProfiles.copy(real, 2, 3)
-        assertFalse(real.getBoolean("p3/$autoCap", true))
-        KeyboardProfiles.copy(real, KeyboardProfiles.SHARED, 3) // the common settings: the main keyboard's
+        KeyboardProfiles.copy(real, kid(2), kid(3))
+        assertFalse(real.getBoolean(idKey(3, autoCap), true))
+        KeyboardProfiles.copy(real, KeyboardProfiles.SHARED, kid(3)) // the common settings: the main keyboard's
         assertEquals(1, set(3).getInt("a", 0))
         assertEquals(3, set(3).getInt("c", 0))
     }
 
     @Test fun ownSetListsSharedFallbacksAndOwnValueBeatsStaleMark() {
-        real.edit().putInt("p1/x", 4).putInt("p2/y", 9).commit()
+        real.edit().putInt(idKey(1, "x"), 4).putInt(idKey(2, "y"), 9).commit()
         val own = set(2)
         assertFalse(own.all.containsKey("x")) // another set's value is no fallback (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones)
         own.edit().remove("y").commit()
         assertFalse(own.all.containsKey("y"))
         // a value written straight into the file (Layout & Typing's Discard does; no mark left behind since 2026-10-11)
-        real.edit().putInt("p2/y", 6).commit()
+        real.edit().putInt(idKey(2, "y"), 6).commit()
         assertEquals(6, own.getInt("y", 0))
         assertEquals(6, own.all["y"])
-        KeyboardProfiles.copy(real, 2, 3)
+        KeyboardProfiles.copy(real, kid(2), kid(3))
         assertEquals(6, set(3).getInt("y", 0))
     }
 
@@ -194,26 +203,26 @@ class ProfilePreferencesTest {
 
     // (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones): a shared menu reads the main keyboard's set (keyboard 1), no keyboard is picked
     @Test fun aMenuMadeSharedTakesTheChosenKeyboardsValuesAndKeepsTheOwnCopies() {
-        real.edit().putBoolean("p1/$autoCap", false).putBoolean("p2/$autoCap", true).commit()
+        real.edit().putBoolean(idKey(1, autoCap), false).putBoolean(idKey(2, autoCap), true).commit()
         assertFalse(KeyboardProfiles.isGlobal(autoCap))
         KeyboardProfiles.setGroupShared(real, correction, true)
         assertTrue(KeyboardProfiles.isGlobal(autoCap))
         assertFalse(set(2).getBoolean(autoCap, true)) // keyboard 1's value
         // (owner 2026-10-11: sharing a menu keeps each keyboard's own) stored, unread while shared
-        assertTrue(real.getBoolean("p2/$autoCap", false))
+        assertTrue(real.getBoolean(idKey(2, autoCap), false))
         assertFalse(real.contains(autoCap))
         set(3).edit().putBoolean(autoCap, true).commit() // one set for all now: the main keyboard's
         assertTrue(set(2).getBoolean(autoCap, false))
-        assertTrue(real.getBoolean("p1/$autoCap", false))
-        assertFalse(real.contains("p3/$autoCap"))
+        assertTrue(real.getBoolean(idKey(1, autoCap), false))
+        assertFalse(real.contains(idKey(3, autoCap)))
     }
 
     @Test fun theChosenKeyboardAtItsDefaultLeavesTheSharedValueAtItsDefault() {
         // keyboard 1: "Default", nothing stored (owner 2026-10-11: no default marks; nothing stored = the default)
-        real.edit().putBoolean("p2/$autoCap", false).commit()
+        real.edit().putBoolean(idKey(2, autoCap), false).commit()
         KeyboardProfiles.setGroupShared(real, correction, true)
         assertTrue(set(2).getBoolean(autoCap, true)) // the main keyboard's: the default
-        assertTrue(real.contains("p2/$autoCap")) // (owner 2026-10-11: sharing a menu keeps each keyboard's own)
+        assertTrue(real.contains(idKey(2, autoCap))) // (owner 2026-10-11: sharing a menu keeps each keyboard's own)
     }
 
     @Test fun aMenuBackToPerKeyboardStartsEachKeyboardFromTheSharedValues() {
@@ -247,6 +256,6 @@ class ProfilePreferencesTest {
         KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.REFINE, false)
         assertFalse(KeyboardProfiles.isGlobal(turn))
         set(1).edit().putFloat(turn, 0.3f).commit()
-        assertEquals(0.3f, real.getFloat("p1/$turn", 0f))
+        assertEquals(0.3f, real.getFloat(idKey(1, turn), 0f))
     }
 }

@@ -50,7 +50,7 @@ class PreUploadFixes2Test {
                 "suggestions_refine_moved", "settings_picked_only_done"))
             assertTrue(keptOnReset(flag, ResetKeep()), flag)
         assertTrue(keptOnReset(Settings.PREF_VERSION_CODE, ResetKeep()))
-        assertFalse(keptOnReset("p1/fonts_follow_migrated", ResetKeep())) // a keyboard's own: its set goes
+        assertFalse(keptOnReset(idKey(1, "fonts_follow_migrated"), ResetKeep())) // a keyboard's own: its set goes (sets by id, 2026-10-11)
         assertFalse(keptOnReset(Settings.PREF_KEY_HORIZONTAL_GAP, ResetKeep(keyboards = true, own = true)))
         for (saved in listOf(AppearanceLooks.PREF, LayoutPresets.PREF)) {
             assertTrue(keptOnReset(saved, ResetKeep(own = true)), saved)

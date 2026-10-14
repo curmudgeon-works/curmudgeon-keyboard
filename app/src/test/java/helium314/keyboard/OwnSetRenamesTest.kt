@@ -9,17 +9,20 @@ import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.ProfilePreferences
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.util.Locale
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 
-/** The upgrade steps that rename or move a stored value reach every keyboard's own set, not the shared one only. */
+/** The upgrade steps that rename or move a stored value reach every keyboard's own set, not the shared one only.
+ *  (owner 2026-10-11: keyboards have unique ids; the sets are "p<id>/", found by their entries, no id map) */
 @RunWith(RobolectricTestRunner::class)
 class OwnSetRenamesTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
@@ -34,27 +37,26 @@ class OwnSetRenamesTest {
         real.edit {
             putInt(Settings.PREF_VERSION_CODE, 3901)
             putBoolean("separate_settings_per_keyboard", separate)
-            putString("keyboard_profile_ids", """{"en_US:":1}""")
             putString(colors, "midnight")
-            putString("p1/$colors", "midnight")
-            putString("p1/${Settings.PREF_THEME_COLORS_NIGHT}", "midnight")
+            putString(idKey(1, colors), "midnight")
+            putString(idKey(1, Settings.PREF_THEME_COLORS_NIGHT), "midnight")
         }
         checkVersionUpgrade(ctx)
     }
 
     @Test fun `a keyboard's own midnight colors become black, then follow the defaults like the shared set`() {
         midnightOnBoth(separate = true)
-        assertNotEquals("midnight", real.all["p1/$colors"])
-        assertNotEquals("midnight", real.all["p1/${Settings.PREF_THEME_COLORS_NIGHT}"])
-        val one = ProfilePreferences(real) { 1 }
+        assertNotEquals("midnight", real.all[idKey(1, colors)])
+        assertNotEquals("midnight", real.all[idKey(1, Settings.PREF_THEME_COLORS_NIGHT)])
+        val one = ProfilePreferences(real) { kid(1) }
         assertEquals(real.getString(colors, Defaults.PREF_THEME_COLORS), one.getString(colors, Defaults.PREF_THEME_COLORS))
         assertEquals(Defaults.PREF_THEME_COLORS, one.getString(colors, Defaults.PREF_THEME_COLORS))
     }
 
     @Test fun `a hidden set's own midnight colors become black too`() {
         midnightOnBoth(separate = false)
-        assertNotEquals("midnight", real.all["p1/$colors"])
-        assertNotEquals("midnight", real.all["p1/${Settings.PREF_THEME_COLORS_NIGHT}"])
+        assertNotEquals("midnight", real.all[idKey(1, colors)])
+        assertNotEquals("midnight", real.all[idKey(1, Settings.PREF_THEME_COLORS_NIGHT)])
     }
 
     // a set from 2026-09-22..28 with its own toolbar mode: it read the shared visibility and lost its own choice
@@ -62,17 +64,19 @@ class OwnSetRenamesTest {
         real.edit {
             putInt(Settings.PREF_VERSION_CODE, 3901)
             putBoolean("separate_settings_per_keyboard", true)
-            putString("keyboard_profile_ids", """{"en_US:":1,"de_DE:":2}""")
+            // (the first keyboard, k3, has no set of its own: the common set becomes its own)
+            putString(Settings.PREF_ENABLED_SUBTYPES, SettingsSubtype(Locale.FRANCE, "").withId(3).toPref())
+            putString(Settings.PREF_ADDITIONAL_SUBTYPES, SettingsSubtype(Locale.FRANCE, "").withId(3).toPref())
             putString(Settings.PREF_TOOLBAR_MODE, "EXPANDABLE")
-            putString("p1/${Settings.PREF_TOOLBAR_MODE}", "HIDDEN")
-            putString("p2/${Settings.PREF_TOOLBAR_MODE}", "EXPANDABLE")
-            putBoolean("p2/${Settings.PREF_TOOLBAR_IN_STRIP_ROW}", true)
+            putString(idKey(1, Settings.PREF_TOOLBAR_MODE), "HIDDEN")
+            putString(idKey(2, Settings.PREF_TOOLBAR_MODE), "EXPANDABLE")
+            putBoolean(idKey(2, Settings.PREF_TOOLBAR_IN_STRIP_ROW), true)
         }
         checkVersionUpgrade(ctx)
-        val one = ProfilePreferences(real) { 1 }
+        val one = ProfilePreferences(real) { kid(1) }
         assertEquals(Settings.TOOLBAR_HIDDEN, Settings.readToolbarVisibility(one))
         assertEquals(false, one.getBoolean(Settings.PREF_SHOW_SUGGESTIONS, Defaults.PREF_SHOW_SUGGESTIONS))
-        val two = ProfilePreferences(real) { 2 }
+        val two = ProfilePreferences(real) { kid(2) }
         assertEquals(Settings.TOOLBAR_IN_PLACE, Settings.readToolbarVisibility(two))
         assertEquals(Defaults.PREF_SHOW_SUGGESTIONS, two.getBoolean(Settings.PREF_SHOW_SUGGESTIONS, Defaults.PREF_SHOW_SUGGESTIONS))
         // the shared set as the plain step leaves it: now the first keyboard's, which had no set (owner 2026-10-11: no

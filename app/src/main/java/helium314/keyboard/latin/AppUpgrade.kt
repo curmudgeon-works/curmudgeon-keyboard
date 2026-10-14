@@ -57,6 +57,9 @@ import kotlin.collections.set
 fun checkVersionUpgrade(context: Context, restoring: Boolean = false) {
     // the settings as stored (review 2026-10-06 Low: through context.prefs() the steps saw one keyboard's view)
     val prefs = context.realPrefs()
+    // (first: every step below finds each keyboard's set by its id; owner 2026-10-11, "do IDs now". App.onCreate runs it
+    // before the keyboards are loaded, a restore's follow-up before this; here for any other caller, done once)
+    helium314.keyboard.latin.settings.KeyboardIdUpgrade.upgrade(context)
     val oldVersion = prefs.getInt(Settings.PREF_VERSION_CODE, 0)
     if (oldVersion != BuildConfig.MIGRATION_VERSION)
         AppUpgrade.onUpgrade(context)
@@ -105,8 +108,7 @@ internal fun keepUserPopupSetsSymbolMap(real: SharedPreferences) {
         val sharedGetsMap = real.getString(selected, null) in lacking && !sharedHasMap
         real.edit {
             if (sharedGetsMap) putString(symbolMap, map)
-            for (id in KeyboardProfiles.idEntries(real).values.toSet()) {
-                if (id == KeyboardProfiles.SHARED || !KeyboardProfiles.hasOwnEntries(real, id)) continue
+            for (id in KeyboardProfiles.setIds(real.all)) {
                 val own = KeyboardProfiles.ownKey(id, selected)
                 val choice = if (real.contains(own)) real.getString(own, null)
                     else if (real.contains(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + selected))) null
@@ -152,8 +154,8 @@ internal fun heliBoardLayoutPins(context: Context, real: SharedPreferences, fres
         val heli = context.getString(R.string.layout_preset_heliboard)
         val extra = context.getString(R.string.layout_preset_heliboard_extra)
         val oldExtra = "HeliBoard Extra"
-        val ids = runCatching { org.json.JSONObject(real.getString("keyboard_profile_ids", "{}")!!) }.getOrNull()
-            ?.let { o -> o.keys().asSequence().map { o.optInt(it, KeyboardProfiles.SHARED) }.toSet() }.orEmpty()
+        // (each keyboard's set by its id, the sets there are; owner 2026-10-11, keyboards have unique ids)
+        val ids = KeyboardProfiles.setIds(real.all)
         val all = real.all
         real.edit {
             for (id in setOf(KeyboardProfiles.SHARED) + ids) {
@@ -258,11 +260,11 @@ internal fun pickedOnlyUpgrade(real: SharedPreferences, freshInstall: Boolean) {
         val numpad = Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD
         val sharedNumpad = all[numpad] == true
         val oldGaps = all[KEY_GAP_DEFAULTS_DONE] != true
-        fun numpadOn(id: Int) = all[KeyboardProfiles.ownKey(id, numpad)] as? Boolean
+        fun numpadOn(id: String) = all[KeyboardProfiles.ownKey(id, numpad)] as? Boolean
             ?: (!all.containsKey(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + numpad)) && sharedNumpad)
         // the sets whose colors went back to the default (null: the shared one): the theme they named (Midnight)
         // isn't what they show any more, so they name none (the Themes row then shows the default, Dynamic)
-        val colorsCleared = HashSet<Int?>()
+        val colorsCleared = HashSet<String?>()
         real.edit {
             for ((stored, value) in all) {
                 val own = KeyboardProfiles.splitOwnKey(stored)
@@ -302,13 +304,9 @@ private fun ownSetUpgrades(real: SharedPreferences, freshInstall: Boolean) {
     // new, nothing of before to move; owner 2026-10-11, no separate common set; a fresh install's first keyboard's set
     // came after the plain steps, and its key font went to the symbols and suggestions at the next start)
     if (real.getBoolean(KeyboardProfiles.NO_COMMON_SET_DONE, false)) return
-    val ids = runCatching { org.json.JSONObject(real.getString("keyboard_profile_ids", "{}")!!) }.getOrNull() ?: return
-    for (name in ids.keys()) {
-        val id = ids.optInt(name, KeyboardProfiles.SHARED)
-        if (id == KeyboardProfiles.SHARED) continue
-        // an id with no set of its own (learned words only, or settings never separate): nothing to move, and
-        // nothing written (review 2026-10-06 Low: a partial set that came alive once settings were made separate)
-        if (!KeyboardProfiles.hasOwnEntries(real, id)) continue
+    // (the sets there are, by keyboard id; an id with no set of its own has nothing to move, and nothing is written:
+    // review 2026-10-06 Low, a partial set that came alive once settings were made separate)
+    for (id in KeyboardProfiles.setIds(real.all)) {
         fun k(key: String) = KeyboardProfiles.ownKey(id, key)
         if (!real.getBoolean(k("fonts_follow_migrated"), false)) real.edit {
             // its own "same font as the keys" (on unless this set turned it off) and key font (else the shared one)

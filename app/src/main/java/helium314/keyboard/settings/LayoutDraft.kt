@@ -108,6 +108,8 @@ class LayoutDraft private constructor(
         // it (the layout files change the keyboard's definition), else one of the same language
         fun listed(keyboard: String?): String? {
             if (keyboard == null || keyboard.toSettingsSubtype() in enabled) return keyboard
+            // (the same keyboard, by its id, as the list put back has it; owner 2026-10-11, keyboards have unique ids)
+            enabled.firstOrNull { it.sameKeyboard(keyboard.toSettingsSubtype()) }?.let { return it.toPref() }
             if (!keep) return null
             var k: String = keyboard
             for (i in 0 until 20) { k = SubtypeUtilsAdditional.changedTo[k] ?: break; if (k.toSettingsSubtype() in enabled) return k }
@@ -188,21 +190,21 @@ class LayoutDraft private constructor(
             Settings.PREF_MORE_POPUP_KEYS, Settings.PREF_POPUP_KEYS_ORDER,
             // the keyboards themselves (a layout choice changes the keyboard's definition)
             Settings.PREF_ADDITIONAL_SUBTYPES, Settings.PREF_ENABLED_SUBTYPES, Settings.PREF_SELECTED_SUBTYPE,
-            "keyboard_profile_ids",
+            // (no "keyboard_profile_ids" since 2026-10-11: a keyboard's set is found by its id, in its definition)
         )
         internal val prefixes = listOf(
             Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, Settings.PREF_SPLIT_SPACER_SCALE_PREFIX, Settings.PREF_LAYOUT_PREFIX,
             Settings.PREF_BOTTOM_ROW_SCALE_PREFIX, Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX, Settings.PREF_SIDE_PADDING_SCALE_PREFIX,
             Settings.PREF_SAVED_APP_SUBTYPE_PREFIX,
         )
-        private val profileKey = Regex("^p\\d+/")
+        private val profileKey = Regex("^p(k[0-9a-z]+|\\d+)/") // (a keyboard's id; a number: a set of before 2026-10-11)
         /** Which keyboard is in use, and each app's remembered one: switching keyboards (the preview does when the try-it
          *  box is tapped) is no change of this screen's settings, and Discard doesn't switch back. */
         private fun switchState(key: String) = plain(key) == Settings.PREF_SELECTED_SUBTYPE || plain(key).startsWith(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX)
         fun plain(key: String) = key.replace(profileKey, "")
         fun inScope(plainKey: String) = plainKey in keys || prefixes.any { plainKey.startsWith(it) }
-        // the learned words' records, keyed by the keyboards' identities as "keyboard_profile_ids" is: put back with
-        // it (owner 2026-10-11), no setting of the screen (not in [keys]: no menu's, no saved Layout's, no change shown)
+        // the learned words' records (by keyboard id since 2026-10-11: a change moves none, put back all the same), no
+        // setting of the screen (not in [keys]: no menu's, no saved Layout's, no change shown)
         private val learnedKeys = setOf(helium314.keyboard.latin.personalization.LearnedKeyboards.PREF_POOLS,
             helium314.keyboard.latin.personalization.LearnedKeyboards.PREF_POOL_NEXT) +
             helium314.keyboard.latin.personalization.LearnedKeyboards.buttonPrefs

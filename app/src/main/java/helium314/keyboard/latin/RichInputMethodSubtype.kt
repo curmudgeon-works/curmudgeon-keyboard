@@ -49,7 +49,9 @@ class RichInputMethodSubtype private constructor(val rawSubtype: InputMethodSubt
 
     override fun equals(other: Any?): Boolean {
         if (other !is RichInputMethodSubtype) return false
-        return rawSubtype == other.rawSubtype && locale == other.locale
+        // (the definition too: a keyboard with an id is one Android subtype whatever its keys, and a changed one must
+        // not find its old built keyboards; owner 2026-10-11, keyboards have unique ids)
+        return rawSubtype == other.rawSubtype && rawSubtype.extraValue == other.rawSubtype.extraValue && locale == other.locale
     }
 
     override fun hashCode(): Int {

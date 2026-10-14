@@ -50,7 +50,6 @@ import helium314.keyboard.settings.LayoutPresets
 import helium314.keyboard.settings.SettingsMode
 import helium314.keyboard.latin.utils.KeyPopupOverrides
 import helium314.keyboard.latin.settings.Defaults
-import org.json.JSONObject
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -86,11 +85,12 @@ class SubScreenSaveRealPathTest {
     @get:Rule val compose = createEmptyComposeRule()
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = ctx.realPrefs()
-    private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
+    private fun own(n: Int, key: String) = idKey(n, key) // (keyboard "k<n>"'s own set)
     // the one edited (in use): the built-in keyboard as the keyboard list gives it back, with its extra values (a bare
-    // "en-US" came back with them, another identity, and the palette question listed the edited keyboard itself)
-    private val kb1 = SubtypeSettings.getResourceSubtypesForLocale(Locale.US).first().toSettingsSubtype()
-    private val kb2 = SettingsSubtype(Locale.GERMANY, "") // switched off, with its own set
+    // "en-US" came back with them, another identity, and the palette question listed the edited keyboard itself); with
+    // its id (owner 2026-10-11: keyboards have unique ids)
+    private val kb1 = SubtypeSettings.getResourceSubtypesForLocale(Locale.US).first().toSettingsSubtype().withId(1)
+    private val kb2 = SettingsSubtype(Locale.GERMANY, "").withId(2) // switched off (in the added list only), with its own set
     private val before = """[{"name":"background","auto":false,"color":-1}]"""
     private var scenario: ActivityScenario<SettingsActivity>? = null
 
@@ -110,12 +110,12 @@ class SubScreenSaveRealPathTest {
         real.edit().clear()
             .putBoolean("separate_settings_per_keyboard", true)
             .putString(Settings.PREF_SELECTED_SUBTYPE, kb1.toPref())
-            .putString("keyboard_profile_ids", JSONObject().put(kb1.toPref(), 1).put(kb2.toPref(), 2).toString())
             .putString(own(2, AppearanceLooks.PREF_SELECTED), "Sunset")
             .putString(own(2, Settings.PREF_THEME_COLORS), "Warm")
             // (keyboard 1's own, the first keyboard's: owner 2026-10-11, no separate common set; the first keyboard's own
             // settings are the common ones)
             .putString(Settings.PREF_ENABLED_SUBTYPES, kb1.toPref())
+            .putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(kb1, kb2)))
             // (owner 2026-10-11: palettes are one app-wide list; keyboards and themes name it, no copies)
             .putString(Settings.PREF_USER_COLORS_PREFIX + "Warm", before)
             .putString(own(1, Settings.PREF_THEME_COLORS), "Warm")
@@ -399,9 +399,9 @@ class SubScreenSaveRealPathTest {
 
     private val layoutsDir get() = File(DeviceProtectedUtils.getFilesDir(ctx), "layouts")
     private fun layoutFiles() = layoutsDir.walk().filter { it.isFile }.toList()
-    /** What defines the keyboards: their definitions, which are on and in use, and their sets' ids. */
+    /** What defines the keyboards: their definitions (with their ids, so their sets), which are on and in use. */
     private fun keyboardsNow() = listOf(Settings.PREF_ADDITIONAL_SUBTYPES, Settings.PREF_ENABLED_SUBTYPES,
-        Settings.PREF_SELECTED_SUBTYPE, "keyboard_profile_ids").associateWith { real.all[it] }
+        Settings.PREF_SELECTED_SUBTYPE).associateWith { real.all[it] }
     private var keyboardsAtOpen: Map<String, Any?> = emptyMap()
 
     /** In the layout files screen: the number row's text changed (still valid, not the built-in one any more). */
@@ -416,6 +416,8 @@ class SubScreenSaveRealPathTest {
         discardOnLayoutAndCheck(R.string.layout_files)
         assertEquals(keyboardsAtOpen, keyboardsNow()) // the keyboard's definition as before
         assertEquals(emptyList(), layoutFiles()) // the layout written there is gone
+        // (owner 2026-10-11: keyboards have unique ids) the keyboards' sets never moved
+        assertEquals(setOf(kid(1), kid(2)), KeyboardProfiles.setIds(real.all))
     }
 
     // the layout files screen through Back, Save and exit, then Layout & Typing's Discard
@@ -566,7 +568,9 @@ class SubScreenSaveRealPathTest {
         assertTrue(files.isNotEmpty()); assertTrue(keyboards != keyboardsAtOpen)
         leaveApp()
         assertEquals(files, layoutFiles().associate { it.path to it.readText() }) // the layout written there stays
-        assertEquals(keyboards, keyboardsNow()) // and the keyboard naming it (definition, in use, its set's id)
+        assertEquals(keyboards, keyboardsNow()) // and the keyboard naming it (definition with its id, in use)
+        assertEquals(kid(1), storedEnabled(real).single().keyboardId) // (the same keyboard: no set moved)
+        assertEquals(setOf(kid(1), kid(2)), KeyboardProfiles.setIds(real.all))
         assertEquals(listOf("Mine"), KeyPopupOverrides.loadSets(real).map { it.name }) // the parent's delete is undone
         assertEquals("Mine", real.getString(own(2, KeyPopupOverrides.PREF_SELECTED_SET), null))
         assertEquals(emptyList(), LayoutDraft.savedSubScreensOnDisk(ctx))

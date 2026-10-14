@@ -198,7 +198,7 @@ object Palettes {
         // where each name landed first: for a slot naming an old kept copy its own set doesn't hold
         val first = HashMap<String, String>()
         fun landed(name: String, colors: Map<String, Any?>) = land(list, origins, name, colors, byContent = false).also { if (name !in first) first[name] = it }
-        val sets = java.util.TreeMap<Int, HashMap<String, Any?>>() // set id -> its stored entries, plain keys
+        val sets = java.util.TreeMap<String, HashMap<String, Any?>>() // set id -> its stored entries, plain keys
         for ((stored, value) in all) {
             val (id, key) = KeyboardProfiles.splitOwnKey(stored) ?: continue
             sets.getOrPut(id) { HashMap() }[key] = value
@@ -255,7 +255,7 @@ object Palettes {
             items += helium314.keyboard.settings.preferences.SavedItemsMerge.In(name, listName(name), colors, plain = name.startsWith(OLD_KEPT))
         }
         for ((name, colors) in list(backup)) take(name, colors)
-        val sets = java.util.TreeMap<Int, HashMap<String, Any?>>()
+        val sets = java.util.TreeMap<String, HashMap<String, Any?>>()
         for ((stored, value) in backup) {
             val (id, key) = KeyboardProfiles.splitOwnKey(stored) ?: continue
             if (isKey(key)) sets.getOrPut(id) { HashMap() }[key] = value

@@ -54,14 +54,14 @@ class ReReviewMedium2Test {
     // 1
     @Test fun `a restore runs the settings moves right away`() {
         val turn = Settings.PREF_GESTURE_TURN_WEIGHT
-        real.edit().putFloat("p3/$turn", 1.2f).putBoolean("p3/~$turn", true).commit()
+        real.edit().putFloat(idKey(3, turn), 1.2f).putBoolean(idKey(3, "~$turn"), true).commit()
         restoreFollowUp(ctx)
-        assertFalse(real.contains("p3/$turn"), "a keyboard's own copy of a moved setting is gone")
+        assertFalse(real.contains(idKey(3, turn)), "a keyboard's own copy of a moved setting is gone")
         assertTrue(real.getBoolean("learning_swiping_global", false))
         assertTrue(real.getBoolean("suggestions_refine_moved", false))
         // (owner 2026-10-11: no default marks; nothing stored = the default: the moved-markers step is gone, every old
         // mark goes with the marks' cleanup)
-        assertFalse(real.contains("p3/~$turn"))
+        assertFalse(real.contains(idKey(3, "~$turn")))
         assertTrue(real.getBoolean(KeyboardProfiles.NO_DEFAULT_MARKS_DONE, false))
     }
 
@@ -91,12 +91,14 @@ class ReReviewMedium2Test {
     @Test fun `a copy with one set of settings for all keyboards gets its own set at once`() {
         // (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones: every
         // keyboard has its own set at once, from the settings picked, read once settings are separate)
-        val source = SettingsSubtype(Locale.US, "")
-        val copy = SettingsSubtype(Locale.UK, "")
-        real.edit().putInt(KeyboardProfiles.ownKey(KeyboardProfiles.idFor(real, source), Settings.PREF_KEY_LONGPRESS_TIMEOUT), 400).commit()
+        // (owner 2026-10-11: keyboards have unique ids; the source is listed, as the Copy source always is)
+        val source = SettingsSubtype(Locale.US, "").withId(1)
+        val copy = SettingsSubtype(Locale.UK, "").withId(2)
+        storeKeyboards(ctx, real, listOf(source))
+        real.edit().putInt(idKey(1, Settings.PREF_KEY_LONGPRESS_TIMEOUT), 400).commit()
         startSettings(ctx, copy, StartSettings.From(source))
         kotlin.test.assertTrue(KeyboardProfiles.hasOwnSettings(real, copy))
-        assertEquals(400, real.getInt(KeyboardProfiles.ownKey(KeyboardProfiles.idFor(real, copy), Settings.PREF_KEY_LONGPRESS_TIMEOUT), 0))
+        assertEquals(400, real.getInt(idKey(2, Settings.PREF_KEY_LONGPRESS_TIMEOUT), 0))
     }
 
 
@@ -122,12 +124,12 @@ class ReReviewMedium2Test {
     @Test fun `a keyboard switch reloads the theme only when the looks differ`() {
         real.edit().putBoolean("separate_settings_per_keyboard", true).putString(Settings.PREF_THEME_COLORS, "black").commit()
         KeyboardProfiles.loadGroups(real)
-        assertFalse(KeyboardProfiles.looksDiffer(real, 1, 2)) // both read the shared look
-        real.edit().putString("p2/${Settings.PREF_THEME_COLORS}", "blue").commit()
-        assertTrue(KeyboardProfiles.looksDiffer(real, 1, 2))
+        assertFalse(KeyboardProfiles.looksDiffer(real, kid(1), kid(2))) // both read the shared look
+        real.edit().putString(idKey(2, Settings.PREF_THEME_COLORS), "blue").commit()
+        assertTrue(KeyboardProfiles.looksDiffer(real, kid(1), kid(2)))
         real.edit().putBoolean(KeyboardProfiles.Group.APPEARANCE.prefKey, true).commit()
         KeyboardProfiles.loadGroups(real)
-        assertFalse(KeyboardProfiles.looksDiffer(real, 1, 2)) // Appearance shared: one look for all
+        assertFalse(KeyboardProfiles.looksDiffer(real, kid(1), kid(2))) // Appearance shared: one look for all
     }
 
     // A

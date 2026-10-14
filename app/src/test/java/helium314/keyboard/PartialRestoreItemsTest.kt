@@ -3,6 +3,7 @@ package helium314.keyboard
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import helium314.keyboard.latin.settings.KeyboardIdUpgrade
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.ProfilePreferences
 import helium314.keyboard.latin.settings.Settings
@@ -12,6 +13,7 @@ import helium314.keyboard.latin.utils.KeyPopupOverrides
 import helium314.keyboard.settings.AppearanceLooks
 import helium314.keyboard.settings.CustomLabels
 import helium314.keyboard.settings.LayoutPresets
+import helium314.keyboard.settings.preferences.RestoreDecision
 import helium314.keyboard.settings.preferences.SavedItemsMerge
 import helium314.keyboard.settings.preferences.restoreKeyboardsFrom
 import helium314.keyboard.settings.preferences.settingsToJsonStream
@@ -34,12 +36,14 @@ import kotlin.test.assertFalse
  * content ("Items inside items must be renamed together"), and the restored keyboard pointing at what its items became;
  * a second restore of the same backup adds nothing. A taken name: the backup's wins it if ticked, the phone's gets the
  * next number (owner 2026-10-11: backup wins the name if ticked; before, the backup's came in numbered).
+ * (owner 2026-10-11: keyboards have unique ids) The backup is of this build: its keyboard has id k1, its set "pk1/"; a
+ * restore again merges into the keyboard the first one brought (unasked, it would come in as a second keyboard).
  */
 @RunWith(RobolectricTestRunner::class)
 class PartialRestoreItemsTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
-    private val keyboard = SettingsSubtype(Locale.US, "")
+    private val keyboard = SettingsSubtype(Locale.US, "").withId(1)
     private val zip by lazy { File(ctx.cacheDir, "partial-items-${System.nanoTime()}.zip") }
 
     // (separate settings on: the keyboard's own set is read; owner 2026-10-11: R7, a restore never turns separate settings
@@ -47,10 +51,10 @@ class PartialRestoreItemsTest {
     @Before fun setUp() { real.edit().clear().putBoolean("separate_settings_per_keyboard", true).commit(); KeyboardProfiles.loadGroups(real) }
     @After fun tearDown() { zip.delete(); real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
 
-    // the backup's keyboard: set 1, its settings its own (owner 2026-10-11: no separate common set; a backup's plain
+    // the backup's keyboard: id k1, its settings its own (owner 2026-10-11: no separate common set; a backup's plain
     // keyboard settings, an old common set, are ignored)
-    private val ids = "keyboard_profile_ids" to JSONObject().put(keyboard.toPref(), 1).toString()
-    private fun b(key: String) = KeyboardProfiles.ownKey(1, key)
+    private val ids = KeyboardIdUpgrade.DONE to true // (a backup of this build: its keyboards have ids)
+    private fun b(key: String) = idKey(1, key)
 
     private fun set(name: String, a: String) = JSONObject().put("name", name).put("morePopups", "all").put("symbolsLayout", "")
         .put("overrides", JSONObject().put("a", JSONArray(listOf(a))))
@@ -74,8 +78,12 @@ class PartialRestoreItemsTest {
             z.closeEntry()
         }
     }
-    private fun own() = ProfilePreferences(real) { KeyboardProfiles.idFor(real, keyboard) }
-    private fun ownChoice(key: String) = real.getString(KeyboardProfiles.prefixedKey(real, KeyboardProfiles.idFor(real, keyboard), key), null)
+    private fun own() = ProfilePreferences(real) { kid(1) }
+    private fun ownChoice(key: String) = real.getString(KeyboardProfiles.prefixedKey(real, kid(1), key), null)
+
+    /** The same restore again, merged into the keyboard the first one brought (as the restore dialog's merge does). */
+    private fun restoreAgain() = restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true,
+        decisions = mapOf(keyboard to RestoreDecision.Merge(listedById(real, kid(1))!!)))
 
     @Test fun `new items come in under their names, and a second restore adds nothing`() {
         backup()
@@ -83,7 +91,7 @@ class PartialRestoreItemsTest {
         assertEquals(listOf("Mine"), KeyPopupOverrides.loadSets(real).map { it.name })
         assertEquals(listOf("Work"), LayoutPresets.load(real).map { it.name })
         assertEquals(listOf("Sunset"), AppearanceLooks.load(real).map { it.name })
-        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true)
+        restoreAgain()
         assertEquals(1, KeyPopupOverrides.loadSets(real).size)
         assertEquals(1, LayoutPresets.load(real).size)
         assertEquals(1, AppearanceLooks.load(real).size)
@@ -159,7 +167,7 @@ class PartialRestoreItemsTest {
         assertEquals("the backup's", File(fonts, "Mine 2.ttf").readText())
         assertEquals("font:Mine 2.ttf", ownChoice(Settings.PREF_KEY_FONT))
         assertEquals("font:Mine 2.ttf", AppearanceLooks.load(real).single().values[Settings.PREF_KEY_FONT])
-        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true) // (again: nothing new)
+        restoreAgain() // (again: nothing new)
         assertEquals(setOf("Mine.ttf", "Mine 2.ttf"), fonts.list()!!.toSet())
         assertEquals(1, AppearanceLooks.load(real).size)
         fonts.deleteRecursively()
@@ -221,7 +229,7 @@ class PartialRestoreItemsTest {
         assertEquals(listOf("Sunset 2", "Sunset"), AppearanceLooks.load(real).map { it.name })
         assertEquals(1f, AppearanceLooks.load(real).first().remembered[Settings.PREF_KEY_HORIZONTAL_GAP]) // (the phone's, numbered)
         assertEquals("Sunset", ownChoice(AppearanceLooks.PREF_SELECTED))
-        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true) // (again: nothing new)
+        restoreAgain() // (again: nothing new)
         assertEquals(2, AppearanceLooks.load(real).size)
     }
 }

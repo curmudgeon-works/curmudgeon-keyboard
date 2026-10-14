@@ -26,7 +26,9 @@ import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.screens.LanguageListScreen
 import helium314.keyboard.settings.screens.USE_OTHERS_BUTTONS_TAG
 import org.json.JSONArray
-import org.json.JSONObject
+import helium314.keyboard.kid
+import helium314.keyboard.poolsJson
+import helium314.keyboard.withId
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -44,14 +46,14 @@ class UseOthersButtonsTest {
     @get:Rule val compose = createEmptyComposeRule()
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = ctx.realPrefs()
-    private val b = available("en-US")
-    private val a = available("de")
+    private val b = available("en-US").withId(1)
+    private val a = available("de").withId(2)
 
     @Before fun setUp() {
         real.edit().clear().commit()
         SubtypeSettings.init(ctx)
         real.edit().putBoolean(LearnedKeyboards.PREF_DONE, true)
-            .putString(LearnedKeyboards.PREF_POOLS, JSONObject(mapOf(a.toPref() to 5, b.toPref() to 6)).toString())
+            .putString(LearnedKeyboards.PREF_POOLS, poolsJson(mapOf(a to 5, b to 6)))
             .putInt(LearnedKeyboards.PREF_POOL_NEXT, 7).commit()
         LearnedStores.init(ctx)
     }
@@ -76,7 +78,7 @@ class UseOthersButtonsTest {
         compose.onNodeWithTag(USE_OTHERS_BUTTONS_TAG).onChildren().filterToOne(hasText(ctx.getString(helium314.keyboard.latin.R.string.learned_words_list_learned)))
             .assertIsNotSelected().performClick()
         idle()
-        assertEquals(setOf(b.toPref()), storedButton(real, LearnedKeyboards.PREF_USE_OTHERS_LEARNED))
+        assertEquals(setOf(kid(1)), storedButton(real, LearnedKeyboards.PREF_USE_OTHERS_LEARNED))
         assertEquals(emptySet(), storedButton(real, LearnedKeyboards.PREF_USE_OTHERS_BLACKLISTED))
         assertEquals(listOf(5), LearnedStores.currentView.othersLearned, "the keyboard reads A's words now")
         compose.onNodeWithTag(USE_OTHERS_BUTTONS_TAG).onChildren().filterToOne(hasText(ctx.getString(helium314.keyboard.latin.R.string.learned_words_list_learned)))
@@ -84,7 +86,7 @@ class UseOthersButtonsTest {
         compose.onNodeWithTag(USE_OTHERS_BUTTONS_TAG).onChildren().filterToOne(hasText(ctx.getString(helium314.keyboard.latin.R.string.learned_words_list_blacklisted)))
             .performClick()
         idle()
-        assertEquals(setOf(b.toPref()), storedButton(real, LearnedKeyboards.PREF_USE_OTHERS_BLACKLISTED))
+        assertEquals(setOf(kid(1)), storedButton(real, LearnedKeyboards.PREF_USE_OTHERS_BLACKLISTED))
         assertEquals(listOf(5), LearnedStores.currentView.othersBlacklisted)
         compose.onNodeWithTag(USE_OTHERS_BUTTONS_TAG).onChildren().filterToOne(hasText(ctx.getString(helium314.keyboard.latin.R.string.learned_words_list_learned)))
             .performClick()
@@ -104,11 +106,11 @@ class UseOthersButtonsTest {
 
     @Test fun `with one keyboard the buttons are hidden, the stored value kept, the learned words row shown`() {
         useKeyboards(ctx, real, b)
-        real.edit().putString(LearnedKeyboards.PREF_USE_OTHERS_LEARNED, JSONArray(listOf(b.toPref())).toString()).commit()
+        real.edit().putString(LearnedKeyboards.PREF_USE_OTHERS_LEARNED, JSONArray(listOf(kid(1))).toString()).commit()
         open()
         idle()
         compose.onNodeWithText(ctx.getString(helium314.keyboard.latin.R.string.learned_use_others)).assertDoesNotExist()
         compose.onNodeWithText(ctx.getString(helium314.keyboard.latin.R.string.learned_words)).assertExists()
-        assertEquals(setOf(b.toPref()), storedButton(real, LearnedKeyboards.PREF_USE_OTHERS_LEARNED))
+        assertEquals(setOf(kid(1)), storedButton(real, LearnedKeyboards.PREF_USE_OTHERS_LEARNED))
     }
 }

@@ -18,6 +18,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import helium314.keyboard.ShadowInputMethodManager2
+import helium314.keyboard.kid
+import helium314.keyboard.storeKeyboards
+import helium314.keyboard.storedEnabled
+import helium314.keyboard.withId
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.KeyboardScopeContext
@@ -50,17 +54,18 @@ import kotlin.test.assertTrue
 
 /** Which keyboard a settings screen edits comes from the screen's own navigation entry (2026-10-09, design (b)): no
  *  global "keyboard being edited" that whichever screen drew last set. Keyboard A (in use) and B, separate settings on.
- *  Drives the real settings activity with the clock stepped by hand. */
+ *  Drives the real settings activity with the clock stepped by hand.
+ *  (owner 2026-10-11: keyboards have unique ids) A is "k1", B "k2", in their definitions; no id map. */
 @RunWith(RobolectricTestRunner::class)
 @Config(shadows = [ShadowInputMethodManager2::class])
 class EditingKeyboardTest {
     @get:Rule val compose = createEmptyComposeRule()
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = ctx.realPrefs()
-    private val a = SubtypeSettings.getResourceSubtypesForLocale(Locale.US).first().toSettingsSubtype()
-    private val b = SubtypeSettings.getResourceSubtypesForLocale(Locale.GERMANY).first().toSettingsSubtype()
-    private var idA = 0
-    private var idB = 0
+    private val a = SubtypeSettings.getResourceSubtypesForLocale(Locale.US).first().toSettingsSubtype().withId(1)
+    private val b = SubtypeSettings.getResourceSubtypesForLocale(Locale.GERMANY).first().toSettingsSubtype().withId(2)
+    private val idA = kid(1)
+    private val idB = kid(2)
     private val key = Settings.PREF_AUTO_CAP // on Text correction, each keyboard's own
     // the activity loads the keyboard's settings into the Settings singleton, whose listener then reloads them on every
     // change in later tests: put back as found (see BackOncePerScreenTest)
@@ -74,16 +79,11 @@ class EditingKeyboardTest {
         val imm = ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
         shadowOf(imm).setEnabledInputMethodInfoList(listOf(InputMethodInfo(ctx.packageName, "LatinIME", "Curmudgeon", null)))
         SettingsDestination.navTarget.value = SettingsDestination.Keyboards
-        real.edit {
-            putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a, b)))
-            putString(Settings.PREF_SELECTED_SUBTYPE, a.toPref())
-        }
+        storeKeyboards(ctx, real, listOf(a, b), selected = a, reload = false)
         KeyboardProfiles.enable(real)
         SubtypeSettings.reloadEnabledSubtypes(ctx)
         KeyboardProfiles.refreshImeId(real)
-        idA = KeyboardProfiles.idFor(real, a)
-        idB = KeyboardProfiles.idFor(real, b)
-        assertTrue(idA != idB && idA != KeyboardProfiles.SHARED && idB != KeyboardProfiles.SHARED)
+        assertEquals(listOf(idA, idB), storedEnabled(real).map { it.keyboardId }, "the keyboards lost their ids")
     }
     @After fun tearDown() {
         loadedSettings.set(Settings.getInstance(), settingsBefore)
@@ -102,7 +102,7 @@ class EditingKeyboardTest {
         kotlinx.coroutines.runBlocking { imeScope.coroutineContext[kotlinx.coroutines.Job]?.children?.forEach { it.join() } }
     }
 
-    private fun own(id: Int) = KeyboardProfiles.ownKey(id, key)
+    private fun own(id: String) = KeyboardProfiles.ownKey(id, key)
 
     // ---- 1: the preferences a context gets ----
 
@@ -125,8 +125,8 @@ class EditingKeyboardTest {
         assertFalse(real.contains(key) || real.contains(Settings.PREF_KEY_LONGPRESS_TIMEOUT))
         real.edit { putBoolean("separate_settings_per_keyboard", true) }
 
-        KeyboardScopeContext(activity, 99).prefs().edit { putInt(Settings.PREF_KEY_LONGPRESS_TIMEOUT, 444) }
-        assertFalse(real.all.keys.any { it.startsWith("p99/") }, "a set no keyboard has was written: ${real.all.keys}")
+        KeyboardScopeContext(activity, kid(99)).prefs().edit { putInt(Settings.PREF_KEY_LONGPRESS_TIMEOUT, 444) }
+        assertFalse(real.all.keys.any { it.startsWith("p${kid(99)}/") }, "a set no keyboard has was written: ${real.all.keys}")
         assertEquals(444, real.getInt(KeyboardProfiles.ownKey(idA, Settings.PREF_KEY_LONGPRESS_TIMEOUT), 0))
     }
 
@@ -257,12 +257,14 @@ class EditingKeyboardTest {
     @Test fun `a restore with B's screen open goes back to the main screen`() = launch { _, activity ->
         openCorrectionOfB()
         frames(1000)
-        // the backup's ids replace the phone's: B's old id is A's now
+        // the backup's ids replace the phone's: B's old id is A's now (owner 2026-10-11: keyboards have unique ids, in
+        // their definitions)
+        val restoredA = a.withoutIds().withId(2)
+        val restoredB = b.withoutIds().withId(1)
         activity.runOnUiThread { helium314.keyboard.settings.preferences.runRestore(activity, {}, R.string.backup_restored) {
-            real.edit().clear().putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(b, a)))
-                .putString(Settings.PREF_SELECTED_SUBTYPE, a.toPref())
-                .putString("keyboard_profile_ids", org.json.JSONObject().put(a.toPref(), idB).put(b.toPref(), idA).toString())
-                .putInt("keyboard_profile_next_id", 3).commit()
+            val lists = SubtypeSettings.createPrefSubtypes(listOf(restoredB, restoredA))
+            real.edit().clear().putString(Settings.PREF_ENABLED_SUBTYPES, lists).putString(Settings.PREF_ADDITIONAL_SUBTYPES, lists)
+                .putString(Settings.PREF_SELECTED_SUBTYPE, restoredA.toPref()).commit()
 
             KeyboardProfiles.enable(real)
         } }
@@ -271,7 +273,7 @@ class EditingKeyboardTest {
         while (helium314.keyboard.settings.preferences.BackupRestoreJob.isRunning && System.currentTimeMillis() < until) { idle(); Thread.sleep(20) }
         assertFalse(helium314.keyboard.settings.preferences.BackupRestoreJob.isRunning, "the restore didn't end")
         frames(1000)
-        assertEquals(idB, KeyboardProfiles.idFor(real, a), "(the restore didn't swap the ids)")
+        assertEquals(idB, storedEnabled(real).first { it.locale == Locale.US }.keyboardId, "(the restore didn't swap the ids)")
         assertEquals(1, shown(mainTitle), "still on B's screen after the restore")
         assertEquals(0, shown(autoCap))
         assertFalse(real.all.keys.any { it.endsWith("/$key") }, "${real.all.keys}")

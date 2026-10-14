@@ -12,7 +12,8 @@ import helium314.keyboard.settings.screens.customizePopupsSaved
 import helium314.keyboard.settings.screens.deletePopupSet
 import helium314.keyboard.settings.screens.layoutFilesSaved
 import helium314.keyboard.settings.screens.paletteEditorSaved
-import org.json.JSONObject
+import helium314.keyboard.idKey
+import helium314.keyboard.kid
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -34,7 +35,7 @@ import kotlin.test.assertTrue
 class SubScreenSaveTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
-    private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
+    private fun own(n: Int, key: String) = idKey(n, key) // (keyboard "k<n>"'s own set)
     // a palette as the editor stores it (the keyboard reads it as it loads), before and after a color change
     private val before = """[{"name":"background","auto":false,"color":-1}]"""
     private val edited = """[{"name":"background","auto":false,"color":-16777216}]"""
@@ -43,7 +44,6 @@ class SubScreenSaveTest {
     @Before fun setUp() {
         real.edit().clear()
             .putBoolean("separate_settings_per_keyboard", true)
-            .putString("keyboard_profile_ids", JSONObject().put("a", 1).put("b", 2).toString())
             .putString(own(2, AppearanceLooks.PREF_SELECTED), "Sunset")
             .putString(own(2, Settings.PREF_THEME_COLORS), "Warm")
             .putString(Settings.PREF_USER_COLORS_PREFIX + "Warm", before)
@@ -94,7 +94,7 @@ class SubScreenSaveTest {
         deletePopupSet(ctx, "Mine")
         assertTrue(KeyPopupOverrides.loadSets(real).isEmpty())
         // Customize popups: a key edited on the edited keyboard, then Save
-        KeyPopupOverrides.save(ProfilePreferences(real) { 1 }, mapOf("e" to listOf("é")))
+        KeyPopupOverrides.save(ProfilePreferences(real) { kid(1) }, mapOf("e" to listOf("é")))
         customizePopupsSaved()
         assertTrue(draft.hasChanges(ctx)) // Layout & Typing shows unsaved changes
         draft.reject(ctx) // Layout & Typing's Discard
@@ -159,7 +159,7 @@ class SubScreenSaveTest {
         LayoutDraft.of(ctx, "en_US:")
         deletePopupSet(ctx, "Mine")
         LayoutDraft.subScreenOpenedOpen(ctx) // Customize popups opens
-        KeyPopupOverrides.save(ProfilePreferences(real) { 1 }, mapOf("e" to listOf("é")))
+        KeyPopupOverrides.save(ProfilePreferences(real) { kid(1) }, mapOf("e" to listOf("é")))
         customizePopupsSaved()
         val edit = real.getString(own(1, KeyPopupOverrides.PREF), null)
         LayoutDraft.forgetActiveForTest() // the process died
@@ -187,10 +187,10 @@ class SubScreenSaveTest {
     @Test fun `leaving the app - a key the parent changed after the sub-screen saved it goes back to the saved value`() {
         LayoutDraft.of(ctx, "en_US:")
         LayoutDraft.subScreenOpenedOpen(ctx)
-        KeyPopupOverrides.save(ProfilePreferences(real) { 1 }, mapOf("e" to listOf("é")))
+        KeyPopupOverrides.save(ProfilePreferences(real) { kid(1) }, mapOf("e" to listOf("é")))
         customizePopupsSaved()
         val edit = real.getString(own(1, KeyPopupOverrides.PREF), null)
-        KeyPopupOverrides.save(ProfilePreferences(real) { 1 }, mapOf("e" to listOf("è"))) // the parent, afterwards
+        KeyPopupOverrides.save(ProfilePreferences(real) { kid(1) }, mapOf("e" to listOf("è"))) // the parent, afterwards
         LayoutDraft.rejectOpen(ctx) // the app left
         assertEquals(edit, real.getString(own(1, KeyPopupOverrides.PREF), null))
     }
@@ -199,7 +199,7 @@ class SubScreenSaveTest {
     @Test fun `the parent's Discard still undoes a recorded sub-screen save`() {
         val draft = LayoutDraft.of(ctx, "en_US:")
         LayoutDraft.subScreenOpenedOpen(ctx)
-        KeyPopupOverrides.save(ProfilePreferences(real) { 1 }, mapOf("e" to listOf("é")))
+        KeyPopupOverrides.save(ProfilePreferences(real) { kid(1) }, mapOf("e" to listOf("é")))
         customizePopupsSaved()
         draft.reject(ctx) // Layout & Typing's Discard
         assertFalse(real.contains(own(1, KeyPopupOverrides.PREF)))

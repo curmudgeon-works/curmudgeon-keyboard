@@ -6,7 +6,6 @@ import androidx.test.core.app.ApplicationProvider
 import helium314.keyboard.latin.BuildConfig
 import helium314.keyboard.latin.checkVersionUpgrade
 import helium314.keyboard.latin.personalization.available
-import helium314.keyboard.latin.personalization.profileIds
 import helium314.keyboard.latin.personalization.useKeyboards
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.ProfilePreferences
@@ -41,6 +40,7 @@ import kotlin.test.assertTrue
  * keyboards point to it.") No common set: the first keyboard in the list is the main one, and its own set is what every
  * keyboard reads with separate settings off, and what a shared menu reads. Nothing is copied on switching; every keyboard
  * has its own set from the start; the old common set goes once, and a backup's is ignored.
+ * (owner 2026-10-11: keyboards have unique ids) keyboards 1, 2, 3 are "k1", "k2", "k3"; the backup's "k6", "k7"; no id map.
  */
 @RunWith(RobolectricTestRunner::class)
 class NoCommonSetTest {
@@ -53,19 +53,19 @@ class NoCommonSetTest {
     private lateinit var en: SettingsSubtype
     private lateinit var de: SettingsSubtype
     private lateinit var hi: SettingsSubtype
-    private fun view(id: Int) = ProfilePreferences(real) { id }
-    /** What keyboard [id]'s own screens edit (KeyboardScopeContext): its set, or the main choice. */
-    private fun screen(id: Int) = ProfilePreferences(real) { KeyboardProfiles.scopedId(real, id) }
-    private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
+    private fun view(id: String) = ProfilePreferences(real) { id }
+    private fun view(n: Int) = view(kid(n))
+    /** What keyboard [n]'s own screens edit (KeyboardScopeContext): its set, or the main choice. */
+    private fun screen(n: Int) = ProfilePreferences(real) { KeyboardProfiles.scopedId(real, kid(n)) }
+    private fun own(n: Int, key: String) = idKey(n, key)
     private fun separate(on: Boolean) = real.edit().putBoolean("separate_settings_per_keyboard", on).commit()
 
     @Before fun setUp() {
         real.edit().clear().commit()
         KeyboardProfiles.filesDir = DeviceProtectedUtils.getFilesDir(ctx); KeyboardProfiles.deleteAllFiles()
         SubtypeSettings.init(ctx)
-        en = available("en-US"); de = available("de-DE"); hi = available("hi")
+        en = available("en-US").withId(1); de = available("de-DE").withId(2); hi = available("hi").withId(3)
         useKeyboards(ctx, real, en, de, hi)
-        profileIds(real, mapOf(en to 1, de to 2, hi to 3), 4)
         KeyboardProfiles.loadGroups(real)
     }
     @After fun tearDown() {
@@ -172,8 +172,8 @@ class NoCommonSetTest {
         // keyboard 2 and 3 without a set; 3 was added picking "keyboard 1's settings", 2 "every default" (kept for later
         // before 2026-10-11; owner 2026-10-11: "don't care about keyboards before this update really")
         real.edit().putFloat(gap, 7f).putFloat(own(1, gap), 2f).putFloat(own(1, vGap), 1f)
-            .putString("keyboard_start_from", JSONObject().put("3", JSONObject().put("from", 1).put("noPopups", false))
-                .put("2", JSONObject().put("from", KeyboardProfiles.START_DEFAULTS).put("noPopups", false)).toString()).commit()
+            .putString("keyboard_start_from", JSONObject().put(kid(3), JSONObject().put("from", kid(1)).put("noPopups", false))
+                .put(kid(2), JSONObject().put("from", KeyboardProfiles.START_DEFAULTS).put("noPopups", false)).toString()).commit()
         KeyboardProfiles.dropCommonSet(real, fromCommon = true)
         assertEquals(7f, real.getFloat(own(3, gap), 0f)); assertFalse(real.contains(own(3, vGap)))
         assertEquals(7f, real.getFloat(own(2, gap), 0f))
@@ -189,13 +189,17 @@ class NoCommonSetTest {
         assertEquals(7f, view(2).getFloat(gap, 0f))
     }
 
+    // the backup's keyboards: English "k6" and Hindi "k7" (sets "pk6/", "pk7/")
+    private val enInBackup get() = en.withoutIds().withId(6)
+    private val hiInBackup get() = hi.withoutIds().withId(7)
+
     private fun backup(vararg values: Pair<String, Any?>, separate: Boolean) {
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("preferences.json"))
-            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to SubtypeSettings.createPrefSubtypes(listOf(en, hi)),
-                Settings.PREF_SELECTED_SUBTYPE to en.toPref(), "separate_settings_per_keyboard" to separate,
+            val lists = SubtypeSettings.createPrefSubtypes(listOf(enInBackup, hiInBackup))
+            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to lists, Settings.PREF_ADDITIONAL_SUBTYPES to lists,
+                Settings.PREF_SELECTED_SUBTYPE to enInBackup.toPref(), "separate_settings_per_keyboard" to separate,
                 Settings.PREF_VERSION_CODE to BuildConfig.MIGRATION_VERSION,
-                "keyboard_profile_ids" to JSONObject().put(en.toPref(), 6).put(hi.toPref(), 7).toString(), "keyboard_profile_next_id" to 8,
                 helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
                 helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true) + values, z)
             z.closeEntry()
@@ -205,7 +209,7 @@ class NoCommonSetTest {
     @Test fun `restoring the main keyboard with separate settings off changes what everyone sees`() {
         real.edit().putFloat(own(1, gap), 2f).commit()
         backup(own(6, gap) to 5f, KeyboardProfiles.NO_COMMON_SET_DONE to true, separate = false)
-        val (_, hidden) = restoreKeyboardsFrom(ctx, zip, listOf(en), withSettings = true, decisions = mapOf(en to RestoreDecision.Merge(en)))
+        val (_, hidden) = restoreKeyboardsFrom(ctx, zip, listOf(enInBackup), withSettings = true, decisions = mapOf(enInBackup to RestoreDecision.Merge(en)))
         assertEquals(5f, real.getFloat(own(1, gap), 0f))
         assertEquals(5f, view(2).getFloat(gap, 0f))
         assertEquals("${keyboardName(en, ctx)}'s settings were restored. All keyboards use them, as they're the common settings.",
@@ -215,7 +219,7 @@ class NoCommonSetTest {
     @Test fun `restoring a keyboard from an old backup ignores the backup's common set`() {
         real.edit().putFloat(own(1, gap), 2f).commit()
         backup(gap to 7f, own(6, vGap) to 1.5f, separate = false)
-        restoreKeyboardsFrom(ctx, zip, listOf(en), withSettings = true, decisions = mapOf(en to RestoreDecision.Merge(en)))
+        restoreKeyboardsFrom(ctx, zip, listOf(enInBackup), withSettings = true, decisions = mapOf(enInBackup to RestoreDecision.Merge(en)))
         assertFalse(real.contains(own(1, gap)), "the backup's common value came")
         assertEquals(1.5f, real.getFloat(own(1, vGap), 0f))
         assertFalse(real.contains(gap))

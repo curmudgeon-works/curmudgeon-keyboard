@@ -12,7 +12,6 @@ import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.LayoutType
 import helium314.keyboard.latin.utils.LayoutUtilsCustom
 import helium314.keyboard.latin.utils.SubtypeSettings
-import org.json.JSONObject
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -51,28 +50,25 @@ class LayoutDeleteEffectsTest {
         SubtypeSettings.reloadEnabledSubtypes(ctx)
     }
 
-    /** Keyboards [keyboards] (sets 1, 2, 3 in this order), the first one in use; the ones picking a layout are additional. */
-    private fun keyboards(separate: Boolean, vararg keyboards: SettingsSubtype) {
-        real.edit()
-            .putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(keyboards.filter { it.layoutName(type) != null }))
-            .putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(keyboards.toList()))
-            .putString(Settings.PREF_SELECTED_SUBTYPE, keyboards.first().toPref())
-            .putString("keyboard_profile_ids", JSONObject(keyboards.withIndex().associate { (i, kb) -> kb.toPref() to i + 1 }).toString())
-            .putInt("keyboard_profile_next_id", keyboards.size + 1)
-            .putBoolean("separate_settings_per_keyboard", separate)
-            .commit()
+    /** Keyboards [keyboards] with ids k1, k2, k3 in this order (owner 2026-10-11: keyboards have unique ids), the first
+     *  one in use, all in the added list. @return them as listed (with their ids) */
+    private fun keyboards(separate: Boolean, vararg keyboards: SettingsSubtype): List<SettingsSubtype> {
+        val listed = keyboards.mapIndexed { i, kb -> kb.withId(i + 1) }
+        real.edit().putBoolean("separate_settings_per_keyboard", separate).commit()
+        storeKeyboards(ctx, real, listed, reload = false)
         KeyboardProfiles.loadGroups(real)
         KeyboardProfiles.refreshImeId(real)
         SubtypeSettings.reloadEnabledSubtypes(ctx)
+        return listed
     }
 
     private fun names(list: List<SettingsSubtype>) = list.map { it.locale.toLanguageTag() }
-    private val builtIn get() = Settings.readDefaultLayoutName(type, ProfilePreferences(real) { 99 })
+    private val builtIn get() = Settings.readDefaultLayoutName(type, ProfilePreferences(real) { kid(99) })
     private fun enabled() = SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }
     /** The number row keyboard [index] of the list draws now (its own pick, else its default in its set [id]). */
     private fun keysOf(index: Int, id: Int): String {
         val pick = enabled()[index].layoutName(type)
-        return pick?.let { file(it).readText() } ?: Settings.readDefaultLayoutName(type, ProfilePreferences(real) { id })
+        return pick?.let { file(it).readText() } ?: Settings.readDefaultLayoutName(type, ProfilePreferences(real) { kid(id) })
     }
 
     /** Each keyboard named in "keeps" ends with its own unsaved copy of the keys; each in "back to default" with the
@@ -82,7 +78,7 @@ class LayoutDeleteEffectsTest {
         for (kb in keeps) {
             val index = before.indexOf(kb)
             // its own pick, or (2026-10-11) the default of its set: an unnamed copy of the keys either way
-            val name = enabled()[index].layoutName(type) ?: Settings.readDefaultLayoutName(type, ProfilePreferences(real) { index + 1 })
+            val name = enabled()[index].layoutName(type) ?: Settings.readDefaultLayoutName(type, ProfilePreferences(real) { kid(index + 1) })
             assertTrue(LayoutUtilsCustom.isPrivateLayout(name), "${kb.locale} named as keeping the keys, but uses $name")
             assertEquals("1 2 3", file(name).readText())
         }
@@ -101,42 +97,42 @@ class LayoutDeleteEffectsTest {
         val a = available("en-US").withLayout(type, x) // picks x
         val b = available("de-DE") // x is the default in its own set
         val c = available("en-GB").withLayout(type, y) // picks y, its own default x: uses none of x
-        keyboards(true, a, b, c)
-        real.edit().putString("p2/$defaultKey", x).putString("p3/$defaultKey", x).commit()
+        val before = keyboards(true, a, b, c)
+        real.edit().putString(idKey(2, defaultKey), x).putString(idKey(3, defaultKey), x).commit()
         val effects = LayoutUtilsCustom.deleteEffects(x, type, ctx)
         assertEquals(listOf("en-US", "de-DE"), names(effects.first)) // (2026-10-11: the default's users keep the keys too)
         assertEquals(emptyList(), names(effects.second))
         LayoutUtilsCustom.deleteLayout(x, type, ctx)
-        assertOutcome(effects, listOf(a, b, c), mapOf(2 to "7 8 9"))
+        assertOutcome(effects, before, mapOf(2 to "7 8 9"))
     }
 
     @Test fun `separate settings off - the keyboards reading the shared default keep the keys too`() {
         val a = available("en-US").withLayout(type, x)
         val b = available("de-DE")
         val c = available("en-GB")
-        keyboards(false, a, b, c)
-        real.edit().putString("p1/$defaultKey", x).commit() // (the first keyboard's: owner 2026-10-11, no separate common set; the first keyboard's own settings are the common ones)
+        val before = keyboards(false, a, b, c)
+        real.edit().putString(idKey(1, defaultKey), x).commit() // (the first keyboard's: owner 2026-10-11, no separate common set; the first keyboard's own settings are the common ones)
         val effects = LayoutUtilsCustom.deleteEffects(x, type, ctx)
         assertEquals(listOf("en-US", "de-DE", "en-GB"), names(effects.first))
         assertEquals(emptyList(), names(effects.second))
         LayoutUtilsCustom.deleteLayout(x, type, ctx)
-        assertOutcome(effects, listOf(a, b, c), emptyMap())
+        assertOutcome(effects, before, emptyMap())
     }
 
     @Test fun `separate settings off - a hidden set's default is named and keeps the keys`() {
         val a = available("en-US")
         val b = available("de-DE")
         val c = available("en-GB")
-        keyboards(false, a, b, c)
-        real.edit().putString("p1/$defaultKey", "number_row").putString("p3/$defaultKey", x).commit() // C's set kept behind the scenes
+        val before = keyboards(false, a, b, c)
+        real.edit().putString(idKey(1, defaultKey), "number_row").putString(idKey(3, defaultKey), x).commit() // C's set kept behind the scenes
         val effects = LayoutUtilsCustom.deleteEffects(x, type, ctx)
         assertEquals(listOf("en-GB"), names(effects.first))
         assertEquals(emptyList(), names(effects.second))
         LayoutUtilsCustom.deleteLayout(x, type, ctx)
         real.edit().putBoolean("separate_settings_per_keyboard", true).commit() // its set in use again
-        assertOutcome(effects, listOf(a, b, c), mapOf(0 to "number_row", 1 to "number_row"))
+        assertOutcome(effects, before, mapOf(0 to "number_row", 1 to "number_row"))
         // (its default kept the keys, as an unnamed copy)
-        Settings.readDefaultLayoutName(type, ProfilePreferences(real) { 3 }).let { assertTrue(LayoutUtilsCustom.isPrivateLayout(it)); assertEquals("1 2 3", file(it).readText()) }
+        Settings.readDefaultLayoutName(type, ProfilePreferences(real) { kid(3) }).let { assertTrue(LayoutUtilsCustom.isPrivateLayout(it)); assertEquals("1 2 3", file(it).readText()) }
     }
 
     @Test fun `the warning text - none, one, many, both`() {

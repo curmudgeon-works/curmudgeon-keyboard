@@ -37,7 +37,9 @@ import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.dialogs.ImportWordsDialog
 import helium314.keyboard.settings.screens.KeyboardsScreen
 import helium314.keyboard.settings.screens.keyboardName
-import org.json.JSONObject
+import helium314.keyboard.kid
+import helium314.keyboard.poolsJson
+import helium314.keyboard.withId
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -65,9 +67,9 @@ class LearnedImportTest {
     private lateinit var de: File
     private val io = BodyStoreIo()
     private val filesDirBefore = KeyboardProfiles.filesDir
-    private val a by lazy { available("en-US") }
-    private val b by lazy { available("de-DE") }
-    private val c by lazy { available("fr") }
+    private val a by lazy { available("en-US").withId(1) }
+    private val b by lazy { available("de-DE").withId(2) }
+    private val c by lazy { available("fr").withId(3) }
 
     @Before fun setUp() {
         deleteLearnedFiles(ce)
@@ -90,7 +92,7 @@ class LearnedImportTest {
 
     /** After the update: [pools] each keyboard's. */
     private fun updated(pools: Map<SettingsSubtype, Int>, next: Int) {
-        real.edit().putString(LearnedKeyboards.PREF_POOLS, JSONObject(pools.mapKeys { it.key.toPref() }).toString())
+        real.edit().putString(LearnedKeyboards.PREF_POOLS, poolsJson(pools))
             .putInt(LearnedKeyboards.PREF_POOL_NEXT, next).putBoolean(LearnedKeyboards.PREF_DONE, true).commit()
     }
 
@@ -150,7 +152,7 @@ class LearnedImportTest {
             idleUntil { System.currentTimeMillis() > until } // (anything started would land meanwhile)
         }
         assertTrue(dismissed)
-        val pool = storedPools(real)[c.toPref()]
+        val pool = storedPools(real)[kid(3)]
         if (pool != null) assertTrue(LearnedStores.scriptsOnDisk(ce, pool).isEmpty(), "files: ${snapshot(ce).keys}")
         assertEquals(setOf(5, 6), LearnedStores.keyboardPoolsOnDisk(ce))
     }
@@ -174,7 +176,7 @@ class LearnedImportTest {
             idleUntil { ShadowToast.getTextOfLatestToast() != null }
             val copy = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.last()
             assertNotEquals(a, copy)
-            val pool = storedPools(real)[copy.toPref()]!!
+            val pool = storedPools(real)[copy.keyboardId!!]!!
             assertEquals(setOf("alpha"), io.words(ce, "Latn", pool))
             assertEquals(mapOf("fromA" to RemovedWords.Entry(1)), readList(ce, "Latn", pool))
         }

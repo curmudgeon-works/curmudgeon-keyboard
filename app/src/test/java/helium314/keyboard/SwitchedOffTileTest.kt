@@ -40,7 +40,6 @@ import helium314.keyboard.settings.SettingsMode
 import helium314.keyboard.settings.screens.KeyboardsScreen
 import helium314.keyboard.settings.screens.deleteKeyboard
 import helium314.keyboard.settings.screens.keyboardName
-import org.json.JSONObject
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -53,8 +52,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** Switched-off keyboards (in the ids map or with a pool, not in the list): one tile on the Keyboards screen with
- *  Advanced on, each to switch on or delete (owner 2026-10-11). */
+/** Switched-off keyboards (in the added list with a set or a pool by their id, not in the list): one tile on the
+ *  Keyboards screen with Advanced on, each to switch on or delete (owner 2026-10-11). (owner 2026-10-11: keyboards
+ *  have unique ids) No id map: a set is the "pk<n>/" entries, a pool is keyed by the id. */
 @RunWith(RobolectricTestRunner::class)
 class SwitchedOffTileTest {
     @get:Rule val compose = createEmptyComposeRule()
@@ -63,12 +63,12 @@ class SwitchedOffTileTest {
     private val ce: File get() = ctx.filesDir
     private val body = BodyStoreIo()
     private val filesDirBefore = KeyboardProfiles.filesDir
-    private val a by lazy { available("en-US") }
-    private val b by lazy { available("de-DE") }
-    private val c by lazy { available("fr") }
-    private val d by lazy { available("it") }
-    private val e by lazy { available("es") }
-    private val f by lazy { available("nl") }
+    private val a by lazy { available("en-US").withId(1) }
+    private val b by lazy { available("de-DE").withId(2) }
+    private val c by lazy { available("fr").withId(3) }
+    private val d by lazy { available("it").withId(4) }
+    private val e by lazy { available("es").withId(5) }
+    private val f by lazy { available("nl").withId(6) }
     private val own = "test_own_setting"
 
     @Before fun setUp() {
@@ -94,16 +94,14 @@ class SwitchedOffTileTest {
         shadowOf(Looper.getMainLooper()).idle()
     }
 
-    /** Ids: a 1, b 2, c 3 (switched off), e 4 (switched off), f the shared set; pools: a 5, b 6, d 8 and e 9 (switched off);
-     *  plus an identity that isn't a keyboard. */
+    /** In the added list a, b (listed) and c, d, e, f. Sets: a, c (switched off), e (switched off) and k7, an id with no
+     *  keyboard; pools: a 5, b 6, d 8 and e 9 (switched off); f has neither. */
     private fun leftovers() {
-        real.edit().putString("keyboard_profile_ids", JSONObject(mapOf(a.toPref() to 1, b.toPref() to 2, c.toPref() to 3,
-                e.toPref() to 4, f.toPref() to KeyboardProfiles.SHARED, "not a keyboard" to 5)).toString())
-            .putInt("keyboard_profile_next_id", 6)
-            .putString(LearnedKeyboards.PREF_POOLS, JSONObject(mapOf(a.toPref() to 5, b.toPref() to 6, d.toPref() to 8,
-                e.toPref() to 9)).toString())
+        real.edit().putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a, b, c, d, e, f)))
+            .putString(LearnedKeyboards.PREF_POOLS, poolsJson(mapOf(a to 5, b to 6, d to 8, e to 9)))
             .putInt(LearnedKeyboards.PREF_POOL_NEXT, 10).putBoolean(LearnedKeyboards.PREF_DONE, true)
-            .putString(KeyboardProfiles.ownKey(3, own), "c's own").putString(KeyboardProfiles.ownKey(1, own), "a's own")
+            .putString(idKey(3, own), "c's own").putString(idKey(1, own), "a's own").putString(idKey(5, own), "e's own")
+            .putString(idKey(7, own), "no keyboard's")
             .commit()
         body.store(ce, "Latn", 9, word("e9", 2, 100))
         body.store(ce, "Latn", 5, word("a5", 2, 100))
@@ -112,7 +110,7 @@ class SwitchedOffTileTest {
     private fun enabled() = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }
     private fun storedEnabled() = SubtypeSettings.createSettingsSubtypes(ctx.prefs().getString(Settings.PREF_ENABLED_SUBTYPES, "")!!)
 
-    @Test fun `the switched-off keyboards - in the ids map, with a pool, or both, not the listed ones nor the shared set`() {
+    @Test fun `the switched-off keyboards - a set, a pool, or both, not the listed ones nor one with neither`() {
         leftovers()
         assertEquals(setOf(c, d, e), SwitchedOffKeyboards.list(real).toSet())
         assertEquals(3, SwitchedOffKeyboards.list(real).size) // (e once)
@@ -123,20 +121,21 @@ class SwitchedOffTileTest {
         assertTrue(SwitchedOffKeyboards.switchOn(ctx, e))
         assertEquals(listOf(a, b, e), enabled())
         assertEquals(listOf(a, b, e), storedEnabled())
-        assertEquals(4, KeyboardProfiles.idFor(real, e))
-        assertEquals(9, storedPools(real)[e.toPref()])
+        assertEquals("e's own", real.getString(idKey(5, own), null)) // (its id kept: its set)
+        assertEquals(9, storedPools(real)[kid(5)])
         assertEquals(setOf("e9"), body.words(ce, "Latn", 9))
         assertEquals(setOf(c, d), SwitchedOffKeyboards.list(real).toSet())
         // switched on as it is: nothing started from another set
         assertTrue(SwitchedOffKeyboards.switchOn(ctx, c))
-        assertEquals("c's own", real.getString(KeyboardProfiles.ownKey(3, own), null))
-        assertEquals(3, KeyboardProfiles.idFor(real, c))
+        assertEquals("c's own", real.getString(idKey(3, own), null))
+        assertEquals(c, listedById(real, kid(3)))
         assertEquals(setOf(d), SwitchedOffKeyboards.list(real).toSet())
     }
 
     @Test fun `switch on - a named keyboard is registered as an added one, one already listed is refused`() {
         val named = c.with(ExtraValue.KEYBOARD_NAME, "Work")
-        real.edit().putString("keyboard_profile_ids", JSONObject(mapOf(named.toPref() to 3)).toString()).commit()
+        real.edit().putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a, b, named)))
+            .putString(idKey(3, own), "c's own").commit()
         assertEquals(listOf(named), SwitchedOffKeyboards.list(real))
         assertTrue(SwitchedOffKeyboards.switchOn(ctx, named))
         assertTrue(named.isAdditionalSubtype(ctx.prefs()))
@@ -151,17 +150,17 @@ class SwitchedOffTileTest {
         deleteKeyboard(ctx, e, null) // (as the delete dialog's confirm calls it)
         deleteKeyboard(ctx, c, null)
         idleUntil { !LearnedStores.storeFile(ce, "Latn", 9).exists() }
-        val ids = KeyboardProfiles.idEntries(real)
-        assertFalse(e.toPref() in ids)
-        assertFalse(c.toPref() in ids)
-        assertEquals(null, real.getString(KeyboardProfiles.ownKey(3, own), null))
-        assertFalse(e.toPref() in storedPools(real))
+        assertFalse(KeyboardProfiles.isOnPhone(real, e)) // (out of the added list)
+        assertFalse(KeyboardProfiles.isOnPhone(real, c))
+        assertEquals(null, real.getString(idKey(3, own), null))
+        assertEquals(null, real.getString(idKey(5, own), null))
+        assertFalse(kid(5) in storedPools(real))
         assertFalse(LearnedStores.storeFile(ce, "Latn", 9).exists())
         assertEquals(listOf(d), SwitchedOffKeyboards.list(real))
         // the listed keyboards are untouched
         assertEquals(listOf(a, b), enabled())
         assertEquals(listOf(a, b), storedEnabled())
-        assertEquals("a's own", real.getString(KeyboardProfiles.ownKey(1, own), null))
+        assertEquals("a's own", real.getString(idKey(1, own), null))
         assertEquals(setOf("a5"), body.words(ce, "Latn", 5))
     }
 
@@ -185,8 +184,8 @@ class SwitchedOffTileTest {
     }
 
     @Test fun `the tile - Delete asks as for a listed keyboard, and the tile goes with the last one`() {
-        real.edit().putString("keyboard_profile_ids", JSONObject(mapOf(c.toPref() to 3)).toString())
-            .putString(KeyboardProfiles.ownKey(3, own), "c's own").commit()
+        real.edit().putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a, b, c)))
+            .putString(idKey(3, own), "c's own").commit()
         SettingsMode.set(ctx, true)
         onScreen {
             compose.onNodeWithText(tile(1)).performScrollTo().performClick()
@@ -195,8 +194,8 @@ class SwitchedOffTileTest {
             compose.onNode(hasText(ctx.getString(R.string.delete)) and hasAnyAncestor(isDialog())).performClick()
             compose.onNodeWithText(tile(1)).assertDoesNotExist()
         }
-        assertFalse(c.toPref() in KeyboardProfiles.idEntries(real))
-        assertEquals(null, real.getString(KeyboardProfiles.ownKey(3, own), null))
+        assertFalse(KeyboardProfiles.isOnPhone(real, c))
+        assertEquals(null, real.getString(idKey(3, own), null))
         assertEquals(listOf(a, b), enabled())
     }
 }

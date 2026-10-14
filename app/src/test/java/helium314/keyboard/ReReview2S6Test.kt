@@ -27,27 +27,26 @@ import kotlin.test.assertEquals
 
 /** Review 2026-10-11 S6: a keyboard switched off on the Languages screen keeps its own set and its id, and a font delete
  *  sends its chosen font to the default too: the warning names it, "<name> (switched off)". A set no keyboard maps to
- *  is not named. Keyboard A ("Work", enabled) = set 1, B (German, switched off) = set 2, set 9 = nobody's. */
+ *  is not named. Keyboard A ("Work", enabled) = id k1, B (German, switched off) = id k2, set k9 = nobody's (owner
+ *  2026-10-11: keyboards have unique ids). */
 @RunWith(RobolectricTestRunner::class)
 class ReReview2S6Test {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = ctx.realPrefs()
-    private val a = withKeyboardName(SettingsSubtype(Locale.US, ""), "Work")
-    private val b = SubtypeSettings.getResourceSubtypesForLocale(Locale.GERMANY).first().toSettingsSubtype()
+    private val a = withKeyboardName(SettingsSubtype(Locale.US, ""), "Work").withId(1)
+    private val b = SubtypeSettings.getResourceSubtypesForLocale(Locale.GERMANY).first().toSettingsSubtype().withId(2)
     private val font get() = File(FontLibrary.dir(ctx), "Mine.ttf")
     private val value = FontLibrary.PREFIX + "Mine.ttf"
 
     @Before fun setUp() {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
-        assertEquals(1, KeyboardProfiles.idFor(real, a))
-        assertEquals(2, KeyboardProfiles.idFor(real, b))
         real.edit {
             putBoolean("separate_settings_per_keyboard", true)
-            putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a)))
+            putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a, b))) // (B switched off: in the added list only)
             putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a)))
-            putString("p1/${Settings.PREF_KEY_FONT}", FontLibrary.PREFIX + "Other.ttf")
-            putString("p2/${Settings.PREF_SUGGESTION_FONT}", value)
-            putString("p9/${Settings.PREF_KEY_FONT}", value)
+            putString(idKey(1, Settings.PREF_KEY_FONT), FontLibrary.PREFIX + "Other.ttf")
+            putString(idKey(2, Settings.PREF_SUGGESTION_FONT), value)
+            putString(idKey(9, Settings.PREF_KEY_FONT), value)
         }
         SubtypeSettings.reloadEnabledSubtypes(ctx)
         FontLibrary.dir(ctx).mkdirs(); font.writeText("not really a font")

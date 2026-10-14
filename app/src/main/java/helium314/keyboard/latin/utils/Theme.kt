@@ -32,7 +32,7 @@ import helium314.keyboard.settings.SettingsActivity
  * KeyboardProfiles.mainEditingId), so opening a keyboard's menu shows that keyboard's look.
  */
 @Composable
-fun Theme(dark: Boolean = isSystemInDarkTheme(), keyboardId: Int? = null, content: @Composable () -> Unit) {
+fun Theme(dark: Boolean = isSystemInDarkTheme(), keyboardId: String? = null, content: @Composable () -> Unit) {
     val ctx = LocalContext.current
     val changed = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
     val curmudgeon = remember(changed?.value, dark, keyboardId) {

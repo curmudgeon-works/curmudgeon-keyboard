@@ -305,7 +305,7 @@ fun KeyboardsScreen(
                 onDismissRequest = { keyboardToRename = null },
                 onConfirmed = { name ->
                     val renamed = renameKeyboard(ctx, keyboard, name)
-                    if (renamed != null && renamed != keyboard) {
+                    if (renamed != keyboard) {
                         if (expanded.remove(keyboard)) expanded.add(renamed)
                         generation++
                     }
@@ -360,42 +360,29 @@ fun KeyboardsScreen(
 /** An Add keyboard entry: a copy of an existing keyboard. */
 private class CopyOf(val keyboard: SettingsSubtype)
 
-/** The switched-off keyboards: an own set (id map) or a learned-words pool, not in the list ([SwitchedOffKeyboards.list],
+/** The switched-off keyboards: an own set or a learned-words pool (by id), not in the list ([SwitchedOffKeyboards.list],
  *  the one helper for them; 2026-10-11). */
 internal fun switchedOffKeyboards(ctx: Context): Set<SettingsSubtype> =
     SwitchedOffKeyboards.list(ctx.realPrefs()).toCollection(LinkedHashSet())
 
-/** The definitions taken by a keyboard, enabled or switched off (owner 2026-10-11: switched-off keyboards count like
- *  switched-on ones; a new or changed keyboard never lands on one's settings and words). */
+/** What the keyboards, enabled or switched off, are set up as (their definitions without their ids): a new keyboard
+ *  set up the same is numbered ("English 2", [nextNumbered]), the owner's naming rule; nothing clashes any more (owner
+ *  2026-10-11, keyboards have unique ids: two keyboards set up alike are two keyboards). */
 internal fun takenKeyboards(ctx: Context): Set<SettingsSubtype> =
-    SubtypeSettings.getEnabledSubtypes(true).mapTo(LinkedHashSet()) { it.toSettingsSubtype() } + switchedOffKeyboards(ctx)
+    (SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() } + switchedOffKeyboards(ctx)).mapTo(LinkedHashSet()) { it.withoutIds() }
 
-/** The name of the other keyboard [to] would be ("<name> (switched off)" for a switched-off one), null when [to] is free
- *  ([from]: the keyboard being changed). */
-internal fun takenBy(ctx: Context, from: SettingsSubtype, to: SettingsSubtype): String? {
-    if (to == from) return null
-    if (SubtypeSettings.getEnabledSubtypes(true).any { it.toSettingsSubtype() == to }) return keyboardName(to, ctx)
-    return if (to in switchedOffKeyboards(ctx)) ctx.getString(R.string.keyboard_switched_off, keyboardName(to, ctx)) else null
-}
+// (owner 2026-10-11, keyboards have unique ids: no "Not changed: <name> is already set up like this" any more. A rename,
+// other keys or languages never make a keyboard another one: takenBy and mayChangeKeyboard are gone)
 
-/** [from] may become [to]: not when another keyboard has that definition (its settings and words would mix); then a
- *  toast names it and false. Rename, languages, layout (before: nothing stopped it, 2026-10-11). */
-internal fun mayChangeKeyboard(ctx: Context, from: SettingsSubtype, to: SettingsSubtype): Boolean {
-    val other = takenBy(ctx, from, to) ?: return true
-    android.widget.Toast.makeText(ctx, ctx.getString(R.string.keyboard_definition_taken, other), android.widget.Toast.LENGTH_LONG).show()
-    return false
-}
-
-/** Rename's OK: the renamed keyboard, or null when another keyboard has that definition (nothing changes). */
-internal fun renameKeyboard(ctx: Context, keyboard: SettingsSubtype, name: String): SettingsSubtype? {
+/** Rename's OK: the renamed keyboard (typed duplicates allowed: its id keeps it apart, owner 2026-10-11). */
+internal fun renameKeyboard(ctx: Context, keyboard: SettingsSubtype, name: String): SettingsSubtype {
     val renamed = withKeyboardName(keyboard, name)
-    if (!mayChangeKeyboard(ctx, keyboard, renamed)) return null
-    if (renamed != keyboard) SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, renamed, ctx) // its settings go with it
+    if (renamed != keyboard) SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, renamed, ctx) // (its id stays: its settings with it)
     return renamed
 }
 
-/** Add: a new keyboard of [locale]; when its plain definition is taken (listed or switched off) another one, numbered
- *  ("English 2"), so the other keeps its settings (a switched-off one isn't silently switched on, 2026-10-11). */
+/** Add: a new keyboard of [locale] (its id comes with [createKeyboard]); when a keyboard is set up as its plain
+ *  definition (listed or switched off) it is numbered ("English 2"), the naming rule. */
 internal fun newKeyboardFor(ctx: Context, locale: Locale): SettingsSubtype {
     val plain = SubtypeUtilsAdditional.createDefaultSubtype(locale).toSettingsSubtype()
     return if (plain !in takenKeyboards(ctx)) plain else nextNumbered(ctx, plain)
@@ -403,14 +390,15 @@ internal fun newKeyboardFor(ctx: Context, locale: Locale): SettingsSubtype {
 
 /** The Add dialog's OK: [added] (or a copy of [copyOf]) added, with the settings it starts from. */
 internal fun createKeyboard(ctx: Context, added: SettingsSubtype, copyOf: SettingsSubtype?, start: StartSettings): SettingsSubtype {
-    val keyboard = if (copyOf != null) copyKeyboard(ctx, copyOf) else { addNewKeyboard(ctx, added); added }
+    val keyboard = if (copyOf != null) copyKeyboard(ctx, copyOf) else addNewKeyboard(ctx, added)
     startSettings(ctx, keyboard, start)
     return keyboard
 }
 
-/** [source] with the lowest copy number ("English 2", 3, ...) no keyboard has, switched-off ones too. */
+/** [source] with the lowest copy number ("English 2", 3, ...) no keyboard has, switched-off ones too; without an id
+ *  (a new keyboard gets its own when it is added). */
 internal fun nextNumbered(ctx: Context, source: SettingsSubtype): SettingsSubtype {
-    val base = source.without(ExtraValue.KEYBOARD_COPY)
+    val base = source.withoutIds().without(ExtraValue.KEYBOARD_COPY)
     val taken = takenKeyboards(ctx)
         .filter { it.without(ExtraValue.KEYBOARD_COPY) == base }
         .mapNotNull { it.getExtraValueOf(ExtraValue.KEYBOARD_COPY)?.toIntOrNull() }
@@ -418,18 +406,21 @@ internal fun nextNumbered(ctx: Context, source: SettingsSubtype): SettingsSubtyp
     return base.with(ExtraValue.KEYBOARD_COPY, number.toString())
 }
 
-/** @return the copy (its settings: [startSettings]) */
+/** @return the copy (its settings: [startSettings]): a new id, came from the original's (owner 2026-10-11) */
 private fun copyKeyboard(ctx: Context, source: SettingsSubtype): SettingsSubtype {
-    val copy = LayoutUtilsCustom.withOwnPrivateLayouts(nextNumbered(ctx, source), ctx) // (its own unnamed keys, not the source's file)
+    val numbered = LayoutUtilsCustom.withOwnPrivateLayouts(nextNumbered(ctx, source), ctx) // (its own unnamed keys, not the source's file)
+    val copy = helium314.keyboard.latin.settings.KeyboardIds.fresh(ctx.realPrefs(), numbered, from = source.keyboardId)
     SubtypeUtilsAdditional.changeAdditionalSubtype(copy, copy, ctx) // registers it
     SubtypeSettings.addEnabledSubtype(ctx.prefs(), copy.toAdditionalSubtype())
     return copy
 }
 
-/** Adds [keyboard] to the list (its settings: [startSettings]). */
-private fun addNewKeyboard(ctx: Context, keyboard: SettingsSubtype) {
-    SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, keyboard, ctx) // registers it unless it equals a built-in one
-    SubtypeSettings.addEnabledSubtype(ctx.prefs(), keyboard.toAdditionalSubtype())
+/** Adds [keyboard] to the list, a new keyboard with a new id (its settings: [startSettings]). @return it as listed */
+private fun addNewKeyboard(ctx: Context, keyboard: SettingsSubtype): SettingsSubtype {
+    val added = helium314.keyboard.latin.settings.KeyboardIds.fresh(ctx.realPrefs(), keyboard.withoutIds())
+    SubtypeUtilsAdditional.changeAdditionalSubtype(added, added, ctx) // registers it
+    SubtypeSettings.addEnabledSubtype(ctx.prefs(), added.toAdditionalSubtype())
+    return added
 }
 
 /**
@@ -448,7 +439,7 @@ internal fun startSettings(ctx: Context, keyboard: SettingsSubtype, start: Start
     val otherScript = start is StartSettings.From &&
         with(helium314.keyboard.latin.utils.ScriptUtils) { start.keyboard.locale.script() != keyboard.locale.script() }
     // (adding or copying a keyboard: one of the explicit moments that create its records, owner 2026-10-11)
-    KeyboardProfiles.startKeyboardFrom(real, KeyboardProfiles.idFor(real, keyboard), from, noPopups = otherScript)
+    KeyboardProfiles.startKeyboardFrom(real, keyboard.keyboardId ?: return, from, noPopups = otherScript)
 }
 
 /** [keyboard] takes the learned words of [learned] and the blacklists of [blacklisted] (in the background; a toast says
@@ -479,7 +470,7 @@ internal fun deleteKeyboard(ctx: Context, keyboard: SettingsSubtype, mergeInto: 
 internal fun onOrderChanged(ctx: Context, mainBefore: SettingsSubtype) {
     val real = ctx.realPrefs()
     val main = KeyboardProfiles.mainKeyboard(real)
-    if (main == mainBefore || !KeyboardProfiles.mainIsCommon(real)) return
+    if (main.sameKeyboard(mainBefore) || !KeyboardProfiles.mainIsCommon(real)) return
     helium314.keyboard.latin.utils.SettingsEventLog.log("the main keyboard is ${main.toPref()} now")
     KeyboardProfiles.refreshImeId(real)
     helium314.keyboard.settings.preferences.clearSettingsCaches()

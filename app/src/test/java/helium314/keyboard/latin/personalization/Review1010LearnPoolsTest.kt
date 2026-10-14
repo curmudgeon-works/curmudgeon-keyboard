@@ -15,7 +15,8 @@ import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.settings.SettingsValuesForSuggestion
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.SubtypeSettings
-import org.json.JSONObject
+import helium314.keyboard.poolsJson
+import helium314.keyboard.withId
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -67,11 +68,11 @@ class Review1010LearnPoolsTest {
         deleteLearnedFiles(ctx.filesDir)
         real.edit().clear().commit()
         SubtypeSettings.init(ctx)
-        b = available("en-US")
-        a = available("de")
+        b = available("en-US").withId(1)
+        a = available("de").withId(2)
         useKeyboards(ctx, real, b, a) // B in use
         real.edit().putBoolean(LearnedKeyboards.PREF_DONE, true)
-            .putString(LearnedKeyboards.PREF_POOLS, JSONObject(mapOf(a.toPref() to poolA, b.toPref() to poolB)).toString())
+            .putString(LearnedKeyboards.PREF_POOLS, poolsJson(mapOf(a to poolA, b to poolB)))
             .putInt(LearnedKeyboards.PREF_POOL_NEXT, 7).commit()
         storeA = RemovableHistory(ctx, "Latn", poolA)
         storeB = RemovableHistory(ctx, "Latn", poolB)

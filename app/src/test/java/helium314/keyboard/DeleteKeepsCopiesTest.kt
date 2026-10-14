@@ -16,7 +16,6 @@ import helium314.keyboard.settings.AppearanceLooks
 import helium314.keyboard.settings.CustomLabels
 import helium314.keyboard.settings.LayoutPresets
 import helium314.keyboard.settings.screens.deletePopupSet
-import org.json.JSONObject
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -39,14 +38,18 @@ import kotlin.test.assertTrue
 class DeleteKeepsCopiesTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
-    private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
-    private fun view(id: Int) = ProfilePreferences(real) { id }
+    private fun own(n: Int, key: String) = idKey(n, key)
+    private fun view(n: Int) = ProfilePreferences(real) { kid(n) }
+
+    // (owner 2026-10-11: keyboards have unique ids; keyboards A = k1 and B = k2 listed, no id map)
+    private val a = SettingsSubtype(Locale.US, "").withId(1)
+    private val b = SettingsSubtype(Locale.US, "").withId(2)
 
     @Before fun setUp() {
         real.edit().clear()
             .putBoolean("separate_settings_per_keyboard", true)
-            .putString("keyboard_profile_ids", JSONObject().put("a", 1).put("b", 2).toString())
             .commit()
+        storeKeyboards(ctx, real, listOf(a, b))
         KeyboardProfiles.loadGroups(real)
     }
     @After fun tearDown() {
@@ -85,7 +88,7 @@ class DeleteKeepsCopiesTest {
     // owner 2026-10-11: global delete ("Global only let's do"): the font file goes and every keyboard (all sets, hidden
     // ones too) and saved theme that chose it goes back to the default font; with Appearance open only after its Save
     @Test fun `a deleted font goes back to the default everywhere, after Save with Appearance open`() {
-        val screen = KeyboardScopeContext(ctx, 1) // (Appearance of keyboard A)
+        val screen = KeyboardScopeContext(ctx, kid(1)) // (Appearance of keyboard A)
         val font = File(FontLibrary.dir(ctx).apply { mkdirs() }, "Mine.ttf").apply { writeText("x") }
         val value = FontLibrary.PREFIX + "Mine.ttf"
         real.edit().putString(own(1, Settings.PREF_KEY_FONT), value).putString(own(2, Settings.PREF_KEY_FONT), value)
@@ -107,7 +110,7 @@ class DeleteKeepsCopiesTest {
     }
 
     @Test fun `Discard after a font delete brings the file and every choice back`() {
-        val screen = KeyboardScopeContext(ctx, 1) // (Appearance of keyboard A)
+        val screen = KeyboardScopeContext(ctx, kid(1)) // (Appearance of keyboard A)
         val font = File(FontLibrary.dir(ctx).apply { mkdirs() }, "Mine.ttf").apply { writeText("x") }
         val value = FontLibrary.PREFIX + "Mine.ttf"
         real.edit().putString(own(1, Settings.PREF_KEY_FONT), value).putString(own(2, Settings.PREF_KEY_FONT), value)

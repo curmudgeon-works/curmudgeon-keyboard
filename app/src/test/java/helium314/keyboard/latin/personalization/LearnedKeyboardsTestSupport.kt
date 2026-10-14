@@ -51,22 +51,20 @@ fun writeList(filesDir: File, script: String, pool: Int, text: String) =
 fun readList(filesDir: File, script: String, pool: Int) =
     LearnedStores.blacklistFile(filesDir, script, pool).takeIf { it.isFile }?.let { helium314.keyboard.latin.utils.RemovedWords.parseAll(it.readLines()) }
 
+/** The first built-in keyboard of [language] (no id: a test gives it one, withKeyboardId, before listing it). */
 fun available(language: String): SettingsSubtype =
     SubtypeSettings.getAllAvailableSubtypes().map { it.toSettingsSubtype() }.first { it.locale == Locale.forLanguageTag(language) }
 
-/** [keyboards] are the keyboard list, the first one selected. */
+/** [keyboards] (with their ids, owner 2026-10-11: keyboards have unique ids) are the keyboard list and in the added
+ *  list, the first one selected. (profileIds, the old id map's writer, is gone with the map.) */
 fun useKeyboards(ctx: Context, real: SharedPreferences, vararg keyboards: SettingsSubtype) {
     real.edit().putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(keyboards.toList()))
+        .putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(keyboards.toList()))
         .putString(Settings.PREF_SELECTED_SUBTYPE, keyboards.first().toPref()).commit()
     SubtypeSettings.reloadEnabledSubtypes(ctx)
 }
 
-fun profileIds(real: SharedPreferences, ids: Map<SettingsSubtype, Int>, next: Int) {
-    real.edit().putString("keyboard_profile_ids", JSONObject(ids.mapKeys { it.key.toPref() }).toString())
-        .putInt("keyboard_profile_next_id", next).commit()
-}
-
-/** The pools map as stored. */
+/** The pools map as stored: keyboard id -> pool. */
 fun storedPools(real: SharedPreferences): Map<String, Int> =
     JSONObject(real.getString(LearnedKeyboards.PREF_POOLS, null) ?: "{}").let { o -> o.keys().asSequence().associateWith { o.getInt(it) } }
 

@@ -17,6 +17,7 @@ import helium314.keyboard.latin.common.Constants.Separators
 import helium314.keyboard.latin.common.LocaleUtils
 import helium314.keyboard.latin.define.DebugFlags
 import helium314.keyboard.latin.settings.Defaults
+import helium314.keyboard.latin.settings.KeyboardIds
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.ProfilePreferences
 import helium314.keyboard.latin.settings.Settings
@@ -58,25 +59,44 @@ object SubtypeSettings {
         }
     }
 
-    fun addEnabledSubtype(prefs: SharedPreferences, newSubtype: InputMethodSubtype) {
-        helium314.keyboard.latin.utils.SettingsEventLog.log("keyboard added: ${newSubtype.toSettingsSubtype().toPref()}")
-        val subtype = newSubtype.toSettingsSubtype()
+    /** Adds [newSubtype] to the list. One without an id (a built-in keyboard of the language list) is a new keyboard: it
+     *  gets one, as a default stored first does (owner 2026-10-11, keyboards have unique ids); each is registered as an
+     *  added keyboard. @return the keyboard as listed */
+    fun addEnabledSubtype(prefs: SharedPreferences, newSubtype: InputMethodSubtype): SettingsSubtype {
+        val real = (prefs as? ProfilePreferences)?.underlying ?: prefs
+        val subtype = newSubtype.toSettingsSubtype().let { if (it.keyboardId == null) KeyboardIds.fresh(real, it) else it }
+        helium314.keyboard.latin.utils.SettingsEventLog.log("keyboard added: ${subtype.toPref()}")
         // (the list is stored from the first start on, see [loadEnabledSubtypes]; found empty all the same: the default
         // keyboard is stored first, as at a first start, so the settings made on it stay with a listed keyboard)
-        val stored = createSettingsSubtypes(prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!)
-        val defaultFirst = stored.isEmpty() && enabledSubtypes.isEmpty()
-        val subtypes = (if (defaultFirst) listOf(getDefaultEnabledSubtypes().first().toSettingsSubtype()) else stored) + subtype
-        val newString = createPrefSubtypes(subtypes)
-        prefs.edit { putString(Settings.PREF_ENABLED_SUBTYPES, newString) }
+        val stored = createSettingsSubtypes(real.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!)
+        val default = if (stored.isEmpty() && enabledSubtypes.isEmpty())
+            KeyboardIds.fresh(real, getDefaultEnabledSubtypes().first().toSettingsSubtype(), alsoTaken = listOfNotNull(subtype.keyboardId))
+            else null
+        val subtypes = (if (default != null) listOf(default) else stored) + subtype
+        real.edit { putString(Settings.PREF_ENABLED_SUBTYPES, createPrefSubtypes(subtypes)) }
+        // (registered after the list: the added list's write reloads the keyboards, Settings' listener, and finds them)
+        register(real, listOfNotNull(default, subtype))
 
         // adding a keyboard: its records now (the net, owner 2026-10-11), before anything reads it in the list
-        KeyboardProfiles.ensureListedRecords((prefs as? ProfilePreferences)?.underlying ?: prefs)
-        if (defaultFirst) enabledSubtypes.add(getDefaultEnabledSubtypes().first())
-        if (newSubtype !in enabledSubtypes) {
-            enabledSubtypes.add(newSubtype)
+        KeyboardProfiles.ensureListedRecords(real)
+        if (default != null && enabledSubtypes.none { it.toSettingsSubtype() == default }) enabledSubtypes.add(0, default.toAdditionalSubtype())
+        val added = subtype.toAdditionalSubtype()
+        if (enabledSubtypes.none { it == added && it.extraValue == added.extraValue }) {
+            enabledSubtypes.removeAll { it == added } // (another definition of the same keyboard, by its id)
+            enabledSubtypes.add(added)
             // order = the order keyboards were added (also the switching order); the pref string keeps it across restarts
             RichInputMethodManager.getInstance().refreshSubtypeCaches()
-        } else if (defaultFirst) RichInputMethodManager.getInstance().refreshSubtypeCaches()
+        } else if (default != null) RichInputMethodManager.getInstance().refreshSubtypeCaches()
+        return subtype
+    }
+
+    /** [keyboards] in the added list (a keyboard with an id is always the user's own), each once, by its id. */
+    private fun register(real: SharedPreferences, keyboards: List<SettingsSubtype>) {
+        val added = createSettingsSubtypes(real.getString(Settings.PREF_ADDITIONAL_SUBTYPES, Defaults.PREF_ADDITIONAL_SUBTYPES)!!)
+        val missing = keyboards.filter { kb -> added.none { it == kb } }
+        if (missing.isEmpty()) return
+        real.edit { putString(Settings.PREF_ADDITIONAL_SUBTYPES, createPrefSubtypes(added.filter { a -> missing.none { it.sameKeyboard(a) } } + missing)) }
+        loadAdditionalSubtypes(real)
     }
 
     /** @return whether subtype was actually removed */
@@ -84,7 +104,7 @@ object SubtypeSettings {
         helium314.keyboard.latin.utils.SettingsEventLog.log("keyboard removed: ${subtype.toSettingsSubtype().toPref()}")
         val prefs = context.prefs()
         if (!removeEnabledSubtype(prefs, subtype.toSettingsSubtype())) {
-            if (SubtypeUtilsAdditional.isAdditionalSubtype(subtype))
+            if (SubtypeUtilsAdditional.isAdditionalSubtype(subtype) || subtype.toSettingsSubtype().keyboardId != null)
                 return false
             // We want to disable a built-in subtype, but can't. This might be because it was changed in method.xml, and we definitely should disable it
             val enabledFromSettings = createSettingsSubtypes(context.prefs().getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!)
@@ -109,6 +129,8 @@ object SubtypeSettings {
 
     fun getSelectedSubtype(prefs: SharedPreferences): InputMethodSubtype {
         val selectedSubtype = prefs.getString(Settings.PREF_SELECTED_SUBTYPE, Defaults.PREF_SELECTED_SUBTYPE)!!.toSettingsSubtype()
+        // the keyboard as it is now, by its id (a rename keeps the selection; owner 2026-10-11, keyboards have unique ids)
+        enabledSubtypes.firstOrNull { it.toSettingsSubtype().sameKeyboard(selectedSubtype) }?.let { return it }
         if (selectedSubtype.isAdditionalSubtype(prefs))
             return selectedSubtype.toAdditionalSubtype()
         // no additional subtype, must be a resource subtype
@@ -168,10 +190,9 @@ object SubtypeSettings {
     fun onRenameLayout(type: LayoutType, from: String, to: String?, context: Context) {
         val prefs = context.prefs()
         val editor = prefs.edit() // calling apply for each separate setting would result in an invalid intermediate state
-        // the keyboards that change, old to new: their own settings (separate settings) move with them; switched-off
-        // ones too (in the additional list only; owner 2026-10-11: treated like switched-on ones), also when one now
-        // equals a built-in keyboard and leaves the list: its set and learned words move to that definition
-        val changed = LinkedHashMap<SettingsSubtype, SettingsSubtype>()
+        // the keyboards that change, switched-off ones too (in the additional list only; owner 2026-10-11: treated like
+        // switched-on ones); each keeps its id, so its set and learned words stay its own (owner 2026-10-11, keyboards
+        // have unique ids: before, they moved to the new definition)
         val lists = LinkedHashMap<String, String>()
         listOf(
             Settings.PREF_ADDITIONAL_SUBTYPES to Defaults.PREF_ADDITIONAL_SUBTYPES,
@@ -189,21 +210,16 @@ object SubtypeSettings {
                             else resourceSubtypesByLocale[subtype.locale]?.first()?.mainLayoutName()
                         val newSubtype = if (defaultLayout == null) subtype.withoutLayout(type)
                             else subtype.withLayout(type, defaultLayout)
-                        changed[subtype] = newSubtype
                         if (newSubtype.isSameAsDefault() && key == Settings.PREF_ADDITIONAL_SUBTYPES) null
                         else newSubtype.toPref()
                     }
-                    else subtype.withLayout(type, to).also { changed[subtype] = it }.toPref()
+                    else subtype.withLayout(type, to).toPref()
                 }
                 else subtype.toPref()
             }.joinToString(Separators.SETS)
             lists[key] = new
         }
-        // the records move first, then the lists (owner 2026-10-11, the ghost records): the lists' write reloads them
-        // (Settings' listener), and the net then finds every listed keyboard with its records; the other way round it
-        // gave each changed keyboard new empty ones and the move stopped (the target has records)
         val real = context.realPrefs()
-        for ((old, new) in changed) helium314.keyboard.latin.settings.KeyboardProfiles.onKeyboardChanged(real, old, new)
         for ((key, new) in lists) editor.putString(key, new)
         editor.apply()
         // the default for its type, in every set (shared, each keyboard's own, hidden ones too); 2026-10-07: only the
@@ -287,9 +303,14 @@ object SubtypeSettings {
     // requires loadResourceSubtypes to be called before. @return whether the list was found empty and the default stored
     private fun loadEnabledSubtypes(context: Context): Boolean {
         val prefs = context.prefs()
+        // every listed keyboard has its id, given before the list is read (the net, owner 2026-10-11: keyboards have
+        // unique ids); its write may have loaded the keyboards already (Settings' listener): loaded once here
+        if (KeyboardIds.ensureListedIds(context.realPrefs())) loadAdditionalSubtypes(prefs)
+        enabledSubtypes.clear()
         val settingsSubtypes = createSettingsSubtypes(prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!)
         for (settingsSubtype in settingsSubtypes) {
-            if (settingsSubtype.isAdditionalSubtype(prefs)) {
+            // (a keyboard with an id is the user's own: from its definition)
+            if (settingsSubtype.keyboardId != null || settingsSubtype.isAdditionalSubtype(prefs)) {
                 enabledSubtypes.add(settingsSubtype.toAdditionalSubtype())
                 continue
             }
@@ -321,13 +342,21 @@ object SubtypeSettings {
         // whose own settings are the main ones (owner 2026-10-11); before, the list stayed empty and a default was shown.
         // (a list whose keyboards only failed to load in debug mode stays as it is)
         if (enabledSubtypes.isEmpty() && createSettingsSubtypes(prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!).isEmpty()) {
-            val default = getDefaultEnabledSubtypes().first()
-            Log.i(TAG, "no keyboard in the list: storing the default ${default.toSettingsSubtype().toPref()}")
+            // (a new keyboard: its own new id, owner 2026-10-11; registered as an added keyboard after the list is written:
+            // that write reloads the keyboards, Settings' listener, and an empty list would store another default)
+            val real = context.realPrefs()
+            val default = KeyboardIds.fresh(real, getDefaultEnabledSubtypes().first().toSettingsSubtype())
+            Log.i(TAG, "no keyboard in the list: storing the default ${default.toPref()}")
             prefs.edit {
-                putString(Settings.PREF_ENABLED_SUBTYPES, createPrefSubtypes(listOf(default.toSettingsSubtype())))
-                if (!prefs.contains(Settings.PREF_SELECTED_SUBTYPE)) putString(Settings.PREF_SELECTED_SUBTYPE, default.toSettingsSubtype().toPref())
+                putString(Settings.PREF_ENABLED_SUBTYPES, createPrefSubtypes(listOf(default)))
+                // (a selected keyboard of before, of no keyboard listed now: the default; the same definition: its id)
+                val selected = prefs.getString(Settings.PREF_SELECTED_SUBTYPE, null)?.toSettingsSubtype()
+                if (selected == null || selected.keyboardId == null || selected.withoutIds() == default.withoutIds())
+                    putString(Settings.PREF_SELECTED_SUBTYPE, default.toPref())
             }
-            enabledSubtypes.add(default)
+            register(real, listOf(default))
+            enabledSubtypes.clear()
+            enabledSubtypes.add(default.toAdditionalSubtype())
             return true
         }
         return false
@@ -338,22 +367,23 @@ object SubtypeSettings {
 
     internal fun removeEnabledSubtypeFromPrefs(prefs: SharedPreferences, subtype: SettingsSubtype): Boolean {
         val oldSubtypes = createSettingsSubtypes(prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!)
-        val newSubtypes = oldSubtypes - subtype
+        // (by its id: whatever its definition now; owner 2026-10-11, keyboards have unique ids)
+        val newSubtypes = oldSubtypes.filter { !it.sameKeyboard(subtype) }
         if (oldSubtypes == newSubtypes)
             return false // already removed
         prefs.edit { putString(Settings.PREF_ENABLED_SUBTYPES, createPrefSubtypes(newSubtypes)) }
-        if (subtype == prefs.getString(Settings.PREF_SELECTED_SUBTYPE, Defaults.PREF_SELECTED_SUBTYPE)!!.toSettingsSubtype()) {
+        if (subtype.sameKeyboard(prefs.getString(Settings.PREF_SELECTED_SUBTYPE, Defaults.PREF_SELECTED_SUBTYPE)!!.toSettingsSubtype())) {
             // switch subtype if the currently used one has been disabled
             try {
                 val nextSubtype = RichInputMethodManager.getInstance().getNextSubtypeInThisIme(true)
-                if (subtype == nextSubtype?.toSettingsSubtype())
+                if (subtype.sameKeyboard(nextSubtype?.toSettingsSubtype()))
                     KeyboardSwitcher.getInstance().switchToSubtype(getDefaultEnabledSubtypes().first())
                 else
                     KeyboardSwitcher.getInstance().switchToSubtype(nextSubtype)
             } catch (_: Exception) { } // do nothing if RichInputMethodManager isn't initialized
             // the keyboard not running, the switch did nothing: the next keyboard is the one in use (review 2026-10-07:
             // the deleted one stayed selected, and the keyboard came up on a new, empty settings set for it)
-            if (subtype == prefs.getString(Settings.PREF_SELECTED_SUBTYPE, Defaults.PREF_SELECTED_SUBTYPE)!!.toSettingsSubtype())
+            if (subtype.sameKeyboard(prefs.getString(Settings.PREF_SELECTED_SUBTYPE, Defaults.PREF_SELECTED_SUBTYPE)!!.toSettingsSubtype()))
                 newSubtypes.firstOrNull()?.let { next -> prefs.edit { putString(Settings.PREF_SELECTED_SUBTYPE, next.toPref()) } }
         }
         return true
