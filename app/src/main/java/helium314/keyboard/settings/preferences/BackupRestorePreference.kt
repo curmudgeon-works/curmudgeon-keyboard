@@ -593,8 +593,14 @@ internal class RestoreDialogData(val pending: PendingRestore, val plan: RestoreP
 
 /** Reads the backup [file] for the restore dialog: the zip read whole (the dry runs too), so never on the main thread
  *  (review 2026-10-11 R5: done in composition, a large backup froze the screen). */
-internal fun readRestoreDialog(ctx: Context, file: File): RestoreDialogData =
-    readBackup(file).let { RestoreDialogData(it, restorePlan(ctx, it)) }
+internal fun readRestoreDialog(ctx: Context, file: File): RestoreDialogData {
+    // first, what a restore killed mid-step left: a device dictionary stepped aside listed again (owner 2026-10-13,
+    // 20261013_L5), whatever this backup brings; before the plan and its dictionary wording are worked out (round-5
+    // review 20261013_F2: at the restore's start, the dialog had planned and worded without it)
+    try { RestoreDictionaries.recoverLeftovers(File(DictionaryInfoUtils.getWordListCacheDirectory(ctx))) }
+    catch (t: Throwable) { Log.w("AdvancedScreen", "error recovering dictionaries left by a restore", t) }
+    return readBackup(file).let { RestoreDialogData(it, restorePlan(ctx, it)) }
+}
 
 /** The restore dialog for the backup [file] (tests); [load] reads it (off the main thread). */
 @Composable
@@ -1650,10 +1656,7 @@ private fun switchToKeptCopy(ctx: Context, choice: RestoreChoice, onDevice: Map<
  */
 private fun restoreDictionaries(ctx: Context, backupPrefs: Map<String, Any?>, dictsDir: File, folders: Map<String, File>,
                                 clashesFor: Set<String>, selectNew: Set<String> = emptySet()): RestoredDictionaries {
-    // first, what a restore killed mid-step left: a device dictionary stepped aside listed again (owner 2026-10-13,
-    // 20261013_L5), whatever this backup brings
-    try { RestoreDictionaries.recoverLeftovers(File(DictionaryInfoUtils.getWordListCacheDirectory(ctx))) }
-    catch (t: Throwable) { Log.w("AdvancedScreen", "error recovering dictionaries left by a restore", t) }
+    // (what a restore killed mid-step left is recovered when the restore dialog opens, [readRestoreDialog], 20261013_F2)
     val backup = HashMap<RestoreDictionaries.Entry, String>()
     for (tag in folders.keys) File(dictsDir, tag).listFiles()?.forEach { f ->
         if (f.isFile) backup[RestoreDictionaries.Entry(tag, f.name)] = f.inputStream().use { RestoreDictionaries.digest(it) }

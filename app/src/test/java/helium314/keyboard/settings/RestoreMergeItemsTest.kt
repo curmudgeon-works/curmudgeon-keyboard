@@ -32,6 +32,7 @@ import helium314.keyboard.poolsJson
 import helium314.keyboard.randomIds
 import helium314.keyboard.settings.preferences.RestoreDecision
 import helium314.keyboard.settings.preferences.dictionaryClashesFrom
+import helium314.keyboard.settings.preferences.readRestoreDialog
 import helium314.keyboard.settings.preferences.restoreChosenFrom
 import helium314.keyboard.settings.preferences.restorePlanFrom
 import helium314.keyboard.settings.preferences.restoreSummary
@@ -428,11 +429,22 @@ class RestoreMergeItemsTest {
         dictDir("fr").mkdirs(); dict("fr", "main_user.dict").writeText("A"); dict("fr", "main_prev_user.dict").writeText("B")
         dict("fr", "main_user.dict.moving").writeText("X"); dict("fr", "emoji_user.dict.restoring").writeText("backup")
         backup(listOf(frB)) // (no dictionaries in it: every restore recovers them)
-        restoreDictionaries(ticked = true)
+        readRestoreDialog(ctx, zip) // (the restore dialog opens: recovered there, 20261013_F2)
         assertEquals(setOf("main_user.dict", "main_prev_user.dict", "main_prev2_user.dict"), dictDir("fr").list()!!.toSet())
         assertEquals("X", dict("fr", "main_prev2_user.dict").readText())
         assertEquals("A", dict("fr", "main_user.dict").readText())
         assertEquals("B", dict("fr", "main_prev_user.dict").readText())
+    }
+
+    // round-5 review 20261013_F2 (owner: "2. A"): the leftover is recovered when the restore dialog opens, before its plan
+    // and dictionary wording. Fail before: recovered at the restore's start, the dialog said "Dictionary differs" for a
+    // backup dictionary the device had (stepped aside)
+    @Test fun `a dictionary a killed restore left stepped aside counts in the dialog's wording`() {
+        dictDir("fr").mkdirs(); dict("fr", "main_user.dict").writeText("A"); dict("fr", "main_user.dict.moving").writeText("X")
+        backup(listOf(frB), entries = mapOf("dicts/fr/main_user.dict" to "X".toByteArray()))
+        assertEquals("Backup's dictionary set as main, yours kept as main_prev", row(readRestoreDialog(ctx, zip).plan))
+        val restored = restoreDictionaries(ticked = true)
+        assertEquals("Dictionaries: French: backup's set as main (yours kept as main_prev).", restoreSummary(ctx, restored).lines().last())
     }
 
     // fail before (L3.5): the other languages' new dictionaries came in silently with the clipboard
