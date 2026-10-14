@@ -122,20 +122,23 @@ fun TextCorrectionScreen(
         revealer = revealer,
         // (Customize suggestions writes the count too)
         isPending = { it in draft.pending || (it == Settings.PREF_SUGGESTION_RULES && Settings.PREF_SUGGESTION_COUNT in draft.pending) },
-        simpleModeKeys = setOf(
-            SettingsWithoutKey.LEARNED_WORDS, Settings.PREF_AUTO_CORRECTION, Settings.PREF_AUTO_CAP,
-            Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE,
-            Settings.PREF_KEY_USE_DOUBLE_SPACE_PERIOD, Settings.PREF_AUTOSPACE_AFTER_SUGGESTION,
-            Settings.PREF_AUTOSPACE_AFTER_GESTURE_TYPING, Settings.PREF_AUTOSPACE_AFTER_PUNCTUATION,
-            Settings.PREF_SHOW_SUGGESTIONS, Settings.PREF_BIGRAM_PREDICTIONS, Settings.PREF_KEY_USE_PERSONALIZED_DICTS,
-            // (suggest emojis and contact names: advanced)
-            Settings.PREF_ADD_TO_PERSONAL_DICTIONARY,
-        ) + (if (prefs.getBoolean(Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Defaults.PREF_KEY_USE_PERSONALIZED_DICTS)) emptySet()
-            else setOf(Settings.PREF_ALWAYS_INCOGNITO_MODE)),
+        simpleModeKeys = correctionSimpleModeKeys(prefs),
     )
     draft.dialogs()
     }
 }
+
+/** The Text correction rows simple mode shows (the main screen's search tints the others, as the screen's own search does). */
+internal fun correctionSimpleModeKeys(prefs: android.content.SharedPreferences): Set<String> = setOf(
+    SettingsWithoutKey.LEARNED_WORDS, Settings.PREF_AUTO_CORRECTION, Settings.PREF_AUTO_CAP,
+    Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE,
+    Settings.PREF_KEY_USE_DOUBLE_SPACE_PERIOD, Settings.PREF_AUTOSPACE_AFTER_SUGGESTION,
+    Settings.PREF_AUTOSPACE_AFTER_GESTURE_TYPING, Settings.PREF_AUTOSPACE_AFTER_PUNCTUATION,
+    Settings.PREF_SHOW_SUGGESTIONS, Settings.PREF_BIGRAM_PREDICTIONS, Settings.PREF_KEY_USE_PERSONALIZED_DICTS,
+    // (suggest emojis and contact names: advanced)
+    Settings.PREF_ADD_TO_PERSONAL_DICTIONARY,
+) + (if (prefs.getBoolean(Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Defaults.PREF_KEY_USE_PERSONALIZED_DICTS)) emptySet()
+    else setOf(Settings.PREF_ALWAYS_INCOGNITO_MODE))
 
 /** The Text correction screen's rows as they are now (with [prefs] of the keyboard it edits): what it shows, what its
  *  search and the main screen's search find. */

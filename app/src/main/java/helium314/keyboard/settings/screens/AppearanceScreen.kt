@@ -216,13 +216,7 @@ fun AppearanceScreen(
         onClickBack = ::leave,
         title = stringResource(R.string.settings_screen_appearance),
         settings = items,
-        simpleModeKeys = setOf(
-            SettingsWithoutKey.DIVIDER, SettingsWithoutKey.APPEARANCE_LOOKS, Settings.PREF_THEME_STYLE, Settings.PREF_THEME_COLORS, Settings.PREF_THEME_KEY_BORDERS, Settings.PREF_THEME_DAY_NIGHT,
-            Settings.PREF_THEME_COLORS_NIGHT, SettingsWithoutKey.FONTS,
-            SettingsWithoutKey.HIDE_ALL_SYMBOLS,
-            // the emoji size (with its fit) and skin tone (the emoji font from a file: advanced)
-            Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT, Settings.PREF_EMOJI_SKIN_TONE,
-        ),
+        simpleModeKeys = appearanceSimpleModeKeys,
         // cross and tick: reject or accept everything changed since the screen opened, each asks first
         topActions = {
             if (changed) {
@@ -301,6 +295,15 @@ internal fun appearanceItems(ctx: Context, prefs: android.content.SharedPreferen
         Settings.PREF_EMOJI_MAX_SDK,
     )
 }
+
+/** The Appearance rows simple mode shows (the main screen's search tints the others, as the screen's own search does). */
+internal val appearanceSimpleModeKeys = setOf(
+    SettingsWithoutKey.DIVIDER, SettingsWithoutKey.APPEARANCE_LOOKS, Settings.PREF_THEME_STYLE, Settings.PREF_THEME_COLORS, Settings.PREF_THEME_KEY_BORDERS, Settings.PREF_THEME_DAY_NIGHT,
+    Settings.PREF_THEME_COLORS_NIGHT, SettingsWithoutKey.FONTS,
+    SettingsWithoutKey.HIDE_ALL_SYMBOLS,
+    // the emoji size (with its fit) and skin tone (the emoji font from a file: advanced)
+    Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT, Settings.PREF_EMOJI_SKIN_TONE,
+)
 
 /** Which of Midnight / Daylight the light-dark pairing came from (see the light / dark switch), for turning it off. */
 private const val PAIRED_FROM = "day_night_paired_from"

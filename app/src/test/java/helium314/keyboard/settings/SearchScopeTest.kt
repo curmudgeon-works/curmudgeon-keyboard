@@ -63,7 +63,7 @@ class SearchScopeTest {
             // Layout & Typing: undo is in an advanced block
             val found = keys(screenSearch("undo", screenSettings(layoutScreenKeys(ctx.prefs(), ctx), real, null)))
             assertTrue(Settings.PREF_UNDO_HISTORY_LENGTH in found, "$found")
-            assertTrue(Settings.PREF_UNDO_HISTORY_LENGTH in layoutScreenAdvancedKeys(ctx.prefs()))
+            assertTrue(Settings.PREF_UNDO_HISTORY_LENGTH in layoutScreenAdvancedKeys(ctx.prefs(), ctx))
             // a screen with simple mode keys: one not among them is advanced-only; none on a screen advanced as a whole
             assertTrue(advancedOnly(Settings.PREF_UNDO_HISTORY_LENGTH, setOf(Settings.PREF_SHOW_NUMBER_ROW)))
             assertFalse(advancedOnly(Settings.PREF_SHOW_NUMBER_ROW, setOf(Settings.PREF_SHOW_NUMBER_ROW)))

@@ -63,11 +63,13 @@ fun FineTuneLearningScreen(onClickBack: () -> Unit) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
           androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.preferences.LocalRowStart provides 22.dp) {
             GroupTitle(R.string.learning_group)
-            androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.preferences.LocalPendingChange provides
-                (Settings.PREF_AUTOCORRECT_FREQUENT_WORDS in draft.pending || Settings.PREF_TRUST_TYPED_COUNT in draft.pending)) {
-                SettingsActivity.settingsContainer[Settings.PREF_AUTOCORRECT_FREQUENT_WORDS]?.Preference()
+            // its rows: the list its search finds (one list, round-7c review 20261014_L4_2)
+            fineTuneLearningKeys.forEach { key ->
+                androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.preferences.LocalPendingChange provides
+                    (key == Settings.PREF_AUTOCORRECT_FREQUENT_WORDS && (key in draft.pending || Settings.PREF_TRUST_TYPED_COUNT in draft.pending))) {
+                    SettingsActivity.settingsContainer[key]?.Preference()
+                }
             }
-            SettingsActivity.settingsContainer[Settings.PREF_LEARNING_LOG]?.Preference()
             GroupTitle(R.string.learn_table_title)
             LearnTable(draft.pending)
           }

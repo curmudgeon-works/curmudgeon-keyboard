@@ -146,6 +146,10 @@ fun SearchSettingsScreen(
         }
     }
     var viewportHeight by remember { mutableIntStateOf(0) }
+    // the main screens' search: what the screens show now, worked out again when a setting changes, not on every letter
+    // typed (round-7c review 20261014_L10_2)
+    val prefTick = if (searchAll) (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()?.value else null
+    val wholeApp = if (searchAll) remember(prefTick) { SettingsActivity.settingsContainer.wholeApp(ctx) } else null
     SearchScreen(
         onClickBack = onClickBack,
         title = { Text(title) },
@@ -239,15 +243,17 @@ fun SearchSettingsScreen(
             }
         },
         filteredItems = { term ->
-            if (searchAll) SettingsActivity.settingsContainer.filter(term, ctx)
+            if (wholeApp != null) SettingsSearch.search(term, wholeApp.settings)
             else screenSearch(term, searchSettings ?: screenSettings(settings + searchKeys,
                 helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx), menu))
         },
         // (under no menu: a result hidden on the menu search was opened from is still a setting, review 2026-10-06)
         // a result shown only in advanced mode on this screen: found in simple mode too, on the advanced tint (owner
-        // 2026-10-13: "find them and show with advanced tint")
+        // 2026-10-13: "find them and show with advanced tint"); from the main screens, a result every screen showing it
+        // shows only in advanced mode (owner 2026-10-14: "Tint them now, to match within screen experience")
         itemContent = { CompositionLocalProvider(LocalSettingsMenu provides null) {
-            if (!searchAll && advancedOnly(it.key, simpleModeKeys)) AdvancedTint { it.Preference() } else it.Preference()
+            val tinted = if (wholeApp != null) it.key in wholeApp.advanced else advancedOnly(it.key, simpleModeKeys)
+            if (tinted) AdvancedTint { it.Preference() } else it.Preference()
         } }
     )
 }

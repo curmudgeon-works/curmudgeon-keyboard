@@ -100,6 +100,25 @@ class WholeAppSearchTest {
         assertTrue(Settings.PREF_GESTURE_TRAIL_THICKNESS in found(term))
     }
 
+    // owner 2026-10-14: "Tint them now, to match within screen experience": a result every screen showing it shows only in
+    // advanced mode is drawn on the advanced tint from the main screen too; one a screen shows in simple mode is not.
+    // Fail before: no tint from the main screen (compile: no wholeApp)
+    @Test fun `the main screen's search tints a result as its screen's own search does`() {
+        KeyboardProfiles.disable(real)
+        val app = container.wholeApp(ctx)
+        assertTrue(Settings.PREF_UNDO_HISTORY_LENGTH in app.advanced) // Layout & Typing, advanced only
+        assertTrue(Settings.PREF_LEAVING_KEEPS_CHANGES in app.advanced) // App settings, advanced only
+        assertTrue(Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE in app.advanced) // Swipe's advanced block
+        assertTrue(Settings.PREF_PINNED_TOOLBAR_KEYS in app.advanced) // a part of an advanced row
+        assertFalse(Settings.PREF_SHOW_NUMBER_ROW in app.advanced)
+        assertFalse(Settings.PREF_THEME_COLORS in app.advanced)
+        // advanced on Layout & Typing, in simple mode on Swipe: plain
+        assertFalse(Settings.PREF_DELETE_SWIPE in app.advanced)
+        // every tinted one is a result
+        val keys = app.settings.map { it.key }.toSet()
+        app.advanced.forEach { assertTrue(it in keys, it) }
+    }
+
     // kept: what was found before as a part of a row the screens show (a row's own lists, its dialog, what it opens)
     @Test fun `the parts of a shown row are still found`() {
         KeyboardProfiles.disable(real)

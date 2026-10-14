@@ -243,6 +243,12 @@ fun SubtypeScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
+    // the rows as they are now, once per redraw: the screen draws its keyed rows from these lists, its search finds them,
+    // the main screen's search asks the same class (worked out again on coming back and on a silencing, see above)
+    val lists = LayoutScreenLists(prefs, ctx, currentSubtype).also {
+        if (resumed < 0 || feedbackChanges < 0) Log.v("irrelevant", "recompose on resume and on a silencing") }
+    // the keyboard's own rows of the app's list (Localize number row) edit this keyboard, here and in the search
+    val editedKeyboard = EditedKeyboard(currentSubtype) { setCurrentSubtype(it) }
     // the key sound settings preview on the keyboard like Appearance's: their dialogs bring it up and keep it
     val focusManager = LocalFocusManager.current
     val softKeyboard = LocalSoftwareKeyboardController.current
@@ -339,12 +345,13 @@ fun SubtypeScreen(
         title = { Text(stringResource(R.string.settings_screen_preferences)) },
         // its search: the settings of the app's list it shows, the advanced ones on the advanced tint (owner 2026-10-13,
         // SEARCH-SCOPE: "Every screen should have a search bar"; before, none)
-        itemContent = { setting -> androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.LocalSettingsMenu provides null) {
-            if (setting.key in layoutScreenAdvancedKeys(prefs)) helium314.keyboard.settings.AdvancedTint { setting.Preference() }
+        itemContent = { setting -> androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.LocalSettingsMenu provides null,
+                LocalEditedKeyboard provides editedKeyboard) {
+            if (lists.isAdvanced(setting.key)) helium314.keyboard.settings.AdvancedTint { setting.Preference() }
             else setting.Preference()
         } },
         filteredItems = { term -> helium314.keyboard.settings.screenSearch(term, helium314.keyboard.settings.screenSettings(
-            layoutScreenKeys(prefs, ctx), ctx.realPrefs(), menuOfScreen)) }
+            lists.all, ctx.realPrefs(), menuOfScreen)) }
     ) {
         Scaffold(
             contentWindowInsets = WindowInsets(0),
@@ -379,55 +386,52 @@ fun SubtypeScreen(
                     // their dialogs keep the preview keyboard up
                     CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
                         LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
-                        Pending(prefixChanged(Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX)) {
-                            SettingsActivity.settingsContainer[Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX]?.Preference() }
-                        Pending(keyChanged(Settings.PREF_SHOW_NUMBER_ROW)) {
-                            SettingsActivity.settingsContainer[Settings.PREF_SHOW_NUMBER_ROW]?.Preference() }
-                        // (shown when its search's list has it, [layoutScreenKeys]: the same condition)
-                        if (Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS in layoutScreenKeys(prefs, ctx))
+                        Listed(lists, Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX) { Pending(prefixChanged(Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX)) {
+                            SettingsActivity.settingsContainer[Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX]?.Preference() } }
+                        Listed(lists, Settings.PREF_SHOW_NUMBER_ROW) { Pending(keyChanged(Settings.PREF_SHOW_NUMBER_ROW)) {
+                            SettingsActivity.settingsContainer[Settings.PREF_SHOW_NUMBER_ROW]?.Preference() } }
+                        Listed(lists, Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS) {
                             Pending(keyChanged(Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS)) { Box(Modifier.padding(start = 16.dp)) {
-                                SettingsActivity.settingsContainer[Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS]?.Preference() } }
+                                SettingsActivity.settingsContainer[Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS]?.Preference() } } }
                     }
                     // the language's own digits on the number row: only for keyboards whose language has them, advanced
-                    // only, right under the numbers row (owner 2026-10-14)
-                    if (hasLocalizedNumberRow(currentSubtype.locale, ctx)) AdvancedBlock(advanced) { Pending(
+                    // only, right under the numbers row (owner 2026-10-14); a row of the app's list, so search finds it
+                    if (Settings.PREF_LOCALIZED_NUMBER_ROW in lists) AdvancedBlock(advanced) { Listed(lists, Settings.PREF_LOCALIZED_NUMBER_ROW) { Pending(
                         currentSubtype.getExtraValueOf(ExtraValue.LOCALIZED_NUMBER_ROW) != openedSubtype.getExtraValueOf(ExtraValue.LOCALIZED_NUMBER_ROW)) {
-                        val checked = currentSubtype.getExtraValueOf(ExtraValue.LOCALIZED_NUMBER_ROW)?.toBoolean()
-                        SwitchRow(stringResource(R.string.localized_number_row),
-                            checked ?: Defaults.PREF_LOCALIZED_NUMBER_ROW, // (Default: on, no app-wide row any more)
-                            extra = { DefaultButton(checked == null) { setCurrentSubtype(currentSubtype.without(ExtraValue.LOCALIZED_NUMBER_ROW)) } },
-                        ) { setCurrentSubtype(currentSubtype.with(ExtraValue.LOCALIZED_NUMBER_ROW, it.toString())) }
-                    } }
+                        CompositionLocalProvider(LocalEditedKeyboard provides editedKeyboard) {
+                            SettingsActivity.settingsContainer[Settings.PREF_LOCALIZED_NUMBER_ROW]?.Preference() }
+                    } } }
                     // then the emoji key switch, and the voice key's (right of the space bar)
-                    Pending(keyChanged(Settings.PREF_SHOW_EMOJI_KEY)) {
+                    Listed(lists, Settings.PREF_SHOW_EMOJI_KEY) { Pending(keyChanged(Settings.PREF_SHOW_EMOJI_KEY)) {
                         PrefSwitchRow(Settings.PREF_SHOW_EMOJI_KEY, Defaults.PREF_SHOW_EMOJI_KEY, R.string.show_emoji_key) {
                             holdPreview()
                             KeyboardSwitcher.getInstance().reloadKeyboard()
                         }
-                    }
-                    Pending(keyChanged(Settings.PREF_SHOW_VOICE_KEY)) {
+                    } }
+                    Listed(lists, Settings.PREF_SHOW_VOICE_KEY) { Pending(keyChanged(Settings.PREF_SHOW_VOICE_KEY)) {
                         PrefSwitchRow(Settings.PREF_SHOW_VOICE_KEY, Defaults.PREF_SHOW_VOICE_KEY, R.string.show_voice_key) {
                             holdPreview()
                             KeyboardSwitcher.getInstance().reloadKeyboard()
                         }
-                    }
+                    } }
                     // split keyboard (and its gap), with the preview keyboard
                     CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
                         LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
-                        Pending(keyChanged(Settings.PREF_ENABLE_SPLIT_KEYBOARD, Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE,
+                        Listed(lists, Settings.PREF_ENABLE_SPLIT_KEYBOARD) {
+                            Pending(keyChanged(Settings.PREF_ENABLE_SPLIT_KEYBOARD, Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE,
                             Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE)) {
-                            SettingsActivity.settingsContainer[Settings.PREF_ENABLE_SPLIT_KEYBOARD]?.Preference() }
-                        if (Settings.PREF_SPLIT_SPACER_SCALE_PREFIX in layoutScreenKeys(prefs, ctx))
+                            SettingsActivity.settingsContainer[Settings.PREF_ENABLE_SPLIT_KEYBOARD]?.Preference() } }
+                        Listed(lists, Settings.PREF_SPLIT_SPACER_SCALE_PREFIX) {
                             Pending(prefixChanged(Settings.PREF_SPLIT_SPACER_SCALE_PREFIX)) { Box(Modifier.padding(start = 16.dp)) {
-                                SettingsActivity.settingsContainer[Settings.PREF_SPLIT_SPACER_SCALE_PREFIX]?.Preference() } }
+                                SettingsActivity.settingsContainer[Settings.PREF_SPLIT_SPACER_SCALE_PREFIX]?.Preference() } } }
                     }
                     // the send/enter key on the rows under the emoji and clipboard panels: one switch for both
                     val withAction = (currentSubtype.layoutName(LayoutType.EMOJI_BOTTOM) ?: Settings.readDefaultLayoutName(LayoutType.EMOJI_BOTTOM, prefs)) == "emoji_bottom_row_with_action"
                     // advanced: the send key on the emoji and clipboard panels, long-press space to change input method
                     AdvancedBlock(advanced) {
-                        Pending(keyChanged(Settings.PREF_SPACE_TO_CHANGE_LANG)) {
+                        Listed(lists, Settings.PREF_SPACE_TO_CHANGE_LANG) { Pending(keyChanged(Settings.PREF_SPACE_TO_CHANGE_LANG)) {
                             CompositionLocalProvider(LocalCompactPreferences provides true) {
-                                SettingsActivity.settingsContainer[Settings.PREF_SPACE_TO_CHANGE_LANG]?.Preference() } }
+                                SettingsActivity.settingsContainer[Settings.PREF_SPACE_TO_CHANGE_LANG]?.Preference() } } }
                         Pending(layoutChanged(LayoutType.EMOJI_BOTTOM)) { SwitchRow(stringResource(R.string.bottom_rows_action_key), withAction) { on ->
                             preview.changed(emoji = true) // the send key shows on the emoji panel's bottom row
                             setCurrentSubtype(
@@ -461,22 +465,23 @@ fun SubtypeScreen(
                     AdvancedBlock(advanced) {
                         CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
                             LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
-                        Pending(prefixChanged(Settings.PREF_BOTTOM_ROW_SCALE_PREFIX) || prefixChanged(Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX)) {
-                            SettingsActivity.settingsContainer[Settings.PREF_BOTTOM_ROW_SCALE_PREFIX]?.Preference() }
-                        Pending(prefixChanged(Settings.PREF_SIDE_PADDING_SCALE_PREFIX)) {
-                            SettingsActivity.settingsContainer[Settings.PREF_SIDE_PADDING_SCALE_PREFIX]?.Preference() }
+                        Listed(lists, Settings.PREF_BOTTOM_ROW_SCALE_PREFIX) {
+                            Pending(prefixChanged(Settings.PREF_BOTTOM_ROW_SCALE_PREFIX) || prefixChanged(Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX)) {
+                            SettingsActivity.settingsContainer[Settings.PREF_BOTTOM_ROW_SCALE_PREFIX]?.Preference() } }
+                        Listed(lists, Settings.PREF_SIDE_PADDING_SCALE_PREFIX) { Pending(prefixChanged(Settings.PREF_SIDE_PADDING_SCALE_PREFIX)) {
+                            SettingsActivity.settingsContainer[Settings.PREF_SIDE_PADDING_SCALE_PREFIX]?.Preference() } }
                         }
                     }
                     // the toolbar (was its own screen, then its own group): visibility in simple mode, the rest advanced
                     CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
                         LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
-                        Pending(keyChanged(Settings.PREF_TOOLBAR_VISIBILITY)) {
-                            SettingsActivity.settingsContainer[Settings.PREF_TOOLBAR_VISIBILITY]?.Preference() }
+                        Listed(lists, Settings.PREF_TOOLBAR_VISIBILITY) { Pending(keyChanged(Settings.PREF_TOOLBAR_VISIBILITY)) {
+                            SettingsActivity.settingsContainer[Settings.PREF_TOOLBAR_VISIBILITY]?.Preference() } }
                     }
                     AdvancedBlock(advanced) {
                         CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
                             LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
-                            toolbarItems(prefs).filterNotNull().filter { it != Settings.PREF_TOOLBAR_VISIBILITY }.forEach {
+                            lists.toolbar.forEach { Listed(lists, it) {
                                 if (it == SettingsWithoutKey.TOOLBAR_KEYS_ALL) {
                                     // the keys list previews on the keyboard (its toolbar opened), like the sound settings
                                     CompositionLocalProvider(LocalKeepKeyboard provides true, LocalPreviewKeyboard provides preview,
@@ -485,15 +490,14 @@ fun SubtypeScreen(
                                             Settings.PREF_PINNED_TOOLBAR_KEYS)) { SettingsActivity.settingsContainer[it]?.Preference() }
                                     }
                                 } else Pending(keyChanged(it)) { SettingsActivity.settingsContainer[it]?.Preference() }
-                            }
+                            } }
                         }
                     }
                 }
                 // ---- typing: key-press popup, vibration, sound, per-app keyboard, localized number row
                 WithBigTitle(stringResource(R.string.settings_category_input)) {
                     CompositionLocalProvider(LocalCompactPreferences provides true) {
-                        (if (resumed >= 0 && feedbackChanges >= 0) preferencesInputItems(prefs, ctx) else emptyList()).filter { it !in advancedInputItems }.forEach {
-                            if (it !is String) return@forEach
+                        lists.input.filter { it !in advancedInputItems }.forEach { Listed(lists, it) {
                             CompositionLocalProvider(LocalPendingChange provides keyChanged(it)) {
                             // the rows that appear under Vibrate / Sound when they're on sit a little in; the dialogs
                             // of the long-press delay and the sound / vibration rows keep the keyboard up to try them
@@ -509,31 +513,32 @@ fun SubtypeScreen(
                             // backspace's long press delay: advanced only, right below the long press delay
                             if (it == Settings.PREF_BACKSPACE_LONGPRESS_DELAY) AdvancedBlock(advanced) { shown() } else shown()
                             }
-                        }
+                        } }
                     }
                     // backspace (was its own group): whole words and speeding up in simple mode; the speed-up dialog
                     // keeps the keyboard up so holding backspace can be tried
                     CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
                         LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
-                        Pending(keyChanged(Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS)) {
-                            SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS]?.Preference() }
-                        Pending(keyChanged(Settings.PREF_BACKSPACE_SPEED_UP, Settings.PREF_BACKSPACE_SPEED_UP_AFTER, Settings.PREF_BACKSPACE_TOP_INTERVAL)) {
-                            SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_SPEED_UP]?.Preference() }
+                        Listed(lists, Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS) { Pending(keyChanged(Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS)) {
+                            SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS]?.Preference() } }
+                        Listed(lists, Settings.PREF_BACKSPACE_SPEED_UP) {
+                            Pending(keyChanged(Settings.PREF_BACKSPACE_SPEED_UP, Settings.PREF_BACKSPACE_SPEED_UP_AFTER, Settings.PREF_BACKSPACE_TOP_INTERVAL)) {
+                            SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_SPEED_UP]?.Preference() } }
                     }
                     // (the symbol switches — hide on the number row / other keys, long-press dots — are on Appearance)
                     AdvancedBlock(advanced) {
                         CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
                             LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
                             // backspace, advanced: swiping left, undoing an autocorrection (a tap after a swipe: on Swiping)
-                            Pending(keyChanged(Settings.PREF_DELETE_SWIPE, Settings.PREF_DELETE_SWIPE_SPEED)) {
-                                SettingsActivity.settingsContainer[Settings.PREF_DELETE_SWIPE]?.Preference() }
-                            if (Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT in layoutScreenKeys(prefs, ctx))
+                            Listed(lists, Settings.PREF_DELETE_SWIPE) { Pending(keyChanged(Settings.PREF_DELETE_SWIPE, Settings.PREF_DELETE_SWIPE_SPEED)) {
+                                SettingsActivity.settingsContainer[Settings.PREF_DELETE_SWIPE]?.Preference() } }
+                            Listed(lists, Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT) {
                                 Pending(keyChanged(Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT)) {
-                                    SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT]?.Preference() }
-                            advancedInputItems.forEach {
+                                    SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT]?.Preference() } }
+                            advancedInputItems.forEach { Listed(lists, it) {
                                 val pending = if (it == SettingsWithoutKey.ABC_AFTER) abcAfterKeys.any { k -> keyChanged(k.first) } else keyChanged(it)
                                 Pending(pending) { SettingsActivity.settingsContainer[it]?.Preference() }
-                            }
+                            } }
                         }
                     }
                 }
@@ -549,25 +554,25 @@ fun SubtypeScreen(
                         CompositionLocalProvider(LocalKeepKeyboard provides true, LocalPreviewKeyboard provides preview,
                             LocalBottomBarTop provides bottomBarTop) { KeyPopupsSection(currentSubtype) { setCurrentSubtype(it) } } }
                     run {
-                        Pending(keyChanged(Settings.PREF_SHOW_TLD_POPUP_KEYS)) {
-                            PrefSwitchRow(Settings.PREF_SHOW_TLD_POPUP_KEYS, Defaults.PREF_SHOW_TLD_POPUP_KEYS, R.string.show_tld_popup_keys) { holdPreview(); reloadPreview() } }
-                        Pending(keyChanged(Settings.PREF_REMOVE_REDUNDANT_POPUPS)) {
-                            PrefSwitchRow(Settings.PREF_REMOVE_REDUNDANT_POPUPS, Defaults.PREF_REMOVE_REDUNDANT_POPUPS, R.string.remove_redundant_popups) { holdPreview(); reloadPreview() } }
+                        Listed(lists, Settings.PREF_SHOW_TLD_POPUP_KEYS) { Pending(keyChanged(Settings.PREF_SHOW_TLD_POPUP_KEYS)) {
+                            PrefSwitchRow(Settings.PREF_SHOW_TLD_POPUP_KEYS, Defaults.PREF_SHOW_TLD_POPUP_KEYS, R.string.show_tld_popup_keys) { holdPreview(); reloadPreview() } } }
+                        Listed(lists, Settings.PREF_REMOVE_REDUNDANT_POPUPS) { Pending(keyChanged(Settings.PREF_REMOVE_REDUNDANT_POPUPS)) {
+                            PrefSwitchRow(Settings.PREF_REMOVE_REDUNDANT_POPUPS, Defaults.PREF_REMOVE_REDUNDANT_POPUPS, R.string.remove_redundant_popups) { holdPreview(); reloadPreview() } } }
                     }
                 } }
                 // ---- the keyboard's own undo / redo (from Others): how far back, and a word or a character per press
                 AdvancedBlock(advanced) { WithBigTitle(stringResource(R.string.undo_redo_group)) {
                     CompositionLocalProvider(LocalCompactPreferences provides true) {
-                        listOf(Settings.PREF_UNDO_HISTORY_LENGTH, Settings.PREF_UNDO_UNIT, Settings.PREF_REDO_UNIT).forEach {
-                            Pending(keyChanged(it)) { SettingsActivity.settingsContainer[it]?.Preference() } }
+                        undoRedoKeys.forEach { Listed(lists, it) {
+                            Pending(keyChanged(it)) { SettingsActivity.settingsContainer[it]?.Preference() } } }
                     }
                 } }
                 // (its own tinted block: the screen's gap between blocks shows as a thin line, like above Backspace)
                 AdvancedBlock(advanced) {
                     WithBigTitle(stringResource(R.string.settings_category_clipboard_history)) {
                         CompositionLocalProvider(LocalCompactPreferences provides true) {
-                            clipboardHistoryItems(prefs).filterIsInstance<String>().forEach {
-                                Pending(keyChanged(it)) { SettingsActivity.settingsContainer[it]?.Preference() } }
+                            lists.clipboard.forEach { Listed(lists, it) {
+                                Pending(keyChanged(it)) { SettingsActivity.settingsContainer[it]?.Preference() } } }
                         }
                     }
                 }
@@ -791,30 +796,103 @@ private val previewedSwitches = listOf(
 private val advancedInputItems = listOf(Settings.PREF_LONG_PRESS_SYMBOL_ACTION, SettingsWithoutKey.ABC_AFTER) // (emoji descriptions: Appearance, Emoji group)
 
 /** The settings of the app's list Layout & Typing shows now, as its search finds them (owner 2026-10-13, SEARCH-SCOPE): the
- *  rows drawn from the list, simple and advanced ([layoutScreenAdvancedKeys]); a row shown only under a switch, while it
- *  is (the screen asks here too). The main screen's search finds these (owner 2026-10-14). */
-internal fun layoutScreenKeys(prefs: android.content.SharedPreferences, ctx: Context): List<String> = listOfNotNull(
-    Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, Settings.PREF_SHOW_NUMBER_ROW,
-    // the symbols page's number row: only while the number row is off
-    if (!prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW)) Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS else null,
-    Settings.PREF_SHOW_EMOJI_KEY, Settings.PREF_SHOW_VOICE_KEY, Settings.PREF_ENABLE_SPLIT_KEYBOARD,
-    // the split's gap: only while the keyboard is split somewhere
-    if (listOf(Settings.PREF_ENABLE_SPLIT_KEYBOARD, Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE,
-            Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE)
-            .any { prefs.getBoolean(it, Defaults.PREF_ENABLE_SPLIT_KEYBOARD) }) Settings.PREF_SPLIT_SPACER_SCALE_PREFIX else null,
-    Settings.PREF_TOOLBAR_VISIBILITY, Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS, Settings.PREF_BACKSPACE_SPEED_UP,
-) + preferencesInputItems(prefs, ctx).filterIsInstance<String>() + layoutScreenAdvancedKeys(prefs)
+ *  rows drawn from the list, simple and advanced ([LayoutScreenLists.advanced]); a row shown only under a switch, while it
+ *  is. The main screen's search finds these (owner 2026-10-14). [keyboard]: the keyboard the screen edits (null: none,
+ *  so no row that is the keyboard's own). */
+internal fun layoutScreenKeys(prefs: android.content.SharedPreferences, ctx: Context, keyboard: SettingsSubtype? = null): List<String> =
+    LayoutScreenLists(prefs, ctx, keyboard).all
 
 /** The settings Layout & Typing shows only in advanced mode (in its advanced blocks), the ones under a switch while it is on. */
-internal fun layoutScreenAdvancedKeys(prefs: android.content.SharedPreferences): List<String> = listOfNotNull(
-    Settings.PREF_SPACE_TO_CHANGE_LANG, Settings.PREF_BOTTOM_ROW_SCALE_PREFIX, Settings.PREF_SIDE_PADDING_SCALE_PREFIX,
-    Settings.PREF_BACKSPACE_LONGPRESS_DELAY, Settings.PREF_DELETE_SWIPE,
-    // undoing an autocorrection: only while autocorrect is on
-    if (prefs.getBoolean(Settings.PREF_AUTO_CORRECTION, Defaults.PREF_AUTO_CORRECTION)) Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT else null,
-    Settings.PREF_SHOW_TLD_POPUP_KEYS, Settings.PREF_REMOVE_REDUNDANT_POPUPS,
-    Settings.PREF_UNDO_HISTORY_LENGTH, Settings.PREF_UNDO_UNIT, Settings.PREF_REDO_UNIT,
-) + toolbarItems(prefs).filterNotNull().filter { it != Settings.PREF_TOOLBAR_VISIBILITY } + advancedInputItems +
-    clipboardHistoryItems(prefs).filterIsInstance<String>()
+internal fun layoutScreenAdvancedKeys(prefs: android.content.SharedPreferences, ctx: Context, keyboard: SettingsSubtype? = null): List<String> =
+    LayoutScreenLists(prefs, ctx, keyboard).advanced
+
+/** The undo / redo group's rows. */
+private val undoRedoKeys = listOf(Settings.PREF_UNDO_HISTORY_LENGTH, Settings.PREF_UNDO_UNIT, Settings.PREF_REDO_UNIT)
+
+/**
+ * Layout & Typing's rows as they are now, read once (with [prefs] of the keyboard it edits, [keyboard]): the screen draws
+ * its keyed rows from these lists (a row is drawn while its list has it), its search and the main screen's search find
+ * them ("draw each screen from its contents", round-7c review 20261014_L4_2, owner: "B. Do the redesign now"). The
+ * lists and the screen can't drift apart.
+ */
+internal class LayoutScreenLists(prefs: android.content.SharedPreferences, ctx: Context, keyboard: SettingsSubtype?) {
+    /** The Typing group's first rows, in their order (the heading left out). */
+    val input: List<String> = preferencesInputItems(prefs, ctx).filterIsInstance<String>()
+    /** The toolbar's rows under its visibility (advanced). */
+    val toolbar: List<String> = toolbarItems(prefs).filterNotNull().filter { it != Settings.PREF_TOOLBAR_VISIBILITY }
+    /** The clipboard history group's rows (advanced). */
+    val clipboard: List<String> = clipboardHistoryItems(prefs).filterIsInstance<String>()
+    /** The settings shown only in advanced mode, the ones under a switch while it is on. */
+    val advanced: List<String> = listOfNotNull(
+        // the language's own digits on the number row: only for a keyboard whose language has them (owner 2026-10-14)
+        if (keyboard != null && hasLocalizedNumberRow(keyboard.locale, ctx)) Settings.PREF_LOCALIZED_NUMBER_ROW else null,
+        Settings.PREF_SPACE_TO_CHANGE_LANG, Settings.PREF_BOTTOM_ROW_SCALE_PREFIX, Settings.PREF_SIDE_PADDING_SCALE_PREFIX,
+        Settings.PREF_BACKSPACE_LONGPRESS_DELAY, Settings.PREF_DELETE_SWIPE,
+        // undoing an autocorrection: only while autocorrect is on
+        if (prefs.getBoolean(Settings.PREF_AUTO_CORRECTION, Defaults.PREF_AUTO_CORRECTION)) Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT else null,
+        Settings.PREF_SHOW_TLD_POPUP_KEYS, Settings.PREF_REMOVE_REDUNDANT_POPUPS,
+    ) + undoRedoKeys + toolbar + advancedInputItems + clipboard
+    /** Every row, simple and advanced. */
+    val all: List<String> = listOfNotNull(
+        Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, Settings.PREF_SHOW_NUMBER_ROW,
+        // the symbols page's number row: only while the number row is off
+        if (!prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW)) Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS else null,
+        Settings.PREF_SHOW_EMOJI_KEY, Settings.PREF_SHOW_VOICE_KEY, Settings.PREF_ENABLE_SPLIT_KEYBOARD,
+        // the split's gap: only while the keyboard is split somewhere
+        if (listOf(Settings.PREF_ENABLE_SPLIT_KEYBOARD, Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE,
+                Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE)
+                .any { prefs.getBoolean(it, Defaults.PREF_ENABLE_SPLIT_KEYBOARD) }) Settings.PREF_SPLIT_SPACER_SCALE_PREFIX else null,
+        Settings.PREF_TOOLBAR_VISIBILITY, Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS, Settings.PREF_BACKSPACE_SPEED_UP,
+    ) + input + advanced
+    private val shown = all.toHashSet()
+    private val advancedSet = advanced.toHashSet()
+    operator fun contains(key: String) = key in shown
+    fun isAdvanced(key: String) = key in advancedSet
+}
+
+/** [content] while [lists] has [key] (a row of Layout & Typing drawn from its lists); noted for the tests' check that a
+ *  screen draws what its search finds ([helium314.keyboard.settings.LocalDrawnKeys]). */
+@Composable
+private fun Listed(lists: LayoutScreenLists, key: String, content: @Composable () -> Unit) {
+    if (key !in lists) return
+    helium314.keyboard.settings.LocalDrawnKeys.current?.add(key)
+    content()
+}
+
+/** The keyboard Layout & Typing edits and how the screen changes it, for a row of the app's list that is the keyboard's
+ *  own (Localize number row): the screen provides it around its rows and its search's results. Null elsewhere (the main
+ *  screen's search): the row edits the keyboard the main screen's results edit ([mainSearchKeyboard]). */
+class EditedKeyboard(val keyboard: SettingsSubtype, val change: (SettingsSubtype) -> Unit)
+val LocalEditedKeyboard = androidx.compose.runtime.compositionLocalOf<EditedKeyboard?> { null }
+
+/** The keyboard the main screen's results edit: the one in use (its own set with separate settings). */
+internal fun mainSearchKeyboard(ctx: Context): SettingsSubtype {
+    val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
+    return KeyboardProfiles.editingKeyboard(real, KeyboardProfiles.mainEditingId(real))
+        ?: SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype()
+}
+
+/** "Localize number row" of a keyboard ([LocalEditedKeyboard], else [mainSearchKeyboard]): its own choice, or Default
+ *  ([Defaults.PREF_LOCALIZED_NUMBER_ROW], owner 2026-10-14: "yes A, start with default on going forward"). */
+@Composable
+internal fun LocalizedNumberRowSwitch() {
+    val ctx = LocalContext.current
+    val edited = LocalEditedKeyboard.current ?: run {
+        // (read again on every change: the keyboard's definition is in the preferences)
+        val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
+        if ((b?.value ?: 0) < 0) Log.v("irrelevant", "recompose on preference change")
+        val keyboard = mainSearchKeyboard(ctx)
+        EditedKeyboard(keyboard) { to ->
+            SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, to, ctx)
+            if (RichInputMethodManager.isInitialized())
+                KeyboardSwitcher.getInstance().switchToSubtype(to.toAdditionalSubtype())
+        }
+    }
+    val checked = edited.keyboard.getExtraValueOf(ExtraValue.LOCALIZED_NUMBER_ROW)?.toBoolean()
+    SwitchRow(stringResource(R.string.localized_number_row), checked ?: Defaults.PREF_LOCALIZED_NUMBER_ROW,
+        extra = { DefaultButton(checked == null) { edited.change(edited.keyboard.without(ExtraValue.LOCALIZED_NUMBER_ROW)) } },
+    ) { edited.change(edited.keyboard.with(ExtraValue.LOCALIZED_NUMBER_ROW, it.toString())) }
+}
 
 /** Advanced items on a slightly different background, so toggling the mode shows what it adds (last in the Input
  *  group, in place elsewhere). */

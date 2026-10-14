@@ -24,7 +24,12 @@ import helium314.keyboard.settings.screens.appearanceItems
 import helium314.keyboard.settings.screens.correctionItems
 import helium314.keyboard.settings.screens.fineTuneLearningKeys
 import helium314.keyboard.settings.screens.fineTuneSuggestionsKeys
-import helium314.keyboard.settings.screens.layoutScreenKeys
+import helium314.keyboard.settings.screens.LayoutScreenLists
+import helium314.keyboard.settings.screens.advancedOnlyAppSettings
+import helium314.keyboard.settings.screens.appearanceSimpleModeKeys
+import helium314.keyboard.settings.screens.correctionSimpleModeKeys
+import helium314.keyboard.settings.screens.mainSearchKeyboard
+import helium314.keyboard.settings.screens.swipeAdvancedKeys
 import helium314.keyboard.settings.screens.swipeScreenKeys
 
 class SettingsContainer(context: Context) {
@@ -46,14 +51,28 @@ class SettingsContainer(context: Context) {
 
     /** Every setting on some screen's current list ([shownScreenLists]), as that screen's own search finds it
      *  ([screenSettings]: not what no screen shows, [hiddenFromSearch], nor what the screen's menu leaves to another). */
-    fun shown(ctx: Context): List<Setting> {
+    fun shown(ctx: Context): List<Setting> = wholeApp(ctx).settings
+
+    /** What the main screen's search searches ([shown]) and which of it is drawn on the advanced tint: the settings every
+     *  screen showing them shows only in advanced mode, as their screen's own search draws them (owner 2026-10-14:
+     *  "Tint them now, to match within screen experience"). Worked out once per change of the settings, not per typed
+     *  letter (the lists read files: the background pictures). */
+    fun wholeApp(ctx: Context): WholeAppSearch {
         val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
-        return shownScreenLists(ctx).flatMap { screenSettings(it.keys, real, it.menu) { key -> map[key] } }.distinctBy { it.key }
+        val lists = shownScreenLists(ctx)
+        val settings = lists.flatMap { screenSettings(it.keys, real, it.menu) { key -> map[key] } }.distinctBy { it.key }
+        val advanced = settings.map { it.key }.filterTo(HashSet()) { key ->
+            lists.filter { key in it.keys }.all { key in it.advanced } }
+        return WholeAppSearch(settings, advanced)
     }
 }
 
-/** A screen's items as it shows them now (keys, headings, nulls), and the menu it is on (null: none). */
-class ScreenList(val keys: List<Any?>, val menu: Menu?)
+/** The main screen's search: the settings it finds, and the ones it draws on the advanced tint. */
+class WholeAppSearch(val settings: List<Setting>, val advanced: Set<String>)
+
+/** A screen's items as it shows them now (keys, headings, nulls), the menu it is on (null: none), and the ones it shows
+ *  only in advanced mode (its own search draws them on the advanced tint). */
+class ScreenList(val keys: List<Any?>, val menu: Menu?, val advanced: Set<String> = emptySet())
 
 /**
  * What each screen with settings shows now, read from [ctx]'s settings: the lists their own searches use (each screen
@@ -66,18 +85,31 @@ class ScreenList(val keys: List<Any?>, val menu: Menu?)
 fun shownScreenLists(ctx: Context): List<ScreenList> {
     val prefs = ctx.prefs()
     val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
+    // (Layout & Typing: the keyboard the main screen's results edit, for its own rows, e.g. Localize number row)
+    val layout = LayoutScreenLists(prefs, ctx, mainSearchKeyboard(ctx))
+    val appearance = appearanceItems(ctx, prefs)
+    val correction = correctionItems(prefs)
+    val correctionSimple = correctionSimpleModeKeys(prefs)
+    val appSettings = appSettingsItems(prefs, real)
     return listOfNotNull(
-        ScreenList(layoutScreenKeys(prefs, ctx), Menu.LAYOUT), // Layout & Typing
-        ScreenList(appearanceItems(ctx, prefs), Menu.APPEARANCE),
-        ScreenList(swipeScreenKeys(prefs), Menu.SWIPE),
-        ScreenList(correctionItems(prefs), Menu.TEXT_CORRECTION),
+        ScreenList(layout.all, Menu.LAYOUT, layout.advanced.toSet()), // Layout & Typing
+        ScreenList(appearance, Menu.APPEARANCE,
+            appearance.filterIsInstance<String>().filterTo(HashSet()) { advancedOnly(it, appearanceSimpleModeKeys) }),
+        ScreenList(swipeScreenKeys(prefs), Menu.SWIPE, swipeAdvancedKeys),
+        ScreenList(correction, Menu.TEXT_CORRECTION, correction.filterIsInstance<String>().filterTo(HashSet()) { advancedOnly(it, correctionSimple) }),
+        // (the Fine-tune screens are advanced as a whole: their entries carry the tint, their searches draw none)
         if (REFINE_MENU_SHOWN) ScreenList(fineTuneSuggestionsKeys(prefs), Menu.REFINE) else null,
         if (REFINE_MENU_SHOWN) ScreenList(fineTuneLearningKeys, Menu.LEARNING) else null,
-        ScreenList(appSettingsItems(prefs, real), null),
+        ScreenList(appSettings, null, appSettings.filterIsInstance<String>().filterTo(HashSet()) { it in advancedOnlyAppSettings }),
         ScreenList(aboutItems, null),
         // a keyboard's Languages screen: its Learned words entry
         ScreenList(listOf(SettingsWithoutKey.LEARNED_WORDS), null),
-    ).map { screen -> ScreenList(screen.keys + screen.keys.filterIsInstance<String>().flatMap { partsOfRows[it].orEmpty() }, screen.menu) }
+    ).map { screen ->
+        // a row's parts are found with it, tinted as it is
+        val strings = screen.keys.filterIsInstance<String>()
+        ScreenList(screen.keys + strings.flatMap { partsOfRows[it].orEmpty() }, screen.menu,
+            screen.advanced + strings.filter { it in screen.advanced }.flatMap { partsOfRows[it].orEmpty() })
+    }
 }
 
 /** Settings of their own that a row holds or opens, found by searching (they were in the main screen's search before
@@ -108,9 +140,14 @@ class Setting(
         if (menu != null && helium314.keyboard.latin.settings.KeyboardProfiles.hiddenOn(
                 helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(androidx.compose.ui.platform.LocalContext.current), menu, key))
             return
+        LocalDrawnKeys.current?.add(key)
         content(this)
     }
 }
+
+/** Tests only (null in the app): the keys of the rows a screen draws are added here, to check them against what its
+ *  search finds (round-7c review 20261014_L4_2: the check that every found setting is on a list was circular). */
+val LocalDrawnKeys = androidx.compose.runtime.compositionLocalOf<MutableSet<String>?> { null }
 
 /** The top-level menu a screen belongs to (for [Setting.Preference]); null outside them (search, App settings). */
 val LocalSettingsMenu = androidx.compose.runtime.compositionLocalOf<helium314.keyboard.latin.settings.KeyboardProfiles.Group?> { null }

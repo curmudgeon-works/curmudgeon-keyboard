@@ -35,7 +35,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
-import helium314.keyboard.keyboard.KeyboardLayoutSet
 import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.latin.AudioAndHapticFeedbackManager
 import helium314.keyboard.latin.KeypressSounds
@@ -223,11 +222,10 @@ fun createPreferencesSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS, R.string.number_row_in_symbols) {
         SwitchPreference(it, Defaults.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
+    // a keyboard's own (no app-wide row since 2026-10-14): the keyboard Layout & Typing edits, from the main screen's
+    // search the keyboard in use (owner: "yes A, start with default on going forward")
     Setting(context, Settings.PREF_LOCALIZED_NUMBER_ROW, R.string.localized_number_row, R.string.localized_number_row_summary) {
-        SwitchPreference(it, Defaults.PREF_LOCALIZED_NUMBER_ROW) {
-            KeyboardLayoutSet.onSystemLocaleChanged()
-            KeyboardSwitcher.getInstance().reloadKeyboard()
-        }
+        LocalizedNumberRowSwitch()
     },
     Setting(context, Settings.PREF_SHOW_EMOJI_KEY, R.string.show_emoji_key) {
         SwitchPreference(it, Defaults.PREF_SHOW_EMOJI_KEY) { KeyboardSwitcher.getInstance().reloadKeyboard() }
