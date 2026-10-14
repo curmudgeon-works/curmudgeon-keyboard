@@ -126,8 +126,8 @@ public class LatinIME extends InputMethodService implements
 
     // UIHandler is needed when creating InputLogic
     public final UIHandler mHandler = new UIHandler(this);
-    // the learned words pool can change after a keyboard switch (a new keyboard's own words copied in the background,
-    // LearnedStores.refresh): the dictionaries then follow it; registered in onCreate, removed in onDestroy
+    // the learned words the keyboard reads can change (a keyboard switch, its buttons "Use lists from other keyboards",
+    // the keyboard list; LearnedStores.refresh): the dictionaries then follow it; registered in onCreate, removed in onDestroy
     private final kotlin.jvm.functions.Function0<kotlin.Unit> mPoolListener = () -> {
         mHandler.post(this::resetDictionaryFacilitatorIfNecessary);
         return kotlin.Unit.INSTANCE;

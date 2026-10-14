@@ -49,8 +49,9 @@ object GestureDecoderVocabulary {
     // settings the decoder applies at scoring time now, see DecoderConfig.learnedBoost; 2026-10-06)
 
     init {
-        // another keyboard's own learned words (or all keyboards' again): the vocabularies carry the old ones
-        LearnedStores.onPoolChanged { rebuildWithLearned() }
+        // another keyboard's own learned words, or other keyboards' words or blacklists (2026-10-10): the vocabularies
+        // carry the old ones, and the learned words kept per store were filtered by the old blacklists
+        LearnedStores.onPoolChanged { learned.clear(); rebuildWithLearned() }
     }
 
     // learned words are merged into every cached vocabulary: when they change as a whole (another keyboard's own learned
@@ -87,14 +88,17 @@ object GestureDecoderVocabulary {
     private fun isRemoved(context: Context, locale: Locale, word: String, learned: Boolean): Boolean {
         // the same list object the keyboard's dictionaries hold (read here once if they haven't yet: a build thread);
         // the list of the word's own script, like the learned words
+        // (and the other keyboards' lists it uses, RemovedWords.Lists)
         val script = LearnedStores.scriptOf(word, locale)
-        val entry = RemovedWords.blacklist(context, script).apply { ensureLoaded() }.entryFor(word) ?: return false
+        val lists = LearnedStores.lists(context, script).apply { ensureLoaded() }
+        if (lists.entryFor(word) == null) return false
         if (!learned) return true
         // (only for a removed word: the counts aren't read per vocabulary word)
-        val history = PersonalizationHelper.getUserHistoryDictionary(context, script, LearnedStores.currentPool)
-        val lower = word.lowercase()
-        val count = maxOf(history.getLearnedCount(word), if (lower != word) history.getLearnedCount(lower) else -1)
-        return RemovedWords.isRemoved(entry, count)
+        return lists.isRemoved(word) {
+            val history = PersonalizationHelper.getUserHistoryDictionary(context, script, LearnedStores.currentPool)
+            val lower = word.lowercase()
+            maxOf(history.getLearnedCount(word), if (lower != word) history.getLearnedCount(lower) else -1)
+        }
     }
 
     private fun isExcluded(context: Context, locale: Locale, word: String, learned: Boolean) =
@@ -190,7 +194,8 @@ object GestureDecoderVocabulary {
         if (vocab.size == 0) return null
         Log.d(TAG, "merged vocabulary for $key: ${vocab.size} words")
         val scriptsDone = specs.map { it.locale.script() }.toSet()
-        logVocab("swipe vocabulary for $key: ${vocab.size} words, learned ${scriptsDone.sumOf { learned[storeKey(it, LearnedStores.currentPool)]?.size ?: 0 }}, " +
+        val view = LearnedStores.currentView
+        logVocab("swipe vocabulary for $key: ${vocab.size} words, learned ${scriptsDone.sumOf { s -> (listOf(view.own) + view.othersLearned).sumOf { learned[storeKey(s, it)]?.size ?: 0 } }}, " +
                 "merged in ${SystemClock.elapsedRealtime() - mergeStart} ms on ${Thread.currentThread().name}")
         if (mergeGeneration.get() == generation) {
             merged[key] = vocab
@@ -464,12 +469,27 @@ object GestureDecoderVocabulary {
     // language's build gets there first, and the others take that list (English and Hinglish both read it before,
     // at the same time, and the lock on the walk made each read take twice as long)
     private val readLocks = ConcurrentHashMap<String, Any>()
-    private fun learnedOnce(context: Context, locale: Locale, retries: Int): List<Pair<String, Int>> {
-        val k = storeKey(locale.script(), LearnedStores.currentPool)
+    private fun learnedOnce(context: Context, locale: Locale, retries: Int): List<Pair<String, Int>> =
+        inView { pool, own -> storeOnce(context, locale, pool, if (own) retries else 0) }
+
+    private fun storeOnce(context: Context, locale: Locale, pool: Int, retries: Int): List<Pair<String, Int>> {
+        val k = storeKey(locale.script(), pool)
         synchronized(readLocks.getOrPut(k) { Any() }) {
             learned[k]?.takeIf { it.isNotEmpty() }?.let { m -> return m.map { it.key to it.value } }
-            return historyEntries(context, locale, retries)
+            return historyEntries(context, locale, retries, pool)
         }
+    }
+
+    /** The learned words of the view (LearnedStores.LearnedView): the own store's ([read] with own = true) and, with
+     *  the button "Learned" on, the other keyboards' it reads, each word at its highest weight (2026-10-10). */
+    private fun inView(read: (pool: Int, own: Boolean) -> List<Pair<String, Int>>): List<Pair<String, Int>> {
+        val view = LearnedStores.currentView
+        val own = read(view.own, true)
+        if (view.othersLearned.isEmpty()) return own
+        val result = LinkedHashMap<String, Int>()
+        for ((word, weight) in own) result[word] = weight
+        for (pool in view.othersLearned) for ((word, weight) in read(pool, false)) result.merge(word, weight, ::maxOf)
+        return result.map { it.key to it.value }
     }
 
     /**
@@ -515,11 +535,12 @@ object GestureDecoderVocabulary {
      * missing (swipe at 74 instead of ~190, curmudgeon not there at all) until each was learned again. Only from a
      * build thread; the multilingual vocabularies take the list kept here ([learnedOf]).
      */
-    private fun historyEntries(context: Context, locale: Locale, retries: Int): List<Pair<String, Int>> {
+    private fun historyEntries(context: Context, locale: Locale, retries: Int, pool: Int = LearnedStores.currentPool): List<Pair<String, Int>> {
         try {
             val script = locale.script()
-            val pool = LearnedStores.currentPool
-            val history = PersonalizationHelper.getUserHistoryDictionary(context, script, pool)
+            // (another keyboard's store: only if it has a file, see LearnedStores.otherStore)
+            val history = if (pool == LearnedStores.currentPool) PersonalizationHelper.getUserHistoryDictionary(context, script, pool)
+                else LearnedStores.otherStore(context, script, pool) ?: return emptyList()
             val start = SystemClock.elapsedRealtime()
             var props = history.allWordPropertiesBlocking
             var attempts = 0
@@ -559,10 +580,13 @@ object GestureDecoderVocabulary {
     private fun storeKey(script: String, pool: Int) = "$script/$pool"
 
     /** [locale]'s learned words for a multilingual vocabulary: the list read by its own build, else read now. */
-    private fun learnedOf(context: Context, locale: Locale): List<Pair<String, Int>> {
-        learned[storeKey(locale.script(), LearnedStores.currentPool)]?.let { m -> return m.map { it.key to it.value } }
-        return historyEntries(context, locale, retries = 0)
+    private fun learnedOf(context: Context, locale: Locale): List<Pair<String, Int>> = inView { pool, _ ->
+        learned[storeKey(locale.script(), pool)]?.let { m -> m.map { it.key to it.value } } ?: historyEntries(context, locale, retries = 0, pool = pool)
     }
+
+    /** What a swipe vocabulary of [locale] takes as learned words (the list a merge takes; tests). */
+    @androidx.annotation.VisibleForTesting
+    internal fun learnedWordsFor(context: Context, locale: Locale): List<Pair<String, Int>> = learnedOf(context, locale)
 
     private fun histogram(entries: List<Pair<String, Int>>): String {
         val bands = IntArray(4)

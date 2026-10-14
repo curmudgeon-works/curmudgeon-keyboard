@@ -93,10 +93,15 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
     private val scope = CoroutineScope(Dispatchers.Default)
 
     // Learned words and the blacklist are per script (LearnedStores): the groups of one script hold the same store
-    // object. [learnedPool] is the pool those stores came from when the dictionaries were set up; [filesContext] where
-    // the blacklists are read.
-    @Volatile private var learnedPool = LearnedStores.SHARED
+    // object. [learnedView] is the view those stores came from when the dictionaries were set up (its own pool:
+    // [learnedPool]); [filesContext] where the blacklists are read.
+    @Volatile private var learnedView = LearnedStores.LearnedView(LearnedStores.SHARED)
+    private val learnedPool get() = learnedView.own
     @Volatile private var filesContext: Context? = null
+    // the other keyboards' learned words read with the own ones (button "Learned", 2026-10-10), by script: never learned
+    // into (not in the groups, so historyFor never finds them); opened in the background ([openOtherStores])
+    @Volatile private var otherHistories: Map<String, List<ExpandableBinaryDictionary>> = emptyMap()
+    private val otherStoresSetUp = java.util.concurrent.atomic.AtomicInteger()
 
     override fun setValidSpellingWordReadCache(cache: LruCache<String, Boolean>) {
         mValidSpellingWordReadCache = cache
@@ -139,7 +144,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         return contacts == dictGroup.hasDict(Dictionary.TYPE_CONTACTS)
                 && apps == dictGroup.hasDict(Dictionary.TYPE_APPS)
                 && personalization == dictGroup.hasDict(Dictionary.TYPE_USER_HISTORY)
-                && learnedPool == LearnedStores.currentPool // another keyboard's own learned words
+                && learnedView == LearnedStores.currentView // another keyboard's own learned words, or other lists
                 && locales.size == dictionaryGroups.size
                 && locales.none { findDictionaryGroupWithLocale(dictionaryGroups, it) == null }
     }
@@ -160,11 +165,15 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
 
         val locales = getUsedLocales(newLocale, context)
         filesContext = context
-        learnedPool = LearnedStores.currentPool
+        val view = LearnedStores.currentView
+        learnedView = view
         blacklists.clear()
-        // the blacklists of the keyboard's scripts read again (e.g. after a restore replaced the files)
+        // the blacklists of the keyboard's scripts read again (e.g. after a restore replaced the files), the other
+        // keyboards' it uses too
+        val scripts = locales.map { it.script() }.distinct()
         if (context.filesDir != null)
-            locales.map { it.script() }.distinct().forEach { RemovedWords.blacklist(context, it, learnedPool).reloadAsync() }
+            for (script in scripts) for (pool in listOf(view.own) + view.othersBlacklisted)
+                RemovedWords.blacklist(context, script, pool).reloadAsync()
 
         val subDictTypesToUse = listOfNotNull(
             Dictionary.TYPE_USER,
@@ -207,7 +216,38 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
 
         mValidSpellingWordWriteCache?.evictAll()
         mValidSpellingWordReadCache?.evictAll()
+        openOtherStores(context, view, scripts)
     }
+
+    /**
+     * The other keyboards' stores of [scripts] that [view] reads (button "Learned"), in the background (file checks:
+     * only stores whose file exists, never one created for them), one set-up after the other; stores no longer read
+     * are saved and closed (the next use of one reads its file again), as the own store is when it changes.
+     */
+    private fun openOtherStores(context: Context, view: LearnedStores.LearnedView, scripts: List<String>) {
+        val setUp = otherStoresSetUp.incrementAndGet()
+        otherStoresExecutor.execute {
+            if (setUp != otherStoresSetUp.get()) return@execute // a later set-up follows
+            val stores = if (view.othersLearned.isEmpty()) emptyMap() else scripts.associateWith { script ->
+                view.othersLearned.mapNotNull { pool -> LearnedStores.otherStore(context, script, pool) } }.filterValues { it.isNotEmpty() }
+            closeOtherStores(stores)
+        }
+    }
+
+    /** [stores] read from now on; the ones read before and not any more saved and closed. On [otherStoresExecutor]. */
+    private fun closeOtherStores(stores: Map<String, List<ExpandableBinaryDictionary>>) {
+        val old = otherHistories
+        otherHistories = stores
+        if (old.isEmpty() && stores.isEmpty()) return
+        val kept = stores.values.flatten() + dictionaryGroups.mapNotNull { it.getSubDict(Dictionary.TYPE_USER_HISTORY) }
+        old.values.flatten().filter { o -> kept.none { it === o } }.distinctBy { System.identityHashCode(it) }.forEach { it.flushAndClose() }
+        mValidSpellingWordWriteCache?.evictAll()
+        mValidSpellingWordReadCache?.evictAll()
+    }
+
+    /** Waits for the other keyboards' stores of the last set-up (tests). */
+    @androidx.annotation.VisibleForTesting
+    internal fun awaitOtherStores() { otherStoresExecutor.submit { }.get() }
 
     /** creates dictionaryGroups for [newLocales] with given [newSubDictTypes], trying to re-use existing dictionaries.
      * returns the new dictionaryGroups and unused dictionary types by locale */
@@ -303,6 +343,8 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
 
     override fun closeDictionaries() {
         onFinishInput() // the dictionaries will save updates to file
+        otherStoresSetUp.incrementAndGet()
+        otherStoresExecutor.execute { closeOtherStores(emptyMap()) }
         val dictionaryGroupsToClose: List<DictionaryGroup>
         synchronized(this) {
             dictionaryGroupsToClose = dictionaryGroups
@@ -444,10 +486,20 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         val inAnyDictionary = mainFreq > 0 || groupsOfScript.any { g ->
             g !== dictionaryGroup && (g.getDict(Dictionary.TYPE_MAIN)?.getFrequency(word) ?: Dictionary.NOT_A_PROBABILITY) > 0 }
         val isValid = inAnyDictionary && !isRemovedWord(wordToUse)
+        // on another keyboard's blacklist this keyboard uses: the uses so far, before this one is stored (asynchronously)
+        val lists = blacklistFor(word)
+        val borrowed = lists?.takeIf { it.borrowed.isNotEmpty() }?.borrowedEntry(word)
+        val countBefore = if (borrowed != null) learnedCount(word) else -1
         UserHistoryDictionary.addToDictionary(userHistoryDictionary, ngramContext, wordToUse, isValid, timeStampInSeconds)
         // each further use raises the word's level once more (the word alone: the word pair was counted above)
         repeat(extraUses) {
             UserHistoryDictionary.addToDictionary(userHistoryDictionary, NgramContext.EMPTY_PREV_WORDS_INFO, wordToUse, isValid, timeStampInSeconds)
+        }
+        // typed often enough to be back (the rule of a keyboard's own list, counted here): taken off the other keyboard's
+        // list it came from, so it's back there too (2026-10-10). A 3rd strike waits for the strip's "+" as usual.
+        if (lists != null && borrowed != null
+            && !RemovedWords.isRemoved(lists.entryFor(word), maxOf(countBefore, -1) + 1 + extraUses) && lists.takeOffBorrowed(word)) {
+            GestureDecoderVocabulary.onWordUnblacklisted(dictionaryGroup.locale, word) // (its dictionary copy: one rebuild)
         }
         GestureDecoderVocabulary.onWordLearned(userHistoryDictionary.mContext, scriptOf(wordToUse), wordToUse)
     }
@@ -592,17 +644,19 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         return PersonalizationHelper.getUserHistoryDictionary(context, script, learnedPool)
     }
 
-    /** The blacklist [word] belongs to: its script's. */
-    private fun blacklistFor(word: String): RemovedWords.WordListFile? {
+    /** The blacklists [word] belongs to: its script's, the keyboard's own and the other keyboards' it uses. */
+    private fun blacklistFor(word: String): RemovedWords.Lists? {
         val script = scriptOf(word)
         blacklists[script]?.let { return it }
         val context = filesContext?.takeIf { it.filesDir != null } ?: return null
-        return RemovedWords.blacklist(context, script, learnedPool).also { blacklists[script] = it }
+        val view = learnedView
+        return RemovedWords.Lists(RemovedWords.blacklist(context, script, view.own),
+            view.othersBlacklisted.map { RemovedWords.blacklist(context, script, it) }).also { blacklists[script] = it }
     }
 
     // the lists in use by script (asked for every suggestion: no file name built each time); emptied on every set-up,
-    // when the pool may change
-    private val blacklists = ConcurrentHashMap<String, RemovedWords.WordListFile>()
+    // when the view may change
+    private val blacklists = ConcurrentHashMap<String, RemovedWords.Lists>()
 
     // TODO: Revise the way to fusion suggestion results.
     override fun getSuggestionResults(
@@ -664,9 +718,25 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
             val dictionary = dictGroup.getDict(dictType) ?: continue
             // learned words belong to the script, not to one language: full weight, whichever language is preferred
             val weightForLocale = if (dictType == Dictionary.TYPE_USER_HISTORY) 1f else groupWeight
+            collectSuggestions(dictionary, dictType, weightForLocale, composedData, ngramContext, settingsValuesForSuggestion,
+                sessionId, proximityInfoHandle, weightOfLangModelVsSpatialModel, suggestions)
+            // the other keyboards' learned words of the script it uses: exactly as its own (2026-10-10)
+            if (dictType == Dictionary.TYPE_USER_HISTORY)
+                for (other in otherHistories[dictGroup.locale.script()].orEmpty())
+                    collectSuggestions(other, dictType, weightForLocale, composedData, ngramContext, settingsValuesForSuggestion,
+                        sessionId, proximityInfoHandle, weightOfLangModelVsSpatialModel, suggestions)
+        }
+        return suggestions
+    }
+
+    private fun collectSuggestions(
+        dictionary: Dictionary, dictType: String, weightForLocale: Float, composedData: ComposedData, ngramContext: NgramContext,
+        settingsValuesForSuggestion: SettingsValuesForSuggestion, sessionId: Int, proximityInfoHandle: Long,
+        weightOfLangModelVsSpatialModel: FloatArray, suggestions: ArrayList<SuggestedWordInfo>
+    ) {
             val dictionarySuggestions = dictionary.getSuggestions(composedData, ngramContext, proximityInfoHandle,
                 settingsValuesForSuggestion, sessionId, weightForLocale, weightOfLangModelVsSpatialModel
-            ) ?: continue
+            ) ?: return
 
             // For some reason "garbage" words are produced when glide typing. For user history
             // and main dictionaries we can filter them out by checking whether the dictionary
@@ -697,8 +767,6 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
 
                 suggestions.add(info)
             }
-        }
-        return suggestions
     }
 
     // Spell checker is using this, and has its own instance of DictionaryFacilitatorImpl,
@@ -712,7 +780,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         return valid || isTrustedWord(word) || isRestoredWord(word)
     }
 
-    // The removed-word entry of [word] (as typed or in lowercase) in its script's blacklist.
+    // The removed-word entry of [word] (as typed or in lowercase) in its script's blacklists.
     private fun removedEntry(word: String): RemovedWords.Entry? = blacklistFor(word)?.entryFor(word)
 
     // How often [word] was learned (in any capitalization): RemovedWords.hasEnoughUses reads it.
@@ -728,8 +796,9 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
     // word again (not corrected, not underlined), a word of no dictionary is a learned word like any other.
     override fun isRestoredWord(word: String): Boolean {
         if (word.isEmpty()) return false
-        val entry = removedEntry(word) ?: return false
-        if (RemovedWords.isRemoved(entry, learnedCount(word))) return false
+        val lists = blacklistFor(word) ?: return false
+        if (lists.entryFor(word) == null) return false
+        if (lists.isRemoved(word) { learnedCount(word) }) return false
         val lower = word.lowercase()
         return dictionaryGroups.any { g -> DictionaryFacilitator.ALL_DICTIONARY_TYPES.any { type ->
             g.getDict(type)?.let { it.isValidWord(word) || it.isValidWord(lower) } == true } }
@@ -744,10 +813,13 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
     /** [word] (or its lowercase entry) brought back with the strip's "+": swiped again too, from its learned copy. */
     override fun confirmRemovedWord(word: String) {
         if (!awaitsConfirmation(word)) return
-        val list = blacklistFor(word) ?: return
+        val lists = blacklistFor(word) ?: return
+        val list = lists.own
         val lower = word.lowercase(dictionaryGroups[0].locale)
         val listed = if (list.contains(word)) word else lower
-        if (!list.confirm(listed)) return
+        // (its own list's entry confirmed; on another keyboard's list it came from: taken off it, as typing does)
+        val confirmed = list.entryFor(word) != null && list.confirm(listed)
+        if (!lists.takeOffBorrowed(word) && !confirmed) return
         val history = historyFor(word) ?: return
         // the learned copy carries it now (in the vocabularies built so far it was left out)
         val learned = listOf(word, lower).firstOrNull { history.getLearnedCount(it) >= 0 } ?: return
@@ -768,7 +840,9 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         fun trusted(history: ExpandableBinaryDictionary, w: String) = history.getLearnedInfo(w)
             ?.let { LearnedDecay.isTrusted(it.mCount, it.mTimestamp, now, typed) } == true
         val history = historyFor(word) ?: return false
-        return trusted(history, word) || (lower != word && trusted(history, lower))
+        // the other keyboards' learned words it uses count as its own (2026-10-10)
+        return (sequenceOf(history) + otherHistories[scriptOf(word)].orEmpty())
+            .any { trusted(it, word) || (lower != word && trusted(it, lower)) }
     }
 
     override fun getMainDictionaryFrequency(word: String, locale: Locale): Int {
@@ -799,11 +873,12 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
 
     private fun isBlacklisted(word: String): Boolean = blacklistFor(word)?.contains(word) == true
 
-    // removed with long-press and not back yet (RemovedWords.isRemoved: the strikes say how it comes back)
+    // removed with long-press and not back yet (RemovedWords.isRemoved: the strikes say how it comes back; on another
+    // keyboard's list it uses: until it's taken off that list, see RemovedWords.Lists)
     override fun isRemovedWord(word: String): Boolean {
         if (word.isEmpty()) return false
-        val entry = removedEntry(word) ?: return false // (the usual case: no counts read)
-        return RemovedWords.isRemoved(entry, learnedCount(word))
+        val lists = blacklistFor(word) ?: return false
+        return lists.isRemoved(word) { learnedCount(word) } // (the usual case, not listed: no counts read)
     }
 
     override fun removeWord(word: String) {
@@ -829,7 +904,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
             struck.add(if (word in spellings) word else spellings.firstOrNull() ?: word.lowercase())
         }
         for (spelling in struck) {
-            blacklistFor(spelling)?.strike(spelling) ?: continue
+            blacklistFor(spelling)?.own?.strike(spelling) ?: continue
             for (group in dictionaryGroups) GestureDecoderVocabulary.onWordBlacklisted(group.locale, spelling)
         }
     }
@@ -862,6 +937,9 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
 
     companion object {
         private val TAG = DictionaryFacilitatorImpl::class.java.simpleName
+
+        // opens and closes the other keyboards' stores of every facilitator, one set-up after the other (file checks)
+        private val otherStoresExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { Thread(it, "LearnedViewStores").apply { isDaemon = true } }
 
         // every facilitator of the process (keyboard, spell checker, emoji search), for removeWord from the settings
         private val liveFacilitators = java.util.Collections.newSetFromMap(java.util.WeakHashMap<DictionaryFacilitatorImpl, Boolean>())

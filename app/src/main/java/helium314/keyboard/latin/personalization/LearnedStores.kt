@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.latin.personalization
 
+import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.os.UserManagerCompat
 import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.Log
+import helium314.keyboard.latin.utils.RemovedWords
 import helium314.keyboard.latin.utils.ScriptUtils
 import helium314.keyboard.latin.utils.ScriptUtils.script
 import java.io.File
@@ -28,28 +33,95 @@ object LearnedStores {
     private const val TAG = "LearnedStores"
     const val SHARED = 0
 
-    /** The pool the keyboard in use learns into and reads from. */
-    @Volatile var currentPool = SHARED
+    /**
+     * What the keyboard in use reads (2026-10-10): its own pool, which it learns into, plus with its buttons "Use lists
+     * from other keyboards" on, the other listed keyboards' pools: [othersLearned] read as if they were its own learned
+     * words, [othersBlacklisted] whose blacklists apply as if they were its own (RemovedWords.Lists). Only once the user
+     * is unlocked (the files are in credential storage).
+     */
+    data class LearnedView(val own: Int, val othersLearned: List<Int> = emptyList(), val othersBlacklisted: List<Int> = emptyList())
+
+    @Volatile var currentView = LearnedView(SHARED)
         private set
+
+    /** The pool the keyboard in use learns into and reads from (its own). */
+    val currentPool get() = currentView.own
 
     /** The pool of the selected keyboard (LearnedKeyboards). [real]: the preferences as stored (not a keyboard's profile view). */
     fun poolFor(real: SharedPreferences): Int = LearnedKeyboards.poolFor(real, KeyboardProfiles.selectedKeyboard(real))
 
-    /** Re-reads which pool is in use (on every keyboard switch, after the one-time update, a reset or a restore). */
+    /** The view of the selected keyboard (prefs only, no files). */
+    fun viewFor(real: SharedPreferences): LearnedView {
+        val keyboard = KeyboardProfiles.selectedKeyboard(real)
+        val own = LearnedKeyboards.poolFor(real, keyboard)
+        if (!LearnedKeyboards.isDone(real)) return LearnedView(own)
+        val learned = LearnedKeyboards.usesOthers(real, LearnedKeyboards.PREF_USE_OTHERS_LEARNED, keyboard)
+        val blacklisted = LearnedKeyboards.usesOthers(real, LearnedKeyboards.PREF_USE_OTHERS_BLACKLISTED, keyboard)
+        if (!learned && !blacklisted) return LearnedView(own)
+        if (!unlocked()) return LearnedView(own) // (before unlock no other store is listed, so none is opened)
+        val others = LearnedKeyboards.otherPools(real, keyboard, own)
+        return LearnedView(own, if (learned) others else emptyList(), if (blacklisted) others else emptyList())
+    }
+
+    // the app, for the unlock check (App.onCreate)
+    @Volatile private var app: Context? = null
+    private fun unlocked() = app?.let { UserManagerCompat.isUserUnlocked(it) } == true
+
+    /** At app start: the view follows the keyboard list, the pools and the buttons as they change (a keyboard added,
+     *  deleted or renamed, a button toggled), wherever that's done. */
+    fun init(context: Context) {
+        app = context.applicationContext ?: context
+        val real = DeviceProtectedUtils.getRealSharedPreferences(context)
+        real.registerOnSharedPreferenceChangeListener(prefsListener)
+        refresh(real)
+    }
+    // (kept here: the preferences hold their listeners weakly)
+    private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
+        if (key == null || key in viewKeys) refresh(prefs)
+    }
+    private val viewKeys = setOf(Settings.PREF_ENABLED_SUBTYPES, LearnedKeyboards.PREF_POOLS, LearnedKeyboards.PREF_DONE) + LearnedKeyboards.buttonPrefs
+
+    /** Re-reads the view (on every keyboard switch, a change of the keyboard list or the buttons, after the one-time
+     *  update, a reset or a restore); what's built from the learned words is rebuilt when it changed. */
     fun refresh(real: SharedPreferences) {
-        val pool = try { poolFor(real) } catch (e: Exception) { Log.w(TAG, "could not read the pool", e); SHARED }
-        if (pool == currentPool) return
-        currentPool = pool
-        helium314.keyboard.latin.utils.HotWords.usePool(pool) // (its recent words with it)
-        Log.i(TAG, "learned words pool now $pool")
+        val view = try { viewFor(real) } catch (e: Exception) { Log.w(TAG, "could not read the pool", e); LearnedView(SHARED) }
+        val old = currentView
+        if (view == old) return
+        currentView = view
+        lists.clear()
+        if (view.own != old.own) helium314.keyboard.latin.utils.HotWords.usePool(view.own) // (its recent words with it)
+        Log.i(TAG, "learned words pool now ${view.own}" + (if (view.othersLearned.isEmpty() && view.othersBlacklisted.isEmpty()) ""
+            else ", other keyboards' learned words ${view.othersLearned}, blacklists ${view.othersBlacklisted}"))
         listeners.forEach { it() }
     }
 
-    // things built from the learned words of the pool in use (swipe vocabularies, frequent long words): rebuilt when it
-    // changes; registered by them, so this file doesn't reach into the keyboard
+    // things built from the learned words of the view (swipe vocabularies, frequent long words, the keyboard's
+    // dictionaries): rebuilt when it changes; registered by them, so this file doesn't reach into the keyboard
     private val listeners = java.util.concurrent.CopyOnWriteArrayList<() -> Unit>()
     fun onPoolChanged(listener: () -> Unit) { listeners.add(listener) }
     fun removeOnPoolChanged(listener: () -> Unit) { listeners.remove(listener) }
+
+    /** The blacklists of [script] that apply on the keyboard in use: its own and the other keyboards' it uses (no file
+     *  is read here). */
+    fun lists(context: Context, script: String): RemovedWords.Lists {
+        lists[script]?.let { return it }
+        val view = currentView
+        val filesDir = context.filesDir
+        val result = RemovedWords.Lists(RemovedWords.forFile(blacklistFile(filesDir, script, view.own)),
+            view.othersBlacklisted.map { RemovedWords.forFile(blacklistFile(filesDir, script, it)) })
+        if (currentView == view) lists[script] = result
+        return result
+    }
+    private val lists = java.util.concurrent.ConcurrentHashMap<String, RemovedWords.Lists>()
+
+    /** Another keyboard's store of [script] in [pool], read as an extra source: only if its file exists (never created
+     *  for it; learning goes into the own store only). The same object as anyone else's (PersonalizationHelper). Off
+     *  the main thread (a file check). */
+    fun otherStore(context: Context, script: String, pool: Int): UserHistoryDictionary? {
+        PersonalizationHelper.getCachedUserHistoryDictionary(script, pool)?.let { return it }
+        if (!storeFile(context.filesDir ?: return null, script, pool).exists()) return null
+        return PersonalizationHelper.getUserHistoryDictionary(context, script, pool)
+    }
 
     /** The script whose store [word] is learned in, blacklisted in and read from; [fallback] for a word without letters. */
     @JvmStatic

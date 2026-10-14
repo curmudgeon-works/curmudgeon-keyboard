@@ -66,6 +66,16 @@ public class PersonalizationHelper {
         }
     }
 
+    /** [dict] is the store of [script] in [pool] from now on, null: none (tests: no native library there). */
+    @androidx.annotation.VisibleForTesting
+    static void setForTest(final String script, final int pool, @Nullable final UserHistoryDictionary dict) {
+        synchronized (sLangUserHistoryDictCache) {
+            final String lookupStr = LearnedStores.storeName(script, pool);
+            if (dict == null) sLangUserHistoryDictCache.remove(lookupStr);
+            else sLangUserHistoryDictCache.put(lookupStr, new SoftReference<>(dict));
+        }
+    }
+
     @Nullable
     private static UserHistoryDictionary getCached(final String lookupStr) {
         final SoftReference<UserHistoryDictionary> ref = sLangUserHistoryDictCache.get(lookupStr);

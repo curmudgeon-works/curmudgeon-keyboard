@@ -97,6 +97,19 @@ object LearnedKeyboards {
     /** Whether [keyboard] uses the other keyboards' lists of button [pref] (one of [buttonPrefs]). */
     fun usesOthers(real: SharedPreferences, pref: String, keyboard: SettingsSubtype) = keyboard.toPref() in ids(real.getString(pref, null))
 
+    /** [keyboard]'s button [pref] on or off (the keyboard's screen); the view follows (LearnedStores' listener). */
+    fun setUsesOthers(real: SharedPreferences, pref: String, keyboard: SettingsSubtype, on: Boolean) {
+        synchronized(this) {
+            val set = ids(real.getString(pref, null))
+            val changed = if (on) set.add(keyboard.toPref()) else set.remove(keyboard.toPref())
+            if (changed) real.edit().also { it.putIds(pref, set) }.apply()
+        }
+    }
+
+    /** The pools of the listed keyboards other than [keyboard] (whose pool is [own]): what its buttons read. */
+    fun otherPools(real: SharedPreferences, keyboard: SettingsSubtype, own: Int): List<Int> =
+        listedKeyboards(real).filter { it.toPref() != keyboard.toPref() }.map { poolFor(real, it) }.distinct().filter { it != own }
+
     private fun ids(json: String?): LinkedHashSet<String> = try {
         JSONArray(json ?: "[]").let { a -> (0 until a.length()).mapTo(LinkedHashSet()) { a.getString(it) } }
     } catch (e: Exception) { LinkedHashSet() }

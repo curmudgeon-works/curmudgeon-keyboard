@@ -43,7 +43,7 @@ object FrequentLongWords {
     private fun qualifies(word: String) = word.length >= MIN_LENGTH || word.contains('@') || word.contains('.')
 
     init {
-        // another keyboard's own learned words (or all keyboards' again)
+        // another keyboard's own learned words, or other keyboards' words read with them (or not any more)
         LearnedStores.onPoolChanged { clear() }
     }
 
@@ -53,15 +53,17 @@ object FrequentLongWords {
         val lower = typed.lowercase()
         val now = SystemClock.elapsedRealtime()
         val found = ArrayList<Entry>()
-        val pool = LearnedStores.currentPool
+        // the own store, and the other keyboards' with the button "Learned" on (2026-10-10; removed words are left out
+        // by the caller, Suggest, for all of them)
+        val view = LearnedStores.currentView
         // (the languages of a script share their learned words: one store each)
-        for (script in locales.map { it.script() }.distinct()) {
+        for (script in locales.map { it.script() }.distinct()) for (pool in listOf(view.own) + view.othersLearned) {
             val key = LearnedStores.storeName(script, pool)
             val cache = caches[key]
-            if (cache == null || now - cache.time > REFRESH_MS) refreshAsync(context, script, pool, key)
+            if (cache == null || now - cache.time > REFRESH_MS) refreshAsync(context, script, pool, key, own = pool == view.own)
             cache?.entries?.filterTo(found) { it.lower.startsWith(lower) && it.lower != lower }
         }
-        return found.sortedByDescending { it.probability }.take(MAX_IN_STRIP).map {
+        return found.sortedByDescending { it.probability }.distinctBy { it.word }.take(MAX_IN_STRIP).map {
             SuggestedWordInfo(it.word, "", it.probability, SuggestedWordInfo.KIND_CORRECTION, it.dict,
                 SuggestedWordInfo.NOT_AN_INDEX, SuggestedWordInfo.NOT_A_CONFIDENCE)
         }
@@ -75,12 +77,14 @@ object FrequentLongWords {
         for ((key, cache) in caches) caches[key] = Cache(cache.entries.filterNot { it.lower == word.lowercase() }, cache.time)
     }
 
-    private fun refreshAsync(context: Context, script: String, pool: Int, key: String) {
+    private fun refreshAsync(context: Context, script: String, pool: Int, key: String, own: Boolean) {
         if (!refreshing.add(key)) return
         val started = SystemClock.elapsedRealtime()
         Thread({
             try {
-                val history = PersonalizationHelper.getUserHistoryDictionary(context, script, pool)
+                // (another keyboard's store only if it has a file: none is created for it)
+                val history = if (own) PersonalizationHelper.getUserHistoryDictionary(context, script, pool)
+                    else LearnedStores.otherStore(context, script, pool) ?: run { caches[key] = Cache(emptyList(), SystemClock.elapsedRealtime()); return@Thread }
                 // the whole store, waited for (the old read gave up after 100 ms and answered with nothing, which a
                 // store of ~11k words always missed); empty only while the store is still loading after a start
                 var props = history.allWordPropertiesBlocking

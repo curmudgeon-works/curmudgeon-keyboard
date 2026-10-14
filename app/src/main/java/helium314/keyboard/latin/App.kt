@@ -38,6 +38,8 @@ class App : Application() {
         // once (2026-10-10): every keyboard its own learned words, from the shared ones if they were shared (after
         // unlock, in the background; see LearnedKeyboards)
         helium314.keyboard.latin.personalization.LearnedKeyboards.startUpdate(this)
+        // the learned words the keyboard in use reads follow the keyboard list and its buttons "Use lists from other keyboards"
+        helium314.keyboard.latin.personalization.LearnedStores.init(this)
         helium314.keyboard.latin.settings.KeyboardProfiles.loadGroups(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
         helium314.keyboard.latin.settings.KeyboardProfiles.migrateFiles(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
         helium314.keyboard.latin.settings.KeyboardProfiles.settingsMoves(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))

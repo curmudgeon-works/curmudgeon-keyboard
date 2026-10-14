@@ -89,6 +89,49 @@ object RemovedWords {
     fun awaitsConfirmation(entry: Entry?, learnedCount: Int): Boolean =
         entry != null && needsConfirmation(entry.strikes) && !entry.confirmed && hasEnoughUses(entry.strikes, learnedCount)
 
+    /**
+     * The lists that apply on a keyboard (2026-10-10): its [own] and, with its button "Blacklisted" on, every other
+     * listed keyboard's ([borrowed]). A word on several: the most strikes count (Entry.max). A word on a borrowed list is
+     * out from every source until it's taken off that list: typed again often enough on this keyboard (its own learned
+     * count, as for its own list) takes it off ([takeOffBorrowed]). Strikes and confirmations of this keyboard go on its
+     * own list only. Without borrowed lists everything is as with the own list alone.
+     */
+    class Lists(val own: WordListFile, val borrowed: List<WordListFile> = emptyList()) {
+        /** Listed as written (a dictionary's copy stays out). */
+        fun contains(word: String) = own.contains(word) || borrowed.any { it.contains(word) }
+
+        /** The entry of [word] (as typed or lowercase) over the borrowed lists, null if none has it. */
+        fun borrowedEntry(word: String): Entry? {
+            var result: Entry? = null
+            for (list in borrowed) list.entryFor(word)?.let { result = it.max(result) }
+            return result
+        }
+
+        /** The entry of [word] (as typed or lowercase) over all the lists. */
+        fun entryFor(word: String): Entry? {
+            val borrowedEntry = if (borrowed.isEmpty()) null else borrowedEntry(word)
+            return own.entryFor(word)?.max(borrowedEntry) ?: borrowedEntry
+        }
+
+        /** Still out ([RemovedWords.isRemoved]); [learnedCount]: this keyboard's own count, read only for a listed word. */
+        fun isRemoved(word: String, learnedCount: () -> Int): Boolean {
+            if (borrowed.isNotEmpty() && borrowedEntry(word) != null) return true
+            val entry = own.entryFor(word) ?: return false
+            return RemovedWords.isRemoved(entry, learnedCount())
+        }
+
+        /** [word] (as typed and lowercase) taken off the borrowed lists that have it: it's back on this keyboard and on
+         *  theirs. @return whether one had it */
+        fun takeOffBorrowed(word: String): Boolean {
+            var taken = false
+            for (list in borrowed) for (spelling in setOf(word, word.lowercase())) if (list.takeOff(spelling)) taken = true
+            return taken
+        }
+
+        /** Every list read (call off the main thread). */
+        fun ensureLoaded() { own.ensureLoaded(); borrowed.forEach { it.ensureLoaded() } }
+    }
+
     // ------------------------------- the file -------------------------------
 
     /** "word", or "word<TAB>N" (with a "<TAB>confirmed" after), as [format] writes; null for an empty line. */
@@ -245,6 +288,14 @@ object RemovedWords {
                 set(word, null)
             }
             return true
+        }
+
+        /** [word] taken off the list as it is in memory (no wait for a read: an unread list has nothing to take off).
+         *  @return false if it wasn't there */
+        fun takeOff(word: String): Boolean = synchronized(lock) {
+            if (!byWord.containsKey(word)) return false
+            set(word, null)
+            true
         }
 
         /** The list replaced by [entries] (the keyboards' lists merged when they share them again). Call off the main thread. */
