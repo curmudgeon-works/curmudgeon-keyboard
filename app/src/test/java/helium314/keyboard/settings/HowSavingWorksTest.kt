@@ -25,6 +25,20 @@ class HowSavingWorksTest {
         }
     }
 
+    // owner 2026-10-12: the restore dialog's groups (Full restore (delete app data); Restore their: Settings,
+    // Dictionaries; And merge: Learned words, Clipboard history), told as they work now; "device", never "phone"
+    @Test fun `partial and full restore rows - the new names, dictionaries and clipboard, device not phone`() {
+        val partial = savingGuide.first { ctx.getString(it.title) == "Partial restore" }.rows.map { it.text }
+        val full = savingGuide.first { ctx.getString(it.title) == "Full restore" }.rows.map { it.text }
+        assertTrue(helium314.keyboard.latin.R.string.saving_partial_dictionaries in partial)
+        assertTrue(helium314.keyboard.latin.R.string.saving_partial_clips in partial)
+        val texts = (partial + full).map { ctx.getString(it) }
+        assertTrue(texts.none { "phone" in it || "Delete app data and restore from backup" in it }, texts.toString())
+        assertTrue(texts.any { "Full restore (delete app data)" in it })
+        assertTrue(texts.any { "higher count" in it && "personal dictionary" in it })
+        assertTrue(texts.any { "…prev" in it })
+    }
+
     // owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones
     @Test fun `separate settings rows - the first keyboard's settings, nothing copied, delete and reorder`() {
         val separate = savingGuide.last().rows.map { it.text }

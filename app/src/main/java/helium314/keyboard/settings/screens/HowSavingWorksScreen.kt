@@ -124,7 +124,9 @@ internal val savingGuide: List<SavingTab> = listOf(
         SavingRow(R.string.saving_kind_fonts, R.string.saving_partial_files),
         SavingRow(R.string.saving_kind_pictures, R.string.saving_partial_files),
         SavingRow(R.string.saving_kind_key_layouts, R.string.saving_partial_files),
+        SavingRow(R.string.saving_kind_dictionaries, R.string.saving_partial_dictionaries),
         SavingRow(R.string.saving_kind_learned, R.string.saving_partial_words),
+        SavingRow(R.string.restore_clipboard, R.string.saving_partial_clips), // ("Clipboard history")
         SavingRow(R.string.saved_items_take_new_defaults, R.string.saving_partial_switch),
     )),
     SavingTab(R.string.saving_tab_full, listOf(
