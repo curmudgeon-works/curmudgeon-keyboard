@@ -8,15 +8,17 @@ import helium314.keyboard.latin.personalization.LearnedKeyboards
 import helium314.keyboard.latin.personalization.available
 import helium314.keyboard.latin.personalization.useKeyboards
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.utils.DictionaryInfoUtils
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.dialogs.dictionaryUserNames
-import helium314.keyboard.settings.dialogs.dictionaryUsers
+import helium314.keyboard.settings.dialogs.dictionaryDeleteBlockers
 import helium314.keyboard.settings.screens.keyboardName
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.io.File
 import java.util.Locale
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -26,21 +28,31 @@ import kotlin.test.assertEquals
  * "No delete allowed if other keyboards using dict". A keyboard switched off keeps its id (or its pool) and its
  * definition, so a dictionary only it uses stays, and the blocked message names it "<name> (switched off)".
  * (owner 2026-10-11: keyboards have unique ids) Switched off: in the added list, its id with a set or a pool.
+ * Through the dialog's gate, [dictionaryDeleteBlockers] (20261013_L13; before, the old dictionaryUsers, which nothing
+ * called any more).
  */
 @RunWith(RobolectricTestRunner::class)
 class SwitchedOffDictionaryTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = ctx.realPrefs()
     private val a by lazy { available("en-US").withId(1) }
+    private val locales = listOf(Locale.GERMANY, Locale.ITALIAN, Locale.FRENCH)
+    private fun dir(locale: Locale) = File(DictionaryInfoUtils.getCacheDirectoryForLocale(locale, ctx)!!)
+    // each language's added main dictionary, the version in use (nothing else selected)
+    private fun dict(locale: Locale) = File(dir(locale), "main_user.dict")
 
     @Before fun setUp() {
         real.edit().clear().commit()
         SubtypeSettings.init(ctx)
+        for (l in locales) { dir(l).deleteRecursively(); dir(l).mkdirs(); dict(l).writeText("x") }
     }
     @After fun tearDown() {
+        for (l in locales) dir(l).deleteRecursively()
         real.edit().clear().commit()
         SubtypeSettings.reloadEnabledSubtypes(ctx)
     }
+
+    private fun blockers(locale: Locale) = dictionaryDeleteBlockers(ctx, locale, dict(locale))
 
     @Test fun `a dictionary only a switched-off keyboard uses can't be deleted, and the message names it switched off`() {
         // German with Italian second, switched off with its set; French, switched off with only its learned pool
@@ -51,10 +63,10 @@ class SwitchedOffDictionaryTest {
             .putString(idKey(2, Settings.PREF_KEY_FONT), "font:Mine.ttf")
             .putString(LearnedKeyboards.PREF_POOLS, """{"k1":5,"k3":6,"k8":7}""").commit() // (k8: an id of no keyboard)
 
-        assertEquals(listOf(german), dictionaryUsers(ctx, Locale.GERMANY, a)) // its main language
-        assertEquals(listOf(german), dictionaryUsers(ctx, Locale.ITALIAN, a)) // its second language
-        assertEquals(listOf(french), dictionaryUsers(ctx, Locale.FRENCH, a)) // a pool entry only
-        val name = dictionaryUserNames(ctx, dictionaryUsers(ctx, Locale.GERMANY, a)).single()
+        assertEquals(listOf(german), blockers(Locale.GERMANY)) // its main language
+        assertEquals(listOf(german), blockers(Locale.ITALIAN)) // its second language
+        assertEquals(listOf(french), blockers(Locale.FRENCH)) // a pool entry only
+        val name = dictionaryUserNames(ctx, blockers(Locale.GERMANY)).single()
         assertEquals(keyboardName(german, ctx) + " (switched off)", name)
         assertEquals(listOf(keyboardName(a, ctx)), dictionaryUserNames(ctx, listOf(a))) // an enabled one as before
     }
@@ -64,7 +76,7 @@ class SwitchedOffDictionaryTest {
         // (German in the added list with neither a set nor a pool: not a switched-off keyboard)
         real.edit().putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a, available("de-DE").withId(2))))
             .putString(LearnedKeyboards.PREF_POOLS, """{"k1":5}""").commit()
-        assertEquals(emptyList(), dictionaryUsers(ctx, Locale.ITALIAN, a))
-        assertEquals(emptyList(), dictionaryUsers(ctx, Locale.GERMANY, a))
+        assertEquals(emptyList(), blockers(Locale.ITALIAN))
+        assertEquals(emptyList(), blockers(Locale.GERMANY))
     }
 }

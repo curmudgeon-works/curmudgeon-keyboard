@@ -260,14 +260,6 @@ internal fun dictionaryDisplayName(context: android.content.Context, name: Strin
     else -> name.removeSuffix("_" + DictionaryInfoUtils.USER_DICTIONARY_SUFFIX)
 }
 
-/** The enabled keyboards with [locale] as a language, but [keyboard] (the one asking: a language row). (No keyboard
- *  asking: the old Dictionaries screen, which nothing opens; there all but one, so a dictionary one keyboard uses can go.) */
-internal fun dictionaryUsers(context: android.content.Context, locale: Locale,
-                             keyboard: helium314.keyboard.latin.settings.SettingsSubtype?): List<helium314.keyboard.latin.settings.SettingsSubtype> {
-    val users = allDictionaryUsers(context, locale) // (the edited keyboard left out by its id)
-    return if (keyboard != null) users.filter { !it.sameKeyboard(keyboard) } else if (users.size < 2) emptyList() else users
-}
-
 /** The keyboards keeping the added dictionary [dict] of [locale] from being deleted (review L3.2): it is the version of
  *  its kind in use ([DictionarySelection.inUse]: selected, or the default name; also the only copy, and an added main
  *  one over the built-in), and every keyboard with the language, the asking one too, on or off, uses it. A version not

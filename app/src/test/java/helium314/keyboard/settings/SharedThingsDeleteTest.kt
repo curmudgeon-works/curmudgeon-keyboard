@@ -18,10 +18,11 @@ import helium314.keyboard.latin.personalization.useKeyboards
 import helium314.keyboard.latin.personalization.word
 import helium314.keyboard.latin.personalization.writeList
 import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.latin.utils.DictionaryInfoUtils
 import helium314.keyboard.latin.utils.RemovedWords
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.realPrefs
-import helium314.keyboard.settings.dialogs.dictionaryUsers
+import helium314.keyboard.settings.dialogs.dictionaryDeleteBlockers
 import org.json.JSONArray
 import helium314.keyboard.poolsJson
 import helium314.keyboard.withId
@@ -130,11 +131,17 @@ class SharedThingsDeleteTest {
         assertNull(readList(ce, "Latn", 6))
     }
 
-    @Test fun `an added dictionary's other users - a second language counts, the asking keyboard doesn't`() {
+    // (through the dialog's gate, dictionaryDeleteBlockers, 20261013_L13: since review L3.2 the asking keyboard counts
+    // too, so a dictionary only it uses stays; before, the old dictionaryUsers, which nothing called any more)
+    @Test fun `an added dictionary's users - a second language counts, the asking keyboard too`() {
         val withEnglish = b.with(ExtraValue.SECONDARY_LOCALES, "en_US")
         useKeyboards(ctx, real, a, withEnglish, c) // (all in the added list, with their ids)
-        assertEquals(listOf(withEnglish), dictionaryUsers(ctx, Locale.US, a))
-        assertEquals(listOf(a), dictionaryUsers(ctx, Locale.US, withEnglish))
-        assertEquals(emptyList(), dictionaryUsers(ctx, Locale.FRENCH, c)) // (only French keyboard: it can go)
+        val dirs = listOf(Locale.US, Locale.FRENCH).associateWith { File(DictionaryInfoUtils.getCacheDirectoryForLocale(it, ctx)!!) }
+        try {
+            // each language's added main dictionary, the version in use
+            val dicts = dirs.mapValues { (_, dir) -> dir.deleteRecursively(); dir.mkdirs(); File(dir, "main_user.dict").apply { writeText("x") } }
+            assertEquals(listOf(a, withEnglish), dictionaryDeleteBlockers(ctx, Locale.US, dicts.getValue(Locale.US)))
+            assertEquals(listOf(c), dictionaryDeleteBlockers(ctx, Locale.FRENCH, dicts.getValue(Locale.FRENCH))) // (only French keyboard: it stays too)
+        } finally { dirs.values.forEach { it.deleteRecursively() } }
     }
 }
