@@ -322,17 +322,19 @@ fun <T: Any?> SearchScreen(
                                     IconButton(
                                         onClick = { showMenu = true }
                                     ) { Icon(painterResource(R.drawable.ic_arrow_left), "menu", Modifier.rotate(-90f)) }
+                                    // (its own window: the screen's keyboard all the same, as in DropDownField)
+                                    val keyboardId = helium314.keyboard.latin.settings.KeyboardScopeContext.idOf(LocalContext.current)
                                     DropdownMenu(
                                         expanded = showMenu,
                                         onDismissRequest = { showMenu = false }
-                                    ) {
+                                    ) { KeyboardScope(keyboardId) {
                                         menu.forEach {
                                             DropdownMenuItem(
                                                 text = { Text(it.first) },
                                                 onClick = { showMenu = false; it.second() }
                                             )
                                         }
-                                    }
+                                    } }
                                 }
                         },
                     )

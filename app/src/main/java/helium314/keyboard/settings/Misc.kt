@@ -157,12 +157,15 @@ fun <T>DropDownField(
                 extraButton()
         }
     }
+    // the menu is its own window, whose context is not the screen's: it edits the screen's keyboard all the same (as
+    // ThreeButtonAlertDialog; review of 3011 I2b, finding 1)
+    val keyboardId = helium314.keyboard.latin.settings.KeyboardScopeContext.idOf(LocalContext.current)
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = { expanded = false },
         // on a screen whose keyboard is the preview the menu must not take the focus, or the keyboard goes away
         properties = PopupProperties(focusable = !LocalKeepKeyboard.current),
-    ) {
+    ) { KeyboardScope(keyboardId) {
         items.forEach {
             DropdownMenuItem(
                 text = { itemContent(it) },
@@ -170,7 +173,7 @@ fun <T>DropDownField(
                 trailingIcon = itemTrailing?.let { trailing -> { trailing(it) } },
             )
         }
-    }
+    } }
 }
 
 @Composable
