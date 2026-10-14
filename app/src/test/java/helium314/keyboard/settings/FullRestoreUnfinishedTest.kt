@@ -88,6 +88,14 @@ class FullRestoreUnfinishedTest {
         FullRestore.afterStep = { if (it == step) throw IllegalStateException("injected at $step") }
     }
 
+    /** The full restore of [zip] as the restore dialog runs it, its follow-up too; @return its error, null for none. */
+    private fun fullRestoreJob(): String? {
+        var error: String? = null
+        assertTrue(runRestore(ctx, { error = it }, R.string.backup_restored, 1, fullRestore = true) { restoreEverythingFrom(ctx, zip) })
+        assertTrue(idleUntil { !BackupRestoreJob.isRunning }, "the job never ended")
+        return error
+    }
+
     @Test fun `a failure right after the wipe leaves the flag set, a full restore that finishes clears it`() {
         backup()
         failAt(null)
@@ -95,7 +103,10 @@ class FullRestoreUnfinishedTest {
         assertFalse(File(ctx.filesDir, "custom_background_image").exists(), "the wipe didn't run")
         assertTrue(FullRestore.isUnfinished(real), "no flag after a failure past the wipe")
         FullRestore.afterStep = null
+        // (the restore alone, without its follow-up, hasn't finished: owner 2026-10-12 "yes", the flag goes after it)
         restoreEverythingFrom(ctx, zip)
+        assertTrue(FullRestore.isUnfinished(real), "cleared before the follow-up")
+        assertEquals(null, fullRestoreJob())
         assertFalse(real.contains(FullRestore.PREF_UNFINISHED), "the flag stayed after a full restore that finished")
         assertEquals(222, real.all[Settings.PREF_KEY_LONGPRESS_TIMEOUT])
     }
@@ -111,17 +122,33 @@ class FullRestoreUnfinishedTest {
     @Test fun `through the restore's job too - its follow-up keeps the flag, the next full restore clears it`() {
         backup()
         failAt("blacklists/en-US.txt")
-        var error: String? = null
-        assertTrue(runRestore(ctx, { error = it }, R.string.backup_restored, 1) { restoreEverythingFrom(ctx, zip) })
-        assertTrue(idleUntil { !BackupRestoreJob.isRunning }, "the job never ended")
-        assertEquals("rinjected at blacklists/en-US.txt", error)
+        assertEquals("rinjected at blacklists/en-US.txt", fullRestoreJob())
         assertTrue(FullRestore.isUnfinished(real))
         FullRestore.afterStep = null
-        error = null
-        assertTrue(runRestore(ctx, { error = it }, R.string.backup_restored, 1) { restoreEverythingFrom(ctx, zip) })
+        assertEquals(null, fullRestoreJob())
+        assertFalse(FullRestore.isUnfinished(real))
+    }
+
+    @Test fun `a failure in the follow-up leaves the flag set`() {
+        backup()
+        failAt(FullRestore.FOLLOW_UP)
+        // (a follow-up failure is only logged, as before: the restore itself finished)
+        assertEquals(null, fullRestoreJob())
+        assertEquals(222, real.all[Settings.PREF_KEY_LONGPRESS_TIMEOUT], "not restored")
+        assertTrue(FullRestore.isUnfinished(real), "cleared although the follow-up failed")
+        FullRestore.afterStep = null
+        assertEquals(null, fullRestoreJob())
+        assertFalse(FullRestore.isUnfinished(real))
+    }
+
+    @Test fun `a restore that isn't the full one never clears the flag`() {
+        backup()
+        FullRestore.mark(real, true)
+        var error: String? = null
+        assertTrue(runRestore(ctx, { error = it }, R.string.backup_restored, 1) { })
         assertTrue(idleUntil { !BackupRestoreJob.isRunning }, "the job never ended")
         assertEquals(null, error)
-        assertFalse(FullRestore.isUnfinished(real))
+        assertTrue(FullRestore.isUnfinished(real))
     }
 
     @Test fun `a check that fails before the wipe leaves the flag as it was`() {
@@ -144,7 +171,7 @@ class FullRestoreUnfinishedTest {
         // a backup that has it all the same (by hand) doesn't bring it
         real.edit().remove(FullRestore.PREF_UNFINISHED).commit()
         backup(mapOf(FullRestore.PREF_UNFINISHED to true))
-        restoreEverythingFrom(ctx, zip)
+        assertEquals(null, fullRestoreJob())
         assertFalse(real.contains(FullRestore.PREF_UNFINISHED), "the backup brought the flag")
     }
 }

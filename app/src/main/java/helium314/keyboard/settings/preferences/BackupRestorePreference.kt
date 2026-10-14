@@ -174,12 +174,14 @@ internal fun restoreEntry(onError: (String) -> Unit): () -> Unit {
 
 /**
  * A full restore that failed after its wipe (owner 2026-10-12: "Yes add this"): set right before the wipe, kept through
- * it, cleared once a full restore finished ([restoreEverything]); while set, the main settings screen says so
+ * it, cleared once a full restore and its follow-up finished ([runRestore]); while set, the main settings screen says so
  * ([UnfinishedRestoreNote]), across app restarts. App-wide (no keyboard's: KeyboardProfiles), never backed up or
  * restored ([notBackedUpKeys]).
  */
 internal object FullRestore {
     const val PREF_UNFINISHED = "full_restore_unfinished"
+    /** [afterStep]'s step at the end of runRestore's follow-up. */
+    const val FOLLOW_UP = "(follow-up)"
 
     fun isUnfinished(real: SharedPreferences) = real.getBoolean(PREF_UNFINISHED, false)
 
@@ -187,7 +189,7 @@ internal object FullRestore {
         real.edit(commit = true) { if (unfinished) putBoolean(PREF_UNFINISHED, true) else remove(PREF_UNFINISHED) }
 
     /** Called right after the wipe (null) and after each entry restored (its name): a failure thrown here is one after
-     *  the wipe (tests). */
+     *  the wipe (tests); with [FOLLOW_UP] at the end of runRestore's follow-up. */
     @Volatile internal var afterStep: ((String?) -> Unit)? = null
 }
 
@@ -577,7 +579,7 @@ private fun RestoreChoiceDialog(pending: PendingRestore, plan: RestorePlan, onDi
             content = { Text(stringResource(R.string.saving_full_everything)) },
             confirmButtonText = stringResource(R.string.restore_delete_and_restore),
             onConfirmed = {
-                started = runRestore(ctx, onError, R.string.backup_restored, restoreSteps(pending)) {
+                started = runRestore(ctx, onError, R.string.backup_restored, restoreSteps(pending), fullRestore = true) {
                     // (checked whole against what this dialog showed before anything is deleted, owner 2026-10-12)
                     try { restoreEverything(ctx, pending.file, promised = pending) } finally { pending.file.delete() }
                 }
@@ -859,7 +861,7 @@ private fun restoreSteps(pending: PendingRestore) = pending.entries.size + 1
  * restore). False when a backup or restore is running already. [onError] is called on the main thread.
  */
 internal fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: Int, steps: Int = 0, note: () -> String? = { null },
-                        work: () -> Unit): Boolean {
+                        fullRestore: Boolean = false, work: () -> Unit): Boolean {
     if (!BackupRestoreJob.start(R.string.restore_running, steps + 1)) return false
     val app = ctx.applicationContext
     ExecutorUtils.getBackgroundExecutor(ExecutorUtils.KEYBOARD).execute {
@@ -878,12 +880,22 @@ internal fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: In
             Log.w("AdvancedScreen", "error during restore", t)
         }
         // (after a failure too, as before: what was restored by then is followed up)
+        var followedUp = false
         if (!unchanged) try {
             helium314.keyboard.latin.gesture.GestureStats.reload() // (its cached rows would come back over the restored ones)
             restoreFollowUp(ctx)
             transferOldPinnedClips(ctx)
+            FullRestore.afterStep?.invoke(FullRestore.FOLLOW_UP)
+            followedUp = true
         } catch (t: Throwable) {
             Log.w("AdvancedScreen", "error after restore", t)
+        }
+        // [fullRestore] finished, its follow-up too: the main screen's note goes (owner 2026-10-12: "Yes add this"; and
+        // "yes": only after the follow-up, which can fail too)
+        if (fullRestore && failure == null && followedUp) try {
+            FullRestore.mark(ctx.realPrefs(), false)
+        } catch (t: Throwable) {
+            Log.w("AdvancedScreen", "error clearing the full restore's flag", t)
         }
         BackupRestoreJob.step() // (the settings)
         BackupRestoreJob.post {
@@ -945,8 +957,7 @@ private fun restoreEverything(ctx: Context, file: File, promised: PendingRestore
     // (a backup from before the keyboards had ids: ids first, so the learned words' update finds each keyboard by its own)
     helium314.keyboard.latin.settings.KeyboardIdUpgrade.upgrade(ctx)
     LearnedKeyboards.updateOnce(ctx)
-    // the full restore finished: the main screen's note goes (owner 2026-10-12: "Yes add this")
-    FullRestore.mark(ctx.realPrefs(), false)
+    // (the flag of a full restore that didn't finish stays: runRestore clears it once its follow-up finished too)
 }
 
 /** [promised]: what the restore dialog showed of [file] (null: no dialog, tests), checked with the rest before the wipe
