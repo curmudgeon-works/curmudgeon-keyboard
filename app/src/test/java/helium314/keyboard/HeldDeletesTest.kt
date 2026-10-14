@@ -170,4 +170,20 @@ class HeldDeletesTest {
         assertEquals("not really a font", font.readText(), "the held font back")
         assertFalse(dir.exists(), "the folder goes after")
     }
+
+    // round-5 review 20261013_L17 (owner: "Yes, drop the list"): the held ones are the files in the held folders, no
+    // list of them. Fail before: the process died after the move and before the list was written (here: the list
+    // gone), the snapshot came back without the font, and the folder went with the font's file in it
+    @Test fun `a held font comes back after a crash from its folder alone`() {
+        AppearanceDraft.of(ctx)
+        FontLibrary.delete(ctx, "Mine.ttf")
+        assertFalse(font.exists())
+        val dir = File(ctx.filesDir, "appearance_draft")
+        File(dir, "held_deletes.json").delete() // (no list, or one the move came before)
+        AppearanceDraft.forgetActiveForTest() // the process dies
+        AppearanceDraft.recoverAfterCrash(ctx)
+        assertEquals("not really a font", font.readText(), "the held font back")
+        assertEquals(FontLibrary.PREFIX + "Mine.ttf", ctx.prefs().getString(Settings.PREF_KEY_FONT, null))
+        assertFalse(dir.exists())
+    }
 }

@@ -41,11 +41,12 @@ class AppearanceDraft private constructor(
     /** A copy of a custom file, with the size and time the live one had (enough to tell a change, no reading). */
     class Saved(val copy: File, val length: Long, val modified: Long)
 
-    // fonts and pictures of "Choose a picture" deleted while the screen is open ("font:<name>", "picture:<name>"): done
-    // for good when the changes are kept, undone with them (owner 2026-10-10: "so discard should bring the font back").
-    // Until then a deleted font's or picture's file waits in the snapshot folder (out of its list), and only the edited
-    // keyboard has let go of a font; what a picture's delete did to the saved themes is in the snapshot's prefs.
-    private val held = LinkedHashSet<String>()
+    // fonts and pictures of "Choose a picture" deleted while the screen is open: done for good when the changes are
+    // kept, undone with them (owner 2026-10-10: "so discard should bring the font back"). Until then a deleted font's or
+    // picture's file waits in the snapshot folder (held_fonts, held_pictures; out of its list), and only the edited
+    // keyboard has let go of a font; what a picture's delete did to the saved themes is in the snapshot's prefs. The
+    // held ones are the files in those folders, no list of them (round-5 review 20261013_L17: a list written after the
+    // move could miss one, and that file went with the folder)
 
     /** Font [name] deleted with the screen open: its file moves into the snapshot folder (out of the font list). False
      *  when it couldn't be moved: then it's deleted at once, as without the screen. */
@@ -53,8 +54,6 @@ class AppearanceDraft private constructor(
         val target = File(File(dir, HELD_FONTS), name)
         target.parentFile?.mkdirs()
         if (!File(helium314.keyboard.keyboard.FontLibrary.dir(ctx), name).renameTo(target)) return false
-        held += FONT + name
-        writeHeld(dir, held)
         version.intValue++
         return true
     }
@@ -66,8 +65,6 @@ class AppearanceDraft private constructor(
         val target = File(File(dir, HELD_PICTURES), picture.name)
         target.parentFile?.mkdirs()
         if (!picture.renameTo(target)) return false
-        held += PICTURE + picture.name
-        writeHeld(dir, held)
         version.intValue++
         return true
     }
@@ -105,20 +102,22 @@ class AppearanceDraft private constructor(
     /** The fonts added to the font list since the screen opened (file names); one deleted (held) and added again
      *  under its name too. Appearance's Discard removes them, but one something outside the edit uses (review
      *  2026-10-12 B5); leaving the app, or the undo after a crash, keeps them, like the palette editor's saves. */
-    fun addedFonts(ctx: Context): List<String> = added(fontsAtStart, helium314.keyboard.keyboard.FontLibrary.dir(ctx), FONT)
+    fun addedFonts(ctx: Context): List<String> = added(fontsAtStart, helium314.keyboard.keyboard.FontLibrary.dir(ctx), HELD_FONTS)
 
     /** The pictures added to the list of "Choose a picture" since the screen opened (file names), as [addedFonts]. */
-    fun addedPictures(ctx: Context): List<String> = added(picturesAtStart, helium314.keyboard.latin.common.PictureLibrary.dir(ctx), PICTURE)
+    fun addedPictures(ctx: Context): List<String> = added(picturesAtStart, helium314.keyboard.latin.common.PictureLibrary.dir(ctx), HELD_PICTURES)
 
-    private fun added(atStart: Set<String>?, folder: File, kind: String): List<String> {
+    // (one in the list under the name of a held file: deleted and added again)
+    private fun added(atStart: Set<String>?, folder: File, heldFolder: String): List<String> {
         atStart ?: return emptyList()
-        return libraryNames(folder).filter { it !in atStart || (kind + it) in held }
+        val held = heldNames(dir, heldFolder)
+        return libraryNames(folder).filter { it !in atStart || it in held }
     }
 
     /** True when a preference or file in the snapshot's scope differs from it, something was deleted, or a font or
      *  picture was added to its list (B5). */
     fun hasChanges(ctx: Context): Boolean {
-        if (held.isNotEmpty()) return true
+        if (heldNames(dir, HELD_FONTS).isNotEmpty() || heldNames(dir, HELD_PICTURES).isNotEmpty()) return true
         if (addedFonts(ctx).isNotEmpty() || addedPictures(ctx).isNotEmpty()) return true
         if (reachedChanged(ctx)) return true
         if (changedKeys(ctx).isNotEmpty()) return true
@@ -172,7 +171,7 @@ class AppearanceDraft private constructor(
             // (crash-safe: a put-back cut off leaves the live file as it was, B4w.3)
             else { helium314.keyboard.latin.utils.AtomicFiles.copy(saved.copy, live); live.setLastModified(saved.modified) }
         }
-        putHeldBack(ctx, dir, held) // the deleted fonts and pictures come back (the themes naming them: in the snapshot's prefs)
+        putHeldBack(ctx, dir) // the deleted fonts and pictures come back (the themes naming them: in the snapshot's prefs)
         val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
         val now = reachedNow(ctx)
         if (now != reached) real.edit().apply {
@@ -184,7 +183,7 @@ class AppearanceDraft private constructor(
         if (keep) { writes.writeTo(real); AppearanceLooks.reload(ctx) }
         // the fonts and pictures added: out of their lists, once the edit's choices and themes are back as they were;
         // one still named then is used outside the edit and stays. A held one whose name an addition took comes back now
-        if (removeUnused(ctx, fontsAdded, picturesAdded)) { putHeldBack(ctx, dir, held); AppearanceLooks.reload(ctx) }
+        if (removeUnused(ctx, fontsAdded, picturesAdded)) { putHeldBack(ctx, dir); AppearanceLooks.reload(ctx) }
         discard()
     }
 
@@ -218,7 +217,7 @@ class AppearanceDraft private constructor(
      *  holds the list and every choice: owner 2026-10-11, palettes are one app-wide list; an old "palette:" entry of a
      *  snapshot from before means nothing.) */
     fun accept(ctx: Context) {
-        for (entry in held) if (entry.startsWith(FONT)) helium314.keyboard.keyboard.FontLibrary.forgetEverywhere(ctx, entry.removePrefix(FONT))
+        for (name in heldNames(dir, HELD_FONTS)) helium314.keyboard.keyboard.FontLibrary.forgetEverywhere(ctx, name)
         discard() // (the held font and picture files go with the folder: a picture leaving the list is only its file going)
     }
 
@@ -257,38 +256,33 @@ class AppearanceDraft private constructor(
         private fun libraryNames(folder: File): List<String> =
             folder.listFiles()?.filter { it.isFile }?.map { it.name }?.sorted() ?: emptyList()
         private const val PREFS_FILE = "draft_prefs.json" // written last: its presence means a complete snapshot
-        private const val HELD_FILE = "held_deletes.json"
         private const val HELD_FONTS = "held_fonts"
         private const val HELD_PICTURES = "held_pictures"
         private const val SUB_SAVES_FILE = "sub_screen_saves.json"
-        private const val FONT = "font:"
-        private const val PICTURE = "picture:"
         private val LABELS = listOf(CustomLabels.Kind.THEME)
-
-        private fun writeHeld(dir: File, held: Collection<String>) =
-            writeAtomically(File(dir, HELD_FILE), org.json.JSONArray(held.toList()).toString())
 
         /** [text] into [file] through a temporary file renamed over it: a crash mid-write leaves the old file whole, never
          *  half a list (owner 2026-10-12 B4: a half-written held list lost the held fonts and pictures; shared since
          *  B4w.2, [helium314.keyboard.latin.utils.AtomicFiles]). */
         private fun writeAtomically(file: File, text: String) = helium314.keyboard.latin.utils.AtomicFiles.write(file, text)
 
-        private fun readHeld(dir: File): List<String> =
-            runCatching { org.json.JSONArray(File(dir, HELD_FILE).readText()) }.getOrNull()
-                ?.let { a -> List(a.length()) { a.getString(it) } } ?: emptyList()
+        /** The names of the held files in [folder] of the snapshot folder [dir] (HELD_FONTS, HELD_PICTURES). */
+        private fun heldNames(dir: File, folder: String): List<String> =
+            File(dir, folder).listFiles()?.filter { it.isFile }?.map { it.name }?.sorted() ?: emptyList()
 
-        /** The held fonts and pictures move back into their lists; one whose name is taken there again stays out. */
-        private fun putHeldBack(ctx: Context, dir: File, held: Collection<String>) {
-            for (entry in held) {
-                val (folder, live) = when {
-                    entry.startsWith(FONT) -> HELD_FONTS to File(helium314.keyboard.keyboard.FontLibrary.dir(ctx), entry.removePrefix(FONT))
-                    entry.startsWith(PICTURE) -> HELD_PICTURES to helium314.keyboard.latin.common.PictureLibrary.file(ctx, entry.removePrefix(PICTURE))
-                    else -> continue
-                }
-                if (live.exists()) continue
-                live.parentFile?.mkdirs()
-                File(File(dir, folder), live.name).renameTo(live)
-            }
+        /** The held fonts and pictures (every file in the held folders) move back into their lists; one whose name is
+         *  taken there again stays out. */
+        private fun putHeldBack(ctx: Context, dir: File) {
+            for (name in heldNames(dir, HELD_FONTS))
+                putBack(File(File(dir, HELD_FONTS), name), File(helium314.keyboard.keyboard.FontLibrary.dir(ctx), name))
+            for (name in heldNames(dir, HELD_PICTURES))
+                putBack(File(File(dir, HELD_PICTURES), name), helium314.keyboard.latin.common.PictureLibrary.file(ctx, name))
+        }
+
+        private fun putBack(held: File, live: File) {
+            if (live.exists()) return
+            live.parentFile?.mkdirs()
+            held.renameTo(live)
         }
 
         /** The draft of the open Appearance screen; it outlives the screen's composition (rotation, search). */
@@ -384,7 +378,7 @@ class AppearanceDraft private constructor(
             val json = runCatching { JSONObject(File(dir, PREFS_FILE).readText()) }.getOrNull()
             // (a snapshot that can't be read: the held fonts and pictures go back to their lists first, then the folder;
             // owner 2026-10-12 B4: before, the folder went first, and the held files with it)
-            if (json == null) { runCatching { putHeldBack(ctx, dir, readHeld(dir)) }; dir.deleteRecursively(); return }
+            if (json == null) { runCatching { putHeldBack(ctx, dir) }; dir.deleteRecursively(); return }
             runCatching {
                 val p = json.getJSONObject("prefs")
                 val prefs = p.keys().asSequence().associateWith { AppearanceLooks.fromJson(p.getJSONObject(it)) }
@@ -402,12 +396,11 @@ class AppearanceDraft private constructor(
                 // (what the palette editor saved before the crash stays, as when the app is left)
                 val writes = SubScreenWrites.load(dir, null, ::recorded)
                 val draft = AppearanceDraft(prefs, files, dir, json.optString("set", KeyboardProfiles.SHARED), reached, labels, writes)
-                // (the deletes made before the crash: undone too, their fonts and pictures moved back)
-                draft.held += readHeld(dir)
+                // (the deletes made before the crash: undone too, their fonts and pictures moved back, [reject])
                 draft.reject(ctx, keepSubScreenSaves = true)
             }.onFailure {
                 // (a snapshot that can't be read: the held files still go back to their lists before the folder goes)
-                runCatching { putHeldBack(ctx, dir, readHeld(dir)) }
+                runCatching { putHeldBack(ctx, dir) }
                 dir.deleteRecursively()
             }
         }
