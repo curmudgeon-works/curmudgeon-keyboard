@@ -7,9 +7,9 @@ package helium314.keyboard.latin.utils
 
 import android.content.Context
 import android.text.TextUtils
+import androidx.annotation.VisibleForTesting
 import com.android.inputmethod.latin.utils.BinaryDictionaryUtils
 import helium314.keyboard.latin.dictionary.Dictionary
-import helium314.keyboard.latin.common.FileUtils
 import helium314.keyboard.latin.common.LocaleUtils.constructLocale
 import helium314.keyboard.latin.common.loopOverCodePoints
 import helium314.keyboard.latin.define.DecoderSpecificConstants
@@ -18,6 +18,7 @@ import helium314.keyboard.latin.makedict.UnsupportedFormatException
 import helium314.keyboard.latin.settings.SpacingAndPunctuations
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
 import java.util.Locale
 
 /** encapsulates the logic for the Latin-IME side of dictionary information management */
@@ -137,21 +138,34 @@ object DictionaryInfoUtils {
         return dictionaryFileName.substringAfter("_").substringBefore(".").constructLocale()
     }
 
+    private val extractLock = Any()
+
+    /**
+     * Copies the bundled dictionary into the language's folder. 2026-10-14: typing and the swipe word list both
+     * extract on a fresh start; the copy went straight onto the .dict, so the other one could read a half-written
+     * file (a swipe list of a fraction of the words, saved and kept). Now the copy is written through [AtomicFiles]
+     * (the .dict appears only when complete), and one lock makes the second caller wait and then use the finished file.
+     */
     // actually we could extract assets dicts to unprotected storage
-    fun extractAssetsDictionary(dictionaryFileName: String, locale: Locale, context: Context): File? {
-        val cacheDir = getCacheDirectoryForLocale(locale, context) ?: return null
-        val targetFile = File(cacheDir, "${dictionaryFileName.substringBefore("_")}.dict")
-        try {
-            FileUtils.copyStreamToNewFile(
-                context.assets.open(ASSETS_DICTIONARY_FOLDER + File.separator + dictionaryFileName),
-                targetFile
-            )
-        } catch (e: IOException) {
-            Log.e(TAG, "Could not extract assets dictionary $dictionaryFileName", e)
-            return null
+    fun extractAssetsDictionary(dictionaryFileName: String, locale: Locale, context: Context): File? =
+        extractAssetsDictionary(dictionaryFileName, locale, context) {
+            context.assets.open(ASSETS_DICTIONARY_FOLDER + File.separator + dictionaryFileName)
         }
-        return targetFile
-    }
+
+    @VisibleForTesting
+    fun extractAssetsDictionary(dictionaryFileName: String, locale: Locale, context: Context, open: () -> InputStream): File? =
+        synchronized(extractLock) {
+            val cacheDir = getCacheDirectoryForLocale(locale, context) ?: return null
+            val targetFile = File(cacheDir, "${dictionaryFileName.substringBefore("_")}.dict")
+            if (targetFile.isFile) return targetFile // the other caller extracted it while this one waited
+            try {
+                AtomicFiles.write(targetFile) { out -> open().use { it.copyTo(out) } }
+            } catch (e: IOException) {
+                Log.e(TAG, "Could not extract assets dictionary $dictionaryFileName", e)
+                return null
+            }
+            targetFile
+        }
 
     fun getAssetsDictionaryList(context: Context): Array<String>? =
         runCatching { context.assets.list(ASSETS_DICTIONARY_FOLDER) }.getOrNull()
