@@ -40,6 +40,8 @@ import helium314.keyboard.settings.SettingsActivity
  */
 @Composable
 fun FineTuneLearningScreen(onClickBack: () -> Unit) {
+    // (a restore running: no snapshot until it ended, owner 2026-10-12 A5)
+    if (helium314.keyboard.settings.WaitingForRestore(stringResource(R.string.fine_tune_learning_screen), onClickBack)) return
     val ctx = LocalContext.current
     val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
     if ((b?.value ?: 0) < 0)

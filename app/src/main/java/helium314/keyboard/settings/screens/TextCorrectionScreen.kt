@@ -62,6 +62,8 @@ import helium314.keyboard.settings.preferences.TextInputPreference
 fun TextCorrectionScreen(
     onClickBack: () -> Unit,
 ) {
+    // (a restore running: no snapshot until it ended, owner 2026-10-12 A5)
+    if (helium314.keyboard.settings.WaitingForRestore(stringResource(R.string.settings_screen_correction), onClickBack)) return
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
     val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()

@@ -61,6 +61,8 @@ internal val swipeTuningKeys = listOf(
  */
 @Composable
 fun LearningSwipingScreen(onClickBack: () -> Unit) {
+    // (a restore running: no snapshot until it ended, owner 2026-10-12 A5)
+    if (helium314.keyboard.settings.WaitingForRestore(stringResource(R.string.learning_swiping_screen), onClickBack)) return
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
     val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()

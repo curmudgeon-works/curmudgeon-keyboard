@@ -360,9 +360,16 @@ internal object BackupRestoreJob {
 
     val isRunning get() = running.get()
 
-    /** Claims the job (false when one is running) and shows the dialog; called on the main thread. */
-    fun start(title: Int, total: Int): Boolean {
+    /** A restore is running, also after its dialog closed (observable; set on the main thread): the screens that take a
+     *  snapshot when they open wait for it to end ([helium314.keyboard.settings.WaitingForRestore], owner 2026-10-12 A5). */
+    var restoring by mutableStateOf(false)
+        private set
+
+    /** Claims the job (false when one is running) and shows the dialog; called on the main thread. [restore]: it is a
+     *  restore ([restoring]). */
+    fun start(title: Int, total: Int, restore: Boolean = false): Boolean {
         if (!running.compareAndSet(false, true)) return false
+        restoring = restore
         this.title = title
         this.total = total.coerceAtLeast(1)
         done.set(0)
@@ -400,6 +407,7 @@ internal object BackupRestoreJob {
     /** The job ended: the dialog closes and another job may start; called on the main thread. */
     fun finish() {
         progress = null
+        restoring = false
         running.set(false)
     }
 }
@@ -978,7 +986,7 @@ private fun restoreSteps(pending: PendingRestore) = pending.entries.size + 1
  */
 internal fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: Int, steps: Int = 0, note: () -> String? = { null },
                         fullRestore: Boolean = false, noteTitle: Int? = null, work: () -> Unit): Boolean {
-    if (!BackupRestoreJob.start(R.string.restore_running, steps + 1)) return false
+    if (!BackupRestoreJob.start(R.string.restore_running, steps + 1, restore = true)) return false
     val app = ctx.applicationContext
     ExecutorUtils.getBackgroundExecutor(ExecutorUtils.KEYBOARD).execute {
         var failure: String? = null

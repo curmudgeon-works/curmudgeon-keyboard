@@ -155,6 +155,8 @@ fun SubtypeScreen(
     initialSubtype: SettingsSubtype,
     onClickBack: () -> Unit,
 ) {
+    // (a restore running: no snapshot until it ended, owner 2026-10-12 A5)
+    if (helium314.keyboard.settings.WaitingForRestore(stringResource(R.string.settings_screen_preferences), onClickBack)) return
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
     val b = (LocalContext.current.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()

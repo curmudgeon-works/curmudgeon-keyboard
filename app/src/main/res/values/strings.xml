@@ -347,6 +347,8 @@
     <string name="backup_running">Backing up…</string>
     <!-- Above the progress bar while a backup is restored -->
     <string name="restore_running">Restoring…</string>
+    <!-- Instead of Appearance, Layout & Typing and the other screens with Save / Discard, opened while a restore still runs; the screen opens once it ended -->
+    <string name="restore_in_progress">Restore in progress…</string>
     <!-- While a picked backup is read for the restore dialog (and while "What to merge" is worked out); Cancel closes it -->
     <string name="restore_reading">Reading backup…</string>
     <!-- Restore dialog: one checklist, mirroring the factory reset one -->

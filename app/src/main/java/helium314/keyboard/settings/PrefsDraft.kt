@@ -4,8 +4,10 @@ package helium314.keyboard.settings
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -16,6 +18,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Modifier
 import androidx.core.content.edit
 import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.latin.R
@@ -25,6 +29,7 @@ import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.settings.dialogs.DiscardChangesDialog
 import helium314.keyboard.settings.dialogs.SaveChangesDialog
 import helium314.keyboard.settings.dialogs.UnsavedChangesDialog
+import helium314.keyboard.settings.preferences.BackupRestoreJob
 import org.json.JSONObject
 import java.io.File
 
@@ -160,4 +165,19 @@ fun rememberPrefsDraft(name: String, keys: Collection<String>, onClickBack: () -
             )
         },
     )
+}
+
+/**
+ * While a restore runs (it goes on after its dialog closed), a screen that takes a snapshot when it opens (Appearance,
+ * Layout & Typing, the [rememberPrefsDraft] screens) shows "Restore in progress…" under its [title] instead, and opens,
+ * its snapshot taken then, once the restore ended (owner 2026-10-12 A5: a snapshot taken mid-restore put a half-restored
+ * state back on Discard). True: the waiting screen shows; the caller shows nothing else and takes no snapshot.
+ */
+@Composable
+fun WaitingForRestore(title: String, onClickBack: () -> Unit): Boolean {
+    if (!BackupRestoreJob.restoring) return false
+    SearchSettingsScreen(onClickBack = onClickBack, title = title, settings = emptyList()) {
+        Text(stringResource(R.string.restore_in_progress), modifier = Modifier.padding(16.dp))
+    }
+    return true
 }

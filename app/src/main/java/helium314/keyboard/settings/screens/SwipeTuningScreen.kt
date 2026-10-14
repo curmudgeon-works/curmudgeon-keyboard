@@ -76,6 +76,8 @@ internal fun GroupTitle(titleId: Int) = Column {
  */
 @Composable
 fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
+    // (a restore running: no snapshot until it ended, owner 2026-10-12 A5)
+    if (helium314.keyboard.settings.WaitingForRestore(stringResource(R.string.swipe_screen), onClickBack)) return
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
     val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
