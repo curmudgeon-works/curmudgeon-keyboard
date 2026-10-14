@@ -235,7 +235,9 @@ class LayoutDraft private constructor(
             dir?.takeIf { it.isDirectory }?.walkTopDown()?.filter { it.isFile }
                 ?.associate { it.relativeTo(dir).path to (it.length() to it.lastModified()) } ?: emptyMap()
 
-        private fun dir(ctx: Context) = File(ctx.filesDir, "layout_draft")
+        // in the device-protected storage, with the layouts it copies (round-6 review 20261013_M1_2, owner 2026-10-13, as
+        // AppearanceDraft's: one storage for the draft and what it holds; no move of an old folder: pre-launch)
+        private fun dir(ctx: Context) = File(DeviceProtectedUtils.getFilesDir(ctx), "layout_draft")
         private const val PREFS_FILE = "draft_prefs.json" // written last: its presence means a complete snapshot
         private const val SUB_SAVES_FILE = "sub_screen_saves.json"
         private val LABELS = listOf(CustomLabels.Kind.LAYOUT, CustomLabels.Kind.POPUPS)

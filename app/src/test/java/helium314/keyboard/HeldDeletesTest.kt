@@ -161,7 +161,7 @@ class HeldDeletesTest {
         assertTrue(AppearanceLooks.deleteFromList(ctx, picture, false))
         assertTrue(AppearanceDraft.activeOrNull()!!.holdFontDelete(ctx, "Mine.ttf"))
         assertFalse(picture.exists()); assertFalse(font.exists())
-        val dir = File(ctx.filesDir, "appearance_draft")
+        val dir = File(DeviceProtectedUtils.getFilesDir(ctx), "appearance_draft")
         assertTrue(dir.listFiles()!!.none { it.name.endsWith(".tmp") }, "the lists written through a temporary file, none left")
         AppearanceDraft.forgetActiveForTest() // the process dies
         File(dir, "draft_prefs.json").writeText("{\"set\": ") // (cut off mid-write)
@@ -178,12 +178,37 @@ class HeldDeletesTest {
         AppearanceDraft.of(ctx)
         FontLibrary.delete(ctx, "Mine.ttf")
         assertFalse(font.exists())
-        val dir = File(ctx.filesDir, "appearance_draft")
+        val dir = File(DeviceProtectedUtils.getFilesDir(ctx), "appearance_draft")
         File(dir, "held_deletes.json").delete() // (no list, or one the move came before)
         AppearanceDraft.forgetActiveForTest() // the process dies
         AppearanceDraft.recoverAfterCrash(ctx)
         assertEquals("not really a font", font.readText(), "the held font back")
         assertEquals(FontLibrary.PREFIX + "Mine.ttf", ctx.prefs().getString(Settings.PREF_KEY_FONT, null))
         assertFalse(dir.exists())
+    }
+
+    // round-6 review 20261013_M1_2 (owner 2026-10-13): the snapshot folder is in the device-protected storage, with the
+    // font and picture lists, so a held delete is a rename within one storage (on an encrypted device a rename between
+    // the two storages is refused, and the file was deleted at once). Fail before: the folder was in the other storage
+    @Test fun `a held delete stays in the storage of the font and picture lists, and Discard puts it back`() {
+        val de = DeviceProtectedUtils.getFilesDir(ctx)
+        assertNotEquals(ctx.filesDir.absoluteFile, de.absoluteFile) // (two storages here too, as on a device)
+        val picture = pictureInATheme()
+        AppearanceDraft.of(ctx) // the Appearance screen opens
+        assertTrue(AppearanceLooks.deleteFromList(ctx, picture, false))
+        FontLibrary.delete(ctx, "Mine.ttf")
+        val draftDir = File(de, "appearance_draft")
+        val heldFont = File(draftDir, "held_fonts${File.separator}Mine.ttf")
+        val heldPicture = File(draftDir, "held_pictures${File.separator}${picture.name}")
+        assertEquals("not really a font", heldFont.readText(), "the font held: moved, not deleted")
+        assertEquals("sunset", heldPicture.readText(), "the picture held: moved, not deleted")
+        assertFalse(File(ctx.filesDir, "appearance_draft").exists(), "a snapshot folder in the other storage")
+        // the lists and the snapshot folder: one storage root
+        for (dir in listOf(FontLibrary.dir(ctx), PictureLibrary.dir(ctx), draftDir))
+            assertTrue(dir.absolutePath.startsWith(de.absolutePath + File.separator), "$dir")
+        AppearanceDraft.rejectOpen(ctx) // the cross, or leaving the app
+        assertEquals("not really a font", font.readText(), "the font back in its list")
+        assertEquals("sunset", picture.readText(), "the picture back in its list")
+        assertFalse(draftDir.exists())
     }
 }

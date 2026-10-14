@@ -24,7 +24,7 @@ class LayoutDraftRecoveryTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
     private val layouts get() = File(DeviceProtectedUtils.getFilesDir(ctx), "layouts")
-    private val draftDir get() = File(ctx.filesDir, "layout_draft")
+    private val draftDir get() = File(DeviceProtectedUtils.getFilesDir(ctx), "layout_draft")
 
     @Before fun setUp() {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
@@ -60,7 +60,7 @@ class LayoutDraftRecoveryTest {
         val draft = LayoutDraft.of(ctx, "en_US:") // Layout & Typing opens
         deleted.delete() // (deleted on the screen)
         val stuck = listOf(File(draftDir, "layouts${File.separator}number_row"),
-            File(ctx.filesDir, "layout_draft.finished${File.separator}layouts${File.separator}number_row"))
+            File(DeviceProtectedUtils.getFilesDir(ctx), "layout_draft.finished${File.separator}layouts${File.separator}number_row"))
         stuck[0].setWritable(false) // (its file can't be deleted: the delete stops partway)
         try {
             draft.accept() // Save
@@ -68,6 +68,6 @@ class LayoutDraftRecoveryTest {
         LayoutDraft.recoverAfterCrash(ctx) // the next app start
         assertFalse(deleted.exists(), "the layout deleted and saved came back")
         assertFalse(draftDir.exists())
-        assertFalse(File(ctx.filesDir, "layout_draft.finished").exists(), "the finished folder is left")
+        assertFalse(File(DeviceProtectedUtils.getFilesDir(ctx), "layout_draft.finished").exists(), "the finished folder is left")
     }
 }

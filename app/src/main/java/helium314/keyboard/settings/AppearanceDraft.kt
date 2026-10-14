@@ -250,7 +250,10 @@ class AppearanceDraft private constructor(
             return KeyboardProfiles.pictureFiles(ctx, id)
         }
 
-        private fun dir(ctx: Context) = File(ctx.filesDir, "appearance_draft")
+        // in the device-protected storage, with the font and picture lists: a held delete is a rename into it, and a
+        // rename between the two storages is refused on an encrypted device, so the file was deleted at once (round-6
+        // review 20261013_M1_2, owner 2026-10-13; no move of an old folder in the other storage: pre-launch)
+        private fun dir(ctx: Context) = File(helium314.keyboard.latin.utils.DeviceProtectedUtils.getFilesDir(ctx), "appearance_draft")
 
         // the files of a font or picture list (its pending folder is no file)
         private fun libraryNames(folder: File): List<String> =
