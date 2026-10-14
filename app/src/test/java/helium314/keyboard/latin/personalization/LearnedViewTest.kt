@@ -67,7 +67,8 @@ class FakeHistory(ctx: Context, script: String, pool: Int)
 /**
  * The buttons "Use lists from other keyboards" (2026-10-10): with [Learned] on, the other keyboards' learned words are
  * read as the keyboard's own (suggestions, swipe, spell check, trust), learning stays in its own store; with
- * [Blacklisted] on, the other keyboards' blacklists apply, and typing a word back takes it off the list it came from.
+ * [Blacklisted] on, the other keyboards' blacklists apply, and typing a word back allows it on the keyboard's own list
+ * (an allowed row); the list it came from stays as it is (owner 2026-10-11 DM21: borrowed lists are read only).
  * Through the real paths: the buttons' preferences, LearnedStores' refresh, the keyboard's facilitator, the swipe list.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -204,14 +205,16 @@ class LearnedViewTest {
             "no file written for anyone")
     }
 
-    @Test fun `typing a word back on B takes it off A's list it came from`() {
+    @Test fun `typing a word back on B allows it on B's own list, A's list keeps it`() {
         writeList(ctx.filesDir, "Latn", poolA, "quexil\n")
         button(LearnedKeyboards.PREF_USE_OTHERS_BLACKLISTED, true)
         waitFor("A's list read") { f.isRemovedWord("quexil") }
         f.addToUserHistory("quexil", false, NgramContext.EMPTY_PREV_WORDS_INFO, System.currentTimeMillis() / 1000, false)
         assertFalse(f.isRemovedWord("quexil"), "back on B")
-        waitFor("off A's list on disk") { readList(ctx.filesDir, "Latn", poolA)?.containsKey("quexil") == false }
-        assertNull(readList(ctx.filesDir, "Latn", poolB)?.get("quexil"), "nothing put on B's list")
+        val listB = LearnedStores.blacklistFile(ctx.filesDir, "Latn", poolB)
+        waitFor("the allowed row on B's list on disk") { listB.isFile && "quexil\tallowed\t1" in listB.readLines() }
+        assertNull(readList(ctx.filesDir, "Latn", poolB)?.get("quexil"), "not blocked on B's list")
+        assertTrue(readList(ctx.filesDir, "Latn", poolA)?.containsKey("quexil") == true, "A's list keeps it (read only)")
     }
 
     @Test fun `spell check and trust see A's word only with Learned on`() {
