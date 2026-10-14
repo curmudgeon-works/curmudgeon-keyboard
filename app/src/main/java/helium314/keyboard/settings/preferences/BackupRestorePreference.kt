@@ -496,10 +496,13 @@ private class RestoreChoice(
 
 /** What a keyboard by keyboard restore did: each restored backup keyboard as it is on the device now ([onDevice]),
  *  those whose settings wait behind the common ones ([hidden], R7), and by name what was merged into the device's
- *  ([merged]: keyboards, and saved items replaced) and what was added ([added]); the dictionaries ([dictionaries]). */
+ *  ([merged]: keyboards, and saved items replaced) and what was added ([added]); the dictionaries ([dictionaries]);
+ *  whether keyboards' settings came ([settings]), the clipboard history ([clipboard]) and Android's personal dictionary
+ *  words ([personalWords]). */
 internal class Restored(val onDevice: Map<SettingsSubtype, SettingsSubtype>, val hidden: List<SettingsSubtype>,
                         val merged: List<String>, val added: List<String>,
-                        val dictionaries: RestoredDictionaries = RestoredDictionaries())
+                        val dictionaries: RestoredDictionaries = RestoredDictionaries(),
+                        val settings: Boolean = false, val clipboard: Boolean = false, val personalWords: Boolean = false)
 
 /** The backup's dictionaries a restore brought: [languages], each language (tag) that got one, with the device's
  *  dictionaries the backup's took over from, by name ("main_prev"), each kept and selectable. */
@@ -513,17 +516,26 @@ internal data class RestoredDictionaries(val languages: Map<String, List<String>
 internal fun backupKeyboardLanguages(keyboards: Collection<SettingsSubtype>): Set<String> =
     keyboards.flatMap { listOf(it.locale) + getSecondaryLocales(it.extraValues) }.mapTo(LinkedHashSet()) { it.toLanguageTag() }
 
-/** The "Backup restored" dialog's text after a keyboard by keyboard restore (owner 2026-10-12): "Merged: …", "Added: …",
- *  the settings and dictionaries line, then the common settings' note when it applies ([hiddenSettingsNote]). The
- *  dictionaries line says what the restore did with them (review L3.1: "kept as …prev" whatever the answers were). */
+/** The "Backup restored" dialog's text after a keyboard by keyboard restore, each line only when it applies (owner
+ *  2026-10-13, R-DICT; review L3.1 before: "kept as …prev" whatever happened): "Merged: …", "Added: …", "Settings
+ *  restored.", "Dictionaries: French (yours kept as main_prev), Urdu added.", the clipboard and personal dictionary
+ *  words, then the common settings' note when it applies ([hiddenSettingsNote]). */
 internal fun restoreSummary(ctx: Context, restored: Restored): String = listOfNotNull(
     restored.merged.takeIf { it.isNotEmpty() }?.let { ctx.getString(R.string.restore_summary_merged, it.joinToString(", ")) },
     restored.added.takeIf { it.isNotEmpty() }?.let { ctx.getString(R.string.restore_summary_added, it.joinToString(", ")) },
-    ctx.getString(when {
-        restored.dictionaries.keptAside.isNotEmpty() -> R.string.restore_summary_settings
-        restored.dictionaries.any -> R.string.restore_summary_settings_dictionaries
-        else -> R.string.restore_summary_settings_only
-    }),
+    if (restored.settings) ctx.getString(R.string.restore_summary_settings) else null,
+    restored.dictionaries.languages.takeIf { it.isNotEmpty() }?.let { languages ->
+        ctx.getString(R.string.restore_summary_dictionaries, languages.entries.joinToString(", ") { (tag, kept) ->
+            val name = java.util.Locale.forLanguageTag(tag).localizedDisplayName(ctx.resources)
+            if (kept.isEmpty()) name else ctx.getString(R.string.restore_summary_dictionary_kept, name, kept.joinToString(", "))
+        })
+    },
+    when {
+        restored.clipboard && restored.personalWords -> ctx.getString(R.string.restore_summary_clipboard_personal)
+        restored.clipboard -> ctx.getString(R.string.restore_summary_clipboard)
+        restored.personalWords -> ctx.getString(R.string.restore_summary_personal)
+        else -> null
+    },
     hiddenSettingsNote(ctx, restored.hidden),
 ).joinToString("\n")
 
@@ -1463,6 +1475,7 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, plan: Res
             learnedDir.deleteRecursively()
         }
         // merged into the device's clips (owner 2026-10-12: "yes, merge clipboard"; the full restore still replaces them)
+        val clipboard = choice.clipboard && restoredDb.exists()
         if (choice.clipboard) Database.copyFromDb(restoredDb, ctx,
             mergeKeeping = ctx.prefs().getInt(Settings.PREF_CLIPBOARD_HISTORY_SIZE, Defaults.PREF_CLIPBOARD_HISTORY_SIZE))
         // Android's personal dictionary words: a word missing for its locale is added (never fail the whole restore over it)
@@ -1472,7 +1485,8 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, plan: Res
         BackupRestoreJob.step() // (the learned words)
         LayoutUtilsCustom.onLayoutFileChanged()
         switchToKeptCopy(ctx, choice, restored.onDevice, typing)
-        return Restored(restored.onDevice, restored.hidden, restored.merged, restored.added, dictionaries)
+        return Restored(restored.onDevice, restored.hidden, restored.merged, restored.added, dictionaries,
+            settings = choice.settings && restored.onDevice.isNotEmpty(), clipboard = clipboard, personalWords = personalWords != null)
     } catch (t: Throwable) {
         throw if (changed) RestoreStoppedPartway(t) else t
     }

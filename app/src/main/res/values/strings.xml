@@ -765,11 +765,15 @@
     <!-- the "Backup restored" dialog after a keyboard by keyboard restore (owner 2026-10-12). %s: names, comma-separated -->
     <string name="restore_summary_merged">Merged: %s</string>
     <string name="restore_summary_added">Added: %s</string>
-    <string name="restore_summary_settings">Settings and dictionaries restored; your dictionaries kept as \"…prev\".</string>
-    <!-- instead of restore_summary_settings: dictionaries came in, none of the device's had to be kept aside -->
-    <string name="restore_summary_settings_dictionaries">Settings and dictionaries restored.</string>
-    <!-- instead of restore_summary_settings: no dictionary came in -->
-    <string name="restore_summary_settings_only">Settings restored.</string>
+    <!-- each line only when it applies (owner 2026-10-13, R-DICT) -->
+    <string name="restore_summary_settings">Settings restored.</string>
+    <!-- %s: the languages that got a dictionary, comma-separated, each maybe as restore_summary_dictionary_kept -->
+    <string name="restore_summary_dictionaries">Dictionaries: %s added.</string>
+    <!-- %1$s: a language, %2$s: the device's dictionaries kept aside for the backup's (e.g. main_prev) -->
+    <string name="restore_summary_dictionary_kept">%1$s (yours kept as %2$s)</string>
+    <string name="restore_summary_clipboard_personal">Clipboard history and personal dictionary words added.</string>
+    <string name="restore_summary_clipboard">Clipboard history added.</string>
+    <string name="restore_summary_personal">Personal dictionary words added.</string>
     <!-- after a restore of the first keyboard while its settings are the common ones: %s the keyboard -->
     <string name="restore_settings_main">%s\'s settings were restored. All keyboards use them, as they\'re the common settings.</string>
     <string name="restore_differs_choose_message">A ticked item takes the backup\'s. An unticked item keeps this device\'s.</string>

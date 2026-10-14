@@ -49,6 +49,7 @@ import java.util.zip.ZipOutputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /**
  * A partial restore's learned words, dictionaries, personal dictionary words and clipboard as the owner decided them
@@ -251,8 +252,8 @@ class RestoreMergeItemsTest {
         assertEquals("fr", dict("fr", "main_user.dict").readText())
     }
 
-    // (owner 2026-10-12: no Dictionaries row any more, dictionaries always come; the "Backup restored" dialog says so)
-    @Test fun `the plan names the restored keyboards' languages whose dictionary clashes, and the summary says yours are kept aside`() {
+    // (the plan names the restored keyboards' languages whose dictionary clashes, for the dialog)
+    @Test fun `the plan names the restored keyboards' languages whose dictionary clashes`() {
         dictDir("fr").mkdirs(); dict("fr", "main_user.dict").writeText("device")
         dictDir("ko").mkdirs(); dict("ko", "main_user.dict").writeText("device ko")
         dictDir("de").mkdirs(); dict("de", "main_user.dict").writeText("same")
@@ -260,31 +261,34 @@ class RestoreMergeItemsTest {
             "dicts/ko/main_user.dict" to "backup ko".toByteArray(), "dicts/de/main_user.dict" to "same".toByteArray()))
         assertEquals(setOf("fr", "ko"), dictionaryClashesFrom(ctx, zip))
         assertEquals(listOf("fr"), restorePlanFrom(ctx, zip).dictionaryClashLanguages(listOf(frB)))
-        assertEquals("Settings and dictionaries restored; your dictionaries kept as \"…prev\".",
-            ctx.getString(helium314.keyboard.latin.R.string.restore_summary_settings))
     }
 
-    // fail before (L3.1): the summary said "your dictionaries kept as …prev" whatever the answers were
-    @Test fun `the summary's dictionaries line follows the answers - kept aside only when a clash was restored`() {
+    private fun french() = java.util.Locale.FRENCH.let { with(helium314.keyboard.latin.common.LocaleUtils) { it.localizedDisplayName(ctx.resources) } }
+    private fun string(id: Int, vararg args: Any) = ctx.getString(id, *args)
+
+    // fail before (R-DICT): one fixed line about settings and dictionaries, whatever came
+    @Test fun `the summary names what came, each line only when it applies`() {
         dictDir("fr").mkdirs(); dict("fr", "main_user.dict").writeText("device")
         backup(listOf(frB), entries = mapOf("dicts/fr/main_user.dict" to "backup".toByteArray()))
         val skipped = restoreChosenFrom(ctx, zip, listOf(frB), settings = false, learnedWords = false, io = io,
             dictionaries = true, decisions = mapOf(frB to RestoreDecision.Skip))
         assertEquals("device", dict("fr", "main_user.dict").readText())
-        assertEquals(ctx.getString(helium314.keyboard.latin.R.string.restore_summary_settings_only), restoreSummary(ctx, skipped))
-        val unticked = restoreChosenFrom(ctx, zip, emptyList(), settings = false, learnedWords = false, io = io, dictionaries = true)
-        assertEquals(ctx.getString(helium314.keyboard.latin.R.string.restore_summary_settings_only), restoreSummary(ctx, unticked))
+        assertEquals("", restoreSummary(ctx, skipped))
         val restored = restoreDictionaries(ticked = true)
         assertEquals("backup", dict("fr", "main_user.dict").readText())
-        assertEquals(ctx.getString(helium314.keyboard.latin.R.string.restore_summary_settings), restoreSummary(ctx, restored).lines().last())
+        assertEquals(string(helium314.keyboard.latin.R.string.restore_summary_dictionaries,
+            string(helium314.keyboard.latin.R.string.restore_summary_dictionary_kept, french(), "main_prev")),
+            restoreSummary(ctx, restored).lines().last())
+        val withSettings = restoreChosenFrom(ctx, zip, listOf(frB), settings = true, learnedWords = false, io = io)
+        assertTrue(restoreSummary(ctx, withSettings).lines().contains(string(helium314.keyboard.latin.R.string.restore_summary_settings)))
     }
 
-    // fail before (L3.1): a new dictionary, nothing kept aside, still said "kept as …prev"
-    @Test fun `the summary of a restore whose dictionary is new says nothing was kept aside`() {
+    // fail before (R-DICT): no line named the language
+    @Test fun `the summary of a new dictionary names its language, nothing kept aside`() {
         backup(listOf(frB), entries = mapOf("dicts/fr/main_user.dict" to "backup".toByteArray()))
         val restored = restoreDictionaries(ticked = true)
         assertEquals("backup", dict("fr", "main_user.dict").readText())
-        assertEquals(ctx.getString(helium314.keyboard.latin.R.string.restore_summary_settings_dictionaries), restoreSummary(ctx, restored).lines().last())
+        assertEquals(string(helium314.keyboard.latin.R.string.restore_summary_dictionaries, french()), restoreSummary(ctx, restored).lines().last())
     }
 
     // fail before (L3.4): the device's dictionary couldn't be moved aside (here a folder holds the "…prev" name, so the
@@ -297,7 +301,7 @@ class RestoreMergeItemsTest {
         assertEquals("device", dict("fr", "main_user.dict").readText())
         assertEquals(null, selected("fr"))
         assertEquals(setOf("main_user.dict", "main_prev_user.dict"), dictDir("fr").list()!!.toSet()) // (nothing left beside)
-        assertEquals(ctx.getString(helium314.keyboard.latin.R.string.restore_summary_settings_only), restoreSummary(ctx, restored).lines().last())
+        assertFalse(restored.dictionaries.any, "a dictionary came")
     }
 
     // fail before (B3b): the prev slot was picked while the match still held it: main_prev2 = A, main_prev empty
@@ -345,7 +349,8 @@ class RestoreMergeItemsTest {
         backup(listOf(frB), entries = mapOf(Database.NAME to db.readBytes(), "dicts/ur/main_user.dict" to "urdu".toByteArray(),
             "dicts/fr/main_user.dict" to "fr".toByteArray()))
         db.delete()
-        restoreChosenFrom(ctx, zip, emptyList(), settings = false, learnedWords = false, io = io, dictionaries = true, clipboard = true)
+        val restored = restoreChosenFrom(ctx, zip, emptyList(), settings = false, learnedWords = false, io = io, dictionaries = true, clipboard = true)
+        assertEquals(string(helium314.keyboard.latin.R.string.restore_summary_clipboard), restoreSummary(ctx, restored)) // (R-DICT)
         assertFalse(dict("ur", "main_user.dict").exists())
         assertFalse(dict("fr", "main_user.dict").exists())
         val dao = ClipboardDao.getInstance(ctx)!!
