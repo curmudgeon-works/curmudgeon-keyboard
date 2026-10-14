@@ -3,7 +3,6 @@ package helium314.keyboard
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
-import helium314.keyboard.keyboard.KeyboardTheme
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
@@ -26,9 +25,11 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * Restoring some keyboards (review C4, owner "yes"): a restored keyboard's kept palette copies ("~custom:N") get the
- * next free number on the phone when the phone already uses that number for another copy, so two different palettes
- * never share a name. Its "Custom" labels come in as they are (owner 2026-10-11: labels are just "Custom", no number; only kept palettes are numbered).
+ * Restoring some keyboards: the backup's palettes come into the phone's one list by content (owner 2026-10-11: palettes
+ * are one app-wide list; until stage 3b): the same colours, any name, are the phone's; a name the phone uses for other
+ * colours gets the next number. An older backup's copies in a set or a saved theme come in the same way, its kept
+ * copies "~custom:N" as "Palette N" (before: renumbered "~custom:M"). Its "Custom" labels come in as they are (owner
+ * 2026-10-11: labels are just "Custom", no number).
  */
 @RunWith(RobolectricTestRunner::class)
 class PartialRestoreCustomNumbersTest {
@@ -37,8 +38,8 @@ class PartialRestoreCustomNumbersTest {
     private val phoneKeyboard = SettingsSubtype(Locale.GERMANY, "")
     private val restored = SettingsSubtype(Locale.US, "")
     private val zip by lazy { File(ctx.cacheDir, "partial-custom-${System.nanoTime()}.zip") }
-    private val hidden1 = KeyboardTheme.HIDDEN_PALETTE + "1"
-    private val hidden2 = KeyboardTheme.HIDDEN_PALETTE + "2"
+    private val hidden1 = "~custom:1" // (an older backup's kept copy)
+    private fun palette(name: String) = real.getString(Settings.PREF_USER_COLORS_PREFIX + name, null)
 
     @Before fun setUp() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
     @After fun tearDown() { zip.delete(); real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
@@ -94,28 +95,38 @@ class PartialRestoreCustomNumbersTest {
         assertEquals(3, restoredOwn(CustomLabels.Kind.THEME.key))
     }
 
-    @Test fun `a restored kept palette whose name the phone uses for other colours comes in under the next free one`() {
-        phone(own = emptyMap(), shared = mapOf(Settings.PREF_USER_COLORS_PREFIX + hidden1 to "x", Settings.PREF_THEME_COLORS to hidden1))
+    @Test fun `an older backup's kept copy comes in as Palette 2 when the phone's Palette 1 has other colours`() {
+        phone(own = mapOf(Settings.PREF_THEME_COLORS to "Palette 1"), shared = mapOf(Settings.PREF_USER_COLORS_PREFIX + "Palette 1" to "x"))
         backup(own = mapOf(Settings.PREF_USER_COLORS_PREFIX + hidden1 to "y", Settings.PREF_THEME_COLORS to hidden1,
             Settings.PREF_THEME_COLORS_NIGHT to hidden1))
         restoreKeyboardsFrom(ctx, zip, listOf(restored), withSettings = true)
-        assertEquals(hidden2, restoredOwn(Settings.PREF_THEME_COLORS))
-        assertEquals(hidden2, restoredOwn(Settings.PREF_THEME_COLORS_NIGHT))
-        assertEquals("y", restoredOwn(Settings.PREF_USER_COLORS_PREFIX + hidden2))
-        assertEquals(null, restoredOwn(Settings.PREF_USER_COLORS_PREFIX + hidden1))
-        assertEquals("x", real.getString(Settings.PREF_USER_COLORS_PREFIX + hidden1, null))
+        assertEquals("Palette 2", restoredOwn(Settings.PREF_THEME_COLORS))
+        assertEquals("Palette 2", restoredOwn(Settings.PREF_THEME_COLORS_NIGHT))
+        assertEquals("y", palette("Palette 2")) // (on the list)
+        assertEquals("x", palette("Palette 1"))
+        assertEquals(null, restoredOwn(Settings.PREF_USER_COLORS_PREFIX + hidden1)) // (no copy in the set)
+        assertEquals(null, restoredOwn(Settings.PREF_USER_COLORS_PREFIX + "Palette 2"))
     }
 
-    @Test fun `a restored kept palette with the phone's colours keeps its name`() {
-        phone(own = emptyMap(), shared = mapOf(Settings.PREF_USER_COLORS_PREFIX + hidden1 to "x", Settings.PREF_THEME_COLORS to hidden1))
-        backup(own = mapOf(Settings.PREF_USER_COLORS_PREFIX + hidden1 to "x", Settings.PREF_THEME_COLORS to hidden1))
+    @Test fun `a restored palette with the phone's colours is the phone's, whatever its name`() {
+        phone(own = emptyMap(), shared = mapOf(Settings.PREF_USER_COLORS_PREFIX + "Warm" to "x"))
+        backup(own = mapOf(Settings.PREF_THEME_COLORS to "Hot"), extra = mapOf(Settings.PREF_USER_COLORS_PREFIX + "Hot" to "x"))
         restoreKeyboardsFrom(ctx, zip, listOf(restored), withSettings = true)
-        assertEquals(hidden1, restoredOwn(Settings.PREF_THEME_COLORS))
-        assertEquals("x", restoredOwn(Settings.PREF_USER_COLORS_PREFIX + hidden1))
+        assertEquals("Warm", restoredOwn(Settings.PREF_THEME_COLORS))
+        assertEquals(null, palette("Hot")) // (not a second one)
     }
 
-    @Test fun `a saved theme the restore brings in follows the kept palette's new name`() {
-        phone(own = emptyMap(), shared = mapOf(Settings.PREF_USER_COLORS_PREFIX + hidden1 to "x", Settings.PREF_THEME_COLORS to hidden1))
+    @Test fun `a restored palette whose name the phone uses for other colours comes in numbered`() {
+        phone(own = emptyMap(), shared = mapOf(Settings.PREF_USER_COLORS_PREFIX + "Warm" to "x"))
+        backup(own = mapOf(Settings.PREF_THEME_COLORS to "Warm"), extra = mapOf(Settings.PREF_USER_COLORS_PREFIX + "Warm" to "y"))
+        restoreKeyboardsFrom(ctx, zip, listOf(restored), withSettings = true)
+        assertEquals("Warm 2", restoredOwn(Settings.PREF_THEME_COLORS))
+        assertEquals("y", palette("Warm 2"))
+        assertEquals("x", palette("Warm"))
+    }
+
+    @Test fun `a saved theme the restore brings in names the palette as it came in, without a copy`() {
+        phone(own = emptyMap(), shared = mapOf(Settings.PREF_USER_COLORS_PREFIX + "Palette 1" to "x"))
         val look = JSONObject().put("name", "Dusk").put("values", JSONObject()
             .put(Settings.PREF_USER_COLORS_PREFIX + hidden1, JSONObject().put("s", "y"))
             .put(Settings.PREF_THEME_COLORS, JSONObject().put("s", hidden1)))
@@ -123,8 +134,9 @@ class PartialRestoreCustomNumbersTest {
             extra = mapOf(AppearanceLooks.PREF to JSONArray(listOf(look)).toString()))
         restoreKeyboardsFrom(ctx, zip, listOf(restored), withSettings = true)
         val dusk = AppearanceLooks.load(real).single { it.name == "Dusk" }
-        assertEquals(hidden2, dusk.values[Settings.PREF_THEME_COLORS])
-        assertEquals("y", dusk.values[Settings.PREF_USER_COLORS_PREFIX + hidden2])
-        assertEquals(hidden2, restoredOwn(Settings.PREF_THEME_COLORS))
+        assertEquals("Palette 2", dusk.values[Settings.PREF_THEME_COLORS])
+        assertEquals(setOf(Settings.PREF_THEME_COLORS), dusk.values.keys.filter { it.startsWith("user_") || it == Settings.PREF_THEME_COLORS }.toSet())
+        assertEquals("Palette 2", restoredOwn(Settings.PREF_THEME_COLORS))
+        assertEquals("y", palette("Palette 2"))
     }
 }

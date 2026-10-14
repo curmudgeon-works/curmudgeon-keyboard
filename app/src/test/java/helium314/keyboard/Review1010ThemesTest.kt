@@ -43,64 +43,63 @@ class Review1010ThemesTest {
 
     // ---- #3: palette rename and delete in the shared set reach the keyboards' hidden own sets ----
 
-    // separate settings off; keyboard 1's own set (kept from earlier) names the shared palette "My theme" with no colours
-    // of its own, keyboard 2's own set has its own "My theme". (owner 2026-10-11: no separate common set; the first
-    // keyboard's own settings are the common ones: keyboard 3, first in the list, holds the shared palette; a set that
-    // follows its rename gets a copy of the colours, as no set reads another's)
+    // separate settings off; keyboard 1's own set (kept from earlier) and keyboard 2's name the palette "My theme", as
+    // keyboard 3's, the first in the list (owner 2026-10-11: palettes are one app-wide list, no set has a copy; before,
+    // keyboard 2 had its own "My theme" and a set following a rename got a copy)
     private val first = helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.FRANCE, "")
     private fun hiddenSetsNamingMyTheme() {
         real.edit()
             .putString("keyboard_profile_ids", """{"en_US:":1,"de_DE:":2,"${first.toPref()}":3}""")
             .putString(Settings.PREF_ENABLED_SUBTYPES, first.toPref())
-            .putString("p3/${Settings.PREF_USER_COLORS_PREFIX}My theme", "[]")
+            .putString("${Settings.PREF_USER_COLORS_PREFIX}My theme", "[]")
             .putString("p3/$colors", "My theme")
             .putString("p1/$colors", "My theme").putString("p1/$night", "My theme")
-            .putString("p2/$colors", "My theme").putString("p2/${Settings.PREF_USER_COLORS_PREFIX}My theme", "[]")
+            .putString("p2/$colors", "My theme")
             .commit()
     }
 
-    // (2026-10-11: delete keeps copies, "other keyboards should keep the popups/palette now called Custom"; before, the
-    // hidden set forgot it and went back to the default colours)
-    @Test fun `a palette deleted in the shared set stays with a hidden set that read it, as Custom N`() {
+    // (owner 2026-10-11: "Move all to default"; before, the hidden sets kept it as Custom N)
+    @Test fun `a palette deleted for all leaves every set, hidden ones too, at the default colours`() {
         hiddenSetsNamingMyTheme()
-        KeyboardTheme.deleteUserColors(ctx, set(1), "My theme") // (separate off: the shared set)
-        val kept = real.getString("p1/$colors", null)!!
-        assertTrue(KeyboardTheme.isHiddenPalette(kept))
-        assertTrue(real.contains("p3/${Settings.PREF_USER_COLORS_PREFIX}$kept")) // (its colours, under the kept name)
-        assertTrue(real.contains("p1/${Settings.PREF_USER_COLORS_PREFIX}$kept")) // (keyboard 1's copy)
-        assertFalse(real.contains("p3/${Settings.PREF_USER_COLORS_PREFIX}My theme")) // (the shared palette's old name is gone)
+        helium314.keyboard.settings.Palettes.delete(real, set(1), "My theme", onlyHere = false) // (separate off: the main set)
+        assertFalse(real.contains("${Settings.PREF_USER_COLORS_PREFIX}My theme"))
+        for (id in 1..3) assertEquals(null, real.getString("p$id/$colors", null))
+        assertTrue(real.getBoolean("p1/~$colors", false)) // (at its default: marked)
+        assertEquals(null, real.getString("p1/$night", null))
         // a new palette that takes the free name later is not picked up by keyboard 1 when separate settings come back
-        real.edit().putString("p3/${Settings.PREF_USER_COLORS_PREFIX}My theme", "[]").putBoolean("separate_settings_per_keyboard", true).commit()
-        assertEquals(kept, set(1).getString(colors, null))
-        // keyboard 2's own palette of that name stays its choice
-        assertEquals("My theme", real.getString("p2/$colors", null))
+        real.edit().putString("${Settings.PREF_USER_COLORS_PREFIX}My theme", "[]").putBoolean("separate_settings_per_keyboard", true).commit()
+        assertEquals(null, set(1).getString(colors, null))
     }
 
-    @Test fun `a palette renamed in the shared set is renamed in a hidden set that read it`() {
+    @Test fun `a palette renamed is renamed in every set, hidden ones too`() {
         hiddenSetsNamingMyTheme()
         assertTrue(KeyboardTheme.renameUserColors("My theme", "Work", set(1)))
+        assertEquals("[]", real.getString("${Settings.PREF_USER_COLORS_PREFIX}Work", null))
+        assertFalse(real.contains("${Settings.PREF_USER_COLORS_PREFIX}My theme"))
         assertEquals("Work", real.getString("p3/$colors", null))
-        assertEquals("[]", real.getString("p1/${Settings.PREF_USER_COLORS_PREFIX}Work", null)) // (keyboard 1's copy)
         assertEquals("Work", real.getString("p1/$colors", null))
         assertEquals("Work", real.getString("p1/$night", null))
+        assertEquals("Work", real.getString("p2/$colors", null))
+    }
+
+    @Test fun `the palette editor's Discard after a rename takes every set back too`() {
+        hiddenSetsNamingMyTheme()
+        KeyboardTheme.renameUserColors("My theme", "Work", set(1))
+        KeyboardTheme.renameUserColors("Work", "My theme", set(1)) // (what the editor's putBack does)
+        assertEquals("My theme", real.getString("p1/$colors", null))
+        assertEquals("My theme", real.getString("p1/$night", null))
         assertEquals("My theme", real.getString("p2/$colors", null))
     }
 
-    @Test fun `the palette editor's Discard after a rename takes the hidden sets back too`() {
-        hiddenSetsNamingMyTheme()
-        KeyboardTheme.renameUserColors("My theme", "Work", set(1))
-        KeyboardTheme.followInHiddenSets(set(1), "Work", "My theme") // (what the editor's putBack does)
-        assertEquals("My theme", real.getString("p1/$colors", null))
-        assertEquals("My theme", real.getString("p1/$night", null))
-    }
-
-    @Test fun `a palette deleted in a keyboard's own set leaves the other keyboards' choices`() {
+    // (owner 2026-10-11: "keep all on Warm and move this to default")
+    @Test fun `a palette deleted for this keyboard only leaves the other keyboards' choices and the list`() {
         hiddenSetsNamingMyTheme()
         real.edit().putBoolean("separate_settings_per_keyboard", true).commit()
-        KeyboardTheme.deleteUserColors(ctx, set(2), "My theme")
+        helium314.keyboard.settings.Palettes.delete(real, set(2), "My theme", onlyHere = true)
+        assertEquals(null, real.getString("p2/$colors", null))
         assertEquals("My theme", real.getString("p1/$colors", null))
         assertEquals("My theme", real.getString("p3/$colors", null))
-
+        assertTrue(real.contains("${Settings.PREF_USER_COLORS_PREFIX}My theme"))
     }
 
     // ---- #4: saved Layouts and themes follow a renamed or deleted name they carry ----

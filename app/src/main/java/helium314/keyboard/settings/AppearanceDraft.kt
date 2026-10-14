@@ -37,7 +37,7 @@ class AppearanceDraft private constructor(
     /** A copy of a custom file, with the size and time the live one had (enough to tell a change, no reading). */
     class Saved(val copy: File, val length: Long, val modified: Long)
 
-    // fonts and palettes deleted while the screen is open ("font:<name>", "palette:<name>"): done for good when the changes
+    // fonts deleted while the screen is open ("font:<name>"): done for good when the changes
     // are kept, undone with them (owner 2026-10-10: "so discard should bring the font back"). Until then a deleted font's
     // file waits in the snapshot folder, and only the edited keyboard has let go of it.
     private val held = LinkedHashSet<String>()
@@ -84,14 +84,6 @@ class AppearanceDraft private constructor(
         File(dir, SUB_SAVES_FILE).writeText(org.json.JSONArray(savedPalettes.toList()).toString())
     }
 
-    /** Palette [name] deleted with the screen open: the edited keyboard's part is done (the snapshot puts it back), the
-     *  other keyboards follow only when the changes are kept. */
-    fun holdPaletteDelete(name: String) {
-        held += PALETTE + name
-        writeHeld(dir, held)
-        version.intValue++
-    }
-
     /** True when a preference or file in the snapshot's scope differs from it, or something was deleted. */
     fun hasChanges(ctx: Context): Boolean {
         if (held.isNotEmpty()) return true
@@ -117,11 +109,14 @@ class AppearanceDraft private constructor(
         }
     }
 
-    /** The preferences whose value differs from the snapshot. */
+    /** The preferences whose value differs from the snapshot; a palette on the app-wide list too (its Colours rows). */
     fun changedKeys(ctx: Context): Set<String> {
-        val now = AppearanceLooks.screenValues(
-            ProfilePreferences(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)) { setId })
-        return (now.keys + prefs.keys).filterTo(HashSet()) { !KnownDefaults.same(it, now[it], prefs[it]) }
+        val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
+        val now = AppearanceLooks.screenValues(ProfilePreferences(real) { setId })
+        val changed = (now.keys + prefs.keys).filterTo(HashSet()) { !KnownDefaults.same(it, now[it], prefs[it]) }
+        val all = real.all
+        (all.keys + reached.keys).filterTo(changed) { Palettes.isKey(it) && KeyboardProfiles.splitOwnKey(it) == null && all[it] != reached[it] }
+        return changed
     }
 
     /** The names of the custom files (background images, fonts) that differ from the snapshot. */
@@ -160,14 +155,11 @@ class AppearanceDraft private constructor(
     // decides the editor's changes too; owner 2026-10-11, option 1, review B1)
 
     /** Keeps what is on the phone now; only the snapshot goes. Deletes made on the screen are done for good now: every
-     *  keyboard and saved theme lets go of a deleted font, the other keyboards of a deleted palette. */
+     *  keyboard and saved theme lets go of a deleted font. (A palette delete is done everywhere at once, the snapshot
+     *  holds the list and every choice: owner 2026-10-11, palettes are one app-wide list; an old "palette:" entry of a
+     *  snapshot from before means nothing.) */
     fun accept(ctx: Context) {
-        val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
-        for (entry in held) {
-            if (entry.startsWith(FONT)) helium314.keyboard.keyboard.FontLibrary.forgetEverywhere(ctx, entry.removePrefix(FONT))
-            else if (entry.startsWith(PALETTE))
-                helium314.keyboard.keyboard.KeyboardTheme.followInHiddenSets(ProfilePreferences(real) { setId }, entry.removePrefix(PALETTE), null)
-        }
+        for (entry in held) if (entry.startsWith(FONT)) helium314.keyboard.keyboard.FontLibrary.forgetEverywhere(ctx, entry.removePrefix(FONT))
         discard() // (the held font files go with the folder)
     }
 
@@ -198,7 +190,6 @@ class AppearanceDraft private constructor(
         private const val HELD_FONTS = "held_fonts"
         private const val SUB_SAVES_FILE = "sub_screen_saves.json"
         private const val FONT = "font:"
-        private const val PALETTE = "palette:"
         private val LABELS = listOf(CustomLabels.Kind.THEME)
 
         private fun writeHeld(dir: File, held: Collection<String>) =
@@ -254,9 +245,9 @@ class AppearanceDraft private constructor(
             return AppearanceDraft(prefs, files, dir, setId, reached, labels, SubScreenWrites(dir, null, ::recorded))
         }
 
-        /** A stored key beyond the edited set that the screen's saved items reach ([reached]): the saved themes; in
-         *  any set, the theme choice, the light and dark colours' choice, the palettes, and their "at default" marks;
-         *  in every keyboard's own set, its theme settings. */
+        /** A stored key beyond the edited set that the screen's saved items reach ([reached]): the saved themes, the
+         *  palettes (the app-wide list; a set's old copy too); in any set, the theme choice, the light and dark colours'
+         *  choice, and their "at default" marks; in every keyboard's own set, its theme settings. */
         private fun reachesBeyond(stored: String): Boolean {
             val own = KeyboardProfiles.splitOwnKey(stored)
             val plain = (own?.second ?: stored).removePrefix(KeyboardProfiles.TOMBSTONE)

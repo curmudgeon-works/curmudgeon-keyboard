@@ -174,7 +174,10 @@ object KeyboardProfiles {
     // ("share_user_history_": the retired per-language share switch, kept global so old keys stay where they are)
     // (language priorities are the keyboard's since 2026-10-07: a keyboard's own set holds its own when settings are
     // separate; the plain value is what the shared set, and every keyboard without its own, reads)
-    private val globalPrefixes = listOf(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX, "share_user_history_", LanguagePriority.PREF_ADDED_PREFIX, "debug_", "gesture_stats")
+    // (the palettes: one app-wide list, as saved themes and Layouts; owner 2026-10-11: "palettes are one app-wide list".
+    // A keyboard's light and dark colours name one; helium314.keyboard.settings.Palettes)
+    private val globalPrefixes = listOf(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX, "share_user_history_", LanguagePriority.PREF_ADDED_PREFIX, "debug_", "gesture_stats",
+        Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
 
     /** A key of the app itself (never a keyboard's), whatever the menus' sharing: the keyboard list, the saved themes and
      *  Layouts, the logs' switches… (re-review 2026-10-07: what a shared menu holds for all keyboards is not app-wide,
@@ -846,7 +849,9 @@ object KeyboardProfiles {
         val main = mainId(real)
         val all = real.all
         // (one-time flags too, as a copy always took them: a set's own steps mustn't run again on it)
-        val common = all.filterKeys { splitOwnKey(it) == null && !isAppWide(it) && !it.startsWith(TOMBSTONE) }
+        // (the palettes too: app-wide since 2026-10-11, but plain ones here are the common set's of before, copied and
+        // deleted as before; Palettes.centralize, after this, moves the sets' copies into the one list)
+        val common = all.filterKeys { splitOwnKey(it) == null && (!isAppWide(it) || isPaletteKey(it)) && !it.startsWith(TOMBSTONE) }
         val editor = real.edit()
         for (id in without) {
             if (fromCommon) for ((key, value) in common) put(editor, ownKey(id, key), value)
@@ -866,6 +871,9 @@ object KeyboardProfiles {
         filesDir?.let { dir -> for (name in profileFileNames) for (ext in listOf("", ".framing")) java.io.File(dir, name + ext).delete() }
         Log.i("KeyboardProfiles", "no common set: ${without.size} keyboards got ${if (fromCommon) "the common set" else "the main's"}")
     }
+
+    private fun isPaletteKey(key: String) = key.startsWith(Settings.PREF_USER_COLORS_PREFIX)
+        || key.startsWith(Settings.PREF_USER_ALL_COLORS_PREFIX) || key.startsWith(Settings.PREF_USER_MORE_COLORS_PREFIX)
 
     /** The keyboard whose settings set [id] holds (separate settings on), or null (shared settings). */
     fun editingKeyboard(real: SharedPreferences, id: Int): SettingsSubtype? {

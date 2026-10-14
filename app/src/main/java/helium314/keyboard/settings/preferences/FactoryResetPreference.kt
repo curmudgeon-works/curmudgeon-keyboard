@@ -121,7 +121,7 @@ internal fun startFactoryReset(ctx: Context, keyboards: Boolean, learnedWords: B
 /**
  * What survives the settings reset: the version and every one-time step's flag (else they run again on a reset phone:
  * review 2026-10-06, the 0.3.002 step brought back the 0.5% / 0.75% gaps), and what isn't being reset: the keyboards
- * ([keyboards] unticked), your own layouts, popup sets and saved themes and Layouts ([custom] unticked).
+ * ([keyboards] unticked), your own layouts, popup sets, saved themes and Layouts and palettes ([custom] unticked).
  */
 internal fun keptOnReset(key: String, keyboards: Boolean, custom: Boolean): Boolean =
     key == Settings.PREF_VERSION_CODE || KeyboardProfiles.isOneTimeFlag(key)
@@ -130,7 +130,9 @@ internal fun keptOnReset(key: String, keyboards: Boolean, custom: Boolean): Bool
             || key == Settings.PREF_SELECTED_SUBTYPE || LanguagePriority.isLanguageKey(key)))
         || (!custom && (key == KeyPopupOverrides.PREF || key == KeyPopupOverrides.PREF_SETS
             || key == KeyPopupOverrides.PREF_SELECTED_SET || key.startsWith(Settings.PREF_LAYOUT_PREFIX)
-            || key == helium314.keyboard.settings.AppearanceLooks.PREF || key == helium314.keyboard.settings.LayoutPresets.PREF))
+            || key == helium314.keyboard.settings.AppearanceLooks.PREF || key == helium314.keyboard.settings.LayoutPresets.PREF
+            // the palettes (owner 2026-10-11: "unchecked would keep palettes, check woud remove palettes")
+            || helium314.keyboard.settings.Palettes.isKey(key)))
 
 private fun factoryReset(ctx: Context, keyboards: Boolean, learnedWords: Boolean, clipboard: Boolean, custom: Boolean) {
     val prefs = ctx.realPrefs()

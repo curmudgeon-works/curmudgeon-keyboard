@@ -385,7 +385,7 @@ fun createAppearanceSettings(context: Context) = listOf(
         Box(if (dayNight) Modifier.tuckedUnder().padding(start = 16.dp) else Modifier) {
             Preference(
                 name = if (dayNight) stringResource(R.string.theme_colors_light) else setting.title,
-                description = prefs.getString(setting.key, Defaults.PREF_THEME_COLORS)!!.let { if (helium314.keyboard.keyboard.KeyboardTheme.isHiddenPalette(it)) helium314.keyboard.keyboard.KeyboardTheme.paletteName(ctx, it) else it.getStringResourceOrName("theme_name_", ctx) },
+                description = prefs.getString(setting.key, Defaults.PREF_THEME_COLORS)!!.getStringResourceOrName("theme_name_", ctx),
                 onClick = { showDialog = true }
             )
         }
@@ -411,7 +411,7 @@ fun createAppearanceSettings(context: Context) = listOf(
         Box(Modifier.tuckedUnder().padding(start = 16.dp)) { // (shown only under the light / dark switch, when it's on)
             Preference(
                 name = setting.title,
-                description = prefs.getString(setting.key, Defaults.PREF_THEME_COLORS_NIGHT)!!.let { if (helium314.keyboard.keyboard.KeyboardTheme.isHiddenPalette(it)) helium314.keyboard.keyboard.KeyboardTheme.paletteName(ctx, it) else it.getStringResourceOrName("theme_name_", ctx) },
+                description = prefs.getString(setting.key, Defaults.PREF_THEME_COLORS_NIGHT)!!.getStringResourceOrName("theme_name_", ctx),
                 onClick = { showDialog = true }
             )
         }

@@ -50,8 +50,8 @@ class SubScreenSaveTest {
             .putString(Settings.PREF_THEME_COLORS, "Warm")
             .putString(own(2, KeyPopupOverrides.PREF_SELECTED_SET), "Mine")
             .commit()
-        AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Sunset", mapOf(Settings.PREF_THEME_COLORS to "Warm",
-            Settings.PREF_USER_COLORS_PREFIX + "Warm" to before))), now = true)
+        // (a theme names its palette, no copy: owner 2026-10-11, palettes are one app-wide list)
+        AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Sunset", mapOf(Settings.PREF_THEME_COLORS to "Warm"))), now = true)
         KeyPopupOverrides.saveSets(real, listOf(KeyPopupOverrides.UserSet("Mine", "all", null, mapOf("a" to listOf("á")))))
         LayoutPresets.save(real, listOf(LayoutPresets.Preset("Work", mapOf(KeyPopupOverrides.PREF_SELECTED_SET to "Mine",
             KeyPopupOverrides.PREF to """{"a":["á"]}"""))))

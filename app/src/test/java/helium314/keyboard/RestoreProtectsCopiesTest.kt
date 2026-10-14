@@ -3,7 +3,6 @@ package helium314.keyboard
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
-import helium314.keyboard.keyboard.KeyboardTheme
 import helium314.keyboard.latin.personalization.available
 import helium314.keyboard.latin.personalization.useKeyboards
 import helium314.keyboard.latin.settings.KeyboardProfiles
@@ -43,8 +42,9 @@ import kotlin.test.assertNull
 /**
  * A restore of some keyboards never trashes what the phone holds unsaved (owner 2026-10-11: "main concern is to make
  * sure nothing gets trashed"): (1) "What to merge" says once that selected items replace the keyboard's settings,
- * unsaved changes too (owner 2026-10-11: no per-copy warnings); (2) a kept palette "~custom:N" the phone uses for other colours is never
- * written over: the backup's comes in under the next free number.
+ * unsaved changes too (owner 2026-10-11: no per-copy warnings); (2) a palette the phone has under that name with other
+ * colours is never written over: the backup's comes into the one list under the next number (owner 2026-10-11:
+ * palettes are one app-wide list; an older backup's kept copy "~custom:1" is "Palette 1"; before, "~custom:2").
  */
 @RunWith(RobolectricTestRunner::class)
 class RestoreProtectsCopiesTest {
@@ -55,10 +55,11 @@ class RestoreProtectsCopiesTest {
     private lateinit var dvorak: SettingsSubtype
     private lateinit var colemak: SettingsSubtype
     private lateinit var english: String
-    private val hidden1 = KeyboardTheme.HIDDEN_PALETTE + "1"
-    private val hidden2 = KeyboardTheme.HIDDEN_PALETTE + "2"
+    private val hidden1 = "~custom:1" // (an older backup's kept copy)
     private val colors1 = Settings.PREF_USER_COLORS_PREFIX + hidden1
-    private val colors2 = Settings.PREF_USER_COLORS_PREFIX + hidden2
+    // the phone's list: "Palette 1" (the name an old kept copy gets), and the next number
+    private val listed1 = Settings.PREF_USER_COLORS_PREFIX + "Palette 1"
+    private val listed2 = Settings.PREF_USER_COLORS_PREFIX + "Palette 2"
     private var backupValues: Map<String, Any?> = emptyMap()
     // two palettes' colours as the app stores them (a JSON list): since the first keyboard's own set is the common one
     // (owner 2026-10-11: no separate common set), the phone keyboard's palette is what the keyboard's settings read
@@ -83,10 +84,10 @@ class RestoreProtectsCopiesTest {
         shadowOf(Looper.getMainLooper()).idle()
     }
 
-    /** The phone: QWERTY, separate settings on, [own] in its own set. */
-    private fun phone(own: Map<String, Any?>) {
+    /** The phone: QWERTY, separate settings on, [own] in its own set, [list] app-wide (the palettes). */
+    private fun phone(own: Map<String, Any?>, list: Map<String, Any?> = emptyMap()) {
         real.edit().putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(qwerty)))
-            .putBoolean("separate_settings_per_keyboard", true).commit()
+            .putBoolean("separate_settings_per_keyboard", true).apply { for ((k, v) in list) KeyboardProfiles.put(this, k, v) }.commit()
         useKeyboards(ctx, real, qwerty)
         val id = KeyboardProfiles.idFor(real, qwerty)
         real.edit().apply { for ((key, value) in own) KeyboardProfiles.put(this, KeyboardProfiles.ownKey(id, key), value) }.commit()
@@ -169,54 +170,55 @@ class RestoreProtectsCopiesTest {
 
     private val keysOnly get() = RestoreDecision.Merge(qwerty, parts = setOf(RestoreMatch.Part.Layout(LayoutType.MAIN)), menus = emptySet(), learnedWords = false)
 
+    private fun phoneOnPalette1() = phone(mapOf(Settings.PREF_THEME_COLORS to "Palette 1"), list = mapOf(listed1 to paletteA))
+
     @Test fun `a merge keeping the phone's look - another restored keyboard's palette of that name comes in under the next number`() {
-        phone(mapOf(Settings.PREF_THEME_COLORS to hidden1, colors1 to paletteA))
+        phoneOnPalette1()
         backup(mapOf(dvorak to emptyMap(), colemak to mapOf(Settings.PREF_THEME_COLORS to hidden1, colors1 to paletteB)))
         restoreKeyboardsFrom(ctx, zip, listOf(dvorak, colemak), withSettings = true,
             decisions = mapOf(dvorak to keysOnly, colemak to RestoreDecision.Separate()))
         val ids = KeyboardProfiles.idEntries(real)
         val merged = ids.getValue(dvorak.toPref())
-        assertEquals(hidden1, own(merged, Settings.PREF_THEME_COLORS))
-        assertEquals(paletteA, own(merged, colors1))
+        assertEquals("Palette 1", own(merged, Settings.PREF_THEME_COLORS))
+        assertEquals(paletteA, real.all[listed1])
         val added = ids.getValue(colemak.toPref())
-        assertEquals(hidden2, own(added, Settings.PREF_THEME_COLORS))
-        assertEquals(paletteB, own(added, colors2))
-        assertNull(own(added, colors1))
+        assertEquals("Palette 2", own(added, Settings.PREF_THEME_COLORS))
+        assertEquals(paletteB, real.all[listed2])
+        assertNull(own(added, colors1)) // (no copy in a set)
     }
 
     @Test fun `a merge keeping the phone's look - a restored saved theme with that palette name comes in under the next number`() {
-        phone(mapOf(Settings.PREF_THEME_COLORS to hidden1, colors1 to paletteA))
+        phoneOnPalette1()
         val look = JSONObject().put("name", "Dusk").put("values", JSONObject()
             .put(colors1, JSONObject().put("s", paletteB)).put(Settings.PREF_THEME_COLORS, JSONObject().put("s", hidden1)))
         backup(mapOf(dvorak to mapOf(Settings.PREF_THEME_COLORS to hidden1, colors1 to paletteB)),
             extra = mapOf(AppearanceLooks.PREF to JSONArray(listOf(look)).toString()))
         restoreKeyboardsFrom(ctx, zip, listOf(dvorak), withSettings = true, decisions = mapOf(dvorak to keysOnly))
-        val merged = KeyboardProfiles.idEntries(real).getValue(dvorak.toPref())
-        assertEquals(paletteA, own(merged, colors1))
+        assertEquals(paletteA, real.all[listed1])
         val dusk = AppearanceLooks.load(real).single { it.name == "Dusk" }
-        assertEquals(hidden2, dusk.values[Settings.PREF_THEME_COLORS])
-        assertEquals(paletteB, dusk.values[colors2])
-        assertNull(dusk.values[colors1])
+        assertEquals("Palette 2", dusk.values[Settings.PREF_THEME_COLORS])
+        assertEquals(paletteB, real.all[listed2])
+        assertNull(dusk.values[colors1]) // (a theme names its palette, no copy)
     }
 
     @Test fun `a separate keyboard's palette of a name the phone keyboard uses comes in under the next number`() {
-        phone(mapOf(Settings.PREF_THEME_COLORS to hidden1, colors1 to paletteA))
+        phoneOnPalette1()
         backup(mapOf(dvorak to mapOf(Settings.PREF_THEME_COLORS to hidden1, colors1 to paletteB)))
         restoreKeyboardsFrom(ctx, zip, listOf(dvorak), withSettings = true, decisions = mapOf(dvorak to RestoreDecision.Separate()))
-        assertEquals(paletteA, own(phoneId(), colors1))
+        assertEquals("Palette 1", own(phoneId(), Settings.PREF_THEME_COLORS))
+        assertEquals(paletteA, real.all[listed1])
         val added = KeyboardProfiles.idEntries(real).getValue(dvorak.toPref())
-        assertEquals(hidden2, own(added, Settings.PREF_THEME_COLORS))
-        assertEquals(paletteB, own(added, colors2))
+        assertEquals("Palette 2", own(added, Settings.PREF_THEME_COLORS))
+        assertEquals(paletteB, real.all[listed2])
     }
 
     @Test fun `the same colours under the same name are the phone's palette - no second one`() {
-        phone(mapOf(Settings.PREF_THEME_COLORS to hidden1, colors1 to paletteA))
+        phoneOnPalette1()
         backup(mapOf(dvorak to emptyMap(), colemak to mapOf(Settings.PREF_THEME_COLORS to hidden1, colors1 to paletteA)))
         restoreKeyboardsFrom(ctx, zip, listOf(dvorak, colemak), withSettings = true,
             decisions = mapOf(dvorak to keysOnly, colemak to RestoreDecision.Separate()))
         val added = KeyboardProfiles.idEntries(real).getValue(colemak.toPref())
-        assertEquals(hidden1, own(added, Settings.PREF_THEME_COLORS))
-        assertEquals(paletteA, own(added, colors1))
-        assertFalse(real.all.keys.any { it.endsWith(colors2) })
+        assertEquals("Palette 1", own(added, Settings.PREF_THEME_COLORS))
+        assertFalse(real.all.keys.any { it.endsWith(listed2) })
     }
 }

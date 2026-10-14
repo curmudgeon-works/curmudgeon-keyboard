@@ -59,13 +59,10 @@ object AppearanceLooks {
     )
     /** A built-in theme: [values], and every other theme setting at its default (null: not set). */
     private fun complete(values: Map<String, Any?>): Map<String, Any?> = keys.associateWith { null } + values
-    // the scales have a key per orientation / fold state, the custom colors one per theme
-    private val prefixes = listOf(
-        // (keyboard height, split, numbers row, bottom row size and side padding are Layout & Typing's: not in themes)
-        Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX,
-    )
 
-    fun inScope(key: String) = key in keys || prefixes.any { key.startsWith(it) }
+    // (keyboard height, split, numbers row, bottom row size and side padding are Layout & Typing's: not in themes; the
+    // palettes are one app-wide list a theme names by its light and dark colours, no copy: owner 2026-10-11, Palettes)
+    fun inScope(key: String) = key in keys
 
     // on the Appearance screen but not in looks: its Save / Discard (AppearanceDraft) keeps them too
     private val screenOnlyKeys = setOf(

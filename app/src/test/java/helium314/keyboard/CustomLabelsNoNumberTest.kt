@@ -3,7 +3,6 @@ package helium314.keyboard
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
-import helium314.keyboard.keyboard.KeyboardTheme
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.ProfilePreferences
 import helium314.keyboard.latin.settings.Settings
@@ -31,7 +30,8 @@ import kotlin.test.assertTrue
 /**
  * Owner 2026-10-11: "Yes, repeats are fine." … "Ok, call them just Custom without number.": the label of a keyboard's
  * own copy of a Layout, theme or popups is "Custom" (with "· from X" while its item exists), a flag, not a number;
- * only kept palettes ("~custom:N") stay numbered, uniquely.
+ * (the kept palettes "~custom:N", numbered, are gone: owner 2026-10-11, palettes are one app-wide list; the old colours
+ * are kept as a real palette "Warm 2", see CentralPalettesTest).
  */
 @RunWith(RobolectricTestRunner::class)
 class CustomLabelsNoNumberTest {
@@ -92,14 +92,12 @@ class CustomLabelsNoNumberTest {
         assertEquals(1, real.getInt(own(1, theme), 0))
     }
 
-    @Test fun `kept palettes stay Custom 1 and Custom 2, unique`() {
-        val first = KeyboardTheme.nextHiddenPalette(real)
-        real.edit().putString(own(1, Settings.PREF_THEME_COLORS), first).commit()
-        val second = KeyboardTheme.nextHiddenPalette(real)
-        assertEquals(KeyboardTheme.HIDDEN_PALETTE + "1", first)
-        assertEquals(KeyboardTheme.HIDDEN_PALETTE + "2", second)
-        assertEquals("Custom 1", KeyboardTheme.paletteName(ctx, first))
-        assertEquals("Custom 2", KeyboardTheme.paletteName(ctx, second))
+    // (owner 2026-10-11: palettes are one app-wide list) the old colours' palette counts up from the name, unique
+    @Test fun `a palette's kept old colours are Warm 2, then Warm 3`() {
+        assertEquals("Warm 2", helium314.keyboard.settings.Palettes.keeperName(real, "Warm"))
+        real.edit().putString(Settings.PREF_USER_COLORS_PREFIX + "Warm 2", "[]").commit()
+        assertEquals("Warm 3", helium314.keyboard.settings.Palettes.keeperName(real, "Warm"))
+        assertEquals("Warm 3", helium314.keyboard.settings.Palettes.keeperName(real, "Warm 2"))
     }
 
     @Test fun `Discard still drops a label added while the screen was open`() {

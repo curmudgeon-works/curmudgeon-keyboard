@@ -4,7 +4,6 @@ package helium314.keyboard
 import android.content.Context
 import androidx.core.content.edit
 import androidx.test.core.app.ApplicationProvider
-import helium314.keyboard.keyboard.KeyboardTheme
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
@@ -13,6 +12,7 @@ import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.AppearanceDraft
+import helium314.keyboard.settings.Palettes
 import helium314.keyboard.settings.screens.keyboardName
 import helium314.keyboard.settings.screens.userNames
 import helium314.keyboard.settings.screens.paletteUsers
@@ -24,12 +24,11 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.util.Locale
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /** Owner 2026-10-11 ("should fix this fo sho"): a keyboard switched off on the Languages screen keeps its own set, and
  *  a palette saved with new colours reached it unasked; the update question names it, "<name> (switched off)", and
- *  left unticked it keeps the old colours as "Custom N". Keyboard A ("Work", enabled, edited) = set 1, B (German,
- *  switched off) = set 2, its own set chose "Warm". */
+ *  keeping the old colours it gets them as "Warm 2" (owner 2026-10-11: palettes are one app-wide list; was "Custom N").
+ *  Keyboard A ("Work", enabled, edited) = set 1, B (German, switched off) = set 2, its own set chose "Warm". */
 @RunWith(RobolectricTestRunner::class)
 class ReReview2PaletteOffTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
@@ -63,17 +62,18 @@ class ReReview2PaletteOffTest {
 
     private fun users() = paletteUsers(ctx, ctx.prefs(), "Warm", "Warm").first
     private fun offName() = "${keyboardName(b, ctx)} (switched off)"
-    private fun keepOld(users: List<SettingsSubtype>) = KeyboardTheme.keepOldPalette(real, "Warm", "Warm", mapOf(warm to "old"), users, emptyList())
+    private fun keepOld(users: List<SettingsSubtype>) = Palettes.afterEdit(real, "Warm", mapOf(Settings.PREF_USER_COLORS_PREFIX to "old"),
+        users.associateWith { Palettes.Choice.KEEP_OLD }, emptyMap())
 
     @Test fun `the update question names a switched-off keyboard whose own set chose the palette`() {
         assertEquals(listOf(offName()), userNames(ctx, users()))
     }
 
-    @Test fun `left unticked, the switched-off keyboard keeps the old colours as a kept copy`() {
+    @Test fun `keeping the old colours, the switched-off keyboard gets them as Warm 2 on the list`() {
         keepOld(users())
-        val kept = real.getString(bChoice, null)!!
-        assertTrue(KeyboardTheme.isHiddenPalette(kept), kept)
-        assertEquals("old", real.getString(KeyboardProfiles.ownKey(2, Settings.PREF_USER_COLORS_PREFIX + kept), null)) // (in its own set: owner 2026-10-11, no separate common set)
+        assertEquals("Warm 2", real.getString(bChoice, null))
+        assertEquals("old", real.getString(Settings.PREF_USER_COLORS_PREFIX + "Warm 2", null)) // (on the app-wide list)
+        assertEquals("new", real.getString(warm, null))
         assertEquals("Warm", real.getString(KeyboardProfiles.ownKey(1, Settings.PREF_THEME_COLORS), null)) // (the edited one: new)
     }
 
@@ -81,16 +81,15 @@ class ReReview2PaletteOffTest {
         real.edit { putBoolean("separate_settings_per_keyboard", false) }
         assertEquals(listOf(offName()), userNames(ctx, users()))
         keepOld(users())
-        assertTrue(KeyboardTheme.isHiddenPalette(real.getString(bChoice, null)!!))
+        assertEquals("Warm 2", real.getString(bChoice, null))
     }
 
-    @Test fun `not named with Appearance shared, nor with its own copy of the palette, nor without a choice of its own`() {
+    // (owner 2026-10-11: palettes are one app-wide list, no keyboard has a copy of its own: the "own copy" case is gone)
+    @Test fun `not named with Appearance shared, nor without a choice of its own`() {
         real.edit { putBoolean(KeyboardProfiles.Group.APPEARANCE.prefKey, true) }; KeyboardProfiles.loadGroups(real)
         assertEquals(emptyList(), users())
         real.edit { putBoolean(KeyboardProfiles.Group.APPEARANCE.prefKey, false) }; KeyboardProfiles.loadGroups(real)
-        real.edit { putString(KeyboardProfiles.ownKey(2, warm), "its own") }
-        assertEquals(emptyList(), users())
-        real.edit { remove(KeyboardProfiles.ownKey(2, warm)).remove(bChoice).putString(Settings.PREF_THEME_COLORS, "Warm") }
+        real.edit { remove(bChoice).putString(Settings.PREF_THEME_COLORS, "Warm") }
         assertEquals(emptyList(), users()) // (only following the shared choice: its own set chose nothing)
     }
 }

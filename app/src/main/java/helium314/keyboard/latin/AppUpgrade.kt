@@ -73,6 +73,9 @@ fun checkVersionUpgrade(context: Context, restoring: Boolean = false) {
     // (after every step that still knows the common set) no common set: each keyboard its own, the main's for all
     // (owner 2026-10-11); a restored backup's common set is ignored ("fine to trash common set with upgrade and restore")
     KeyboardProfiles.dropCommonSet(context.realPrefs(), fromCommon = !restoring)
+    // (after it) the palettes of the sets and saved themes move into the one list (owner 2026-10-11: "palettes are one
+    // app-wide list"); a restored backup from before moves too
+    helium314.keyboard.settings.Palettes.centralize(context.realPrefs())
 }
 
 /** Set once [keepUserPopupSetsSymbolMap] ran (a backup from before carries none: its restore runs it again). */

@@ -32,7 +32,7 @@ internal object SavedItemsMerge {
                   val notBrought: Map<String, Set<String>> = emptyMap()) {
         /** A restored keyboard's settings ([values], plain keys) naming its items as they are called on the phone now
          *  (a choice of one not brought in left out: it names none). */
-        fun apply(values: Map<String, Any?>): Map<String, Any?> = RestoredCustomCopies.renamePalettes(values, palettes)
+        fun apply(values: Map<String, Any?>): Map<String, Any?> = helium314.keyboard.settings.Palettes.renamedIn(values, palettes)
             .filter { (key, value) -> !names(key, value) }.mapValues { (key, value) ->
             val map = when (key) {
                 KeyPopupOverrides.PREF_SELECTED_SET -> popupSets
@@ -90,13 +90,13 @@ internal object SavedItemsMerge {
         return generateSequence(2) { it + 1 }.map { "$name $it" }.first { it !in taken }
     }
 
-    /** [keyboards]: the restored keyboards' settings as in the backup (plain keys), [phone]: the phone's stored settings
-     *  without the sets the restore replaces, for the kept palettes' numbers (see [RestoredCustomCopies]). Not [write]:
+    /** [keyboards]: the restored keyboards' settings as in the backup (plain keys; their palettes are the backup's list
+     *  now, read from [backup]), [phone]: the phone's stored settings, its palettes ([helium314.keyboard.settings.Palettes.merge]). Not [write]:
      *  the renames only, the phone's lists untouched (review 2026-10-11 R3: the restore question compares with them). */
     fun merge(ctx: Context, real: SharedPreferences, backup: Map<String, Any?>, asCopies: Boolean,
               fonts: Map<String, String> = emptyMap(), pictures: Map<String, String> = emptyMap(),
               keyLayouts: Map<LayoutType, Map<String, String>> = emptyMap(),
-              keyboards: Collection<Map<String, Any?>> = emptyList(), phone: Map<String, Any?> = real.all, write: Boolean = true): Renames {
+              @Suppress("UNUSED_PARAMETER") keyboards: Collection<Map<String, Any?>> = emptyList(), phone: Map<String, Any?> = real.all, write: Boolean = true): Renames {
         // the backup's lists, read as the phone reads its own (a scratch store, gone afterwards)
         val scratch = ctx.getSharedPreferences(if (write) "restore_saved_items" else "restore_saved_items_dry", Context.MODE_PRIVATE)
         scratch.edit(commit = true) {
@@ -145,14 +145,14 @@ internal object SavedItemsMerge {
             val phoneThemes = AppearanceLooks.load(real).toMutableList()
             val themeNames = HashMap<String, String>()
             val themesNotBrought = HashSet<String>()
-            // kept palette copies ("~custom:N") the phone uses for other colours: the next free number, in the keyboards
-            // and the themes together (review C4)
+            // the backup's palettes, by content like the themes (owner 2026-10-11: palettes are one app-wide list; until
+            // stage 3b), first: the keyboards and themes name them as they are called on the phone
             val backupLooks = AppearanceLooks.load(scratch)
-            val palettes = RestoredCustomCopies.paletteRenames(phone, phoneThemes.map { it.values }, keyboards + backupLooks.map { it.values })
+            val palettes = helium314.keyboard.settings.Palettes.merge(real, phone, backup, backupLooks, write)
             for (backupLook in backupLooks) {
-                // (its fonts, pictures and kept palettes named as they came in, before it's compared)
+                // (its fonts, pictures and palettes named as they came in, no palette copies, before it's compared)
                 val look = AppearanceLooks.Look(backupLook.name,
-                    RestoredCustomCopies.renamePalettes(renamedFiles(backupLook.values, fonts, pictures), palettes), backupLook.remembered)
+                    helium314.keyboard.settings.Palettes.renamedIn(renamedFiles(backupLook.values, fonts, pictures), palettes), backupLook.remembered)
                 phoneThemes.firstOrNull { SavedItemDefaults.sameContent(it.values, it.remembered, look.values, look.remembered) }?.let { themeNames[look.name] = it.name; continue }
                 val taken = phoneThemes.map { it.name }.toSet() + builtInThemes
                 if (look.name in taken && !asCopies) { themesNotBrought += look.name; continue }

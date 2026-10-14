@@ -18,7 +18,7 @@ private fun alsoUndoesLine(res: Int, alsoUndoes: List<String>): (@Composable () 
 
 /** The names of [palettes] (stored names) for that line, as the palette list shows them. */
 fun savedPaletteNames(ctx: android.content.Context, palettes: List<String>): List<String> =
-    palettes.map { ctx.getString(R.string.discard_also_undoes_palette, helium314.keyboard.keyboard.KeyboardTheme.paletteName(ctx, it)) }
+    palettes.map { ctx.getString(R.string.discard_also_undoes_palette, it) }
 
 /** The names of the Layout & Typing sub-screens [saved] for that line, as their rows show them. */
 fun savedSubScreenNames(ctx: android.content.Context, saved: List<helium314.keyboard.settings.LayoutDraft.SubScreen>): List<String> =

@@ -347,7 +347,7 @@
     <string name="factory_reset_keyboards">Keyboards and languages</string>
     <string name="factory_reset_learned_words">Learned words</string>
     <string name="factory_reset_clipboard">Clipboard history</string>
-    <string name="factory_reset_custom">Your own layouts, popup layouts, saved themes and Layouts, added dictionaries, and loaded fonts and pictures</string>
+    <string name="factory_reset_custom">Your own layouts, popup layouts, saved themes and Layouts, palettes, added dictionaries, and loaded fonts and pictures</string>
     <string name="factory_reset_backup_hint">To be able to go back, make a backup first (Backup and restore, above).</string>
     <string name="factory_reset_done">Reset done</string>
     <string name="backspace_settings">Backspace</string>
@@ -575,8 +575,6 @@
     <string name="key_popups_custom">Custom</string>
     <!-- a keyboard's own copy of a Layout, theme or popups that differs from the saved item (or whose item was deleted); no number (owner 2026-10-11) -->
     <string name="custom_label">Custom</string>
-    <!-- a kept palette copy ("~custom:N"), numbered: palettes are shared by name -->
-    <string name="custom_n">Custom %d</string>
     <!-- "Custom · from Sunset": the copy and the saved item it came from -->
     <string name="custom_from">%1$s · from %2$s</string>
     <!-- the save icon on a saved Layout, theme or popup set: it gets the settings of the keyboard being edited -->
@@ -588,6 +586,20 @@
     <!-- a saved Layout holding the popup set, in its update dialog's list -->
     <string name="update_item_layout">Layout “%s”</string>
     <string name="update_item_theme">Theme “%s”</string>
+    <!-- the palette editor's Save when other keyboards or saved themes use the palette (owner 2026-10-11: palettes are one app-wide list); %s = its name -->
+    <string name="palette_edit_title">Save “%s”?</string>
+    <string name="palette_edit_text">This keyboard takes the new colours. Choose what each one below takes.</string>
+    <string name="palette_take_new">The new colours</string>
+    <string name="palette_take_default">The default colours</string>
+    <!-- %s = the palette the old colours are kept as, the next free number: "Warm 2" -->
+    <string name="palette_take_old">The old colours, as “%s”</string>
+    <!-- the trash on a palette other keyboards or saved themes use; %s = its name -->
+    <string name="palette_delete_title">Delete “%s”?</string>
+    <!-- %s = the keyboards and saved themes using it, one per line -->
+    <string name="palette_delete_users">Also used by:\n%s</string>
+    <string name="palette_delete_text">All to default: they and this keyboard go to the default colours, and “%1$s” leaves the list. Only this keyboard: this keyboard goes to the default colours, they keep “%1$s”.</string>
+    <string name="palette_delete_all">All to default</string>
+    <string name="palette_delete_only_here">Only this keyboard</string>
     <string name="update_item_icon">Update with this keyboard\'s settings</string>
     <!-- a saved item with these exact settings exists already (Update, Save as new); nothing is blocked -->
     <string name="same_settings_as">These settings are the same as “%s”.</string>

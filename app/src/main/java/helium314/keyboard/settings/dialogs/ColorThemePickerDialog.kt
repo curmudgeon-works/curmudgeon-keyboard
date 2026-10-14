@@ -62,6 +62,7 @@ import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.settings.filePicker
 import helium314.keyboard.latin.utils.previewDark
 import helium314.keyboard.settings.screens.SaveThoseColors
+import helium314.keyboard.latin.utils.realPrefs
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -94,7 +95,7 @@ fun ColorThemePickerDialog(
             it.startsWith(Settings.PREF_USER_MORE_COLORS_PREFIX) -> it.substringAfter(Settings.PREF_USER_MORE_COLORS_PREFIX)
             else -> null
         }
-    }.filterTo(sortedSetOf()) { !KeyboardTheme.isHiddenPalette(it) } // (kept copies of deleted ones: not on the list) 
+    }.toSortedSet() // (the app-wide list: owner 2026-10-11, palettes are one list like saved themes)
     val selectedColor = prefs.getString(setting.key, default)!!
     if (selectedColor !in defaultColors)
         userColors.add(selectedColor) // there are cases where we have no settings for a user theme
@@ -110,6 +111,8 @@ fun ColorThemePickerDialog(
     // a tap shows the colors on the live keyboard; OK keeps them, Cancel puts back what was set when the dialog opened
     val snapshot = rememberPrefSnapshot(prefs, listOf(setting.key))
     var confirmed by remember { mutableStateOf(false) }
+    // (deleted here, for this keyboard at least: not put back by Cancel)
+    var deleted by remember { mutableStateOf(emptySet<String>()) }
     val close = { confirmed = true; onOpenEditor() }
     ThreeButtonAlertDialog(
         // the keyboard stays up below the dialog (a tap shows the colours on it), the dialog sits above it
@@ -117,9 +120,9 @@ fun ColorThemePickerDialog(
         onDismissRequest = {
             // (a set deleted here isn't put back: the keyboard stays on what it shows now)
             val before = snapshot[setting.key] as? String
-            val beforeGone = before != null && before !in defaultColors && prefs.all.keys.none { k ->
+            val beforeGone = before != null && before !in defaultColors && (before in deleted || prefs.all.keys.none { k ->
                 k == Settings.PREF_USER_COLORS_PREFIX + before || k == Settings.PREF_USER_ALL_COLORS_PREFIX + before
-                    || k == Settings.PREF_USER_MORE_COLORS_PREFIX + before }
+                    || k == Settings.PREF_USER_MORE_COLORS_PREFIX + before })
             if (!confirmed && !beforeGone && snapshot.restore()) KeyboardSwitcher.getInstance().setThemeNeedsReload()
             onDismissRequest()
         },
@@ -137,7 +140,7 @@ fun ColorThemePickerDialog(
                     // a short list that scrolls inside, so the dialog stays clear of the keyboard
                     LazyColumn(state = state, modifier = androidx.compose.ui.Modifier.heightIn(max = 300.dp).scrollbar(state)) {
                         items(colors) { item ->
-                            ColorItemRow(close, item, item == selectedColor, item in userColors, targetScreen, setting.key)
+                            ColorItemRow(close, item, item == selectedColor, item in userColors, targetScreen, setting.key) { deleted = deleted + item }
                         }
                     }
                 }
@@ -215,7 +218,8 @@ private fun AddColorRow(onDismissRequest: () -> Unit, targetScreen: String, pref
 }
 
 @Composable
-private fun ColorItemRow(onDismissRequest: () -> Unit, item: String, isSelected: Boolean, isUser: Boolean, targetScreen: String, prefKey: String) {
+private fun ColorItemRow(onDismissRequest: () -> Unit, item: String, isSelected: Boolean, isUser: Boolean, targetScreen: String, prefKey: String,
+                         onDeleted: () -> Unit) {
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
     Row(
@@ -237,27 +241,38 @@ private fun ColorItemRow(onDismissRequest: () -> Unit, item: String, isSelected:
             }
         )
         Text(
-            text = if (KeyboardTheme.isHiddenPalette(item)) KeyboardTheme.paletteName(ctx, item) else item.getStringResourceOrName("theme_name_", ctx),
+            text = item.getStringResourceOrName("theme_name_", ctx),
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f),
         )
-        if (isUser && !KeyboardTheme.isHiddenPalette(item)) { // (a kept copy: this keyboard's, nothing to delete or edit)
+        if (isUser) {
             var showDialog by remember { mutableStateOf(false) }
-            DeleteButton { showDialog = true }
+            // the other keyboards and saved themes using it, asked when the trash is tapped
+            var users by remember { mutableStateOf<Pair<List<helium314.keyboard.latin.settings.SettingsSubtype>, List<String>>?>(null) }
+            DeleteButton { users = helium314.keyboard.settings.screens.paletteUsers(ctx, prefs, item, item); showDialog = true }
             EditButton {
                 onDismissRequest()
                 SettingsDestination.navigateTo(targetScreen + android.net.Uri.encode(item), ctx)
             }
-            if (showDialog)
+            // (done everywhere at once; the open Appearance screen's Discard undoes it: owner 2026-10-11)
+            fun delete(onlyHere: Boolean) {
+                showDialog = false
+                helium314.keyboard.settings.Palettes.delete(ctx.realPrefs(), prefs, item, onlyHere)
+                onDeleted()
+            }
+            val (keyboards, themes) = users ?: (emptyList<helium314.keyboard.latin.settings.SettingsSubtype>() to emptyList())
+            if (showDialog && keyboards.isEmpty() && themes.isEmpty())
                 ConfirmationDialog(
                     onDismissRequest = { showDialog = false },
                     content = { Text(stringResource(R.string.delete_confirmation, item)) },
-                    onConfirmed = {
-                        showDialog = false
-                        // (also where the other mode's colours name it, and not undone by the screen's Discard)
-                        KeyboardTheme.deleteUserColors(ctx, prefs, item)
-                    }
+                    onConfirmed = { delete(onlyHere = false) } // (nobody else uses it: the plain delete)
                 )
+            else if (showDialog)
+                PaletteDeleteDialog(item,
+                    helium314.keyboard.settings.screens.userNames(ctx, keyboards) + themes.map { ctx.getString(R.string.update_item_theme, it) },
+                    onDismissRequest = { showDialog = false },
+                    onAll = { delete(onlyHere = false) },
+                    onOnlyHere = { delete(onlyHere = true) })
         }
     }
 }

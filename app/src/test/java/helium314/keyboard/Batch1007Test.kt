@@ -49,7 +49,7 @@ class Batch1007Test {
         KeyboardTheme.writeUserColors(prefs, name, KeyboardTheme.seedUserColors(ctx, prefs, KeyboardTheme.THEME_CURMUDGEON, false))
         prefs.edit { putString(Settings.PREF_THEME_COLORS, name); putString(Settings.PREF_THEME_COLORS_NIGHT, name) }
         AppearanceDraft.of(ctx) // the Appearance screen opens: its snapshot holds the palette
-        KeyboardTheme.deleteUserColors(ctx, prefs, name)
+        helium314.keyboard.settings.Palettes.delete(real, prefs, name, onlyHere = false) // (nobody else uses it: the plain delete; owner 2026-10-11: palettes are one app-wide list)
         assertTrue(palette(name).isEmpty(), "still there after the delete: ${palette(name)}")
         assertNotEquals(name, prefs.getString(Settings.PREF_THEME_COLORS, null))
         assertNotEquals(name, prefs.getString(Settings.PREF_THEME_COLORS_NIGHT, null), "the dark colours still named it")
@@ -64,7 +64,7 @@ class Batch1007Test {
         val name = "Mine"
         KeyboardTheme.writeUserColors(prefs, name, KeyboardTheme.seedUserColors(ctx, prefs, KeyboardTheme.THEME_CURMUDGEON, false))
         AppearanceDraft.of(ctx).let { draft ->
-            KeyboardTheme.deleteUserColors(ctx, prefs, name)
+            helium314.keyboard.settings.Palettes.delete(real, prefs, name, onlyHere = false) // (nobody else uses it: the plain delete; owner 2026-10-11: palettes are one app-wide list)
             draft.accept(ctx) // the tick
         }
         assertTrue(palette(name).isEmpty())
