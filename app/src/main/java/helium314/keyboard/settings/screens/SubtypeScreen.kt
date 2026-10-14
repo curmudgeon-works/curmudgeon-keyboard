@@ -178,6 +178,7 @@ fun SubtypeScreen(
     fun layoutChanged(type: LayoutType) = currentSubtype.layoutName(type) != openedSubtype.layoutName(type)
         || type.folder.substringAfterLast(java.io.File.separator) in changedFolders || keyChanged(Settings.PREF_LAYOUT_PREFIX + type.name)
     var askOnLeave by remember { mutableStateOf(false) }
+    var askDelete by remember { mutableStateOf(false) }
     // a Discard puts values back behind the rows' backs: the list is built anew, every row reads its value again
     var rebuild by remember { mutableIntStateOf(0) }
     var askReject by remember { mutableStateOf(false) }
@@ -292,6 +293,20 @@ fun SubtypeScreen(
     }
     if (askReject) DiscardChangesDialog({ askReject = false }) { discardChanges(); draft = LayoutDraft.of(ctx, currentSubtypeString) }
     if (askAccept) SaveChangesDialog({ askAccept = false }) { draft.accept(); draft = LayoutDraft.of(ctx, currentSubtypeString) }
+    if (askDelete) ConfirmationDialog(
+        onDismissRequest = { askDelete = false },
+        onConfirmed = {
+            askDelete = false
+            LayoutDraft.close() // deleting keeps the changes so far: a Discard mustn't bring the keyboard back
+            if (currentSubtype.isAdditionalSubtype(prefs)) SubtypeUtilsAdditional.removeAdditionalSubtype(ctx, currentSubtype.toAdditionalSubtype())
+            SubtypeSettings.removeEnabledSubtype(ctx, currentSubtype.toAdditionalSubtype())
+            helium314.keyboard.latin.personalization.LearnedKeyboards.deleteKeyboard(ctx, currentSubtype) // (its words too)
+            onClickBack()
+        },
+        title = { Text(stringResource(R.string.delete_keyboard_title)) },
+        content = { Text(stringResource(R.string.delete_keyboard_message, keyboardName(currentSubtype, ctx))) },
+        confirmButtonText = stringResource(R.string.delete),
+    )
     if (askOnLeave) UnsavedChangesDialog(
         onKeepWorking = { askOnLeave = false },
         onDiscardAndExit = { discardChanges(); askOnLeave = false; onClickBack() },
@@ -306,12 +321,9 @@ fun SubtypeScreen(
                 IconButton({ askAccept = true }) { Icon(painterResource(R.drawable.ic_check), stringResource(R.string.appearance_accept)) }
             }
         },
+        // asks first, as the keyboard list does (2026-10-10: its learned and blacklisted words go with it now)
         icon = { if (SubtypeSettings.getEnabledSubtypes(true).size > 1 && SubtypeSettings.isEnabled(currentSubtype.toAdditionalSubtype())) DeleteButton {
-            LayoutDraft.close() // deleting keeps the changes so far: a Discard mustn't bring the keyboard back
-            if (currentSubtype.isAdditionalSubtype(prefs)) SubtypeUtilsAdditional.removeAdditionalSubtype(ctx, currentSubtype.toAdditionalSubtype())
-            SubtypeSettings.removeEnabledSubtype(ctx, currentSubtype.toAdditionalSubtype())
-            helium314.keyboard.latin.personalization.LearnedKeyboards.deleteKeyboard(ctx, currentSubtype) // (its words too)
-            onClickBack()
+            askDelete = true
         } },
         // the screen's name (the keyboard's name goes under it when settings are separate per keyboard)
         title = { Text(stringResource(R.string.settings_screen_preferences)) },
