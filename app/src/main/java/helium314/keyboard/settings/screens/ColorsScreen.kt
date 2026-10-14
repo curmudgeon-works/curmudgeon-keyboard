@@ -72,6 +72,7 @@ import kotlinx.serialization.json.Json
 fun ColorsScreen(
     isNight: Boolean,
     theme: String?,
+    made: String? = null, // the palette was just made by "Add your own", these colours were selected before
     onClickBack: () -> Unit
 ) {
     val ctx = LocalContext.current
@@ -83,6 +84,40 @@ fun ColorsScreen(
     val themeName = theme ?: if (isNight) prefs.getString(Settings.PREF_THEME_COLORS_NIGHT, Defaults.PREF_THEME_COLORS_NIGHT)!!
         else prefs.getString(Settings.PREF_THEME_COLORS, Defaults.PREF_THEME_COLORS)!!
     var newThemeName by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue(themeName)) }
+
+    // Back with changes asks Keep working / Discard and exit / Save and exit (2026-10-10, it saved silently): every
+    // change is live, so this is what the palette and the colours selections were when the editor opened; a palette
+    // just made counts as a change, its Discard deletes it and selects the colours from before
+    val prefKey = if (isNight) Settings.PREF_THEME_COLORS_NIGHT else Settings.PREF_THEME_COLORS
+    val openedName = rememberSaveable { themeName }
+    fun paletteKeys(name: String) = listOf(Settings.PREF_USER_COLORS_PREFIX + name, Settings.PREF_USER_MORE_COLORS_PREFIX + name,
+        Settings.PREF_USER_ALL_COLORS_PREFIX + name)
+    val opened = rememberSaveable(saver = androidx.compose.runtime.saveable.Saver<helium314.keyboard.settings.PrefSnapshot, HashMap<String, Any?>>(
+        save = { it.saved() },
+        restore = { @Suppress("UNCHECKED_CAST") helium314.keyboard.settings.PrefSnapshot(prefs, it as Map<String, Any?>) },
+    )) {
+        val keys = paletteKeys(openedName) + Settings.PREF_THEME_COLORS + Settings.PREF_THEME_COLORS_NIGHT
+        val now = prefs.all.let { all -> keys.associateWith { all[it] } }
+        helium314.keyboard.settings.PrefSnapshot(prefs,
+            if (made == null) now else now + paletteKeys(openedName).associateWith { null } + (prefKey to made))
+    }
+    val changed = made != null || newThemeName.text != openedName || opened.changed()
+    fun putBack() {
+        // only what changed goes back: a keyboard following the shared colours choice keeps following it (writing an
+        // unchanged value through the keyboard's view would make it its own, review 2026-10-07 finding 10)
+        val all = prefs.all
+        prefs.edit().apply {
+            if (newThemeName.text != openedName) paletteKeys(newThemeName.text).forEach { remove(it) }
+            for (key in paletteKeys(openedName) + Settings.PREF_THEME_COLORS + Settings.PREF_THEME_COLORS_NIGHT) {
+                val value = opened[key]
+                if (all[key] == value) continue
+                if (value == null) remove(key) else helium314.keyboard.latin.settings.KeyboardProfiles.put(this, key, value)
+            }
+        }.apply()
+        helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().setThemeNeedsReload()
+    }
+    var askLeave by rememberSaveable { mutableStateOf(false) }
+    fun leave() { if (changed) askLeave = true else onClickBack() }
 
     // is there really no better way of only setting forceOpposite while the screen is shown (and not paused)?
     // lifecycle stuff is weird, there is no pause and similar when activity is paused
@@ -185,7 +220,7 @@ fun ColorsScreen(
                         cm.setPrimaryClip(ClipData.newPlainText("Curmudgeon theme", getColorString(prefs, newThemeName.text)))
                     },
                 ),
-                onClickBack = onClickBack,
+                onClickBack = ::leave,
                 filteredItems = { search ->
                     val result = shownColors.filter { color ->
                         color.displayName.split(" ", "_").any { it.startsWith(search, true) }
@@ -238,6 +273,17 @@ fun ColorsScreen(
     }
     }
     }
+    if (askLeave) helium314.keyboard.settings.dialogs.UnsavedChangesDialog(
+        onKeepWorking = { askLeave = false },
+        onDiscardAndExit = { askLeave = false; putBack(); onClickBack() },
+        // saved for good, as on the popups screen: the Appearance screen under it doesn't ask again about it
+        onSaveAndExit = {
+            askLeave = false
+            helium314.keyboard.settings.AppearanceDraft.rebaseOpen(ctx,
+                (paletteKeys(openedName) + paletteKeys(newThemeName.text) + Settings.PREF_THEME_COLORS + Settings.PREF_THEME_COLORS_NIGHT).toSet())
+            onClickBack()
+        },
+    )
     if (chosenColor != null) CompositionLocalProvider(helium314.keyboard.settings.dialogs.LocalPreviewKeyboard provides preview) {
         val oldAllColors = KeyboardTheme.readUserAllColors(prefs, newThemeName.text, null)
         // the colour shows on the keyboard while it's picked; Cancel puts back what was there

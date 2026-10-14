@@ -153,11 +153,12 @@ fun SettingsNavHost(
         screen(SettingsDestination.LayoutFiles + "{subtype}") {
             LayoutFilesScreen(keyboard = it.arguments?.getString("subtype")!!.toSettingsSubtype(), onClickBack = ::goBack)
         }
-        screen(SettingsDestination.Colors + "{theme}") {
-            ColorsScreen(isNight = false, theme = it.arguments?.getString("theme"), onClickBack = ::goBack)
+        // made: the editor opened on a palette "Add your own" just made, with the colours selected before it (2026-10-10)
+        screen(SettingsDestination.Colors + "{theme}", optional = listOf(SettingsDestination.MADE)) {
+            ColorsScreen(isNight = false, theme = it.arguments?.getString("theme"), made = it.arguments?.getString(SettingsDestination.MADE), onClickBack = ::goBack)
         }
-        screen(SettingsDestination.ColorsNight + "{theme}") {
-            ColorsScreen(isNight = true, theme = it.arguments?.getString("theme"), onClickBack = ::goBack)
+        screen(SettingsDestination.ColorsNight + "{theme}", optional = listOf(SettingsDestination.MADE)) {
+            ColorsScreen(isNight = true, theme = it.arguments?.getString("theme"), made = it.arguments?.getString(SettingsDestination.MADE), onClickBack = ::goBack)
         }
         screen(SettingsDestination.Subtype + "{subtype}") {
             androidx.compose.runtime.CompositionLocalProvider(LocalSettingsMenu provides helium314.keyboard.latin.settings.KeyboardProfiles.Group.LAYOUT) { SubtypeScreen(initialSubtype = it.arguments?.getString("subtype")!!.toSettingsSubtype(), onClickBack = ::goBack) }
@@ -183,9 +184,11 @@ fun SettingsNavHost(
 
 /** A destination that can be one keyboard's: opened with [SettingsDestination.SET] in its route, its content edits that
  *  keyboard's set ([KeyboardScopeContext] as its context), however long it stays composed (a slide, a dialog's work). */
-private fun NavGraphBuilder.screen(route: String, content: @Composable (NavBackStackEntry) -> Unit) =
-    composable("$route?${SettingsDestination.SET}={${SettingsDestination.SET}}",
-        arguments = listOf(navArgument(SettingsDestination.SET) { type = NavType.IntType; defaultValue = SettingsDestination.NO_SET })
+/** [optional]: more query arguments of the route, strings, null when not given. */
+private fun NavGraphBuilder.screen(route: String, optional: List<String> = emptyList(), content: @Composable (NavBackStackEntry) -> Unit) =
+    composable("$route?${SettingsDestination.SET}={${SettingsDestination.SET}}" + optional.joinToString("") { "&$it={$it}" },
+        arguments = listOf(navArgument(SettingsDestination.SET) { type = NavType.IntType; defaultValue = SettingsDestination.NO_SET }) +
+            optional.map { navArgument(it) { type = NavType.StringType; nullable = true; defaultValue = null } }
     ) { entry ->
         KeyboardScope(SettingsDestination.setIdOf(entry)) { content(entry) }
     }
@@ -230,7 +233,9 @@ object SettingsDestination {
     const val SET = "set"
     internal const val NO_SET = -1
     /** [route] for the screens of keyboard set [setId] (null: no keyboard's own). */
-    fun inSet(route: String, setId: Int?): String = if (setId == null) route else "$route?$SET=$setId"
+    fun inSet(route: String, setId: Int?): String = if (setId == null) route else if ('?' in route) "$route&$SET=$setId" else "$route?$SET=$setId"
+    /** The Colors screens' argument: the palette was just made by "Add your own", these colours were selected before. */
+    const val MADE = "made"
     /** The keyboard set of a back stack entry, or null. */
     fun setIdOf(entry: NavBackStackEntry?): Int? = entry?.arguments?.getInt(SET, NO_SET)?.takeIf { it != NO_SET }
     /** [target] opened from a screen with context [from]: it edits the same keyboard (Colors from that keyboard's

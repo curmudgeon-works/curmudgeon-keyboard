@@ -18,7 +18,7 @@ import java.io.File
  * (SettingsActivity.onStop) and, after a crash, when the app starts again ([recoverAfterCrash]).
  */
 class AppearanceDraft private constructor(
-    private val prefs: Map<String, Any?>,
+    private var prefs: Map<String, Any?>,
     private val files: Map<File, Saved?>, // the live file -> its saved copy, null when it didn't exist
     private val dir: File,
     private val setId: Int = KeyboardProfiles.SHARED, // the set the screen edited (see PrefsDraft)
@@ -58,6 +58,17 @@ class AppearanceDraft private constructor(
         discard()
     }
 
+    /** [keys] are kept as they are now ("Save and exit" on a screen opened from Appearance, the palette editor): the
+     *  snapshot takes their values, so neither the cross nor leaving the app undoes them. */
+    fun rebase(ctx: Context, keys: Set<String>) {
+        val now = AppearanceLooks.screenValues(
+            ProfilePreferences(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)) { setId })
+        prefs = prefs.filterKeys { it !in keys } + now.filterKeys { it in keys }
+        writeSnapshot(dir, setId, prefs, files)
+        version.intValue++
+        helium314.keyboard.latin.utils.SettingsEventLog.log("Appearance snapshot rebased: $keys")
+    }
+
     /** Keeps what is on the phone now; only the snapshot goes. */
     fun accept() = discard()
 
@@ -95,6 +106,9 @@ class AppearanceDraft private constructor(
 
         /** The screen is left with nothing changed: the snapshot goes (the next visit starts from what is there then). */
         fun close() { active?.discard() }
+
+        /** [AppearanceDraft.rebase] of the running draft, if there is one. */
+        fun rebaseOpen(ctx: Context, keys: Set<String>) { active?.rebase(ctx, keys) }
 
         /** The app is left (or the screen goes to the background) with the screen open: changes not accepted are undone. */
         fun rejectOpen(ctx: Context) { active?.reject(ctx) }

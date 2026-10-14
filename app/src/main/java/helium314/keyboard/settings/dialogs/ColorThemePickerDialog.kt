@@ -199,7 +199,8 @@ private fun AddColorRow(onDismissRequest: () -> Unit, targetScreen: String, pref
             KeyboardTheme.writeUserMoreColors(prefs, defaultName, Defaults.PREF_USER_MORE_COLORS)
             prefs.edit { putString(prefKey, defaultName) }
             onDismissRequest()
-            SettingsDestination.navigateTo(targetScreen + android.net.Uri.encode(defaultName), ctx) // (Navigation decodes the route: a name with % or ? broke it)
+            // (Navigation decodes the route: a name with % or ? broke it); the editor's Discard puts [from] back
+            SettingsDestination.navigateTo(targetScreen + android.net.Uri.encode(defaultName) + "?${SettingsDestination.MADE}=" + android.net.Uri.encode(from), ctx)
             KeyboardSwitcher.getInstance().setThemeNeedsReload()
         }.padding(start = 10.dp, top = 12.dp, bottom = 12.dp)
     ) {
