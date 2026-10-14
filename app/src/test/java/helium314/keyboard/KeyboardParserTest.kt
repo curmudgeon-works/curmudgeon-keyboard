@@ -458,8 +458,9 @@ f""", // no newline at the end
     @Test fun `a popup that is a key of the layout is dropped wherever that key sits`() {
         val editorInfo = EditorInfo()
         val subtype = SubtypeUtilsAdditional.createEmojiCapableAdditionalSubtype(Locale.GERMANY, "qwertz+", true)
-        // (the dedupe is a setting, off by default)
-        val prefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(latinIME)
+        // (the dedupe is a setting, off by default; a keyboard's setting, so written through the keyboard's settings:
+        // owner 2026-10-11, no separate common set, the plain key in the real preferences is no keyboard's any more)
+        val prefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(latinIME)
         prefs.edit().putBoolean(helium314.keyboard.latin.settings.Settings.PREF_REMOVE_REDUNDANT_POPUPS, true).commit()
         helium314.keyboard.latin.settings.Settings.getInstance().loadSettings(latinIME)
         val (kb, _) = try { buildKeyboard(editorInfo, subtype, KeyboardId.ELEMENT_ALPHABET) } finally {
