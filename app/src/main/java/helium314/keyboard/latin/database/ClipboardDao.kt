@@ -3,6 +3,8 @@ package helium314.keyboard.latin.database
 
 import android.content.ContentValues
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import helium314.keyboard.latin.ClipboardHistoryEntry
 import helium314.keyboard.latin.settings.Settings
@@ -27,6 +29,9 @@ class ClipboardDao private constructor(private val db: Database) {
         fun onClipInserted(position: Int)
         fun onClipsRemoved(position: Int, count: Int)
         fun onClipMoved(oldPosition: Int, newPosition: Int)
+        /** Everything may have changed (a restore's clips, committed or rolled back): redraw all. On the main thread
+         *  (owner 2026-10-13, 20261013_L4). */
+        fun onClipsReloaded()
     }
 
     var listener: Listener? = null
@@ -54,57 +59,66 @@ class ClipboardDao private constructor(private val db: Database) {
 
     fun addClip(timestamp: Long, pinned: Boolean, text: String) = addClip(timestamp, pinned, text, strict = false)
 
-    // [strict]: a failed insert throws (a restore's refill, rolled back as a whole) instead of going unnoticed
-    private fun addClip(timestamp: Long, pinned: Boolean, text: String, strict: Boolean) {
+    // [restoring]: a failed insert throws (a restore's refill, rolled back as a whole) instead of going unnoticed, and the
+    // view isn't told clip by clip (owner 2026-10-13, 20261013_L4: once, after the transaction)
+    private fun addClip(timestamp: Long, pinned: Boolean, text: String, restoring: Boolean) {
         val existingIndex = cache.indexOfFirst { it.text == text }
         if (existingIndex >= 0 && cache[existingIndex].timeStamp == timestamp)
             return // nothing to do
         if (existingIndex >= 0) {
-            updateTimestampAt(existingIndex, timestamp)
+            updateTimestampAt(existingIndex, timestamp, notify = !restoring)
             return
         }
-        insertNewEntry(timestamp, pinned, text, trim = !strict, strict = strict)
+        insertNewEntry(timestamp, pinned, text, trim = !restoring, strict = restoring, notify = !restoring)
     }
 
     /**
      * The device's clips replaced by a backup's [clips] (time, pinned, text; a full restore), the clear and every add in
      * one transaction, as [mergeClips] (owner 2026-10-13, 20261013_L1): an add that fails rolls it all back, the cache
-     * is read again, and the device's clips are really kept (before, they were cleared first and gone).
+     * is read again, and the device's clips are really kept (before, they were cleared first and gone). The view is told
+     * once, after it ([notifyReloaded]).
      */
     fun replaceClips(clips: List<Triple<Long, Boolean, String>>) {
         val w = db.writableDatabase
         w.beginTransaction()
         var done = false
         try {
-            clear()
-            for ((timestamp, pinned, text) in clips) addClip(timestamp, pinned, text, strict = true)
+            cache.clear()
+            w.delete(TABLE, null, null)
+            for ((timestamp, pinned, text) in clips) addClip(timestamp, pinned, text, restoring = true)
             w.setTransactionSuccessful()
             done = true
         } finally {
             w.endTransaction()
             if (!done) reloadCache()
+            notifyReloaded()
         }
+    }
+
+    /** The view, if shown, redraws everything, on the main thread: after a restore's transaction, committed or rolled
+     *  back (owner 2026-10-13, 20261013_L4: the restore runs on a background thread and told the view clip by clip, and a
+     *  rollback's reload not at all). */
+    private fun notifyReloaded() {
+        mainHandler.post { listener?.onClipsReloaded() }
     }
 
     /**
      * A clip of a backup merged in (a partial restore, owner 2026-10-12: "yes, merge clipboard"): one with the same text
      * is kept once, pinned if either is, with the newer time; a new one is added. Nothing is dropped here: the history
-     * size is applied once all are in ([keepNewestUnpinned]).
+     * size is applied once all are in ([keepNewestUnpinned]). The view isn't told ([mergeClips] does, once).
      */
-    fun mergeClip(timestamp: Long, pinned: Boolean, text: String) {
+    private fun mergeClip(timestamp: Long, pinned: Boolean, text: String) {
         val existing = cache.firstOrNull { it.text == text }
         if (existing == null) {
-            insertNewEntry(timestamp, pinned, text, trim = false)
+            insertNewEntry(timestamp, pinned, text, trim = false, notify = false)
             return
         }
         val newPinned = existing.isPinned || pinned
         val newTime = maxOf(existing.timeStamp, timestamp)
         if (newPinned == existing.isPinned && newTime == existing.timeStamp) return
-        val oldPos = cache.indexOf(existing)
         existing.isPinned = newPinned
         existing.timeStamp = newTime
         cache.sort()
-        listener?.onClipMoved(oldPos, cache.indexOf(existing))
         val cv = ContentValues(2)
         cv.put(COLUMN_PINNED, newPinned)
         cv.put(COLUMN_TIMESTAMP, newTime)
@@ -114,7 +128,8 @@ class ClipboardDao private constructor(private val db: Database) {
     /**
      * A backup's [clips] (time, pinned, text) merged in ([mergeClip] each), then the history [size] applied
      * ([keepNewestUnpinned]), all in one transaction (review L3.6): a merge that fails partway leaves the clips as they
-     * were, and the cache is read again.
+     * were, and the cache is read again. The view is told once, after it ([notifyReloaded]; owner 2026-10-13,
+     * 20261013_L4: before, clip by clip from the restore's thread, and not of a rollback).
      */
     fun mergeClips(clips: List<Triple<Long, Boolean, String>>, size: Int) {
         val w = db.writableDatabase
@@ -128,20 +143,17 @@ class ClipboardDao private constructor(private val db: Database) {
         } finally {
             w.endTransaction()
             if (!done) reloadCache()
+            notifyReloaded()
         }
     }
 
     /** Keeps the newest [size] unpinned clips, pins all (as [clearOldClips], right away and with the size given); also
-     *  while the clipboard is shown (review L3.6: it was skipped then), the view told of each one removed. */
-    fun keepNewestUnpinned(size: Int) {
+     *  while the clipboard is shown (review L3.6: it was skipped then); the view isn't told ([mergeClips] does, once). */
+    private fun keepNewestUnpinned(size: Int) {
         val unpinned = cache.filter { !it.isPinned }.sortedByDescending { it.timeStamp }
         if (unpinned.size <= size) return
         val old = unpinned.drop(size)
-        for (entry in old) {
-            val index = cache.indexOf(entry)
-            cache.removeAt(index)
-            listener?.onClipsRemoved(index, 1)
-        }
+        cache.removeAll(old.toSet())
         db.writableDatabase.delete(TABLE, "$COLUMN_ID IN (${old.joinToString { it.id.toString() }})", null)
     }
 
@@ -159,7 +171,8 @@ class ClipboardDao private constructor(private val db: Database) {
         sort()
     }
 
-    private fun insertNewEntry(timestamp: Long, pinned: Boolean, text: String, trim: Boolean = true, strict: Boolean = false) {
+    private fun insertNewEntry(timestamp: Long, pinned: Boolean, text: String, trim: Boolean = true, strict: Boolean = false,
+                               notify: Boolean = true) {
         val cv = ContentValues(3)
         cv.put(COLUMN_TIMESTAMP, timestamp)
         cv.put(COLUMN_PINNED, pinned)
@@ -169,15 +182,15 @@ class ClipboardDao private constructor(private val db: Database) {
         val entry = ClipboardHistoryEntry(rowId, timestamp, pinned, text)
         cache.add(entry)
         cache.sort()
-        listener?.onClipInserted(cache.indexOf(entry))
+        if (notify) listener?.onClipInserted(cache.indexOf(entry))
         if (trim) clearOldClips()
     }
 
-    private fun updateTimestampAt(index: Int, timestamp: Long) {
+    private fun updateTimestampAt(index: Int, timestamp: Long, notify: Boolean = true) {
         val entry = cache[index]
         entry.timeStamp = timestamp
         cache.sort()
-        listener?.onClipMoved(index, cache.indexOf(entry))
+        if (notify) listener?.onClipMoved(index, cache.indexOf(entry))
         val cv = ContentValues(1)
         cv.put(COLUMN_TIMESTAMP, timestamp)
         db.writableDatabase.update(TABLE, cv, "$COLUMN_ID = ${entry.id}", null)
@@ -278,6 +291,7 @@ class ClipboardDao private constructor(private val db: Database) {
         """
 
         private var instance: ClipboardDao? = null
+        private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
 
         /** Returns the instance or creates a new one. Returns null if instance can't be created (e.g. no access to db due to device being locked) */
         fun getInstance(context: Context): ClipboardDao? {

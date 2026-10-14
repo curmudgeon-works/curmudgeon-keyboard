@@ -254,6 +254,12 @@ class ClipboardHistoryView @JvmOverloads constructor(
         if (newPosition < oldPosition) clipboardRecyclerView.smoothScrollToPosition(newPosition)
     }
 
+    // a restore's clips, after its transaction (owner 2026-10-13, 20261013_L4): everything redrawn at once
+    @SuppressLint("NotifyDataSetChanged")
+    override fun onClipsReloaded() {
+        clipboardAdapter.notifyDataSetChanged()
+    }
+
     override fun onSharedPreferenceChanged(prefs: SharedPreferences?, key: String?) {
         setToolbarButtonsActivatedStateOnPrefChange(KeyboardSwitcher.getInstance().clipboardStrip, key)
 

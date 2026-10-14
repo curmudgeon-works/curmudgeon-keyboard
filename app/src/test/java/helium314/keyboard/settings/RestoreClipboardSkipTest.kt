@@ -171,6 +171,68 @@ class RestoreClipboardSkipTest {
         }
     }
 
+    /** A clipboard view: what it was told, "reloaded" with whether on the main thread and outside a transaction. */
+    private class Panel(private val ctx: Context) : ClipboardDao.Listener {
+        val calls = mutableListOf<String>()
+        override fun onClipInserted(position: Int) { calls += "inserted" }
+        override fun onClipsRemoved(position: Int, count: Int) { calls += "removed" }
+        override fun onClipMoved(oldPosition: Int, newPosition: Int) { calls += "moved" }
+        override fun onClipsReloaded() {
+            calls += "reloaded" + (if (Looper.myLooper() == Looper.getMainLooper()) "" else " off the main thread") +
+                (if (Database.getInstance(ctx).writableDatabase.inTransaction()) " in the transaction" else "")
+        }
+    }
+
+    // ---- the open clipboard view during a restore (owner 2026-10-13, 20261013_L4). Fail before: told clip by clip from
+    // the restore's thread, and nothing of a rollback ----
+
+    @Test fun `copyFromDb full - the view is told once, after the transaction, nothing clip by clip`() {
+        val dao = deviceClips()
+        val panel = Panel(ctx)
+        dao.listener = panel
+        try {
+            restoredDb.parentFile?.mkdirs()
+            restoredDb.writeBytes(clipboardDb(version = 2))
+            assertTrue(Database.copyFromDb(restoredDb, ctx))
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(listOf("reloaded"), panel.calls)
+            assertEquals(setOf("x", "y"), texts(dao))
+        } finally { dao.listener = null }
+    }
+
+    @Test fun `copyFromDb merge rolled back - the view is told once, the device's clips back`() {
+        val dao = deviceClips()
+        val panel = Panel(ctx)
+        dao.listener = panel
+        restoredDb.parentFile?.mkdirs()
+        restoredDb.writeBytes(clipboardDb(version = 2))
+        val w = Database.getInstance(ctx).writableDatabase
+        // (the table refuses every delete: the size applied last fails after the clips went in, the merge rolls back)
+        w.execSQL("CREATE TRIGGER refuse_delete BEFORE DELETE ON CLIPBOARD BEGIN SELECT RAISE(ABORT, 'refused'); END")
+        try {
+            assertFalse(Database.copyFromDb(restoredDb, ctx, mergeKeeping = 1), "said restored")
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(listOf("reloaded"), panel.calls)
+            assertEquals(setOf("a", "b"), texts(dao))
+        } finally {
+            w.execSQL("DROP TRIGGER IF EXISTS refuse_delete")
+            dao.listener = null
+        }
+    }
+
+    // (passes before too: the copy path keeps its notifications and animation)
+    @Test fun `a copy while the clipboard is shown - the view is told of the one clip, as before`() {
+        val dao = deviceClips()
+        val panel = Panel(ctx)
+        dao.listener = panel
+        try {
+            dao.addClip(50, false, "new")
+            dao.addClip(60, false, "a") // (one there: moved to the top)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(listOf("inserted", "moved"), panel.calls)
+        } finally { dao.listener = null }
+    }
+
     /** The texts in the device's clipboard table itself. */
     private fun tableTexts() = Database.getInstance(ctx).readableDatabase.rawQuery("SELECT TEXT FROM CLIPBOARD", null).use {
         val out = HashSet<String>(); while (it.moveToNext()) out += it.getString(0); out

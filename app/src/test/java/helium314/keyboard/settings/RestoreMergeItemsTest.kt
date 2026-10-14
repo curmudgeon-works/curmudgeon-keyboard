@@ -539,17 +539,19 @@ class RestoreMergeItemsTest {
         assertFalse(clips.any { it.first == "f" }, "the oldest unpinned beyond the size stays out")
     }
 
-    // fail before (L3.6): with the clipboard view listening the size wasn't applied, and each clip was its own write
+    // fail before (L3.6): with the clipboard view listening the size wasn't applied, and each clip was its own write.
+    // Since owner 2026-10-13, 20261013_L4 the view is told once, after the transaction, never clip by clip
     @Test fun `clipboard merge - one transaction, and the size applied while the clipboard is shown`() {
         real.edit().putInt(Settings.PREF_CLIPBOARD_HISTORY_SIZE, 2).commit()
         val dao = ClipboardDao.getInstance(ctx)!!
         dao.addClip(10, false, "a")
-        val inTransaction = mutableListOf<Boolean>()
-        var removed = 0
+        val perClip = mutableListOf<String>()
+        val reloaded = mutableListOf<Boolean>() // (each: in the transaction then)
         dao.listener = object : ClipboardDao.Listener {
-            override fun onClipInserted(position: Int) { inTransaction += Database.getInstance(ctx).writableDatabase.inTransaction() }
-            override fun onClipsRemoved(position: Int, count: Int) { removed += count }
-            override fun onClipMoved(oldPosition: Int, newPosition: Int) { }
+            override fun onClipInserted(position: Int) { perClip += "inserted" }
+            override fun onClipsRemoved(position: Int, count: Int) { perClip += "removed" }
+            override fun onClipMoved(oldPosition: Int, newPosition: Int) { perClip += "moved" }
+            override fun onClipsReloaded() { reloaded += Database.getInstance(ctx).writableDatabase.inTransaction() }
         }
         try {
             val db = File(ctx.cacheDir, "clips-${System.nanoTime()}.db")
@@ -562,8 +564,9 @@ class RestoreMergeItemsTest {
             backup(emptyList(), entries = mapOf(Database.NAME to db.readBytes()))
             db.delete()
             restoreChosenFrom(ctx, zip, emptyList(), settings = false, learnedWords = false, io = io, clipboard = true)
-            assertEquals(listOf(true, true), inTransaction)
-            assertEquals(1, removed)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(emptyList(), perClip)
+            assertEquals(listOf(false), reloaded)
             assertEquals(listOf("c", "b"), (0 until dao.count()).map { dao.getAt(it).text })
         } finally {
             dao.listener = null
