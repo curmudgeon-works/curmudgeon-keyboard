@@ -304,8 +304,8 @@ class RestoreOnePlanTest {
         assertEquals(RestoreFlow.Question.Item(Kind.THEMES, "Sunset"), flow.current)
         assertTrue(flow.isLast)
         val item = flow.itemQuestion(flow.current as RestoreFlow.Question.Item)!!
-        assertEquals(Answer.Replace("Sunset"), item.picked, "the same name suggested")
-        item.picked = Answer.KeepBoth
+        assertEquals(Answer.KeepBoth, item.picked, "the same name, other content: Keep both suggested (owner 2026-10-12, A2)")
+        item.picked = Answer.Replace("Sunset")
         flow.keep(item)
         flow.back()
         assertEquals(0, flow.index)
@@ -321,8 +321,95 @@ class RestoreOnePlanTest {
         flow.tick(sunset, false)
         assertEquals(listOf(RestoreFlow.Question.Keyboard(backupEnglish)), flow.questions)
         flow.tick(sunset, true)
-        assertEquals(Answer.KeepBoth, flow.itemQuestion(RestoreFlow.Question.Item(Kind.THEMES, "Sunset"))!!.picked)
+        assertEquals(Answer.Replace("Sunset"), flow.itemQuestion(RestoreFlow.Question.Item(Kind.THEMES, "Sunset"))!!.picked)
         assertEquals(mapOf<SettingsSubtype, RestoreDecision>(backupEnglish to RestoreDecision.Separate("Mine")), flow.decisions())
-        assertEquals(Answer.KeepBoth, flow.choices().answers[sunset])
+        assertEquals(Answer.Replace("Sunset"), flow.choices().answers[sunset])
+    }
+
+    // ---- one device item, one claimant (review 2026-10-12 A2, owner: option D) ----
+
+    /** The device's English (k1) on its Sunset (gap 1); the backup's English (k1, using no theme) with Sunset (gap 3, other
+     *  colors) and Dusk (gap 1, the device Sunset's), in [order]; screen 1 done, the flow at its first theme question. */
+    private fun sunsetAndDusk(vararg order: String): Pair<RestoreFlow, SettingsSubtype> {
+        val deviceEnglish = available("en-US").withId(1)
+        device(listOf(deviceEnglish), own = mapOf(idKey(1, theme) to "Sunset"), extra = mapOf(looks(look("Sunset", 1.0))))
+        val gaps = mapOf("Sunset" to 3.0, "Dusk" to 1.0)
+        backup(listOf(available("en-US").withId(1)), mapOf(looks(*order.map { look(it, gaps.getValue(it)) }.toTypedArray())))
+        val plan = restorePlanFrom(ctx, zip)
+        val flow = RestoreFlow(plan, plan.incoming.keys.toList())
+        flow.top.check(false)
+        assertEquals(order.map { RestoreFlow.Question.Item(Kind.THEMES, it) }, flow.questions.filterIsInstance<RestoreFlow.Question.Item>())
+        assertFalse(flow.begin())
+        while (flow.current !is RestoreFlow.Question.Item) assertFalse(flow.next())
+        return flow to deviceEnglish
+    }
+
+    private fun RestoreFlow.itemShowing() = itemQuestion(current as RestoreFlow.Question.Item)!!
+
+    /** The flow's answers run, the backup's English merged into the device's (its settings unchanged). */
+    private fun run(flow: RestoreFlow, deviceEnglish: SettingsSubtype) {
+        val backupEnglish = flow.keyboards.single()
+        restoreKeyboardsFrom(ctx, zip, listOf(backupEnglish), withSettings = true, names = flow.choices(),
+            decisions = mapOf(backupEnglish to RestoreDecision.Merge(deviceEnglish, parts = emptySet(), menus = emptySet())))
+    }
+
+    // fail before: Sunset's question picked Replace of the device's Sunset, which Dusk's merge had taken already (both
+    // pointed at it; the run silently kept both), and Keep both said "yours becomes Sunset 2" for a Sunset gone by then
+    @Test fun `Dusk first merges into the device's Sunset; Sunset's question shows it taken by Dusk, Keep both picked, no Sunset 2`() {
+        val (flow, deviceEnglish) = sunsetAndDusk("Dusk", "Sunset")
+        val dusk = flow.itemShowing()
+        assertEquals(emptyMap(), dusk.taken)
+        assertEquals(Answer.Replace("Sunset"), dusk.picked, "the same colors: merged into, suggested")
+        flow.keep(dusk)
+        assertFalse(flow.next())
+        val sunset = flow.itemShowing()
+        assertEquals(mapOf("Sunset" to "Dusk"), sunset.taken, "the device's Sunset: Already taken by Dusk")
+        assertEquals(Answer.KeepBoth, sunset.picked)
+        assertFalse(sunset.keepBothRenames, "the device's Sunset is Dusk by then: the backup's comes in as Sunset, no number")
+        assertEquals("Already taken by Dusk", ctx.getString(helium314.keyboard.latin.R.string.restore_item_taken, "Dusk"))
+        flow.keep(sunset)
+        assertTrue(flow.isLast)
+        run(flow, deviceEnglish)
+        assertEquals(mapOf("Dusk" to 1f, "Sunset" to 3f), themes())
+        assertEquals("Dusk", own(kid(1), theme), "the device's English follows its theme, renamed Dusk")
+    }
+
+    // owner 2026-10-12: "Same name but different content feels like both will be valuable to have": Keep both picked for
+    // Sunset; Keep both takes no device item, so Dusk still merges into the device's Sunset. Answered Replace instead,
+    // Sunset takes it: Dusk's question shows it taken by Sunset, Keep both picked
+    @Test fun `Sunset first - Keep both picked, Dusk merges into the device's Sunset; Sunset replacing it, Dusk shows it taken`() {
+        val (flow, deviceEnglish) = sunsetAndDusk("Sunset", "Dusk")
+        val sunset = flow.itemShowing()
+        assertEquals(Answer.KeepBoth, sunset.picked, "same name, other colors: Keep both suggested (before: Replace)")
+        assertTrue(sunset.keepBothRenames)
+        flow.keep(sunset)
+        assertFalse(flow.next())
+        val dusk = flow.itemShowing()
+        assertEquals(emptyMap(), dusk.taken)
+        assertEquals(Answer.Replace("Sunset"), dusk.picked)
+        flow.keep(dusk)
+        // Back to Sunset, answered Replace: the device's Sunset is Sunset's, Dusk's earlier answer can't stand
+        flow.back()
+        val again = flow.itemShowing()
+        again.picked = Answer.Replace("Sunset")
+        flow.keep(again)
+        assertFalse(flow.next())
+        val dusk2 = flow.itemShowing()
+        assertEquals(mapOf("Sunset" to "Sunset"), dusk2.taken)
+        assertEquals(Answer.KeepBoth, dusk2.picked, "the device's Sunset taken: nothing else to merge into")
+        flow.keep(dusk2)
+        run(flow, deviceEnglish)
+        assertEquals(mapOf("Sunset" to 3f, "Dusk" to 1f), themes())
+        assertEquals("Sunset", own(kid(1), theme), "the device's English on Sunset, now the backup's")
+    }
+
+    // Keep both picked for Sunset and the device's Sunset merged into by Dusk after it: the device's goes Sunset 2, then
+    // Dusk; nothing is left numbered (the run, unanswered: the suggested answers)
+    @Test fun `unanswered, Sunset kept both and Dusk merged - the device's Sunset ends as Dusk, no Sunset 2`() {
+        val (flow, deviceEnglish) = sunsetAndDusk("Sunset", "Dusk")
+        run(flow, deviceEnglish)
+        assertEquals(mapOf("Sunset" to 3f, "Dusk" to 1f), themes())
+        assertEquals("Dusk", own(kid(1), theme))
+        assertEquals(emptySet(), real.all.filterValues { it == "Sunset 2" }.keys)
     }
 }

@@ -130,12 +130,14 @@ class PartialRestoreCustomNumbersTest {
         assertEquals(null, palette("Warm"))
     }
 
-    // (owner 2026-10-12: replaced, the suggested answer, the phone's Warm has the backup's colors; kept both, the backup's
-    // takes the name and the phone's is numbered, its keyboard following; before, the backup's came in as "Warm 2")
+    // (owner 2026-10-12: replaced, answered (Keep both is suggested since option D, A2), the phone's Warm has the
+    // backup's colors; kept both, the backup's takes the name and the phone's is numbered, its keyboard following;
+    // before, the backup's came in as "Warm 2")
     @Test fun `a restored palette whose name the phone uses for other colors - replaced or kept both`() {
         phone(own = mapOf(Settings.PREF_THEME_COLORS to "Warm"), shared = mapOf(Settings.PREF_USER_COLORS_PREFIX + "Warm" to "x"))
         backup(own = mapOf(Settings.PREF_THEME_COLORS to "Warm"), extra = mapOf(Settings.PREF_USER_COLORS_PREFIX + "Warm" to "y"))
-        restoreKeyboardsFrom(ctx, zip, listOf(restored), withSettings = true)
+        restoreKeyboardsFrom(ctx, zip, listOf(restored), withSettings = true, names = SavedItemsMerge.Choices(
+            answers = mapOf((SavedItemsMerge.Kind.PALETTES to "Warm") to SavedItemsMerge.Answer.Replace("Warm"))))
         assertEquals("Warm", restoredOwn(Settings.PREF_THEME_COLORS))
         assertEquals("y", palette("Warm"))
         assertEquals(null, palette("Warm 2"))

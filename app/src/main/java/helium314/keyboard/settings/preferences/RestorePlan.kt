@@ -456,9 +456,13 @@ internal class RestoreFlow(val plan: RestorePlan, val keyboards: List<SettingsSu
         if (decide) a.decision = choice.decision
     }
 
-    /** The item question of [question], as it was last answered (none: the suggested answer). */
-    fun itemQuestion(question: Question.Item): ItemQuestion? =
-        plan.items.item(question.kind, question.key)?.let { ItemQuestion(it, itemAnswers[question.kind to question.key]) }
+    /** The item question of [question], as it was last answered (none, or a device item an earlier question took since:
+     *  the suggested answer), with the device items earlier questions took (review 2026-10-12 A2). */
+    fun itemQuestion(question: Question.Item): ItemQuestion? = plan.items.item(question.kind, question.key)?.let { item ->
+        // (the questions before it: the ticked items of its kind, in order, as answered)
+        val answered = SavedItemsMerge.answers(plan.items.of(item.kind), choices())[item.key]
+        ItemQuestion(item, answered?.answer, answered?.taken.orEmpty())
+    }
 
     fun keep(question: ItemQuestion) { itemAnswers[question.item.kind to question.item.key] = question.picked }
 }
@@ -477,7 +481,12 @@ internal class MergeTicks(val differences: List<RestoreMatch.Difference>, val ti
                           val wordsRow: Boolean, val wordsTicked: Boolean, val typed: String?)
 
 /** A saved item's question (owner 2026-10-12): Replace one of its candidates on the device, or Keep both; [answer]: as
- *  answered before (none: the suggested one, the first candidate). */
-internal class ItemQuestion(val item: SavedItemsMerge.ItemPlan<*>, answer: SavedItemsMerge.Answer?) {
-    var picked: SavedItemsMerge.Answer by mutableStateOf(answer ?: item.suggested)
+ *  answered before (none: the suggested one, [SavedItemsMerge.ItemPlan.suggested]); [taken]: the device items earlier
+ *  questions merge into, by the backup item's name that took them, greyed out and not picked (review 2026-10-12 A2). */
+internal class ItemQuestion(val item: SavedItemsMerge.ItemPlan<*>, answer: SavedItemsMerge.Answer?, val taken: Map<String, String> = emptyMap()) {
+    var picked: SavedItemsMerge.Answer by mutableStateOf(answer ?: item.suggested(taken.keys))
+    /** The answer picked to start with (its candidate's line says "Suggested"). */
+    val suggested get() = item.suggested(taken.keys)
+    /** Whether Keep both renames the device's of the item's name: not when an earlier question took it (A2). */
+    val keepBothRenames get() = item.keepBothName != null && item.holder !in taken
 }

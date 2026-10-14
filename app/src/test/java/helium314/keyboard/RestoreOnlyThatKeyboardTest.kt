@@ -163,14 +163,17 @@ class RestoreOnlyThatKeyboardTest {
             AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Sunset", mapOf(gap to 1f))), now = true)
             backup(mapOf(AppearanceLooks.PREF to JSONArray(listOf(sunset)).toString(), own(7, AppearanceLooks.PREF_SELECTED) to "Sunset"))
             val before = outsideHindi()
+            // (ticked: answered Replace; Keep both is the suggested answer since owner 2026-10-12 option D, A2)
             restoreKeyboardsFrom(ctx, zip, listOf(backupHi), withSettings = true, decisions = whole, names =
                 helium314.keyboard.settings.preferences.SavedItemsMerge.Choices(if (ticked) emptySet() else
-                    setOf(helium314.keyboard.settings.preferences.SavedItemsMerge.Kind.THEMES to "Sunset")))
+                    setOf(helium314.keyboard.settings.preferences.SavedItemsMerge.Kind.THEMES to "Sunset"),
+                    mapOf((helium314.keyboard.settings.preferences.SavedItemsMerge.Kind.THEMES to "Sunset") to
+                        helium314.keyboard.settings.preferences.SavedItemsMerge.Answer.Replace("Sunset"))))
             assertEquals(before, outsideHindi())
             assertFalse(real.contains(own(1, AppearanceLooks.PREF_SELECTED)), "the shared set got Hindi's choice")
             assertEquals("Sunset", real.getString(own(2, AppearanceLooks.PREF_SELECTED), null))
             assertFalse(real.contains(own(2, label)))
-            // (owner 2026-10-12: ticked, replaced, the suggested answer: the device's Sunset is the backup's)
+            // (owner 2026-10-12: ticked, replaced: the device's Sunset is the backup's)
             assertEquals(listOf("Sunset"), AppearanceLooks.load(real).map { it.name })
             assertEquals(if (ticked) 5f else 1f, AppearanceLooks.load(real).last().values[gap])
         }

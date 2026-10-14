@@ -696,16 +696,18 @@ private fun CheckRow(text: String, checked: Boolean, enabled: Boolean = true, su
         }
     }
 
-/** A row with a radio button, and [subtext] under its text if any. */
+/** A row with a radio button, and [subtext] under its text if any; not [enabled]: greyed out, not picked. */
 @Composable
-private fun RadioRow(text: String, selected: Boolean, subtext: String? = null, onClick: () -> Unit) =
+private fun RadioRow(text: String, selected: Boolean, subtext: String? = null, enabled: Boolean = true, onClick: () -> Unit) =
     Row(verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 2.dp)) {
-        RadioButton(selected = selected, onClick = onClick)
-        if (subtext == null) Text(text)
+        modifier = Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick).padding(vertical = 2.dp)) {
+        RadioButton(selected = selected, onClick = if (enabled) onClick else null, enabled = enabled)
+        // (greyed out as Material greys a disabled control's text)
+        val grey = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        if (subtext == null) Text(text, color = if (enabled) androidx.compose.ui.graphics.Color.Unspecified else grey)
         else Column {
-            Text(text)
-            Text(subtext, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(text, color = if (enabled) androidx.compose.ui.graphics.Color.Unspecified else grey)
+            Text(subtext, style = MaterialTheme.typography.bodySmall, color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else grey)
         }
     }
 
@@ -874,9 +876,9 @@ private fun itemNoun(kind: SavedItemsMerge.Kind) = when (kind) {
     SavedItemsMerge.Kind.PICTURES -> R.string.restore_noun_image
 }
 
-/** A candidate's line in a saved item's question (owner 2026-10-12: "Suggested: same name, other colors. Used by your
- *  English (US), French: they take the backup's look"; "Same colors, other name: renamed Sunset"). [suggested]: the
- *  first candidate, picked to start with. */
+/** A candidate's line in a saved item's question (owner 2026-10-12: "Same name, other colors. Used by your English
+ *  (US), French: they take the backup's look"; "Suggested: same colors, other name: renamed Sunset"). [suggested]: the
+ *  candidate picked to start with ([ItemQuestion.suggested]). */
 internal fun restoreCandidateText(ctx: Context, plan: RestorePlan, item: SavedItemsMerge.ItemPlan<*>, name: String, suggested: Boolean): String {
     val kind = item.kind
     val colors = kind == SavedItemsMerge.Kind.THEMES || kind == SavedItemsMerge.Kind.PALETTES
@@ -903,9 +905,11 @@ internal fun restoreCandidateText(ctx: Context, plan: RestorePlan, item: SavedIt
 
 /**
  * A saved item's question (owner 2026-10-12): "Restoring theme Sunset", "This device has a theme like it. Replace it
- * with the backup's, or keep both?", its candidates on the device (the same name first, picked to start with) and Keep
- * both (the backup's keeps its name; the device's becomes "Sunset 2", the keyboards using it keeping their look). The
- * item acts as a whole: no per-part choice. Back / Next, the last question's Restore.
+ * with the backup's, or keep both?", its candidates on the device (the same name first) and Keep both (the backup's
+ * keeps its name; the device's becomes "Sunset 2", the keyboards using it keeping their look). Picked to start with:
+ * one with the same content, else Keep both (owner 2026-10-12, option D). A candidate an earlier question merges into
+ * is greyed out, "Already taken by Dusk", and Keep both renames nothing then (review 2026-10-12 A2). The item acts as a
+ * whole: no per-part choice. Back / Next, the last question's Restore.
  */
 @Composable
 private fun ItemQuestionDialog(flow: RestoreFlow, question: ItemQuestion, onRestore: () -> Unit) {
@@ -920,13 +924,15 @@ private fun ItemQuestionDialog(flow: RestoreFlow, question: ItemQuestion, onRest
         content = {
             Column {
                 Text(stringResource(R.string.restore_item_message, noun), modifier = Modifier.padding(bottom = 8.dp))
-                item.candidates.forEachIndexed { i, name ->
+                item.candidates.forEach { name ->
                     val answer = SavedItemsMerge.Answer.Replace(name)
-                    RadioRow(name, question.picked == answer, subtext = restoreCandidateText(ctx, flow.plan, item, name, suggested = i == 0)) {
+                    val takenBy = question.taken[name]
+                    RadioRow(name, question.picked == answer, enabled = takenBy == null, subtext = takenBy?.let { stringResource(R.string.restore_item_taken, it) }
+                        ?: restoreCandidateText(ctx, flow.plan, item, name, suggested = question.suggested == answer)) {
                         question.picked = answer
                     }
                 }
-                val keepBoth = item.keepBothName?.let { stringResource(R.string.restore_item_keep_both_renamed, item.name, it) }
+                val keepBoth = item.keepBothName?.takeIf { question.keepBothRenames }?.let { stringResource(R.string.restore_item_keep_both_renamed, item.name, it) }
                     ?: stringResource(R.string.restore_item_keep_both_added, item.name)
                 RadioRow(stringResource(R.string.restore_keep_both), question.picked == SavedItemsMerge.Answer.KeepBoth, subtext = keepBoth) {
                     question.picked = SavedItemsMerge.Answer.KeepBoth

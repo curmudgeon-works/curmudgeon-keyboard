@@ -26,11 +26,15 @@ import java.io.File
  * come in (a ticked keyboard's items are always ticked: "Required for"). The device's with the same name and content is
  * the device's, nothing asked. A backup item with candidates on the device ("Merge required": the device's of the same
  * name with other content first, then the device's with the same content under another name) is asked about
- * ([Answer]):
+ * ([Answer]; picked to start with: [ItemPlan.suggested]):
  * - Replace one of them: it becomes exactly the backup's (the same name: its content the backup's, and the keyboards
  *   using it take it; another name: it is renamed to the backup's, its users following).
  * - Keep both: the backup's takes its name, the device's of that name gets the next free number ("Sunset 2"), every
- *   keyboard and saved item using it following, so they keep their look.
+ *   keyboard and saved item using it following, so they keep their look; no number when an earlier answer merged the
+ *   device's of that name already, renamed (review 2026-10-12 A2: nothing clashes any more).
+ * A device item one answer merges into is taken: a later question shows it greyed out, "Already taken by Dusk", and
+ * can't pick it ([answers]; review 2026-10-12 A2, owner: option D; before, two backup items could both claim it and the
+ * second silently fell back to Keep both).
  * (Overrides owner 2026-10-11 "backup wins the name if ticked": the device's users stayed on the name and took the
  * backup's; an unticked clash named the device's.) Whatever the answer, the backup's keeps its name ([ItemPlan.after]):
  * a built-in name, or an older backup's kept palette copy ("~custom:N", matched by content, else "Palette N"), comes
@@ -50,7 +54,7 @@ internal object SavedItemsMerge {
 
     /**
      * A backup item with candidates on the device ("Merge required"): [candidates], the device's names, the same name
-     * first; [phoneName], the first of them (the suggested one); [phoneNewName], what the device's of the same name
+     * first; [phoneName], the first of them; [phoneNewName], what the device's of the same name
      * becomes with Keep both ("Sunset 2"; null: none has the name). A Layout's [files]: its custom key layouts whose
      * device copy is renamed ([FileClash]).
      */
@@ -72,7 +76,30 @@ internal object SavedItemsMerge {
      *  the [answers] to their questions (none: the suggested one, [ItemPlan.suggested]). */
     data class Choices(val unticked: Set<Pair<Kind, String>> = emptySet(), val answers: Map<Pair<Kind, String>, Answer> = emptyMap()) {
         fun ticked(kind: Kind, key: String) = (kind to key) !in unticked
-        fun answer(plan: ItemPlan<*>): Answer = answers[plan.kind to plan.key] ?: plan.suggested
+        /** [plan]'s answer, the device items in [taken] merged into by earlier answers: as answered, else the suggested
+         *  one (an answer naming a taken one is from before an earlier answer changed: the dialog shows it again). */
+        fun answer(plan: ItemPlan<*>, taken: Set<String> = emptySet()): Answer =
+            answers[plan.kind to plan.key]?.takeIf { it !is Answer.Replace || (it.device in plan.candidates && it.device !in taken) }
+                ?: plan.suggested(taken)
+    }
+
+    /** An asked item's answer in a restore ([answers]): [answer], and the device items earlier answers merged into, by
+     *  device name -> the backup item's name that took it ([taken]: "Already taken by Dusk"). */
+    class Answered(val answer: Answer, val taken: Map<String, String>)
+
+    /** The answers of the ticked items asked about of one kind ([plans], in order: the questions' order), by backup key: a
+     *  device item one merges into is taken for every later one (review 2026-10-12 A2). The restore dialog shows these,
+     *  the run does them. */
+    fun answers(plans: List<ItemPlan<*>>, choices: Choices): Map<String, Answered> {
+        val taken = LinkedHashMap<String, String>()
+        val out = HashMap<String, Answered>()
+        for (p in plans) {
+            if (!p.mergeRequired || !choices.ticked(p.kind, p.key)) continue
+            val answer = choices.answer(p, taken.keys)
+            out[p.key] = Answered(answer, HashMap(taken))
+            (answer as? Answer.Replace)?.let { taken[it.device] = p.name }
+        }
+        return out
     }
 
     /** A loaded font's or picture's content, compared by its size and digest. */
@@ -95,8 +122,12 @@ internal object SavedItemsMerge {
         val candidates: List<String> get() = listOfNotNull(holder) + sameContent
         /** "Merge required": the restore dialog asks about it. */
         val mergeRequired get() = candidates.isNotEmpty()
-        /** The answer picked to start with: the first candidate replaced (the same name first). */
-        val suggested: Answer get() = Answer.Replace(candidates.first())
+        /** The answer picked to start with, the device items in [taken] merged into by earlier answers (owner 2026-10-12,
+         *  option D): the first free device item with the same content merged into ("if the content is same then why keep
+         *  both?"), else Keep both, the same name with other content too ("Same name but different content feels like both
+         *  will be valuable to have"; before, Replace of the same name). */
+        fun suggested(taken: Set<String> = emptySet()): Answer =
+            sameContent.firstOrNull { it !in taken }?.let { Answer.Replace(it) } ?: Answer.KeepBoth
         /** Its name after the restore, whatever the answer (owner 2026-10-12: the backup's keeps its name). */
         val after: String get() = exact ?: if (mergeRequired) name else landName
     }
@@ -164,7 +195,7 @@ internal object SavedItemsMerge {
     fun <C> applyKind(plans: List<ItemPlan<C>>, phone: List<Pair<String, C>>, choices: Choices,
                       contentOf: (ItemPlan<C>) -> C = { it.content }): KindResult<C> {
         val list = phone.map { Entry(it.first, it.first, it.second) }.toMutableList()
-        val claimed = HashSet<Entry<C>>()
+        val answered = answers(plans, choices)
         val names = LinkedHashMap<String, String>()
         val renames = ArrayList<Pair<String, String>>()
         val replaced = ArrayList<String>()
@@ -175,7 +206,8 @@ internal object SavedItemsMerge {
             val content = contentOf(p)
             list += Entry(null, name, content); names[p.key] = name; added[p.key] = content
         }
-        // the device's still called [p]'s name moves to its Keep-both name, its users following
+        // the device's still called [p]'s name moves to its Keep-both name, its users following (one an earlier answer
+        // merged, renamed, isn't: the backup's takes the name as it is, A2)
         fun clearName(p: ItemPlan<C>) {
             val holder = list.firstOrNull { it.name == p.name && it.original != null } ?: return
             rename(holder, p.keepBothName ?: freeName(p.name, list.mapTo(HashSet()) { it.name }))
@@ -186,10 +218,9 @@ internal object SavedItemsMerge {
             if (!choices.ticked(p.kind, p.key)) { (p.exact ?: p.candidates.firstOrNull())?.let(::device)?.let { names[p.key] = it.name }; continue }
             if (p.exact != null) { names[p.key] = device(p.exact)?.name ?: p.exact; continue }
             if (!p.mergeRequired) { add(p, p.landName); continue }
-            // (a device item another backup item took already: Keep both)
-            val target = (choices.answer(p) as? Answer.Replace)?.device?.takeIf { it in p.candidates }?.let(::device)?.takeIf { it !in claimed }
+            // (a device item is merged into by one backup item at most: [answers])
+            val target = (answered[p.key]?.answer as? Answer.Replace)?.device?.let(::device)
             if (target == null) { clearName(p); add(p, p.name); continue }
-            claimed += target
             if (target.original == p.holder && target.name == p.name) { target.content = contentOf(p); replaced += p.name }
             else { clearName(p); rename(target, p.name) }
             names[p.key] = p.name

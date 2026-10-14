@@ -684,7 +684,7 @@
     <string name="restore_noun_popup_set">popup set</string>
     <string name="restore_noun_font">font</string>
     <string name="restore_noun_image">image</string>
-    <!-- the first candidate, picked to start with. %s: what it is (restore_item_same_…) -->
+    <!-- the candidate picked to start with. %s: what it is (restore_item_same_…) -->
     <string name="restore_item_suggested">Suggested: %s</string>
     <string name="restore_item_same_name_colors">same name, other colors</string>
     <string name="restore_item_same_name_settings">same name, other settings</string>
@@ -702,6 +702,8 @@
     <string name="restore_item_keep_both_renamed">The backup\'s is %1$s; yours becomes %2$s (keyboards using it keep their look)</string>
     <!-- under Keep both when the device's like it has another name. %s: the item's name -->
     <string name="restore_item_keep_both_added">The backup\'s comes in as %s; yours stays as it is</string>
+    <!-- under a device item an earlier question merges into, greyed out (review 2026-10-12 A2). %s: that backup item's name -->
+    <string name="restore_item_taken">Already taken by %s</string>
     <string name="restore_next">Next</string>
     <!-- the name box of a merged or separate keyboard -->
     <string name="restore_name">Name</string>

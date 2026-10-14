@@ -214,11 +214,14 @@ class ReReview2R3Test {
     }
 
     // (owner 2026-10-11: backup wins the name if ticked) the keyboards with the same look, both named "Sunset" after the
-    // restore whatever the tick: nothing of Appearance to restore
+    // restore, replaced or unticked: nothing of Appearance to restore. Kept both, the suggested answer since owner
+    // 2026-10-12 option D (A2), the device's is on Sunset 2 by then: the theme choice differs
     @Test fun `(c) the backup's Sunset with other content, the keyboards' own looks the same - no Appearance row, ticked or not`() {
         themes("Sunset", 1f, "Sunset", 3f)
         real.edit().putFloat(KeyboardProfiles.ownKey(english.keyboardId!!, Settings.PREF_KEY_HORIZONTAL_GAP), 3f).commit()
-        assertFalse(appearanceRow(restoreDifferencesFrom(ctx, zip, english, english)))
+        assertFalse(appearanceRow(restoreDifferencesFrom(ctx, zip, english, english, names = SavedItemsMerge.Choices(
+            answers = mapOf((SavedItemsMerge.Kind.THEMES to "Sunset") to SavedItemsMerge.Answer.Replace("Sunset"))))))
+        assertTrue(appearanceRow(restoreDifferencesFrom(ctx, zip, english, english)))
         assertFalse(appearanceRow(restoreDifferencesFrom(ctx, zip, english, english,
             names = SavedItemsMerge.Choices(setOf(SavedItemsMerge.Kind.THEMES to "Sunset")))))
     }

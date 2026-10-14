@@ -154,7 +154,8 @@ class PartialRestoreItemsTest {
     }
 
     // (owner 2026-10-12: Keep both, the backup's keeps the name, the device's is numbered; before, the backup's was
-    // "Mine 2.ttf". Replace, the suggested answer: the device's file is the backup's)
+    // "Mine 2.ttf". Replace, answered (Keep both is the suggested answer since owner 2026-10-12 option D, A2): the
+    // device's file is the backup's)
     @Test fun `a font whose name the phone uses for another file - kept both, the phone's is numbered; replaced, the backup's`() {
         val fonts = File(DeviceProtectedUtils.getFilesDir(ctx), "fonts").apply { mkdirs() }
         File(fonts, "Mine.ttf").writeText("the phone's")
@@ -181,7 +182,8 @@ class PartialRestoreItemsTest {
         File(fonts, "Mine.ttf").writeText("the phone's")
         real.edit().clear().putBoolean("separate_settings_per_keyboard", true).commit(); KeyboardProfiles.loadGroups(real)
         helium314.keyboard.latin.utils.SubtypeSettings.reloadEnabledSubtypes(ctx)
-        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true)
+        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true, names = SavedItemsMerge.Choices(
+            answers = mapOf((SavedItemsMerge.Kind.FONTS to "Mine.ttf") to SavedItemsMerge.Answer.Replace("Mine.ttf"))))
         assertEquals("the backup's", File(fonts, "Mine.ttf").readText())
         assertEquals(setOf("Mine.ttf"), fonts.list()!!.toSet())
         assertEquals("font:Mine.ttf", ownChoice(Settings.PREF_KEY_FONT))
