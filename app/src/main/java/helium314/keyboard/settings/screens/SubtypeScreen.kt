@@ -388,6 +388,16 @@ fun SubtypeScreen(
                             Pending(keyChanged(Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS)) { Box(Modifier.padding(start = 16.dp)) {
                                 SettingsActivity.settingsContainer[Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS]?.Preference() } }
                     }
+                    // the language's own digits on the number row: only for keyboards whose language has them, advanced
+                    // only, right under the numbers row (owner 2026-10-14)
+                    if (hasLocalizedNumberRow(currentSubtype.locale, ctx)) AdvancedBlock(advanced) { Pending(
+                        currentSubtype.getExtraValueOf(ExtraValue.LOCALIZED_NUMBER_ROW) != openedSubtype.getExtraValueOf(ExtraValue.LOCALIZED_NUMBER_ROW)) {
+                        val checked = currentSubtype.getExtraValueOf(ExtraValue.LOCALIZED_NUMBER_ROW)?.toBoolean()
+                        SwitchRow(stringResource(R.string.localized_number_row),
+                            checked ?: prefs.getBoolean(Settings.PREF_LOCALIZED_NUMBER_ROW, Defaults.PREF_LOCALIZED_NUMBER_ROW),
+                            extra = { DefaultButton(checked == null) { setCurrentSubtype(currentSubtype.without(ExtraValue.LOCALIZED_NUMBER_ROW)) } },
+                        ) { setCurrentSubtype(currentSubtype.with(ExtraValue.LOCALIZED_NUMBER_ROW, it.toString())) }
+                    } }
                     // then the emoji key switch, and the voice key's (right of the space bar)
                     Pending(keyChanged(Settings.PREF_SHOW_EMOJI_KEY)) {
                         PrefSwitchRow(Settings.PREF_SHOW_EMOJI_KEY, Defaults.PREF_SHOW_EMOJI_KEY, R.string.show_emoji_key) {
@@ -500,15 +510,6 @@ fun SubtypeScreen(
                             if (it == Settings.PREF_BACKSPACE_LONGPRESS_DELAY) AdvancedBlock(advanced) { shown() } else shown()
                             }
                         }
-                    }
-                    // (show numbers row and its symbols-page twin are in the Layout group; the localized digits are per language)
-                    if (hasLocalizedNumberRow(currentSubtype.locale, ctx)) Pending(
-                        currentSubtype.getExtraValueOf(ExtraValue.LOCALIZED_NUMBER_ROW) != openedSubtype.getExtraValueOf(ExtraValue.LOCALIZED_NUMBER_ROW)) {
-                        val checked = currentSubtype.getExtraValueOf(ExtraValue.LOCALIZED_NUMBER_ROW)?.toBoolean()
-                        SwitchRow(stringResource(R.string.localized_number_row),
-                            checked ?: prefs.getBoolean(Settings.PREF_LOCALIZED_NUMBER_ROW, Defaults.PREF_LOCALIZED_NUMBER_ROW),
-                            extra = { DefaultButton(checked == null) { setCurrentSubtype(currentSubtype.without(ExtraValue.LOCALIZED_NUMBER_ROW)) } },
-                        ) { setCurrentSubtype(currentSubtype.with(ExtraValue.LOCALIZED_NUMBER_ROW, it.toString())) }
                     }
                     // backspace (was its own group): whole words and speeding up in simple mode; the speed-up dialog
                     // keeps the keyboard up so holding backspace can be tried
