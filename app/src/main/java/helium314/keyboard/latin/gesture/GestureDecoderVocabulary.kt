@@ -6,6 +6,7 @@ import android.os.SystemClock
 import com.android.inputmethod.latin.BinaryDictionary
 import helium314.keyboard.gesture.Vocabulary
 import helium314.keyboard.latin.common.LocaleUtils.constructLocale
+import helium314.keyboard.latin.common.LocaleUtils
 import helium314.keyboard.latin.dictionary.Dictionary
 import helium314.keyboard.latin.personalization.LearnedStores
 import helium314.keyboard.latin.personalization.PersonalizationHelper
@@ -675,10 +676,12 @@ object GestureDecoderVocabulary {
         cached.firstOrNull { it.name.endsWith(DictionaryInfoUtils.USER_DICTIONARY_SUFFIX) }?.let { return it }
         cached.firstOrNull()?.let { return it }
         // not cached yet: extract the assets dict for this language, like DictionaryFactory does
+        // same matching as typing (DictionaryFactory): a dictionary of another script never counts, so a Hinglish
+        // keyboard doesn't swipe against main_hi (Devanagari) now that both are bundled
         val assetsDicts = DictionaryInfoUtils.getAssetsDictionaryList(context).orEmpty()
-        val match = assetsDicts.firstOrNull {
-            it.startsWith(DictionaryInfoUtils.DEFAULT_MAIN_DICT) &&
-                    it.substringAfter("_").substringBefore(".dict").constructLocale().language == locale.language
+            .filter { it.startsWith(DictionaryInfoUtils.DEFAULT_MAIN_DICT + "_") }
+        val match = LocaleUtils.getBestMatch(locale, assetsDicts) {
+            DictionaryInfoUtils.extractLocaleFromAssetsDictionaryFile(it)
         } ?: return null
         return DictionaryInfoUtils.extractAssetsDictionary(match, locale, context)
     }

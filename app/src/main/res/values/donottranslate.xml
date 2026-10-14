@@ -23,6 +23,13 @@
         <item>Srpski</item>
     </string-array>
 
+    <!-- About > Dictionary sources: attribution the CC BY / CC BY-SA word lists require (HTML) -->
+    <string name="dictionary_sources_text" translatable="false"><![CDATA[
+<b>Hindi</b> (Devanagari): built from the <a href="https://wortschatz.uni-leipzig.de/en/download/">Leipzig Corpora Collection</a> (hin_news_2022, hin_news_2020, hin_wikipedia_2021, hin_mixed_2019), <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. Word list: CC BY 4.0.<br><br>
+<b>Hinglish</b>: built from the Leipzig Corpora Collection (CC BY 4.0); <a href="https://github.com/google-research-datasets/dakshina">Dakshina dataset</a> (Google, <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>); <a href="https://huggingface.co/datasets/ai4bharat/Aksharantar">Aksharantar</a> (AI4Bharat, CC BY 4.0); <a href="https://doi.org/10.5281/zenodo.3605597">PHINC</a> (Srivastava and Singh, CC BY 4.0); <a href="https://github.com/google-research-datasets/Hinglish-TOP-Dataset">Hinglish-TOP</a> (Google, Apache 2.0); <a href="https://huggingface.co/datasets/LingoIITGN/COMI-LINGUA">COMI-LINGUA</a> (CC BY 4.0); the AOSP English word list (Apache 2.0). Word list: <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.<br><br>
+Other languages: word lists from <a href="https://codeberg.org/Helium314/aosp-dictionaries">aosp-dictionaries</a>, each under the licence named in its source note there (Apache 2.0 for the AOSP lists, CC BY 4.0 for those built from the Leipzig Corpora Collection).
+]]></string>
+
     <!-- Generic subtype label -->
     <string name="subtype_generic" translatable="false">%s</string>
 

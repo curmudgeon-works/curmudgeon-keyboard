@@ -74,6 +74,7 @@ object SettingsWithoutKey {
     const val APP = "app"
     const val VERSION = "version"
     const val LICENSE = "license"
+    const val DICTIONARY_SOURCES = "dictionary_sources"
     const val BASED_ON = "based_on"
     const val HIDDEN_FEATURES = "hidden_features"
     const val GITHUB = "github"

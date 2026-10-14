@@ -55,6 +55,7 @@ fun AboutScreen(
         SettingsWithoutKey.APP,
         SettingsWithoutKey.VERSION,
         SettingsWithoutKey.LICENSE,
+        SettingsWithoutKey.DICTIONARY_SOURCES,
         SettingsWithoutKey.BASED_ON,
         SettingsWithoutKey.HIDDEN_FEATURES,
         SettingsWithoutKey.GITHUB_WIKI,
@@ -121,6 +122,25 @@ fun createAboutSettings(context: Context) = listOf(
                 intent.data = Links.LICENSE.toUri()
                 intent.action = Intent.ACTION_VIEW
                 ctx.startActivity(intent)
+            },
+            icon = R.drawable.ic_settings_about_license
+        )
+    },
+    // the CC BY / CC BY-SA word lists require naming their sources (attribution text in donottranslate.xml)
+    Setting(context, SettingsWithoutKey.DICTIONARY_SOURCES, R.string.dictionary_sources_title, R.string.dictionary_sources_summary) {
+        val ctx = LocalContext.current
+        Preference(
+            name = it.title,
+            description = it.description,
+            onClick = {
+                val dialog = AlertDialog.Builder(ctx)
+                    .setIcon(R.drawable.ic_settings_about_license)
+                    .setTitle(R.string.dictionary_sources_title)
+                    .setMessage(SpannableStringUtils.fromHtml(ctx.getString(R.string.dictionary_sources_text)))
+                    .setPositiveButton(R.string.dialog_close, null)
+                    .create()
+                dialog.show()
+                (dialog.findViewById<View>(android.R.id.message) as TextView).movementMethod = LinkMovementMethod.getInstance()
             },
             icon = R.drawable.ic_settings_about_license
         )
