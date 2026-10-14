@@ -6,7 +6,7 @@ import android.os.Looper
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -56,7 +56,8 @@ import kotlin.test.assertTrue
 
 /**
  * The factory reset runs to the end from the dialog's button, with the learned words' files off the screen thread.
- * Owner 2026-10-11: ticks mean keep; all unticked = full reset ("Select items you DON'T want to reset:"). The learned
+ * Owner 2026-10-11: ticks mean keep; all unticked = full reset ("Select items you DON'T want to reset:"); the boxes
+ * start ticked (owner 2026-10-14). The learned
  * words' part (merge into the default keyboard's): LearnedKeyboardsResetRestoreTest.
  * (owner 2026-10-11: keyboards have unique ids; sets are "p<id>/", kept keyboards keep their ids, a reset one is a new
  * default with a new id)
@@ -313,7 +314,8 @@ class FactoryResetTest {
         }
     }
 
-    @Test fun `the dialog - its texts, all four boxes unticked, Cancel left of Reset, Reset with nothing ticked keeps nothing`() {
+    // (owner 2026-10-14: the boxes start ticked, "all checkboxes on"; fail before: all four started unticked)
+    @Test fun `the dialog - its texts, all four boxes ticked, Cancel left of Reset, Reset with all ticked keeps all four`() {
         var picked: ResetKeep? = null
         showDialog(onReset = { picked = it })
         compose.onNodeWithText("All settings go back to their defaults. This can't be undone.").assertExists()
@@ -323,21 +325,31 @@ class FactoryResetTest {
             compose.onNodeWithText(text).assertExists()
         val boxes = compose.onAllNodes(isToggleable())
         assertEquals(4, boxes.fetchSemanticsNodes().size)
-        for (i in 0 until 4) boxes[i].assertIsOff()
+        for (i in 0 until 4) boxes[i].assertIsOn()
         val cancel = compose.onNodeWithText(ctx.getString(android.R.string.cancel)).fetchSemanticsNode().boundsInRoot
         val reset = compose.onNodeWithText("Reset").fetchSemanticsNode().boundsInRoot
         assertTrue(cancel.left < reset.left, "Cancel left of Reset: $cancel / $reset")
         compose.onNodeWithText("Backup").assertIsEnabled()
         compose.onNodeWithText("Reset").performClick()
-        assertEquals(ResetKeep(), picked)
+        assertEquals(ResetKeep(keyboards = true, words = true, clipboard = true, own = true), picked)
     }
 
-    @Test fun `the dialog - a box ticked is kept`() {
+    @Test fun `the dialog - a box unticked is reset`() {
         var picked: ResetKeep? = null
         showDialog(onReset = { picked = it })
         compose.onNodeWithText("Learned and blacklisted words").performClick()
         compose.onNodeWithText("Reset").performClick()
-        assertEquals(ResetKeep(words = true), picked)
+        assertEquals(ResetKeep(keyboards = true, words = false, clipboard = true, own = true), picked)
+    }
+
+    @Test fun `the dialog - all four unticked keeps nothing`() {
+        var picked: ResetKeep? = null
+        showDialog(onReset = { picked = it })
+        for (text in listOf("Keyboards and languages", "Learned and blacklisted words", "Clipboard history",
+                "Saved layouts & popups, themes & color palettes, added dictionaries, and loaded fonts and pictures"))
+            compose.onNodeWithText(text).performClick()
+        compose.onNodeWithText("Reset").performClick()
+        assertEquals(ResetKeep(), picked)
     }
 
     @Test fun `the dialog - Backup asks for the backup`() {

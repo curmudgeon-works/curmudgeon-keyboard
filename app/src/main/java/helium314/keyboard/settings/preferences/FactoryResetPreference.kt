@@ -95,15 +95,16 @@ fun FactoryResetPreference(setting: Setting) {
     )
 }
 
-/** The dialog itself: four keep boxes, all unticked; Backup (grey once [backedUp], and while a backup runs, when Reset
- *  is too), Cancel left of Reset (the app's order). The ticks stay through a backup (the picker and back). */
+/** The dialog itself: four keep boxes, all ticked at first (owner 2026-10-14: "should come with all checkboxes on instead
+ *  of just the first one"; before, all unticked); Backup (grey once [backedUp], and while a backup runs, when Reset is
+ *  too), Cancel left of Reset (the app's order). The ticks stay through a backup (the picker and back). */
 @Composable
 internal fun FactoryResetDialog(backedUp: Boolean, backupRunning: Boolean, onDismiss: () -> Unit, onBackup: () -> Unit,
                                 onReset: (ResetKeep) -> Unit) {
-    var keyboards by rememberSaveable { mutableStateOf(false) }
-    var words by rememberSaveable { mutableStateOf(false) }
-    var clipboard by rememberSaveable { mutableStateOf(false) }
-    var own by rememberSaveable { mutableStateOf(false) }
+    var keyboards by rememberSaveable { mutableStateOf(true) }
+    var words by rememberSaveable { mutableStateOf(true) }
+    var clipboard by rememberSaveable { mutableStateOf(true) }
+    var own by rememberSaveable { mutableStateOf(true) }
     ThreeButtonAlertDialog(
         onDismissRequest = onDismiss,
         onConfirmed = { onReset(ResetKeep(keyboards, words, clipboard, own)) },
