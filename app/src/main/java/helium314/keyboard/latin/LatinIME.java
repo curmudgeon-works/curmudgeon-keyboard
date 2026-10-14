@@ -1590,18 +1590,14 @@ public class LatinIME extends InputMethodService implements
     }
 
     @Override
-    public boolean isInPersonalDictionary(final String word) {
-        return mDictionaryFacilitator.isInPersonalDictionary(word);
-    }
-
-    @Override
-    public void removeSuggestion(final String word, final SuggestedWords remaining, final boolean alsoFromPersonalDictionary) {
+    public void removeSuggestion(final String word, final SuggestedWords remaining) {
         if (!mSettings.getCurrent().mIncognitoModeEnabled) // (nothing typed in incognito goes in the log)
             helium314.keyboard.latin.personalization.LearningEventLog.log(
                     helium314.keyboard.latin.personalization.LearningEventLog.REMOVED,
                     helium314.keyboard.latin.personalization.LearningEventLog.STRIP, word, "",
                     mDictionaryFacilitator.getLearnedWordsLabel(word), mDictionaryFacilitator.getLearnedCountsNow());
-        mDictionaryFacilitator.removeWord(word, alsoFromPersonalDictionary);
+        // on this keyboard only: Android's personal dictionary keeps it (owner 2026-10-12)
+        mDictionaryFacilitator.removeWord(word);
         // its recent and frequent uses go too: typed again, it starts from the bottom like a new word
         helium314.keyboard.latin.utils.HotWords.INSTANCE.forget(word);
         helium314.keyboard.latin.utils.FrequentLongWords.INSTANCE.forget(word);

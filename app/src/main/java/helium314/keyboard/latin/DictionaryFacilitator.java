@@ -129,16 +129,11 @@ public interface DictionaryFacilitator {
             final String dictNamePrefix,
             @Nullable final DictionaryInitializationListener listener);
 
-    /** removes the word from all editable dictionaries (Android's personal dictionary too, in any capitalization), and gives
-     *  it one more strike on the blacklist (RemovedWords: the more strikes, the harder it comes back) */
-    default void removeWord(String word) { removeWord(word, true); }
-
-    /** as {@link #removeWord(String)}; with alsoFromPersonalDictionary false Android's personal dictionary keeps the
-     *  word (owner 2026-10-12: the strip's Remove asks, unticked by default) and it's blocked on this keyboard only */
-    void removeWord(String word, boolean alsoFromPersonalDictionary);
-
-    /** the word (in any capitalization) is in Android's personal dictionary, as the keyboard has it loaded */
-    default boolean isInPersonalDictionary(final String word) { return false; }
+    /** removes the word (in any capitalization) from the learned words, contacts and apps, and gives it one more strike
+     *  on the blacklist (RemovedWords: the more strikes, the harder it comes back). Android's personal dictionary keeps
+     *  it, also the keyboard's copy of it: the blacklist keeps it out of the suggestions until it's back (owner 2026-10-12
+     *  "don't need option to delete from personal dict when trying to remove a word") */
+    void removeWord(String word);
 
     void closeDictionaries();
 

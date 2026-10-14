@@ -886,29 +886,11 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         return lists.isRemoved(word) { learnedCount(word) } // (the usual case, not listed: no counts read)
     }
 
-    // (the personal dictionary's copy the keyboard holds: Android's words, in any capitalization)
-    override fun isInPersonalDictionary(word: String): Boolean {
-        if (word.isEmpty()) return false
-        return dictionaryGroups.any { group ->
-            val user = group.getSubDict(Dictionary.TYPE_USER) ?: return@any false
-            val lower = word.lowercase(group.locale)
-            linkedSetOf(word, lower, word.uppercase(group.locale), lower.replaceFirstChar { it.titlecase(group.locale) })
-                .any { user.isInDictionary(it) }
-        }
-    }
-
-    override fun removeWord(word: String, alsoFromPersonalDictionary: Boolean) {
-        // (unticked, owner 2026-10-12 "DM22 STRIP REMOVE": blocked on this keyboard only, Android's copy stays, in memory
-        // too: the blacklist keeps it out of the suggestions until it's back)
-        removeWords(listOf(word), personal = alsoFromPersonalDictionary)
-        if (!alsoFromPersonalDictionary) return
-        // and out of Android's personal dictionary for real: the in-memory copy alone came back with its next reload
-        // (2026-10-04; taken out 2026-10-10 by mistake, back 2026-10-11, owner: "previous behavior was fine. Remove would
-        // delete words out of android dict")
-        val context = dictionaryGroups.firstNotNullOfOrNull { it.getSubDict(Dictionary.TYPE_USER)?.mContext } ?: return
-        val locales = locales
-        // (the provider can be missing or fail on some devices, see addToPersonalDictionaryIfInvalidButInHistory)
-        scope.launch { runCatching { deleteFromPersonalDictionary(context, word, locales) } }
+    override fun removeWord(word: String) {
+        // blocked on this keyboard only, Android's personal dictionary keeps it, in memory too: the blacklist keeps it out
+        // of the suggestions until it's back (owner 2026-10-12 "don't need option to delete from personal dict when
+        // trying to remove a word"; before, the strip asked when it found the word there, else deleted it device-wide)
+        removeWords(listOf(word), personal = false)
     }
 
     /**
@@ -1040,31 +1022,6 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
                 Log.e(TAG, "Cannot create dictionary: $dictType", e)
             }
             return null
-        }
-
-        /** Deletes [word] in any capitalization from Android's personal dictionary: its rows for all languages and for
-         *  those of [locales]. Blocking. Returns how many rows went. */
-        @JvmStatic
-        fun deleteFromPersonalDictionary(context: Context, word: String, locales: Collection<Locale>): Int {
-            val lower = word.lowercase()
-            val languages = locales.mapTo(HashSet()) { it.language.lowercase() }
-            val ids = mutableListOf<Long>()
-            // (comparing in SQL would ignore the case of ASCII letters only, and a personal dictionary is small)
-            context.contentResolver.query(UserDictionary.Words.CONTENT_URI,
-                arrayOf(UserDictionary.Words._ID, UserDictionary.Words.WORD, UserDictionary.Words.LOCALE), null, null, null
-            )?.use { cursor ->
-                while (cursor.moveToNext()) {
-                    if (cursor.getString(1)?.lowercase() != lower) continue
-                    // "en_US", "en", or none for all languages
-                    val rowLocale = cursor.getString(2)
-                    if (rowLocale.isNullOrEmpty() || rowLocale.split('_', '-').first().lowercase() in languages)
-                        ids.add(cursor.getLong(0))
-                }
-            }
-            var deleted = 0
-            for (id in ids)
-                deleted += context.contentResolver.delete(UserDictionary.Words.CONTENT_URI, "${UserDictionary.Words._ID}=?", arrayOf(id.toString()))
-            return deleted
         }
 
         private fun findDictionaryGroupWithLocale(dictGroups: List<DictionaryGroup>?, locale: Locale): DictionaryGroup? {

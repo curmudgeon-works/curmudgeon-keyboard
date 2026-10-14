@@ -582,9 +582,6 @@
     <!-- Long-press menu on a suggestion, %s is the word -->
     <string name="remove_suggestion">Remove \"%s\" from suggestions?</string>
     <string name="remove_suggestion_message">It comes back if you type it again (the more often you remove it, the more it takes). If the keyboard had learned it from your typing, that learning starts over.</string>
-    <!-- Remove of a word that is in Android's personal dictionary: asked whether it goes from there too (unticked) -->
-    <string name="remove_word_question">Remove \"%s\"?</string>
-    <string name="remove_also_from_personal_dictionary">Also delete it from your device\'s personal dictionary</string>
     <!-- content description of the "+" after a typed word that was removed 3 times: tapping it brings the word back -->
     <string name="bring_back_removed_word">Bring back \"%s\"</string>
     <string name="no_dictionary_short">No dictionary</string>
