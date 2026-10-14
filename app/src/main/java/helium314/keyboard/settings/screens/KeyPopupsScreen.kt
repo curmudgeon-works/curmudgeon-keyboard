@@ -624,7 +624,7 @@ fun CustomizePopupsScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     // leaving the settings with the screen open undoes its unsaved changes (written as made: the preview), whether Layout
     // & typing's are kept or undone then (owner 2026-10-14: "Sub-items should still discard as per usual?"); what its
     // Save kept stays (its tick: the new starting point)
-    helium314.keyboard.settings.UndoUnsavedOnLeave { if (now() != opened) putBack() }
+    helium314.keyboard.settings.UndoUnsavedOnLeave("Customize popups") { (now() != opened).also { if (it) putBack() } }
     var askReject by rememberSaveable { mutableStateOf(false) }
     var askAccept by rememberSaveable { mutableStateOf(false) }
     var askLeave by rememberSaveable { mutableStateOf(false) }

@@ -13,6 +13,7 @@ import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.spellcheck.SpellCheckerSettingsActivity
 import helium314.keyboard.latin.utils.ExecutorUtils
+import helium314.keyboard.latin.utils.SettingsEventLog
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.realPrefs
 import org.junit.After
@@ -23,6 +24,7 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -108,6 +110,51 @@ class OneSettingsWindowTest {
             scenario.moveToState(Lifecycle.State.DESTROYED)
             assertFalse(PrefsDraft.anyOpen(), "the closed window's draft still running")
             assertEquals(false, ctx.prefs().getBoolean(key, true), "its change wasn't kept")
+        }
+    }
+
+    // owner 2026-10-14: "add some logging to see if unsaved edits are happening a lot and/or creating problems": a line
+    // per open edit with changes, what happened to them and why; none for an edit without changes. Fail before: no line
+    private val log get() = File(ctx.getExternalFilesDir(null) ?: ctx.filesDir, "settings_events.log")
+    private fun unsavedLines(): List<String> {
+        shadowOf(Looper.getMainLooper()).idle(); SettingsEventLog.flushForTest()
+        return if (log.exists()) log.readLines().filter { it.contains("Unsaved changes") } else emptyList()
+    }
+    private fun freshLog() { SettingsEventLog.init(ctx); SettingsEventLog.flushForTest(); log.delete() }
+
+    @Test fun `leaving the app with a changed edit open logs it as kept`() {
+        freshLog()
+        window().use { scenario ->
+            changeWithDraftOpen()
+            scenario.moveToState(Lifecycle.State.CREATED)
+            val lines = unsavedLines()
+            assertEquals(1, lines.size, lines.joinToString("\n"))
+            assertTrue(lines.single().endsWith("Unsaved changes kept on leaving (left the app): $draftName: 1 settings"), lines.single())
+        }
+    }
+
+    @Test fun `a window closed with a changed edit open logs it as undone with the switch off`() {
+        real.edit().putBoolean(Settings.PREF_LEAVING_KEEPS_CHANGES, false).commit()
+        freshLog()
+        window().use { scenario ->
+            changeWithDraftOpen()
+            @Suppress("DEPRECATION")
+            scenario.onActivity { it.startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).setType("*/*"), 1) }
+            scenario.moveToState(Lifecycle.State.CREATED)
+            assertEquals(emptyList(), unsavedLines()) // (its own file picker in front: not left)
+            scenario.moveToState(Lifecycle.State.DESTROYED)
+            val lines = unsavedLines()
+            assertEquals(1, lines.size, lines.joinToString("\n"))
+            assertTrue(lines.single().endsWith("Unsaved changes undone on leaving (window closed): $draftName: 1 settings"), lines.single())
+        }
+    }
+
+    @Test fun `an open edit without changes logs nothing`() {
+        freshLog()
+        window().use { scenario ->
+            PrefsDraft.of(ctx, draftName, listOf(key))
+            scenario.moveToState(Lifecycle.State.CREATED)
+            assertEquals(emptyList(), unsavedLines())
         }
     }
 

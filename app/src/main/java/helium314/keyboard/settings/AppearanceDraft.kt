@@ -339,6 +339,12 @@ class AppearanceDraft private constructor(
          *  2026-10-14). The palette editor's unsaved changes are undone before ([OpenEditors]). */
         fun acceptOpen(ctx: Context) { active?.accept(ctx) }
 
+        /** The running draft's pending changes for the log, e.g. "Appearance: 3 settings, 1 file"; null: none (or no
+         *  draft). (A font or picture added or deleted counts in neither number.) */
+        fun pendingOpen(ctx: Context): String? = active?.takeIf { it.hasChanges(ctx) }?.let {
+            "Appearance: ${it.changedKeys(ctx).size} settings, ${it.changedFiles().size} files"
+        }
+
         private fun start(ctx: Context): AppearanceDraft {
             val dir = dir(ctx).apply { deleteRecursively(); mkdirs() }
             val setId = PrefsDraft.currentSetId(ctx)

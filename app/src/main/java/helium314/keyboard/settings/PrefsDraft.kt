@@ -106,6 +106,10 @@ class PrefsDraft private constructor(private val name: String, private val value
         /** The app is left with such a screen open and [leavingKeepsChanges] on: its changes are kept, as with Save. */
         fun acceptOpen() { active.values.toList().forEach { it.accept() } }
 
+        /** The running drafts' pending changes for the log, one each with changes, e.g. "swipe: 2 settings". */
+        fun pendingOpen(ctx: Context): List<String> =
+            active.values.mapNotNull { d -> d.changedKeys(ctx).size.takeIf { it > 0 }?.let { "${d.name}: $it settings" } }
+
         /** Whether such a screen is open (its draft running). */
         fun anyOpen(): Boolean = active.isNotEmpty()
 
@@ -151,29 +155,34 @@ fun leavingKeepsChanges(ctx: Context): Boolean = helium314.keyboard.latin.utils.
  * editor holds its unsaved text in memory only, written by its Save: nothing to undo.)
  */
 object OpenEditors {
-    private class Entry(val window: android.app.Activity?, val undo: () -> Unit)
+    private class Entry(val window: android.app.Activity?, val name: String, val undo: () -> Boolean)
     private val open = LinkedHashMap<Any, Entry>()
 
-    fun register(token: Any, window: android.app.Activity?, undo: () -> Unit) { open[token] = Entry(window, undo) }
+    /** Editor [name] opened in [window]; [undo] undoes its unsaved changes, true when it had any. */
+    fun register(token: Any, window: android.app.Activity?, name: String, undo: () -> Boolean) { open[token] = Entry(window, name, undo) }
     fun unregister(token: Any) { open.remove(token) }
 
-    /** The settings are left: every open editor undoes its unsaved changes. */
-    fun undoUnsaved() { open.values.toList().forEach { it.undo() } }
+    /** The settings are left ([reason], for the log): every open editor undoes its unsaved changes. */
+    fun undoUnsaved(reason: String) {
+        for (editor in open.values.toList()) if (editor.undo())
+            helium314.keyboard.latin.utils.SettingsEventLog.log("Unsaved changes undone on leaving ($reason): ${editor.name}", withCaller = false)
+    }
 
     /** Settings window [window] is gone: its editors with it. */
     fun forget(window: android.app.Activity) { open.entries.removeAll { it.value.window === window } }
 }
 
-/** [undo], the editor's undo of its unsaved changes, runs when the settings are left with the editor open ([OpenEditors]). */
+/** [undo], editor [name]'s undo of its unsaved changes (true when it had any), runs when the settings are left with the
+ *  editor open ([OpenEditors]). */
 @Composable
-fun UndoUnsavedOnLeave(undo: () -> Unit) {
+fun UndoUnsavedOnLeave(name: String, undo: () -> Boolean) {
     val ctx = LocalContext.current
     val latest by androidx.compose.runtime.rememberUpdatedState(undo)
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(Unit) {
         val token = Any()
         val window = ctx.getActivity()
-        OpenEditors.register(token, window) { latest() }
+        OpenEditors.register(token, window, name) { latest() }
         onDispose {
             // (its window closing, not a rotation: still there for the window's onDestroy, which may have to undo it and
             // then forgets the window's editors; once the window is destroyed, nothing will)

@@ -158,8 +158,8 @@ fun ColorsScreen(
     // leaving the settings with the editor open undoes its unsaved changes, whether Appearance's are kept or undone then
     // (owner 2026-10-14: "Sub-items should still discard as per usual?"); what its Save kept stays. The editor stays
     // open, on the palette as it was opened
-    helium314.keyboard.settings.UndoUnsavedOnLeave {
-        if (changed()) { putBack(); newThemeName = TextFieldValue(openedName) }
+    helium314.keyboard.settings.UndoUnsavedOnLeave("palette editor ($openedName)") {
+        changed().also { if (it) { putBack(); newThemeName = TextFieldValue(openedName) } }
     }
     var askLeave by rememberSaveable { mutableStateOf(false) }
     fun leave() { if (changed()) askLeave = true else onClickBack() }

@@ -50,6 +50,7 @@ import helium314.keyboard.latin.utils.BackButton
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.ExecutorUtils
 import helium314.keyboard.latin.utils.JniUtils
+import helium314.keyboard.latin.utils.SettingsEventLog
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.latin.utils.UncachedInputMethodManagerUtils
 import helium314.keyboard.latin.utils.cleanUnusedMainDicts
@@ -226,7 +227,10 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
         prefs.unregisterOnSharedPreferenceChangeListener(this)
         // leaving the app with Appearance open undoes its changes that weren't kept (or keeps them, see
         // leaveOpenEdits); a file picker we opened (background image, font) and rotating don't count
-        if (!isChangingConfigurations) { if (awaitingResult) editsLeftOpen = true else leaveOpenEdits() }
+        if (!isChangingConfigurations) {
+            if (awaitingResult) editsLeftOpen = true
+            else leaveOpenEdits(if (isFinishing) REASON_CLOSED else REASON_LEFT)
+        }
         super.onStop()
     }
 
@@ -235,17 +239,22 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
         // 2026-10-14, the settings key's fix A: it closes an older window; that one's drafts stayed running, and the next
         // screen took them over, Layout & typing even for another keyboard). Only when its onStop left them running: a
         // window already left has none of its own, and a draft running now is another window's
-        if (!isChangingConfigurations && editsLeftOpen) { editsLeftOpen = false; leaveOpenEdits() }
+        if (!isChangingConfigurations && editsLeftOpen) { editsLeftOpen = false; leaveOpenEdits(REASON_CLOSED) }
         OpenEditors.forget(this)
         super.onDestroy()
     }
 
     /** The settings are left with a Save/Discard edit open: an editor opened from a main screen undoes its unsaved
      *  changes; the main screens' changes are kept with "Leaving a screen keeps your changes" on (owner 2026-10-14),
-     *  else undone. */
-    private fun leaveOpenEdits() {
-        OpenEditors.undoUnsaved() // (first: a main screen's undo or keep then covers what the editor put back)
-        if (leavingKeepsChanges(this)) { AppearanceDraft.acceptOpen(this); LayoutDraft.acceptOpen(); PrefsDraft.acceptOpen() }
+     *  else undone. [reason]: the window closed or the app left, for the log. */
+    private fun leaveOpenEdits(reason: String) {
+        OpenEditors.undoUnsaved(reason) // (first: a main screen's undo or keep then covers what the editor put back)
+        val keep = leavingKeepsChanges(this)
+        // each open edit with changes, before they are kept or undone (owner 2026-10-14: "add some logging to see if
+        // unsaved edits are happening a lot and/or creating problems"); written only with "Log settings changes" on
+        for (edit in listOfNotNull(AppearanceDraft.pendingOpen(this), LayoutDraft.pendingOpen(this)) + PrefsDraft.pendingOpen(this))
+            SettingsEventLog.log("Unsaved changes ${if (keep) "kept" else "undone"} on leaving ($reason): $edit", withCaller = false)
+        if (keep) { AppearanceDraft.acceptOpen(this); LayoutDraft.acceptOpen(); PrefsDraft.acceptOpen() }
         else { AppearanceDraft.rejectOpen(this); LayoutDraft.rejectOpen(this); PrefsDraft.rejectOpen(this) }
     }
 
@@ -317,6 +326,10 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
     }
 
     companion object {
+        // why the open edits were left ([leaveOpenEdits]), for the log
+        private const val REASON_CLOSED = "window closed"
+        private const val REASON_LEFT = "left the app"
+
         /** The settings opened from outside them (the keyboard's settings key, the spell checker's settings): one
          *  window, on its main screen. An older settings window in the task is closed (owner 2026-10-14: "I updated swipe
          *  trail and had to press back a bunch to get to main settings screen": the new one landed on top of it, and Back

@@ -273,6 +273,12 @@ class LayoutDraft private constructor(
          *  2026-10-14). Customize popups' unsaved changes are undone before ([OpenEditors]). */
         fun acceptOpen() { active?.accept() }
 
+        /** The running draft's pending changes for the log, e.g. "Layout & typing: 2 settings, 1 layout types"; null:
+         *  none (or no draft). */
+        fun pendingOpen(ctx: Context): String? = active?.takeIf { it.hasChanges(ctx) }?.let {
+            "Layout & typing: ${it.changedKeys(ctx).size} settings, ${it.changedLayoutFolders(ctx).size} layout types"
+        }
+
         /** [LayoutDraft.subScreenOpened] of the running draft, if there is one. */
         fun subScreenOpenedOpen(ctx: Context) { active?.subScreenOpened(ctx) }
 
