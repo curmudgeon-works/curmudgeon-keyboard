@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.dialogs
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Row
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Surface
@@ -23,12 +25,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.PaintingStyle
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
@@ -55,7 +60,7 @@ fun ColorPickerDialog(
     showDefault: Boolean,
     onDefault: () -> Unit,
     // set: the colour shows on the preview keyboard as it's picked (a moment after the finger stops), the keyboard stays
-    // up and the dialog stays clear of it (smaller wheel, no hex box: it would need the keyboard)
+    // up and the dialog stays clear of it (smaller wheel; the hex box types on that keyboard)
     onPreview: ((Int) -> Unit)? = null,
     onConfirmed: (Int) -> Unit,
 ) {
@@ -72,6 +77,10 @@ fun ColorPickerDialog(
     var textValue by remember { mutableStateOf(TextFieldValue(initialString, TextRange(initialString.length))) }
     var currentColor by remember { mutableStateOf(Color(initialColor)) }
     val useWideLayout = isWideScreen()
+    // while previewing, the dialog leaves the keyboard to the preview; a tap on the hex box gives it to the box
+    var hexFocused by remember { mutableStateOf(false) }
+    val softKeyboard = LocalSoftwareKeyboardController.current
+    if (onPreview != null && hexFocused) LaunchedEffect(Unit) { withFrameNanos { }; softKeyboard?.show() }
     @Composable fun topBar() {
         Row {
             Surface(
@@ -106,6 +115,27 @@ fun ColorPickerDialog(
         )
     }
     @Composable fun slidersAndTextField() {
+        // the hex box on every picker (2026-10-10, palettes too), right-aligned above the transparency bar, as far above
+        // it as the brightness bar is below it (20 dp: this row's 10 dp under it + the bar's own 10 dp)
+        Row(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 10.dp), horizontalArrangement = Arrangement.End) {
+            TextField(
+                value = textValue,
+                singleLine = true,
+                modifier = Modifier.width(150.dp).onFocusChanged { hexFocused = it.isFocused },
+                keyboardOptions = KeyboardOptions(
+                    autoCorrectEnabled = false,
+                    keyboardType = KeyboardType.Password, // todo: KeyboardType.Password is a crappy way of avoiding suggestions... is there really no way in compose?
+                    imeAction = ImeAction.Done,
+                ),
+                keyboardActions = KeyboardActions(onDone = { onDismissRequest(); onConfirmed(controller.selectedColor.value.toArgb()) }),
+                onValueChange = {
+                    textValue = it
+                    val androidColor = runCatching { "#${it.text}".toColorInt() }.getOrNull()
+                    if (androidColor != null)
+                        controller.selectByColor(Color(androidColor), false)
+                }
+            )
+        }
         AlphaSlider(
             modifier = Modifier
                 .fillMaxWidth()
@@ -124,24 +154,10 @@ fun ColorPickerDialog(
             initialColor = Color(initialColor),
             wheelPaint = wheelPaint
         )
-        if (onPreview == null) TextField(
-            value = textValue,
-            keyboardOptions = KeyboardOptions(
-                autoCorrectEnabled = false,
-                keyboardType = KeyboardType.Password, // todo: KeyboardType.Password is a crappy way of avoiding suggestions... is there really no way in compose?
-                imeAction = ImeAction.Done,
-            ),
-            keyboardActions = KeyboardActions(onDone = { onDismissRequest(); onConfirmed(controller.selectedColor.value.toArgb()) }),
-            onValueChange = {
-                textValue = it
-                val androidColor = runCatching { "#${it.text}".toColorInt() }.getOrNull()
-                if (androidColor != null)
-                    controller.selectByColor(Color(androidColor), false)
-            }
-        )
     }
     ThreeButtonAlertDialog(
-        keepKeyboard = onPreview != null, // the hex box needs the focus (no hex box while previewing)
+        keepKeyboard = onPreview != null, // the preview keyboard stays up (the hex box types on it)
+        fieldTyping = hexFocused,
         onDismissRequest = onDismissRequest,
         onConfirmed = { onConfirmed(controller.selectedColor.value.toArgb()) },
         title = { Text(title) },

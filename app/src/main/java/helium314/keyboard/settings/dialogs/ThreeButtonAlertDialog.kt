@@ -103,6 +103,7 @@ fun ThreeButtonAlertDialog(
     confirmFirst: Boolean = false, // OK left of Cancel, for dialogs whose buttons are spelled out as "Ok: …" / "Cancel: …"
     keepKeyboard: Boolean = LocalKeepKeyboard.current, // the keyboard stays up (the dialog takes no focus) and the dialog sits at the top, clear of it
     summonKeyboard: Boolean = true, // with [keepKeyboard]: the screen's preview keyboard comes up for this dialog (off when the dialog previews itself)
+    fieldTyping: Boolean = false, // with [keepKeyboard]: a text field of the dialog has the focus, the keyboard types into it
 ) {
     // the preview keyboard is used while its dialog is open (typing, emoji tabs): a tap on it mustn't close the
     // dialog. The platform's outside-tap closing is off; the dialog closes itself on a tap on the settings screen
@@ -129,7 +130,9 @@ fun ThreeButtonAlertDialog(
             SideEffect {
                 // the dialog stays focusable (back and outside taps work as usual) but tells the system it has no use
                 // for the keyboard, so the one below stays up; no dim, the keyboard is the preview
-                window?.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
+                // (a text field being typed in takes the keyboard: the colour picker's hex box)
+                if (fieldTyping) window?.clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
+                else window?.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
                 window?.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
             }
             // touches outside the dialog go to the window under them: the keyboard gets its taps (typing, emoji tabs);
