@@ -164,14 +164,15 @@ internal object RestoreMatch {
         }
     }
 
-    /** The warning under a ticked row of an unsaved key layout of the device the backup's replaces under its name
-     *  ([deviceSave]: the name the device's keys are saved as, or null), or null (owner 2026-10-12: "Unsaved number row
-     *  on the device will be saved as "temp_MMDD" to prevent loss of unsaved data"). */
-    fun unsavedWarning(ctx: Context, difference: Difference, deviceSave: (LayoutType, String) -> String?): String? {
+    /** The warning under a ticked row of an unsaved key layout of the device the row leaves unused ([deviceSave]: by
+     *  type, the device's name and the backup's, the name the device's keys are saved as, or null: [RestorePlan.unsavedSave]),
+     *  or null (owner 2026-10-12: "Unsaved number row on the device will be saved as "temp_MMDD" to prevent loss of
+     *  unsaved data"; for any unsaved one left unused, "give it same treatment of temp_MMDD ig.", A1b). */
+    fun unsavedWarning(ctx: Context, difference: Difference, deviceSave: (LayoutType, String, String?) -> String?): String? {
         val definition = difference as? Difference.Definition ?: return null
         val part = definition.part as? Part.Layout ?: return null
-        val name = definition.phone?.takeIf { it == definition.backup && LayoutUtilsCustom.isPrivateLayout(it) } ?: return null
-        val saved = deviceSave(part.type, name) ?: return null
+        val name = definition.phone?.takeIf { LayoutUtilsCustom.isPrivateLayout(it) } ?: return null
+        val saved = deviceSave(part.type, name, definition.backup) ?: return null
         return ctx.getString(R.string.restore_unsaved_warning, label(ctx, part).lowercase(java.util.Locale.getDefault()),
             LayoutUtilsCustom.getDisplayName(saved))
     }

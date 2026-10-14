@@ -236,7 +236,9 @@ internal object SavedItemsMerge {
      * 2026-10-12: the backup's keeps its name, the device's becomes "My numrow 2"; an unsaved one a new unsaved name).
      * An unsaved one a ticked "What to merge" row replaces on its keyboard is saved instead, under the name in
      * [deviceSaves] (owner 2026-10-12: "Unsaved number row on the device will be saved as "temp_MMDD" to prevent loss
-     * of unsaved data"). Worked out once with the plan.
+     * of unsaved data"); so is one a ticked row leaves unused under another name, its keys others than the backup's
+     * (owner 2026-10-12: "give it same treatment of temp_MMDD ig.", A1b: [RestorePlan.unsavedSave]). Worked out once
+     * with the plan.
      */
     class KeyLayouts(val contents: Map<Pair<LayoutType, String>, ByteArray> = emptyMap(),
                      val deviceRenames: Map<Pair<LayoutType, String>, String> = emptyMap(),

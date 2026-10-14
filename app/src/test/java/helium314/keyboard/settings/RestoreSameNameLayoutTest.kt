@@ -101,13 +101,14 @@ class RestoreSameNameLayoutTest {
     private fun row(differences: List<RestoreMatch.Difference>, type: LayoutType) =
         differences.filterIsInstance<RestoreMatch.Difference.Definition>().singleOrNull { it.part == RestoreMatch.Part.Layout(type) }
 
-    /** Restores [keyboard] merged into itself on the device, the [type] row ticked or not (every other row ticked). */
-    private fun restore(keyboard: SettingsSubtype, type: LayoutType, ticked: Boolean): RestoreMatch.Difference {
-        val differences = restoreDifferencesFrom(ctx, zip, keyboard, keyboard)
+    /** Restores [keyboard] merged into the device's [phone] (itself to start with), the [type] row ticked or not (every
+     *  other row ticked). */
+    private fun restore(keyboard: SettingsSubtype, type: LayoutType, ticked: Boolean, phone: SettingsSubtype = keyboard): RestoreMatch.Difference {
+        val differences = restoreDifferencesFrom(ctx, zip, keyboard, phone)
         val row = row(differences, type)
         assertTrue(row != null, "no row for $type: $differences")
         val plan = restorePlanFrom(ctx, zip)
-        val decision = plan.mergeDecision(keyboard, differences, if (ticked) differences else differences - row,
+        val decision = plan.mergeDecision(phone, differences, if (ticked) differences else differences - row,
             learnedRow = false, learnedTicked = false, name = null)
         restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true, decisions = mapOf(keyboard to decision))
         return row
@@ -125,7 +126,7 @@ class RestoreSameNameLayoutTest {
         val row = row(restoreDifferencesFrom(ctx, zip, phone, phone), type)!!
         assertEquals("Number row: Backup's My numrow; yours becomes My numrow 2",
             RestoreMatch.rowText(ctx, row, phone, plan.items.keyLayouts::deviceRename))
-        assertNull(RestoreMatch.unsavedWarning(ctx, row, plan.items.keyLayouts::deviceSave), "a saved one: no warning")
+        assertNull(RestoreMatch.unsavedWarning(ctx, row, plan.unsavedSaves(phone)), "a saved one: no warning")
         restore(phone, type, ticked = true)
         assertEquals(numrow, listed(1).layoutName(type))
         assertEquals("B", file(numrow, type).readText())
@@ -156,7 +157,7 @@ class RestoreSameNameLayoutTest {
         assertEquals("Number row: device and backup differ", RestoreMatch.rowText(ctx, row, phone, plan.items.keyLayouts::deviceRename))
         assertEquals(ctx.getString(R.string.restore_differs_unsaved, "Number row"), RestoreMatch.rowText(ctx, row, phone, plan.items.keyLayouts::deviceRename))
         assertEquals("Warning: Unsaved number row on the device will be saved as \"temp_1012\" to prevent loss of unsaved data",
-            RestoreMatch.unsavedWarning(ctx, row, plan.items.keyLayouts::deviceSave))
+            RestoreMatch.unsavedWarning(ctx, row, plan.unsavedSaves(phone)))
         assertEquals(LayoutUtilsCustom.getLayoutName("temp_1012", type), plan.items.keyLayouts.deviceSave(type, a))
         assertEquals(setOf(a), folder(type).list()!!.toSet(), "the dialog writes nothing")
     }
@@ -188,7 +189,7 @@ class RestoreSameNameLayoutTest {
         val plan = restorePlanFrom(ctx, zip)
         val row = row(restoreDifferencesFrom(ctx, zip, phone, phone), type)!!
         assertEquals("Warning: Unsaved number row on the device will be saved as \"temp_1012 2\" to prevent loss of unsaved data",
-            RestoreMatch.unsavedWarning(ctx, row, plan.items.keyLayouts::deviceSave))
+            RestoreMatch.unsavedWarning(ctx, row, plan.unsavedSaves(phone)))
         restore(phone, type, ticked = true)
         val temp2 = LayoutUtilsCustom.getLayoutName("temp_1012 2", type)
         assertEquals("A", file(temp2, type).readText())
@@ -218,7 +219,7 @@ class RestoreSameNameLayoutTest {
         val row = row(restoreDifferencesFrom(ctx, zip, phone, phone), type)!!
         assertEquals("Symbols: device and backup differ", RestoreMatch.rowText(ctx, row, phone, plan.items.keyLayouts::deviceRename))
         assertEquals("Warning: Unsaved symbols on the device will be saved as \"temp_1012\" to prevent loss of unsaved data",
-            RestoreMatch.unsavedWarning(ctx, row, plan.items.keyLayouts::deviceSave))
+            RestoreMatch.unsavedWarning(ctx, row, plan.unsavedSaves(phone)))
         restore(phone, type, ticked = true)
         val temp = LayoutUtilsCustom.getLayoutName("temp_1012", type)
         assertEquals(a, listed(1).layoutName(type))
@@ -240,5 +241,93 @@ class RestoreSameNameLayoutTest {
         assertEquals(mine, listed(1).layoutName(type))
         assertEquals("A", file(mine, type).readText())
         assertEquals(setOf(mine), folder(type).list()!!.toSet())
+    }
+
+    // ---- (d) an unsaved key layout a ticked row leaves unused, under another name (owner 2026-10-12: "give it same
+    // treatment of temp_MMDD ig.", A1b). Fail before: no warning, and its keys went with the cleanup ----
+
+    /** The warning under [phone]'s [type] row for the backup's [keyboard], as "What to merge" shows it ticked. */
+    private fun warning(keyboard: SettingsSubtype, phone: SettingsSubtype, type: LayoutType): String? {
+        val plan = restorePlanFrom(ctx, zip)
+        val row = row(restoreDifferencesFrom(ctx, zip, keyboard, phone), type)!!
+        return RestoreMatch.unsavedWarning(ctx, row, plan.unsavedSaves(phone))
+    }
+
+    @Test fun `(d) the number row edited after the backup - ticked the backup's My numrow, the device's keys saved as temp_1012`() {
+        val type = LayoutType.NUMBER_ROW
+        val a = unsaved("A", type)
+        val numrow = LayoutUtilsCustom.getLayoutName("My numrow", type)
+        val phone = hindi.withLayout(type, a).withId(1)
+        val inBackup = hindi.withLayout(type, numrow).withId(1)
+        deviceAndBackup(listOf(phone), inBackup, type, numrow, "B")
+        assertEquals("Warning: Unsaved number row on the device will be saved as \"temp_1012\" to prevent loss of unsaved data",
+            warning(inBackup, phone, type))
+        assertEquals(setOf(a), folder(type).list()!!.toSet(), "the dialog writes nothing")
+        restore(inBackup, type, ticked = true, phone = phone)
+        val temp = LayoutUtilsCustom.getLayoutName("temp_1012", type)
+        assertEquals(numrow, listed(1).layoutName(type), "the backup's number row")
+        assertEquals("B", file(numrow, type).readText())
+        assertEquals("A", file(temp, type).readText(), "the device's keys, saved")
+        assertFalse(LayoutUtilsCustom.isPrivateLayout(temp))
+        LayoutUtilsCustom.removeUnusedPrivateLayouts(ctx)
+        assertEquals(setOf(numrow, temp), folder(type).list()!!.toSet(), "the unused unsaved one gone, its keys kept")
+    }
+
+    @Test fun `(d) unticked the edited number row stays, nothing saved`() {
+        val type = LayoutType.NUMBER_ROW
+        val a = unsaved("A", type)
+        val numrow = LayoutUtilsCustom.getLayoutName("My numrow", type)
+        val phone = hindi.withLayout(type, a).withId(1)
+        val inBackup = hindi.withLayout(type, numrow).withId(1)
+        deviceAndBackup(listOf(phone), inBackup, type, numrow, "B")
+        restore(inBackup, type, ticked = false, phone = phone)
+        assertEquals(3f, gap(1), "the rest of the merge came")
+        assertEquals(a, listed(1).layoutName(type))
+        assertFalse(file(LayoutUtilsCustom.getLayoutName("temp_1012", type), type).exists())
+    }
+
+    @Test fun `(d) a backup from another device - both unsaved, other names and keys - ticked the device's saved as temp_1012`() {
+        val type = LayoutType.NUMBER_ROW
+        val a = unsaved("A", type)
+        val other = LayoutUtilsCustom.newPrivateLayoutName(type, "") { it == a } // (the other device's unsaved one)
+        val phone = hindi.withLayout(type, a).withId(1)
+        val inBackup = hindi.withLayout(type, other).withId(1)
+        deviceAndBackup(listOf(phone), inBackup, type, other, "B")
+        assertEquals("Warning: Unsaved number row on the device will be saved as \"temp_1012\" to prevent loss of unsaved data",
+            warning(inBackup, phone, type))
+        restore(inBackup, type, ticked = true, phone = phone)
+        val temp = LayoutUtilsCustom.getLayoutName("temp_1012", type)
+        assertEquals(other, listed(1).layoutName(type))
+        assertEquals("B", file(other, type).readText())
+        assertEquals("A", file(temp, type).readText(), "the device's keys, saved")
+    }
+
+    @Test fun `(d) an unsaved number row another keyboard still uses - no warning, nothing saved, it keeps its keys`() {
+        val type = LayoutType.NUMBER_ROW
+        val a = unsaved("A", type)
+        val numrow = LayoutUtilsCustom.getLayoutName("My numrow", type)
+        val phone = hindi.withLayout(type, a).withId(1)
+        val user = english.withLayout(type, a).withId(2)
+        val inBackup = hindi.withLayout(type, numrow).withId(1)
+        deviceAndBackup(listOf(phone, user), inBackup, type, numrow, "B")
+        assertNull(warning(inBackup, phone, type), "still used: nothing lost")
+        restore(inBackup, type, ticked = true, phone = phone)
+        assertEquals(numrow, listed(1).layoutName(type))
+        assertEquals(a, listed(2).layoutName(type))
+        assertEquals("A", file(a, type).readText())
+        assertFalse(file(LayoutUtilsCustom.getLayoutName("temp_1012", type), type).exists())
+    }
+
+    @Test fun `(d) the backup's keys the same as the unsaved one's - no warning, nothing saved`() {
+        val type = LayoutType.NUMBER_ROW
+        val a = unsaved("A", type)
+        val numrow = LayoutUtilsCustom.getLayoutName("My numrow", type)
+        val phone = hindi.withLayout(type, a).withId(1)
+        val inBackup = hindi.withLayout(type, numrow).withId(1)
+        deviceAndBackup(listOf(phone), inBackup, type, numrow, "A")
+        assertNull(warning(inBackup, phone, type), "the same keys: nothing lost")
+        restore(inBackup, type, ticked = true, phone = phone)
+        assertEquals(numrow, listed(1).layoutName(type))
+        assertFalse(file(LayoutUtilsCustom.getLayoutName("temp_1012", type), type).exists())
     }
 }

@@ -87,7 +87,8 @@ internal sealed class RestoreDecision {
  * device's kept aside as "…_prev"). [items]: every saved item of the backup ([SavedItemsMerge.Plan]); [usedBy], the
  * backup keyboards using each (by kind and key; directly, or through a Layout or theme): "Required for"; [usedByItems],
  * the backup's Layouts and themes using each; [deviceUsers], the device keyboards using each device item (by kind and
- * name), which take the backup's when it is replaced.
+ * name), which take the backup's when it is replaced. [unsavedSave]: the name a device keyboard's unsaved key layout is
+ * saved as when a ticked row leaves it unused, or null (A1b).
  */
 internal class RestorePlan(
     val incoming: Map<SettingsSubtype, SettingsSubtype>,
@@ -103,7 +104,12 @@ internal class RestorePlan(
     val usedBy: Map<Pair<SavedItemsMerge.Kind, String>, List<SettingsSubtype>> = emptyMap(),
     val usedByItems: Map<Pair<SavedItemsMerge.Kind, String>, Set<Pair<SavedItemsMerge.Kind, String>>> = emptyMap(),
     val deviceUsers: Map<Pair<SavedItemsMerge.Kind, String>, List<SettingsSubtype>> = emptyMap(),
+    val unsavedSave: (SettingsSubtype, helium314.keyboard.latin.utils.LayoutType, String, String?) -> String? = { _, _, _, _ -> null },
 ) {
+    /** [unsavedSave] for the device's [target] ("What to merge"'s warnings). */
+    fun unsavedSaves(target: SettingsSubtype): (helium314.keyboard.latin.utils.LayoutType, String, String?) -> String? =
+        { type, phone, backup -> unsavedSave(target, type, phone, backup) }
+
     val phone = (enabled + switchedOff).distinct()
 
     /** The languages of [keyboards] (their main and other languages, in order) whose dictionary clashes. */
