@@ -30,15 +30,18 @@ object SubtypeSettings {
     /** @return enabled subtypes. If none are enabled and [fallback]: the default keyboard ([getDefaultEnabledSubtypes]),
      *  only before [init] stored it (2026-10-11: the list is never left empty, see [loadEnabledSubtypes]). */
     fun getEnabledSubtypes(fallback: Boolean = false): List<InputMethodSubtype> {
-        if (fallback && enabledSubtypes.isEmpty())
+        val enabled = enabledSubtypes // (one read: the whole list of now, it never changes; see [enabledSubtypes])
+        if (fallback && enabled.isEmpty())
             return getDefaultEnabledSubtypes()
-        return enabledSubtypes
+        return enabled
     }
 
     // (the default counts only while nothing is listed: a default keyboard taken out of the list is not enabled; before
     // 2026-10-11 it stayed "enabled" and switching could go back to it)
-    fun isEnabled(subtype: InputMethodSubtype?): Boolean =
-        subtype in enabledSubtypes || (enabledSubtypes.isEmpty() && subtype in getDefaultEnabledSubtypes())
+    fun isEnabled(subtype: InputMethodSubtype?): Boolean {
+        val enabled = enabledSubtypes
+        return subtype in enabled || (enabled.isEmpty() && subtype in getDefaultEnabledSubtypes())
+    }
 
     fun getAllAvailableSubtypes(): List<InputMethodSubtype> =
         resourceSubtypesByLocale.values.flatten() + additionalSubtypes
@@ -79,14 +82,20 @@ object SubtypeSettings {
 
         // adding a keyboard: its records now (the net, owner 2026-10-11), before anything reads it in the list
         KeyboardProfiles.ensureListedRecords(real)
-        if (default != null && enabledSubtypes.none { it.toSettingsSubtype() == default }) enabledSubtypes.add(0, default.toAdditionalSubtype())
         val added = subtype.toAdditionalSubtype()
-        if (enabledSubtypes.none { it == added && it.extraValue == added.extraValue }) {
-            enabledSubtypes.removeAll { it == added } // (another definition of the same keyboard, by its id)
-            enabledSubtypes.add(added)
-            // order = the order keyboards were added (also the switching order); the pref string keeps it across restarts
-            RichInputMethodManager.getInstance().refreshSubtypeCaches()
-        } else if (default != null) RichInputMethodManager.getInstance().refreshSubtypeCaches()
+        var addedNow = false
+        changeEnabledSubtypes { current ->
+            val list = current.toMutableList()
+            if (default != null && list.none { it.toSettingsSubtype() == default }) list.add(0, default.toAdditionalSubtype())
+            if (list.none { it == added && it.extraValue == added.extraValue }) {
+                list.removeAll { it == added } // (another definition of the same keyboard, by its id)
+                list.add(added)
+                // order = the order keyboards were added (also the switching order); the pref string keeps it across restarts
+                addedNow = true
+            }
+            list
+        }
+        if (addedNow || default != null) RichInputMethodManager.getInstance().refreshSubtypeCaches()
         return subtype
     }
 
@@ -122,27 +131,30 @@ object SubtypeSettings {
                 Log.w(TAG, "had to do some workaround to actually disable $match")
             }
         }
-        if (!enabledSubtypes.remove(subtype)) reloadEnabledSubtypes(context)
+        var removed = false
+        changeEnabledSubtypes { current -> current.toMutableList().also { removed = it.remove(subtype) } }
+        if (!removed) reloadEnabledSubtypes(context)
         else RichInputMethodManager.getInstance().refreshSubtypeCaches()
         return true
     }
 
     fun getSelectedSubtype(prefs: SharedPreferences): InputMethodSubtype {
         val selectedSubtype = prefs.getString(Settings.PREF_SELECTED_SUBTYPE, Defaults.PREF_SELECTED_SUBTYPE)!!.toSettingsSubtype()
+        val enabled = enabledSubtypes // (one list throughout, see [enabledSubtypes])
         // the keyboard as it is now, by its id (a rename keeps the selection; owner 2026-10-11, keyboards have unique ids)
-        enabledSubtypes.firstOrNull { it.toSettingsSubtype().sameKeyboard(selectedSubtype) }?.let { return it }
+        enabled.firstOrNull { it.toSettingsSubtype().sameKeyboard(selectedSubtype) }?.let { return it }
         if (selectedSubtype.isAdditionalSubtype(prefs))
             return selectedSubtype.toAdditionalSubtype()
         // no additional subtype, must be a resource subtype
 
-        val subtype = enabledSubtypes.firstOrNull { it.toSettingsSubtype() == selectedSubtype }
+        val subtype = enabled.firstOrNull { it.toSettingsSubtype() == selectedSubtype }
         if (subtype != null) {
             return subtype
-        } else if (enabledSubtypes.isNotEmpty()) {
+        } else if (enabled.isNotEmpty()) {
             Log.w(TAG, "selected subtype $selectedSubtype / ${prefs.getString(Settings.PREF_SELECTED_SUBTYPE, Defaults.PREF_SELECTED_SUBTYPE)} not found")
         }
-        if (enabledSubtypes.isNotEmpty())
-            return enabledSubtypes.first()
+        if (enabled.isNotEmpty())
+            return enabled.first()
         val defaultSubtypes = getDefaultEnabledSubtypes()
         return defaultSubtypes.firstOrNull { it.locale() == selectedSubtype.locale && it.mainLayoutName() == it.mainLayoutName() }
             ?: defaultSubtypes.firstOrNull { it.locale().language == selectedSubtype.locale.language }
@@ -160,23 +172,24 @@ object SubtypeSettings {
 
     fun isAdditionalSubtype(subtype: InputMethodSubtype): Boolean = subtype in additionalSubtypes
 
-    fun getAdditionalSubtypes(): List<InputMethodSubtype> = additionalSubtypes.toList()
+    fun getAdditionalSubtypes(): List<InputMethodSubtype> = additionalSubtypes
 
     fun reloadSystemLocales(context: Context) {
-        systemLocales.clear()
+        val locales = mutableListOf<Locale>()
         try {
             val localeList = LocaleManagerCompat.getSystemLocales(context)
             (0 until localeList.size()).forEach {
                 val locale = localeList[it]
-                if (locale != null) systemLocales.add(locale)
+                if (locale != null) locales.add(locale)
             }
         } catch (_: Throwable) {
-            systemLocales.add(context.resources.configuration.locale())
+            locales.add(context.resources.configuration.locale())
         }
-        systemSubtypes.clear()
+        systemLocales = locales
+        systemSubtypes = emptyList()
     }
 
-    fun getSystemLocales(): List<Locale> = systemLocales.toList()
+    fun getSystemLocales(): List<Locale> = systemLocales
 
     fun getResourceSubtypesForLocale(locale: Locale): List<InputMethodSubtype> = resourceSubtypesByLocale[locale].orEmpty()
 
@@ -233,7 +246,6 @@ object SubtypeSettings {
 
     fun reloadEnabledSubtypes(context: Context) {
         loadingOnce {
-            enabledSubtypes.clear()
             loadAdditionalSubtypes(context.prefs())
             // the net (owner 2026-10-11), not for a default stored as the list was found empty: in a reload that is a
             // moment of a list being rewritten (cleared, reset, restored), and records for it stayed behind as a
@@ -288,11 +300,10 @@ object SubtypeSettings {
         builtInDictLocales.clear()
         DictionaryInfoUtils.getAssetsDictionaryList(context).orEmpty().filter { it.startsWith(DictionaryInfoUtils.MAIN_DICT_PREFIX) }
             .mapNotNullTo(builtInDictLocales) { runCatching { DictionaryInfoUtils.extractLocaleFromAssetsDictionaryFile(it) }.getOrNull() }
-        systemSubtypes.clear()
+        systemSubtypes = emptyList()
         loadingOnce {
             loadAdditionalSubtypes(context.prefs())
-            enabledSubtypes.clear() // loading twice must not list a keyboard twice
-            loadEnabledSubtypes(context)
+            loadEnabledSubtypes(context) // (a new list: loading twice does not list a keyboard twice)
         }
     }
 
@@ -303,15 +314,14 @@ object SubtypeSettings {
      * getUserAndInternalDictionaries), its first built-in keyboard; else English (US).
      */
     private fun getDefaultEnabledSubtypes(): List<InputMethodSubtype> {
-        if (systemSubtypes.isNotEmpty()) return systemSubtypes
+        systemSubtypes.let { if (it.isNotEmpty()) return it }
         val subtype = systemLocales.firstNotNullOfOrNull { locale ->
             if (LocaleUtils.getBestMatch(locale, builtInDictLocales) { it } == null) return@firstNotNullOfOrNull null
             (resourceSubtypesByLocale[locale]
                 ?: LocaleUtils.getBestMatch(locale, resourceSubtypesByLocale.keys) { it }?.let { resourceSubtypesByLocale[it] })
                 ?.firstOrNull()
         } ?: resourceSubtypesByLocale[Locale.US]!!.first()
-        systemSubtypes.add(subtype)
-        return systemSubtypes
+        return listOf(subtype).also { systemSubtypes = it }
     }
 
     private fun loadResourceSubtypes(resources: Resources) {
@@ -321,24 +331,32 @@ object SubtypeSettings {
     }
 
     private fun loadAdditionalSubtypes(prefs: SharedPreferences) {
-        additionalSubtypes.clear()
         val additionalSubtypeString = prefs.getString(Settings.PREF_ADDITIONAL_SUBTYPES, Defaults.PREF_ADDITIONAL_SUBTYPES)!!
-        val subtypes = SubtypeUtilsAdditional.createAdditionalSubtypes(additionalSubtypeString)
-        additionalSubtypes.addAll(subtypes)
+        additionalSubtypes = SubtypeUtilsAdditional.createAdditionalSubtypes(additionalSubtypeString).toList()
     }
 
     // requires loadResourceSubtypes to be called before. @return whether the list was found empty and the default stored
-    private fun loadEnabledSubtypes(context: Context): Boolean {
+    // (review 2026-10-12 B2: the list was read and, built aside, published at the end; a writer changing the list in use
+    // in between (remove, switch on, add) was undone in memory until the next load. Now the whole load, from the read to
+    // the publish, holds the writers' lock: such a change waits and is made on the list published here. Readers never
+    // wait. Lock order: the object's monitor (loadingOnce), then this lock; a writer holds only this lock, and only
+    // inside [changeEnabledSubtypes] (no pref writes, no refreshSubtypeCaches under it))
+    private fun loadEnabledSubtypes(context: Context): Boolean =
+        synchronized(enabledSubtypesLock) { loadEnabledSubtypesLocked(context) }
+
+    private fun loadEnabledSubtypesLocked(context: Context): Boolean {
         val prefs = context.prefs()
         // every listed keyboard has its id, given before the list is read (the net, owner 2026-10-11: keyboards have
         // unique ids); its write may have loaded the keyboards already (Settings' listener): loaded once here
         if (KeyboardIds.ensureListedIds(context.realPrefs())) loadAdditionalSubtypes(prefs)
-        enabledSubtypes.clear()
+        // (built here, the list in use stays whole until the new one replaces it at the end, see [enabledSubtypes])
+        val loaded = mutableListOf<InputMethodSubtype>()
         val settingsSubtypes = createSettingsSubtypes(prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!)
+        afterListReadForTest?.invoke()
         for (settingsSubtype in settingsSubtypes) {
             // (a keyboard with an id is the user's own: from its definition)
             if (settingsSubtype.keyboardId != null || settingsSubtype.isAdditionalSubtype(prefs)) {
-                enabledSubtypes.add(settingsSubtype.toAdditionalSubtype())
+                loaded.add(settingsSubtype.toAdditionalSubtype())
                 continue
             }
             val subtypesForLocale = resourceSubtypesByLocale[settingsSubtype.locale]
@@ -363,12 +381,12 @@ object SubtypeSettings {
                 continue
             }
 
-            enabledSubtypes.add(subtype)
+            loaded.add(subtype)
         }
         // nothing listed (the first start, or the list found empty): the default keyboard is stored, an ordinary keyboard
         // whose own settings are the main ones (owner 2026-10-11); before, the list stayed empty and a default was shown.
         // (a list whose keyboards only failed to load in debug mode stays as it is)
-        if (enabledSubtypes.isEmpty() && createSettingsSubtypes(prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!).isEmpty()) {
+        if (loaded.isEmpty() && createSettingsSubtypes(prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!).isEmpty()) {
             // (a new keyboard: its own new id, owner 2026-10-11; registered as an added keyboard after the list is written:
             // that write reloads the keyboards, Settings' listener, and an empty list would store another default)
             val real = context.realPrefs()
@@ -382,12 +400,16 @@ object SubtypeSettings {
                     putString(Settings.PREF_SELECTED_SUBTYPE, default.toPref())
             }
             register(real, listOf(default))
-            enabledSubtypes.clear()
-            enabledSubtypes.add(default.toAdditionalSubtype())
+            changeEnabledSubtypes { listOf(default.toAdditionalSubtype()) } // (its lock is held already, and reentrant)
             return true
         }
+        changeEnabledSubtypes { loaded }
         return false
     }
+
+    /** Tests only: run between a load's read of the list and its publish (review 2026-10-12 B2, a writer in between). */
+    @androidx.annotation.VisibleForTesting
+    @Volatile internal var afterListReadForTest: (() -> Unit)? = null
 
     /** @return whether pref was changed */
     private fun removeEnabledSubtype(prefs: SharedPreferences, subtype: SettingsSubtype): Boolean = removeEnabledSubtypeFromPrefs(prefs, subtype)
@@ -416,15 +438,26 @@ object SubtypeSettings {
         return true
     }
 
-    // (copy on write: a reload runs off the main thread too, e.g. a restore's follow-up on the keyboard executor
-    // (AppUpgrade.onUpgrade), while the keyboard on the main thread goes through the list getEnabledSubtypes hands out;
-    // with a plain list that was a ConcurrentModificationException. A reader may still see the list between its clear
-    // and its new keyboards, as before)
-    private val enabledSubtypes = java.util.concurrent.CopyOnWriteArrayList<InputMethodSubtype>()
+    // (a reload runs off the main thread too, e.g. a restore's follow-up on the keyboard executor (AppUpgrade.onUpgrade),
+    // while the keyboard on the main thread reads the list (language key, space bar slide). Review 2026-10-12 M1: the
+    // live list was cleared and filled again one keyboard at a time, and a reader in between found it empty or half
+    // built: % 0 / index crashes, or a missing keyboard. Now a list is never changed once in use: a new one is built
+    // aside and replaces it in one step ([changeEnabledSubtypes]); a reader sees the whole old list or the whole new one)
+    @Volatile private var enabledSubtypes: List<InputMethodSubtype> = emptyList()
+    private val enabledSubtypesLock = Any()
+
+    /** The one way the enabled list changes: [change] gets the list of now and returns the new one, which replaces it.
+     *  Writers take turns (an add and a reload at once must not lose either; a load holds the lock throughout, see
+     *  [loadEnabledSubtypes]); readers never wait. [change] only builds the list: no pref writes, no reloads in it. */
+    private fun changeEnabledSubtypes(change: (List<InputMethodSubtype>) -> List<InputMethodSubtype>) {
+        synchronized(enabledSubtypesLock) { enabledSubtypes = change(enabledSubtypes) }
+    }
+
     private val resourceSubtypesByLocale = LinkedHashMap<Locale, MutableList<InputMethodSubtype>>(100)
-    private val additionalSubtypes = java.util.concurrent.CopyOnWriteArrayList<InputMethodSubtype>()
-    private val systemLocales = mutableListOf<Locale>()
-    private val systemSubtypes = mutableListOf<InputMethodSubtype>() // (the default keyboard, once worked out)
+    // (the same for these: replaced whole, never changed in place)
+    @Volatile private var additionalSubtypes: List<InputMethodSubtype> = emptyList()
+    @Volatile private var systemLocales: List<Locale> = emptyList()
+    @Volatile private var systemSubtypes: List<InputMethodSubtype> = emptyList() // (the default keyboard, once worked out)
     private val builtInDictLocales = mutableListOf<Locale>() // the languages of the built-in (asset) main dictionaries
     private val TAG = SubtypeSettings::class.simpleName
 }

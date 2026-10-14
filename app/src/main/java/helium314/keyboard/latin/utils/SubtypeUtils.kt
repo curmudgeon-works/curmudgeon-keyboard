@@ -196,6 +196,6 @@ class SubtypeState(private val switchToSubtype: (InputMethodSubtype?) -> Unit) {
             return
         }
         // switchSubtype is called only for internal switching, so let's just switch to the next subtype
-        switchToSubtype(richImm.getNextSubtypeInThisIme(true))
+        richImm.getNextSubtypeInThisIme(true)?.let { switchToSubtype(it) } // (none listed: stays, no switch to nothing)
     }
 }
