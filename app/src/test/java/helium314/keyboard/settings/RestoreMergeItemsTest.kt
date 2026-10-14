@@ -269,6 +269,24 @@ class RestoreMergeItemsTest {
         assertEquals(ctx.getString(helium314.keyboard.latin.R.string.restore_summary_settings_only), restoreSummary(ctx, restored).lines().last())
     }
 
+    // fail before (L3.5): the other languages' new dictionaries came in silently with the clipboard
+    @Test fun `a clipboard-only restore brings no dictionaries`() {
+        val db = File(ctx.cacheDir, "clips-${System.nanoTime()}.db")
+        SQLiteDatabase.openOrCreateDatabase(db, null).use { d ->
+            d.execSQL(ClipboardDao.CREATE_TABLE)
+            d.version = 2
+            d.insert("CLIPBOARD", null, ContentValues().apply { put("TIMESTAMP", 1L); put("PINNED", 0); put("TEXT", "clip") })
+        }
+        backup(listOf(frB), entries = mapOf(Database.NAME to db.readBytes(), "dicts/ur/main_user.dict" to "urdu".toByteArray(),
+            "dicts/fr/main_user.dict" to "fr".toByteArray()))
+        db.delete()
+        restoreChosenFrom(ctx, zip, emptyList(), settings = false, learnedWords = false, io = io, dictionaries = true, clipboard = true)
+        assertFalse(dict("ur", "main_user.dict").exists())
+        assertFalse(dict("fr", "main_user.dict").exists())
+        val dao = ClipboardDao.getInstance(ctx)!!
+        assertEquals(listOf("clip"), (0 until dao.count()).map { dao.getAt(it).text })
+    }
+
     // ---- 5. the clipboard merges (owner 2026-10-12: "yes, merge clipboard") ----
 
     // fail before: the device's clips were cleared and replaced by the backup's

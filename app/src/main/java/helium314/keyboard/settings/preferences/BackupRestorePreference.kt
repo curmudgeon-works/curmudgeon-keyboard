@@ -1394,7 +1394,8 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, plan: Res
         return when (entry.tag) {
             in tags -> entry.takeIf { choice.dictionaries }
             in skippedTags -> null
-            else -> entry
+            // (no keyboard restored, e.g. the clipboard only: no dictionary comes either, review L3.5)
+            else -> entry.takeIf { restoring.isNotEmpty() }
         }
     }
     val restoredDb = ctx.getDatabasePath(Database.NAME + "_restored")
