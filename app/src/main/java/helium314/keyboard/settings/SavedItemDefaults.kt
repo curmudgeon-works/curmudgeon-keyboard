@@ -158,6 +158,9 @@ object SavedItemDefaults {
     /**
      * Once: saved Layouts and themes from before kept no value for their unpicked settings; they remember today's (what
      * they show now), so turning the switch off keeps them as they look today. A fresh install has none.
+     * (review 2026-10-11: "today's" is [SettingDefaults.of] in the release that runs this, not what the item showed when
+     * saved. If a release changes a default and is also the first to run this step on a phone, the items remember the
+     * new default, not the old one they showed: remember the old value with a one-time row for that default instead.)
      */
     fun rememberToday(real: SharedPreferences) {
         if (real.getBoolean(REMEMBERED_DONE, false)) return
