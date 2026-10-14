@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import helium314.keyboard.keyboard.FontLibrary
 import helium314.keyboard.keyboard.KeyboardTheme
 import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.latin.settings.KeyboardScopeContext
 import helium314.keyboard.latin.settings.ProfilePreferences
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
@@ -31,7 +32,8 @@ import kotlin.test.assertTrue
 
 /**
  * Owner 2026-10-11, delete = off the list only: every keyboard and saved item using it keeps its copy, shown as Custom 1,
- * Custom 2 …; nothing goes back to the default, nothing comes back by itself; a font nothing uses asks before its file goes.
+ * Custom 2 …; nothing goes back to the default, nothing comes back by itself. Fonts are the exception (owner 2026-10-11:
+ * global delete): the file goes and its users go back to the default font.
  */
 @RunWith(RobolectricTestRunner::class)
 class DeleteKeepsCopiesTest {
@@ -79,23 +81,48 @@ class DeleteKeepsCopiesTest {
         assertTrue(real.getInt(own(1, CustomLabels.Kind.POPUPS.key), 0) > 0)
     }
 
-    @Test fun `a deleted font in use only leaves the list, every user keeps it`() {
+    // owner 2026-10-11: global delete ("Global only let's do"): the font file goes and every keyboard (all sets, hidden
+    // ones too) and saved theme that chose it goes back to the default font; with Appearance open only after its Save
+    @Test fun `a deleted font goes back to the default everywhere, after Save with Appearance open`() {
+        val screen = KeyboardScopeContext(ctx, 1) // (Appearance of keyboard A)
         val font = File(FontLibrary.dir(ctx).apply { mkdirs() }, "Mine.ttf").apply { writeText("x") }
-        real.edit().putString(own(2, Settings.PREF_KEY_FONT), FontLibrary.PREFIX + "Mine.ttf").commit()
-        assertTrue(FontLibrary.removeFromList(ctx, "Mine.ttf"))
-        assertTrue(font.exists())
-        assertFalse("Mine.ttf" in FontLibrary.names(ctx))
-        assertEquals(FontLibrary.PREFIX + "Mine.ttf", real.getString(own(2, Settings.PREF_KEY_FONT), null))
-        assertEquals(listOf(FontLibrary.PREFIX + "Mine.ttf"), FontLibrary.choices(ctx, FontLibrary.PREFIX + "Mine.ttf")) // (its own keyboard sees it)
-        assertTrue(FontLibrary.choices(ctx, "default").isEmpty())
+        val value = FontLibrary.PREFIX + "Mine.ttf"
+        real.edit().putString(own(1, Settings.PREF_KEY_FONT), value).putString(own(2, Settings.PREF_KEY_FONT), value)
+            .putString(Settings.PREF_HINT_FONT, value) // (a shared key)
+            .putString(own(9, Settings.PREF_EMOJI_FONT), value).commit() // (a set no keyboard has now)
+        AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Sunset", mapOf(Settings.PREF_SUGGESTION_FONT to value))), now = true)
+        val draft = AppearanceDraft.of(screen)
+        FontLibrary.delete(screen, "Mine.ttf")
+        assertFalse(font.exists()); assertFalse("Mine.ttf" in FontLibrary.names(ctx)) // (held until Save)
+        assertEquals("default", real.getString(own(1, Settings.PREF_KEY_FONT), null)) // (the edited keyboard lets go at once)
+        assertEquals(value, real.getString(own(2, Settings.PREF_KEY_FONT), null)) // (the others after Save)
+        draft.accept(screen)
+        assertFalse(font.exists())
+        assertEquals("default", real.getString(own(1, Settings.PREF_KEY_FONT), null))
+        assertEquals("default", real.getString(own(2, Settings.PREF_KEY_FONT), null))
+        assertEquals("default", real.getString(Settings.PREF_HINT_FONT, null))
+        assertEquals("default", real.getString(own(9, Settings.PREF_EMOJI_FONT), null))
+        assertEquals("default", AppearanceLooks.load(real).single().values[Settings.PREF_SUGGESTION_FONT])
     }
 
-    @Test fun `a font nothing uses asks first - nothing hidden or deleted by the trash alone`() {
+    @Test fun `Discard after a font delete brings the file and every choice back`() {
+        val screen = KeyboardScopeContext(ctx, 1) // (Appearance of keyboard A)
         val font = File(FontLibrary.dir(ctx).apply { mkdirs() }, "Mine.ttf").apply { writeText("x") }
-        assertFalse(FontLibrary.removeFromList(ctx, "Mine.ttf")) // (the dialog asks)
-        assertTrue("Mine.ttf" in FontLibrary.names(ctx))
-        FontLibrary.hide(ctx, "Mine.ttf") // "Keep the file"
-        assertTrue(font.exists()); assertFalse("Mine.ttf" in FontLibrary.names(ctx))
+        val value = FontLibrary.PREFIX + "Mine.ttf"
+        real.edit().putString(own(1, Settings.PREF_KEY_FONT), value).putString(own(2, Settings.PREF_KEY_FONT), value)
+            .putString(Settings.PREF_HINT_FONT, value).commit()
+        AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Sunset", mapOf(Settings.PREF_SUGGESTION_FONT to value))), now = true)
+        val before = real.all.filterKeys { it != AppearanceLooks.PREF }
+        AppearanceDraft.of(screen)
+        FontLibrary.delete(screen, "Mine.ttf")
+        AppearanceDraft.rejectOpen(screen)
+        assertTrue(font.exists()); assertTrue("Mine.ttf" in FontLibrary.names(ctx))
+        assertEquals(value, real.getString(own(1, Settings.PREF_KEY_FONT), null))
+        assertEquals(value, real.getString(own(2, Settings.PREF_KEY_FONT), null))
+        assertEquals(value, real.getString(Settings.PREF_HINT_FONT, null))
+        assertEquals(value, AppearanceLooks.load(real).single().values[Settings.PREF_SUGGESTION_FONT])
+        val fontsNow = real.all.filterKeys { k -> FontLibrary.fontPrefs.any { k.endsWith(it) } }
+        assertEquals(before.filterKeys { k -> FontLibrary.fontPrefs.any { k.endsWith(it) } }, fontsNow)
     }
 
     @Test fun `a deleted palette in use stays with its keyboards and saved themes as Custom N, off the list`() {

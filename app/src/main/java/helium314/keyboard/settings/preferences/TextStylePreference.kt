@@ -173,7 +173,7 @@ fun TextStylePreference(setting: Setting, keys: TextStyleKeys) {
         }
     }
     val pickFile = { launcher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")) }
-    val choices = TextFonts.system + FontLibrary.choices(ctx, font) +
+    val choices = TextFonts.system + FontLibrary.names(ctx).map { FontLibrary.PREFIX + it } +
         listOfNotNull(font.takeIf { FontLibrary.isPending(it) }) + TextFonts.LOAD
 
     ThreeButtonAlertDialog(
@@ -198,7 +198,7 @@ fun TextStylePreference(setting: Setting, keys: TextStyleKeys) {
                                 selectedItem = font,
                                 onSelected = { choice -> if (choice == TextFonts.LOAD) pickFile() else choose(choice) },
                                 itemTrailing = { choice ->
-                                    if (choice.startsWith(FontLibrary.PREFIX) && !FontLibrary.isPending(choice) && !FontLibrary.isHidden(ctx, choice))
+                                    if (choice.startsWith(FontLibrary.PREFIX) && !FontLibrary.isPending(choice))
                                         FontDeleteButton(choice) { reload() }
                                 },
                             ) { Text(fontName(it)) }
@@ -335,7 +335,7 @@ fun FontsPreference(setting: Setting, texts: List<Pair<Int, TextStyleKeys>>) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 for ((label, k) in texts) {
                     val font = fontOf(k)
-                    val choices = TextFonts.system + FontLibrary.choices(ctx, font) +
+                    val choices = TextFonts.system + FontLibrary.names(ctx).map { FontLibrary.PREFIX + it } +
                         listOfNotNull(font.takeIf { FontLibrary.isPending(it) }) + TextFonts.LOAD
                     val stored = if (k.sizeIsInt) prefs.getInt(k.size, k.sizeDefault.toInt()).toFloat() else prefs.getFloat(k.size, k.sizeDefault)
                     var position by remember(k.size) { mutableFloatStateOf(stored) }
@@ -354,7 +354,7 @@ fun FontsPreference(setting: Setting, texts: List<Pair<Int, TextStyleKeys>>) {
                                     } else change { putString(k.font, choice) }
                                 },
                                 itemTrailing = { choice ->
-                                    if (choice.startsWith(FontLibrary.PREFIX) && !FontLibrary.isPending(choice) && !FontLibrary.isHidden(ctx, choice))
+                                    if (choice.startsWith(FontLibrary.PREFIX) && !FontLibrary.isPending(choice))
                                         FontDeleteButton(choice) { reload() }
                                 },
                             ) { Text(fontName(it), maxLines = 1) }
@@ -436,7 +436,7 @@ fun EmojiFontPreference(setting: Setting) {
         }
     }
     // the system's emoji, or a font file (the serif / sans / mono families have no emoji of their own)
-    val choices = listOf(TextFonts.DEFAULT) + FontLibrary.choices(ctx, font) +
+    val choices = listOf(TextFonts.DEFAULT) + FontLibrary.names(ctx).map { FontLibrary.PREFIX + it } +
         listOfNotNull(font.takeIf { FontLibrary.isPending(it) }) + TextFonts.LOAD
     ThreeButtonAlertDialog(
         onDismissRequest = {
@@ -459,7 +459,7 @@ fun EmojiFontPreference(setting: Setting) {
                     else choose(choice)
                 },
                 itemTrailing = { choice ->
-                    if (choice.startsWith(FontLibrary.PREFIX) && !FontLibrary.isPending(choice) && !FontLibrary.isHidden(ctx, choice))
+                    if (choice.startsWith(FontLibrary.PREFIX) && !FontLibrary.isPending(choice))
                         FontDeleteButton(choice) { reload() }
                 },
             ) { Text(fontName(it)) }
@@ -517,23 +517,40 @@ fun SuggestionColorRow(reload: () -> Unit) {
     }
 }
 
+/** Who goes back to the default font when font [name] is deleted: the enabled keyboards choosing it (the one being
+ *  edited too), by name, then the saved themes, "theme <name>"; one line each. */
+internal fun fontUsers(ctx: Context, name: String): List<String> {
+    val value = FontLibrary.PREFIX + name
+    val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
+    val edited = helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(real, helium314.keyboard.settings.PrefsDraft.currentSetId(ctx))
+    val keyboards = helium314.keyboard.settings.screens.keyboardsUsing(ctx, FontLibrary.fontPrefs, edited) { _, v -> v == value }
+        .map { helium314.keyboard.settings.screens.keyboardName(it, ctx) }
+    val themes = helium314.keyboard.settings.AppearanceLooks.load(real)
+        .filter { look -> FontLibrary.fontPrefs.any { look.values[it] == value } }
+        .map { ctx.getString(R.string.font_delete_theme, it.name) }
+    return keyboards + themes
+}
+
 /**
- * The trash on a loaded font (owner 2026-10-11: "Fonts should be kept after delete. If it's not used by any other
- * keyboard/theme, then user should be prompted if they want to perma delete"): used somewhere, it only leaves the
- * list and every user keeps it; used nowhere, asked: delete the file for good, or keep it (off the list).
+ * The trash on a loaded font (owner 2026-10-11: "Global only let's do. With warning telling where it's being used, or
+ * mentioning it's not used anywhere"): always asked first; Delete takes the file away and every keyboard (all sets,
+ * hidden ones too) and saved theme that chose it goes back to the default font. With Appearance open the delete waits
+ * for its Save ([FontLibrary.delete]).
  */
 @Composable
 internal fun FontDeleteButton(choice: String, onDone: () -> Unit) {
     val ctx = LocalContext.current
     val name = FontLibrary.displayName(choice)
-    var ask by remember { mutableStateOf(false) }
-    DeleteButton { if (FontLibrary.removeFromList(ctx, name)) onDone() else ask = true }
-    if (ask) helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog(
-        onDismissRequest = { ask = false },
-        onCancel = { FontLibrary.hide(ctx, name); ask = false; onDone() }, // keep the file
-        onConfirmed = { FontLibrary.delete(ctx, name); onDone() },
-        title = { Text(stringResource(R.string.font_delete_file_title, name)) },
-        cancelButtonText = stringResource(R.string.font_keep_file),
-        confirmButtonText = stringResource(R.string.delete),
-    )
+    var users by remember { mutableStateOf<List<String>?>(null) }
+    DeleteButton { users = fontUsers(ctx, name) }
+    users?.let { list ->
+        helium314.keyboard.settings.dialogs.ConfirmationDialog(
+            onDismissRequest = { users = null },
+            onConfirmed = { FontLibrary.delete(ctx, name); onDone() },
+            title = { Text(stringResource(R.string.font_delete_title, name)) },
+            content = { Text(if (list.isEmpty()) stringResource(R.string.font_delete_unused)
+                else stringResource(R.string.font_delete_users, list.joinToString("\n"))) },
+            confirmButtonText = stringResource(R.string.delete),
+        )
+    }
 }

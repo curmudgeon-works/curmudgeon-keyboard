@@ -245,7 +245,7 @@ class AppearanceDraft private constructor(
             // (a keyboard's own theme settings: the update dialog writes them on the keyboards ticked there; not its Custom
             // label, which the Themes row gives when it first shows one: that's no change of the screen)
             if (own != null && AppearanceLooks.inScope(plain)) return true
-            return plain == AppearanceLooks.PREF || plain == AppearanceLooks.PREF_SELECTED || plain == helium314.keyboard.keyboard.FontLibrary.PREF_HIDDEN
+            return plain == AppearanceLooks.PREF || plain == AppearanceLooks.PREF_SELECTED
                 || plain == Settings.PREF_THEME_COLORS || plain == Settings.PREF_THEME_COLORS_NIGHT
                 || plain.startsWith(Settings.PREF_USER_COLORS_PREFIX) || plain.startsWith(Settings.PREF_USER_ALL_COLORS_PREFIX)
                 || plain.startsWith(Settings.PREF_USER_MORE_COLORS_PREFIX)

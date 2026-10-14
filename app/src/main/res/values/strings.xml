@@ -584,9 +584,13 @@
     <!-- a saved item with these exact settings exists already (Update, Save as new); nothing is blocked -->
     <string name="same_settings_as">These settings are the same as “%s”.</string>
     <string name="save_anyway">Save anyway</string>
-    <!-- the trash on a font nothing uses any more -->
-    <string name="font_delete_file_title">Also delete the font file “%s” for good?</string>
-    <string name="font_keep_file">Keep the file</string>
+    <!-- the trash on a loaded font: the file goes, and everything that chose it goes back to the default font -->
+    <string name="font_delete_title">Delete the font \"%s\"?</string>
+    <!-- %s = the keyboards and saved themes using the font, one per line -->
+    <string name="font_delete_users">These go back to the default font:\n%s</string>
+    <string name="font_delete_unused">No keyboard or saved theme uses it.</string>
+    <!-- a saved theme in that list; %s = its name -->
+    <string name="font_delete_theme">theme %s</string>
     <!-- deleting an added dictionary other keyboards use: not allowed -->
     <string name="dictionary_in_use_title">“%s” is in use</string>
     <string name="dictionary_in_use_message">These keyboards use it too, so it stays:\n%s</string>

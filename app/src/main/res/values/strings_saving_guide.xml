@@ -68,7 +68,7 @@
     <string name="saving_delete_items">Off the list only. Keyboards using it keep its settings, shown as Custom 1, Custom 2 …; nothing goes back to the default. The dialog names them. Waits for the screen\'s Save.</string>
     <string name="saving_delete_popups">Off the list. Keyboards using it keep its popups as Custom N; saved Layouts keep its popups without the name, and it never comes back by itself.</string>
     <string name="saving_delete_palettes">Off the list. Keyboards and saved themes using it keep its colours as Custom N. One nothing uses is deleted.</string>
-    <string name="saving_delete_fonts">Off the list; keyboards and themes using it keep it. One nothing uses: you\'re asked whether to delete the file for good.</string>
+    <string name="saving_delete_fonts">The file goes. Every keyboard and saved theme using it goes back to the default font; you\'re asked first, and the question names them, or says nothing uses it. Waits for the screen\'s Save.</string>
     <string name="saving_delete_pictures">Off the picture list; keyboards and themes keep their copies.</string>
     <string name="saving_delete_key_layouts">Off the list. Every keyboard using it keeps its keys as an unsaved layout of its own, whether it chose it or had it as the default for that part.</string>
     <string name="saving_delete_keyboards">Its learned and blacklisted words go too. Keyboards reading them (\"Use lists from other keyboards\") are named, and one you pick can take them, merged into its own.</string>
@@ -84,7 +84,7 @@
 
     <!-- Add / Import -->
     <string name="saving_add_palettes">Add a palette, or Load one from a file or text.</string>
-    <string name="saving_add_fonts">Load a font file in a text style. The same font loaded again is reused; a font taken off the list comes back.</string>
+    <string name="saving_add_fonts">Load a font file in a text style. The same font loaded again is reused.</string>
     <string name="saving_add_pictures">Pick a picture: it joins the picture list every keyboard chooses from.</string>
     <string name="saving_add_key_layouts">Add custom layout (paste one into the editor), or Load file in Full customization with JSON.</string>
     <string name="saving_add_keyboards">Add a keyboard, or a copy of one. A new keyboard can start with words from other keyboards.</string>
