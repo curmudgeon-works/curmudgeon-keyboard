@@ -26,7 +26,7 @@ class HowSavingWorksTest {
     }
 
     // owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones
-    @Test fun `separate settings rows: the first keyboard's settings, nothing copied, delete and reorder`() {
+    @Test fun `separate settings rows - the first keyboard's settings, nothing copied, delete and reorder`() {
         val separate = savingGuide.last().rows.map { it.text }
         val texts = separate.map { ctx.getString(it) }
         assertTrue(texts.none { "a copy of the common settings" in it || "the keyboard you pick" in it }, texts.toString())
