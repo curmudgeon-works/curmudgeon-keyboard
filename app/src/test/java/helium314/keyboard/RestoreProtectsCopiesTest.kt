@@ -30,6 +30,8 @@ import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
+import android.os.Looper
 import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -72,7 +74,14 @@ class RestoreProtectsCopiesTest {
         colemak = qwerty.withLayout(LayoutType.MAIN, "colemak").toPref().toSettingsSubtype()
         english = keyboardName(qwerty, ctx)
     }
-    @After fun tearDown() { zip.delete(); real.edit().clear().commit(); KeyboardProfiles.loadGroups(real); SubtypeSettings.reloadEnabledSubtypes(ctx) }
+    @After fun tearDown() {
+        zip.delete(); real.edit().clear().commit(); KeyboardProfiles.loadGroups(real); SubtypeSettings.reloadEnabledSubtypes(ctx)
+        // the work queued on the main thread done here (2026-10-11): the "What to merge" ticks are Compose state, and once
+        // an earlier class had drawn a screen, writing them queues Compose's notice of the change on the main thread;
+        // dropped at the end of the test, it left the next class's settings screens deaf to taps (EditingKeyboardTest's
+        // keyboard B didn't unfold, as SwitchedOffTileTest's before)
+        shadowOf(Looper.getMainLooper()).idle()
+    }
 
     /** The phone: QWERTY, separate settings on, [own] in its own set. */
     private fun phone(own: Map<String, Any?>) {
