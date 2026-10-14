@@ -95,13 +95,18 @@ class ReReview2R7Test {
         assertEquals(5f, real.getFloat(own(2, gap), 0f))
         assertEquals(true, real.getBoolean(own(2, autoCap), false))
         assertEquals(listOf(hi), hidden)
-        assertEquals("${keyboardName(hi, ctx)}'s settings were restored. You'll see them once you turn on Use separate settings in App settings.",
-            hiddenSettingsNote(ctx, hidden))
+        // (owner 2026-10-12: the after-note is a dialog naming the first keyboard and the real switch; was "You'll see
+        // them once you turn on Use separate settings in App settings.")
+        val hiName = keyboardName(hi, ctx); val enName = keyboardName(en, ctx)
+        assertEquals("$hiName's settings were restored, but all keyboards follow $enName for now. To see $hiName's restored " +
+            "settings, turn on Separate settings per keyboard (App settings › Per keyboard).", hiddenSettingsNote(ctx, hidden))
         // (English is the first keyboard: its settings are the common ones; owner 2026-10-11, no separate common set)
-        assertEquals("The settings of ${keyboardName(hi, ctx)}, ${keyboardName(de, ctx)} were restored. You'll see them once you turn on Use separate settings in App settings.",
+        assertEquals("The settings of $hiName, ${keyboardName(de, ctx)} were restored, but all keyboards follow $enName for now. " +
+            "To see their restored settings, turn on Separate settings per keyboard (App settings › Per keyboard).",
             hiddenSettingsNote(ctx, listOf(hi, de)))
-        assertEquals("${keyboardName(en, ctx)}'s settings were restored. All keyboards use them, as they're the common settings.\n" +
-            "${keyboardName(hi, ctx)}'s settings were restored. You'll see them once you turn on Use separate settings in App settings.",
+        assertEquals("$enName's settings were restored. All keyboards use them, as they're the common settings.\n" +
+            "$hiName's settings were restored, but all keyboards follow $enName for now. To see $hiName's restored " +
+            "settings, turn on Separate settings per keyboard (App settings › Per keyboard).",
             hiddenSettingsNote(ctx, listOf(hi, en)))
 
         // separate settings on: Hindi reads the backup's, English the common ones

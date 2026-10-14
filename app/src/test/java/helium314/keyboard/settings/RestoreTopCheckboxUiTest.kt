@@ -44,8 +44,11 @@ class RestoreTopCheckboxUiTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val zip by lazy { File(ctx.cacheDir, "top-checkbox-${System.nanoTime()}.zip") }
     private var scenario: ActivityScenario<SettingsActivity>? = null
-    private val top = "Delete app data and restore from backup"
-    private val line = "App data won't be deleted. Each selected keyboard will be merged or added, based on your selection on next screens."
+    // (owner 2026-10-12: the top checkbox reads "Full restore (delete app data)"; was "Delete app data and restore from backup")
+    private val top = "Full restore (delete app data)"
+    // (owner 2026-10-12: the line under the unchecked checkbox; was "App data won't be deleted. Each selected keyboard
+    // will be merged or added, based on your selection on next screens.")
+    private val line = "Prepare to do super-complex merging! Select what you want to bring in from the backup:"
     private val marker = Settings.PREF_CLIPBOARD_HISTORY_SIZE
 
     @Before fun setUp() {
@@ -66,6 +69,7 @@ class RestoreTopCheckboxUiTest {
         ctx.realPrefs().edit().clear().commit()
         SubtypeSettings.reloadEnabledSubtypes(ctx)
         KeyboardProfiles.loadGroups(ctx.realPrefs())
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
     }
 
     private fun show() {

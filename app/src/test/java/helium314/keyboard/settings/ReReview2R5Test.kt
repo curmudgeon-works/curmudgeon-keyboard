@@ -64,7 +64,8 @@ class ReReview2R5Test {
     private val zip by lazy { File(ctx.cacheDir, "r5-${System.nanoTime()}.zip") }
     private var scenario: ActivityScenario<SettingsActivity>? = null
     private val reading = "Reading backup…"
-    private val top = "Delete app data and restore from backup"
+    // (owner 2026-10-12: the top checkbox reads "Full restore (delete app data)"; was "Delete app data and restore from backup")
+    private val top = "Full restore (delete app data)"
     private val type = LayoutType.NUMBER_ROW
     private val folder get() = LayoutUtilsCustom.getLayoutFile("x", type, ctx).parentFile!!
 

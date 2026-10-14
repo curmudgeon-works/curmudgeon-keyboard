@@ -80,7 +80,8 @@ internal sealed class RestoreDecision {
  * type are the same keys (an unsaved one compared by its keys); [backupSettings], a backup keyboard's settings with its
  * saved items named as the restore would name them, and [phoneSettings], a phone keyboard's, for the restore dialog's
  * ticks ([SavedItemsMerge.Choices]); [clashes], the backup's saved items the restore dialog asks about (owner
- * 2026-10-11: "backup wins the name if ticked").
+ * 2026-10-11: "backup wins the name if ticked"); [dictionaryClashes], the languages (tags) whose added dictionary in the
+ * backup differs from the device's (owner 2026-10-12: the backup's is selected, the device's kept aside as "…_prev").
  */
 internal class RestorePlan(
     val incoming: Map<SettingsSubtype, SettingsSubtype>,
@@ -91,8 +92,14 @@ internal class RestorePlan(
     val backupSettings: (SettingsSubtype, SavedItemsMerge.Choices) -> Map<String, Any?> = { _, _ -> emptyMap() },
     val phoneSettings: (Map<String, Any?>, SavedItemsMerge.Choices) -> Map<String, Any?> = { values, _ -> values },
     val clashes: List<SavedItemsMerge.Clash> = emptyList(),
+    val dictionaryClashes: Set<String> = emptySet(),
 ) {
     val phone = (enabled + switchedOff).distinct()
+
+    /** The languages of [keyboards] (their main and other languages, in order) whose dictionary clashes. */
+    fun dictionaryClashLanguages(keyboards: Collection<SettingsSubtype>): List<String> =
+        keyboards.flatMap { listOf(it.locale) + helium314.keyboard.latin.utils.getSecondaryLocales(it.extraValues) }
+            .map { it.toLanguageTag() }.distinct().filter { it in dictionaryClashes }
 
     fun isSwitchedOff(keyboard: SettingsSubtype) = enabled.none { it.sameKeyboard(keyboard) }
 
@@ -129,13 +136,14 @@ internal class RestorePlan(
             if (other in decisions) result(other, decisions[other]) else if (!asks(other)) result(other, null) else null }
     }
 
-    /** The name box's first text: the keyboard's name ([decision] with its name unchanged), or the next free one when
-     *  another keyboard after the restore has it ([nextFreeName], among the keyboards there are then, [others]; owner
-     *  2026-10-11: "same Name (or language in absence of name) makes it <name> 2"). */
+    /** The name box's first text. Merged: the device keyboard's current name, never a numbered one (owner 2026-10-12:
+     *  "yes, when merging the name should be current name"). Kept separate: the keyboard's name, or the next free one
+     *  when another keyboard after the restore has it ([nextFreeName], among the keyboards there are then, [others];
+     *  owner 2026-10-11: "same Name (or language in absence of name) makes it <name> 2"). */
     fun prefillName(keyboard: SettingsSubtype, decision: RestoreDecision, chosen: Collection<SettingsSubtype>,
                     decisions: Map<SettingsSubtype, RestoreDecision>): String {
         val unnamed = when (decision) {
-            is RestoreDecision.Merge -> decision.copy(name = null)
+            is RestoreDecision.Merge -> return nameOf(decision.phone)
             is RestoreDecision.Separate -> RestoreDecision.Separate()
             RestoreDecision.Skip -> return ""
         }
@@ -224,10 +232,44 @@ internal class MergeChoice(val question: MergeQuestion, val target: SettingsSubt
         if (it is RestoreDecision.Skip) "" else plan.prefillName(question.keyboard, it, question.chosen, question.decisions) }
     val decision get() = decision(name)
 
+    /** The menus ticked ("<menu> settings" rows). */
+    val tickedMenus get() = ticked.filterIsInstance<RestoreMatch.Difference.Menu>().map { it.group }
+
+    /** The note on which ticked menus are common (R-4, owner 2026-10-11 wording), or null. */
+    fun commonNote(ctx: Context): String? =
+        if (decision is RestoreDecision.Skip) null else commonMenusNote(ctx, target, tickedMenus)
+
     /** The line near the top whenever something is ticked, else null (owner 2026-10-11: one line, no per-copy warnings:
      *  "If someone is overwriting items they should generally know what they're talking about"). */
     fun replacesNote(ctx: Context): String? =
         if (decision is RestoreDecision.Skip) null else ctx.getString(R.string.restore_replaces_settings)
+}
+
+/**
+ * What "What to merge" says when ticked [menus] of the device's [target] are common to all keyboards (R-4, owner
+ * 2026-10-11, mockup QvEiPwiBdyBCe8YUtXL7JJ; "for a non-first keyboard too you should communicate that you're indeed
+ * restoring the backup, but settings won't show because common is selected"): menus shared (App settings › Per
+ * keyboard), or all of them with separate settings off; [target] first in the list (its settings are the common ones)
+ * or not. Null: none of them is common.
+ */
+internal fun commonMenusNote(ctx: Context, target: SettingsSubtype, menus: Collection<KeyboardProfiles.Group>): String? {
+    if (menus.isEmpty()) return null
+    val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
+    val separate = KeyboardProfiles.isSeparate(real)
+    val common = KeyboardProfiles.Group.entries.filter { it in menus && (!separate || KeyboardProfiles.isShared(real, it)) }
+    if (common.isEmpty()) return null
+    val names = common.joinToString(", ") { ctx.getString(helium314.keyboard.settings.screens.groupTitle(it)) }
+    val first = KeyboardProfiles.mainKeyboard(real)
+    val kb = helium314.keyboard.settings.screens.keyboardName(target, ctx)
+    val res = ctx.resources
+    return when {
+        separate && target.sameKeyboard(first) -> res.getQuantityString(R.plurals.restore_common_first, common.size, names, kb)
+        separate -> res.getQuantityString(R.plurals.restore_common_other, common.size, names,
+            helium314.keyboard.settings.screens.keyboardName(first, ctx), kb)
+        target.sameKeyboard(first) -> res.getQuantityString(R.plurals.restore_all_common_first, common.size, kb, names)
+        else -> res.getQuantityString(R.plurals.restore_all_common_other, common.size,
+            helium314.keyboard.settings.screens.keyboardName(first, ctx), names, kb)
+    }
 }
 
 /**
@@ -257,7 +299,7 @@ internal class RestoreDialogState(private val keyboards: List<SettingsSubtype>) 
 
     /** The keyboard rows, and the rows that only mean something keyboard by keyboard, can be changed. */
     val rowsEnabled get() = !wipe
-    /** "App data won't be deleted. Each selected keyboard will be merged or added, …" */
+    /** "Prepare to do super-complex merging! Select what you want to bring in from the backup:" (owner 2026-10-12) */
     val showsMergeLine get() = !wipe
     /** A keyboard row's tick: greyed out, every keyboard comes back. */
     fun ticked(keyboard: SettingsSubtype) = wipe || keyboard in selected

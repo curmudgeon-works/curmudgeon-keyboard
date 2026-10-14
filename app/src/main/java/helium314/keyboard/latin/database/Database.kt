@@ -31,7 +31,10 @@ class Database private constructor(context: Context, name: String = NAME) : SQLi
         }
 
         // needs to be in sync with db version
-        fun copyFromDb(file: File, context: Context) {
+        /** The clips of the database [file] replace the phone's (a full restore), or with [mergeKeeping] (the history
+         *  size) are merged into them (a partial restore, owner 2026-10-12: backup's clips added, exact duplicates
+         *  once, both sides' pins kept, newest first, the oldest unpinned beyond the size dropped). */
+        fun copyFromDb(file: File, context: Context, mergeKeeping: Int? = null) {
             if (!file.exists())
                 return
             val otherDb = Database(context, file.name) // this upgrades the DB if necessary
@@ -41,10 +44,14 @@ class Database private constructor(context: Context, name: String = NAME) : SQLi
             } else {
                 otherDb.readableDatabase.rawQuery("SELECT TIMESTAMP, PINNED, TEXT FROM CLIPBOARD", null)
                     .use {
-                        clipDao.clear()
-                        while (it.moveToNext())
-                            clipDao.addClip(it.getLong(0), it.getInt(1) != 0, it.getString(2))
+                        if (mergeKeeping == null) clipDao.clear()
+                        while (it.moveToNext()) {
+                            val text = it.getString(2) ?: continue
+                            if (mergeKeeping == null) clipDao.addClip(it.getLong(0), it.getInt(1) != 0, text)
+                            else clipDao.mergeClip(it.getLong(0), it.getInt(1) != 0, text)
+                        }
                     }
+                if (mergeKeeping != null) clipDao.keepNewestUnpinned(mergeKeeping)
             }
             // (upstream also copied its gesture-data table here: not in this app, and fresh installs don't have it)
             otherDb.close()

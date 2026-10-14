@@ -190,6 +190,8 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
                             )
                         }
                     }
+                    // what a restore has to say, once it's done (owner 2026-10-12: a dialog, not a toast)
+                    helium314.keyboard.settings.preferences.AfterRestoreNote()
                     if (dictUri != null) {
                         NewDictionaryDialog(
                             onDismissRequest = { dictUriFlow.value = null },

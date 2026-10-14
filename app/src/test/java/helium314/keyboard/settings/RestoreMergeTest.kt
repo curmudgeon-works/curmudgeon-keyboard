@@ -238,8 +238,30 @@ class RestoreMergeTest {
         restoreKeyboardsFrom(ctx, zip, listOf(dvorak), withSettings = false, decisions = mapOf(dvorak to duplicate))
         assertEquals(listOf(qwerty, second, dvorak), enabled())
         assertEquals(english, name(dvorak))
-        // a merge keeps the phone keyboard's own name, numbered only when another has it
+        // a merge keeps the phone keyboard's own name
         assertEquals(english, plan.prefillName(dvorak, RestoreDecision.Merge(qwerty, parts = setOf(RestoreMatch.Part.Layout(main)), menus = emptySet()), listOf(dvorak), emptyMap()))
+    }
+
+    // (owner 2026-10-12: "yes, when merging the name should be current name"; was: numbered when another keyboard had
+    // it, "English (US) 2") fail before: the merge's box said "English (US) 2"
+    @Test fun `merging, the name box is the device keyboard's current name even when another keyboard has it`() {
+        val twin = withKeyboardName(colemak, english).toPref().toSettingsSubtype()
+        phoneAndBackup(listOf(qwerty, twin), listOf(dvorak))
+        assertEquals(english, name(twin))
+        val plan = restorePlanFrom(ctx, zip)
+        assertEquals(english, plan.prefillName(dvorak, RestoreDecision.Merge(qwerty), listOf(dvorak), emptyMap()))
+        assertEquals(english, plan.prefillName(dvorak, RestoreDecision.Merge(qwerty, parts = setOf(RestoreMatch.Part.Layout(main)),
+            menus = emptySet()), listOf(dvorak), emptyMap()))
+        val work = withKeyboardName(qwerty, "Work").toPref().toSettingsSubtype()
+        assertEquals("Work", plan.prefillName(dvorak, RestoreDecision.Merge(work), listOf(dvorak), emptyMap()))
+        // kept separate: still the next free name
+        assertEquals("$english 2", plan.prefillName(dvorak, RestoreDecision.Separate(), listOf(dvorak), emptyMap()))
+        // and what "What to merge" starts with
+        val question = MergeQuestion(plan, dvorak, listOf(dvorak), emptyMap())
+        val differences = RestoreMatch.definitionDifferences(qwerty, plan.incoming.getValue(dvorak))
+        val choice = MergeChoice(question, qwerty, differences, wordsRow = false)
+        choice.ticked.addAll(differences)
+        assertEquals(english, choice.name)
     }
 
     // (owner 2026-10-11: keyboards have unique ids; was: a result set up like another keyboard was blocked, "fully

@@ -341,20 +341,26 @@
     <!-- While a picked backup is read for the restore dialog (and while "What to merge" is worked out); Cancel closes it -->
     <string name="restore_reading">Reading backup…</string>
     <!-- Restore dialog: one checklist, mirroring the factory reset one -->
-    <!-- the restore dialog's top checkbox, checked to start with: the full restore, which wipes (owner 2026-10-11) -->
-    <string name="restore_delete_app_data">Delete app data and restore from backup</string>
+    <!-- the restore dialog's top checkbox, checked to start with: the full restore, which wipes (owner 2026-10-11;
+         wording owner 2026-10-12: "makes it clear") -->
+    <string name="restore_delete_app_data">Full restore (delete app data)</string>
     <!-- title and button of the question asked before that wipe; its message: saving_full_everything -->
     <string name="restore_delete_and_restore">Delete and restore</string>
+    <!-- the restore dialog's groups (owner 2026-10-12, v3), shown in capitals: KEYBOARDS · RESTORE THEIR (Settings ·
+         Dictionaries) · AND MERGE (Learned words · Clipboard history) · FOR OTHER CLASHES -->
     <string name="restore_keyboards">Keyboards</string>
-    <string name="restore_with_keyboards">Bring with them</string>
+    <string name="restore_their">Restore their</string>
     <string name="restore_settings">Settings</string>
-    <string name="restore_learned_words">Learned words (for their scripts)</string>
-    <string name="restore_dictionaries">Added dictionaries</string>
-    <string name="restore_also">Also restore</string>
-    <string name="restore_custom_words">Custom words</string>
+    <string name="restore_dictionaries">Dictionaries</string>
+    <!-- under Dictionaries when the restored keyboards' languages have one that differs from the device's; %s: the
+         languages, comma-separated (owner 2026-10-12 wording) -->
+    <string name="restore_dictionaries_clash">%s: Backup is prioritized, yours is kept aside as \"…prev\"</string>
+    <string name="restore_and_merge">And merge</string>
+    <!-- also brings the backup's words of Android's personal dictionary (added only) -->
+    <string name="restore_learned_words">Learned words</string>
     <string name="restore_clipboard">Clipboard history</string>
-    <!-- under the restore dialog's rows when its top checkbox is unchecked (owner 2026-10-11) -->
-    <string name="restore_merge_note">App data won\'t be deleted. Each selected keyboard will be merged or added, based on your selection on next screens.</string>
+    <!-- under the restore dialog's top checkbox when it is unchecked (owner 2026-10-12) -->
+    <string name="restore_merge_note">Prepare to do super-complex merging! Select what you want to bring in from the backup:</string>
     <!-- Swipe tuning screen (own gesture decoder): inflection weights and per-setting statistics -->
     <string name="swipe_tuning">Swipe suggestion parameters</string>
     <!-- One line under the heading: what the six sliders below are -->
@@ -655,8 +661,9 @@
     <string name="restore_keyboard_new">%s (new)</string>
     <!-- the restore dialog, keyboard by keyboard: the backup's saved items clashing with this phone's, each ticked to
          start with (owner 2026-10-11: "backup wins the name if ticked"; replaces "bring them in as copies") -->
-    <string name="restore_clashes">Saved items that clash with yours</string>
-    <string name="restore_clashes_note">Ticked: the backup\'s name wins, and every keyboard and saved item using that name uses the backup\'s. Unticked: nothing of yours is renamed, and a backup item with one of your names doesn\'t come in.</string>
+    <string name="restore_clashes">For other clashes</string>
+    <!-- (owner 2026-10-12 wording; yours is renamed, never overwritten) -->
+    <string name="restore_clashes_note">Checked: Backup item is prioritized, yours is kept as \"… 2\". Unchecked: Backup item is ignored.</string>
     <!-- same name, other content. %1$s: the name, %2$s: what this phone's item becomes, e.g. "Sunset 2" -->
     <string name="restore_clash_same_name">%1$s: use the backup\'s, yours becomes %2$s</string>
     <!-- the same content under another name. %1$s: this phone's name, %2$s: the backup's name -->
@@ -683,9 +690,31 @@
     <string name="restore_nothing_ticked">Nothing to restore: %s will not be restored from the backup.</string>
     <string name="restore_dont_restore">Don\'t restore</string>
     <string name="restore_done">Done</string>
-    <!-- after a restore with one set of settings for all (separate settings off), which the restore leaves off: %s the keyboard(s) -->
-    <string name="restore_settings_hidden_one">%s\'s settings were restored. You\'ll see them once you turn on Use separate settings in App settings.</string>
-    <string name="restore_settings_hidden_many">The settings of %s were restored. You\'ll see them once you turn on Use separate settings in App settings.</string>
+    <!-- a dialog with OK after a restore with one set of settings for all (separate settings off), which the restore
+         leaves off (owner 2026-10-12 wording): %1$s the keyboard(s), %2$s the first keyboard, whose settings all follow -->
+    <string name="restore_settings_hidden_one">%1$s\'s settings were restored, but all keyboards follow %2$s for now. To see %1$s\'s restored settings, turn on Separate settings per keyboard (App settings › Per keyboard).</string>
+    <string name="restore_settings_hidden_many">The settings of %1$s were restored, but all keyboards follow %2$s for now. To see their restored settings, turn on Separate settings per keyboard (App settings › Per keyboard).</string>
+    <!-- "What to merge", when ticked menus are common to all keyboards (R-4, owner 2026-10-11 wording). Shared menus:
+         %1$s the menus, %2$s the keyboard merged into, first in the list -->
+    <plurals name="restore_common_first">
+        <item quantity="one">%1$s is common to all your keyboards (App settings › Per keyboard), and %2$s is first in your list. The backup\'s %1$s will show on every keyboard. Each keyboard\'s own settings stay saved.</item>
+        <item quantity="other">%1$s are common to all your keyboards (App settings › Per keyboard), and %2$s is first in your list. The backup\'s %1$s will show on every keyboard. Each keyboard\'s own settings stay saved.</item>
+    </plurals>
+    <!-- %1$s the menus, %2$s the first keyboard, %3$s the keyboard merged into -->
+    <plurals name="restore_common_other">
+        <item quantity="one">%1$s is common to all your keyboards (App settings › Per keyboard) and comes from %2$s, first in your list. The backup\'s %1$s is restored into %3$s\'s own settings, and shows once that menu is set per keyboard.</item>
+        <item quantity="other">%1$s are common to all your keyboards (App settings › Per keyboard) and come from %2$s, first in your list. The backup\'s %1$s are restored into %3$s\'s own settings, and show once those menus are set per keyboard.</item>
+    </plurals>
+    <!-- separate settings off: %1$s the keyboard merged into, first in the list, %2$s the menus -->
+    <plurals name="restore_all_common_first">
+        <item quantity="one">All settings are common to all your keyboards (App settings › Per keyboard: separate settings off), and %1$s is first in your list. The backup\'s %2$s will show on every keyboard. Each keyboard\'s own settings stay saved.</item>
+        <item quantity="other">All settings are common to all your keyboards (App settings › Per keyboard: separate settings off), and %1$s is first in your list. The backup\'s %2$s will show on every keyboard. Each keyboard\'s own settings stay saved.</item>
+    </plurals>
+    <!-- separate settings off: %1$s the first keyboard, %2$s the menus, %3$s the keyboard merged into -->
+    <plurals name="restore_all_common_other">
+        <item quantity="one">All settings are common to all your keyboards (App settings › Per keyboard: separate settings off) and come from %1$s, first in your list. The backup\'s %2$s is restored into %3$s\'s own settings, and shows once you turn on Separate settings per keyboard.</item>
+        <item quantity="other">All settings are common to all your keyboards (App settings › Per keyboard: separate settings off) and come from %1$s, first in your list. The backup\'s %2$s are restored into %3$s\'s own settings, and show once you turn on Separate settings per keyboard.</item>
+    </plurals>
     <!-- after a restore of the first keyboard while its settings are the common ones: %s the keyboard -->
     <string name="restore_settings_main">%s\'s settings were restored. All keyboards use them, as they\'re the common settings.</string>
     <string name="restore_differs_choose_message">A ticked item takes the backup\'s. An unticked item keeps this phone\'s.</string>

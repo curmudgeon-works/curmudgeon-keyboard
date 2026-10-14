@@ -63,7 +63,43 @@ class ClipboardDao private constructor(private val db: Database) {
         insertNewEntry(timestamp, pinned, text)
     }
 
-    private fun insertNewEntry(timestamp: Long, pinned: Boolean, text: String) {
+    /**
+     * A clip of a backup merged in (a partial restore, owner 2026-10-12: "yes, merge clipboard"): one with the same text
+     * is kept once, pinned if either is, with the newer time; a new one is added. Nothing is dropped here: the history
+     * size is applied once all are in ([keepNewestUnpinned]).
+     */
+    fun mergeClip(timestamp: Long, pinned: Boolean, text: String) {
+        val existing = cache.firstOrNull { it.text == text }
+        if (existing == null) {
+            insertNewEntry(timestamp, pinned, text, trim = false)
+            return
+        }
+        val newPinned = existing.isPinned || pinned
+        val newTime = maxOf(existing.timeStamp, timestamp)
+        if (newPinned == existing.isPinned && newTime == existing.timeStamp) return
+        val oldPos = cache.indexOf(existing)
+        existing.isPinned = newPinned
+        existing.timeStamp = newTime
+        cache.sort()
+        listener?.onClipMoved(oldPos, cache.indexOf(existing))
+        val cv = ContentValues(2)
+        cv.put(COLUMN_PINNED, newPinned)
+        cv.put(COLUMN_TIMESTAMP, newTime)
+        db.writableDatabase.update(TABLE, cv, "$COLUMN_ID = ${existing.id}", null)
+    }
+
+    /** Keeps the newest [size] unpinned clips, pins all (as [clearOldClips], right away and with the size given; not
+     *  while the clipboard is shown). */
+    fun keepNewestUnpinned(size: Int) {
+        if (listener != null) return
+        val unpinned = cache.filter { !it.isPinned }.sortedByDescending { it.timeStamp }
+        if (unpinned.size <= size) return
+        val old = unpinned.drop(size)
+        cache.removeAll(old.toSet())
+        db.writableDatabase.delete(TABLE, "$COLUMN_ID IN (${old.joinToString { it.id.toString() }})", null)
+    }
+
+    private fun insertNewEntry(timestamp: Long, pinned: Boolean, text: String, trim: Boolean = true) {
         val cv = ContentValues(3)
         cv.put(COLUMN_TIMESTAMP, timestamp)
         cv.put(COLUMN_PINNED, pinned)
@@ -74,7 +110,7 @@ class ClipboardDao private constructor(private val db: Database) {
         cache.add(entry)
         cache.sort()
         listener?.onClipInserted(cache.indexOf(entry))
-        clearOldClips()
+        if (trim) clearOldClips()
     }
 
     private fun updateTimestampAt(index: Int, timestamp: Long) {
