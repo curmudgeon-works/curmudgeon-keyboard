@@ -428,6 +428,28 @@ object KeyboardProfiles {
         editor.apply()
     }
 
+    /**
+     * A restore of one keyboard: [settings] (plain keys) become set [id]'s own entries for every key [takes] (a partly
+     * replaced keyboard: its ticked menus), and a "default" mark for each other key of [takes] the shared set holds; its
+     * entries for the other keys stay. A shared menu's keys too, as its hidden own values: never the shared set's or
+     * another set's keys (owner 2026-10-11: "restore should only apply to that keyboard's settings. Regardless of
+     * whether it is shared with others or hidden or separate"; before, [write] dropped its hidden own values there).
+     */
+    @Synchronized
+    fun restoreSet(real: SharedPreferences, id: Int, settings: Map<String, Any?>, takes: (String) -> Boolean = { true }) {
+        if (id == SHARED) return
+        val editor = real.edit()
+        for (stored in real.all.keys) {
+            val plain = splitOwnKey(stored)?.takeIf { it.first == id }?.second ?: continue
+            if (takes(plain.removePrefix(TOMBSTONE))) editor.remove(stored)
+        }
+        for ((key, value) in settings) if (!isAppWide(key) && !key.startsWith(TOMBSTONE) && takes(key)) put(editor, ownKey(id, key), value)
+        for (key in real.all.keys)
+            if (!isAppWide(key) && !key.startsWith(TOMBSTONE) && key !in settings && !isOneTimeFlag(key) && takes(key))
+                editor.putBoolean(ownKey(id, TOMBSTONE + key), true)
+        editor.apply()
+    }
+
     fun put(editor: SharedPreferences.Editor, key: String, value: Any?) {
         @Suppress("UNCHECKED_CAST")
         when (value) {
@@ -450,7 +472,7 @@ object KeyboardProfiles {
         if (!map.has(pref)) return null
         val id = map.getInt(pref)
         val start = "$PREFIX$id$SEPARATOR"
-        return backup.filterKeys { it.startsWith(start) }.mapKeys { it.key.substring(start.length) }.filterKeys { !isGlobal(it) }
+        return backup.filterKeys { it.startsWith(start) }.mapKeys { it.key.substring(start.length) }.filterKeys { !isAppWide(it.removePrefix(TOMBSTONE)) }
     }
 
     /** [keyboard]'s set id inside a backed-up preference map, or null when the backup kept no separate set for it. */
@@ -468,7 +490,9 @@ object KeyboardProfiles {
     }
 
     /** What [keyboard] read in a backed-up preference map: the backup's shared set with its own set on top (a default
-     *  mark of its own takes the shared value out), plain keys, no marks. */
+     *  mark of its own takes the shared value out), plain keys, no marks. The menus shared now too, with its own values
+     *  there (hidden while shared): what it reads once they are per keyboard (2026-10-11: a restore of the keyboard
+     *  brings them, into its own set only). */
     fun effectiveSettingsIn(backup: Map<String, Any?>, keyboard: SettingsSubtype): Map<String, Any?> {
         val values = HashMap(sharedSettingsIn(backup))
         val own = ownSettingsIn(backup, keyboard) ?: return values
@@ -477,9 +501,9 @@ object KeyboardProfiles {
         return values
     }
 
-    /** The shared set of a backed-up preference map: plain, non-global keys. */
+    /** The shared set of a backed-up preference map: plain keys, no app-wide ones (a shared menu's are in). */
     fun sharedSettingsIn(backup: Map<String, Any?>): Map<String, Any?> =
-        backup.filterKeys { !isGlobal(it) && !(it.startsWith(PREFIX) && it.contains(SEPARATOR)) }
+        backup.filterKeys { !isAppWide(it) }
 
     /**
      * Turn separate settings on: every enabled keyboard without a set of its own gets a copy of the shared set

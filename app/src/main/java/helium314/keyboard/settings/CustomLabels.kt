@@ -40,15 +40,20 @@ object CustomLabels {
             else KeyboardProfiles.splitOwnKey(stored)?.takeIf { it.second == selectedKey }?.first
         }.toSet()
         for (id in ids) {
-            if (id == KeyboardProfiles.SHARED || !KeyboardProfiles.isGlobal(kind.key)) {
-                number(real, helium314.keyboard.latin.settings.ProfilePreferences(real) { id }, kind); continue }
-            // a keyboard's own set hidden by a shared menu: its own label, not the shared set's (owner 2026-10-11:
-            // "Deleting should not happen. Behavior should be same": it comes back when the menu is per keyboard again)
-            val own = KeyboardProfiles.ownKey(id, kind.key)
-            if (real.getInt(own, 0) > 0) continue
-            val next = nextFree(real, kind)
-            real.edit(commit = true) { putInt(own, next); remove(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + kind.key)) }
+            if (id == KeyboardProfiles.SHARED || !KeyboardProfiles.isGlobal(kind.key))
+                number(real, helium314.keyboard.latin.settings.ProfilePreferences(real) { id }, kind)
+            else numberOwn(real, id, kind) // (a keyboard's own set hidden by a shared menu: its own label)
         }
+    }
+
+    /** Set [id]'s own number for [kind], given the next free one if it had none: in its own set also while the menu is
+     *  shared, hidden then (owner 2026-10-11: "Deleting should not happen. Behavior should be same": it comes back when
+     *  the menu is per keyboard again), never the shared set's. */
+    fun numberOwn(real: SharedPreferences, id: Int, kind: Kind) {
+        val own = KeyboardProfiles.ownKey(id, kind.key)
+        if (real.getInt(own, 0) > 0) return
+        val next = nextFree(real, kind)
+        real.edit(commit = true) { putInt(own, next); remove(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + kind.key)) }
     }
 
     /** The stored keys of every set's label of [kinds] (plain or "p<id>/"): what an editing screen records when it

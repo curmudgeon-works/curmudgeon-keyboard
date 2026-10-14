@@ -915,7 +915,8 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
     val renames = if (withSettings) SavedItemsMerge.merge(ctx, real, backup, asCopies, files?.first.orEmpty(), files?.second.orEmpty(), keyLayouts,
         chosen.map { KeyboardProfiles.effectiveSettingsIn(backup, it) }, phone) else null
     val settings = RestoredCustomCopies.labels(phone, backupSettings.mapValues { (_, values) -> renames?.apply(values) ?: values })
-    if (withSettings && !KeyboardProfiles.isSeparate(real))
+    val wasSeparate = KeyboardProfiles.isSeparate(real)
+    if (withSettings && !wasSeparate)
         KeyboardProfiles.enable(real, SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }, keepExisting = true)
 
     if (withSettings) {
@@ -963,14 +964,19 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
             SubtypeSettings.addEnabledSubtype(prefs, phoneKeyboard.toAdditionalSubtype())
         if (withSettings) {
             val id = KeyboardProfiles.idFor(real, phoneKeyboard)
-            // exactly that set: a setting the backup leaves at its default gets a default mark, so it doesn't read
-            // the phone's shared value instead (partly replaced: the phone's values for the menus not ticked)
-            val values = phoneSettings[keyboard]?.let { RestoreMatch.settings(plan!!, it, settings.getValue(keyboard)) } ?: settings.getValue(keyboard)
-            KeyboardProfiles.write(real, id, values, markDefaults = true)
+            // exactly that set, its own only, a shared menu's values too, hidden there (owner 2026-10-11: "restore should
+            // only apply to that keyboard's settings"): a setting the backup leaves at its default gets a default mark,
+            // so it doesn't read the phone's shared value instead. Partly replaced: only its entries of the ticked menus
+            // (the others stay, hidden ones too); with one set for all before, the phone's values it read for the others
+            val restored = settings.getValue(keyboard)
+            val phoneValues = phoneSettings[keyboard]
+            if (phoneValues != null && !wasSeparate) KeyboardProfiles.restoreSet(real, id, RestoreMatch.settings(plan!!, phoneValues, restored))
+            else if (phoneValues != null) KeyboardProfiles.restoreSet(real, id, restored) { takesSetting(keyboard, it) }
+            else KeyboardProfiles.restoreSet(real, id, restored)
             // an item it chose that wasn't brought in (its name is the phone's for other content, copies off): it names
             // none and shows "Custom 1" (owner 2026-10-11, option 2); of the menus taken from the backup only
             renames?.customKinds(backupSettings.getValue(keyboard).filterKeys { takesSetting(keyboard, it) })?.forEach {
-                helium314.keyboard.settings.CustomLabels.number(real, helium314.keyboard.latin.settings.ProfilePreferences(real) { id }, it) }
+                helium314.keyboard.settings.CustomLabels.numberOwn(real, id, it) }
             // its languages' priorities, into its own set (not the shared one, which every other keyboard reads: review
             // session 2026-10-07): the backup's own copy for this keyboard first, else the backup's shared value
             // (partly replaced: only when its languages are the backup's)
@@ -979,7 +985,7 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
                 for (locale in listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues))
                     for (key in LanguagePriority.keys(locale).filter { LanguagePriority.isPriorityKey(it) }) {
                         val value = (backupId?.let { backup[KeyboardProfiles.ownKey(it, key)] } ?: backup[key]) as? Int ?: continue
-                        putInt(KeyboardProfiles.prefixedKey(id, key), value)
+                        putInt(KeyboardProfiles.ownKey(id, key), value)
                     }
             }
             // its own pictures in the backup, or the backup's shared ones when it had no set of its own (partly
