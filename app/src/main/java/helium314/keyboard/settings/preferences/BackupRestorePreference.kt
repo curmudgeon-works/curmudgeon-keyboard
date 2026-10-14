@@ -1434,6 +1434,8 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, plan: Res
     // restore says so (owner 2026-10-12, A3); one before it fails as before
     var changed = false
     val changing = { changed = true }
+    // the keyboard being typed on, before anything changes (Q1)
+    val typing = try { SubtypeSettings.getSelectedSubtype(ctx.realPrefs()).toSettingsSubtype() } catch (e: Exception) { null }
     try {
         // the device side, then the saved items, the dictionaries (between them and the keyboards), the settings and the
         // keyboards (owner 2026-10-12: "A keyboard never arrives before what it names")
@@ -1460,10 +1462,33 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, plan: Res
         }
         BackupRestoreJob.step() // (the learned words)
         LayoutUtilsCustom.onLayoutFileChanged()
+        switchToKeptCopy(ctx, choice, restored.onDevice, typing)
         return Restored(restored.onDevice, restored.hidden, restored.merged, restored.added, dictionaries)
     } catch (t: Throwable) {
         throw if (changed) RestoreStoppedPartway(t) else t
     }
+}
+
+/**
+ * After a restore that kept a backup keyboard apart ("Keep both"), the keyboard in use becomes the restored copy of the
+ * one being typed on before ([typing]): the kept-apart backup keyboard with its id (as "Suggested: same keyboard as in
+ * the backup"), else one of its language; with no such copy, the first restored keyboard in the list's order (owner
+ * 2026-10-13, Q1: "User's choice to restore should take precedence", "restored copy of what I was typing"). Other
+ * restores leave the keyboard in use as it is. [onDevice]: each restored backup keyboard as it is on the device now.
+ */
+private fun switchToKeptCopy(ctx: Context, choice: RestoreChoice, onDevice: Map<SettingsSubtype, SettingsSubtype>, typing: SettingsSubtype?) {
+    val kept = onDevice.filterKeys { choice.decisions[it] is RestoreDecision.Separate }
+    if (kept.isEmpty()) return
+    val ofTyping = typing?.let { t ->
+        kept.entries.firstOrNull { t.keyboardId != null && it.key.keyboardId == t.keyboardId }?.value
+            ?: kept.entries.firstOrNull { it.key.locale.toLanguageTag() == t.locale.toLanguageTag() }?.value
+    }
+    val target = ofTyping ?: SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }
+        .firstOrNull { e -> onDevice.values.any { it.sameKeyboard(e) } } ?: return
+    val real = ctx.realPrefs()
+    SubtypeSettings.setSelectedSubtype(real, target.toAdditionalSubtype())
+    KeyboardProfiles.refreshImeId(real) // (its own settings; the keyboard takes it with the restore's refresh)
+    helium314.keyboard.latin.utils.SettingsEventLog.keyboard(ctx, "in use after the restore", target, null)
 }
 
 /**

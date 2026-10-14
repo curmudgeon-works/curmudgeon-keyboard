@@ -287,6 +287,39 @@ class RestoreMergeItemsTest {
         assertEquals(listOf("clip"), (0 until dao.count()).map { dao.getAt(it).text })
     }
 
+    // ---- Q1: after "Keep both", the restored copy of the keyboard being typed on is in use ----
+
+    private fun inUse() = SubtypeSettings.getSelectedSubtype(real).let { with(SettingsSubtype) { it.toSettingsSubtype() } }
+
+    // fail before: the device's English stayed in use
+    @Test fun `Keep both - the restored copy of the keyboard being typed on is in use after the restore`() {
+        val enB = available("en-US").withId(1) // (the backup's English: the device's keyboard itself)
+        backup(listOf(frB, enB))
+        val restored = restoreChosenFrom(ctx, zip, listOf(frB, enB), settings = false, learnedWords = false, io = io,
+            decisions = mapOf(enB to RestoreDecision.Separate()))
+        val copy = restored.onDevice.getValue(enB)
+        assertFalse(copy.sameKeyboard(en), "the copy kept apart has its own id")
+        assertEquals(copy.keyboardId, inUse().keyboardId)
+    }
+
+    // fail before: the device's English stayed in use
+    @Test fun `Keep both with no copy of the keyboard being typed on - the first restored keyboard in the list is in use`() {
+        val de = available("de-DE").withId(2)
+        useKeyboards(ctx, real, en, de) // (English in use)
+        val deB = available("de-DE").withId(8)
+        backup(listOf(frB, deB))
+        val restored = restoreChosenFrom(ctx, zip, listOf(frB, deB), settings = false, learnedWords = false, io = io,
+            decisions = mapOf(deB to RestoreDecision.Separate()))
+        assertEquals(restored.onDevice.getValue(frB).keyboardId, inUse().keyboardId) // (added first: first in the list)
+    }
+
+    // (passes before too: no keyboard kept apart, the keyboard in use stays)
+    @Test fun `a restore without Keep both leaves the keyboard in use`() {
+        backup(listOf(frB))
+        restoreChosenFrom(ctx, zip, listOf(frB), settings = false, learnedWords = false, io = io)
+        assertEquals(en.keyboardId, inUse().keyboardId)
+    }
+
     // ---- 5. the clipboard merges (owner 2026-10-12: "yes, merge clipboard") ----
 
     // fail before: the device's clips were cleared and replaced by the backup's
