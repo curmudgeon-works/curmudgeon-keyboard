@@ -85,4 +85,14 @@ class UserPopupSetMapTest {
         assertEquals(Defaults.PREF_SYMBOL_POPUP_MAP, set.symbolMap) // (null before: it followed every later default)
         assertEquals(Defaults.PREF_POPUP_KEYS_ORDER, set.popupOrder)
     }
+
+    @Test fun `a keyboard that chose no set keeps the default when the common settings get the set's map`() {
+        real.edit().putString(KeyPopupOverrides.PREF_SELECTED_SET, "Revamped popups") // (the common settings chose it)
+            .remove(KeyboardProfiles.ownKey(1, KeyPopupOverrides.PREF_SELECTED_SET))
+            .putBoolean(KeyboardProfiles.ownKey(1, KeyboardProfiles.TOMBSTONE + KeyPopupOverrides.PREF_SELECTED_SET), true) // (keyboard 1: no set)
+            .commit()
+        keepUserPopupSetsSymbolMap(real)
+        assertEquals(Defaults.CURMUDGEON_SYMBOL_POPUP_MAP, real.getString(Settings.PREF_SYMBOL_POPUP_MAP, null))
+        assertEquals("", map(1)) // still the default it showed
+    }
 }

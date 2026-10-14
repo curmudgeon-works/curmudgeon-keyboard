@@ -91,15 +91,23 @@ internal fun keepUserPopupSetsSymbolMap(real: SharedPreferences) {
         KeyPopupOverrides.saveSets(real, sets.map {
             if (it.name in lacking) KeyPopupOverrides.UserSet(it.name, it.morePopups, it.symbolsLayout, it.overrides, map, it.popupOrder) else it })
         val sharedHasMap = real.contains(symbolMap)
+        val sharedGetsMap = real.getString(selected, null) in lacking && !sharedHasMap
         real.edit {
-            if (real.getString(selected, null) in lacking && !sharedHasMap) putString(symbolMap, map)
+            if (sharedGetsMap) putString(symbolMap, map)
             for (id in KeyboardProfiles.idEntries(real).values.toSet()) {
                 if (id == KeyboardProfiles.SHARED || !KeyboardProfiles.hasOwnEntries(real, id)) continue
                 val own = KeyboardProfiles.ownKey(id, selected)
                 val choice = if (real.contains(own)) real.getString(own, null)
                     else if (real.contains(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + selected))) null
                     else real.getString(selected, null)
-                if (choice !in lacking || real.contains(KeyboardProfiles.ownKey(id, symbolMap))) continue
+                if (real.contains(KeyboardProfiles.ownKey(id, symbolMap))) continue
+                if (choice !in lacking) {
+                    // it reads the common map, which just got the set's: it stays at the default it showed (review
+                    // 2026-10-11: a keyboard that chose no set took the map without picking it)
+                    if (sharedGetsMap && !real.contains(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + symbolMap)))
+                        putBoolean(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + symbolMap), true)
+                    continue
+                }
                 val atDefault = real.contains(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + symbolMap))
                 if (!atDefault && sharedHasMap) continue // (it reads the common settings' map: someone picked that)
                 remove(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + symbolMap))
