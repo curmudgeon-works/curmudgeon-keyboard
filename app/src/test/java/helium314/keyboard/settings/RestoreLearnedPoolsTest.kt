@@ -77,7 +77,8 @@ class RestoreLearnedPoolsTest {
 
     // (owner 2026-10-11: keyboards have unique ids) the phone of before gets its ids by the one-time upgrade (which, with
     // sharing off, also does the learned words' update: pool = old set number); the old backup's keyboards get fresh ids
-    // when it is read (its pools likewise). Ids counted: A k1, B k2, then C k3, D k4. The old id map is gone: the check
+    // when it is read (its pools likewise). Ids counted: A k1, B k2 (the added list's other keyboards next); the backup is
+    // read with ids from k100: C k100, D k101. The old id map is gone: the check
     // that the phone's keyboards keep theirs is now on the keyboards' ids
     @Test fun `the backup's keyboards get their own words, the phone's keep theirs`() {
         // the phone: keyboards A and B, learned words per keyboard, the shared ones with x
@@ -101,19 +102,20 @@ class RestoreLearnedPoolsTest {
         val backup: Map<String?, Any?> = mapOf(Settings.PREF_ENABLED_SUBTYPES to SubtypeSettings.createPrefSubtypes(listOf(c0, d0)),
             Settings.PREF_SHARE_LEARNED_WORDS to false, Settings.PREF_SELECTED_SUBTYPE to c0.toPref(),
             KeyboardIdUpgrade.OLD_IDS to JSONObject(mapOf(c0.toPref() to 1, d0.toPref() to 2) as Map<*, *>).toString(), "keyboard_profile_next_id" to 3)
-        val c = c0.withId(3); val d = d0.withId(4) // (as read from the backup)
+        val c = c0.withId(100); val d = d0.withId(101) // (as read from the backup, ids counted from 100 below)
         val store = LearnedStores.storeName("Latn", 1) + LearnedStores.DICT_EXTENSION
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("preferences.json")); settingsToJsonStream(backup, z); z.closeEntry()
             z.putNextEntry(ZipEntry("$store/$store.body")); z.write((FakeLearnedStoreIo.format(word("c", 2, 200)) + "\n").toByteArray()); z.closeEntry()
         }
 
+        countingIds(100) // (the backup's keyboards: C k100, D k101; the phone's upgrade gave the added list's other keyboards ids too)
         LearnedKeyboards.storeIo = io
         try { restoreChosenFrom(ctx, zip, listOf(c, d), settings = true, learnedWords = true, io = io) }
         finally { LearnedKeyboards.storeIo = LearnedStoreIo.Native }
 
         // (the phone's keyboards stay, with their ids; (owner 2026-10-11: a keyboard restore never wipes; only the full restore does))
-        assertEquals(setOf(kid(1), kid(2), kid(3), kid(4)), storedEnabled(real).map { it.keyboardId }.toSet())
+        assertEquals(setOf(kid(1), kid(2), kid(100), kid(101)), storedEnabled(real).map { it.keyboardId }.toSet())
         // the phone's keyboards kept their pools (sharing was off there), the backup's got their own
         val pools = JSONObject(real.getString(LearnedKeyboards.PREF_POOLS, "{}")!!)
         assertEquals(5, pools.getInt(kid(1)))
