@@ -29,6 +29,8 @@ internal object RestoreDictionaries {
     const val INTERNAL = "internal"
     /** A matching copy's name while it steps aside (not listed: no "user.dict" ending). */
     private const val MOVING = ".moving"
+    /** The backup's copy while it waits beside the device's (not listed either). */
+    private const val RESTORING = ".restoring"
     private val suffix = "_" + DictionaryInfoUtils.USER_DICTIONARY_SUFFIX
 
     /** The app-wide selection of language [tag]'s dictionary of [kind] (e.g. "dict_selected_hi_main"). */
@@ -149,7 +151,7 @@ internal object RestoreDictionaries {
         dir.mkdirs()
         // the backup's is copied in beside first, under a name the app doesn't list: nothing of the device's moves before
         // the copy succeeded (review L3.4)
-        val incoming = if (step.action == Action.SAME) null else File(dir, step.target + ".restoring").also {
+        val incoming = if (step.action == Action.SAME) null else File(dir, step.target + RESTORING).also {
             it.delete()
             try { source.copyTo(it, overwrite = true) } catch (e: Exception) { it.delete(); throw e }
         }
@@ -176,6 +178,24 @@ internal object RestoreDictionaries {
         // ([selectNew]: a new one selected too, over a built-in one the device selected; R-DICT, the other dictionaries)
         if (step.select || (selectNew && step.action == Action.NEW)) real.edit(commit = true) { putString(selectedKey(step.tag, step.kind), step.target) }
         return true
+    }
+
+    /**
+     * What a restore killed mid-step left in the language folders under [root] (owner 2026-10-13, 20261013_L5): a device
+     * dictionary stepped aside as "<name>.moving" (B3b) gets the next free "…_prev" name of its kind ("main_prev_user.dict",
+     * the ".user.dict" ending kept), so the app lists it and it is selectable again; the backup's copy "<name>.restoring"
+     * is deleted (only the backup's: nothing of the device's lost). Run at the start of a restore's dictionary step,
+     * before planning.
+     */
+    fun recoverLeftovers(root: File) {
+        for (dir in root.listFiles()?.filter { it.isDirectory }.orEmpty()) {
+            for (f in dir.listFiles()?.filter { it.isFile }?.sortedBy { it.name }.orEmpty()) {
+                if (f.name.endsWith(RESTORING)) { f.delete(); continue }
+                if (!f.name.endsWith(MOVING)) continue
+                val kind = kindOf(f.name.removeSuffix(MOVING))
+                f.renameTo(File(dir, nextPrev(kind, dir.list()?.toSet().orEmpty())))
+            }
+        }
     }
 
     /** The digests of a language folder's added dictionaries. */

@@ -422,6 +422,19 @@ class RestoreMergeItemsTest {
         assertEquals(null, selected("fr"))
     }
 
+    // fail before (owner 2026-10-13, 20261013_L5): a restore killed mid-step left the device's dictionary as "….moving",
+    // unlisted for good, and the backup's copy as "….restoring"
+    @Test fun `a dictionary a killed restore left stepped aside is listed again as the next prev, the backup's copy deleted`() {
+        dictDir("fr").mkdirs(); dict("fr", "main_user.dict").writeText("A"); dict("fr", "main_prev_user.dict").writeText("B")
+        dict("fr", "main_user.dict.moving").writeText("X"); dict("fr", "emoji_user.dict.restoring").writeText("backup")
+        backup(listOf(frB)) // (no dictionaries in it: every restore recovers them)
+        restoreDictionaries(ticked = true)
+        assertEquals(setOf("main_user.dict", "main_prev_user.dict", "main_prev2_user.dict"), dictDir("fr").list()!!.toSet())
+        assertEquals("X", dict("fr", "main_prev2_user.dict").readText())
+        assertEquals("A", dict("fr", "main_user.dict").readText())
+        assertEquals("B", dict("fr", "main_prev_user.dict").readText())
+    }
+
     // fail before (L3.5): the other languages' new dictionaries came in silently with the clipboard
     @Test fun `a clipboard-only restore brings no dictionaries`() {
         val db = File(ctx.cacheDir, "clips-${System.nanoTime()}.db")

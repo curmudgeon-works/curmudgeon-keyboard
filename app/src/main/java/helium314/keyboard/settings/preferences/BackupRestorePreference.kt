@@ -1628,6 +1628,10 @@ private fun switchToKeptCopy(ctx: Context, choice: RestoreChoice, onDevice: Map<
  */
 private fun restoreDictionaries(ctx: Context, backupPrefs: Map<String, Any?>, dictsDir: File, folders: Map<String, File>,
                                 clashesFor: Set<String>, selectNew: Set<String> = emptySet()): RestoredDictionaries {
+    // first, what a restore killed mid-step left: a device dictionary stepped aside listed again (owner 2026-10-13,
+    // 20261013_L5), whatever this backup brings
+    try { RestoreDictionaries.recoverLeftovers(File(DictionaryInfoUtils.getWordListCacheDirectory(ctx))) }
+    catch (t: Throwable) { Log.w("AdvancedScreen", "error recovering dictionaries left by a restore", t) }
     val backup = HashMap<RestoreDictionaries.Entry, String>()
     for (tag in folders.keys) File(dictsDir, tag).listFiles()?.forEach { f ->
         if (f.isFile) backup[RestoreDictionaries.Entry(tag, f.name)] = f.inputStream().use { RestoreDictionaries.digest(it) }
