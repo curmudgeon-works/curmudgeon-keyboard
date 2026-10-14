@@ -88,8 +88,7 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
     var askLoss: Triple<LayoutPresets.Preset, Map<String, Any?>, SettingsSubtype>? by remember { mutableStateOf(null) }
     fun keep(preset: LayoutPresets.Preset, from: SettingsSubtype) {
         LayoutPresets.restorePopupSet(ctx, from, preset) // its popup set, if deleted since
-        prefs.edit { putString(LayoutPresets.PREF_SELECTED, preset.name) }
-        helium314.keyboard.settings.CustomLabels.clear(prefs, helium314.keyboard.settings.CustomLabels.Kind.LAYOUT)
+        LayoutPresets.chosen(prefs, from, preset) // (its name; no Custom label for it, nor for popups it replaced)
     }
     if (showList || askLoss != null) androidx.compose.runtime.DisposableEffect(Unit) {
         helium314.keyboard.latin.utils.LayoutUtilsCustom.cleanupHeld++

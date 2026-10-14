@@ -216,10 +216,20 @@ object LayoutPresets {
         // should not be affected by the common/separate toggle at all.")
         val view = helium314.keyboard.latin.settings.OwnSetPreferences(real, id)
         applySettings(ctx, settingsFor(keyboard, preset, SavedItemDefaults.takeNewDefaults(real)), view)
-        view.edit { putString(PREF_SELECTED, preset.name) }
-        CustomLabels.clear(view, CustomLabels.Kind.LAYOUT)
+        chosen(view, keyboard, preset)
         val changed = keyboardWith(ctx, keyboard, preset)
         if (changed != keyboard) helium314.keyboard.latin.utils.SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, changed, ctx)
+    }
+
+    /** [preset] applied on [keyboard] ([prefs]: its settings view, [preset]'s settings on it already): its name, and no
+     *  Custom label or origin for the Layout, nor for the popups when the Layout's popups came with it ([popupsFit]: they
+     *  replaced the keyboard's; review 2026-10-08, the popups row follows a Layout applied on the same screen). The
+     *  Layouts row's OK and [applyToOther] both end with this. */
+    fun chosen(prefs: SharedPreferences, keyboard: SettingsSubtype, preset: Preset) {
+        prefs.edit { putString(PREF_SELECTED, preset.name) }
+        CustomLabels.clear(prefs, CustomLabels.Kind.LAYOUT)
+        // (else "Custom · from <a deleted set>" stayed on popups the Layout replaced)
+        if (popupsFit(keyboard, preset)) CustomLabels.clear(prefs, CustomLabels.Kind.POPUPS)
     }
 
     /** [values] (settings part) replace the current ones ([prefs]: the edited keyboard's): null and missing keys go

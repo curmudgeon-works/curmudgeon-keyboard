@@ -54,11 +54,12 @@ class KeyPopupsSectionTest {
         it.setContent { KeyPopupsSection(keyboard) { } }
     }
 
-    /** As the Layouts row's OK does it (LayoutPresetsPreference: applySettings while previewed, then keep). */
+    /** As the Layouts row's OK does it (LayoutPresetsPreference: applySettings while previewed, then keep: the popup
+     *  set back if deleted, and LayoutPresets.chosen). */
     private fun applyLayout(preset: LayoutPresets.Preset) {
         LayoutPresets.applySettings(ctx, LayoutPresets.settingsFor(keyboard, preset))
         LayoutPresets.restorePopupSet(ctx, keyboard, preset)
-        ctx.prefs().edit().putString(LayoutPresets.PREF_SELECTED, preset.name).commit()
+        LayoutPresets.chosen(ctx.prefs(), keyboard, preset)
     }
 
     @Test fun `after a popup set delete, a Layout applied on the same screen shows its popups' name`() {
