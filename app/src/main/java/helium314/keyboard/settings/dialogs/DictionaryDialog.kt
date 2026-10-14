@@ -189,15 +189,10 @@ private fun DictionaryDetails(dict: File, locale: Locale, keyboard: helium314.ke
             onDismissRequest = { showDeleteDialog = false },
             confirmButtonText = stringResource(R.string.remove),
             onConfirmed = { deleteDictionary(context, locale, dict, onSelectionChanged) },
-            content = {
-                // (the old Dictionaries screen, no keyboard asking: who uses it, none or the one, owner 2026-10-11)
-                val users = if (keyboard != null) null else remember { allDictionaryUsers(context, locale) }
-                Text(removeDictionaryQuestion(context, dict) + when {
-                    users == null -> ""
-                    users.isEmpty() -> "\n\n" + stringResource(R.string.dictionary_used_by_none)
-                    else -> "\n\n" + stringResource(R.string.dictionary_used_by_one, dictionaryUserNames(context, users.take(1)).first())
-                })
-            }
+            // (only the question: reached only when no keyboard uses this version, so the old Dictionaries screen's
+            // "<keyboard> uses it and loses this dictionary" was never true; round-6 review 20261013_L14_2, owner
+            // 2026-10-13: dropped, no other text)
+            content = { Text(removeDictionaryQuestion(context, dict)) }
         )
     }
 }

@@ -718,8 +718,6 @@
     </plurals>
     <!-- the dialog's button: selects the other dictionary, then deletes this one; %s = the other dictionary's name -->
     <string name="dictionary_replace_and_delete">Replace with %s and delete this one</string>
-    <string name="dictionary_used_by_none">No keyboard uses it.</string>
-    <string name="dictionary_used_by_one">%s uses it and loses this dictionary.</string>
     <!-- deleting a keyboard whose word lists other keyboards read -->
     <string name="delete_keyboard_readers">These keyboards use its learned and blacklisted words (Use lists from other keyboards). Pick one to keep them, merged into its own; the others then read them from there:</string>
     <string name="delete_keyboard_merge_none">None: the lists go</string>

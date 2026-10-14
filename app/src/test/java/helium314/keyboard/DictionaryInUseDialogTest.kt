@@ -26,6 +26,7 @@ import java.util.Locale
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 
 /**
@@ -126,6 +127,15 @@ class DictionaryInUseDialogTest {
             removeDictionaryQuestion(ctx, File(dir(danish), "main_user.dict")))
         assertEquals("Really remove user-added dictionary \"Main dictionary (main_prev)\"?",
             removeDictionaryQuestion(ctx, File(dir(danish), "main_prev_user.dict")))
+    }
+
+    // round-6 review 20261013_L14_2 (owner 2026-10-13: drop the line): the plain delete (no keyboard using the version)
+    // asks only the question; its "<keyboard> uses it and loses this dictionary" and "No keyboard uses it." are gone.
+    // Fail before: the dialog appended them from the Dictionaries screen
+    @Test fun `the plain delete adds no who-uses-it line`() {
+        assertNotEquals(0, ctx.resources.getIdentifier("remove_dictionary_message", "string", ctx.packageName)) // (the lookup works)
+        for (gone in listOf("dictionary_used_by_one", "dictionary_used_by_none"))
+            assertEquals(0, ctx.resources.getIdentifier(gone, "string", ctx.packageName), gone)
     }
 
     // 20261013_F6 (owner: "6. A"): a plain delete (not in use) redraws the dialog's list, through the callback Replace
