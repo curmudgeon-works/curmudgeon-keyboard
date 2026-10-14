@@ -897,15 +897,18 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
      */
     private fun removeWords(words: Collection<String>) {
         val struck = LinkedHashSet<String>()
+        // (the swipe lists are the keyboard in use's: not touched for the words of another keyboard, e.g. through the
+        // spell checker's facilitator still set up for it)
+        val swipe = inUseReads(learnedPool)
         for (word in words) {
             val history = historyFor(word)
             // each language's dictionaries say how the word is listed: as written if one of them has it so, else lowercase
-            val spellings = dictionaryGroups.map { it.removeEverywhere(word, history) }
+            val spellings = dictionaryGroups.map { it.removeEverywhere(word, history, swipe) }
             struck.add(if (word in spellings) word else spellings.firstOrNull() ?: word.lowercase())
         }
         for (spelling in struck) {
             blacklistFor(spelling)?.own?.strike(spelling) ?: continue
-            for (group in dictionaryGroups) GestureDecoderVocabulary.onWordBlacklisted(group.locale, spelling)
+            if (swipe) for (group in dictionaryGroups) GestureDecoderVocabulary.onWordBlacklisted(group.locale, spelling)
         }
     }
 
@@ -958,22 +961,30 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
             if (live != null) return live.removeWords(words)
             val history = PersonalizationHelper.getUserHistoryDictionary(context, script, pool)
             val groups = locales.map { DictionaryGroup(it, DictionaryFactory.createMainDictionaryCollection(context, it, false)) }
+            val swipe = inUseReads(pool)
             try {
                 val struck = LinkedHashSet<String>()
                 for (word in words) {
-                    val spellings = groups.map { it.removeEverywhere(word, history) }
+                    val spellings = groups.map { it.removeEverywhere(word, history, swipe) }
                     struck.add(if (word in spellings || spellings.isEmpty()) word else spellings.first())
                 }
                 val list = RemovedWords.blacklist(context, script, pool)
                 for (spelling in struck) {
                     list.strike(spelling)
-                    for (locale in locales) GestureDecoderVocabulary.onWordBlacklisted(locale, spelling)
+                    if (swipe) for (locale in locales) GestureDecoderVocabulary.onWordBlacklisted(locale, spelling)
                 }
                 history.onFinishInput() // written to the file now: the keyboard may not be running
             } finally {
                 groups.forEach { it.closeDict(Dictionary.TYPE_MAIN) }
             }
         }
+
+        /** Whether the keyboard in use reads the learned words or the blacklist of [pool] (its own, or another keyboard's
+         *  through the buttons): only then do its swipe lists change with a Remove there (review 2026-10-08 area 3 #6:
+         *  Remove on another keyboard's Learned words screen took the word out of the swipe lists of the keyboard in use,
+         *  which may have learned it itself). */
+        private fun inUseReads(pool: Int) = LearnedStores.currentView.let { view ->
+            pool == view.own || pool in view.othersLearned || pool in view.othersBlacklisted }
 
         // HACK: This threshold is being used when adding a capitalized entry in the User History dictionary.
         private const val CAPITALIZED_FORM_MAX_PROBABILITY_FOR_INSERT = 140
@@ -1093,10 +1104,10 @@ private class DictionaryGroup(
 
     /**
      * Takes [word] out of this group's dictionaries and out of [history] (the learned words of the word's script, which
-     * the languages of a script share; the blacklist strike is the caller's, once per word).
+     * the languages of a script share; the blacklist strike is the caller's, once per word); [swipe]: the swipe lists of the keyboard in use read [history] or its blacklist.
      * @return the spelling its blacklist entry has
      */
-    fun removeEverywhere(word: String, history: ExpandableBinaryDictionary?): String {
+    fun removeEverywhere(word: String, history: ExpandableBinaryDictionary?, swipe: Boolean = true): String {
         // from the learned words and the personal dictionary in every capitalization ("Hello" at a sentence start was
         // learned as "hello"; "HELLO" with caps lock)
         val lower = word.lowercase(locale)
@@ -1105,8 +1116,9 @@ private class DictionaryGroup(
             history?.removeUnigramEntryDynamically(form)
             getSubDict(Dictionary.TYPE_USER)?.removeUnigramEntryDynamically(form)
         }
-        // and from the swipe vocabularies already built (the removed words list keeps it out of rebuilds)
-        GestureDecoderVocabulary.onWordRemoved(locale, word)
+        // and from the swipe vocabularies already built (the removed words list keeps it out of rebuilds), when they are
+        // [history]'s keyboard's ([swipe])
+        if (swipe) GestureDecoderVocabulary.onWordRemoved(locale, word)
 
         val contactsDict = getSubDict(Dictionary.TYPE_CONTACTS)
         if (contactsDict != null && contactsDict.isInDictionary(word)) {
