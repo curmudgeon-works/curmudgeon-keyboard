@@ -917,7 +917,8 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
      * Remove: one strike; and one per word, not one per language (the languages of a script share the list).
      */
     private fun removeWords(words: Collection<String>, blacklist: Boolean = true, personal: Boolean = true) {
-        val struck = LinkedHashSet<String>()
+        // each struck spelling, with the word as removed (its allowed rows go too, L4.2)
+        val struck = LinkedHashMap<String, String>()
         // (the swipe lists are the keyboard in use's: not touched for the words of another keyboard, e.g. through the
         // spell checker's facilitator still set up for it)
         val swipe = inUseReads(learnedPool)
@@ -925,15 +926,17 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
             val history = historyFor(word)
             // each language's dictionaries say how the word is listed: as written if one of them has it so, else lowercase
             val spellings = dictionaryGroups.map { it.removeEverywhere(word, history, swipe, learnedPool, personal) }
-            struck.add(if (word in spellings) word else spellings.firstOrNull() ?: word.lowercase())
+            struck.putIfAbsent(if (word in spellings) word else spellings.firstOrNull() ?: word.lowercase(), word)
         }
         if (!blacklist) { // (a plain delete: a dictionary word's copy is swiped again, as if never learned)
-            if (swipe) for (group in dictionaryGroups) GestureDecoderVocabulary.onWordUnblacklisted(group.locale, struck.firstOrNull() ?: return)
+            if (swipe) for (group in dictionaryGroups) GestureDecoderVocabulary.onWordUnblacklisted(group.locale, struck.keys.firstOrNull() ?: return)
             return
         }
-        for (spelling in struck) {
+        for ((spelling, word) in struck) {
             // (a word allowed here: its own strike row, at least the borrowed strikes it overrode, see RemovedWords.Lists)
-            blacklistFor(spelling)?.strike(spelling) ?: continue
+            val lists = blacklistFor(spelling) ?: continue
+            lists.strike(spelling)
+            lists.own.disallow(word)
             if (swipe) for (group in dictionaryGroups) GestureDecoderVocabulary.onWordBlacklisted(group.locale, spelling)
         }
     }
@@ -992,19 +995,21 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
             val groups = locales.map { DictionaryGroup(it, DictionaryFactory.createMainDictionaryCollection(context, it, false)) }
             val swipe = inUseReads(pool)
             try {
-                val struck = LinkedHashSet<String>()
+                // each struck spelling, with the word as removed (its allowed rows go too, L4.2)
+                val struck = LinkedHashMap<String, String>()
                 for (word in words) {
                     val spellings = groups.map { it.removeEverywhere(word, history, swipe, pool, personal) }
-                    struck.add(if (word in spellings || spellings.isEmpty()) word else spellings.first())
+                    struck.putIfAbsent(if (word in spellings || spellings.isEmpty()) word else spellings.first(), word)
                 }
                 if (!blacklist) { // (a plain delete from the Learned words list: no strike)
-                    if (swipe) for (locale in locales) GestureDecoderVocabulary.onWordUnblacklisted(locale, struck.firstOrNull() ?: break)
+                    if (swipe) for (locale in locales) GestureDecoderVocabulary.onWordUnblacklisted(locale, struck.keys.firstOrNull() ?: break)
                     history.onFinishInput()
                     return
                 }
                 val list = RemovedWords.blacklist(context, script, pool)
-                for (spelling in struck) {
+                for ((spelling, word) in struck) {
                     list.strike(spelling)
+                    list.disallow(word)
                     if (swipe) for (locale in locales) GestureDecoderVocabulary.onWordBlacklisted(locale, spelling)
                 }
                 history.onFinishInput() // written to the file now: the keyboard may not be running

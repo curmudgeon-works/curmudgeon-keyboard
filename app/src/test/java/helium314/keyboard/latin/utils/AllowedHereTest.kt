@@ -66,6 +66,25 @@ class AllowedHereTest {
         }
     }
 
+    // fail before (L4.2): Remove of "Zorp" left the allowed row of "zorp", so the borrowed block stayed lifted
+    @Test fun `Remove of a capitalized word clears the allowed rows of both spellings`() {
+        a.strike("zorp")
+        assertTrue(lists.allowHere("Zorp")) // (the row of the spelling A has: "zorp")
+        assertEquals(mapOf("zorp" to 1), b.allowedEntries())
+        lists.strike("Zorp")
+        b.reload()
+        assertEquals(emptyMap(), b.allowedEntries())
+        assertNull(b.allowedFor("Zorp"))
+        assertFalse(lists.isAllowedHere("zorp"))
+        assertEquals(listOf("Zorp"), fileB.readLines())
+        // (the struck spelling another than the word removed: disallow takes the removed word's rows off)
+        b.allow("Quux", 1); b.allow("quux", 1)
+        b.strike("quux")
+        b.disallow("Quux")
+        b.reload()
+        assertEquals(emptyMap(), b.allowedEntries())
+    }
+
     @Test fun `a borrowed block typed enough on B becomes an allowed row on B and the source stays untouched`() {
         a.strike("zorp")
         a.reload()

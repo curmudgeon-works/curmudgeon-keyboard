@@ -151,6 +151,23 @@ class Review1010LearnPoolsTest {
         } finally { cache.closeDictionaries() }
     }
 
+    // fail before (L4.2): Remove cleared the allowed row of the struck spelling only, the other spelling's stayed
+    @Test fun `Remove clears the allowed rows of the word as typed and in lowercase`() {
+        storeA.counts["Zorblat"] = 3
+        val list = helium314.keyboard.latin.utils.RemovedWords.blacklist(ctx, "Latn", poolA)
+        list.ensureLoaded()
+        list.allow("Zorblat", 1); list.allow("zorblat", 1)
+        val f = facilitatorOfA()
+        try {
+            DictionaryFacilitatorImpl.removeWords(ctx, "Latn", poolA, listOf(Locale.US), listOf("Zorblat"))
+            assertEquals(emptyMap(), list.allowedEntries())
+            assertTrue(list.entries().keys.any { it.equals("zorblat", true) }, "Remove no longer blacklists")
+        } finally {
+            f.closeDictionaries()
+            list.replaceAll(emptyMap())
+        }
+    }
+
     // 2026-10-11 (owner: "longpress delete should just knock that word out of that list entirely as if it never existed")
     @Test fun `Delete on the Learned words list forgets the word without blacklisting it - Remove still blacklists`() {
         storeA.counts["wfddsg"] = 3

@@ -456,9 +456,25 @@ object RemovedWords {
         private fun strikeNow(word: String, floor: Entry?): Int {
             // (a fresh Remove: never confirmed, whatever the borrowed entry had)
             val strikes = Entry((byWord[word]?.strikes ?: 0) + 1).max(floor).strikes
+            // (removed in every capitalization: an allowed row of the lowercase spelling goes too, review L4.2; the
+            // as-typed one goes with its new row)
+            val lower = word.lowercase()
+            if (lower != word && allowedByWord.remove(lower) != null) pending[lower] = null
             set(word, Entry(strikes))
             recordGated(GatedStrike(word))
             return strikes
+        }
+
+        /** A Remove of [word]: the allowed rows of it as typed and in lowercase taken off (review L4.2: the strike's row
+         *  can be another spelling's, as the dictionaries list the word; read first, as for a strike). */
+        fun disallow(word: String) {
+            if (!loaded) { if (LearnedStoreMigration.isRunning) reloadAsync() else read() }
+            synchronized(lock) {
+                var changed = false
+                for (spelling in setOf(word, word.lowercase()))
+                    if (allowedByWord.remove(spelling) != null) { pending[spelling] = null; changed = true }
+                if (changed) write()
+            }
         }
 
         /** [word] (3rd strike, typed often enough) brought back with the strip's "+". @return false if it wasn't waiting */
