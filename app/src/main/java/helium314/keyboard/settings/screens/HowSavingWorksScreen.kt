@@ -80,6 +80,7 @@ internal val savingGuide: List<SavingTab> = listOf(
         SavingRow(R.string.saving_kind_pictures, R.string.saving_delete_pictures),
         SavingRow(R.string.saving_kind_key_layouts, R.string.saving_delete_key_layouts),
         SavingRow(R.string.saving_kind_keyboards, R.string.saving_delete_keyboards),
+        SavingRow(R.string.saving_kind_keyboards, R.string.saving_separate_first_delete),
         SavingRow(R.string.saving_kind_dictionaries, R.string.saving_delete_dictionaries),
         SavingRow(R.string.saving_kind_learned, R.string.saving_delete_learned),
         SavingRow(R.string.saving_kind_blacklisted, R.string.saving_delete_blacklisted),
@@ -151,6 +152,8 @@ internal val savingGuide: List<SavingTab> = listOf(
     SavingTab(R.string.saving_tab_separate, listOf(
         SavingRow(R.string.saving_kind_keyboards, R.string.saving_separate_on),
         SavingRow(R.string.saving_kind_keyboards, R.string.saving_separate_off),
+        SavingRow(R.string.saving_kind_keyboards, R.string.saving_separate_first_delete),
+        SavingRow(R.string.saving_kind_keyboards, R.string.saving_separate_reorder),
         SavingRow(R.string.saving_kind_layouts, R.string.saving_separate_items),
         SavingRow(R.string.saving_kind_learned, R.string.saving_separate_words),
     )),

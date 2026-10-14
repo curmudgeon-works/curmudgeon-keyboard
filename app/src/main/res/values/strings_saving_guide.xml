@@ -53,7 +53,7 @@
     <string name="saving_edit_popups">Key edits stay on this keyboard, as for Layouts and themes; the set changes only with its save icon. Saved Layouts holding the set are listed with ticks too.</string>
     <string name="saving_edit_palettes">Edited in the palette editor; Discard there, or on Appearance, undoes it.</string>
     <string name="saving_edit_key_layouts">Edits the layout file: every keyboard using it changes. Layout &amp; Typing\'s Discard undoes it.</string>
-    <string name="saving_edit_keyboards">With separate settings, each keyboard\'s settings are its own; with one set of settings, a change reaches every keyboard.</string>
+    <string name="saving_edit_keyboards">With separate settings, each keyboard\'s settings are its own; with one set of settings (the first keyboard\'s), a change reaches every keyboard.</string>
 
     <!-- Save as new -->
     <string name="saving_new_items">Saves this keyboard\'s settings under a new name. If another saved item has exactly these settings, the dialog says so; it still saves.</string>
@@ -87,7 +87,7 @@
     <string name="saving_add_fonts">Load a font file in a text style. The same font loaded again is reused.</string>
     <string name="saving_add_pictures">Pick a picture: it joins the picture list every keyboard chooses from.</string>
     <string name="saving_add_key_layouts">Add custom layout (paste one into the editor), or Load file in Full customization with JSON.</string>
-    <string name="saving_add_keyboards">Add a keyboard, or a copy of one. A new keyboard can start with words from other keyboards.</string>
+    <string name="saving_add_keyboards">Add a keyboard, or a copy of one. It gets its own settings at once, from the ones you pick. A new keyboard can start with words from other keyboards.</string>
     <string name="saving_add_dictionaries">Add from Downloads, or get one from curmudgeon.works.</string>
     <string name="saving_add_personal">Add word, in Android\'s personal dictionary.</string>
 
@@ -124,8 +124,10 @@
     <string name="saving_reset_words">Kept, unless ticked (learned words, clipboard history).</string>
 
     <!-- Separate settings on / off -->
-    <string name="saving_separate_on">On: each keyboard gets a copy of the common settings, then its own (a keyboard that had its own before keeps them).</string>
-    <string name="saving_separate_off">Off: every keyboard uses one set, from the keyboard you pick; each keyboard\'s own settings stay stored and come back when it\'s on again.</string>
+    <string name="saving_separate_on">On: each keyboard uses its own settings, as it left them. Nothing is copied; a keyboard added has its own from the start.</string>
+    <string name="saving_separate_off">Off: every keyboard uses the first keyboard\'s settings (the first in the list), and a change from any keyboard changes them. Each keyboard\'s own settings stay stored and come back when it\'s on again. A menu shared under Per keyboard works the same way.</string>
+    <string name="saving_separate_first_delete">The first keyboard can\'t be deleted while its settings are the common ones (separate settings off, or a menu shared): move another keyboard to the top first.</string>
+    <string name="saving_separate_reorder">Moving another keyboard to the top makes its settings the common ones, at once.</string>
     <string name="saving_separate_items">Saved items are shared by all keyboards either way. With one set of settings, the update and delete dialogs have no keyboards to tick.</string>
     <string name="saving_separate_words">Each keyboard always keeps its own learned and blacklisted words.</string>
 </resources>
