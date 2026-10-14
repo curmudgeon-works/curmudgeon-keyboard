@@ -36,9 +36,27 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.Implementation
+import org.robolectric.annotation.Implements
+import com.android.inputmethod.latin.utils.BinaryDictionaryUtils
+import helium314.keyboard.latin.makedict.DictionaryHeader
+import java.io.File
+import java.io.IOException
 import java.util.Locale
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+
+/**
+ * No main dictionary can be read: a learned word's delete opens the main dictionaries of the script's languages (and
+ * the system languages: en-US here) to see how the word is listed, and reading a dictionary's header needs the native
+ * library tests don't have (UnsatisfiedLinkError, 2026-10-11). Unreadable: the dictionary is skipped, as on a phone.
+ */
+@Implements(BinaryDictionaryUtils::class)
+object ShadowNoMainDictionary {
+    @Implementation
+    @JvmStatic
+    fun getHeader(dictFile: File): DictionaryHeader = throw IOException("no native library in tests: ${dictFile.name}")
+}
 
 /**
  * Batch delete on "Learned & blacklisted words" (owner 2026-10-11: "longpress to start multi-select and then tap tap
@@ -46,7 +64,8 @@ import kotlin.test.assertTrue
  * sure?"), driven through the screen; and the batch delete itself.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(qualifiers = "w400dp-h2400dp") // (tall: every row on screen)
+// (tall: every row on screen; no main dictionaries, see ShadowNoMainDictionary)
+@Config(qualifiers = "w400dp-h2400dp", shadows = [ShadowNoMainDictionary::class])
 class LearnedWordsBatchDeleteTest {
     @get:Rule val compose = createEmptyComposeRule()
     private val ctx: Context = ApplicationProvider.getApplicationContext()
@@ -55,7 +74,6 @@ class LearnedWordsBatchDeleteTest {
     private lateinit var store: RemovableHistory
     private var scenario: ActivityScenario<SettingsActivity>? = null
     private var leftScreen = 0
-    private val danish = Locale.forLanguageTag("da")
     private val latin = Locale.Builder().setScript("Latn").build().displayScript // (as the screen names the script)
     private val blacklist get() = RemovedWords.blacklist(ctx, "Latn", pool)
 
@@ -64,9 +82,7 @@ class LearnedWordsBatchDeleteTest {
         deleteLearnedFiles(ctx.filesDir)
         real.edit().clear().commit()
         SubtypeSettings.init(ctx)
-        // (a Latin language without a main dictionary in the app: the delete opens the languages' main dictionaries,
-        // which need the native library tests don't have)
-        useKeyboards(ctx, real, available("da"))
+        useKeyboards(ctx, real, available("en-US"))
         store = RemovableHistory(ctx, "Latn", pool)
         PersonalizationHelper.setForTest("Latn", pool, store)
         LearnedStores.storeFile(ctx.filesDir, "Latn", pool).mkdirs()
@@ -205,11 +221,11 @@ class LearnedWordsBatchDeleteTest {
         learn("alpha", "beta", "gamma")
         val lists = buildWordLists("Latn", store.counts.map { it.key to it.value }, emptyList(), blacklist.entries())
         val yours = lists.yours.filter { it.word != "gamma" }.map { Item(it, Kind.YOURS) }
-        deleteWords(ctx, "Latn", pool, listOf(danish), yours)
+        deleteWords(ctx, "Latn", pool, listOf(Locale.US), yours)
         assertEquals(setOf("gamma"), store.counts.keys)
         assertEquals(setOf("teh", "hte", "adn"), blacklist.entries().keys) // (not blacklisted)
         val black = lists.blacklisted.filter { it.word != "adn" }.map { Item(it, Kind.BLACKLISTED) }
-        deleteWords(ctx, "Latn", pool, listOf(danish), black)
+        deleteWords(ctx, "Latn", pool, listOf(Locale.US), black)
         assertEquals(setOf("adn"), blacklist.entries().keys)
     }
 }
