@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit
 import helium314.keyboard.latin.dictionary.Dictionary
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** A test store of learned words (as [FakeHistory]) whose Remove takes the word out. */
@@ -135,5 +136,17 @@ class Review1010LearnPoolsTest {
             assertTrue(!swipeable("quexil"), "the swipe lists didn't take the marker word out")
             assertTrue(swipeable("zorblat"), "B lost its own learned word from its swipe list")
         } finally { f.closeDictionaries() }
+    }
+
+    // area 3 #7: the spell checker kept the learned words of the keyboard in use when it was set up
+    @Test fun `the spell checker reads the learned words of the keyboard in use after a switch`() {
+        storeA.counts["zorblat"] = 4 // learned on A only
+        val cache = helium314.keyboard.latin.DictionaryFacilitatorLruCache(ctx, "spellcheck_")
+        try {
+            assertFalse(cache.get(Locale.US).isValidSpellingWord("zorblat"), "B in use: A's word isn't B's")
+            useKeyboards(ctx, real, a, b) // A in use now
+            LearnedStores.refresh(real)
+            assertTrue(cache.get(Locale.US).isValidSpellingWord("zorblat"), "A in use: the spell checker still read B's words")
+        } finally { cache.closeDictionaries() }
     }
 }

@@ -90,7 +90,9 @@ public class DictionaryFacilitatorLruCache {
 
     public DictionaryFacilitator get(final Locale locale) {
         synchronized (mLock) {
-            if (!mDictionaryFacilitator.isForLocale(locale)) {
+            // (and when another keyboard's learned words are in use since: with a learned-words pool per keyboard the
+            // spell checker went on reading the keyboard's of its set-up; review 2026-10-08 area 3 #7)
+            if (!mDictionaryFacilitator.isForLocale(locale) || !mDictionaryFacilitator.usesCurrentLearnedWords()) {
                 mLocale = locale;
                 resetDictionariesForLocaleLocked();
             }

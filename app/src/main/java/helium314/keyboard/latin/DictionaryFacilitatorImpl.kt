@@ -116,6 +116,8 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         return locale != null && locale == dictionaryGroups[0].locale
     }
 
+    override fun usesCurrentLearnedWords() = learnedView == LearnedStores.currentView
+
     override fun onStartInput() {
     }
 

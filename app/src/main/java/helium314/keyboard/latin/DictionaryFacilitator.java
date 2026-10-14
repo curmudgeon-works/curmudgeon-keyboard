@@ -75,6 +75,10 @@ public interface DictionaryFacilitator {
      */
     boolean isForLocale(final Locale locale);
 
+    /** Whether the learned words (and blacklists) this facilitator was set up with are those of the keyboard in use
+     *  now (LearnedStores.currentView): the spell checker sets up again when they aren't (review 2026-10-08 area 3 #7). */
+    default boolean usesCurrentLearnedWords() { return true; }
+
     interface DictionaryInitializationListener {
         void onUpdateMainDictionaryAvailability(boolean isMainDictionaryAvailable);
     }
