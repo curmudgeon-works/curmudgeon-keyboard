@@ -1538,16 +1538,19 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, plan: Re
     // numrow; yours becomes My numrow 2"; before, the backup's came in as "My numrow 2")
     for ((type, name) in wanted) keyLayouts.deviceRename(type, name)?.let { renamePhoneLayoutFile(ctx, SavedItemsMerge.FileClash(type, name, it)) }
     // the merge targets as they are now (R4: their key layouts renamed; a new id)
-    decisions = decisions.mapValues { (_, d) -> if (d is RestoreDecision.Merge) onDeviceNow(d.phone)?.let { d.copy(phone = it) } ?: d else d }
-    replaces = replacesNow()
+    fun mapTargets() {
+        decisions = decisions.mapValues { (_, d) -> if (d is RestoreDecision.Merge) onDeviceNow(d.phone)?.let { d.copy(phone = it) } ?: d else d }
+        replaces = replacesNow()
+    }
+    mapTargets()
 
     // ---- the backup's things, parts before what uses them (owner 2026-10-12): key layouts; palettes, fonts and pictures,
     // popup sets, Layouts, themes; the dictionaries; the settings; the keyboards ----
     writeKeyLayouts(ctx, keyLayouts, wanted)
     val applied = if (withSettings) SavedItemsMerge.apply(ctx, real, plan.items, names, write = true, files = backupFiles(pending)) else null
     // the device's keyboards that used an item now the backup's take it ("they take the backup's look"), by the plan's
-    // lists through the id map
-    applied?.let { reapplyReplaced(ctx, plan, it.replaced, ::onDeviceNow) }
+    // lists through the id map; a Layout can change their keys, so the merge targets are looked up again
+    applied?.let { if (it.replaced.isNotEmpty()) { reapplyReplaced(ctx, plan, it.replaced, ::onDeviceNow); mapTargets() } }
     beforeKeyboards()
 
     // one mapping, backup keyboard -> the device keyboard it becomes: merged or added as answered, named as answered
