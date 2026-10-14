@@ -83,6 +83,27 @@ class CopyModelTest {
         assertTrue(popupSetDiffers(prefs, kb, atDefault, emptyMap(), takeNew = false))
     }
 
+    @Test fun `a keyboard that stored the default map and order is the same as a set keeping them at default`() {
+        val set = KeyPopupOverrides.UserSet("Mine", "all", null, emptyMap(), "q!", "x",
+            setOf(KeyPopupOverrides.MAP, KeyPopupOverrides.ORDER))
+        val kb = us.with(helium314.keyboard.latin.common.Constants.Subtype.ExtraValue.MORE_POPUPS, "all")
+        val prefs = view(1)
+        prefs.edit().putString(Settings.PREF_SYMBOL_POPUP_MAP, helium314.keyboard.latin.settings.Defaults.PREF_SYMBOL_POPUP_MAP)
+            .putString(Settings.PREF_POPUP_KEYS_ORDER, helium314.keyboard.latin.settings.Defaults.PREF_POPUP_KEYS_ORDER).commit()
+        assertFalse(popupSetDiffers(prefs, kb, set, emptyMap(), takeNew = true))
+        // the keyboard's own popup order picked equal to the default: the same too
+        val kbOrder = kb.with(helium314.keyboard.latin.common.Constants.Subtype.ExtraValue.POPUP_ORDER,
+            helium314.keyboard.latin.settings.Defaults.PREF_POPUP_KEYS_ORDER)
+        assertFalse(popupSetDiffers(prefs, kbOrder, set, emptyMap(), takeNew = true))
+        // a stored map that is not the default differs
+        prefs.edit().putString(Settings.PREF_SYMBOL_POPUP_MAP, "w?").commit()
+        assertTrue(popupSetDiffers(prefs, kb, set, emptyMap(), takeNew = true))
+        // and so does a stored order that is not the default
+        prefs.edit().putString(Settings.PREF_SYMBOL_POPUP_MAP, helium314.keyboard.latin.settings.Defaults.PREF_SYMBOL_POPUP_MAP)
+            .putString(Settings.PREF_POPUP_KEYS_ORDER, "x").commit()
+        assertTrue(popupSetDiffers(prefs, kb, set, emptyMap(), takeNew = true))
+    }
+
     @Test fun `an updated popup set reaches a ticked keyboard and a ticked saved Layout`() {
         val set = KeyPopupOverrides.UserSet("Mine", "all", null, mapOf("e" to listOf("é")), "q!", "x")
         view(2).edit().putString(KeyPopupOverrides.PREF_SELECTED_SET, "Old").putInt(CustomLabels.Kind.POPUPS.key, 3).commit()

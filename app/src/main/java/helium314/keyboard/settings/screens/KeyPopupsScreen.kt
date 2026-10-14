@@ -370,10 +370,15 @@ internal fun popupSetDiffers(prefs: SharedPreferences, keyboard: SettingsSubtype
     val accents = keyboard.getExtraValueOf(ExtraValue.MORE_POPUPS)
     if (KeyPopupOverrides.ACCENTS in follows) { if (accents != null) return true }
     else if ((accents ?: prefs.getString(Settings.PREF_MORE_POPUP_KEYS, Defaults.PREF_MORE_POPUP_KEYS)) != set.morePopups) return true
-    if (KeyPopupOverrides.MAP in follows) { if (prefs.contains(Settings.PREF_SYMBOL_POPUP_MAP)) return true }
+    // a field the set keeps at its default: the same when the keyboard reads the default, stored or not (review D3)
+    if (KeyPopupOverrides.MAP in follows) {
+        if (prefs.getString(Settings.PREF_SYMBOL_POPUP_MAP, Defaults.PREF_SYMBOL_POPUP_MAP) != Defaults.PREF_SYMBOL_POPUP_MAP) return true
+    }
     else if (set.symbolMap != null && prefs.getString(Settings.PREF_SYMBOL_POPUP_MAP, Defaults.PREF_SYMBOL_POPUP_MAP) != set.symbolMap) return true
     val order = keyboard.getExtraValueOf(ExtraValue.POPUP_ORDER)
-    if (KeyPopupOverrides.ORDER in follows) { if (order != null || prefs.contains(Settings.PREF_POPUP_KEYS_ORDER)) return true }
+    if (KeyPopupOverrides.ORDER in follows) {
+        if ((order ?: prefs.getString(Settings.PREF_POPUP_KEYS_ORDER, Defaults.PREF_POPUP_KEYS_ORDER)) != Defaults.PREF_POPUP_KEYS_ORDER) return true
+    }
     else if (set.popupOrder != null && (order ?: prefs.getString(Settings.PREF_POPUP_KEYS_ORDER, Defaults.PREF_POPUP_KEYS_ORDER)) != set.popupOrder) return true
     return false
 }
