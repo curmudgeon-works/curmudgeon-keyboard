@@ -2,6 +2,7 @@
 package helium314.keyboard
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.test.core.app.ApplicationProvider
 import helium314.keyboard.keyboard.FontLibrary
 import helium314.keyboard.keyboard.KeyboardTheme
@@ -161,5 +162,23 @@ class Review1010ThemesTest {
         live().apply { parentFile?.mkdirs(); writeText("picture Q") }
         AppearanceLooks.applyPictures(ctx, AppearanceLooks.Look("", mapOf(AppearanceLooks.PICTURES to held)))
         assertFalse(live().exists())
+    }
+
+    // ---- #7: the old picture folders go only after the looks naming the library are written ----
+
+    // the process dies before an apply() lands: only commit() writes
+    private class DiesBeforeApply(private val r: SharedPreferences) : SharedPreferences by r {
+        override fun edit(): SharedPreferences.Editor = object : SharedPreferences.Editor by r.edit() { override fun apply() {} }
+    }
+
+    @Test fun `a look's old picture folder isn't gone before the look names the library`() {
+        clearPictures()
+        val folder = java.io.File(ctx.filesDir, "looks/old-uuid").apply { mkdirs() }
+        java.io.File(folder, "custom_background_image").writeText("picture O")
+        AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Old", mapOf(AppearanceLooks.PICTURES to "old-uuid"))))
+        AppearanceLooks.migratePictureFolders(ctx, DiesBeforeApply(real))
+        val pictures = AppearanceLooks.load(real).single().values[AppearanceLooks.PICTURES] as String
+        assertTrue(pictures.startsWith("lib:") || folder.isDirectory, "the look names a folder that is gone: its pictures are lost")
+        folder.deleteRecursively()
     }
 }

@@ -143,7 +143,7 @@ object AppearanceLooks {
      *  library, the folder goes); a look with an empty folder says [NO_PICTURES]. At app start, cheap once done. */
     fun migratePictureFolders(ctx: Context, prefs: SharedPreferences) {
         val looks = load(prefs)
-        var changed = false
+        val done = ArrayList<java.io.File>()
         val converted = looks.map { look ->
             val id = look.values[PICTURES] as? String ?: return@map look
             if (id == NO_PICTURES || id.startsWith(LIB)) return@map look
@@ -161,11 +161,15 @@ object AppearanceLooks {
             }
             // the folder goes only once every picture is in the library (review session 2026-10-07: a failed copy lost it)
             if (!complete) return@map look
-            dir.deleteRecursively()
-            changed = true
+            done.add(dir)
             Look(look.name, look.values + (PICTURES to if (o.length() == 0) NO_PICTURES else LIB + o.toString()))
         }
-        if (changed) save(prefs, converted)
+        if (done.isEmpty()) return
+        // the looks naming the library are on disk before their folders go (review 2026-10-08 area 4 #7: a folder went
+        // first, and a process killed before the async write left the look naming it, its pictures lost); killed in
+        // between, a folder stays behind unused
+        save(prefs, converted, now = true)
+        done.forEach { it.deleteRecursively() }
     }
 
     /** How many saved looks name library picture [name]: the library's "forget" warns with it. */
@@ -334,7 +338,8 @@ object AppearanceLooks {
         })
     }
 
-    fun save(prefs: SharedPreferences, looks: List<Look>) {
+    /** [now]: written before this returns (commit), not in the background. */
+    fun save(prefs: SharedPreferences, looks: List<Look>, now: Boolean = false) {
         keepBrokenAside(prefs, PREF)
         val arr = JSONArray()
         for (look in looks) arr.put(JSONObject().apply {
@@ -343,7 +348,7 @@ object AppearanceLooks {
             put("values", JSONObject().also { v -> look.values.forEach { (key, value) ->
                 (if (value == null) JSONObject().put("d", true) else toJson(value))?.let { v.put(key, it) } } })
         })
-        prefs.edit { putString(PREF, arr.toString()) }
+        prefs.edit(commit = now) { putString(PREF, arr.toString()) }
     }
 
     internal fun toJson(value: Any?): JSONObject? = when (value) {
