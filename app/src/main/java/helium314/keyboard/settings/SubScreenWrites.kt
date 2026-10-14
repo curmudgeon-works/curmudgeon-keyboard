@@ -19,9 +19,10 @@ import java.io.File
  * disk in [dir] with the snapshot, so the undo after a crash keeps them as well.
  * Only the sub-screen's own change (owner 2026-10-11, review E4: "On app exit you should only honour the sub-screen's
  * save and discard all else"): a key holding a whole list ([ListElements]: the saved themes, Layouts and popup sets, the
- * keyboard lists, the learned words' pools) is recorded by the elements the sub-screen changed, and leaving the app puts
- * only those onto the list as the snapshot had it. Before, the whole list was taken, with the editing screen's own
- * unsaved changes in it (a theme deleted on Appearance stayed deleted). The palettes are a key each: one palette.
+ * keyboard lists, the learned words' pools, the popup keys) is recorded by the elements the sub-screen changed, and
+ * leaving the app puts only those onto the list as the snapshot had it. Before, the whole list was taken, with the
+ * editing screen's own unsaved changes in it (a theme deleted on Appearance stayed deleted). The palettes are a key
+ * each: one palette.
  */
 internal class SubScreenWrites(private val dir: File, private val liveDir: File?, private val inScope: (String) -> Boolean) {
     private var ctx: Context? = null
@@ -145,7 +146,7 @@ internal class SubScreenWrites(private val dir: File, private val liveDir: File?
  * The stored keys holding a whole list, as their elements (review E4): what a sub-screen's save changed of them is
  * recorded element by element ([SubScreenWrites]). The saved themes, Layouts and popup sets (a JSON list, an element by
  * its "name"), the keyboard list and the added keyboards (an element by its keyboard id), the learned words' pools
- * (keyboard id -> pool). Any other key is one value.
+ * (keyboard id -> pool), the popup keys (key -> its popups, review M2). Any other key is one value.
  */
 internal object ListElements {
     /** An element a sub-screen's save changed: [element] as saved (null: removed); [added]: none of that id was there
@@ -156,6 +157,9 @@ internal object ListElements {
     private val keyboards = setOf(helium314.keyboard.latin.settings.Settings.PREF_ENABLED_SUBTYPES,
         helium314.keyboard.latin.settings.Settings.PREF_ADDITIONAL_SUBTYPES)
     private val maps = setOf(helium314.keyboard.latin.personalization.LearnedKeyboards.PREF_POOLS)
+    // (key -> a JSON list; a key the sub-screen changed is put even where the snapshot had none: the popups as generated
+    // are no element the editing screen made)
+    private val popups = setOf(helium314.keyboard.latin.utils.KeyPopupOverrides.PREF)
     private val sep = helium314.keyboard.latin.common.Constants.Separators.SETS
 
     private fun plain(key: String) = LayoutDraft.plain(key)
@@ -164,7 +168,7 @@ internal object ListElements {
      *  can't be read as one. */
     fun split(key: String, value: Any?): LinkedHashMap<String, String>? {
         val p = plain(key)
-        if (p !in named && p !in keyboards && p !in maps) return null
+        if (p !in named && p !in keyboards && p !in maps && p !in popups) return null
         val out = LinkedHashMap<String, String>()
         if (value == null) return out
         if (value !is String) return null
@@ -183,18 +187,19 @@ internal object ListElements {
     private fun join(key: String, elements: Collection<Pair<String, String>>): String = when (plain(key)) {
         in named -> JSONArray().also { a -> elements.forEach { a.put(JSONObject(it.second)) } }.toString()
         in keyboards -> elements.joinToString(sep) { it.second }
+        in popups -> JSONObject().also { o -> elements.forEach { (id, e) -> o.put(id, runCatching { JSONArray(e) }.getOrDefault(e)) } }.toString()
         else -> JSONObject().also { o -> elements.forEach { (id, e) -> o.put(id, e.toIntOrNull() ?: e) } }.toString()
     }
 
     /** [changed] onto [value], [key]'s list as it is: a changed element in its place, one the sub-screen made at the end,
      *  a removed one gone; the rest as there. A changed element not in [value] stays out: the editing screen made it
-     *  (a theme it renamed, a keyboard it added), and its changes are undone. Null: nothing stored (no element, none
-     *  before). A value that can't be read as the list stays as it is. */
+     *  (a theme it renamed, a keyboard it added), and its changes are undone; a popup key is put all the same. Null:
+     *  nothing stored (no element, none before). A value that can't be read as the list stays as it is. */
     fun applied(key: String, value: Any?, changed: Map<String, Change>): Any? {
         val elements = split(key, value) ?: return value
         for ((id, c) in changed) when {
             c.element == null -> elements.remove(id)
-            id in elements || c.added -> elements[id] = c.element
+            id in elements || c.added || plain(key) in popups -> elements[id] = c.element
         }
         if (value == null && elements.isEmpty()) return null
         return join(key, elements.map { it.key to it.value })

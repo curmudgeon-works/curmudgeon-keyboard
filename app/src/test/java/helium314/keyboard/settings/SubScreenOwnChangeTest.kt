@@ -161,4 +161,41 @@ class SubScreenOwnChangeTest {
         LayoutDraft.rejectOpen(ctx)
         assertEquals(listOf("Mine", "New"), KeyPopupOverrides.loadSets(real).map { it.name })
     }
+
+    // review M2: the popup keys are recorded by key, not as the whole map
+    private val m1 = mapOf("a" to listOf("à", "á"), "e" to listOf("é"))
+
+    /** Popups M1; a saved Layout applied on Layout and Typing (unsaved) writes its map M2; Customize popups changes "a". */
+    private fun popupKeysScenario() {
+        KeyPopupOverrides.save(real, m1)
+        LayoutDraft.of(ctx, "en_US:")
+        KeyPopupOverrides.save(real, mapOf("a" to listOf("ä"), "o" to listOf("ö"))) // (the Layout's popups, unsaved)
+        LayoutDraft.subScreenOpenedOpen(ctx)
+        KeyPopupOverrides.set(real, "a", listOf("ä", "â"))
+        customizePopupsSaved()
+    }
+
+    @Test fun `popup keys - a Layout applied, one key edited and saved in Customize popups, leaving the app keeps M1 with only that key`() {
+        popupKeysScenario()
+        LayoutDraft.rejectOpen(ctx) // the app left
+        assertEquals(mapOf("a" to listOf("ä", "â"), "e" to listOf("é")), KeyPopupOverrides.load(real))
+    }
+
+    @Test fun `popup keys - the same after a crash, the keys kept on disk`() {
+        popupKeysScenario()
+        LayoutDraft.forgetActiveForTest() // the process died
+        LayoutDraft.recoverAfterCrash(ctx) // the next app start
+        assertEquals(mapOf("a" to listOf("ä", "â"), "e" to listOf("é")), KeyPopupOverrides.load(real))
+    }
+
+    @Test fun `popup keys - a key the snapshot had none for, edited and saved, is kept`() {
+        KeyPopupOverrides.save(real, m1)
+        LayoutDraft.of(ctx, "en_US:")
+        KeyPopupOverrides.save(real, mapOf("o" to listOf("ö"))) // (the Layout's popups, unsaved)
+        LayoutDraft.subScreenOpenedOpen(ctx)
+        KeyPopupOverrides.set(real, "o", listOf("ö", "ó"))
+        customizePopupsSaved()
+        LayoutDraft.rejectOpen(ctx)
+        assertEquals(m1 + ("o" to listOf("ö", "ó")), KeyPopupOverrides.load(real))
+    }
 }
