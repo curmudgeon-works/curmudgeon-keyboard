@@ -28,9 +28,12 @@ import java.util.concurrent.Executors
  * Allowed here (owner 2026-10-11 "DM21 ALLOWED HERE": borrowing another keyboard's blacklist is read-only): a word that
  * is blocked only through a borrowed list and comes back on this keyboard (typed often enough by the source's strike
  * rule, or the strip's "+") gets a silent row in THIS keyboard's own file, "word<TAB>allowed<TAB>N" (N: the source's
- * strikes it overrides), instead of an edit of the source. Each word is at most once in a file: a blocked row or an
- * allowed row. An allowed row is no block: [WordListFile.entries] and [parseAll] leave it out (the Blacklisted words
- * screen doesn't list it); [Lists] reads it. Backups, restores and copies carry it with the list (the same file).
+ * strikes it overrides), instead of an edit of the source. Each word is at most once in a file (owner 2026-10-12: one
+ * row holds both): a word with its own strikes too keeps them in the same row, "word<TAB>N[<TAB>confirmed]<TAB>allowed
+ * <TAB>L" (N written even for 1), so allowing it here loses none of its own history and a further Remove counts on
+ * from there. The allowed part is no block: [WordListFile.entries] and [parseAll] have the own strikes only (an
+ * allowed-only row isn't listed on the Blacklisted words screen); [Lists] reads the allowed part. Backups, restores and
+ * copies carry it with the list (the same file). Older versions read a combined row as its own strikes alone.
  */
 object RemovedWords {
     private val lists = ConcurrentHashMap<String, WordListFile>()
@@ -152,7 +155,8 @@ object RemovedWords {
          * [word] (as typed and lowercase) is back on this keyboard although borrowed lists have it: an allowed row on the
          * own list for each spelling they have, at their strikes (the most of them). The borrowed lists stay as they are
          * (owner 2026-10-11: borrowing is read-only; until then they were edited). An own blocked row of that spelling
-         * becomes the allowed row (a word is listed once). @return whether a row was written
+         * keeps its strikes, the allowed part added to it (owner 2026-10-12: one row holds both). @return whether a row
+         * was written
          */
         fun allowHere(word: String): Boolean {
             var allowed = false
@@ -167,7 +171,8 @@ object RemovedWords {
 
         /**
          * Remove (strip) of [word] on this keyboard: one more strike on its own list. A word allowed here gets its own
-         * strike row instead, its strikes combined with the borrowed ones (Entry.max). @return its strikes now
+         * strike row instead (its allowed part goes): one more than its own strikes or the borrowed ones, the more of
+         * them (owner 2026-10-12: a borrowed 2 and no own row: 3; an own 3: 4). @return its strikes now
          */
         fun strike(word: String): Int {
             val floor = if (borrowed.isNotEmpty() && own.allowedFor(word) != null) borrowedEntry(word) else null
@@ -180,15 +185,23 @@ object RemovedWords {
 
     // ------------------------------- the file -------------------------------
 
-    /** "word", or "word<TAB>N" (with a "<TAB>confirmed" after), as [format] writes; null for an empty line and for an
-     *  allowed row ([parseAllowed]: no block). */
+    /** "word", or "word<TAB>N" (with a "<TAB>confirmed" after), as [format] writes, and the own strikes of a combined
+     *  row ([formatRow]); null for an empty line and for an allowed-only row ([parseAllowed]: no block). */
     internal fun parse(line: String): Pair<String, Entry>? {
         val parts = line.split('\t')
         val word = parts[0]
         if (word.isEmpty()) return null
         if (parts.getOrNull(1)?.trim() == ALLOWED) return null
         val strikes = parts.getOrNull(1)?.trim()?.toIntOrNull()?.coerceAtLeast(1) ?: 1
-        return word to Entry(strikes, parts.drop(2).any { it.trim() == CONFIRMED })
+        val at = allowedAt(parts)
+        val own = if (at < 0) parts.drop(2) else parts.subList(2, at) // (at >= 2: "word<TAB>allowed" returned above)
+        return word to Entry(strikes, own.any { it.trim() == CONFIRMED })
+    }
+
+    // the index of the "allowed" part of a line's [parts] (after the word), -1 without one
+    private fun allowedAt(parts: List<String>): Int {
+        for (i in 1 until parts.size) if (parts[i].trim() == ALLOWED) return i
+        return -1
     }
 
     /** A plain word for a single strike: the lines everything before strikes wrote and read. */
@@ -198,31 +211,38 @@ object RemovedWords {
         else -> word
     }
 
-    /** An allowed row "word<TAB>allowed<TAB>N" ([formatAllowed]): the word and N, the borrowed strikes it overrides;
-     *  null for any other line. */
+    /** The allowed part of a row, "word<TAB>allowed<TAB>N" ([formatAllowed]) or after the own strikes of a combined
+     *  row ([formatRow]): the word and N, the borrowed strikes it overrides; null for a line without one. */
     internal fun parseAllowed(line: String): Pair<String, Int>? {
         val parts = line.split('\t')
         val word = parts[0]
-        if (word.isEmpty() || parts.getOrNull(1)?.trim() != ALLOWED) return null
-        return word to (parts.getOrNull(2)?.trim()?.toIntOrNull()?.coerceAtLeast(1) ?: 1)
+        val at = allowedAt(parts)
+        if (word.isEmpty() || at < 0) return null
+        return word to (parts.getOrNull(at + 1)?.trim()?.toIntOrNull()?.coerceAtLeast(1) ?: 1)
     }
 
     internal fun formatAllowed(word: String, level: Int): String = "$word\t$ALLOWED\t$level"
 
-    /** The allowed rows of [lines] (a word allowed twice: the higher level; a word also blocked there: blocked). */
+    /** [word]'s one row: its own [entry] (as [format]) and its [allowed] part, either or both (owner 2026-10-12: one
+     *  row holds both); with both, the strikes are written even for 1, so the row reads as before up to "allowed". */
+    internal fun formatRow(word: String, entry: Entry?, allowed: Int?): String = when {
+        allowed == null -> format(word, entry ?: Entry())
+        entry == null -> formatAllowed(word, allowed)
+        else -> "$word\t${entry.strikes}${if (entry.confirmed) "\t$CONFIRMED" else ""}\t$ALLOWED\t$allowed"
+    }
+
+    /** The allowed parts of [lines] (a word allowed twice: the higher level; its own strikes don't change it, owner
+     *  2026-10-12: one row holds both). */
     internal fun parseAllAllowed(lines: List<String>): Map<String, Int> {
-        val blocked = HashSet<String>()
         val result = LinkedHashMap<String, Int>()
         for (line in lines) {
-            parse(line)?.let { blocked.add(it.first) }
             val (word, level) = parseAllowed(line) ?: continue
             result[word] = maxOf(level, result[word] ?: 0)
         }
-        result.keys.removeAll(blocked)
         return result
     }
 
-    /** [lines] of a list file read into entries (a word listed twice: the most strikes); allowed rows are no entries. */
+    /** [lines] of a list file read into entries (a word listed twice: the most strikes); an allowed part is no entry. */
     internal fun parseAll(lines: List<String>): Map<String, Entry> {
         val result = LinkedHashMap<String, Entry>()
         for (line in lines) {
@@ -239,20 +259,16 @@ object RemovedWords {
         return result
     }
 
-    /** The lines [WordListFile] writes for [entries] and the [allowed] rows (a word in both: its entry). */
+    /** The lines [WordListFile] writes for [entries] and the [allowed] parts (a word in both: one row, [formatRow]). */
     fun formatAll(entries: Map<String, Entry>, allowed: Map<String, Int> = emptyMap()): String =
-        (entries.map { it.key to format(it.key, it.value) } +
-            allowed.filterKeys { it !in entries }.map { it.key to formatAllowed(it.key, it.value) })
-            .sortedBy { it.first }.joinToString("") { it.second + "\n" }
+        (entries.keys + allowed.keys).sorted().joinToString("") { formatRow(it, entries[it], allowed[it]) + "\n" }
 
-    // a change in memory, not written yet
-    private sealed interface Change
-    private class Block(val entry: Entry) : Change
-    private class Allow(val level: Int) : Change
+    // a change in memory, not written yet: the word's row now, its own entry and its allowed part (either may be null)
+    private class Change(val entry: Entry?, val allowed: Int?)
 
     class WordListFile internal constructor(val file: File) {
         private val byWord = ConcurrentHashMap<String, Entry>()
-        // the allowed rows: word -> the borrowed strikes it overrides (a word is never in [byWord] too)
+        // the allowed parts: word -> the borrowed strikes it overrides (a word in [byWord] too: one row holding both)
         private val allowedByWord = ConcurrentHashMap<String, Int>()
         // changed in memory, not written yet (null: taken off): a re-read meanwhile must not undo them
         private val pending = HashMap<String, Change?>()
@@ -324,16 +340,17 @@ object RemovedWords {
             val read = parseAll(lines)
             val result = HashMap(read)
             val allowedResult = HashMap(parseAllAllowed(lines))
-            for ((word, change) in pending) when (change) {
-                null -> { result.remove(word); allowedResult.remove(word) }
-                is Block -> { result[word] = change.entry; allowedResult.remove(word) }
-                is Allow -> { allowedResult[word] = change.level; result.remove(word) }
+            for ((word, change) in pending) {
+                val entry = change?.entry
+                val allowed = change?.allowed
+                if (entry == null) result.remove(word) else result[word] = entry
+                if (allowed == null) allowedResult.remove(word) else allowedResult[word] = allowed
             }
             for ((word, n) in strikesWhileLoading) {
                 val entry = Entry((read[word]?.strikes ?: 0) + n)
                 result[word] = entry
                 allowedResult.remove(word)
-                pending[word] = Block(entry)
+                pending[word] = Change(entry, null)
             }
             strikesWhileLoading.clear()
             byWord.putAll(result)
@@ -371,33 +388,27 @@ object RemovedWords {
             io.submit { synchronized(lock) { if (pending.isNotEmpty()) writeLocked() } }.get()
         }
 
-        // [word]'s row: its blocked row [entry], or none with null; an allowed row of it goes either way
-        private fun set(word: String, entry: Entry?) {
+        // [word]'s row: its own [entry] and its [allowed] part (null: none of it; both null: no row)
+        private fun set(word: String, entry: Entry?, allowed: Int?) {
             if (entry == null) byWord.remove(word) else byWord[word] = entry
-            allowedByWord.remove(word)
-            pending[word] = entry?.let { Block(it) }
+            if (allowed == null) allowedByWord.remove(word) else allowedByWord[word] = allowed
+            pending[word] = if (entry == null && allowed == null) null else Change(entry, allowed)
             write()
         }
 
-        private fun setAllowed(word: String, level: Int) {
-            byWord.remove(word)
-            allowedByWord[word] = level
-            pending[word] = Allow(level)
-            write()
-        }
-
-        /** [word] allowed on this keyboard over borrowed strikes up to [level] (its blocked row, if any, replaced: one row
-         *  per word). No wait for a read (kept pending, as a strike). @return false if it was allowed so already */
+        /** [word] allowed on this keyboard over borrowed strikes up to [level] (its own strikes, if any, kept in the same
+         *  row: owner 2026-10-12 "one row holds both"). No wait for a read (kept pending, as a strike). @return false if
+         *  it was allowed so already */
         fun allow(word: String, level: Int): Boolean = synchronized(lock) {
-            if (allowedByWord[word] == level && !byWord.containsKey(word)) return false
-            setAllowed(word, level)
+            if (allowedByWord[word] == level) return false
+            set(word, byWord[word], level)
             true
         }
 
         /**
-         * One more Remove of [word]: one more strike, and a brought-back word is out again. [floor]: the borrowed entry
-         * of a word allowed here, combined in (Entry.max): its own row has at least the strikes it overrode.
-         * @return its strikes now
+         * One more Remove of [word]: one more strike, and a brought-back word is out again (its allowed part goes).
+         * [floor]: the borrowed entry of a word allowed here: one more than the more of its own strikes and those
+         * (owner 2026-10-12: a borrowed 2 and no own row: 3, not 2). @return its strikes now
          */
         fun strike(word: String, floor: Entry? = null): Int {
             // the strikes so far are in the file (usually read already, when the dictionaries were set up); while the
@@ -412,8 +423,8 @@ object RemovedWords {
 
         private fun strikeNow(word: String, floor: Entry?): Int {
             // (a fresh Remove: never confirmed, whatever the borrowed entry had)
-            val strikes = Entry((byWord[word]?.strikes ?: 0) + 1).max(floor).strikes
-            set(word, Entry(strikes))
+            val strikes = maxOf(byWord[word]?.strikes ?: 0, floor?.strikes ?: 0) + 1
+            set(word, Entry(strikes), null)
             return strikes
         }
 
@@ -421,57 +432,56 @@ object RemovedWords {
         fun confirm(word: String): Boolean = synchronized(lock) {
             val entry = byWord[word] ?: return false
             if (!needsConfirmation(entry.strikes) || entry.confirmed) return false
-            set(word, entry.copy(confirmed = true))
+            set(word, entry.copy(confirmed = true), allowedByWord[word])
             true
         }
 
-        /** Un-blacklist: the word and its strikes. @return false if it wasn't there */
+        /** Un-blacklist: the word and its strikes (an allowed part of its row stays: the borrowed block stays lifted, as
+         *  when the row was allowed-only). @return false if it wasn't there */
         fun remove(word: String): Boolean {
             if (!loaded) reload()
             synchronized(lock) {
                 if (!byWord.containsKey(word)) return false
-                set(word, null)
+                set(word, null, allowedByWord[word])
             }
             return true
         }
 
-        /** [word] taken off the list as it is in memory (no wait for a read: an unread list has nothing to take off).
-         *  @return false if it wasn't there */
+        /** [word] taken off the list as it is in memory (no wait for a read: an unread list has nothing to take off; an
+         *  allowed part stays, as with [remove]). @return false if it wasn't there */
         fun takeOff(word: String): Boolean = synchronized(lock) {
             if (!byWord.containsKey(word)) return false
-            set(word, null)
+            set(word, null, allowedByWord[word])
             true
         }
 
-        /** The list replaced by [entries] and [allowed] rows (a copy of another list; emptied with both empty). Call off
+        /** The list replaced by [entries] and [allowed] parts (a copy of another list; emptied with both empty). Call off
          *  the main thread. */
         fun replaceAll(entries: Map<String, Entry>, allowed: Map<String, Int> = emptyMap()) {
             io.submit {
                 synchronized(lock) {
                     ensureLoaded()
-                    for (word in byWord.keys + allowedByWord.keys) if (word !in entries && word !in allowed) set(word, null)
-                    for ((word, entry) in entries) if (byWord[word] != entry) set(word, entry)
-                    for ((word, level) in allowed)
-                        if (word !in entries && (allowedByWord[word] != level || byWord.containsKey(word))) setAllowed(word, level)
+                    for (word in byWord.keys + allowedByWord.keys + entries.keys + allowed.keys)
+                        if (byWord[word] != entries[word] || allowedByWord[word] != allowed[word])
+                            set(word, entries[word], allowed[word])
                 }
             }.get()
             reload() // after the write it started
         }
 
-        /** A backup's list ([lines]) added to this one: its words, and the most strikes of a word on both; its allowed
-         *  rows too (the higher level; a word blocked on either stays blocked). Call off the main thread. */
+        /** A backup's list ([lines]) added to this one: its words, and the most strikes of a word on both (Entry.max);
+         *  its allowed parts too (the higher level), each part of a row on its own (owner 2026-10-12: one row holds both;
+         *  a word's own strikes still block by their own rule). Call off the main thread. */
         fun combine(lines: List<String>) {
             io.submit {
                 synchronized(lock) {
                     ensureLoaded()
-                    for ((word, entry) in parseAll(lines)) {
-                        val combined = entry.max(byWord[word])
-                        if (combined != byWord[word]) set(word, combined)
-                    }
-                    for ((word, level) in parseAllAllowed(lines)) {
-                        if (byWord.containsKey(word)) continue
-                        val now = allowedByWord[word]
-                        if (now == null || level > now) setAllowed(word, level)
+                    val entries = parseAll(lines)
+                    val allowed = parseAllAllowed(lines)
+                    for (word in entries.keys + allowed.keys) {
+                        val entry = entries[word]?.max(byWord[word]) ?: byWord[word]
+                        val level = allowed[word]?.let { maxOf(it, allowedByWord[word] ?: 0) } ?: allowedByWord[word]
+                        if (entry != byWord[word] || level != allowedByWord[word]) set(word, entry, level)
                     }
                 }
             }.get()

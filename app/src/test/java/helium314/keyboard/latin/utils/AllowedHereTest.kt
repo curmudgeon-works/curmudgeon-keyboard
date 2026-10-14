@@ -103,18 +103,19 @@ class AllowedHereTest {
         assertEquals(mapOf("zorp" to 3), b.allowedEntries())
     }
 
-    @Test fun `Remove on B turns the allowed row into B's own strike row combined with the borrowed strikes`() {
+    // owner 2026-10-12 (M5): no own row, a borrowed 2, allowed here, then Remove: 3 (until then 2, the borrowed count)
+    @Test fun `Remove on B of a word allowed here without own strikes is one more than the borrowed strikes`() {
         a.strike("zorp"); a.strike("zorp")
         assertTrue(typedEnoughOnB("zorp", 2))
-        assertEquals(2, lists.strike("zorp"), "own strikes: at least the borrowed ones (Entry.max)")
+        assertEquals(3, lists.strike("zorp"), "the borrowed strikes + 1")
         b.reload()
-        assertEquals(mapOf("zorp" to Entry(2)), b.entries())
+        assertEquals(mapOf("zorp" to Entry(3)), b.entries())
         assertEquals(emptyMap(), b.allowedEntries())
-        assertEquals(listOf("zorp\t2"), fileB.readLines())
+        assertEquals(listOf("zorp\t3"), fileB.readLines())
         assertTrue(lists.isRemoved("zorp") { 0 })
         assertEquals(Entry(2), a.entry("zorp"))
         // a further Remove: one more
-        assertEquals(3, lists.strike("zorp"))
+        assertEquals(4, lists.strike("zorp"))
         // a word not allowed here: strikes as before, the borrowed ones not added in
         a.strike("other"); a.strike("other")
         assertEquals(1, lists.strike("other"))
@@ -137,9 +138,10 @@ class AllowedHereTest {
         assertNull(RemovedWords.parseAllowed("zorp\t3"))
         assertEquals("zorp\tallowed\t3", RemovedWords.formatAllowed("zorp", 3))
         assertEquals(mapOf("teh" to Entry(2)), RemovedWords.parseAll(fileB.readLines()))
-        // a word at most once: blocked wins over an allowed row of the same word
-        assertEquals(emptyMap(), RemovedWords.parseAllAllowed(listOf("zorp\tallowed\t1", "zorp\t2")))
-        assertEquals("teh\t2\nzorp\tallowed\t3\n", RemovedWords.formatAll(mapOf("teh" to Entry(2)), mapOf("zorp" to 3, "teh" to 1)))
+        // owner 2026-10-12 "one row holds both": a word's own strikes and its allowed part in one row
+        assertEquals(mapOf("zorp" to 1), RemovedWords.parseAllAllowed(listOf("zorp\tallowed\t1", "zorp\t2")))
+        assertEquals("teh\t2\tallowed\t1\nzorp\tallowed\t3\n",
+            RemovedWords.formatAll(mapOf("teh" to Entry(2)), mapOf("zorp" to 3, "teh" to 1)))
     }
 
     @Test fun `turning borrowing off keeps the allowed rows unread`() {
@@ -159,22 +161,24 @@ class AllowedHereTest {
         b.combine(backup)
         assertEquals(mapOf("zorp" to 2), b.allowedEntries())
         assertEquals(mapOf("teh" to Entry(1)), b.entries())
-        // a restore with a lower level keeps the higher; a blocked row stays blocked
+        // a restore with a lower level keeps the higher; a blocked row keeps its strikes, the allowed part added
+        // (owner 2026-10-12: one row holds both)
         b.combine(listOf("zorp\tallowed\t1", "teh\tallowed\t5"))
-        assertEquals(mapOf("zorp" to 2), b.allowedEntries())
+        assertEquals(mapOf("zorp" to 2, "teh" to 5), b.allowedEntries())
         assertEquals(mapOf("teh" to Entry(1)), b.entries())
         // a copy (LearnedKeyboards.copyShared)
         val c = RemovedWords.blacklist(ctx, script, 43)
         c.replaceAll(b.entries(), b.allowedEntries())
-        assertEquals(mapOf("zorp" to 2), c.allowedEntries())
-        assertEquals(listOf("teh", "zorp\tallowed\t2"), LearnedStores.blacklistFile(ctx.filesDir, script, 43).readLines())
+        assertEquals(mapOf("zorp" to 2, "teh" to 5), c.allowedEntries())
+        assertEquals(mapOf("teh" to Entry(1)), c.entries())
+        assertEquals(listOf("teh\t1\tallowed\t5", "zorp\tallowed\t2"), LearnedStores.blacklistFile(ctx.filesDir, script, 43).readLines())
         // emptied (factory reset, a deleted keyboard)
         c.replaceAll(emptyMap())
         assertEquals(emptyMap(), c.allowedEntries())
         assertEquals(emptyList(), LearnedStores.blacklistFile(ctx.filesDir, script, 43).readLines())
         // a re-read keeps them
         b.reload()
-        assertEquals(mapOf("zorp" to 2), b.allowedEntries())
+        assertEquals(mapOf("zorp" to 2, "teh" to 5), b.allowedEntries())
     }
 
     @Test fun `a keyboard deleted with merge-into drops its allowed rows`() {
@@ -189,14 +193,90 @@ class AllowedHereTest {
         assertEquals(listOf("teh\t2"), fileB.readLines())
     }
 
-    @Test fun `an allowed row replaces the own blocked row of that spelling`() {
+    // owner 2026-10-12 "one row holds both" (until then the allowed row replaced the own one)
+    @Test fun `an allowed part joins the own blocked row of that spelling`() {
         a.strike("zorp")
         b.strike("zorp")
         assertTrue(lists.isRemoved("zorp") { -1 })
         assertTrue(typedEnoughOnB("zorp", 0))
         b.reload()
-        assertEquals(emptyMap(), b.entries())
+        assertEquals(mapOf("zorp" to Entry(1)), b.entries())
         assertEquals(mapOf("zorp" to 1), b.allowedEntries())
+        assertEquals(listOf("zorp\t1\tallowed\t1"), fileB.readLines())
         assertFalse(lists.isRemoved("zorp") { 0 })
+    }
+
+    // M5: own 3 + confirmed, a borrowed 2, allowed here (typed back), then Remove: 4 (until then the allow wiped the own
+    // row and Remove gave 2)
+    @Test fun `allowing a word here keeps its own strikes and Remove counts on from them`() {
+        fileA.parentFile!!.mkdirs(); fileB.parentFile!!.mkdirs()
+        fileA.writeText("zorp\t2\n")
+        fileB.writeText("zorp\t3\tconfirmed\n")
+        a.reload(); b.reload()
+        assertTrue(lists.isRemoved("zorp") { 2 }, "A's 2 strikes block it on B")
+        // typed 3 times on B (count 2): back by both rules
+        assertTrue(typedEnoughOnB("zorp", 2))
+        b.reload()
+        assertEquals(mapOf("zorp" to Entry(3, true)), b.entries(), "own history kept")
+        assertEquals(mapOf("zorp" to 2), b.allowedEntries())
+        assertEquals(listOf("zorp\t3\tconfirmed\tallowed\t2"), fileB.readLines())
+        assertFalse(lists.isRemoved("zorp") { 2 })
+        assertTrue(lists.isAllowedHere("zorp"))
+        // the Blacklisted words screen lists its own strikes, as before the allow
+        val shown = buildWordLists(script, emptyList(), emptyList(), b.entries())
+        assertEquals(listOf("zorp" to 3), shown.blacklisted.map { it.word to it.strikes })
+        // Remove: own 3 + 1 (more than the borrowed 2), the allowed part gone
+        assertEquals(4, lists.strike("zorp"))
+        b.reload()
+        assertEquals(mapOf("zorp" to Entry(4)), b.entries())
+        assertEquals(emptyMap(), b.allowedEntries())
+        assertEquals(listOf("zorp\t4"), fileB.readLines())
+        assertTrue(lists.isRemoved("zorp") { 100 })
+        assertEquals(Entry(2), a.entry("zorp"), "A's list read only")
+    }
+
+    @Test fun `Un-blacklist of a combined row keeps its allowed part`() {
+        fileA.parentFile!!.mkdirs(); fileB.parentFile!!.mkdirs()
+        fileA.writeText("zorp\t2\n")
+        fileB.writeText("zorp\t3\tconfirmed\tallowed\t2\n")
+        a.reload(); b.reload()
+        assertTrue(b.remove("zorp"))
+        b.reload()
+        assertEquals(emptyMap(), b.entries())
+        assertEquals(mapOf("zorp" to 2), b.allowedEntries())
+        assertEquals(listOf("zorp\tallowed\t2"), fileB.readLines())
+        assertFalse(lists.isRemoved("zorp") { -1 }, "the borrowed block stays lifted")
+    }
+
+    @Test fun `old lines still parse and a combined row round-trips and combines`() {
+        // the lines before (plain, strikes, confirmed, allowed-only)
+        assertEquals("teh" to Entry(1), RemovedWords.parse("teh"))
+        assertEquals("teh" to Entry(2), RemovedWords.parse("teh\t2"))
+        assertEquals("teh" to Entry(3, true), RemovedWords.parse("teh\t3\tconfirmed"))
+        assertNull(RemovedWords.parseAllowed("teh\t3\tconfirmed"))
+        assertNull(RemovedWords.parse("zorp\tallowed\t3"))
+        assertEquals("zorp" to 3, RemovedWords.parseAllowed("zorp\tallowed\t3"))
+        // combined rows
+        for ((entry, line) in listOf(Entry(3, true) to "foo\t3\tconfirmed\tallowed\t2", Entry(1) to "foo\t1\tallowed\t2",
+                Entry(4) to "foo\t4\tallowed\t2")) {
+            assertEquals(line, RemovedWords.formatRow("foo", entry, 2))
+            assertEquals("foo" to entry, RemovedWords.parse(line))
+            assertEquals("foo" to 2, RemovedWords.parseAllowed(line))
+        }
+        assertEquals("foo\t2", RemovedWords.formatRow("foo", Entry(2), null))
+        assertEquals("foo\tallowed\t2", RemovedWords.formatRow("foo", null, 2))
+        // through the file
+        fileB.parentFile!!.mkdirs()
+        fileB.writeText("bar\nfoo\t3\tconfirmed\tallowed\t2\nzorp\tallowed\t1\n")
+        b.reload()
+        assertEquals(mapOf("bar" to Entry(1), "foo" to Entry(3, true)), b.entries())
+        assertEquals(mapOf("foo" to 2, "zorp" to 1), b.allowedEntries())
+        // a restore (combine): the most strikes (confirmed with equal strikes), the higher allowed level, each part
+        b.combine(listOf("foo\t3\tallowed\t4", "bar\t2\tallowed\t1", "zorp\t2\tconfirmed\tallowed\t1", "new\t1\tallowed\t3"))
+        b.reload()
+        assertEquals(mapOf("bar" to Entry(2), "foo" to Entry(3, true), "zorp" to Entry(2, true), "new" to Entry(1)), b.entries())
+        assertEquals(mapOf("foo" to 4, "bar" to 1, "zorp" to 1, "new" to 3), b.allowedEntries())
+        assertEquals(listOf("bar\t2\tallowed\t1", "foo\t3\tconfirmed\tallowed\t4", "new\t1\tallowed\t3",
+            "zorp\t2\tconfirmed\tallowed\t1"), fileB.readLines())
     }
 }

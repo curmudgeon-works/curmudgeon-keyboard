@@ -68,7 +68,9 @@ import java.util.Locale
  *   delete them from your device's personal dictionary" (ticked) says whether it goes from there too (owner 2026-10-12).
  *   An allowed row (RemovedWords: a borrowed block lifted on this keyboard) stays: the delete forgets the count only.
  * - Blacklisted words: the script's long-press Remove list (see RemovedWords), with how often each was removed (its
- *   strikes, which say how it comes back). Delete: the word and its strikes, as if never removed.
+ *   strikes, which say how it comes back; a word allowed here keeps its own strikes in its row and is listed with them,
+ *   owner 2026-10-12: one row holds both). Delete: the word and its strikes, as if never removed (an allowed part of
+ *   its row stays: the borrowed block stays lifted).
  * A further section (another list of the kind) is one more Kind with its action and one more section() in rows().
  * The personal dictionary's own screens (shortcuts, weights, "for all languages", editing) stay reachable from the
  * first screen, and Add a word here is its add dialog.
