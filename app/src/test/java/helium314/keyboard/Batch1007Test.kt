@@ -65,7 +65,7 @@ class Batch1007Test {
         KeyboardTheme.writeUserColors(prefs, name, KeyboardTheme.seedUserColors(ctx, prefs, KeyboardTheme.THEME_CURMUDGEON, false))
         AppearanceDraft.of(ctx).let { draft ->
             KeyboardTheme.deleteUserColors(ctx, prefs, name)
-            draft.accept() // the tick
+            draft.accept(ctx) // the tick
         }
         assertTrue(palette(name).isEmpty())
     }

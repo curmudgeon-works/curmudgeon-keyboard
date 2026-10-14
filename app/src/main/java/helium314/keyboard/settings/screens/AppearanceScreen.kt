@@ -274,12 +274,12 @@ fun AppearanceScreen(
         isPending = { tile -> tileChanged(tile, pendingKeys, pendingFiles) },
     )
     if (askReject) DiscardChangesDialog({ askReject = false }) { draft.reject(ctx); draft = AppearanceDraft.of(ctx) }
-    if (askAccept) SaveChangesDialog({ askAccept = false }) { draft.accept(); draft = AppearanceDraft.of(ctx) }
+    if (askAccept) SaveChangesDialog({ askAccept = false }) { draft.accept(ctx); draft = AppearanceDraft.of(ctx) }
     }
     if (askOnLeave) UnsavedChangesDialog(
         onKeepWorking = { askOnLeave = false },
         onDiscardAndExit = { draft.reject(ctx); askOnLeave = false; onClickBack() },
-        onSaveAndExit = { draft.accept(); askOnLeave = false; onClickBack() },
+        onSaveAndExit = { draft.accept(ctx); askOnLeave = false; onClickBack() },
     )
 }
 

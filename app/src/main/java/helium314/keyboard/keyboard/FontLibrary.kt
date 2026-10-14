@@ -91,7 +91,20 @@ object FontLibrary {
      *  only the keyboard being edited did; the others kept the name and took a font loaded later under it). "default"
      *  is written, not the choice removed: nothing chosen ("auto") reads a loaded font of before ([fileFor]). */
     fun delete(ctx: Context, name: String) {
+        // with Appearance open the delete waits for its Keep: the file is held, and only the edited keyboard lets go of
+        // the font now (its Discard brings it back; 2026-10-10)
+        val draft = helium314.keyboard.settings.AppearanceDraft.activeOrNull()
+        if (draft != null && draft.holdFontDelete(ctx, name)) {
+            val prefs = ctx.prefs()
+            prefs.edit().apply { fontPrefs.forEach { if (prefs.getString(it, null) == PREFIX + name) putString(it, "default") } }.apply()
+            return
+        }
         File(dir(ctx), name).delete()
+        forgetEverywhere(ctx, name)
+    }
+
+    /** Every keyboard and saved theme that chose font [name] goes back to the default. */
+    fun forgetEverywhere(ctx: Context, name: String) {
         val real = ctx.realPrefs()
         fontPrefs.forEach { KeyboardProfiles.replaceValueEverywhere(real, it, PREFIX + name, "default") }
         // and in the saved themes: applying one wrote the gone name again, and a font loaded later under it was taken up

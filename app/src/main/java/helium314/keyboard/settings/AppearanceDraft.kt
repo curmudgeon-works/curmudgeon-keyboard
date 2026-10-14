@@ -26,8 +26,34 @@ class AppearanceDraft private constructor(
     /** A copy of a custom file, with the size and time the live one had (enough to tell a change, no reading). */
     class Saved(val copy: File, val length: Long, val modified: Long)
 
-    /** True when a preference or file in the snapshot's scope differs from it. */
+    // fonts and palettes deleted while the screen is open ("font:<name>", "palette:<name>"): done for good when the changes
+    // are kept, undone with them (Rahul 2026-10-10: "so discard should bring the font back"). Until then a deleted font's
+    // file waits in the snapshot folder, and only the edited keyboard has let go of it.
+    private val held = LinkedHashSet<String>()
+
+    /** Font [name] deleted with the screen open: its file moves into the snapshot folder (out of the font list). False
+     *  when it couldn't be moved: then it's deleted at once, as without the screen. */
+    fun holdFontDelete(ctx: Context, name: String): Boolean {
+        val target = File(File(dir, HELD_FONTS), name)
+        target.parentFile?.mkdirs()
+        if (!File(helium314.keyboard.keyboard.FontLibrary.dir(ctx), name).renameTo(target)) return false
+        held += FONT + name
+        writeHeld(dir, held)
+        version.intValue++
+        return true
+    }
+
+    /** Palette [name] deleted with the screen open: the edited keyboard's part is done (the snapshot puts it back), the
+     *  other keyboards follow only when the changes are kept. */
+    fun holdPaletteDelete(name: String) {
+        held += PALETTE + name
+        writeHeld(dir, held)
+        version.intValue++
+    }
+
+    /** True when a preference or file in the snapshot's scope differs from it, or something was deleted. */
     fun hasChanges(ctx: Context): Boolean {
+        if (held.isNotEmpty()) return true
         if (changedKeys(ctx).isNotEmpty()) return true
         return files.any { (live, saved) ->
             if (saved == null) live.exists() else !live.exists() || live.length() != saved.length || live.lastModified() != saved.modified
@@ -52,6 +78,11 @@ class AppearanceDraft private constructor(
         for ((live, saved) in files) {
             if (saved == null) live.delete()
             else { saved.copy.copyTo(live, overwrite = true); live.setLastModified(saved.modified) }
+        }
+        for (entry in held) if (entry.startsWith(FONT)) { // the deleted fonts come back (palettes: in the snapshot's prefs)
+            val name = entry.removePrefix(FONT)
+            val live = File(helium314.keyboard.keyboard.FontLibrary.dir(ctx), name)
+            if (!live.exists()) File(File(dir, HELD_FONTS), name).renameTo(live)
         }
         AppearanceLooks.applyScreen(ctx, prefs,
             ProfilePreferences(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)) { setId })
@@ -81,8 +112,17 @@ class AppearanceDraft private constructor(
         version.intValue++
     }
 
-    /** Keeps what is on the phone now; only the snapshot goes. */
-    fun accept() = discard()
+    /** Keeps what is on the phone now; only the snapshot goes. Deletes made on the screen are done for good now: every
+     *  keyboard and saved theme lets go of a deleted font, the other keyboards of a deleted palette. */
+    fun accept(ctx: Context) {
+        val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
+        for (entry in held) {
+            if (entry.startsWith(FONT)) helium314.keyboard.keyboard.FontLibrary.forgetEverywhere(ctx, entry.removePrefix(FONT))
+            else if (entry.startsWith(PALETTE))
+                helium314.keyboard.keyboard.KeyboardTheme.followInHiddenSets(ProfilePreferences(real) { setId }, entry.removePrefix(PALETTE), null)
+        }
+        discard() // (the held font files go with the folder)
+    }
 
     private fun discard() {
         dir.deleteRecursively()
@@ -105,6 +145,13 @@ class AppearanceDraft private constructor(
 
         private fun dir(ctx: Context) = File(ctx.filesDir, "appearance_draft")
         private const val PREFS_FILE = "draft_prefs.json" // written last: its presence means a complete snapshot
+        private const val HELD_FILE = "held_deletes.json"
+        private const val HELD_FONTS = "held_fonts"
+        private const val FONT = "font:"
+        private const val PALETTE = "palette:"
+
+        private fun writeHeld(dir: File, held: Collection<String>) =
+            File(dir, HELD_FILE).writeText(org.json.JSONArray(held.toList()).toString())
 
         /** The draft of the open Appearance screen; it outlives the screen's composition (rotation, search). */
         private var active: AppearanceDraft? = null
@@ -118,6 +165,9 @@ class AppearanceDraft private constructor(
 
         /** The screen is left with nothing changed: the snapshot goes (the next visit starts from what is there then). */
         fun close() { active?.discard() }
+
+        /** Tests: the process died with the screen open (the draft's folder stays for [recoverAfterCrash]). */
+        @androidx.annotation.VisibleForTesting internal fun forgetActiveForTest() { active = null }
 
         /** [AppearanceDraft.rebase] of the running draft, if there is one. */
         fun rebaseOpen(ctx: Context, keys: Set<String>) { active?.rebase(ctx, keys) }
@@ -162,7 +212,11 @@ class AppearanceDraft private constructor(
                     val live = File(path)
                     live to (f.optJSONObject(path)?.let { Saved(File(dir, live.name), it.getLong("length"), it.getLong("modified")) })
                 }
-                AppearanceDraft(prefs, files, dir, json.optInt("set", KeyboardProfiles.SHARED)).reject(ctx)
+                val draft = AppearanceDraft(prefs, files, dir, json.optInt("set", KeyboardProfiles.SHARED))
+                // (the deletes made before the crash: undone too, their fonts moved back)
+                runCatching { org.json.JSONArray(File(dir, HELD_FILE).readText()) }.getOrNull()
+                    ?.let { a -> for (i in 0 until a.length()) draft.held += a.getString(i) }
+                draft.reject(ctx)
             }.onFailure { dir.deleteRecursively() }
         }
     }

@@ -548,7 +548,9 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                 if (prefs.getString(Settings.PREF_THEME_COLORS, null) == name) remove(Settings.PREF_THEME_COLORS)
                 if (prefs.getString(Settings.PREF_THEME_COLORS_NIGHT, null) == name) remove(Settings.PREF_THEME_COLORS_NIGHT)
             }
-            followInHiddenSets(prefs, name, null)
+            // with Appearance open the other keyboards let go only when its changes are kept (Discard brings it back; 2026-10-10)
+            val draft = helium314.keyboard.settings.AppearanceDraft.activeOrNull()
+            if (draft != null) draft.holdPaletteDelete(name) else followInHiddenSets(prefs, name, null)
             KeyboardSwitcher.getInstance().setThemeNeedsReload()
         }
 
