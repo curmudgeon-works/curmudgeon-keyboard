@@ -42,6 +42,8 @@ class FullRestoreCheckTest {
     private val protectedDir get() = DeviceProtectedUtils.getFilesDir(ctx)
 
     @Before fun setUp() {
+        // (no native library in tests: the learned words' stores through the test stores, as RestoreMergeItemsTest)
+        helium314.keyboard.latin.personalization.LearnedKeyboards.storeIo = helium314.keyboard.latin.personalization.BodyStoreIo()
         real.edit().clear().commit()
         ctx.protectedPrefs().edit().clear().commit()
         // the device's own data: settings, a learned-words file and a picture, both kinds of files folder
@@ -53,6 +55,7 @@ class FullRestoreCheckTest {
     }
 
     @After fun tearDown() {
+        helium314.keyboard.latin.personalization.LearnedKeyboards.storeIo = helium314.keyboard.latin.personalization.LearnedStoreIo.Native
         idleUntil { !BackupRestoreJob.isRunning }
         real.edit().clear().commit()
         ctx.protectedPrefs().edit().clear().commit()

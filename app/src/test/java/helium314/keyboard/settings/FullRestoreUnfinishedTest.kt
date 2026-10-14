@@ -45,6 +45,8 @@ class FullRestoreUnfinishedTest {
     private val written = File(ctx.cacheDir, "full-restore-written.zip")
 
     @Before fun setUp() {
+        // (no native library in tests: the learned words' stores through the test stores, as RestoreMergeItemsTest)
+        helium314.keyboard.latin.personalization.LearnedKeyboards.storeIo = helium314.keyboard.latin.personalization.BodyStoreIo()
         real.edit().clear().commit()
         ctx.protectedPrefs().edit().clear().commit()
         real.edit().putInt(Settings.PREF_KEY_LONGPRESS_TIMEOUT, 444).commit()
@@ -52,6 +54,7 @@ class FullRestoreUnfinishedTest {
     }
 
     @After fun tearDown() {
+        helium314.keyboard.latin.personalization.LearnedKeyboards.storeIo = helium314.keyboard.latin.personalization.LearnedStoreIo.Native
         FullRestore.afterStep = null
         idleUntil { !BackupRestoreJob.isRunning }
         real.edit().clear().commit()
