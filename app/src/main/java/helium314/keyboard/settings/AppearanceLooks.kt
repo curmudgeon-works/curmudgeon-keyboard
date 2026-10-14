@@ -305,7 +305,9 @@ object AppearanceLooks {
      *  that keyboard's pictures back too (held first). */
     fun applyToOther(ctx: Context, keyboard: helium314.keyboard.latin.settings.SettingsSubtype, look: Look) {
         val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
-        val id = KeyboardProfiles.anyIdIn(real.all, keyboard) ?: return
+        // (one without a set of its own yet reads the shared set, so it was listed: it gets its set now, as opening its
+        // settings gives one, then the change; before, it was skipped; review 2026-10-11 C8)
+        val id = KeyboardProfiles.idFor(real, keyboard)
         val view = helium314.keyboard.latin.settings.ProfilePreferences(real) { id }
         apply(ctx, current(view) + applied(look, SavedItemDefaults.takeNewDefaults(real)), view)
         view.edit { putString(PREF_SELECTED, look.name) }

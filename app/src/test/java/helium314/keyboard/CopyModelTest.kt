@@ -40,6 +40,8 @@ class CopyModelTest {
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
     private val us = SettingsSubtype(Locale.US, "")
     private val fr = "fr:".toSettingsSubtype()
+    /** Enabled, never opened or picked: no set of its own yet, it reads the shared set (review 2026-10-11 C8). */
+    private val de = "de:".toSettingsSubtype()
     private fun view(id: Int) = ProfilePreferences(real) { id }
     private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
 
@@ -47,6 +49,7 @@ class CopyModelTest {
         real.edit().clear()
             .putBoolean("separate_settings_per_keyboard", true)
             .putString("keyboard_profile_ids", JSONObject().put(us.toPref(), 1).put(fr.toPref(), 2).toString())
+            .putInt("keyboard_profile_next_id", 3)
             .commit()
         KeyboardProfiles.loadGroups(real)
     }
@@ -138,7 +141,7 @@ class CopyModelTest {
         real.edit().putString(warm, "new").putString(Settings.PREF_THEME_COLORS, "Warm").commit() // (keyboard 2 reads it from the shared set)
         AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Kept", mapOf(Settings.PREF_THEME_COLORS to "Warm", warm to "old")),
             AppearanceLooks.Look("Updated", mapOf(Settings.PREF_THEME_COLORS to "Warm", warm to "old"))), now = true)
-        helium314.keyboard.keyboard.KeyboardTheme.keepOldPalette(real, "Warm", "Warm", mapOf(warm to "old"), keepOld = listOf(2), keepOldThemes = listOf("Kept"))
+        helium314.keyboard.keyboard.KeyboardTheme.keepOldPalette(real, "Warm", "Warm", mapOf(warm to "old"), keepOld = listOf(fr), keepOldThemes = listOf("Kept"))
         helium314.keyboard.keyboard.KeyboardTheme.updateInSavedThemes(real, real, "Warm", listOf("Updated"))
         val hidden = real.getString(own(2, Settings.PREF_THEME_COLORS), null)!!
         assertTrue(helium314.keyboard.keyboard.KeyboardTheme.isHiddenPalette(hidden))
@@ -155,5 +158,45 @@ class CopyModelTest {
         CustomLabels.number(real, view(1), CustomLabels.Kind.THEME)
         CustomLabels.number(real, view(2), CustomLabels.Kind.THEME)
         assertFalse(draft.hasChanges(ctx))
+    }
+
+    // review 2026-10-11 C8: a ticked keyboard without a set of its own (it reads the shared set, so it is listed) was
+    // skipped; it gets a set at that moment, as opening its settings gives one, and then the change
+    @Test fun `an updated Layout reaches a ticked keyboard that has no set of its own yet`() {
+        real.edit().putString(LayoutPresets.PREF_SELECTED, "Work").commit() // (de reads it from the shared set)
+        LayoutPresets.applyToOther(ctx, de, LayoutPresets.Preset("Work", mapOf(Settings.PREF_SHOW_NUMBER_ROW to true)))
+        assertEquals(3, KeyboardProfiles.anyIdIn(real.all, de))
+        assertEquals(true, real.all[own(3, Settings.PREF_SHOW_NUMBER_ROW)])
+        assertEquals("Work", real.getString(own(3, LayoutPresets.PREF_SELECTED), null))
+        assertNull(real.all[Settings.PREF_SHOW_NUMBER_ROW]) // (the shared set: not changed)
+    }
+
+    @Test fun `an updated theme reaches a ticked keyboard that has no set of its own yet`() {
+        real.edit().putString(AppearanceLooks.PREF_SELECTED, "Sunset").commit()
+        AppearanceLooks.applyToOther(ctx, de, AppearanceLooks.Look("Sunset", mapOf(Settings.PREF_KEY_HORIZONTAL_GAP to 3f)))
+        assertEquals(3, KeyboardProfiles.anyIdIn(real.all, de))
+        assertEquals(3f, real.all[own(3, Settings.PREF_KEY_HORIZONTAL_GAP)])
+        assertEquals("Sunset", real.getString(own(3, AppearanceLooks.PREF_SELECTED), null))
+    }
+
+    @Test fun `an updated popup set reaches a ticked keyboard that has no set of its own yet`() {
+        real.edit().putString(KeyPopupOverrides.PREF_SELECTED_SET, "Mine").commit()
+        applySetToOther(ctx, de, KeyPopupOverrides.UserSet("Mine", "all", null, mapOf("e" to listOf("é")), "q!", "x"), takeNew = true)
+        // (its identity took the set's accents level: the set moved with it)
+        assertEquals(3, KeyboardProfiles.idEntries(real)[de.with(helium314.keyboard.latin.common.Constants.Subtype.ExtraValue.MORE_POPUPS, "all").toPref()])
+        assertEquals(mapOf("e" to listOf("é")), KeyPopupOverrides.load(view(3)))
+        assertEquals("q!", real.getString(own(3, Settings.PREF_SYMBOL_POPUP_MAP), null))
+        assertEquals("Mine", real.getString(own(3, KeyPopupOverrides.PREF_SELECTED_SET), null))
+    }
+
+    @Test fun `a palette saved with new colours - an unticked keyboard with no set of its own yet keeps the old ones`() {
+        val warm = Settings.PREF_USER_COLORS_PREFIX + "Warm"
+        real.edit().putString(warm, "new").putString(Settings.PREF_THEME_COLORS, "Warm").commit() // (de reads it from the shared set)
+        helium314.keyboard.keyboard.KeyboardTheme.keepOldPalette(real, "Warm", "Warm", mapOf(warm to "old"), keepOld = listOf(de), keepOldThemes = emptyList())
+        assertEquals(3, KeyboardProfiles.anyIdIn(real.all, de))
+        val hidden = real.getString(own(3, Settings.PREF_THEME_COLORS), null)!!
+        assertTrue(helium314.keyboard.keyboard.KeyboardTheme.isHiddenPalette(hidden))
+        assertEquals("old", real.getString(Settings.PREF_USER_COLORS_PREFIX + hidden, null))
+        assertEquals("Warm", real.getString(Settings.PREF_THEME_COLORS, null)) // (the shared set: still the palette)
     }
 }

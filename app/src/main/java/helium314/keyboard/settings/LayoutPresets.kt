@@ -204,7 +204,9 @@ object LayoutPresets {
      *  the update dialog (2026-10-11): its settings, its keys, the name, no Custom label. */
     fun applyToOther(ctx: Context, keyboard: SettingsSubtype, preset: Preset) {
         val real = ctx.realPrefs()
-        val id = KeyboardProfiles.anyIdIn(real.all, keyboard) ?: return
+        // (one without a set of its own yet reads the shared set, so it was listed: it gets its set now, as opening its
+        // settings gives one, then the change; before, it was skipped; review 2026-10-11 C8)
+        val id = KeyboardProfiles.idFor(real, keyboard)
         val view = helium314.keyboard.latin.settings.ProfilePreferences(real) { id }
         applySettings(ctx, settingsFor(keyboard, preset, SavedItemDefaults.takeNewDefaults(real)), view)
         view.edit { putString(PREF_SELECTED, preset.name) }

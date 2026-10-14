@@ -395,7 +395,9 @@ internal fun renamePopupSet(ctx: Context, oldName: String, name: String) {
  *  (2026-10-11): its arrangement, accents level, symbols page, map and order, the set's name, no Custom label. */
 internal fun applySetToOther(ctx: Context, keyboard: SettingsSubtype, set: KeyPopupOverrides.UserSet, takeNew: Boolean) {
     val real = ctx.realPrefs()
-    val id = KeyboardProfiles.anyIdIn(real.all, keyboard) ?: return
+    // (one without a set of its own yet reads the shared set, so it was listed: it gets its set now, as opening its
+    // settings gives one, then the change; before, it was skipped; review 2026-10-11 C8)
+    val id = KeyboardProfiles.idFor(real, keyboard)
     val view = helium314.keyboard.latin.settings.ProfilePreferences(real) { id }
     val follows = if (takeNew) set.atDefault else emptySet()
     KeyPopupOverrides.save(view, set.overrides)

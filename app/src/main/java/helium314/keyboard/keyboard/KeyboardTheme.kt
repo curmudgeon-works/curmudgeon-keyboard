@@ -607,20 +607,22 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
         }
 
         /**
-         * Palette [name] was saved with new colours, and the keyboards [keepOld] (set ids) and saved themes [keepOldThemes]
-         * that use it were left unticked in the update dialog (2026-10-11): they keep its colours of before, [old] (the
-         * palette's keys under [oldName] when the editor opened), as one kept copy, "Custom N", off the list.
+         * Palette [name] was saved with new colours, and the keyboards [keepOld] and saved themes [keepOldThemes] that use
+         * it were left unticked in the update dialog (2026-10-11): they keep its colours of before, [old] (the palette's
+         * keys under [oldName] when the editor opened), as one kept copy, "Custom N", off the list. A keyboard without a
+         * set of its own yet gets one now, as opening its settings gives one (review 2026-10-11 C8).
          */
         internal fun keepOldPalette(real: SharedPreferences, name: String, oldName: String, old: Map<String, Any?>,
-                                    keepOld: Collection<Int>, keepOldThemes: Collection<String>) {
+                                    keepOld: Collection<helium314.keyboard.latin.settings.SettingsSubtype>, keepOldThemes: Collection<String>) {
             if (keepOld.isEmpty() && keepOldThemes.isEmpty()) return
             val hidden = nextHiddenPalette(real)
             val prefixes = listOf(Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
             val choices = listOf(Settings.PREF_THEME_COLORS, Settings.PREF_THEME_COLORS_NIGHT)
             val copy = prefixes.mapNotNull { p -> old[p + oldName]?.let { p + hidden to it } }.toMap()
+            val ids = keepOld.map { KeyboardProfiles.idFor(real, it) }
             real.edit().apply {
                 for ((key, value) in copy) KeyboardProfiles.put(this, key, value)
-                for (id in keepOld) for (key in choices) {
+                for (id in ids) for (key in choices) {
                     val view = ProfilePreferences(real) { id }
                     if (view.getString(key, null) == name) putString(KeyboardProfiles.ownKey(id, key), hidden)
                 }

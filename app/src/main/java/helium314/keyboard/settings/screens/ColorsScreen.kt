@@ -139,24 +139,26 @@ fun ColorsScreen(
         paletteEditorSaved(openedName, newThemeName.text)
         onClickBack()
     }
-    /** The other keyboards (with their set ids) and the saved themes that use this palette: none with one set of
+    /** The other keyboards and the saved themes that use this palette: none with one set of
      *  settings or Appearance shared (every keyboard has the change), except the saved themes. */
-    fun paletteUsers(): Pair<List<Pair<helium314.keyboard.latin.settings.SettingsSubtype, Int>>, List<String>> {
+    fun paletteUsers(): Pair<List<helium314.keyboard.latin.settings.SettingsSubtype>, List<String>> {
         val real = ctx.realPrefs()
         val names = setOf(openedName, newThemeName.text)
         val choices = listOf(Settings.PREF_THEME_COLORS, Settings.PREF_THEME_COLORS_NIGHT)
         val themes = helium314.keyboard.settings.AppearanceLooks.load(real).filter { look -> choices.any { look.values[it] in names } }.map { it.name }
         val edited = helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(real, helium314.keyboard.settings.PrefsDraft.currentSetId(ctx))
         if (edited == null || helium314.keyboard.latin.settings.KeyboardProfiles.isShared(real, helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE))
-            return emptyList<Pair<helium314.keyboard.latin.settings.SettingsSubtype, Int>>() to themes
+            return emptyList<helium314.keyboard.latin.settings.SettingsSubtype>() to themes
         // (this keyboard's own copy of the palette: no other keyboard sees the change)
         if ((prefs as? helium314.keyboard.latin.settings.ProfilePreferences)?.writesShared(Settings.PREF_USER_COLORS_PREFIX + newThemeName.text) == false)
-            return emptyList<Pair<helium314.keyboard.latin.settings.SettingsSubtype, Int>>() to themes
+            return emptyList<helium314.keyboard.latin.settings.SettingsSubtype>() to themes
         val palettes = listOf(Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
+        // (one without a set of its own yet reads the shared set: listed too, its set comes when it's left unticked
+        // and keeps the old colours; before, it was left out and took the new ones unasked; review 2026-10-11 C8)
         val keyboards = keyboardsUsing(ctx, choices, edited) { _, v -> v in names }.filter { it != edited }
-            .mapNotNull { kb -> helium314.keyboard.latin.settings.KeyboardProfiles.anyIdIn(real.all, kb)?.let { kb to it } }
             // (a keyboard with its own copy under that name reads its own: not this one)
-            .filter { (_, id) -> names.none { n -> palettes.any { real.contains(helium314.keyboard.latin.settings.KeyboardProfiles.ownKey(id, it + n)) } } }
+            .filter { kb -> val id = helium314.keyboard.latin.settings.KeyboardProfiles.anyIdIn(real.all, kb)
+                id == null || names.none { n -> palettes.any { real.contains(helium314.keyboard.latin.settings.KeyboardProfiles.ownKey(id, it + n)) } } }
         return keyboards to themes
     }
 
@@ -328,14 +330,14 @@ fun ColorsScreen(
     if (askUpdate) {
         val (keyboards, themes) = remember { paletteUsers() }
         helium314.keyboard.settings.dialogs.UpdateSavedItemDialog(KeyboardTheme.paletteName(ctx, newThemeName.text),
-            keyboards.map { keyboardName(it.first, ctx) } + themes.map { ctx.getString(R.string.update_item_theme, it) }, null,
+            keyboards.map { keyboardName(it, ctx) } + themes.map { ctx.getString(R.string.update_item_theme, it) }, null,
             onDismissRequest = { askUpdate = false },
         ) { ticked ->
             val real = ctx.realPrefs()
             val name = newThemeName.text
             val old = paletteKeys(openedName).associateWith { opened[it] }
             KeyboardTheme.keepOldPalette(real, name, openedName, old,
-                keyboards.indices.filter { it !in ticked }.map { keyboards[it].second },
+                keyboards.indices.filter { it !in ticked }.map { keyboards[it] },
                 themes.indices.filter { it + keyboards.size !in ticked }.map { themes[it] })
             KeyboardTheme.updateInSavedThemes(real, prefs, name, themes.indices.filter { it + keyboards.size in ticked }.map { themes[it] })
             askUpdate = false
