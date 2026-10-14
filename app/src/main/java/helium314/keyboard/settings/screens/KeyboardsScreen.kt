@@ -4,7 +4,8 @@ package helium314.keyboard.settings.screens
 import android.content.Context
 import helium314.keyboard.latin.common.Constants.Subtype.ExtraValue
 import helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog
-import helium314.keyboard.settings.dialogs.ImportWordsDialog
+import helium314.keyboard.settings.dialogs.AddKeyboardDialog
+import helium314.keyboard.settings.dialogs.StartSettings
 import java.util.Locale
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -85,13 +86,11 @@ fun KeyboardsScreen(
     val ctx = LocalContext.current
     val advanced by SettingsMode.state(ctx)
     var showAddKeyboard by remember { mutableStateOf(false) }
-    var keyboardToCopy: SettingsSubtype? by remember { mutableStateOf(null) } // asks: its own settings, or the common ones?
     var keyboardToDelete: SettingsSubtype? by remember { mutableStateOf(null) }
     var keyboardMenu: SettingsSubtype? by remember { mutableStateOf(null) } // press and hold: Rename, Delete
     var keyboardToRename: SettingsSubtype? by remember { mutableStateOf(null) }
-    var newKeyboard: SettingsSubtype? by remember { mutableStateOf(null) } // added, asks where its settings come from
-    // added: asks once whether it starts with other keyboards' words (2026-10-10); second: a copy's source
-    var importInto: Pair<SettingsSubtype, SettingsSubtype?>? by remember { mutableStateOf(null) }
+    // a keyboard being added (and the keyboard it's a copy of): one dialog asks its settings and word lists, then adds it
+    var adding: Pair<SettingsSubtype, SettingsSubtype?>? by remember { mutableStateOf(null) }
     val real = ctx.realPrefs()
     // the switch is on App settings > Per keyboard now: read again whenever a setting changes (coming back from there)
     val changed = (ctx.getActivity() as? helium314.keyboard.settings.SettingsActivity)?.prefChanged?.collectAsState()
@@ -281,31 +280,13 @@ fun KeyboardsScreen(
                 confirmButtonText = stringResource(R.string.delete),
             )
         }
-        newKeyboard?.let { added ->
-            val defaults = stringResource(R.string.new_keyboard_default_settings)
-            ListPickerDialog<Any>(
-                onDismissRequest = { newKeyboard = null }, // (nothing added)
-                onItemSelected = { from ->
-                    addNewKeyboard(ctx, added, (from as? SettingsSubtype) ?: SettingsSubtype(Locale.ROOT, DEFAULTS_ONLY))
-                    newKeyboard = null
-                    importInto = added to null
-                    generation++
-                },
-                title = { Text(stringResource(R.string.new_keyboard_copy_settings, keyboardName(added, ctx))) },
-                items = enabledNow + defaults,
-                getItemName = { if (it is SettingsSubtype) keyboardName(it, ctx) else it as String },
-                showRadioButtons = false,
-            )
-        }
         if (showAddKeyboard)
             ListPickerDialog<Any>(
                 onDismissRequest = { showAddKeyboard = false },
                 onItemSelected = { item ->
                     if (item is CopyOf) {
                         showAddKeyboard = false
-                        // with one set of settings for all there is nothing to choose: the copy has them too
-                        if (separate) keyboardToCopy = item.keyboard
-                        else { importInto = copyKeyboard(ctx, item.keyboard, withOwnSettings = false) to item.keyboard; generation++ }
+                        adding = nextNumbered(item.keyboard) to item.keyboard
                         return@ListPickerDialog
                     }
                     val locale = item as Locale
@@ -314,9 +295,7 @@ fun KeyboardsScreen(
                     // listed one keeps its settings
                     val settingsSubtype = if (!enabledNow.contains(plain)) plain else nextNumbered(plain)
                     showAddKeyboard = false
-                    // with its own settings, it asks which keyboard's settings to start from; else it has the shared ones
-                    if (separate) newKeyboard = settingsSubtype
-                    else { addNewKeyboard(ctx, settingsSubtype, null); importInto = settingsSubtype to null; generation++ } // stays here, it appears at the end
+                    adding = settingsSubtype to null // (it appears at the end of the list, the screen stays)
                 },
                 title = { Text(stringResource(R.string.add_keyboard)) },
                 // copies of the keyboards first, then a new keyboard for any language
@@ -324,21 +303,16 @@ fun KeyboardsScreen(
                 getItemName = { if (it is CopyOf) stringResource(R.string.copy_of_keyboard, keyboardName(it.keyboard, ctx)) else (it as Locale).localizedDisplayName(ctx.resources) },
                 showRadioButtons = false,
             )
-        keyboardToCopy?.let { source ->
-            ThreeButtonAlertDialog(
-                onDismissRequest = { keyboardToCopy = null },
-                onConfirmed = { importInto = copyKeyboard(ctx, source, withOwnSettings = true) to source; generation++ },
-                title = { Text(stringResource(R.string.copy_of_keyboard, keyboardName(source, ctx))) },
-                content = { Text(stringResource(R.string.copy_keyboard_message)) },
-                confirmButtonText = stringResource(R.string.copy_keyboard_with_settings),
-                neutralButtonText = stringResource(R.string.copy_keyboard_common_settings),
-                // (the neutral button doesn't close the dialog by itself: re-review 2026-10-07, every tap added a copy)
-                onNeutral = { importInto = copyKeyboard(ctx, source, withOwnSettings = false) to source; generation++; keyboardToCopy = null },
-                confirmFirst = true,
-            )
-        }
-        importInto?.let { (added, copyOf) ->
-            ImportWordsDialog(added, copyOf) { importInto = null }
+        adding?.let { (added, copyOf) ->
+            AddKeyboardDialog(added, copyOf, keyboards = enabledNow,
+                inUse = SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype(),
+                onDismissRequest = { adding = null }, // (nothing added)
+            ) { start, learned, blacklisted ->
+                val keyboard = if (copyOf != null) copyKeyboard(ctx, copyOf) else { addNewKeyboard(ctx, added); added }
+                startSettings(ctx, keyboard, start)
+                startWords(ctx, keyboard, learned, blacklisted)
+                generation++
+            }
         }
     }
 }
@@ -346,10 +320,6 @@ fun KeyboardsScreen(
 /** An Add keyboard entry: a copy of an existing keyboard. */
 private class CopyOf(val keyboard: SettingsSubtype)
 
-/**
- * Adds a copy of [source]: the same languages and layout, told apart by a number; with [withOwnSettings] it takes
- * [source]'s own settings (separate settings), otherwise it starts from the common ones.
- */
 /** [source] with the lowest copy number ("English 2", 3, ...) no listed keyboard has. */
 private fun nextNumbered(source: SettingsSubtype): SettingsSubtype {
     val base = source.without(ExtraValue.KEYBOARD_COPY)
@@ -360,41 +330,45 @@ private fun nextNumbered(source: SettingsSubtype): SettingsSubtype {
     return base.with(ExtraValue.KEYBOARD_COPY, number.toString())
 }
 
-/** @return the copy */
-private fun copyKeyboard(ctx: Context, source: SettingsSubtype, withOwnSettings: Boolean): SettingsSubtype {
-    val real = ctx.realPrefs()
+/** @return the copy (its settings: [startSettings]) */
+private fun copyKeyboard(ctx: Context, source: SettingsSubtype): SettingsSubtype {
     val copy = LayoutUtilsCustom.withOwnPrivateLayouts(nextNumbered(source), ctx) // (its own unnamed keys, not the source's file)
     SubtypeUtilsAdditional.changeAdditionalSubtype(copy, copy, ctx) // registers it
     SubtypeSettings.addEnabledSubtype(ctx.prefs(), copy.toAdditionalSubtype())
-    ownSetSourceFor(real, source, withOwnSettings)?.let { KeyboardProfiles.copy(real, it, KeyboardProfiles.idFor(real, copy)) }
     return copy
 }
 
-/** The set a copied keyboard's own set starts from: the source's or the shared one; null with one set of settings for
- *  all keyboards (re-review 2026-10-07: a copy got a frozen own set then, which came alive, stale, once settings were
- *  made separate). */
-internal fun ownSetSourceFor(real: android.content.SharedPreferences, source: SettingsSubtype, withOwnSettings: Boolean): Int? =
-    if (!KeyboardProfiles.isSeparate(real)) null
-    else if (withOwnSettings) KeyboardProfiles.idFor(real, source) else KeyboardProfiles.SHARED
-
-private const val DEFAULTS_ONLY = "defaults only" // (a marker, never a keyboard)
-
-/**
- * Adds [keyboard] to the list; with separate settings its own set starts as [from]'s (null: the keyboard in use's), or
- * at every default ([DEFAULTS_ONLY]). A source of another script keeps its popups to itself (they're for its letters):
- * the new keyboard has the default popups.
- */
-private fun addNewKeyboard(ctx: Context, keyboard: SettingsSubtype, from: SettingsSubtype?) {
-    val real = ctx.realPrefs()
+/** Adds [keyboard] to the list (its settings: [startSettings]). */
+private fun addNewKeyboard(ctx: Context, keyboard: SettingsSubtype) {
     SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, keyboard, ctx) // registers it unless it equals a built-in one
     SubtypeSettings.addEnabledSubtype(ctx.prefs(), keyboard.toAdditionalSubtype())
-    if (!KeyboardProfiles.isSeparate(real)) return
-    val id = KeyboardProfiles.idFor(real, keyboard)
-    if (from?.extraValues == DEFAULTS_ONLY) { KeyboardProfiles.write(real, id, emptyMap(), markDefaults = true); return }
-    val source = from ?: SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype()
-    KeyboardProfiles.copy(real, KeyboardProfiles.idFor(real, source), id)
-    if (with(helium314.keyboard.latin.utils.ScriptUtils) { source.locale.script() != keyboard.locale.script() }) {
-        val own = helium314.keyboard.latin.settings.ProfilePreferences(real) { id }
-        own.edit().apply { listOf("key_popups", "key_popup_set_selected", Settings.PREF_SYMBOL_POPUP_MAP).forEach { remove(it) } }.apply()
+}
+
+/**
+ * The settings [keyboard] starts from, as picked when it was added: another keyboard's own (as that one reads them now),
+ * the common ones, or every default. With one set for all keyboards the pick is kept for when settings are made separate.
+ * A source of another script keeps its popups to itself (they're for its letters): the new keyboard has the default popups.
+ */
+internal fun startSettings(ctx: Context, keyboard: SettingsSubtype, start: StartSettings) {
+    val real = ctx.realPrefs()
+    val from = when (start) {
+        is StartSettings.From -> KeyboardProfiles.idFor(real, start.keyboard)
+        StartSettings.Common -> KeyboardProfiles.SHARED
+        StartSettings.Defaults -> KeyboardProfiles.START_DEFAULTS
+    }
+    val otherScript = start is StartSettings.From &&
+        with(helium314.keyboard.latin.utils.ScriptUtils) { start.keyboard.locale.script() != keyboard.locale.script() }
+    KeyboardProfiles.startKeyboardFrom(real, KeyboardProfiles.idFor(real, keyboard), from, noPopups = otherScript)
+}
+
+/** [keyboard] takes the learned words of [learned] and the blacklists of [blacklisted] (in the background; a toast says
+ *  how many came in). */
+private fun startWords(ctx: Context, keyboard: SettingsSubtype, learned: List<SettingsSubtype>, blacklisted: List<SettingsSubtype>) {
+    if (learned.isEmpty() && blacklisted.isEmpty()) return
+    val app = ctx.applicationContext
+    helium314.keyboard.latin.personalization.LearnedImport.start(ctx, keyboard, learned, blacklisted) { result ->
+        val text = if (result == null) app.getString(R.string.import_words_failed)
+            else app.getString(R.string.import_words_done, result.learned, result.blacklisted)
+        android.widget.Toast.makeText(app, text, android.widget.Toast.LENGTH_LONG).show()
     }
 }

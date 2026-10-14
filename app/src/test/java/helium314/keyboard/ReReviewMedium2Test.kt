@@ -19,7 +19,8 @@ import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.RemovedWords
 import helium314.keyboard.settings.preferences.restoreFollowUp
-import helium314.keyboard.settings.screens.ownSetSourceFor
+import helium314.keyboard.settings.screens.startSettings
+import helium314.keyboard.settings.dialogs.StartSettings
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -85,12 +86,12 @@ class ReReviewMedium2Test {
 
     // 3
     @Test fun `a copy with one set of settings for all keyboards gets no own set`() {
+        // (since 2026-10-10 the settings picked wait for separate settings, see AddKeyboardTest: still no frozen own set)
         val source = SettingsSubtype(Locale.US, "")
-        assertNull(ownSetSourceFor(real, source, withOwnSettings = true))
-        assertNull(ownSetSourceFor(real, source, withOwnSettings = false))
-        real.edit().putBoolean("separate_settings_per_keyboard", true).commit()
-        assertEquals(KeyboardProfiles.SHARED, ownSetSourceFor(real, source, withOwnSettings = false))
-        assertEquals(KeyboardProfiles.idFor(real, source), ownSetSourceFor(real, source, withOwnSettings = true))
+        val copy = SettingsSubtype(Locale.UK, "")
+        startSettings(ctx, copy, StartSettings.From(source))
+        startSettings(ctx, copy, StartSettings.Common)
+        kotlin.test.assertFalse(KeyboardProfiles.hasOwnSettings(real, copy))
     }
 
     // 4

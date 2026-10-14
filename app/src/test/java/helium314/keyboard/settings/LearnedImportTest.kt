@@ -165,14 +165,15 @@ class LearnedImportTest {
             compose.onNodeWithText(ctx.getString(R.string.add_keyboard)).performClick()
             compose.onNodeWithText(ctx.getString(R.string.copy_of_keyboard, keyboardName(a, ctx))).performClick()
             compose.waitForIdle()
-            val copy = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.last()
-            assertNotEquals(a, copy)
-            compose.onNodeWithText(title(copy)).assertExists()
+            // one dialog (2026-10-10): A's settings and A's two lists picked; nothing added until Add
+            assertEquals(2, SubtypeSettings.getEnabledSubtypes(true).size)
             val boxes = compose.onAllNodes(isToggleable() and hasAnyAncestor(isDialog())) // (the screen has switches)
             boxes[0].assertIsOn(); boxes[1].assertIsOn() // A's
             boxes[2].assertIsOff(); boxes[3].assertIsOff() // B's
-            compose.onNodeWithText(ctx.getString(R.string.import_words_button)).performClick()
+            compose.onNodeWithText(ctx.getString(R.string.add_keyboard_button)).performClick()
             idleUntil { ShadowToast.getTextOfLatestToast() != null }
+            val copy = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.last()
+            assertNotEquals(a, copy)
             val pool = storedPools(real)[copy.toPref()]!!
             assertEquals(setOf("alpha"), io.words(ce, "Latn", pool))
             assertEquals(mapOf("fromA" to RemovedWords.Entry(1)), readList(ce, "Latn", pool))

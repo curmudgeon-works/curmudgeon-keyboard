@@ -34,7 +34,7 @@ object KeyboardProfiles {
         Settings.PREF_CLIPBOARD_HISTORY_SIZE, Settings.PREF_CLIPBOARD_HISTORY_PINNED_FIRST,
         Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_SWIPE_METRICS, Settings.PREF_AUTO_PREVIEW_KEYBOARD, // logs of the user's swiping: one file, one switch
         Settings.PREF_LEARNING_LOG, // and of what corrections do to the learned words
-        PREF_SEPARATE, PREF_IDS, PREF_NEXT_ID,
+        PREF_SEPARATE, PREF_IDS, PREF_NEXT_ID, PREF_START_FROM,
         "key_popup_sets", // saved popup sets are meant to be reused across keyboards
         "appearance_looks", // saved looks too
         "layout_presets", // and saved Layouts
@@ -429,11 +429,46 @@ object KeyboardProfiles {
     @Synchronized
     fun enable(real: SharedPreferences, keyboards: List<SettingsSubtype>, keepExisting: Boolean) {
         helium314.keyboard.latin.utils.SettingsEventLog.log("separate settings ON for ${keyboards.map { it.toPref() }} (keepExisting $keepExisting)")
+        val startFrom = startFrom(real)
         for (keyboard in keyboards) {
             if (keepExisting && hasOwnSettings(real, keyboard)) continue
-            copy(real, SHARED, idFor(real, keyboard))
+            val id = idFor(real, keyboard)
+            // a keyboard added with one set for all starts from the settings picked when it was added
+            val picked = startFrom.optJSONObject(id.toString())
+            if (picked != null) startOwnSet(real, id, picked.optInt("from", SHARED), picked.optBoolean("noPopups"))
+            else copy(real, SHARED, id)
         }
-        real.edit().putBoolean(PREF_SEPARATE, true).apply()
+        real.edit().putBoolean(PREF_SEPARATE, true).remove(PREF_START_FROM).apply()
+    }
+
+    // ---- the settings a keyboard starts from (the Add keyboard dialog, 2026-10-10) ----
+
+    /** A keyboard added while one set of settings is for all: which settings it starts from once they are separate. Rahul
+     *  2026-10-10: Add keyboard always asks, whether settings are separate or not. {set id: {"from": set id or
+     *  [START_DEFAULTS], "noPopups": true when the source is of another script}} */
+    private const val PREF_START_FROM = "keyboard_start_from"
+    /** Start from every default rather than another set. */
+    const val START_DEFAULTS = -1
+
+    private fun startFrom(real: SharedPreferences): JSONObject =
+        runCatching { JSONObject(real.getString(PREF_START_FROM, null) ?: "{}") }.getOrDefault(JSONObject())
+
+    /** Keyboard set [id] starts from set [from] (or every default, [START_DEFAULTS]); [noPopups]: not the source's popups,
+     *  which are for another script's letters. With separate settings now, else when they are turned on ([enable]). */
+    fun startKeyboardFrom(real: SharedPreferences, id: Int, from: Int, noPopups: Boolean) {
+        if (isSeparate(real)) { startOwnSet(real, id, from, noPopups); return }
+        val map = startFrom(real)
+        if (from == SHARED && !noPopups) map.remove(id.toString()) // (what turning them on gives anyway)
+        else map.put(id.toString(), JSONObject().put("from", from).put("noPopups", noPopups))
+        real.edit().apply { if (map.length() == 0) remove(PREF_START_FROM) else putString(PREF_START_FROM, map.toString()) }.apply()
+    }
+
+    /** The source set as it reads now (shared values under its own) becomes set [id]. */
+    private fun startOwnSet(real: SharedPreferences, id: Int, from: Int, noPopups: Boolean) {
+        if (from == START_DEFAULTS) { write(real, id, emptyMap(), markDefaults = true); return }
+        copy(real, from, id)
+        if (noPopups) ProfilePreferences(real) { id }.edit().apply {
+            listOf("key_popups", "key_popup_set_selected", Settings.PREF_SYMBOL_POPUP_MAP).forEach { remove(it) } }.apply()
     }
 
     /** Turn separate settings off; [sharedFrom] = the keyboard whose set becomes the shared one, null keeps the previous shared set. */
