@@ -28,6 +28,9 @@ class LayoutDraft private constructor(
     private val dir: File,
     /** The keyboard (subtype preference string) the screen was opened for. */
     val subtype: String,
+    // the Layout and popup Custom labels stored when the screen opened (any set): Discard takes back the ones handed out
+    // since (review D2); out of [changedKeys], as a label alone is no change of the screen. Null: none taken back
+    private val labels: Set<String>? = null,
 ) {
     fun hasChanges(ctx: Context): Boolean = changedKeys(ctx).isNotEmpty() || layoutsChanged(ctx)
 
@@ -115,6 +118,7 @@ class LayoutDraft private constructor(
         Settings.getValues()?.let { Settings.getInstance().loadSettings(Settings.getCurrentContext(), it.mLocale, it.mInputAttributes) }
         KeyboardLayoutSet.onSystemLocaleChanged()
         runCatching { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+        labels?.let { CustomLabels.removeNew(real, LABELS, it) }
         rejectedSubtype = subtype
         discard()
     }
@@ -191,6 +195,7 @@ class LayoutDraft private constructor(
         private fun dir(ctx: Context) = File(ctx.filesDir, "layout_draft")
         private const val PREFS_FILE = "draft_prefs.json" // written last: its presence means a complete snapshot
         private const val SUB_SAVES_FILE = "sub_screen_saves.json"
+        private val LABELS = listOf(CustomLabels.Kind.LAYOUT, CustomLabels.Kind.POPUPS)
 
         private var active: LayoutDraft? = null
 
@@ -202,8 +207,9 @@ class LayoutDraft private constructor(
         /** The running draft for [subtype], or a fresh snapshot. */
         fun of(ctx: Context, subtype: String): LayoutDraft = active ?: start(ctx, subtype).also { active = it }
 
-        private fun write(dir: File, subtype: String, hasLayouts: Boolean, prefs: Map<String, Any?>) {
+        private fun write(dir: File, subtype: String, hasLayouts: Boolean, prefs: Map<String, Any?>, labels: Set<String>) {
             val json = JSONObject().put("subtype", subtype).put("layouts", hasLayouts)
+            json.put("labels", org.json.JSONArray(labels.toList()))
             json.put("prefs", JSONObject().also { o -> prefs.forEach { (k, v) -> AppearanceLooks.toJson(v)?.let { o.put(k, it) } } })
             File(dir, PREFS_FILE).writeText(json.toString())
         }
@@ -221,6 +227,8 @@ class LayoutDraft private constructor(
         @androidx.annotation.VisibleForTesting internal fun savedSubScreensOnDisk(ctx: Context): List<SubScreen> =
             runCatching { org.json.JSONArray(File(dir(ctx), SUB_SAVES_FILE).readText()) }.getOrNull()
                 ?.let { a -> List(a.length()) { SubScreen.valueOf(a.getString(it)) } } ?: emptyList()
+        /** Tests: the process died with the screen open (the draft's folder stays for [recoverAfterCrash]). */
+        @androidx.annotation.VisibleForTesting internal fun forgetActiveForTest() { active = null }
 
         private fun start(ctx: Context, subtype: String): LayoutDraft {
             helium314.keyboard.latin.utils.SettingsEventLog.log("Layout & Typing snapshot taken for $subtype")
@@ -230,8 +238,9 @@ class LayoutDraft private constructor(
             // copies keep the live files' times, so an unchanged folder compares equal
             copy?.walkTopDown()?.filter { it.isFile }?.forEach { f -> f.setLastModified(File(live, f.relativeTo(copy).path).lastModified()) }
             val prefs = scoped(ctx)
-            write(dir, subtype, copy != null, prefs)
-            return LayoutDraft(prefs, copy, dir, subtype)
+            val labels = CustomLabels.stored(ctx.realPrefs(), LABELS)
+            write(dir, subtype, copy != null, prefs, labels)
+            return LayoutDraft(prefs, copy, dir, subtype, labels)
         }
 
         /** A snapshot left on disk by a process that died with Layout & Typing open: put it back. Called at app start. */
@@ -245,7 +254,9 @@ class LayoutDraft private constructor(
                 val p = json.getJSONObject("prefs")
                 val prefs = p.keys().asSequence().associateWith { AppearanceLooks.fromJson(p.getJSONObject(it)) }
                 val copy = if (json.optBoolean("layouts")) File(dir, "layouts") else null
-                LayoutDraft(prefs, copy, dir, json.getString("subtype")).reject(ctx)
+                // (a snapshot from before review D2 has no "labels": the labels stay as they are now)
+                val labels = json.optJSONArray("labels")?.let { a -> (0 until a.length()).mapTo(HashSet()) { a.getString(it) } }
+                LayoutDraft(prefs, copy, dir, json.getString("subtype"), labels).reject(ctx)
             }.onFailure { dir.deleteRecursively() }
         }
     }

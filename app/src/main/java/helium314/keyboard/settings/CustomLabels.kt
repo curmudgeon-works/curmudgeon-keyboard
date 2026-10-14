@@ -37,6 +37,20 @@ object CustomLabels {
         for (id in ids) number(real, helium314.keyboard.latin.settings.ProfilePreferences(real) { id }, kind)
     }
 
+    /** The stored keys of every set's label of [kinds] (plain or "p<id>/"): what an editing screen records when it
+     *  opens, so its Discard can take back the numbers handed out meanwhile ([removeNew]). */
+    fun stored(real: SharedPreferences, kinds: Collection<Kind>): Set<String> {
+        val keys = kinds.mapTo(HashSet()) { it.key }
+        return real.all.keys.filterTo(HashSet()) { (KeyboardProfiles.splitOwnKey(it)?.second ?: it) in keys }
+    }
+
+    /** Discard: the labels of [kinds] stored now but not in [before] go (review D2: they took numbers, so a keyboard
+     *  needing one later skipped to "Custom 2"); those there before stay as they are. */
+    fun removeNew(real: SharedPreferences, kinds: Collection<Kind>, before: Set<String>) {
+        val added = stored(real, kinds) - before
+        if (added.isNotEmpty()) real.edit(commit = true) { added.forEach { remove(it) } }
+    }
+
     /** The keyboard ([prefs]) has a Custom number for [kind]: its copy, whatever it chose. */
     fun has(prefs: SharedPreferences, kind: Kind) = prefs.getInt(kind.key, 0) > 0
 

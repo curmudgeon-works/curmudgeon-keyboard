@@ -26,6 +26,9 @@ class AppearanceDraft private constructor(
     // themes, each set's theme choice and palettes, so Discard undoes a rename or delete everywhere it reached (owner
     // 2026-10-11: "Every action on an editing screen ... is held until Save; Discard undoes it everywhere it reached")
     private val reached: Map<String, Any?> = emptyMap(),
+    // the theme Custom labels stored when the screen opened (any set): Discard takes back the ones handed out since
+    // (review D2); not part of hasChanges, as a label alone is no change of the screen. Null: none taken back
+    private val labels: Set<String>? = null,
 ) {
     /** A copy of a custom file, with the size and time the live one had (enough to tell a change, no reading). */
     class Saved(val copy: File, val length: Long, val modified: Long)
@@ -55,7 +58,7 @@ class AppearanceDraft private constructor(
         }
         if (added.isEmpty()) return
         files = files + added
-        writeSnapshot(dir, setId, prefs, files, reached)
+        writeSnapshot(dir, setId, prefs, files, reached, labels)
     }
 
     // palettes the palette editor saved while the screen is open (its Save only keeps them, this screen's Save or
@@ -136,6 +139,7 @@ class AppearanceDraft private constructor(
             for ((key, value) in reached) if (now[key] != value) KeyboardProfiles.put(this, key, value)
         }.commit()
         AppearanceLooks.applyScreen(ctx, prefs, ProfilePreferences(real) { setId })
+        labels?.let { CustomLabels.removeNew(real, LABELS, it) }
         discard()
     }
 
@@ -181,6 +185,7 @@ class AppearanceDraft private constructor(
         private const val SUB_SAVES_FILE = "sub_screen_saves.json"
         private const val FONT = "font:"
         private const val PALETTE = "palette:"
+        private val LABELS = listOf(CustomLabels.Kind.THEME)
 
         private fun writeHeld(dir: File, held: Collection<String>) =
             File(dir, HELD_FILE).writeText(org.json.JSONArray(held.toList()).toString())
@@ -226,8 +231,9 @@ class AppearanceDraft private constructor(
             val prefs = currentPrefs(ctx)
             val setId = PrefsDraft.currentSetId(ctx)
             val reached = reachedNow(ctx)
-            writeSnapshot(dir, setId, prefs, files, reached)
-            return AppearanceDraft(prefs, files, dir, setId, reached)
+            val labels = CustomLabels.stored(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx), LABELS)
+            writeSnapshot(dir, setId, prefs, files, reached, labels)
+            return AppearanceDraft(prefs, files, dir, setId, reached, labels)
         }
 
         /** A stored key beyond the edited set that the screen's saved items reach ([reached]): the saved themes; in
@@ -257,8 +263,9 @@ class AppearanceDraft private constructor(
         private fun reachedNow(ctx: Context): Map<String, Any?> =
             helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx).all.filterKeys { reachesBeyond(it) }
 
-        private fun writeSnapshot(dir: File, setId: Int, prefs: Map<String, Any?>, files: Map<File, Saved?>, reached: Map<String, Any?>) {
+        private fun writeSnapshot(dir: File, setId: Int, prefs: Map<String, Any?>, files: Map<File, Saved?>, reached: Map<String, Any?>, labels: Set<String>?) {
             val json = JSONObject().put("set", setId)
+            labels?.let { json.put("labels", org.json.JSONArray(it.toList())) }
             json.put("prefs", JSONObject().also { o -> prefs.forEach { (k, v) -> AppearanceLooks.toJson(v)?.let { o.put(k, it) } } })
             json.put("reached", JSONObject().also { o -> reached.forEach { (k, v) -> AppearanceLooks.toJson(v)?.let { o.put(k, it) } } })
             json.put("files", JSONObject().also { o -> files.forEach { (live, saved) ->
@@ -285,7 +292,9 @@ class AppearanceDraft private constructor(
                 val r = json.optJSONObject("reached")
                 val reached = r?.keys()?.asSequence()?.associateWith { AppearanceLooks.fromJson(r.getJSONObject(it)) }
                     ?: reachedNow(ctx)
-                val draft = AppearanceDraft(prefs, files, dir, json.optInt("set", KeyboardProfiles.SHARED), reached)
+                // (a snapshot from before review D2 has no "labels": the labels stay as they are now)
+                val labels = json.optJSONArray("labels")?.let { a -> (0 until a.length()).mapTo(HashSet()) { a.getString(it) } }
+                val draft = AppearanceDraft(prefs, files, dir, json.optInt("set", KeyboardProfiles.SHARED), reached, labels)
                 // (the deletes made before the crash: undone too, their fonts moved back)
                 runCatching { org.json.JSONArray(File(dir, HELD_FILE).readText()) }.getOrNull()
                     ?.let { a -> for (i in 0 until a.length()) draft.held += a.getString(i) }
