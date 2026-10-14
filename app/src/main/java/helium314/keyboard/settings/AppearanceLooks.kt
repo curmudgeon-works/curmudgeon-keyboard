@@ -339,6 +339,15 @@ object AppearanceLooks {
     }
 
     /** [now]: written before this returns (commit), not in the background. */
+    /** A saved theme renamed to [new], or deleted ([new] null): every keyboard that chose [old] follows, and the open Appearance screen's snapshot (see
+     *  [KeyboardProfiles.replaceValueEverywhere] and [KeyboardProfiles.forgetValueEverywhere]). */
+    fun choiceRenamed(ctx: Context, old: String, new: String?) {
+        val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
+        if (new == null) KeyboardProfiles.forgetValueEverywhere(real, PREF_SELECTED, old)
+        else KeyboardProfiles.replaceValueEverywhere(real, PREF_SELECTED, old, new)
+        AppearanceDraft.followThemeOpen(old, new) // (and the open screen's Discard: review 2026-10-08 area 1 #4)
+    }
+
     fun save(prefs: SharedPreferences, looks: List<Look>, now: Boolean = false) {
         keepBrokenAside(prefs, PREF)
         val arr = JSONArray()

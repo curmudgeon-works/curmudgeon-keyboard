@@ -69,6 +69,18 @@ class AppearanceDraft private constructor(
         helium314.keyboard.latin.utils.SettingsEventLog.log("Appearance snapshot rebased: $keys")
     }
 
+    /** A saved theme renamed to [new] or deleted (null) while the screen is open: the list of themes is no part of the
+     *  snapshot (the rename or delete stays), so the snapshot's choice follows it, as every keyboard's did; else Discard
+     *  or leaving the app named a theme that no longer exists (review 2026-10-08 area 1 #4). Another theme chosen on the
+     *  screen since is still put back. */
+    private fun followTheme(old: String, new: String?) {
+        if (prefs[AppearanceLooks.PREF_SELECTED] != old) return
+        // (absent: put back as "nothing chosen", in a keyboard's own set with its mark, as forgetValueEverywhere left it)
+        prefs = if (new == null) prefs - AppearanceLooks.PREF_SELECTED else prefs + (AppearanceLooks.PREF_SELECTED to new)
+        writeSnapshot(dir, setId, prefs, files)
+        version.intValue++
+    }
+
     /** Keeps what is on the phone now; only the snapshot goes. */
     fun accept() = discard()
 
@@ -109,6 +121,9 @@ class AppearanceDraft private constructor(
 
         /** [AppearanceDraft.rebase] of the running draft, if there is one. */
         fun rebaseOpen(ctx: Context, keys: Set<String>) { active?.rebase(ctx, keys) }
+
+        /** [AppearanceDraft.followTheme] of the running draft, if there is one. */
+        fun followThemeOpen(old: String, new: String?) { active?.followTheme(old, new) }
 
         /** The app is left (or the screen goes to the background) with the screen open: changes not accepted are undone. */
         fun rejectOpen(ctx: Context) { active?.reject(ctx) }
