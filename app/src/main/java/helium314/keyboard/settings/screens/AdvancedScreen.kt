@@ -119,8 +119,10 @@ internal fun appSettingsItems(prefs: android.content.SharedPreferences, real: an
         // before, among the swipe logs on Learning & swiping, shown only while swiping was on)
         Settings.PREF_LOG_SETTINGS,
         // the swipe logs and the learning log, while the Fine-tune screens that show them are hidden: here, advanced only,
-        // so the screens (and with them the search) still reach them (owner 2026-10-14, option B: "fine")
-        *(if (helium314.keyboard.settings.REFINE_MENU_SHOWN) emptyArray() else hiddenMenuLogKeys.toTypedArray()),
+        // so the screens (and with them the search) still reach them (owner 2026-10-14, option B: "fine"); the swipe logs
+        // only while swiping is on, as Fine-tune suggestions shows them (owner 2026-10-14: "yep")
+        *(if (helium314.keyboard.settings.REFINE_MENU_SHOWN) emptyArray() else hiddenMenuLogKeys
+            .filter { it !in swipeLogKeys || swipeLogsShown(prefs) }.toTypedArray()),
         if (BuildConfig.DEBUG || prefs.getBoolean(DebugSettings.PREF_SHOW_DEBUG_SETTINGS, Defaults.PREF_SHOW_DEBUG_SETTINGS))
             SettingsWithoutKey.DEBUG_SETTINGS else null,
         // each keyboard its own settings or one set for all, and with separate settings which menus each keyboard keeps

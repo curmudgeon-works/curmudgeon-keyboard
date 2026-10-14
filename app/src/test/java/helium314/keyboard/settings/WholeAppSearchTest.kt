@@ -15,6 +15,7 @@ import org.junit.Before
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -98,6 +99,26 @@ class WholeAppSearchTest {
         assertFalse(Settings.PREF_GESTURE_TRAIL_THICKNESS in found(term))
         ctx.prefs().edit(commit = true) { putBoolean(Settings.PREF_GESTURE_INPUT, true) }
         assertTrue(Settings.PREF_GESTURE_TRAIL_THICKNESS in found(term))
+    }
+
+    // round-7c review 20261014_L13_2 (owner: "yep"): the swipe logs on App settings only while swiping is on, as the
+    // Fine-tune screen shows them; the learning log always. Fail before: shown with swiping off
+    @Test fun `the swipe logs on App settings only while swiping is on`() {
+        KeyboardProfiles.disable(real)
+        val swipeLogs = listOf(Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_SWIPE_METRICS)
+        ctx.prefs().edit(commit = true) { putBoolean(Settings.PREF_GESTURE_INPUT, false) }
+        val off = appSettingsItems(ctx.prefs(), real)
+        for (key in swipeLogs) {
+            assertFalse(key in off, key)
+            assertFalse(key in found(container[key]!!.title), key)
+        }
+        assertEquals(!REFINE_MENU_SHOWN, Settings.PREF_LEARNING_LOG in off)
+        ctx.prefs().edit(commit = true) { putBoolean(Settings.PREF_GESTURE_INPUT, true) }
+        val on = appSettingsItems(ctx.prefs(), real)
+        for (key in swipeLogs) {
+            assertEquals(!REFINE_MENU_SHOWN, key in on, key)
+            assertTrue(key in found(container[key]!!.title), key) // (App settings, or Fine-tune suggestions)
+        }
     }
 
     // owner 2026-10-14: "Tint them now, to match within screen experience": a result every screen showing it shows only in

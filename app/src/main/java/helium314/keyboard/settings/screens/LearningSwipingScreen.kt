@@ -56,9 +56,15 @@ internal val swipeTuningKeys = listOf(
  *  screen's search find; the tuning and the swipe logs only while swiping is on, as the screen folds them away. */
 internal fun fineTuneSuggestionsKeys(prefs: android.content.SharedPreferences): List<String> =
     listOf(Settings.PREF_SUGGESTION_COUNT, Settings.PREF_SUGGESTION_RULES) +
-        (if (prefs.getBoolean(Settings.PREF_GESTURE_INPUT, Defaults.PREF_GESTURE_INPUT))
-            swipeTuningKeys + listOf(Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_SWIPE_METRICS)
-        else emptyList())
+        (if (swipeLogsShown(prefs)) swipeTuningKeys + swipeLogKeys else emptyList())
+
+/** The two swipe logs (recording the swipe corpus, logging swipe results). */
+internal val swipeLogKeys = listOf(Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_SWIPE_METRICS)
+
+/** Whether the swipe logs (and the tuning) show, with [prefs] of the keyboard edited: only while swiping is on, here and
+ *  on App settings while this screen is hidden (round-7c review 20261014_L13_2, owner: "yep"). */
+internal fun swipeLogsShown(prefs: android.content.SharedPreferences): Boolean =
+    prefs.getBoolean(Settings.PREF_GESTURE_INPUT, Defaults.PREF_GESTURE_INPUT)
 
 /**
  * "Refine swipe and learning" (2026-10-04): the swipe decoder's tuning with the statistics of every tuning
