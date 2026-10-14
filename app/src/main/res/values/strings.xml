@@ -1357,7 +1357,7 @@ New dictionary:
     <!-- preference title for saving the log to a file -->
     <string name="save_log">Save log</string>
     <!-- attribution line for about screen; forks are asked to keep it -->
-    <string name="about_based_on" translatable="false">Based on Curmudgeon Keyboard</string>
+    <string name="about_based_on">Source code</string>
     <!-- description of the attribution line: where the source of this build lives -->
     <string name="about_based_on_summary">Free software under GPL-3.0. The complete source of this build is at github.com/curmudgeon-works/curmudgeon-keyboard, a fork of HeliBoard.</string>
     <!-- license for about screen-->
