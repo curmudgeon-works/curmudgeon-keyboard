@@ -52,6 +52,8 @@ import helium314.keyboard.latin.utils.LayoutType.Companion.displayNameId
 import helium314.keyboard.latin.utils.LayoutUtils
 import helium314.keyboard.latin.utils.LayoutUtilsCustom
 import helium314.keyboard.latin.utils.getActivity
+import helium314.keyboard.latin.utils.mainLayoutNameOrQwerty
+import helium314.keyboard.latin.common.LocaleUtils.localizedDisplayName
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.settings.SettingsActivity
 import org.json.JSONObject
@@ -66,18 +68,29 @@ internal fun layoutFilesSaved() {
     helium314.keyboard.settings.LayoutDraft.subScreenSavedOpen(helium314.keyboard.settings.LayoutDraft.SubScreen.LAYOUT_FILES) // (named in its Discard question)
 }
 
-/** The layouts edited here, one tab each: everything but the letters (own picker). The symbols page too (owner
- *  2026-10-13, JSON-S): the popup editor doesn't edit it, it only chooses one through its presets (e.g. Arabic's). */
+/** The layouts edited here, one tab each: all of them. The letters first (owner 2026-10-13, JSON-L: the keyboard's one
+ *  set of letter keys, as the Keys row also picks it); the symbols page too (JSON-S): the popup editor doesn't edit it,
+ *  it only chooses one through its presets (e.g. Arabic's). */
 private val LAYOUT_FILE_TYPES = listOf(
-    LayoutType.NUMBER_ROW, LayoutType.NUMBER, LayoutType.NUMPAD, LayoutType.NUMPAD_LANDSCAPE, LayoutType.PHONE,
+    LayoutType.MAIN, LayoutType.NUMBER_ROW, LayoutType.NUMBER, LayoutType.NUMPAD, LayoutType.NUMPAD_LANDSCAPE, LayoutType.PHONE,
     LayoutType.PHONE_SYMBOLS, LayoutType.SYMBOLS, LayoutType.MORE_SYMBOLS, LayoutType.FUNCTIONAL, LayoutType.EMOJI_BOTTOM, LayoutType.CLIPBOARD_BOTTOM,
 )
 private const val FILE_FORMAT = "curmudgeon-layouts"
 
+/** The default letters layout of [locale]'s language: its first built-in keyboard's (QWERTY when it has none). */
+internal fun languageDefaultLayout(locale: java.util.Locale): String =
+    helium314.keyboard.latin.utils.SubtypeSettings.getResourceSubtypesForLocale(locale).firstOrNull()?.mainLayoutNameOrQwerty()
+        ?: helium314.keyboard.latin.utils.SubtypeLocaleUtils.QWERTY
+
+/** A tab's name: the letters' as the Keys row's (its own type name is "No language"). */
+private val LayoutType.tabNameId get() = if (this == LayoutType.MAIN) R.string.layout_keys else displayNameId
+
 /**
- * The secondary layouts of one keyboard in one editor, a tab each: what that keyboard uses (its own pick, else its
- * default). Saving changes that keyboard only: each changed layout becomes its own unnamed copy, or the built-in one
- * when edited back to it (2026-10-03: a layout is the keyboard's, like its other settings; no shared file is written).
+ * The layouts of one keyboard in one editor, a tab each: what that keyboard uses (its own pick, else its default; the
+ * letters: its main layout, a built-in one with its language's extra keys). Saving changes that keyboard only: each
+ * changed layout becomes its own unnamed copy, or the built-in one when edited back to it (2026-10-03: a layout is the
+ * keyboard's, like its other settings; no shared file is written). The letters' built-in one is the language's default
+ * letters layout (JSON-L), and their copy is scoped to the keyboard's language, as the Keys row's.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,16 +102,24 @@ fun LayoutFilesScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     rememberSaveable { helium314.keyboard.settings.LayoutDraft.subScreenOpenedOpen(ctx); true }
     // (the type's default built-in, every tab alike: also for a symbols page a popup preset chose, e.g. Arabic's; that
     // one shows as the keyboard uses it, and goes to a copy of its own only once edited)
-    fun builtIn(type: LayoutType) = LayoutUtils.getContent(type, type.default, ctx)
+    // (the letters: the main language's default letters layout, with its extra keys, as the Keys row's editor shows a
+    // built-in one)
+    fun builtInName(type: LayoutType) = if (type != LayoutType.MAIN) type.default else languageDefaultLayout(keyboard.locale)
+    fun builtInContent(type: LayoutType, name: String) =
+        if (type == LayoutType.MAIN) LayoutUtils.getContentWithPlus(name, keyboard.locale, ctx) else LayoutUtils.getContent(type, name, ctx)
+    fun builtIn(type: LayoutType) = builtInContent(type, builtInName(type))
     // the keyboard as it is now (a save here changes its definition)
     fun kb() = helium314.keyboard.latin.utils.SubtypeUtilsAdditional.current(keyboard.toPref()).toSettingsSubtype()
-    // what this keyboard uses for [type]: its own pick (or its own copy), else its default
-    fun usedName(type: LayoutType) = kb().layoutName(type) ?: Settings.readDefaultLayoutName(type, prefs)
+    // what this keyboard uses for [type]: its own pick (or its own copy), else its default (the letters: its main layout)
+    fun usedName(type: LayoutType) = if (type == LayoutType.MAIN) kb().mainLayoutName() ?: builtInName(type)
+        else kb().layoutName(type) ?: Settings.readDefaultLayoutName(type, prefs)
     fun inUse(type: LayoutType): String {
         val name = usedName(type)
-        return if (!LayoutUtilsCustom.isCustomLayout(name)) LayoutUtils.getContent(type, name, ctx)
+        return if (!LayoutUtilsCustom.isCustomLayout(name)) builtInContent(type, name)
             else LayoutUtilsCustom.getLayoutFile(name, type, ctx).takeIf { it.isFile }?.readText() ?: builtIn(type)
     }
+    // a copy's scope: the letters' is their language's (LayoutUtilsCustom.scopeFor), the other types have none
+    fun scope(type: LayoutType) = if (type == LayoutType.MAIN) LayoutUtilsCustom.scopeFor(kb().locale) else ""
     val saved = remember { mutableStateMapOf<LayoutType, String>().apply { LAYOUT_FILE_TYPES.forEach { put(it, inUse(it)) } } }
     val texts = remember { mutableStateMapOf<LayoutType, String>().apply { putAll(saved) } }
     var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -116,10 +137,11 @@ fun LayoutFilesScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
             val text = texts[t]!!
             val current = after.layoutName(t)
             after = when {
-                text == builtIn(t) -> after.withLayout(t, t.default)
-                current != null && LayoutUtilsCustom.isPrivateLayout(current) -> {
+                text == builtIn(t) -> after.withLayout(t, builtInName(t))
+                // (its own copy, rewritten in place: of the letters, only one scoped to its language)
+                current != null && LayoutUtilsCustom.isPrivateLayout(current) && LayoutUtilsCustom.scopeOf(current, t) == scope(t) -> {
                     LayoutUtilsCustom.getLayoutFile(current, t, ctx).writeText(text); after }
-                else -> after.withLayout(t, LayoutUtilsCustom.makePrivateLayout(text, t, "", ctx))
+                else -> after.withLayout(t, LayoutUtilsCustom.makePrivateLayout(text, t, scope(t), ctx))
             }
             saved[t] = text
         }
@@ -145,7 +167,11 @@ fun LayoutFilesScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     if (askBuiltIn) helium314.keyboard.settings.dialogs.ConfirmationDialog(
         onDismissRequest = { askBuiltIn = false },
         title = { Text(stringResource(R.string.layout_files_builtin)) },
-        content = { Text(stringResource(R.string.layout_files_builtin_confirm)) },
+        // (the letters: which built-in keys, for which language, JSON-L)
+        content = { Text(if (type != LayoutType.MAIN) stringResource(R.string.layout_files_builtin_confirm)
+            else stringResource(R.string.layout_files_builtin_confirm_letters,
+                helium314.keyboard.latin.utils.SubtypeLocaleUtils.getLayoutDisplayNameInSystemLocale(builtInName(type), keyboard.locale),
+                keyboard.locale.localizedDisplayName(ctx.resources))) },
         onConfirmed = { texts[type] = builtIn(type) },
     )
     if (askLeave) helium314.keyboard.settings.dialogs.UnsavedChangesDialog(
@@ -174,7 +200,7 @@ fun LayoutFilesScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
             ScrollableTabRow(selectedTabIndex = tab, edgePadding = 8.dp) {
                 LAYOUT_FILE_TYPES.forEachIndexed { i, t ->
                     val mark = if (t in invalid) " !" else if (t in changed) " •" else ""
-                    Tab(selected = i == tab, onClick = { tab = i }, text = { Text(stringResource(t.displayNameId) + mark) })
+                    Tab(selected = i == tab, onClick = { tab = i }, text = { Text(stringResource(t.tabNameId) + mark) })
                 }
             }
             OutlinedTextField(

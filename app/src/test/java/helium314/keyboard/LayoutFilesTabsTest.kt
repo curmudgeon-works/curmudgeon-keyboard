@@ -49,7 +49,7 @@ import kotlin.test.assertTrue
 
 /**
  * "Customize keys and popups with JSON" (the layout files screen), its new tabs through the screen itself: the symbols
- * page (JSON-S, owner 2026-10-13), saved by the same rule as the other tabs: changed text, the keyboard's own unnamed
+ * page (JSON-S) and the letters (JSON-L, owner 2026-10-13), saved by the same rule as the other tabs: changed text, the keyboard's own unnamed
  * copy; the built-in text, the built-in layout.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -96,6 +96,31 @@ class LayoutFilesTabsTest {
         compose.onNodeWithContentDescription(ctx.getString(R.string.appearance_accept)).performClick()
         compose.onNode(hasText(ctx.getString(R.string.appearance_accept_all)) and hasAnyAncestor(isDialog())).performClick()
         compose.waitForIdle()
+    }
+
+    // fail before (JSON-L): there was no letters tab, the screen opened on the number row
+    @Test fun `the Keys tab comes first with the keyboard's letters, saves its own copy, and Built-in names layout and language`() {
+        show()
+        val default = helium314.keyboard.settings.screens.languageDefaultLayout(Locale.US)
+        val builtIn = LayoutUtils.getContentWithPlus(default, Locale.US, ctx)
+        assertEquals(builtIn, fieldText()) // (the first tab, open)
+        field().performTextReplacement("$builtIn\n"); compose.waitForIdle()
+        saveWithTick()
+        val name = kbNow().mainLayoutName()!!
+        assertTrue(LayoutUtilsCustom.isPrivateLayout(name), "not the keyboard's own copy: $name")
+        assertEquals(LayoutUtilsCustom.scopeFor(Locale.US), LayoutUtilsCustom.scopeOf(name, LayoutType.MAIN))
+        assertEquals("$builtIn\n", LayoutUtilsCustom.getLayoutFile(name, LayoutType.MAIN, ctx).readText())
+        // Built-in: asks, naming the layout and the language; then the built-in layout again once saved
+        compose.onNodeWithText(ctx.getString(R.string.layout_files_builtin)).performClick()
+        val language = Locale.US.let { with(helium314.keyboard.latin.common.LocaleUtils) { it.localizedDisplayName(ctx.resources) } }
+        compose.onNode(hasText(ctx.getString(R.string.layout_files_builtin_confirm_letters,
+            helium314.keyboard.latin.utils.SubtypeLocaleUtils.getLayoutDisplayNameInSystemLocale(default, Locale.US), language))
+            and hasAnyAncestor(isDialog())).assertExists()
+        compose.onNode(hasText(ctx.getString(android.R.string.ok)) and hasAnyAncestor(isDialog())).performClick()
+        compose.waitForIdle()
+        assertEquals(builtIn, fieldText())
+        saveWithTick()
+        assertEquals(default, kbNow().mainLayoutName())
     }
 
     // fail before: there was no Symbols tab
