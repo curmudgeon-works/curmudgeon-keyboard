@@ -6,6 +6,8 @@
     <string name="saving_guide_summary">What choosing, editing, deleting, restoring and updating do to your Layouts, themes and word lists</string>
 
     <!-- tabs -->
+    <!-- owner 2026-10-14: "Screen should open on summary each time yes" -->
+    <string name="saving_tab_summary">Summary</string>
     <string name="saving_tab_choose">Choose</string>
     <string name="saving_tab_edit">Edit</string>
     <string name="saving_tab_save_new">Save as new</string>
@@ -38,6 +40,20 @@
     <string name="saving_kind_emoji">Emoji recents</string>
     <string name="saving_kind_everything">Everything</string>
 
+    <!-- Summary (2026-10-14) -->
+    <string name="saving_summary_save_discard_title">Screens with Save and Discard</string>
+    <string name="saving_summary_save_discard_text">Appearance, Layout &amp; typing, Text correction, Swipe and the Fine-tune screens hold your changes until you save or leave, with the changed settings in italics. Every other screen saves a change at once.</string>
+    <string name="saving_summary_keeps_on_title">Leaving a screen keeps your changes: on</string>
+    <string name="saving_summary_keeps_on_text">Back, Save and leaving the app keep your changes without asking. Only Discard asks, and then undoes them. On to start with; the switch is in App settings (advanced).</string>
+    <string name="saving_summary_keeps_off_title">Leaving a screen keeps your changes: off</string>
+    <string name="saving_summary_keeps_off_text">Back and Save ask first. Leaving the app, or closing the settings window, undoes the changes you didn\'t save.</string>
+    <string name="saving_summary_editors_title">Editors opened from those screens</string>
+    <string name="saving_summary_editors_text">The palette editor and Customize popups have their own Save and Discard and always ask, whatever the switch. Leaving the app undoes what you hadn\'t saved there. What you saved stays.</string>
+    <string name="saving_summary_saved_items_title">Saved Layouts, themes and popup sets</string>
+    <string name="saving_summary_saved_items_text">Changing a setting changes this keyboard only, shown as \"Custom · from Sunset\". The saved item changes only with its save icon in the list.</string>
+    <string name="saving_summary_one_or_all_title">One keyboard or all</string>
+    <string name="saving_summary_one_or_all_text">With separate settings on, a change stays on the keyboard you\'re editing. Off, every keyboard uses the first keyboard\'s settings, so a change reaches all of them. Backup, restore, app update and factory reset each have their own tab.</string>
+
     <!-- Choose -->
     <string name="saving_choose_layouts">Puts all its settings and keys on this keyboard. The built-in Layouts always follow the latest defaults.</string>
     <string name="saving_choose_themes">Puts its colors, fonts, pictures and look on this keyboard.</string>
@@ -49,9 +65,9 @@
     <string name="saving_choose_saved_defaults">A saved item\'s settings that were at their default when saved: with \"Saved items take new defaults\" on they take today\'s defaults, off they apply as saved. Flipping the switch changes the keyboards using them at once, switched-off ones too; if a popup set\'s accents would make two keyboards the same, you\'re asked first, and OK gives the lower one the next number. With it off, a setting still at the value the keyboard\'s chosen item kept for its default is saved at its default again (the save icon, Save as new).</string>
 
     <!-- Edit -->
-    <string name="saving_edit_items">Changes stay on this keyboard, shown as \"Custom · from Sunset\". The saved item changes only with its save icon in the list, which asks which other keyboards using it get the change. Everything waits for the screen\'s Save; Discard undoes it everywhere.</string>
-    <string name="saving_edit_popups">Key edits stay on this keyboard, as for Layouts and themes; the set changes only with its save icon. Saved Layouts holding the set are listed with ticks too.</string>
-    <string name="saving_edit_palettes">Edited in the palette editor: every keyboard and saved theme using it changes. If others use it, its Save asks for each, switched-off keyboards too: the new colors, the default ones, or the old ones kept as the next number, \"Warm 2\", one for all that keep them. Discard there, or on Appearance, undoes it all.</string>
+    <string name="saving_edit_items">Changes stay on this keyboard, shown as \"Custom · from Sunset\". The saved item changes only with its save icon in the list, which asks which other keyboards using it get the change. Everything waits for the screen\'s Save, or for leaving the screen while \"Leaving a screen keeps your changes\" is on; Discard undoes it everywhere.</string>
+    <string name="saving_edit_popups">Key edits stay on this keyboard, as for Layouts and themes; the set changes only with its save icon. Saved Layouts holding the set are listed with ticks too. Customize popups always asks before you leave it, and leaving the app undoes what it hadn\'t saved.</string>
+    <string name="saving_edit_palettes">Edited in the palette editor: every keyboard and saved theme using it changes. If others use it, its Save asks for each, switched-off keyboards too: the new colors, the default ones, or the old ones kept as the next number, \"Warm 2\", one for all that keep them. Discard there, or on Appearance, undoes it all. Leaving the app undoes what the editor hadn\'t saved, whatever the switch.</string>
     <string name="saving_edit_key_layouts">Edits the layout file: every keyboard using it changes. Layout &amp; Typing\'s Discard undoes it.</string>
     <string name="saving_edit_keyboards">With separate settings, each keyboard\'s settings are its own; with one set of settings (the first keyboard\'s), a change reaches every keyboard.</string>
 
@@ -72,7 +88,7 @@
     <string name="saving_delete_pictures">Off the picture list; keyboards and themes keep their copies.</string>
     <string name="saving_delete_key_layouts">Off the list. Every keyboard using it keeps its keys as an unsaved layout of its own, whether it chose it or had it as the default for that part.</string>
     <string name="saving_delete_keyboards">Its learned and blacklisted words go too. Keyboards reading them (\"Use lists from other keyboards\") are named, and one you pick can take them, merged into its own.</string>
-    <string name="saving_delete_dictionaries">Only if no other keyboard has the language; if one does, you can turn the language off on this keyboard instead.</string>
+    <string name="saving_delete_dictionaries">One no keyboard uses is deleted. One in use: if only this keyboard uses it and the language has another version, \"Replace with … and delete this one\" does both; otherwise select another version for the keyboards using it first. A language\'s only dictionary can\'t be deleted while a keyboard uses the language.</string>
     <string name="saving_delete_learned">Delete in the Learned list: gone as if never typed, also for keyboards reading this list.</string>
     <string name="saving_delete_blacklisted">Delete in the Blacklisted list: the word can be suggested again.</string>
     <string name="saving_delete_personal">Remove (long-press a suggestion) deletes it there too, with the learned word, and blacklists it on this keyboard.</string>

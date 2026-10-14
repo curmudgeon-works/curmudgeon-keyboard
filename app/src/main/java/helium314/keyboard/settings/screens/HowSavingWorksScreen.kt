@@ -40,6 +40,15 @@ internal class SavingRow(@StringRes val kind: Int, @StringRes val text: Int)
 internal class SavingTab(@StringRes val title: Int, val rows: List<SavingRow>)
 
 internal val savingGuide: List<SavingTab> = listOf(
+    // owner 2026-10-14: "Screen should open on summary each time yes": first, so a fresh open starts on it
+    SavingTab(R.string.saving_tab_summary, listOf(
+        SavingRow(R.string.saving_summary_save_discard_title, R.string.saving_summary_save_discard_text),
+        SavingRow(R.string.saving_summary_keeps_on_title, R.string.saving_summary_keeps_on_text),
+        SavingRow(R.string.saving_summary_keeps_off_title, R.string.saving_summary_keeps_off_text),
+        SavingRow(R.string.saving_summary_editors_title, R.string.saving_summary_editors_text),
+        SavingRow(R.string.saving_summary_saved_items_title, R.string.saving_summary_saved_items_text),
+        SavingRow(R.string.saving_summary_one_or_all_title, R.string.saving_summary_one_or_all_text),
+    )),
     SavingTab(R.string.saving_tab_choose, listOf(
         SavingRow(R.string.saving_kind_layouts, R.string.saving_choose_layouts),
         SavingRow(R.string.saving_kind_themes, R.string.saving_choose_themes),
@@ -174,6 +183,8 @@ internal val savingGuide: List<SavingTab> = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HowSavingWorksScreen(onClickBack: () -> Unit) {
+    // (2026-10-14) each opening is a new back stack entry, so this starts on Summary (0) every time; saveable only
+    // keeps the tab over a rotation
     var tab by rememberSaveable { mutableIntStateOf(0) }
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
