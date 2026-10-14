@@ -40,4 +40,22 @@ object OnDemandDictionaries {
 
     /** The page, at [locale]'s entry. */
     fun pageFor(locale: Locale) = "$PAGE#${locale.toLanguageTag()}"
+
+    /** Our dictionaries' own file type (dl.curmudgeon.works serves them with it; the app's .dict filter declares it). */
+    const val MIME_TYPE = "application/x-curmudgeon-dict"
+
+    /**
+     * The file picker for a dictionary: in Downloads, showing ours (their own type, which a picker set to octet-stream
+     * hid) and any other .dict. The keyboard has no internet permission (owner 2026-10-10: "Let's skip internet access"):
+     * the browser downloads, this or Chrome's Downloads brings the file in.
+     */
+    fun pickerIntent(): android.content.Intent = android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT)
+        .addCategory(android.content.Intent.CATEGORY_OPENABLE)
+        .setType("*/*")
+        .putExtra(android.content.Intent.EXTRA_MIME_TYPES, arrayOf("application/octet-stream", MIME_TYPE))
+        .apply {
+            if (android.os.Build.VERSION.SDK_INT >= 26)
+                putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI,
+                    android.net.Uri.parse("content://com.android.externalstorage.documents/document/primary%3ADownload"))
+        }
 }

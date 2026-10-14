@@ -96,11 +96,9 @@ fun DictionaryDialog(
             }
         },
         scrollContent = true,
-        neutralButtonText = stringResource(R.string.add_new_dictionary_title),
+        neutralButtonText = stringResource(R.string.add_dictionary_from_downloads),
         onNeutral = {
-            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
-                .addCategory(Intent.CATEGORY_OPENABLE)
-                .setType("application/octet-stream")
+            val intent = helium314.keyboard.latin.utils.OnDemandDictionaries.pickerIntent()
             picker.launch(intent)
         }
     )

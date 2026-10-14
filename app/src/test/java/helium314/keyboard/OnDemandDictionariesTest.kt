@@ -48,4 +48,12 @@ class OnDemandDictionariesTest {
         val bundledCopy = File(en, "main.dict").apply { writeText("x") }
         assertFalse(keepUnbundledMainDict(ctx, en, bundledCopy)) // still built in: cleared as before
     }
+
+    @Test fun `the dictionary picker opens in Downloads and shows our downloads, not only generic files`() {
+        val intent = OnDemandDictionaries.pickerIntent()
+        val types = intent.getStringArrayExtra(android.content.Intent.EXTRA_MIME_TYPES)!!.toList()
+        assertTrue(OnDemandDictionaries.MIME_TYPE in types && "application/octet-stream" in types) // (octet-stream alone hid ours)
+        assertEquals("content://com.android.externalstorage.documents/document/primary%3ADownload",
+            intent.getParcelableExtra<android.net.Uri>(android.provider.DocumentsContract.EXTRA_INITIAL_URI).toString())
+    }
 }

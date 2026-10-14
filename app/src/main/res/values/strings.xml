@@ -586,6 +586,8 @@
     <string name="dictionary_get_ours">Get the %1$s dictionary from curmudgeon.works (%2$s)</string>
     <!-- Welcome wizard, last step: heading over links to download dictionaries for the phone's languages -->
     <string name="setup_dictionaries_title">Dictionaries for your languages</string>
+    <!-- Dictionary dialog button: pick a downloaded dictionary file (opens the file picker in Downloads) -->
+    <string name="add_dictionary_from_downloads">Add from Downloads</string>
     <string name="add_keyboard_dialog_title">Add %s</string>
     <!-- Add keyboard dialog: the button that adds it -->
     <string name="add_keyboard_button">Add</string>
