@@ -61,7 +61,7 @@ class App : Application() {
         val scope = CoroutineScope(Dispatchers.Default)
         scope.launch { // do some uncritical work in background for faster startup
             SupportedEmojis.load(this@App)
-            // an extracted dictionary of a language no longer built in (Hindi since 2026-10-10) becomes the user's own
+            // an extracted dictionary of a language no longer built in (Hindi was, 2026-10-10 to -11) becomes the user's own
             // copy: the update itself may not clear extracted dictionaries, and only own copies count as a dictionary
             helium314.keyboard.latin.utils.DictionaryInfoUtils.getCacheDirectories(this@App).forEach { dir ->
                 dir.listFiles()?.forEach { runCatching { helium314.keyboard.latin.keepUnbundledMainDict(this@App, dir, it) } }

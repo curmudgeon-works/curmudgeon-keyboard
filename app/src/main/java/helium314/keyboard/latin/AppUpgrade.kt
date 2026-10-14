@@ -445,7 +445,7 @@ fun transferOldPinnedClips(context: Context) {
 }
 
 /**
- * An extracted main dictionary whose language the app no longer has built in (Hindi, on-demand since 2026-10-10): it
+ * An extracted main dictionary whose language the app no longer has built in (Hindi was, 2026-10-10 to -11): it
  * becomes the user's own copy instead of going, else that keyboard lost its dictionary with the update. True if kept.
  */
 internal fun keepUnbundledMainDict(context: Context, dir: java.io.File, file: java.io.File): Boolean {

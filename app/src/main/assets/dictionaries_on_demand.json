@@ -56,13 +56,6 @@
   "licence": "CC BY 4.0"
  },
  {
-  "tag": "hi",
-  "name": "Hindi",
-  "file": "main_hi.dict",
-  "bytes": 2340536,
-  "licence": "CC BY 4.0"
- },
- {
   "tag": "id",
   "name": "Indonesian",
   "file": "main_id.dict",
