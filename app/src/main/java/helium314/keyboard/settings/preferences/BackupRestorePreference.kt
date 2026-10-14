@@ -1206,9 +1206,11 @@ private fun replaceEverythingChecked(ctx: Context, file: File) = keepingPhoneCho
                 // as stored, not through a keyboard's view (2026-10-11: with no common set the view put the backup's
                 // plain keys into the first keyboard's set; the follow-up's upgrade step deals with an old common set)
                 val prefs = ctx.realPrefs()
-                prefs.edit { clear() }
+                // (the flag in the same edit as the clear (review 2026-10-12 L2): never a moment, nor a crash, with the
+                // settings wiped and the flag gone)
+                prefs.edit(commit = true) { clear(); putBoolean(FullRestore.PREF_UNFINISHED, true) }
                 readJsonLinesToSettings(prefLines, prefs)
-                FullRestore.mark(prefs, true) // (the clear took it; a backup never has it, and never brings it)
+                FullRestore.mark(prefs, true) // (a backup never has it, and never brings it: one made by hand neither)
             } else if (entry.name == PROTECTED_PREFS_FILE_NAME) {
                 val prefLines = String(zip.readBytes()).split("\n")
                 restoreProtectedPrefs(ctx, prefLines)
