@@ -227,7 +227,7 @@ fun LayoutFilesScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
             )
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
                 // (only asks when the tab's text would be lost: already the built-in one, nothing to do)
-                TextButton(onClick = { if (texts[type] != builtIn(type)) askBuiltIn = true }) { Text(stringResource(R.string.layout_files_builtin)) }
+                TextButton(onClick = { if (texts[type] != builtIn(type)) askBuiltIn = true }) { Text(stringResource(R.string.layout_files_builtin_button)) }
             }
         }
     }

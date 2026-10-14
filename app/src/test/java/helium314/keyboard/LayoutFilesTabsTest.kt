@@ -111,7 +111,12 @@ class LayoutFilesTabsTest {
         assertEquals(LayoutUtilsCustom.scopeFor(Locale.US), LayoutUtilsCustom.scopeOf(name, LayoutType.MAIN))
         assertEquals("$builtIn\n", LayoutUtilsCustom.getLayoutFile(name, LayoutType.MAIN, ctx).readText())
         // Built-in: asks, naming the layout and the language; then the built-in layout again once saved
-        compose.onNodeWithText(ctx.getString(R.string.layout_files_builtin)).performClick()
+        // (20261013_BUILTIN-WORD, owner "App's original makes sense": fail before, the button read "Built-in" and the
+        // question "the built-in QWERTY keys")
+        compose.onNodeWithText("App's original").assertExists()
+        compose.onNodeWithText(ctx.getString(R.string.layout_files_builtin_button)).performClick()
+        compose.onNode(hasText("Replace this tab with the original ", substring = true)
+            and hasText(" that came with the app? Your changes in it will be lost.", substring = true) and hasAnyAncestor(isDialog())).assertExists()
         val language = Locale.US.let { with(helium314.keyboard.latin.common.LocaleUtils) { it.localizedDisplayName(ctx.resources) } }
         compose.onNode(hasText(ctx.getString(R.string.layout_files_builtin_confirm_letters,
             helium314.keyboard.latin.utils.SubtypeLocaleUtils.getLayoutDisplayNameInSystemLocale(default, Locale.US), language))
@@ -155,7 +160,7 @@ class LayoutFilesTabsTest {
         val builtIn = fieldText()
         field().performTextReplacement("$builtIn\n"); compose.waitForIdle()
         saveWithTick()
-        compose.onNodeWithText(ctx.getString(R.string.layout_files_builtin)).performClick()
+        compose.onNodeWithText(ctx.getString(R.string.layout_files_builtin_button)).performClick()
         compose.onNode(hasText(ctx.getString(R.string.layout_files_builtin_confirm)) and hasAnyAncestor(isDialog())).assertExists()
         compose.onNode(hasText(ctx.getString(android.R.string.ok)) and hasAnyAncestor(isDialog())).performClick()
         compose.waitForIdle()
@@ -177,7 +182,7 @@ class LayoutFilesTabsTest {
         val arabicPage = LayoutUtils.getContent(LayoutType.SYMBOLS, "symbols_arabic", ctx)
         assertEquals(arabicPage, fieldText())
         field().performTextReplacement("$arabicPage\n"); compose.waitForIdle()
-        compose.onNodeWithText(ctx.getString(R.string.layout_files_builtin)).performClick()
+        compose.onNodeWithText(ctx.getString(R.string.layout_files_builtin_button)).performClick()
         compose.onNode(hasText(ctx.getString(R.string.layout_files_builtin_confirm_symbols, ctx.getString(R.string.key_popups_preset_arabic)))
             and hasAnyAncestor(isDialog())).assertExists()
         compose.onNode(hasText(ctx.getString(android.R.string.ok)) and hasAnyAncestor(isDialog())).performClick()

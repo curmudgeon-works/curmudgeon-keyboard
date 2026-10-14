@@ -446,11 +446,13 @@
     <!-- Name under which an edited layout is kept as the user's own -->
     <string name="layout_files_own_name">My layout</string>
     <string name="layout_files_builtin">Built-in</string>
-    <string name="layout_files_builtin_confirm">Replace this tab with the built-in layout? Your changes in it will be lost.</string>
+    <!-- The layout files screen's button that puts the tab's layout that came with the app back (asks first) -->
+    <string name="layout_files_builtin_button">App\'s original</string>
+    <string name="layout_files_builtin_confirm">Replace this tab with the original layout that came with the app? Your changes in it will be lost.</string>
     <!-- the same on the Symbols tab of a keyboard whose popup preset chose a symbols page: %s the preset (e.g. Arabic) -->
-    <string name="layout_files_builtin_confirm_symbols">Replace this tab with the built-in symbols page of %s? Your changes in it will be lost.</string>
+    <string name="layout_files_builtin_confirm_symbols">Replace this tab with the original symbols page of %s (from the app)? Your changes in it will be lost.</string>
     <!-- the same on the letters' tab (Keys): %1$s the built-in layout (e.g. QWERTY), %2$s the keyboard's main language -->
-    <string name="layout_files_builtin_confirm_letters">Replace this tab with the built-in %1$s keys for %2$s? Your changes in it will be lost.</string>
+    <string name="layout_files_builtin_confirm_letters">Replace this tab with the original %1$s keys for %2$s that came with the app? Your changes in it will be lost.</string>
     <string name="layout_files_load">Load file</string>
     <string name="layout_files_export">Save to file</string>
     <string name="layout_files_loaded">Layouts loaded. Save to use them.</string>
