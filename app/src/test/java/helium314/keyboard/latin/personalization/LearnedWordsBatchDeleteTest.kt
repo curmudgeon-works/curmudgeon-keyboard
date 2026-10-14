@@ -138,7 +138,7 @@ class LearnedWordsBatchDeleteTest {
         assertEquals(setOf("teh", "hte", "adn"), blacklist.entries().keys)
     }
 
-    @Test fun `Back and the cross leave selection mode, not the screen; a tap outside it asks about that word`() {
+    @Test fun `Back and the cross leave selection mode, not the screen - a tap outside it asks about that word`() {
         learn("alpha", "beta")
         show(blacklisted = false, firstWord = "alpha")
         hold("alpha")
