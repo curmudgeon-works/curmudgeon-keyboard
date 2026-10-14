@@ -330,11 +330,11 @@ fun SubtypeScreen(
         } },
         // the screen's name (the keyboard's name goes under it when settings are separate per keyboard)
         title = { Text(stringResource(R.string.settings_screen_preferences)) },
-        // its search: the settings of the app's list it shows, the advanced ones on the advanced tint (owner 2026-10-13,
-        // SEARCH-SCOPE: "Every screen should have a search bar"; before, none)
+        // its search: the settings of the app's list it shows, the advanced ones too, none on the advanced tint (owner
+        // 2026-10-13, SEARCH-SCOPE: "Every screen should have a search bar"; before, none; owner 2026-10-14, round-7
+        // review 20261013_L1_3: "Remove the tint entirely from all screens' searches")
         itemContent = { setting -> androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.LocalSettingsMenu provides null) {
-            if (setting.key in layoutScreenAdvancedKeys(prefs)) helium314.keyboard.settings.AdvancedTint { setting.Preference() }
-            else setting.Preference()
+            setting.Preference()
         } },
         filteredItems = { term -> helium314.keyboard.settings.screenSearch(term, helium314.keyboard.settings.screenSettings(
             layoutScreenKeys(prefs, ctx), ctx.realPrefs(), menuOfScreen)) }
@@ -784,15 +784,12 @@ private val previewedSwitches = listOf(
 private val advancedInputItems = listOf(Settings.PREF_LONG_PRESS_SYMBOL_ACTION, SettingsWithoutKey.ABC_AFTER) // (emoji descriptions: Appearance, Emoji group)
 
 /** The settings of the app's list Layout & Typing shows, as its search finds them (owner 2026-10-13, SEARCH-SCOPE): the
- *  rows drawn from the list, simple and advanced ([layoutScreenAdvancedKeys]). */
+ *  rows drawn from the list, simple and then advanced (the ones in its advanced blocks). */
 internal fun layoutScreenKeys(prefs: android.content.SharedPreferences, ctx: Context): List<String> = listOf(
     Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, Settings.PREF_SHOW_NUMBER_ROW, Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS,
     Settings.PREF_SHOW_EMOJI_KEY, Settings.PREF_SHOW_VOICE_KEY, Settings.PREF_ENABLE_SPLIT_KEYBOARD, Settings.PREF_SPLIT_SPACER_SCALE_PREFIX,
     Settings.PREF_TOOLBAR_VISIBILITY, Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS, Settings.PREF_BACKSPACE_SPEED_UP,
-) + preferencesInputItems(prefs, ctx).filterIsInstance<String>() + layoutScreenAdvancedKeys(prefs)
-
-/** The settings Layout & Typing shows only in advanced mode (in its advanced blocks). */
-internal fun layoutScreenAdvancedKeys(prefs: android.content.SharedPreferences): List<String> = listOf(
+) + preferencesInputItems(prefs, ctx).filterIsInstance<String>() + listOf(
     Settings.PREF_SPACE_TO_CHANGE_LANG, Settings.PREF_BOTTOM_ROW_SCALE_PREFIX, Settings.PREF_SIDE_PADDING_SCALE_PREFIX,
     Settings.PREF_BACKSPACE_LONGPRESS_DELAY, Settings.PREF_DELETE_SWIPE, Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT,
     Settings.PREF_SHOW_TLD_POPUP_KEYS, Settings.PREF_REMOVE_REDUNDANT_POPUPS,
