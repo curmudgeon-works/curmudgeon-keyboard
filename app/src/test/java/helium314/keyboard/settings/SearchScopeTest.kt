@@ -12,6 +12,8 @@ import helium314.keyboard.settings.screens.keyboardMenuSearch
 import helium314.keyboard.settings.screens.layoutScreenAdvancedKeys
 import helium314.keyboard.settings.screens.layoutScreenKeys
 import helium314.keyboard.settings.screens.popupSearchRows
+import helium314.keyboard.settings.screens.swipeAdvancedKeys
+import helium314.keyboard.settings.screens.swipeSettingKeys
 import helium314.keyboard.settings.screens.toolbarItems
 import org.junit.After
 import org.junit.Before
@@ -89,6 +91,24 @@ class SearchScopeTest {
         assertEquals(listOf(2 to ".  (Web address)"), popupSearchRows(groups, 1, "web") { it })
         assertEquals(listOf(2 to "@  (Email)"), popupSearchRows(groups, 1, "email") { it })
         assertEquals(listOf(2 to ".  (Web address)"), popupSearchRows(groups, 1, "address") { it })
+    }
+
+    // the bracket keys themselves: split on brackets, their titles were empty words. Fail before: "(" found nothing
+    @Test fun `Customize popups - a bracket key is still found by its bracket`() {
+        val groups = listOf(1 to listOf("(", ")"), 2 to listOf(".  (Web address)"))
+        assertEquals(listOf(1 to "("), popupSearchRows(groups, 2, "(") { it })
+        assertEquals(listOf(1 to ")"), popupSearchRows(groups, 2, ")") { it })
+    }
+
+    // round-7 review 20261013_L1_3: the Swipe screen's search tints its advanced block's rows. Fail before: its search
+    // had no simple set, so nothing was advanced-only there
+    @Test fun `Swipe search - the advanced block's rows are advanced-only, the others not`() {
+        val simple = (swipeSettingKeys - swipeAdvancedKeys).toSet()
+        assertTrue(swipeSettingKeys.containsAll(swipeAdvancedKeys))
+        assertTrue(advancedOnly(Settings.PREF_GESTURE_CAPS_SWIPE, simple))
+        assertTrue(advancedOnly(Settings.PREF_TOUCHPAD_SENSITIVITY, simple))
+        assertFalse(advancedOnly(Settings.PREF_GESTURE_TRAIL_THICKNESS, simple))
+        assertFalse(advancedOnly(Settings.PREF_DELETE_SWIPE, simple))
     }
 
     // owner 2026-10-13: "Keyboard screen search bar should only search items in that screen too", "Whole app search should

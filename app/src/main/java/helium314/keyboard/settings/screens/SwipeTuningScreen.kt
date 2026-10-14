@@ -53,6 +53,15 @@ import androidx.core.content.edit
 import kotlin.math.roundToInt
 
 /** The "Swipe settings" group's preferences (not the decoder weights of "Swipe tuning"). */
+/** The ones of [swipeSettingKeys] its advanced block (on the advanced tint, last in the group) shows, so its search
+ *  shows them on the tint too (round-7 review 20261013_L1_3, owner 2026-10-14: "keep search results tinted too if it
+ *  works"); drawing the block from this list waits for "draw each screen from its contents" (20261013_L2_3). */
+internal val swipeAdvancedKeys = setOf(
+    Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD, Settings.PREF_GESTURE_FAST_TYPING_COOLDOWN, Settings.PREF_GESTURE_CAPS_SWIPE,
+    Settings.PREF_GESTURE_CAPS_HEIGHT, Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE, Settings.PREF_SPACE_HORIZONTAL_SWIPE,
+    Settings.PREF_SPACE_VERTICAL_SWIPE, Settings.PREF_LANGUAGE_SWIPE_DISTANCE, Settings.PREF_TOUCHPAD_SENSITIVITY,
+)
+
 internal val swipeSettingKeys = listOf(
     Settings.PREF_GESTURE_INPUT, Settings.PREF_GESTURE_TRAIL_THICKNESS,
     Settings.PREF_GESTURE_TRAIL_WHOLE, Settings.PREF_GESTURE_TRAIL_WHOLE_LINGER, Settings.PREF_DELETE_SWIPE, Settings.PREF_DELETE_SWIPE_SPEED, Settings.PREF_AUTOSPACE_AFTER_GESTURE_TYPING, Settings.PREF_GESTURE_FAST_TYPING_COOLDOWN,
@@ -115,6 +124,7 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
         topActions = draft.topActions,
         settings = emptyList(),
         searchKeys = swipeSettingKeys, // its search: the settings it shows (owner 2026-10-13, SEARCH-SCOPE)
+        simpleModeKeys = (swipeSettingKeys - swipeAdvancedKeys).toSet(), // (only for its search's tint: no [settings] list)
     ) {
         // (a screen with its own content draws its own try-it bar: SearchSettingsScreen's bottomBar is for its list)
         androidx.compose.material3.Scaffold(contentWindowInsets = WindowInsets(0), bottomBar = {
@@ -182,6 +192,7 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
             // under its switch, indented), then the swipes that work when tapping too: down on the suggestion strip
             // (moved from the toolbar settings), and every space bar swipe (moved from Advanced) with the distance /
             // sensitivity their actions use
+            // (its keys: [swipeAdvancedKeys])
             AdvancedTint(advanced) {
                 helium314.keyboard.settings.AdvancedReveal(gestureOn) { Column {
                     Pref(Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD)
