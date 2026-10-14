@@ -583,6 +583,9 @@
     <!-- a saved item with these exact settings exists already (Update, Save as new); nothing is blocked -->
     <string name="same_settings_as">These settings are the same as “%s”.</string>
     <string name="save_anyway">Save anyway</string>
+    <!-- the trash on a font nothing uses any more -->
+    <string name="font_delete_file_title">Also delete the font file “%s” for good?</string>
+    <string name="font_keep_file">Keep the file</string>
     <string name="key_popups_save_as_new">Save current popup layout</string>
     <string name="key_popups_save_change_title">Save this change to a set of your own</string>
     <string name="key_popups_my_set">My popups</string>
@@ -763,8 +766,8 @@
     <!-- under a delete question: the keyboards that use the item keep it (they are named, never "all keyboards");
          %s = their names, one per line -->
     <plurals name="delete_keeps_layout">
-        <item quantity="one">This keyboard keeps its settings, shown as unsaved:\n%s</item>
-        <item quantity="other">These keyboards keep its settings, shown as unsaved:\n%s</item>
+        <item quantity="one">This keyboard keeps its settings, shown as Custom. Nothing goes back to the default:\n%s</item>
+        <item quantity="other">These keyboards keep its settings, shown as Custom. Nothing goes back to the default:\n%s</item>
     </plurals>
     <!-- Layout & Typing: the key arrangement (QWERTY, AZERTY, your own) -->
     <string name="layout_keys">Keys</string>
@@ -777,8 +780,8 @@
     <string name="appearance_look_delete">Delete the theme \"%s\"?</string>
     <!-- %s = the names of the keyboards using the theme, one per line -->
     <plurals name="delete_keeps_theme">
-        <item quantity="one">This keyboard keeps its colors and look:\n%s</item>
-        <item quantity="other">These keyboards keep its colors and look:\n%s</item>
+        <item quantity="one">This keyboard keeps its colors and look, shown as Custom. Nothing goes back to the default:\n%s</item>
+        <item quantity="other">These keyboards keep its colors and look, shown as Custom. Nothing goes back to the default:\n%s</item>
     </plurals>
     <!-- the four built-in themes -->
     <string name="theme_preset_dynamic">Dynamic</string>

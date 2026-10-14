@@ -25,6 +25,21 @@ object CustomLabels {
         return next
     }
 
+    /** Saved item [name] (chosen under [selectedKey]) is deleted: every set that chose it, in use or hidden, keeps its
+     *  copy and gets its Custom number now (2026-10-11: "other keyboards should keep the popups/palette now called
+     *  Custom ... Custom1, Custom2, etc., indexing"). Call before the name is forgotten. */
+    fun detach(real: SharedPreferences, selectedKey: String, name: String, kind: Kind) {
+        val ids = real.all.mapNotNull { (stored, value) ->
+            if (value != name) null
+            else if (stored == selectedKey) KeyboardProfiles.SHARED
+            else KeyboardProfiles.splitOwnKey(stored)?.takeIf { it.second == selectedKey }?.first
+        }.toSet()
+        for (id in ids) number(real, helium314.keyboard.latin.settings.ProfilePreferences(real) { id }, kind)
+    }
+
+    /** The keyboard ([prefs]) has a Custom number for [kind]: its copy, whatever it chose. */
+    fun has(prefs: SharedPreferences, kind: Kind) = prefs.getInt(kind.key, 0) > 0
+
     /** The keyboard chose an item again: no label. */
     fun clear(prefs: SharedPreferences, kind: Kind) { if (prefs.contains(kind.key)) prefs.edit { remove(kind.key) } }
 

@@ -210,7 +210,7 @@ class AppearanceDraft private constructor(
             val plain = (own?.second ?: stored).removePrefix(KeyboardProfiles.TOMBSTONE)
             // (a keyboard's own theme settings: the update dialog writes them on the keyboards ticked there)
             if (own != null && (AppearanceLooks.inScope(plain) || plain == CustomLabels.Kind.THEME.key)) return true
-            return plain == AppearanceLooks.PREF || plain == AppearanceLooks.PREF_SELECTED
+            return plain == AppearanceLooks.PREF || plain == AppearanceLooks.PREF_SELECTED || plain == helium314.keyboard.keyboard.FontLibrary.PREF_HIDDEN
                 || plain == Settings.PREF_THEME_COLORS || plain == Settings.PREF_THEME_COLORS_NIGHT
                 || plain.startsWith(Settings.PREF_USER_COLORS_PREFIX) || plain.startsWith(Settings.PREF_USER_ALL_COLORS_PREFIX)
                 || plain.startsWith(Settings.PREF_USER_MORE_COLORS_PREFIX)

@@ -428,8 +428,11 @@ internal fun updateSetInLayout(real: SharedPreferences, layoutName: String, set:
 
 internal fun deletePopupSet(ctx: Context, name: String) {
     val real = ctx.realPrefs()
+    helium314.keyboard.settings.CustomLabels.detach(real, KeyPopupOverrides.PREF_SELECTED_SET, name,
+        helium314.keyboard.settings.CustomLabels.Kind.POPUPS) // (keyboards keep their popups: Custom N)
     KeyPopupOverrides.saveSets(real, KeyPopupOverrides.loadSets(real).filter { it.name != name })
     KeyboardProfiles.forgetValueEverywhere(real, KeyPopupOverrides.PREF_SELECTED_SET, name)
+    helium314.keyboard.settings.LayoutPresets.onPopupSetRenamed(real, name, null) // (saved Layouts keep the popups, not the name)
 }
 
 /** The presets the list offers [keyboard]: the built-ins, then the user's own [userSets]; what a set kept at its default

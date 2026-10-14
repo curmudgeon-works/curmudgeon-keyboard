@@ -541,6 +541,14 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
          * every other change there (decided 2026-10-07).
          */
         fun deleteUserColors(context: Context, prefs: SharedPreferences, name: String) {
+            // used by a keyboard or a saved theme: they keep its colours, as "Custom N", off the list (owner 2026-10-11:
+            // "other keyboards should keep the popups/palette now called Custom. Any layout/theme that was using them
+            // should also follow this Custom behavior"); the open Appearance screen's Discard undoes it everywhere
+            if (paletteUsed(prefs, name)) {
+                renameUserColors(name, nextHiddenPalette(prefs), prefs)
+                KeyboardSwitcher.getInstance().setThemeNeedsReload()
+                return
+            }
             prefs.edit {
                 remove(Settings.PREF_USER_COLORS_PREFIX + name)
                 remove(Settings.PREF_USER_ALL_COLORS_PREFIX + name)
@@ -579,6 +587,31 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                 else editor.remove(stored).putBoolean(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + key), true)
             }
             editor.apply()
+        }
+
+        /** A palette kept by the keyboards and themes that used one deleted (not on the palette list): "Custom N". */
+        const val HIDDEN_PALETTE = "~custom:"
+        fun isHiddenPalette(name: String) = name.startsWith(HIDDEN_PALETTE)
+        /** A palette's name as shown: its own, or "Custom N" for a kept copy. */
+        fun paletteName(context: Context, name: String): String =
+            if (isHiddenPalette(name)) helium314.keyboard.settings.CustomLabels.text(context, name.removePrefix(HIDDEN_PALETTE).toIntOrNull() ?: 1, null)
+            else name
+
+        /** The next free kept-copy name, numbered across every keyboard's set and the saved themes. */
+        private fun nextHiddenPalette(prefs: SharedPreferences): String {
+            val real = (prefs as? ProfilePreferences)?.underlying ?: prefs
+            val text = real.all.values.filterIsInstance<String>() + real.all.keys +
+                helium314.keyboard.settings.AppearanceLooks.load(real).flatMap { it.values.keys + it.values.values.filterIsInstance<String>() }
+            val taken = text.flatMap { t -> Regex(Regex.escape(HIDDEN_PALETTE) + "(\\d+)").findAll(t).map { it.groupValues[1].toInt() } }.toSet()
+            return HIDDEN_PALETTE + generateSequence(1) { it + 1 }.first { it !in taken }
+        }
+
+        /** Whether palette [name] is chosen by any keyboard's set (light or dark) or a saved theme. */
+        private fun paletteUsed(prefs: SharedPreferences, name: String): Boolean {
+            val real = (prefs as? ProfilePreferences)?.underlying ?: prefs
+            val keys = setOf(Settings.PREF_THEME_COLORS, Settings.PREF_THEME_COLORS_NIGHT)
+            if (real.all.any { (stored, v) -> v == name && (KeyboardProfiles.splitOwnKey(stored)?.second ?: stored) in keys }) return true
+            return helium314.keyboard.settings.AppearanceLooks.load(real).any { look -> keys.any { look.values[it] == name } }
         }
 
         // returns false if not renamed due to invalid name or collision

@@ -244,6 +244,7 @@ object LayoutPresets {
     /** Saved Layout [name] goes from the list, and every keyboard that had it chosen has none chosen (2026-10-07: only
      *  the keyboard being edited forgot it; the others kept the name, and took a Layout saved later under it). */
     fun delete(real: SharedPreferences, name: String) {
+        CustomLabels.detach(real, PREF_SELECTED, name, CustomLabels.Kind.LAYOUT) // (they keep their copy: Custom N)
         save(real, load(real).filter { it.name != name })
         KeyboardProfiles.forgetValueEverywhere(real, PREF_SELECTED, name)
     }
@@ -257,9 +258,9 @@ object LayoutPresets {
         save(real, presets.map { if (it.values[key] == from) Preset(it.name, it.values + (key to to), it.builtIn, it.remembered) else it })
     }
 
-    /** User popup set [from] renamed to [to]. (A deleted one stays named: applying the Layout brings it back,
-     *  [restorePopupSet].) */
-    fun onPopupSetRenamed(real: SharedPreferences, from: String, to: String) = followValue(real, KeyPopupOverrides.PREF_SELECTED_SET, from, to)
+    /** User popup set [from] renamed to [to], or deleted ([to] null): the Layouts holding it follow; a deleted one's
+     *  popups stay in them, nameless, and never bring the set back by themselves (2026-10-11: "No coming back by itself"). */
+    fun onPopupSetRenamed(real: SharedPreferences, from: String, to: String?) = followValue(real, KeyPopupOverrides.PREF_SELECTED_SET, from, to)
 
     /** Custom key layout [from] of [type] renamed to [to], or deleted ([to] null). The default for its type follows
      *  (deleted: the built-in one); the keys' own name only follows a rename, a deleted one comes back from the content

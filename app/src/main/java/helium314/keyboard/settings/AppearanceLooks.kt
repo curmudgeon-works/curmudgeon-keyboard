@@ -359,6 +359,7 @@ object AppearanceLooks {
      *  [KeyboardProfiles.replaceValueEverywhere] and [KeyboardProfiles.forgetValueEverywhere]). */
     fun choiceRenamed(ctx: Context, old: String, new: String?) {
         val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
+        if (new == null) CustomLabels.detach(real, PREF_SELECTED, old, CustomLabels.Kind.THEME) // (they keep the look: Custom N)
         if (new == null) KeyboardProfiles.forgetValueEverywhere(real, PREF_SELECTED, old)
         else KeyboardProfiles.replaceValueEverywhere(real, PREF_SELECTED, old, new)
         // (the open screen's Discard undoes it everywhere: its snapshot holds every keyboard's choice, 2026-10-11)

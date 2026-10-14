@@ -108,7 +108,7 @@ class DeleteWarningTest {
         enable(previewed, b)
         val screenOfSet1 = helium314.keyboard.latin.settings.KeyboardScopeContext(ctx, 1) // (the screen editing set 1)
         real.edit { putString("p1/$layout", "X") }
-        assertEquals("This keyboard keeps its settings, shown as unsaved:\nWork",
+        assertEquals("This keyboard keeps its settings, shown as Custom. Nothing goes back to the default:\nWork",
             deleteKeepersText(screenOfSet1, R.plurals.delete_keeps_layout, layout, "X", edited = previewed))
         assertNull(deleteKeepersText(screenOfSet1, R.plurals.delete_keeps_layout, layout, "X")) // no keyboard edited: the map
     }
@@ -118,9 +118,9 @@ class DeleteWarningTest {
         assertEquals("Work", keyboardName(a, ctx))
         assertEquals(true, bName.contains("German"), bName)
         assertNull(keepersText(ctx, R.plurals.delete_keeps_layout, emptyList()))
-        assertEquals("This keyboard keeps its settings, shown as unsaved:\nWork",
+        assertEquals("This keyboard keeps its settings, shown as Custom. Nothing goes back to the default:\nWork",
             keepersText(ctx, R.plurals.delete_keeps_layout, listOf(a)))
-        assertEquals("These keyboards keep its colors and look:\nWork\n$bName",
+        assertEquals("These keyboards keep its colors and look, shown as Custom. Nothing goes back to the default:\nWork\n$bName",
             keepersText(ctx, R.plurals.delete_keeps_theme, listOf(a, b)))
     }
 
@@ -128,12 +128,12 @@ class DeleteWarningTest {
         enable(b, a)
         val bName = keyboardName(b, ctx)
         real.edit { putString("p1/$layout", "X"); putString("p2/$layout", "X"); putString(layout, "Y") }
-        assertEquals("These keyboards keep its settings, shown as unsaved:\n$bName\nWork",
+        assertEquals("These keyboards keep its settings, shown as Custom. Nothing goes back to the default:\n$bName\nWork",
             deleteKeepersText(ctx, R.plurals.delete_keeps_layout, layout, "X"))
         assertNull(deleteKeepersText(ctx, R.plurals.delete_keeps_layout, layout, "Y"))
         // separate settings off: every enabled keyboard reads the shared one, each named
         real.edit { putBoolean("separate_settings_per_keyboard", false) }
-        assertEquals("These keyboards keep its settings, shown as unsaved:\n$bName\nWork",
+        assertEquals("These keyboards keep its settings, shown as Custom. Nothing goes back to the default:\n$bName\nWork",
             deleteKeepersText(ctx, R.plurals.delete_keeps_layout, layout, "Y"))
         val set = KeyPopupOverrides.PREF_SELECTED_SET
         real.edit { putString("p1/$set", "S") } // hidden

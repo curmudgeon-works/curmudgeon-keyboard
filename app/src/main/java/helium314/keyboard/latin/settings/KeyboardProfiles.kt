@@ -39,6 +39,7 @@ object KeyboardProfiles {
         "appearance_looks", // saved looks too
         "layout_presets", // and saved Layouts
         helium314.keyboard.settings.SavedItemDefaults.PREF, // what saved items do with new defaults: one switch for all
+        helium314.keyboard.keyboard.FontLibrary.PREF_HIDDEN, // fonts taken off the list (the list is app-wide)
     ) + Group.entries.map { it.prefKey } +
         // which pool of learned words each keyboard has, its buttons, the old switch (read by the update only)
         helium314.keyboard.latin.personalization.LearnedKeyboards.appWideKeys

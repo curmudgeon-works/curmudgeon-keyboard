@@ -94,7 +94,7 @@ fun ColorThemePickerDialog(
             it.startsWith(Settings.PREF_USER_MORE_COLORS_PREFIX) -> it.substringAfter(Settings.PREF_USER_MORE_COLORS_PREFIX)
             else -> null
         }
-    }.toSortedSet() // we don't want duplicates, and we want a consistent order
+    }.filterTo(sortedSetOf()) { !KeyboardTheme.isHiddenPalette(it) } // (kept copies of deleted ones: not on the list) 
     val selectedColor = prefs.getString(setting.key, default)!!
     if (selectedColor !in defaultColors)
         userColors.add(selectedColor) // there are cases where we have no settings for a user theme
@@ -234,11 +234,11 @@ private fun ColorItemRow(onDismissRequest: () -> Unit, item: String, isSelected:
             }
         )
         Text(
-            text = item.getStringResourceOrName("theme_name_", ctx),
+            text = if (KeyboardTheme.isHiddenPalette(item)) KeyboardTheme.paletteName(ctx, item) else item.getStringResourceOrName("theme_name_", ctx),
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f),
         )
-        if (isUser) {
+        if (isUser && !KeyboardTheme.isHiddenPalette(item)) { // (a kept copy: this keyboard's, nothing to delete or edit)
             var showDialog by remember { mutableStateOf(false) }
             DeleteButton { showDialog = true }
             EditButton {

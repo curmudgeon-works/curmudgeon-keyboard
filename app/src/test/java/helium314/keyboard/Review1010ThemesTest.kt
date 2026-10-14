@@ -55,16 +55,18 @@ class Review1010ThemesTest {
             .commit()
     }
 
-    @Test fun `a palette deleted in the shared set is forgotten by a hidden set that read it`() {
+    // (2026-10-11: delete keeps copies, "other keyboards should keep the popups/palette now called Custom"; before, the
+    // hidden set forgot it and went back to the default colours)
+    @Test fun `a palette deleted in the shared set stays with a hidden set that read it, as Custom N`() {
         hiddenSetsNamingMyTheme()
         KeyboardTheme.deleteUserColors(ctx, set(1), "My theme") // (separate off: the shared set)
-        assertFalse(real.contains(colors))
-        assertFalse(real.contains("p1/$colors"))
-        assertFalse(real.contains("p1/$night"))
-        assertTrue(real.getBoolean("p1/${KeyboardProfiles.TOMBSTONE}$colors", false))
+        val kept = real.getString("p1/$colors", null)!!
+        assertTrue(KeyboardTheme.isHiddenPalette(kept))
+        assertTrue(real.contains(Settings.PREF_USER_COLORS_PREFIX + kept)) // (its colours, under the kept name)
+        assertFalse(real.contains(Settings.PREF_USER_COLORS_PREFIX + "My theme")) // (the shared palette's old name is gone)
         // a new palette that takes the free name later is not picked up by keyboard 1 when separate settings come back
         real.edit().putString(Settings.PREF_USER_COLORS_PREFIX + "My theme", "[]").putBoolean("separate_settings_per_keyboard", true).commit()
-        assertNull(set(1).getString(colors, null))
+        assertEquals(kept, set(1).getString(colors, null))
         // keyboard 2's own palette of that name stays its choice
         assertEquals("My theme", real.getString("p2/$colors", null))
     }

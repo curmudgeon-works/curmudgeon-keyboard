@@ -38,11 +38,44 @@ object FontLibrary {
     fun dir(ctx: Context) = File(DeviceProtectedUtils.getFilesDir(ctx), "fonts")
     private fun pendingDir(ctx: Context) = File(dir(ctx), PENDING)
 
-    /** The loaded fonts' names, sorted; pending files are not in the list yet. */
+    /** The fonts taken off the list while keyboards or saved themes still use them (2026-10-11: "Fonts should be kept
+     *  after delete"): their files stay, each user keeps it; app-wide (KeyboardProfiles.isAppWide). */
+    const val PREF_HIDDEN = "font_library_hidden"
+    fun hidden(ctx: Context): Set<String> = runCatching { org.json.JSONArray(ctx.realPrefs().getString(PREF_HIDDEN, "[]")) }
+        .getOrNull()?.let { a -> (0 until a.length()).map { a.getString(it) }.toSet() } ?: emptySet()
+    private fun setHidden(ctx: Context, names: Set<String>) = ctx.realPrefs().edit {
+        if (names.isEmpty()) remove(PREF_HIDDEN) else putString(PREF_HIDDEN, org.json.JSONArray(names.sorted()).toString()) }
+
+    /** The loaded fonts' names, sorted; pending files are not in the list yet, fonts taken off it neither. */
     fun names(ctx: Context): List<String> {
         migrate(ctx)
-        return dir(ctx).listFiles()?.filter { it.isFile }?.map { it.name }?.sortedBy { it.lowercase() } ?: emptyList()
+        val hidden = hidden(ctx)
+        return dir(ctx).listFiles()?.filter { it.isFile && it.name !in hidden }?.map { it.name }?.sortedBy { it.lowercase() } ?: emptyList()
     }
+
+    /** A text style dialog's font choices: the list, and [current] if it is a font taken off the list (this keyboard's copy). */
+    fun choices(ctx: Context, current: String): List<String> = names(ctx).map { PREFIX + it } +
+        listOfNotNull(current.takeIf { it.startsWith(PREFIX) && !isPending(it) && displayName(it) in hidden(ctx) && File(dir(ctx), displayName(it)).isFile })
+
+    /** Whether font [name] is taken off the list (a user keeps it: no delete button). */
+    fun isHidden(ctx: Context, value: String) = value.startsWith(PREFIX) && displayName(value) in hidden(ctx)
+
+    /** Whether a keyboard (any set, in use or not) or a saved theme chooses font [name]. */
+    fun isUsed(ctx: Context, name: String): Boolean {
+        val value = PREFIX + name
+        val real = ctx.realPrefs()
+        if (real.all.any { (stored, v) -> v == value && (KeyboardProfiles.splitOwnKey(stored)?.second ?: stored) in fontPrefs }) return true
+        return helium314.keyboard.settings.AppearanceLooks.load(real).any { look -> fontPrefs.any { look.values[it] == value } }
+    }
+
+    /** The trash on a font: used somewhere, it only leaves the list (every user keeps it); used nowhere, false: ask
+     *  whether to delete the file for good ([delete]) or keep it ([hide]). */
+    fun removeFromList(ctx: Context, name: String): Boolean {
+        if (!isUsed(ctx, name)) return false
+        hide(ctx, name)
+        return true
+    }
+    fun hide(ctx: Context, name: String) = setHidden(ctx, hidden(ctx) + name)
 
     fun isPending(value: String) = value.startsWith("$PREFIX$PENDING/")
     fun displayName(value: String) = value.removePrefix(PREFIX).removePrefix("$PENDING/")
@@ -81,13 +114,14 @@ object FontLibrary {
             n++
         }
         if (!target.exists()) file.copyTo(target)
+        if (target.name in hidden(ctx)) setHidden(ctx, hidden(ctx) - target.name) // (loaded again: back on the list)
         discardPending(ctx)
         return PREFIX + target.name
     }
 
     fun discardPending(ctx: Context) { pendingDir(ctx).deleteRecursively() }
 
-    /** Removes a font from the list; text styles that used it go back to the default, in every keyboard's set (2026-10-07:
+    /** Deletes a font's file for good (asked when nothing uses it, [removeFromList]); text styles that used it go back to the default, in every keyboard's set (2026-10-07:
      *  only the keyboard being edited did; the others kept the name and took a font loaded later under it). "default"
      *  is written, not the choice removed: nothing chosen ("auto") reads a loaded font of before ([fileFor]). */
     fun delete(ctx: Context, name: String) {

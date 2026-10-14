@@ -383,7 +383,7 @@ fun createAppearanceSettings(context: Context) = listOf(
         Box(if (dayNight) Modifier.tuckedUnder().padding(start = 16.dp) else Modifier) {
             Preference(
                 name = if (dayNight) stringResource(R.string.theme_colors_light) else setting.title,
-                description = prefs.getString(setting.key, Defaults.PREF_THEME_COLORS)!!.getStringResourceOrName("theme_name_", ctx),
+                description = prefs.getString(setting.key, Defaults.PREF_THEME_COLORS)!!.let { if (helium314.keyboard.keyboard.KeyboardTheme.isHiddenPalette(it)) helium314.keyboard.keyboard.KeyboardTheme.paletteName(ctx, it) else it.getStringResourceOrName("theme_name_", ctx) },
                 onClick = { showDialog = true }
             )
         }
@@ -409,7 +409,7 @@ fun createAppearanceSettings(context: Context) = listOf(
         Box(Modifier.tuckedUnder().padding(start = 16.dp)) { // (shown only under the light / dark switch, when it's on)
             Preference(
                 name = setting.title,
-                description = prefs.getString(setting.key, Defaults.PREF_THEME_COLORS_NIGHT)!!.getStringResourceOrName("theme_name_", ctx),
+                description = prefs.getString(setting.key, Defaults.PREF_THEME_COLORS_NIGHT)!!.let { if (helium314.keyboard.keyboard.KeyboardTheme.isHiddenPalette(it)) helium314.keyboard.keyboard.KeyboardTheme.paletteName(ctx, it) else it.getStringResourceOrName("theme_name_", ctx) },
                 onClick = { showDialog = true }
             )
         }
@@ -650,16 +650,19 @@ private fun SavedLooksPreference(setting: Setting) {
     val chosenName = prefs.getString(AppearanceLooks.PREF_SELECTED, null)
         ?: ctx.getString(R.string.theme_preset_dynamic).takeIf { android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S }
     val chosen = chosenName?.let { name -> (builtIn + looks).firstOrNull { it.name == name } }
-    val tweaked = chosen != null && AppearanceLooks.isTweaked(ctx, chosen)
+    // its theme was deleted: its copy, "Custom 1", until it chooses one again
+    val detached = prefs.getString(AppearanceLooks.PREF_SELECTED, null) == null
+        && helium314.keyboard.settings.CustomLabels.has(prefs, helium314.keyboard.settings.CustomLabels.Kind.THEME)
+    val tweaked = detached || (chosen != null && AppearanceLooks.isTweaked(ctx, chosen))
     // (redrawn when the draft is saved or dropped; none outside the Appearance screen, e.g. in search results: nothing
     // unsaved, a theme chosen there is kept at once)
     val draft = AppearanceDraft.version.intValue.let { AppearanceDraft.activeOrNull() }
     val unsaved = draft != null && (draft.changedKeys(ctx).any { AppearanceLooks.inScope(it) || it == AppearanceLooks.PREF_SELECTED }
         || draft.changedFiles().any { it.startsWith("custom_background") })
     // differs from the chosen theme: the keyboard's own copy, "Custom 1 · from Sunset" (2026-10-11; was "Sunset (tweaked)")
-    val shown = chosen?.let { look -> if (!tweaked) look.name else remember(look.name, tweaked) {
+    val shown = if (!tweaked) chosen?.name else if (!detached && chosen == null) null else remember(chosen?.name, tweaked, detached) {
         helium314.keyboard.settings.CustomLabels.text(ctx, helium314.keyboard.settings.CustomLabels.number(ctx.realPrefs(), prefs,
-            helium314.keyboard.settings.CustomLabels.Kind.THEME), look.name) } }
+            helium314.keyboard.settings.CustomLabels.Kind.THEME), chosen?.name?.takeIf { !detached }) }
     val summary = shown?.let { if (unsaved) it + " (" + stringResource(R.string.theme_unsaved) + ")" else it }
     // which of the user's themes differ from the keyboard as it was when the list opened: those get the save icon
     val differs = remember(showList, generation) { looks.associateWith { AppearanceLooks.isTweaked(ctx, it) } }
