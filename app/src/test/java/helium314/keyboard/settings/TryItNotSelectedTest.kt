@@ -73,7 +73,7 @@ class TryItNotSelectedTest {
     private val tryHere get() = ctx.getString(R.string.key_popups_try)
     private val switchLabel get() = ctx.getString(R.string.try_it_switch_to_preview)
 
-    @Test fun `not selected - the switch label, no buttons, no keyboard, a tap opens the picker; selected - as before`() {
+    @Test fun `not selected - the switch label, no buttons, no keyboard, a tap opens the picker, selected - as before`() {
         assertEquals("Switch to Curmudgeon to preview", switchLabel)
         compose.onNodeWithText(switchLabel).assertExists()
         compose.onNodeWithText(tryHere).assertDoesNotExist()
