@@ -153,6 +153,14 @@ class HowSavingWorksTest {
         for (log in listOf("swipe results", "swipe corpus", "corrections", "settings changes")) assertTrue(log in export, log)
     }
 
+    // owner 2026-10-14: "fade yes, but not too wide. Just a hint is fine.": a narrow fade at the grid's right edge while
+    // more columns are to the right, none once the last column is in view. Fail before: no fade (compile)
+    @Test fun `the grid's right edge fades while more columns are to the right, narrowly`() {
+        assertEquals(helium314.keyboard.settings.screens.gridFadeWidth, helium314.keyboard.settings.screens.gridFade(canScrollRight = true))
+        assertEquals(0f, helium314.keyboard.settings.screens.gridFade(canScrollRight = false).value)
+        assertTrue(helium314.keyboard.settings.screens.gridFadeWidth.value in 16f..24f)
+    }
+
     // owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones
     @Test fun `separate settings rows - the first keyboard's settings, nothing copied, delete and reorder`() {
         val separate = savingGuide.last().rows.map { it.text }

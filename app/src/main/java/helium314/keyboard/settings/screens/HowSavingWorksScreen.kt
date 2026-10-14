@@ -35,7 +35,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.utils.BackButton
@@ -302,11 +311,30 @@ internal val savingShort: Map<Int, Int> = mapOf(
 private val kindWidth = 120.dp
 private val cellWidth = 128.dp // (2–3 action columns fit beside the kinds on a device)
 
+/** The soft fade at the grid's right edge while more columns are to the right (round-7c review 20261014_L9_2, owner:
+ *  "fade yes, but not too wide. Just a hint is fine."; none at the bottom: "don't add bottom fade"). */
+internal val gridFadeWidth = 20.dp
+
+/** How wide the right-edge fade is now: [gridFadeWidth] while the grid can scroll further right, else none. */
+internal fun gridFade(canScrollRight: Boolean): Dp = if (canScrollRight) gridFadeWidth else 0.dp
+
+/** Fades the last [width] of the content out towards the right edge (whatever is behind it shows through). */
+private fun Modifier.rightEdgeFade(width: Dp): Modifier = if (width <= 0.dp) this else this
+    .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+    .drawWithContent {
+        drawContent()
+        val w = width.toPx().coerceAtMost(size.width)
+        drawRect(Brush.horizontalGradient(listOf(Color.Black, Color.Transparent), startX = size.width - w, endX = size.width),
+            topLeft = Offset(size.width - w, 0f), size = Size(w, size.height), blendMode = BlendMode.DstIn)
+    }
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun HowSavingWorksScreen(onClickBack: () -> Unit) {
     // one sideways scroll for the header and every row keeps the columns lined up; the kind column stays put
     val sideways = rememberScrollState()
+    // the hint that more columns are to the right, on the header and every row alike
+    val fade = gridFade(sideways.canScrollForward)
     var open by remember { mutableStateOf<Pair<Int, SavingTab>?>(null) }
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
@@ -326,7 +354,7 @@ fun HowSavingWorksScreen(onClickBack: () -> Unit) {
                 Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
                     Row {
                         Spacer(Modifier.width(kindWidth))
-                        Row(Modifier.horizontalScroll(sideways)) {
+                        Row(Modifier.rightEdgeFade(fade).horizontalScroll(sideways)) {
                             for (action in savingActions) Text(stringResource(action.title), Modifier.width(cellWidth).padding(8.dp),
                                 style = MaterialTheme.typography.labelLarge)
                         }
@@ -339,7 +367,7 @@ fun HowSavingWorksScreen(onClickBack: () -> Unit) {
                     Text(stringResource(kind), Modifier.width(kindWidth).fillMaxHeight()
                         .background(MaterialTheme.colorScheme.surfaceContainer).padding(8.dp),
                         style = MaterialTheme.typography.bodyMedium)
-                    Row(Modifier.horizontalScroll(sideways)) {
+                    Row(Modifier.rightEdgeFade(fade).horizontalScroll(sideways)) {
                         for (action in savingActions) {
                             val rows = savingCell(kind, action)
                             if (rows.isEmpty())
