@@ -66,7 +66,7 @@ class KeyPopupsSectionTest {
             compose.onNodeWithText("Custom").assertExists() // the keyboard keeps its popups
             applyLayout(LayoutPresets.builtIn(ctx).first()) // the Curmudgeon Layout: no popups of its own
             compose.waitForIdle()
-            compose.onNodeWithText("Curmudgeon").assertExists()
+            compose.onNodeWithText(ctx.getString(helium314.keyboard.latin.R.string.key_popups_preset_heliboard_packed)).assertExists() // the default popups
         }
     }
 

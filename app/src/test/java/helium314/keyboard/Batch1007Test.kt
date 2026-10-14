@@ -131,6 +131,6 @@ class Batch1007Test {
         assertTrue(Defaults.PREF_BACKSPACE_SPEED_UP)
         assertTrue(Defaults.PREF_BOTTOM_PADDING_SCALE.all { it == 0f }, "no space under the bottom row")
         assertEquals("all", Defaults.PREF_MORE_POPUP_KEYS)
-        assertEquals(Defaults.CURMUDGEON_SYMBOL_POPUP_MAP, Defaults.PREF_SYMBOL_POPUP_MAP)
+        assertEquals("", Defaults.PREF_SYMBOL_POPUP_MAP, "HeliBoard extra's popups: no symbol map (2026-10-10)")
     }
 }

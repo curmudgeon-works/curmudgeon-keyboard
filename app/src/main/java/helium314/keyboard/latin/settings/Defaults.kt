@@ -193,15 +193,16 @@ object Defaults {
     const val PREF_SHOW_TLD_POPUP_KEYS = true
     const val PREF_ADVANCED_SETTINGS = false // simple settings menu by default; switch at the top of the main screen
     // letter followed by its popup symbols, entries separated by whitespace; only used when the number row is on
-    // the default again since 2026-10-07 (none in 0.3.008, HeliBoard's popups); also the "Curmudgeon" popup preset
+    // the "Curmudgeon" popup preset's (the default 2026-10-07 to 0.3.011)
     const val CURMUDGEON_SYMBOL_POPUP_MAP = "q~` w× e÷ r{ t} y[ u] i| o_ p- a@ s+ d—– f… g: h; j' k\" l/ z= x\\ c< v> b, n! m?"
-    const val PREF_SYMBOL_POPUP_MAP = CURMUDGEON_SYMBOL_POPUP_MAP // the Curmudgeon popups (2026-10-07; HeliBoard's "" in 0.3.008)
+    // none: the default popups are HeliBoard extra's (2026-10-10; the Curmudgeon map 2026-10-07 to 0.3.011, "" in 0.3.008)
+    const val PREF_SYMBOL_POPUP_MAP = ""
     const val PREF_RECORD_GESTURE_CORPUS = false
     const val PREF_SWIPE_METRICS = false
     const val PREF_LEARNING_LOG = false
     const val PREF_SHARE_LEARNED_WORDS = true
     const val PREF_AUTO_PREVIEW_KEYBOARD = true // settings bring the preview keyboard up by themselves
-    const val PREF_MORE_POPUP_KEYS = "all" // the Curmudgeon popups, the Curmudgeon Layout's (2026-10-07; HeliBoard's "main" in 0.3.008)
+    const val PREF_MORE_POPUP_KEYS = "all" // every accent, HeliBoard extra's popups, the Curmudgeon Layout's (2026-10-07; HeliBoard's "main" in 0.3.008)
     const val PREF_SPACE_TO_CHANGE_LANG = true
     const val PREF_LANGUAGE_SWIPE_DISTANCE = 5
     const val PREF_TOUCHPAD_SENSITIVITY = 50

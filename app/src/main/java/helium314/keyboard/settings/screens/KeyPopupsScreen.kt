@@ -309,7 +309,8 @@ internal fun popupPresets(keyboard: SettingsSubtype, userSets: List<KeyPopupOver
     listOf(
         // each built-in preset is a whole recipe: accents level, symbols page, symbol map, popup order (nothing is
         // kept from the one before; 2026-10-03)
-        // Curmudgeon's own: every variant a key has, plus the symbol map (the default 2026-09-26 to 0.3.007)
+        // Curmudgeon's own: every variant a key has, plus the symbol map (the default 2026-09-26 to 0.3.007 and 2026-10-07 to
+        // 0.3.011; HeliBoard extra's since 2026-10-10)
         Preset(R.string.key_popups_preset_standard, POPUP_KEYS_ALL, null, symbolMap = Defaults.CURMUDGEON_SYMBOL_POPUP_MAP,
             popupOrder = POPUP_KEYS_ORDER_DEFAULT),
         // HeliBoard's own, the default since 0.3.008: its accents level, no symbol map, and its popup order (as HeliBoard ships it, checked

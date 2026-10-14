@@ -110,7 +110,7 @@ class NamesEverywhereTest {
     }
 
     @Test fun `a keyboard with no popups of its own and no set still shows the built-in it matches`() {
-        assertEquals(R.string.key_popups_preset_standard, row(set(3))?.name) // the defaults: the Curmudgeon set
+        assertEquals(R.string.key_popups_preset_heliboard_packed, row(set(3))?.name) // the defaults: the HeliBoard extra set
         real.edit().putString("p3/${KeyPopupOverrides.PREF}", popups).commit()
         assertNull(row(set(3))) // its own popups: Custom
     }
