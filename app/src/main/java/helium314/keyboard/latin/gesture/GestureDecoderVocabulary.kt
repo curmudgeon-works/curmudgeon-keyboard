@@ -58,14 +58,22 @@ object GestureDecoderVocabulary {
 
     // learned words are merged into every cached vocabulary: when they change as a whole (another keyboard's own learned
     // words) or a removed word comes back, rebuild them in the background while the current ones keep serving swipes
-    // (clearing them emptied every swipe until the rebuild)
+    // (clearing them emptied every swipe until the rebuild). One rebuild at a time: requests while one runs make it run
+    // once more when done (a batch delete of ~300 blacklisted words started ~300 rebuild threads at once; 2026-10-12)
     private fun rebuildWithLearned() {
-        val context = Settings.getCurrentContext() ?: run { cache.clear(); clearMerged(); learned.clear(); return }
-        val entries = mainEntries.toMap()
-        Thread({
-            for ((key, list) in entries) runCatching { publishNow(key, key.constructLocale(), context, list) }
-        }, "GestureVocabBoost").start()
+        rebuildRequests.incrementAndGet()
+        if (Settings.getCurrentContext() == null) { cache.clear(); clearMerged(); learned.clear(); return }
+        rebuilds.request()
     }
+    private val rebuilds = CoalescingRunner("GestureVocabBoost") {
+        Settings.getCurrentContext()?.let { context ->
+            val entries = mainEntries.toMap() // (read when the run starts: a run after a request sees what it changed)
+            for ((key, list) in entries) runCatching { publishNow(key, key.constructLocale(), context, list) }
+        }
+    }
+    /** The rebuilds asked for with the learned words (tests: a batch delete asks once). */
+    @androidx.annotation.VisibleForTesting
+    internal val rebuildRequests = java.util.concurrent.atomic.AtomicInteger()
     /**
      * Which words must stay out of the vocabularies, so they can't be swiped. Asked once per word while a vocabulary
      * is built (and for a word learned or removed live), never per swipe: keep it a set lookup.
@@ -371,7 +379,8 @@ object GestureDecoderVocabulary {
     }
 
     /** [word] was taken off [locale]'s removed words (the settings screen "Learned & blacklisted words"): its dictionary
-     *  copy can be swiped again (the vocabularies are rebuilt in the background; rare). */
+     *  copy can be swiped again (the vocabularies are rebuilt in the background; rare). Many words at once (a batch
+     *  delete): call it once, after the last one. */
     @Suppress("UNUSED_PARAMETER")
     fun onWordUnblacklisted(locale: Locale, word: String) {
         rebuildWithLearned()
@@ -783,4 +792,42 @@ object GestureDecoderVocabulary {
         word.length in 1..24
                 && word.all { Character.isLetter(it) || it == '\'' || it == '’' }
                 && word.any { Character.isLetter(it) }
+}
+
+/**
+ * Runs [work] on its own thread named [name], one run at a time: a [request] while a run is going only marks it, and the
+ * run then goes once more (however many requests came in the meantime); a request while idle starts a run at once.
+ */
+internal class CoalescingRunner(private val name: String, private val work: () -> Unit) {
+    private var running = false
+    private var again = false
+
+    fun request() {
+        synchronized(this) {
+            if (running) { again = true; return }
+            running = true
+        }
+        try {
+            Thread({ runAll() }, name).start()
+        } catch (t: Throwable) {
+            synchronized(this) { running = false; again = false }
+            throw t
+        }
+    }
+
+    private fun runAll() {
+        var done = false
+        try {
+            while (true) {
+                try { work() } catch (e: Exception) { Log.w("CoalescingRunner", "$name failed", e) }
+                synchronized(this) {
+                    if (!again) { running = false; done = true; return }
+                    again = false
+                }
+            }
+        } finally {
+            // (an Error out of [work]: the next request starts a run again)
+            if (!done) synchronized(this) { running = false; again = false }
+        }
+    }
 }
