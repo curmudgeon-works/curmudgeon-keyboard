@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.preferences
 
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import helium314.keyboard.latin.R
 import helium314.keyboard.latin.common.Constants.Subtype.ExtraValue
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
+import helium314.keyboard.settings.CustomLabels
 import helium314.keyboard.settings.screens.withKeyboardName
 
 /**
@@ -80,6 +83,8 @@ internal class RestorePlan(
     val enabled: List<SettingsSubtype>,
     val switchedOff: List<SettingsSubtype>,
     val nameOf: (SettingsSubtype) -> String,
+    /** The unsaved copies a phone keyboard holds ("Custom · from Work"), for the warnings of "what to merge". */
+    val unsavedCopies: (SettingsSubtype) -> List<UnsavedCopy> = { emptyList() },
 ) {
     val phone = (enabled + switchedOff).distinct()
 
@@ -215,6 +220,51 @@ internal class MergeChoice(val question: MergeQuestion, val target: SettingsSubt
     val decision get() = decision(name)
     /** The keyboard it would be the same as (blocked), or null. */
     val sameAs get() = decision.let { if (it is RestoreDecision.Skip) null else plan.sameAs(question.keyboard, it, question.chosen, question.decisions) }
+
+    private val copies by lazy { plan.unsavedCopies(target) }
+
+    /** The unsaved copies on [target] that [difference], ticked, replaces: a menu the copies whose label is in the
+     *  keyboard's own set (what the restore writes), a part of the definition those it shows (the keys are the Layout's,
+     *  accents and popup order the popups'). */
+    private fun replaces(difference: RestoreMatch.Difference): List<UnsavedCopy> = copies.filter { copy -> when (difference) {
+        is RestoreMatch.Difference.Menu -> copy.own && difference.group == when (copy.kind) {
+            CustomLabels.Kind.THEME -> KeyboardProfiles.Group.APPEARANCE
+            CustomLabels.Kind.LAYOUT, CustomLabels.Kind.POPUPS -> KeyboardProfiles.Group.LAYOUT
+        }
+        is RestoreMatch.Difference.Definition -> copy.shown && when (copy.kind) {
+            CustomLabels.Kind.THEME -> false
+            CustomLabels.Kind.LAYOUT -> difference.part is RestoreMatch.Part.Layout
+            CustomLabels.Kind.POPUPS -> difference.part == RestoreMatch.Part.Extra(ExtraValue.MORE_POPUPS)
+                || difference.part == RestoreMatch.Part.Extra(ExtraValue.POPUP_ORDER)
+        }
+    } }
+
+    /** The copies the ticked [difference] replaces, each under the first ticked row that does (once). */
+    fun replacedCopies(difference: RestoreMatch.Difference): List<UnsavedCopy> {
+        if (difference !in ticked) return emptyList()
+        val earlier = differences.takeWhile { it != difference }.filter { it in ticked }.flatMap(::replaces).toSet()
+        return replaces(difference).filter { it !in earlier }
+    }
+
+    /** The line under [difference]'s row (owner 2026-10-11: "Go!"): a warning only, the merge goes ahead. Null: none. */
+    fun warning(ctx: Context, difference: RestoreMatch.Difference): String? =
+        replacedCopies(difference).takeIf { it.isNotEmpty() }?.joinToString("\n") { it.warning(ctx, plan.nameOf(target)) }
+}
+
+/**
+ * An unsaved copy of a Layout, theme or popup set on a phone keyboard ([kind]; "Custom · from Work": [from], the saved
+ * item it came from, null when gone): [own], its label in the keyboard's own set; [shown], on its screens.
+ */
+internal data class UnsavedCopy(val kind: CustomLabels.Kind, val from: String?, val own: Boolean, val shown: Boolean) {
+    /** "Hindi's unsaved theme (Custom · from Work) will be replaced. Save it as a theme first if you want to keep it." */
+    fun warning(ctx: Context, keyboard: String): String {
+        val label = from?.let { ctx.getString(R.string.restore_unsaved_custom_from, it) } ?: ctx.getString(R.string.restore_unsaved_custom)
+        return ctx.getString(when (kind) {
+            CustomLabels.Kind.THEME -> R.string.restore_unsaved_theme
+            CustomLabels.Kind.LAYOUT -> R.string.restore_unsaved_layout
+            CustomLabels.Kind.POPUPS -> R.string.restore_unsaved_popups
+        }, keyboard, label)
+    }
 }
 
 /**

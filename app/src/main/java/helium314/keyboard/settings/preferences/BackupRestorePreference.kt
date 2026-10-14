@@ -613,6 +613,9 @@ private fun RestoreChooseDialog(question: MergeQuestion, target: SettingsSubtype
                     CheckRow(RestoreMatch.rowText(ctx, difference, question.keyboard), difference in choice.ticked) {
                         if (it) choice.ticked.add(difference) else choice.ticked.remove(difference)
                     }
+                    // (an unsaved copy this row replaces: said under it, owner 2026-10-11)
+                    choice.warning(ctx, difference)?.let { Text(it, color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 48.dp, bottom = 4.dp)) }
                 }
                 if (wordsRow) CheckRow(stringResource(R.string.restore_learned_row), choice.wordsTicked) { choice.wordsTicked = it }
                 if (decision is RestoreDecision.Skip)
@@ -1001,8 +1004,13 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, asked: List<
     val replacing = KeyboardProfiles.idEntries(real).let { ids ->
         (chosen + onPhone.values + replaces.values.map { it.phone }).mapNotNull { ids[it.toPref()] } }.toSet() - KeyboardProfiles.SHARED
     val phone = real.all.filterKeys { KeyboardProfiles.splitOwnKey(it)?.first !in replacing }
+    // kept palettes: a merge target whose Appearance stays the phone's keeps its "~custom:N" (owner 2026-10-11, R2: "make
+    // sure nothing gets trashed"; it didn't count, and another restored keyboard or theme came in under its name)
+    val keepsLook = KeyboardProfiles.idEntries(real).let { ids ->
+        replaces.values.filter { !it.takes(KeyboardProfiles.Group.APPEARANCE) }.mapNotNull { ids[it.phone.toPref()] } }.toSet()
+    val phonePalettes = real.all.filterKeys { key -> KeyboardProfiles.splitOwnKey(key)?.first.let { it !in replacing || it in keepsLook } }
     val renames = if (withSettings) SavedItemsMerge.merge(ctx, real, backup, asCopies, files?.first.orEmpty(), files?.second.orEmpty(), keyLayouts,
-        chosen.map { KeyboardProfiles.effectiveSettingsIn(backup, it) }, phone) else null
+        chosen.map { KeyboardProfiles.effectiveSettingsIn(backup, it) }, phonePalettes) else null
     val settings = backupSettings.mapValues { (_, values) -> renames?.apply(values) ?: values }
     val wasSeparate = KeyboardProfiles.isSeparate(real)
 
@@ -1114,7 +1122,32 @@ private fun incomingKeyboards(ctx: Context, pending: PendingRestore): Map<Settin
 /** The restore dialog's questions for [pending]'s keyboards: each as it would come in, and the phone's keyboards. */
 private fun restorePlan(ctx: Context, pending: PendingRestore): RestorePlan {
     val (enabled, off) = phoneKeyboards(ctx.realPrefs())
-    return RestorePlan(incomingKeyboards(ctx, pending), enabled, off) { keyboardName(it, ctx) }
+    return RestorePlan(incomingKeyboards(ctx, pending), enabled, off, { keyboardName(it, ctx) }, { unsavedCopies(ctx, it) })
+}
+
+/** The unsaved copies phone keyboard [keyboard] holds: each kind with a Custom label, in its own set or on its screens,
+ *  and the saved item it came from while that still exists. */
+private fun unsavedCopies(ctx: Context, keyboard: SettingsSubtype): List<UnsavedCopy> {
+    val real = ctx.realPrefs()
+    val id = KeyboardProfiles.idEntries(real)[keyboard.toPref()] ?: return emptyList()
+    val stored = helium314.keyboard.settings.CustomLabels.stored(real, helium314.keyboard.settings.CustomLabels.Kind.entries)
+    val shownView = helium314.keyboard.latin.settings.ProfilePreferences(real) { id }
+    val ownView = helium314.keyboard.latin.settings.ProfilePreferences(real, true) { id }
+    return helium314.keyboard.settings.CustomLabels.Kind.entries.mapNotNull { kind ->
+        val own = KeyboardProfiles.ownKey(id, kind.key) in stored
+        val shown = helium314.keyboard.settings.CustomLabels.has(shownView, kind)
+        if (!own && !shown) return@mapNotNull null
+        val (key, names) = when (kind) {
+            helium314.keyboard.settings.CustomLabels.Kind.THEME -> helium314.keyboard.settings.AppearanceLooks.PREF_SELECTED to {
+                (helium314.keyboard.settings.AppearanceLooks.load(real) + helium314.keyboard.settings.AppearanceLooks.builtIn(ctx)).map { it.name } }
+            helium314.keyboard.settings.CustomLabels.Kind.LAYOUT -> helium314.keyboard.settings.LayoutPresets.PREF_SELECTED to {
+                (helium314.keyboard.settings.LayoutPresets.load(real) + helium314.keyboard.settings.LayoutPresets.builtIn(ctx)).map { it.name } }
+            helium314.keyboard.settings.CustomLabels.Kind.POPUPS -> helium314.keyboard.latin.utils.KeyPopupOverrides.PREF_SELECTED_SET to {
+                helium314.keyboard.latin.utils.KeyPopupOverrides.loadSets(real).map { it.name } }
+        }
+        val from = (if (own) ownView else shownView).getString(key, null)?.takeIf { it in names() }
+        UnsavedCopy(kind, from, own, shown)
+    }
 }
 
 /** The restore dialog's questions for the backup [file]'s keyboards (tests). */
