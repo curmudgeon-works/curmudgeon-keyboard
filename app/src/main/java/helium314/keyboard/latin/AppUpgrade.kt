@@ -79,9 +79,10 @@ internal fun heliBoardPins(): Map<String, Any> = mapOf(
 /**
  * A keyboard that picked the HeliBoard or HeliBoard extra Layout in 0.3.008 stored only what that Layout named; the rest
  * read the defaults of then, which the Curmudgeon Layout's values replaced on 2026-10-07. Each such set (the shared one
- * and every keyboard's own, in use or not) gets HeliBoard's values for those where it reads no value of its own: the
- * Layout was picked, so this is the pick written down, not a default (re-review 2026-10-07). The Layout renamed the same
- * day ("HeliBoard Extra" to "HeliBoard extra") keeps being the chosen one.
+ * and every keyboard's own that picked it, in use or not) gets HeliBoard's values for those where it reads no value of
+ * its own: the Layout was picked, so this is the pick written down, not a default (re-review 2026-10-07). A keyboard
+ * reading the shared choice reads the shared values too, and gets nothing (2026-10-10), except where it is marked "at
+ * the default". The Layout renamed the same day ("HeliBoard Extra" to "HeliBoard extra") keeps being the chosen one.
  */
 internal fun heliBoardLayoutPins(context: Context, real: SharedPreferences, freshInstall: Boolean) {
     if (real.getBoolean(HELIBOARD_LAYOUT_PINS_DONE, false)) return
@@ -99,9 +100,12 @@ internal fun heliBoardLayoutPins(context: Context, real: SharedPreferences, fres
                 // what the set reads: its own value, else (not marked "at the default") the shared one
                 fun reads(key: String): Any? = all[own(key)] ?: if (marked(key)) null else all[key]
                 val selected = reads(helium314.keyboard.settings.LayoutPresets.PREF_SELECTED) as? String ?: continue
-                if (selected == oldExtra) putString(own(helium314.keyboard.settings.LayoutPresets.PREF_SELECTED), extra)
                 if (selected != heli && selected != extra && selected != oldExtra) continue
-                for ((key, value) in heliBoardPins()) if (reads(key) == null) {
+                // (2026-10-10, review M3) a keyboard's own set gets values only where it picked the Layout itself, or
+                // where it reads the default of then (a mark) instead of the shared pin; else it reads the shared set's
+                val picked = id == KeyboardProfiles.SHARED || all.containsKey(own(helium314.keyboard.settings.LayoutPresets.PREF_SELECTED))
+                if (picked && selected == oldExtra) putString(own(helium314.keyboard.settings.LayoutPresets.PREF_SELECTED), extra)
+                for ((key, value) in heliBoardPins()) if (reads(key) == null && (picked || marked(key))) {
                     KeyboardProfiles.put(this, own(key), value)
                     if (marked(key)) remove(own(KeyboardProfiles.TOMBSTONE + key))
                 }

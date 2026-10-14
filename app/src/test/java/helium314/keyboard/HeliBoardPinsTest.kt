@@ -61,6 +61,33 @@ class HeliBoardPinsTest {
         assertNull(real.all[Settings.PREF_BACKSPACE_SPEED_UP], "the shared set didn't pick HeliBoard")
     }
 
+    // review 2026-10-08 M3: keyboards reading the shared HeliBoard Layout got their own set from the pins, and kept
+    // HeliBoard's values once the shared set later took another Layout (2026-10-10)
+    @Test fun `an update pins only the sets that picked a HeliBoard Layout, not keyboards reading the shared one`() {
+        val longPress = Settings.PREF_KEY_LONGPRESS_TIMEOUT
+        val extra = ctx.getString(R.string.layout_preset_heliboard_extra)
+        real.edit {
+            putInt(Settings.PREF_VERSION_CODE, 3008)
+            putBoolean(helium314.keyboard.latin.PICKED_ONLY_DONE, true) // a 0.3.008 phone
+            putString("keyboard_profile_ids", """{"en_US:":2,"de_DE:":3,"fr_FR:":4,"it_IT:":5}""")
+            putString(sel, "HeliBoard Extra") // the shared set, under 0.3.008's name
+            // keyboard 2: nothing of its own (learned words only)
+            putBoolean("p3/${KeyboardProfiles.TOMBSTONE}$longPress", true) // keyboard 3: its long press "at the default"
+            putString("p4/$sel", ctx.getString(R.string.layout_preset_heliboard)) // keyboard 4: its own pick
+            putBoolean("p5/${KeyboardProfiles.TOMBSTONE}$sel", true) // keyboard 5: no Layout chosen (the Curmudgeon one)
+        }
+        helium314.keyboard.latin.checkVersionUpgrade(ctx)
+        assertEquals(extra, real.getString(sel, null))
+        for ((key, value) in heliBoardPins()) assertEquals(value, real.all[key], key)
+        assertEquals(emptyList(), real.all.keys.filter { it.startsWith("p2/") }, "keyboard 2 got a set of its own")
+        // keyboard 3 read the default of then, HeliBoard's (300), and reads it still; the rest it reads from the shared set
+        assertEquals(300, real.all["p3/$longPress"])
+        assertNull(real.all["p3/${KeyboardProfiles.TOMBSTONE}$longPress"])
+        for (key in heliBoardPins().keys - longPress) assertNull(real.all["p3/$key"], key)
+        for ((key, value) in heliBoardPins()) assertEquals(value, real.all["p4/$key"], key)
+        for (key in heliBoardPins().keys + sel) assertNull(real.all["p5/$key"], key)
+    }
+
     @Test fun `a fresh install writes nothing and runs once`() {
         real.edit { putString(sel, ctx.getString(R.string.layout_preset_heliboard)) }
         heliBoardLayoutPins(ctx, real, freshInstall = true)
