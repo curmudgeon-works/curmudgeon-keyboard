@@ -6,7 +6,6 @@ import helium314.keyboard.latin.common.PictureFraming
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.ProfilePreferences
 import helium314.keyboard.latin.settings.KeyboardProfiles
-import helium314.keyboard.latin.utils.prefs
 import org.json.JSONObject
 import java.io.File
 
@@ -177,7 +176,11 @@ class AppearanceDraft private constructor(
          *  when that ends without any setting changing (2026-10-06: the Themes row kept "(unsaved)" after the tick). */
         val version = androidx.compose.runtime.mutableIntStateOf(0)
 
-        private fun currentPrefs(ctx: Context): Map<String, Any?> = AppearanceLooks.screenValues(ctx.prefs())
+        /** The screen's values in set [setId], the set the undo writes into ([reject]): read from the same set, so the
+         *  snapshot and what it puts back can't be two sets. (Until 2026-10-12 read through the context's preferences:
+         *  the same set for a settings screen, the keyboard in use for any other context.) */
+        private fun currentPrefs(ctx: Context, setId: String): Map<String, Any?> = AppearanceLooks.screenValues(
+            ProfilePreferences(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)) { setId })
 
         private fun liveFiles(ctx: Context) = listOf(
             Settings.getCustomBackgroundFile(ctx, false, false), Settings.getCustomBackgroundFile(ctx, false, true),
@@ -238,8 +241,8 @@ class AppearanceDraft private constructor(
             val files = liveFiles(ctx).associateWith { live ->
                 if (live.exists()) Saved(live.copyTo(File(dir, live.name), overwrite = true), live.length(), live.lastModified()) else null
             }
-            val prefs = currentPrefs(ctx)
             val setId = PrefsDraft.currentSetId(ctx)
+            val prefs = currentPrefs(ctx, setId)
             val reached = reachedNow(ctx)
             val labels = CustomLabels.Opened.of(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx), LABELS)
             writeSnapshot(dir, setId, prefs, files, reached, labels)

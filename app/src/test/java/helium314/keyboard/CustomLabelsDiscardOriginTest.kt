@@ -60,6 +60,8 @@ class CustomLabelsDiscardOriginTest {
      *  theme Old deleted before ("Custom · from Old"); Work deleted with Appearance open, keyboard 4 chooses Home. */
     private fun themeScenario(): Map<String, Any?> {
         storeKeyboards(ctx, real, (1..4).map { SettingsSubtype(Locale.US, "").withId(it) })
+        // the keyboard in use worked out for these keyboards (not left from the test before: the order tests run in)
+        KeyboardProfiles.refreshImeId(real)
         AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Work", mapOf(Settings.PREF_THEME_COLORS to "Warm")),
             AppearanceLooks.Look("Home", mapOf(Settings.PREF_THEME_COLORS to "Cool"))), now = true)
         real.edit().apply {
