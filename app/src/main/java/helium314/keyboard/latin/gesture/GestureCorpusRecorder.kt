@@ -74,7 +74,12 @@ object GestureCorpusRecorder {
     fun onTypedWordCommitted() { deletedAt = 0L }
 
     /** Another field: a swipe deleted in the last one says nothing about what's typed here (review 2026-10-06 Low). */
-    fun onFieldChanged() { deletedAt = 0L }
+    fun onFieldChanged() {
+        // a swipe still open was kept as it came: the next field's first word is not its outcome, and may be private
+        // (review 2026-10-08 M7, 2026-10-10)
+        if (pendingId >= 0) finish(SwipeMetrics.OUTCOME_KEPT, -1, null)
+        deletedAt = 0L
+    }
 
     fun corpusFile(): File? = file
 
@@ -175,7 +180,8 @@ object GestureCorpusRecorder {
         if (id < 0) return
         pendingId = -1L
         deletedAt = if (outcome == SwipeMetrics.OUTCOME_DELETED) System.currentTimeMillis() else 0L
-        if (lastPrivate) return // (made while typing privately: nothing of it is written)
+        // (made while typing privately, or settled while typing privately: nothing of it is written; 2026-10-10)
+        if (lastPrivate || SwipeMetrics.privateNow()) return
         SwipeMetrics.onOutcome(id, lastWord, outcome, rank, word, lastDecodeMs, lastSpeed, lastTuning)
         when (outcome) {
             SwipeMetrics.OUTCOME_PICKED -> if (rank != 0) correction(id, "pick", word)

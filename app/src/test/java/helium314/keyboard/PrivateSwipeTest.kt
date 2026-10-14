@@ -52,6 +52,27 @@ class PrivateSwipeTest {
         assertFalse("secret" in logged(), "the private swipe was logged")
     }
 
+    // review 2026-10-08 M7 (2026-10-10): a swipe still open when the field changes was settled by the next field's
+    // first word and logged, even when that field was private
+    @Test fun `a swipe open when the field changes is kept, and the next private field's word is not logged`() {
+        private = false
+        swipe("hello")
+        GestureCorpusRecorder.onFieldChanged()
+        private = true // (the new field is private)
+        GestureCorpusRecorder.onWordCommitted("secretword")
+        val log = logged()
+        assertFalse("secretword" in log, "the private field's word was logged")
+        assertTrue(log.lines().any { "\thello\t" in it && "\t${SwipeMetrics.OUTCOME_KEPT}\t" in it }, "the open swipe wasn't logged as kept: $log")
+    }
+
+    @Test fun `a swipe settled while the current field is private leaves no line`() {
+        private = false
+        swipe("hello")
+        private = true // (the same field restarted as private, no field change)
+        GestureCorpusRecorder.onWordCommitted("secretword")
+        assertFalse("secretword" in logged(), "the private field's word was logged")
+    }
+
     @Test fun `a normal swipe is logged`() {
         private = false
         swipe("hello")
