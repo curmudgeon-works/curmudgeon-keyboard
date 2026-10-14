@@ -34,6 +34,7 @@ import helium314.keyboard.settings.preferences.RestoreDecision
 import helium314.keyboard.settings.preferences.dictionaryClashesFrom
 import helium314.keyboard.settings.preferences.restoreChosenFrom
 import helium314.keyboard.settings.preferences.restorePlanFrom
+import helium314.keyboard.settings.preferences.restoreSummary
 import helium314.keyboard.settings.preferences.settingsToJsonStream
 import helium314.keyboard.withId
 import org.junit.After
@@ -230,6 +231,29 @@ class RestoreMergeItemsTest {
         assertEquals(listOf("fr"), restorePlanFrom(ctx, zip).dictionaryClashLanguages(listOf(frB)))
         assertEquals("Settings and dictionaries restored; your dictionaries kept as \"…prev\".",
             ctx.getString(helium314.keyboard.latin.R.string.restore_summary_settings))
+    }
+
+    // fail before (L3.1): the summary said "your dictionaries kept as …prev" whatever the answers were
+    @Test fun `the summary's dictionaries line follows the answers - kept aside only when a clash was restored`() {
+        dictDir("fr").mkdirs(); dict("fr", "main_user.dict").writeText("device")
+        backup(listOf(frB), entries = mapOf("dicts/fr/main_user.dict" to "backup".toByteArray()))
+        val skipped = restoreChosenFrom(ctx, zip, listOf(frB), settings = false, learnedWords = false, io = io,
+            dictionaries = true, decisions = mapOf(frB to RestoreDecision.Skip))
+        assertEquals("device", dict("fr", "main_user.dict").readText())
+        assertEquals(ctx.getString(helium314.keyboard.latin.R.string.restore_summary_settings_only), restoreSummary(ctx, skipped))
+        val unticked = restoreChosenFrom(ctx, zip, emptyList(), settings = false, learnedWords = false, io = io, dictionaries = true)
+        assertEquals(ctx.getString(helium314.keyboard.latin.R.string.restore_summary_settings_only), restoreSummary(ctx, unticked))
+        val restored = restoreDictionaries(ticked = true)
+        assertEquals("backup", dict("fr", "main_user.dict").readText())
+        assertEquals(ctx.getString(helium314.keyboard.latin.R.string.restore_summary_settings), restoreSummary(ctx, restored).lines().last())
+    }
+
+    // fail before (L3.1): a new dictionary, nothing kept aside, still said "kept as …prev"
+    @Test fun `the summary of a restore whose dictionary is new says nothing was kept aside`() {
+        backup(listOf(frB), entries = mapOf("dicts/fr/main_user.dict" to "backup".toByteArray()))
+        val restored = restoreDictionaries(ticked = true)
+        assertEquals("backup", dict("fr", "main_user.dict").readText())
+        assertEquals(ctx.getString(helium314.keyboard.latin.R.string.restore_summary_settings_dictionaries), restoreSummary(ctx, restored).lines().last())
     }
 
     // ---- 5. the clipboard merges (owner 2026-10-12: "yes, merge clipboard") ----

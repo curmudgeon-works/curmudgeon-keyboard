@@ -494,16 +494,26 @@ private class RestoreChoice(
 
 /** What a keyboard by keyboard restore did: each restored backup keyboard as it is on the device now ([onDevice]),
  *  those whose settings wait behind the common ones ([hidden], R7), and by name what was merged into the device's
- *  ([merged]: keyboards, and saved items replaced) and what was added ([added]). */
+ *  ([merged]: keyboards, and saved items replaced) and what was added ([added]); the dictionaries ([dictionaries]). */
 internal class Restored(val onDevice: Map<SettingsSubtype, SettingsSubtype>, val hidden: List<SettingsSubtype>,
-                        val merged: List<String>, val added: List<String>)
+                        val merged: List<String>, val added: List<String>,
+                        val dictionaries: RestoredDictionaries = RestoredDictionaries())
+
+/** The backup's dictionaries a restore brought: [keptAside], the languages (tags) whose device dictionary was kept
+ *  aside as "…prev" for the backup's (a clash, as the keyboards' answers had it); [any], whether any came in. */
+internal data class RestoredDictionaries(val keptAside: Set<String> = emptySet(), val any: Boolean = false)
 
 /** The "Backup restored" dialog's text after a keyboard by keyboard restore (owner 2026-10-12): "Merged: …", "Added: …",
- *  the settings and dictionaries line, then the common settings' note when it applies ([hiddenSettingsNote]). */
+ *  the settings and dictionaries line, then the common settings' note when it applies ([hiddenSettingsNote]). The
+ *  dictionaries line says what the restore did with them (review L3.1: "kept as …prev" whatever the answers were). */
 internal fun restoreSummary(ctx: Context, restored: Restored): String = listOfNotNull(
     restored.merged.takeIf { it.isNotEmpty() }?.let { ctx.getString(R.string.restore_summary_merged, it.joinToString(", ")) },
     restored.added.takeIf { it.isNotEmpty() }?.let { ctx.getString(R.string.restore_summary_added, it.joinToString(", ")) },
-    ctx.getString(R.string.restore_summary_settings),
+    ctx.getString(when {
+        restored.dictionaries.keptAside.isNotEmpty() -> R.string.restore_summary_settings
+        restored.dictionaries.any -> R.string.restore_summary_settings_dictionaries
+        else -> R.string.restore_summary_settings_only
+    }),
     hiddenSettingsNote(ctx, restored.hidden),
 ).joinToString("\n")
 
@@ -1426,9 +1436,10 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, plan: Res
     try {
         // the device side, then the saved items, the dictionaries (between them and the keyboards), the settings and the
         // keyboards (owner 2026-10-12: "A keyboard never arrives before what it names")
+        var dictionaries = RestoredDictionaries()
         val restored = restoreKeyboards(ctx, pending, plan, restoring, choice.settings, choice.names, choice.decisions, changing) {
             changing()
-            restoreDictionaries(ctx, pending.prefs, dictsDir, dictFolders, clashesFor = tags)
+            dictionaries = restoreDictionaries(ctx, pending.prefs, dictsDir, dictFolders, clashesFor = tags)
             dictsDir.deleteRecursively()
         }
         // (the learned words, the clips and the personal dictionary words change the device too)
@@ -1448,7 +1459,7 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, plan: Res
         }
         BackupRestoreJob.step() // (the learned words)
         LayoutUtilsCustom.onLayoutFileChanged()
-        return restored
+        return Restored(restored.onDevice, restored.hidden, restored.merged, restored.added, dictionaries)
     } catch (t: Throwable) {
         throw if (changed) RestoreStoppedPartway(t) else t
     }
@@ -1458,25 +1469,31 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, plan: Res
  * The backup's added dictionaries unpacked in [dictsDir] ("<tag>/<name>") into the device's language folders
  * ([folders], by tag) as [RestoreDictionaries] plans them: a clash, or a match selected (B4), only for the languages
  * [clashesFor] (the restored keyboards', Dictionaries ticked); for the others only the new ones come in, the device's
- * stay.
+ * stay. Returns what came in (the "Backup restored" dialog's line).
  */
-private fun restoreDictionaries(ctx: Context, backupPrefs: Map<String, Any?>, dictsDir: File, folders: Map<String, File>, clashesFor: Set<String>) {
+private fun restoreDictionaries(ctx: Context, backupPrefs: Map<String, Any?>, dictsDir: File, folders: Map<String, File>,
+                                clashesFor: Set<String>): RestoredDictionaries {
     val backup = HashMap<RestoreDictionaries.Entry, String>()
     for (tag in folders.keys) File(dictsDir, tag).listFiles()?.forEach { f ->
         if (f.isFile) backup[RestoreDictionaries.Entry(tag, f.name)] = f.inputStream().use { RestoreDictionaries.digest(it) }
     }
-    if (backup.isEmpty()) return
+    if (backup.isEmpty()) return RestoredDictionaries()
     val steps = RestoreDictionaries.plan(backup, backupPrefs) { tag -> folders[tag]?.let { RestoreDictionaries.deviceDigests(it) }.orEmpty() }
+    val keptAside = LinkedHashSet<String>()
+    var any = false
     for (step in steps) {
         // (the device's stays: no clash, and no match selected, B4)
         if (step.action != RestoreDictionaries.Action.NEW && step.tag !in clashesFor) continue
         val dir = folders[step.tag] ?: continue
         try {
             RestoreDictionaries.apply(step, dir, File(File(dictsDir, step.tag), step.backupName), ctx.realPrefs())
+            any = true
+            if (step.action == RestoreDictionaries.Action.CLASH && step.renames.isNotEmpty()) keptAside += step.tag
         } catch (t: Throwable) {
             Log.w("AdvancedScreen", "error restoring the dictionary ${step.tag}/${step.backupName}", t)
         }
     }
+    return RestoredDictionaries(keptAside, any)
 }
 
 /** The languages whose dictionary in the backup [pending] clashes with the device's (the restore dialog's subtext; read

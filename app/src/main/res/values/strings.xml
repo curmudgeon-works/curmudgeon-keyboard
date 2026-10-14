@@ -752,6 +752,10 @@
     <string name="restore_summary_merged">Merged: %s</string>
     <string name="restore_summary_added">Added: %s</string>
     <string name="restore_summary_settings">Settings and dictionaries restored; your dictionaries kept as \"…prev\".</string>
+    <!-- instead of restore_summary_settings: dictionaries came in, none of the device's had to be kept aside -->
+    <string name="restore_summary_settings_dictionaries">Settings and dictionaries restored.</string>
+    <!-- instead of restore_summary_settings: no dictionary came in -->
+    <string name="restore_summary_settings_only">Settings restored.</string>
     <!-- after a restore of the first keyboard while its settings are the common ones: %s the keyboard -->
     <string name="restore_settings_main">%s\'s settings were restored. All keyboards use them, as they\'re the common settings.</string>
     <string name="restore_differs_choose_message">A ticked item takes the backup\'s. An unticked item keeps this device\'s.</string>
