@@ -306,6 +306,8 @@ private fun writeBackup(ctx: Context, open: () -> OutputStream?): Boolean {
             BackupRestoreJob.step()
         }
         val dbFile = ctx.getDatabasePath(Database.NAME)
+        // the rows still in the write-ahead log into the file first: the file alone is copied (review 2026-10-12 L2)
+        try { Database.checkpoint(ctx) } catch (t: Throwable) { Log.w("AdvancedScreen", "error checkpointing the clipboard database", t) }
         if (dbFile.exists()) {
             val fileStream = FileInputStream(dbFile).buffered()
             zipStream.putNextEntry(ZipEntry(Database.NAME))

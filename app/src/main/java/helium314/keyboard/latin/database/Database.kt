@@ -30,6 +30,14 @@ class Database private constructor(context: Context, name: String = NAME) : SQLi
             return instance!!
         }
 
+        /** Everything written so far folded into the database file itself (its write-ahead log checkpointed), so a copy
+         *  of the file alone holds every row: the backup copies the file (review 2026-10-12 L2: rows still in the log
+         *  were missing from it). Nothing when there is no database yet. */
+        fun checkpoint(context: Context) {
+            if (!context.getDatabasePath(NAME).exists()) return
+            getInstance(context).writableDatabase.rawQuery("PRAGMA wal_checkpoint(FULL)", null).use { it.moveToFirst() }
+        }
+
         // needs to be in sync with db version
         /** The clips of the database [file] replace the phone's (a full restore), or with [mergeKeeping] (the history
          *  size) are merged into them (a partial restore, owner 2026-10-12: backup's clips added, exact duplicates
