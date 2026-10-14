@@ -180,12 +180,15 @@ fun rememberPrefsDraft(name: String, keys: Collection<String>, onClickBack: () -
  * While a restore runs (it goes on after its dialog closed), a screen that takes a snapshot when it opens (Appearance,
  * Layout & Typing, the [rememberPrefsDraft] screens) shows "Restore in progress…" under its [title] instead, and opens,
  * its snapshot taken then, once the restore ended (owner 2026-10-12 A5: a snapshot taken mid-restore put a half-restored
- * state back on Discard). True: the waiting screen shows; the caller shows nothing else and takes no snapshot.
+ * state back on Discard). True: the waiting screen shows (without a search); the caller shows nothing else and takes no
+ * snapshot.
  */
 @Composable
 fun WaitingForRestore(title: String, onClickBack: () -> Unit): Boolean {
     if (!BackupRestoreJob.restoring) return false
-    SearchSettingsScreen(onClickBack = onClickBack, title = title, settings = emptyList()) {
+    // no search: there is nothing on it to find (round-7 review 20261013_L10_3, owner 2026-10-14)
+    SearchScreen<Any?>(onClickBack = onClickBack, title = { Text(title) }, filteredItems = { emptyList() }, itemContent = { },
+        icon = { }) {
         Text(stringResource(R.string.restore_in_progress), modifier = Modifier.padding(16.dp))
     }
     return true

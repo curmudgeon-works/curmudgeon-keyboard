@@ -6,6 +6,7 @@ import android.os.Looper
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -51,6 +52,7 @@ class RestoreWaitScreensTest {
     private var scenario: ActivityScenario<SettingsActivity>? = null
     private val gate = CountDownLatch(1)
     private val waiting get() = ctx.getString(R.string.restore_in_progress)
+    private val search get() = ctx.getString(R.string.label_search_key)
     private val fineTuneDraft get() = File(ctx.filesDir, "prefs_draft_finetunelearning.json")
 
     @After fun tearDown() {
@@ -94,6 +96,20 @@ class RestoreWaitScreensTest {
         endRestore()
         compose.onNodeWithText(waiting).assertDoesNotExist()
         assertNotNull(AppearanceDraft.activeOrNull(), "the screen opened with its snapshot after the restore")
+    }
+
+    // round-7 review 20261013_L10_3 (owner 2026-10-14): the waiting screen has no search, there is nothing on it to find;
+    // the screen opened after the restore has its search. Fail before: the waiting screen showed a search button
+    @Test fun `the waiting screen has no search`() {
+        restoreRunning()
+        scenario = ActivityScenario.launch(SettingsActivity::class.java).onActivity { it.setContent {
+            CompositionLocalProvider(LocalSettingsMenu provides KeyboardProfiles.Group.LEARNING) { FineTuneLearningScreen(onClickBack = { }) }
+        } }
+        compose.waitForIdle()
+        compose.onNodeWithText(waiting).assertExists()
+        compose.onNodeWithContentDescription(search).assertDoesNotExist()
+        endRestore()
+        compose.onNodeWithContentDescription(search).assertExists()
     }
 
     // the same for a screen with a PrefsDraft (its snapshot is a file); fail before: the file was written at once
