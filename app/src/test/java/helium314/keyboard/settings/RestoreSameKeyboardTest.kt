@@ -60,7 +60,11 @@ class RestoreSameKeyboardTest {
     private fun phoneAndBackup() {
         // (separate settings on: the keyboard's own set is read; owner 2026-10-11: R7, a restore never turns separate
         // settings on)
-        real.edit().putString(Settings.PREF_ADDITIONAL_SUBTYPES, phone.toPref()).putBoolean("separate_settings_per_keyboard", true).commit() // (a keyboard of the user's)
+        // (the list stored with it, before anything else: owner 2026-10-11, the first start stores a default keyboard, and
+        // a list replaced after a write gave that default keyboard a set made it a switched-off keyboard of this phone)
+        real.edit().putString(Settings.PREF_ADDITIONAL_SUBTYPES, phone.toPref())
+            .putString(Settings.PREF_ENABLED_SUBTYPES, phone.toPref()).putString(Settings.PREF_SELECTED_SUBTYPE, phone.toPref())
+            .putBoolean("separate_settings_per_keyboard", true).commit() // (a keyboard of the user's)
         useKeyboards(ctx, real, phone)
         assertEquals(listOf(phone), enabled())
         // (each keyboard's settings its own set, the phone's and the backup's; owner 2026-10-11: no separate common set;
