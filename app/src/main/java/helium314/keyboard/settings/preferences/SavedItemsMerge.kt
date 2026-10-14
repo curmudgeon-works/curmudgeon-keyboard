@@ -17,9 +17,9 @@ import helium314.keyboard.settings.SavedItemDefaults
  * number"): every popup set, Layout and theme of the backup comes in unless the phone has one with the same content
  * (any name; then the phone's is used). A name the phone uses already (its own items or a built-in) gets the next free
  * number, "Sunset 2", when [asCopies] (the restore dialog's tick, on by default); off, it's not brought in and nothing
- * names it: the keyboards that chose it keep its look and show "Custom 1", a Layout that held such a popup set keeps its
+ * names it: the keyboards that chose it keep its look and show "Custom", a Layout that held such a popup set keeps its
  * popups (owner 2026-10-11 chose this "option 2": names never point at other content; before, they named the phone's
- * same-named item, "Custom 1 · from Sunset" on a look that isn't Sunset).
+ * same-named item, "Custom · from Sunset" on a look that isn't Sunset).
  * Inner items first (popup sets), then the outer ones (Layouts) with their references rewritten, so a second restore
  * of the same backup adds nothing. The result maps each kind's backup names to the phone's. The custom key layouts that
  * came in under other names (restoreLayoutFiles) are named so in the Layouts, and in the keyboards' defaults for each type.
@@ -46,7 +46,7 @@ internal object SavedItemsMerge {
 
         private fun names(key: String, value: Any?) = value is String && value in notBrought[key].orEmpty()
 
-        /** The kinds whose item the keyboard ([values], before [apply]) chose wasn't brought in: it gets its Custom number. */
+        /** The kinds whose item the keyboard ([values], before [apply]) chose wasn't brought in: it gets its Custom label. */
         fun customKinds(values: Map<String, Any?>): List<helium314.keyboard.settings.CustomLabels.Kind> = listOfNotNull(
             helium314.keyboard.settings.CustomLabels.Kind.POPUPS.takeIf { names(KeyPopupOverrides.PREF_SELECTED_SET, values[KeyPopupOverrides.PREF_SELECTED_SET]) },
             helium314.keyboard.settings.CustomLabels.Kind.LAYOUT.takeIf { names(LayoutPresets.PREF_SELECTED, values[LayoutPresets.PREF_SELECTED]) },

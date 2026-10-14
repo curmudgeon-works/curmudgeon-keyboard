@@ -18,6 +18,7 @@ import java.io.File
 import java.util.Locale
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 
 /**
  * Edits made while settings are shared stay with the keyboard whose settings were made the shared ones; the others get
@@ -77,15 +78,16 @@ class SharedEditsStayTest {
         assertEquals(false, real.contains(KeyboardProfiles.ownKey(1, gap)))
     }
 
+    // (owner 2026-10-11: labels are just "Custom", no number; only kept palettes are numbered)
     @Test fun `a Custom label given while shared goes to the keyboard shared from`() {
-        assertEquals(1, CustomLabels.number(real, view(2), CustomLabels.Kind.THEME)) // Hindi's own
+        CustomLabels.mark(view(2), CustomLabels.Kind.THEME) // Hindi's own
         share(1)
-        val given = CustomLabels.number(real, view(1), CustomLabels.Kind.THEME)
-        assertEquals(2, given)
+        assertFalse(CustomLabels.has(view(1), CustomLabels.Kind.THEME)) // (English's choice, shared: no label)
+        CustomLabels.mark(view(1), CustomLabels.Kind.THEME)
         unshare()
-        assertEquals(given, view(1).getInt(label, 0))
-        assertEquals(given, real.getInt(KeyboardProfiles.ownKey(1, label), 0), "English lost the label") // (its own, not a fallback)
-        assertEquals(1, view(2).getInt(label, 0))
+        assertEquals(CustomLabels.SET, view(1).getInt(label, 0))
+        assertEquals(CustomLabels.SET, real.getInt(KeyboardProfiles.ownKey(1, label), 0), "English lost the label") // (its own, not a fallback)
+        assertEquals(CustomLabels.SET, view(2).getInt(label, 0))
     }
 
     @Test fun `a picture changed while shared goes to the keyboard shared from`() {

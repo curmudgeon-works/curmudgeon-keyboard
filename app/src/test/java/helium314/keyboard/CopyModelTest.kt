@@ -30,7 +30,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Owner 2026-10-11, the copy model: a keyboard's changes stay its own ("Custom 1 · from Sunset") until a saved item is
+ * Owner 2026-10-11, the copy model: a keyboard's changes stay its own ("Custom · from Sunset") until a saved item is
  * deliberately updated (its save icon); the update reaches the other keyboards ticked in its dialog, and the open
  * screen's Discard undoes it there too.
  */
@@ -55,16 +55,17 @@ class CopyModelTest {
     }
     @After fun tearDown() { AppearanceDraft.close(); helium314.keyboard.settings.LayoutDraft.close(); real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
 
-    @Test fun `Custom labels number per kind across keyboards, and go when an item is chosen`() {
-        assertEquals(1, CustomLabels.number(real, view(1), CustomLabels.Kind.THEME))
-        assertEquals(1, CustomLabels.number(real, view(1), CustomLabels.Kind.THEME)) // (kept)
-        assertEquals(2, CustomLabels.number(real, view(2), CustomLabels.Kind.THEME))
-        assertEquals(1, CustomLabels.number(real, view(2), CustomLabels.Kind.LAYOUT)) // (each kind its own)
+    // (owner 2026-10-11: labels are just "Custom", no number; only kept palettes are numbered)
+    @Test fun `Custom labels per kind and keyboard, the same text on each, and go when an item is chosen`() {
+        CustomLabels.mark(view(1), CustomLabels.Kind.THEME)
+        CustomLabels.mark(view(2), CustomLabels.Kind.THEME)
+        assertEquals(1, real.getInt(own(1, CustomLabels.Kind.THEME.key), 0))
+        assertEquals(1, real.getInt(own(2, CustomLabels.Kind.THEME.key), 0)) // (repeats are fine)
+        assertFalse(CustomLabels.has(view(2), CustomLabels.Kind.LAYOUT)) // (each kind its own)
         CustomLabels.clear(view(1), CustomLabels.Kind.THEME)
         assertFalse(real.contains(own(1, CustomLabels.Kind.THEME.key)))
-        assertEquals(1, CustomLabels.number(real, view(1), CustomLabels.Kind.THEME)) // (the free number again)
-        assertEquals("Custom 2 · from Sunset", CustomLabels.text(ctx, 2, "Sunset"))
-        assertEquals("Custom 2", CustomLabels.text(ctx, 2, null))
+        assertEquals("Custom · from Sunset", CustomLabels.text(ctx, "Sunset"))
+        assertEquals("Custom", CustomLabels.text(ctx, null))
     }
 
     @Test fun `a keyboard's popups differ from its set when an arrangement or the map changed`() {
@@ -106,7 +107,7 @@ class CopyModelTest {
 
     @Test fun `an updated popup set reaches a ticked keyboard and a ticked saved Layout`() {
         val set = KeyPopupOverrides.UserSet("Mine", "all", null, mapOf("e" to listOf("é")), "q!", "x")
-        view(2).edit().putString(KeyPopupOverrides.PREF_SELECTED_SET, "Old").putInt(CustomLabels.Kind.POPUPS.key, 3).commit()
+        view(2).edit().putString(KeyPopupOverrides.PREF_SELECTED_SET, "Old").putInt(CustomLabels.Kind.POPUPS.key, 1).commit()
         applySetToOther(ctx, fr, set, takeNew = true)
         assertEquals("Mine", real.getString(own(2, KeyPopupOverrides.PREF_SELECTED_SET), null))
         assertEquals(mapOf("e" to listOf("é")), KeyPopupOverrides.load(view(2)))
@@ -176,8 +177,8 @@ class CopyModelTest {
 
     @Test fun `a Custom label given while Appearance is open is no change of the screen`() {
         val draft = AppearanceDraft.of(ctx)
-        CustomLabels.number(real, view(1), CustomLabels.Kind.THEME)
-        CustomLabels.number(real, view(2), CustomLabels.Kind.THEME)
+        CustomLabels.mark(view(1), CustomLabels.Kind.THEME)
+        CustomLabels.mark(view(2), CustomLabels.Kind.THEME)
         assertFalse(draft.hasChanges(ctx))
     }
 
@@ -222,16 +223,17 @@ class CopyModelTest {
     }
 
     // review 2026-10-11 D1: owner "yes, one copy one number". A menu shared by all keyboards shows them one copy, so one
-    // Custom number, stored in the shared set; per keyboard each its own. A label, never a saved theme or Layout.
-    @Test fun `a menu shared by all keyboards has one Custom number for its one copy`() {
+    // Custom label, stored in the shared set; per keyboard each its own. A label, never a saved theme or Layout.
+    // (owner 2026-10-11: labels are just "Custom", no number; only kept palettes are numbered)
+    @Test fun `a menu shared by all keyboards has one Custom label for its one copy`() {
         real.edit().putBoolean(KeyboardProfiles.Group.APPEARANCE.prefKey, true).putBoolean(KeyboardProfiles.Group.LAYOUT.prefKey, true).commit()
         KeyboardProfiles.loadGroups(real)
         val appearance = AppearanceDraft.of(ctx)
         val layout = helium314.keyboard.settings.LayoutDraft.of(ctx, us.toPref())
         for (kind in CustomLabels.Kind.entries) {
-            val first = CustomLabels.number(real, view(1), kind)
-            assertEquals(first, CustomLabels.number(real, view(2), kind), kind.name)
-            assertEquals(first, real.getInt(kind.key, 0), kind.name) // (in the shared set)
+            CustomLabels.mark(view(1), kind)
+            assertTrue(CustomLabels.has(view(2), kind), kind.name)
+            assertEquals(1, real.getInt(kind.key, 0), kind.name) // (in the shared set)
             assertFalse(real.contains(own(1, kind.key)) || real.contains(own(2, kind.key)), kind.name)
         }
         assertTrue(AppearanceLooks.load(real).isEmpty())
@@ -240,13 +242,15 @@ class CopyModelTest {
         assertFalse(layout.hasChanges(ctx))
     }
 
-    @Test fun `a menu per keyboard numbers each keyboard's copy`() {
+    // (owner 2026-10-11: labels are just "Custom", no number; only kept palettes are numbered)
+    @Test fun `a menu per keyboard labels each keyboard's copy`() {
         val appearance = AppearanceDraft.of(ctx)
         val layout = helium314.keyboard.settings.LayoutDraft.of(ctx, us.toPref())
         for (kind in CustomLabels.Kind.entries) {
-            assertEquals(1, CustomLabels.number(real, view(1), kind), kind.name)
-            assertEquals(2, CustomLabels.number(real, view(2), kind), kind.name)
-            assertEquals(1, real.getInt(own(1, kind.key), 0)); assertEquals(2, real.getInt(own(2, kind.key), 0))
+            CustomLabels.mark(view(1), kind)
+            assertFalse(CustomLabels.has(view(2), kind), kind.name)
+            CustomLabels.mark(view(2), kind)
+            assertEquals(1, real.getInt(own(1, kind.key), 0)); assertEquals(1, real.getInt(own(2, kind.key), 0))
             assertFalse(real.contains(kind.key), kind.name)
         }
         assertTrue(AppearanceLooks.load(real).isEmpty())
@@ -255,14 +259,14 @@ class CopyModelTest {
         assertFalse(layout.hasChanges(ctx))
     }
 
-    @Test fun `a Custom number moves with its menu when the menu becomes shared`() {
-        assertEquals(1, CustomLabels.number(real, view(1), CustomLabels.Kind.THEME))
-        assertEquals(2, CustomLabels.number(real, view(2), CustomLabels.Kind.THEME))
+    // (owner 2026-10-11: labels are just "Custom", no number; only kept palettes are numbered)
+    @Test fun `a Custom label moves with its menu when the menu becomes shared`() {
+        CustomLabels.mark(view(1), CustomLabels.Kind.THEME) // (keyboard 2: no copy)
         KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.APPEARANCE, true, 2)
-        assertEquals(2, CustomLabels.number(real, view(1), CustomLabels.Kind.THEME)) // (keyboard 2's copy won: its number)
+        assertFalse(CustomLabels.has(view(1), CustomLabels.Kind.THEME)) // (keyboard 2's choice won: no label)
         // (owner 2026-10-11: sharing a menu keeps each keyboard's own) kept, unread, back when per keyboard again
-        assertEquals(1, real.getInt(own(1, CustomLabels.Kind.THEME.key), 0)); assertEquals(2, real.getInt(own(2, CustomLabels.Kind.THEME.key), 0))
+        assertEquals(1, real.getInt(own(1, CustomLabels.Kind.THEME.key), 0))
         KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.APPEARANCE, false, KeyboardProfiles.SHARED)
-        assertEquals(1, CustomLabels.number(real, view(1), CustomLabels.Kind.THEME))
+        assertTrue(CustomLabels.has(view(1), CustomLabels.Kind.THEME))
     }
 }

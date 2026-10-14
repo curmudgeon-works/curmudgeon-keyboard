@@ -31,8 +31,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Owner 2026-10-11, delete = off the list only: every keyboard and saved item using it keeps its copy, shown as Custom 1,
- * Custom 2 …; nothing goes back to the default, nothing comes back by itself. Fonts are the exception (owner 2026-10-11:
+ * Owner 2026-10-11, delete = off the list only: every keyboard and saved item using it keeps its copy, shown as Custom
+ * (a kept palette as Custom 1, Custom 2 …); nothing goes back to the default, nothing comes back by itself. Fonts are the exception (owner 2026-10-11:
  * global delete): the file goes and its users go back to the default font.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -54,7 +54,8 @@ class DeleteKeepsCopiesTest {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
     }
 
-    @Test fun `a deleted Layout leaves its keyboards their settings, each with its Custom number`() {
+    // (owner 2026-10-11: labels are just "Custom", no number; only kept palettes are numbered)
+    @Test fun `a deleted Layout leaves its keyboards their settings, each with its Custom label`() {
         LayoutPresets.save(real, listOf(LayoutPresets.Preset("Work", mapOf(Settings.PREF_SHOW_NUMBER_ROW to true))))
         real.edit().putString(own(1, LayoutPresets.PREF_SELECTED), "Work").putBoolean(own(1, Settings.PREF_SHOW_NUMBER_ROW), true)
             .putString(own(2, LayoutPresets.PREF_SELECTED), "Work").commit()
@@ -62,7 +63,7 @@ class DeleteKeepsCopiesTest {
         assertTrue(LayoutPresets.load(real).isEmpty())
         assertEquals(true, real.all[own(1, Settings.PREF_SHOW_NUMBER_ROW)]) // (kept)
         assertNull(real.getString(own(1, LayoutPresets.PREF_SELECTED), null))
-        assertEquals(setOf(1, 2), setOf(real.getInt(own(1, CustomLabels.Kind.LAYOUT.key), 0), real.getInt(own(2, CustomLabels.Kind.LAYOUT.key), 0)))
+        assertEquals(listOf(1, 1), listOf(real.getInt(own(1, CustomLabels.Kind.LAYOUT.key), 0), real.getInt(own(2, CustomLabels.Kind.LAYOUT.key), 0)))
         assertTrue(CustomLabels.has(view(1), CustomLabels.Kind.LAYOUT))
     }
 

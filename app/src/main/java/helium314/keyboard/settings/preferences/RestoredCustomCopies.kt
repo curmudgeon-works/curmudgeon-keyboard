@@ -4,39 +4,17 @@ package helium314.keyboard.settings.preferences
 import helium314.keyboard.keyboard.KeyboardTheme
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
-import helium314.keyboard.settings.CustomLabels
 
 /**
- * Restoring some keyboards (review C4, owner "yes"): a restored keyboard's "Custom N" labels and kept palette copies
- * ("~custom:N") come in under the next free number on the phone when the phone uses that number for another copy
- * already, so two different copies never both show "Custom 1". Plain counters, as [CustomLabels.number] and
- * [KeyboardTheme.nextHiddenPalette] give them. [phone]: the phone's stored settings without the sets of the keyboards
- * being replaced by the restore.
+ * Restoring some keyboards (review C4, owner "yes"): a restored keyboard's kept palette copies ("~custom:N") come in
+ * under the next free number on the phone when the phone uses that number for another copy already, so two different
+ * palettes never share a name. Plain counters, as [KeyboardTheme.nextHiddenPalette] gives them. The "Custom" labels
+ * of Layouts, themes and popups come in as they are: no number (owner 2026-10-11).
  */
 internal object RestoredCustomCopies {
     private val colorPrefixes = listOf(Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
     private val colorChoices = listOf(Settings.PREF_THEME_COLORS, Settings.PREF_THEME_COLORS_NIGHT)
     private val hiddenNumber = Regex(Regex.escape(KeyboardTheme.HIDDEN_PALETTE) + "(\\d+)")
-
-    /** The restored keyboards' settings ([restored], plain keys) with each Custom label number another set on the
-     *  phone has for that kind replaced by the next free one. */
-    fun <K> labels(phone: Map<String, Any?>, restored: Map<K, Map<String, Any?>>): Map<K, Map<String, Any?>> {
-        var result = restored
-        for (kind in CustomLabels.Kind.entries) {
-            val onPhone = phone.filterKeys { (KeyboardProfiles.splitOwnKey(it)?.second ?: it) == kind.key }.values.filterIsInstance<Int>().toSet()
-            val numbers = restored.values.mapNotNull { (it[kind.key] as? Int)?.takeIf { n -> n > 0 } }
-            val taken = (onPhone + numbers).toMutableSet()
-            val kept = HashSet<Int>()
-            result = result.mapValues { (_, values) ->
-                val n = (values[kind.key] as? Int)?.takeIf { it > 0 } ?: return@mapValues values
-                if (n !in onPhone && kept.add(n)) return@mapValues values
-                val next = generateSequence(1) { it + 1 }.first { it !in taken }
-                taken += next
-                values + (kind.key to next)
-            }
-        }
-        return result
-    }
 
     /** The colours of kept palette [name] in [values] (plain keys), by prefix. */
     private fun colors(values: Map<String, Any?>, name: String) =

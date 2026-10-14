@@ -996,14 +996,14 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, asked: List<
     // one mapping, backup keyboard -> the phone keyboard it becomes: its key layouts as they came in (B4), merged or
     // added as answered, named as answered
     val onPhone = chosen.associateWith { keyboard -> RestoreDecision.result(decisions[keyboard], renamedLayouts(keyboard, keyLayouts), nameOf)!! }
-    // (their Custom numbers and kept palette copies: the next free ones where the phone's other sets use them, review C4;
+    // (their kept palette copies: the next free numbers where the phone's other sets use them, review C4;
     // the sets of the phone keyboards they merge into don't count)
     val replacing = KeyboardProfiles.idEntries(real).let { ids ->
         (chosen + onPhone.values + replaces.values.map { it.phone }).mapNotNull { ids[it.toPref()] } }.toSet() - KeyboardProfiles.SHARED
     val phone = real.all.filterKeys { KeyboardProfiles.splitOwnKey(it)?.first !in replacing }
     val renames = if (withSettings) SavedItemsMerge.merge(ctx, real, backup, asCopies, files?.first.orEmpty(), files?.second.orEmpty(), keyLayouts,
         chosen.map { KeyboardProfiles.effectiveSettingsIn(backup, it) }, phone) else null
-    val settings = RestoredCustomCopies.labels(phone, backupSettings.mapValues { (_, values) -> renames?.apply(values) ?: values })
+    val settings = backupSettings.mapValues { (_, values) -> renames?.apply(values) ?: values }
     val wasSeparate = KeyboardProfiles.isSeparate(real)
 
     if (withSettings) {
@@ -1056,9 +1056,9 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, asked: List<
             // (one set for all: turning separate settings on later gives it this set, not the common one)
             if (!wasSeparate) KeyboardProfiles.restoredBehindShared(real, id)
             // an item it chose that wasn't brought in (its name is the phone's for other content, copies off): it names
-            // none and shows "Custom 1" (owner 2026-10-11, option 2); of the menus taken from the backup only
+            // none and shows "Custom" (owner 2026-10-11, option 2); of the menus taken from the backup only
             renames?.customKinds(backupSettings.getValue(keyboard).filterKeys { takesSetting(keyboard, it) })?.forEach {
-                helium314.keyboard.settings.CustomLabels.numberOwn(real, id, it) }
+                helium314.keyboard.settings.CustomLabels.markOwn(real, id, it) }
             // its languages' priorities, into its own set (not the shared one, which every other keyboard reads: review
             // session 2026-10-07): the backup's own copy for this keyboard first, else the backup's shared value
             // (merged in parts: only when its languages are the backup's)

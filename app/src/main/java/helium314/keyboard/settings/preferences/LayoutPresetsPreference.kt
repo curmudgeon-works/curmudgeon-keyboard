@@ -69,14 +69,14 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
     val changed = (ctx.getActivity() as? helium314.keyboard.settings.SettingsActivity)?.prefChanged?.collectAsState()
     val chosen = prefs.getString(LayoutPresets.PREF_SELECTED, null)?.let { name -> all.firstOrNull { it.name == name } }
         ?: builtIn.first()
-    // its Layout was deleted: its copy, "Custom 1", until it chooses one again
+    // its Layout was deleted: its copy, "Custom", until it chooses one again
     val detached = prefs.getString(LayoutPresets.PREF_SELECTED, null) == null
         && helium314.keyboard.settings.CustomLabels.has(prefs, helium314.keyboard.settings.CustomLabels.Kind.LAYOUT)
     val tweaked = detached || remember(changed?.value, keyboard, chosen, generation) { LayoutPresets.isTweaked(ctx, keyboard, chosen) }
-    // differs from it: the keyboard's own copy, "Custom 1 · from Work" (2026-10-11; was "unsaved")
+    // differs from it: the keyboard's own copy, "Custom · from Work" (2026-10-11, no number since; was "unsaved")
     val customText = if (!tweaked) null else remember(tweaked, chosen.name, generation) {
-        helium314.keyboard.settings.CustomLabels.text(ctx, helium314.keyboard.settings.CustomLabels.number(ctx.realPrefs(), prefs,
-            helium314.keyboard.settings.CustomLabels.Kind.LAYOUT), chosen.name.takeIf { !detached })
+        helium314.keyboard.settings.CustomLabels.mark(prefs, helium314.keyboard.settings.CustomLabels.Kind.LAYOUT)
+        helium314.keyboard.settings.CustomLabels.text(ctx, chosen.name.takeIf { !detached })
     }
     Preference(name = stringResource(R.string.layout_presets),
         description = customText ?: chosen.name, descriptionItalic = tweaked,

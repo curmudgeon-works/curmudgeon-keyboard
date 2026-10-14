@@ -27,8 +27,8 @@ class AppearanceDraft private constructor(
     // themes, each set's theme choice and palettes, so Discard undoes a rename or delete everywhere it reached (owner
     // 2026-10-11: "Every action on an editing screen ... is held until Save; Discard undoes it everywhere it reached")
     private val reached: Map<String, Any?> = emptyMap(),
-    // the theme Custom labels stored when the screen opened (any set): Discard takes back the ones handed out since
-    // (review D2); not part of hasChanges, as a label alone is no change of the screen. Null: none taken back
+    // the theme Custom labels stored when the screen opened (any set): Discard drops the ones added since
+    // (review D2); not part of hasChanges, as a label alone is no change of the screen. Null: none dropped
     private val labels: Set<String>? = null,
     // what the palette editor wrote with its Save: kept when the app is left (owner 2026-10-11, S2: "yes let's keep
     // saved subscreen changes"), undone by Appearance's own Discard

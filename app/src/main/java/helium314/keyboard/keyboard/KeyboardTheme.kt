@@ -594,7 +594,7 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
         fun isHiddenPalette(name: String) = name.startsWith(HIDDEN_PALETTE)
         /** A palette's name as shown: its own, or "Custom N" for a kept copy. */
         fun paletteName(context: Context, name: String): String =
-            if (isHiddenPalette(name)) helium314.keyboard.settings.CustomLabels.text(context, name.removePrefix(HIDDEN_PALETTE).toIntOrNull() ?: 1, null)
+            if (isHiddenPalette(name)) context.getString(helium314.keyboard.latin.R.string.custom_n, name.removePrefix(HIDDEN_PALETTE).toIntOrNull() ?: 1)
             else name
 
         /** The next free kept-copy name, numbered across every keyboard's set and the saved themes. */

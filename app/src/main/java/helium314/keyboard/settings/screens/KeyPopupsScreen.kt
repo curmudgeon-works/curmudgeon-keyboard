@@ -148,15 +148,14 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
         val current = currentPopupPreset(prefs, keyboard, presets, overrides)
         @Composable fun presetName(p: Preset) = p.userName ?: stringResource(p.name)
         // the keyboard's popups differ from the set it chose (edits stay on the keyboard until saved, 2026-10-11): it
-        // shows "Custom 1 · from Mine"; no set and no built-in recipe: "Custom 1"
+        // shows "Custom · from Mine"; no set and no built-in recipe: "Custom"
         val chosenSet = current?.userName?.let { name -> userSets.firstOrNull { it.name == name } }
         val differs = chosenSet != null && popupSetDiffers(prefs, keyboard, chosenSet, overrides,
             helium314.keyboard.settings.SavedItemDefaults.takeNewDefaults(ctx.realPrefs()))
         val custom = current == null || differs
         val rowLabel = if (!custom) presetName(current!!) else remember(custom, chosenSet?.name, generation) {
-            helium314.keyboard.settings.CustomLabels.text(ctx,
-                helium314.keyboard.settings.CustomLabels.number(ctx.realPrefs(), prefs, helium314.keyboard.settings.CustomLabels.Kind.POPUPS),
-                chosenSet?.name)
+            helium314.keyboard.settings.CustomLabels.mark(prefs, helium314.keyboard.settings.CustomLabels.Kind.POPUPS)
+            helium314.keyboard.settings.CustomLabels.text(ctx, chosenSet?.name)
         }
         // every arrangement belongs to a set of the user's own: into the selected one, or into a new one to be named
         fun storeInSet(name: String, all: Map<String, List<String>>) {
@@ -461,7 +460,7 @@ internal fun customizePopupsSaved() {
 internal fun deletePopupSet(ctx: Context, name: String) {
     val real = ctx.realPrefs()
     helium314.keyboard.settings.CustomLabels.detach(real, KeyPopupOverrides.PREF_SELECTED_SET, name,
-        helium314.keyboard.settings.CustomLabels.Kind.POPUPS) // (keyboards keep their popups: Custom N)
+        helium314.keyboard.settings.CustomLabels.Kind.POPUPS) // (keyboards keep their popups: Custom)
     KeyPopupOverrides.saveSets(real, KeyPopupOverrides.loadSets(real).filter { it.name != name })
     KeyboardProfiles.forgetValueEverywhere(real, KeyPopupOverrides.PREF_SELECTED_SET, name)
     helium314.keyboard.settings.LayoutPresets.onPopupSetRenamed(real, name, null) // (saved Layouts keep the popups, not the name)
@@ -541,7 +540,7 @@ fun CustomizePopupsScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     val unfolded = rememberSaveable(saver = listSaver(save = { it.toList() }, restore = { mutableStateListOf(*it.toTypedArray()) })) { mutableStateListOf<String>() }
     var tab by rememberSaveable { mutableIntStateOf(0) }
     // a change stays on the keyboard (owner 2026-10-11: a saved item changes only when deliberately updated, its save
-    // icon in the presets list): the keyboard shows "Custom 1 · from <set>" until then
+    // icon in the presets list): the keyboard shows "Custom · from <set>" until then
     fun applyChange(overrideKey: String, labels: List<String>?) {
         val all = overrides.toMutableMap().also { if (labels == null) it.remove(overrideKey) else it[overrideKey] = labels }
         KeyPopupOverrides.save(prefs, all)

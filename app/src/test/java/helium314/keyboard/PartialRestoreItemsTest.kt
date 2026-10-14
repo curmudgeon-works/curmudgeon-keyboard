@@ -106,8 +106,8 @@ class PartialRestoreItemsTest {
         assertEquals(listOf("Sunset"), AppearanceLooks.load(real).map { it.name }) // (the phone's Sunset)
         assertEquals(1f, AppearanceLooks.load(real).single().values[Settings.PREF_KEY_HORIZONTAL_GAP])
         // the taken name with other content: the keyboard keeps the backup's look but names no theme, so it shows a
-        // plain "Custom N", not "Custom N · from Sunset" (owner 2026-10-11 chose option 2: names never point at other
-        // content; before, it named the phone's Sunset)
+        // plain "Custom", not "Custom · from Sunset" (owner 2026-10-11 chose option 2: names never point at other
+        // content; before, it named the phone's Sunset) (owner 2026-10-11: labels are just "Custom", no number; only kept palettes are numbered)
         assertEquals(3f, own().getFloat(Settings.PREF_KEY_HORIZONTAL_GAP, 0f))
         assertNull(own().getString(AppearanceLooks.PREF_SELECTED, null))
         assertTrue(CustomLabels.has(own(), CustomLabels.Kind.THEME))
@@ -119,7 +119,7 @@ class PartialRestoreItemsTest {
         restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true, asCopies = false)
         assertEquals(listOf("Mine"), KeyPopupOverrides.loadSets(real).map { it.name }) // (the phone's Mine, unchanged)
         assertEquals(listOf("à"), KeyPopupOverrides.loadSets(real).single().overrides["a"])
-        // (owner 2026-10-11, option 2: the keyboard names no set and shows "Custom N"; the Layout brought in keeps its
+        // (owner 2026-10-11, option 2: the keyboard names no set and shows "Custom"; the Layout brought in keeps its
         // popups but names no set either)
         assertNull(own().getString(KeyPopupOverrides.PREF_SELECTED_SET, null))
         assertTrue(CustomLabels.has(own(), CustomLabels.Kind.POPUPS))

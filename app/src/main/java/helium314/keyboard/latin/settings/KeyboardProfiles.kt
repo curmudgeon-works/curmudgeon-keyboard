@@ -57,7 +57,7 @@ object KeyboardProfiles {
         REFINE("share_group_refine", true), // "Fine-tune suggestions": your hand, so one set by default
         LEARNING("share_group_learning", true); // "Fine-tune learning" (split from Refine 2026-10-10): your words, the same
 
-        // (a "Custom N" label follows its menu: one shared copy, one number; review 2026-10-11 D1. Here, not in the
+        // (a "Custom" label follows its menu: one shared copy, one label; review 2026-10-11 D1. Here, not in the
         // screens' scopes: a label is no setting of a saved Layout or theme, and no change of the screen's draft)
         fun contains(key: String): Boolean = when (this) {
             LAYOUT -> helium314.keyboard.settings.LayoutDraft.inScope(key) || key in layoutLabelKeys

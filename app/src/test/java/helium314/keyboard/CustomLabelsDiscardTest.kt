@@ -25,9 +25,10 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Review D2 (owner: "Yes"): Discard also takes back the "Custom N" numbers handed out while the screen was open (a saved
- * theme, Layout or popup set deleted gives its keyboards one), so a later keyboard doesn't skip to "Custom 2". Numbers
- * there before the screen opened stay; Save keeps the new ones; a label alone is no unsaved change.
+ * Review D2 (owner: "Yes"): Discard also drops the "Custom" labels added while the screen was open (a saved theme,
+ * Layout or popup set deleted gives its keyboards one), so a Discard leaves no stray "Custom". Labels there before
+ * the screen opened stay; Save keeps the new ones; a label alone is no unsaved change.
+ * (owner 2026-10-11: labels are just "Custom", no number; only kept palettes are numbered)
  */
 @RunWith(RobolectricTestRunner::class)
 class CustomLabelsDiscardTest {
@@ -38,8 +39,8 @@ class CustomLabelsDiscardTest {
     private val layout = CustomLabels.Kind.LAYOUT.key
     private val popups = CustomLabels.Kind.POPUPS.key
 
-    /** Separate settings; keyboard 2 on theme "Sunset", Layout "Work", popup set "Mine"; keyboard 1 already has Custom 1
-     *  of each kind. */
+    /** Separate settings; keyboard 2 on theme "Sunset", Layout "Work", popup set "Mine"; keyboard 1 already has a Custom
+     *  label of each kind. */
     @Before fun setUp() {
         real.edit().clear()
             .putBoolean("separate_settings_per_keyboard", true)
@@ -64,22 +65,20 @@ class CustomLabelsDiscardTest {
         AppearanceLooks.choiceRenamed(ctx, "Sunset", null)
     }
 
-    @Test fun `Discard on Appearance takes back the Custom number a theme delete gave`() {
+    @Test fun `Discard on Appearance drops the Custom label a theme delete gave`() {
         AppearanceDraft.of(ctx)
         deleteSunset()
-        assertEquals(2, real.getInt(own(2, theme), 0))
+        assertEquals(1, real.getInt(own(2, theme), 0))
         AppearanceDraft.rejectOpen(ctx)
         assertEquals("Sunset", real.getString(own(2, AppearanceLooks.PREF_SELECTED), null))
         assertFalse(real.contains(own(2, theme)))
         assertEquals(1, real.getInt(own(1, theme), 0))
-        // the next keyboard needing one gets 2, not 3
-        assertEquals(2, CustomLabels.number(real, ProfilePreferences(real) { 2 }, CustomLabels.Kind.THEME))
     }
 
-    @Test fun `a Custom number alone is no unsaved change on Appearance, and Discard takes it back`() {
+    @Test fun `a Custom label alone is no unsaved change on Appearance, and Discard takes it back`() {
         val draft = AppearanceDraft.of(ctx)
-        CustomLabels.number(real, ProfilePreferences(real) { 2 }, CustomLabels.Kind.THEME)
-        CustomLabels.number(real, real, CustomLabels.Kind.THEME) // (the shared set too)
+        CustomLabels.mark(ProfilePreferences(real) { 2 }, CustomLabels.Kind.THEME)
+        CustomLabels.mark(real, CustomLabels.Kind.THEME) // (the shared set too)
         assertFalse(draft.hasChanges(ctx))
         AppearanceDraft.rejectOpen(ctx)
         assertFalse(real.contains(own(2, theme)))
@@ -87,14 +86,14 @@ class CustomLabelsDiscardTest {
         assertEquals(1, real.getInt(own(1, theme), 0))
     }
 
-    @Test fun `Save on Appearance keeps the Custom number`() {
+    @Test fun `Save on Appearance keeps the Custom label`() {
         val draft = AppearanceDraft.of(ctx)
         deleteSunset()
         draft.accept(ctx)
-        assertEquals(2, real.getInt(own(2, theme), 0))
+        assertEquals(1, real.getInt(own(2, theme), 0))
     }
 
-    @Test fun `a crash with Appearance open takes back the Custom number too`() {
+    @Test fun `a crash with Appearance open drops the Custom label too`() {
         AppearanceDraft.of(ctx)
         deleteSunset()
         AppearanceDraft.forgetActiveForTest()
@@ -103,12 +102,12 @@ class CustomLabelsDiscardTest {
         assertEquals(1, real.getInt(own(1, theme), 0))
     }
 
-    @Test fun `Discard on Layout and Typing takes back the Custom numbers of a Layout and a popup set delete`() {
+    @Test fun `Discard on Layout and Typing drops the Custom labels of a Layout and a popup set delete`() {
         LayoutDraft.of(ctx, "en_US:")
         LayoutPresets.delete(real, "Work")
         deletePopupSet(ctx, "Mine")
-        assertEquals(2, real.getInt(own(2, layout), 0))
-        assertEquals(2, real.getInt(own(2, popups), 0))
+        assertEquals(1, real.getInt(own(2, layout), 0))
+        assertEquals(1, real.getInt(own(2, popups), 0))
         LayoutDraft.rejectOpen(ctx)
         assertEquals("Work", real.getString(own(2, LayoutPresets.PREF_SELECTED), null))
         assertFalse(real.contains(own(2, layout)))
@@ -117,19 +116,19 @@ class CustomLabelsDiscardTest {
         assertEquals(1, real.getInt(own(1, popups), 0))
     }
 
-    @Test fun `a Custom number alone is no unsaved change on Layout and Typing`() {
+    @Test fun `a Custom label alone is no unsaved change on Layout and Typing`() {
         val draft = LayoutDraft.of(ctx, "en_US:")
-        CustomLabels.number(real, ProfilePreferences(real) { 2 }, CustomLabels.Kind.LAYOUT)
+        CustomLabels.mark(ProfilePreferences(real) { 2 }, CustomLabels.Kind.LAYOUT)
         assertFalse(draft.hasChanges(ctx))
         LayoutDraft.rejectOpen(ctx)
         assertFalse(real.contains(own(2, layout)))
     }
 
-    @Test fun `Save on Layout and Typing keeps the Custom number, a crash takes it back`() {
+    @Test fun `Save on Layout and Typing keeps the Custom label, a crash drops it`() {
         val draft = LayoutDraft.of(ctx, "en_US:")
         LayoutPresets.delete(real, "Work")
         draft.accept()
-        assertEquals(2, real.getInt(own(2, layout), 0))
+        assertEquals(1, real.getInt(own(2, layout), 0))
 
         LayoutDraft.of(ctx, "en_US:")
         deletePopupSet(ctx, "Mine")
@@ -137,6 +136,6 @@ class CustomLabelsDiscardTest {
         LayoutDraft.forgetActiveForTest()
         LayoutDraft.recoverAfterCrash(ctx)
         assertFalse(real.contains(own(2, popups)))
-        assertEquals(2, real.getInt(own(2, layout), 0)) // (kept by the Save before)
+        assertEquals(1, real.getInt(own(2, layout), 0)) // (kept by the Save before)
     }
 }

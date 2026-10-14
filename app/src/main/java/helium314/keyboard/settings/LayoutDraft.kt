@@ -30,8 +30,8 @@ class LayoutDraft private constructor(
     private val dir: File,
     /** The keyboard (subtype preference string) the screen was opened for. */
     val subtype: String,
-    // the Layout and popup Custom labels stored when the screen opened (any set): Discard takes back the ones handed out
-    // since (review D2); out of [changedKeys], as a label alone is no change of the screen. Null: none taken back
+    // the Layout and popup Custom labels stored when the screen opened (any set): Discard drops the ones added
+    // since (review D2); out of [changedKeys], as a label alone is no change of the screen. Null: none dropped
     private val labels: Set<String>? = null,
     // what the screens opened from here wrote with their Save: kept when the app is left (owner 2026-10-11, S2: "yes
     // let's keep saved subscreen changes"), undone by this screen's own Discard

@@ -26,9 +26,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * Restoring some keyboards (review C4, owner "yes"): a restored keyboard's "Custom N" labels and kept palette copies
- * ("~custom:N") get the next free number on the phone when the phone already uses that number for another copy, so two
- * different copies never both show "Custom 1".
+ * Restoring some keyboards (review C4, owner "yes"): a restored keyboard's kept palette copies ("~custom:N") get the
+ * next free number on the phone when the phone already uses that number for another copy, so two different palettes
+ * never share a name. Its "Custom" labels come in as they are (owner 2026-10-11: labels are just "Custom", no number; only kept palettes are numbered).
  */
 @RunWith(RobolectricTestRunner::class)
 class PartialRestoreCustomNumbersTest {
@@ -76,15 +76,17 @@ class PartialRestoreCustomNumbersTest {
     private fun restoredId() = KeyboardProfiles.idEntries(real).getValue(restored.toPref())
     private fun restoredOwn(key: String) = real.all[KeyboardProfiles.ownKey(restoredId(), key)]
 
-    @Test fun `a restored keyboard's Custom number taken on the phone gets the next free one`() {
+    // (owner 2026-10-11: labels are just "Custom", no number; only kept palettes are numbered)
+    @Test fun `a restored keyboard's Custom label the phone has too stays as it is`() {
         phone(own = mapOf(CustomLabels.Kind.THEME.key to 1))
         backup(own = mapOf(CustomLabels.Kind.THEME.key to 1))
         restoreKeyboardsFrom(ctx, zip, listOf(restored), withSettings = true)
-        assertEquals(2, restoredOwn(CustomLabels.Kind.THEME.key))
+        assertEquals(1, restoredOwn(CustomLabels.Kind.THEME.key))
         assertEquals(1, real.all[KeyboardProfiles.ownKey(1, CustomLabels.Kind.THEME.key)])
     }
 
-    @Test fun `a restored Custom number free on the phone stays`() {
+    // (an older backup's numbered label: still a label, the number as it was)
+    @Test fun `a restored Custom label stays`() {
         phone(own = mapOf(CustomLabels.Kind.THEME.key to 1))
         backup(own = mapOf(CustomLabels.Kind.LAYOUT.key to 1, CustomLabels.Kind.THEME.key to 3))
         restoreKeyboardsFrom(ctx, zip, listOf(restored), withSettings = true)
