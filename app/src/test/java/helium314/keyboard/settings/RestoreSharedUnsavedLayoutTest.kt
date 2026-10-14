@@ -75,7 +75,11 @@ class RestoreSharedUnsavedLayoutTest {
 
     /** The device: [phones] (separate settings on); the backup: [inBackup] (the device's keyboards themselves, their
      *  ids), each with the saved number row [name] holding [keys]. */
-    private fun deviceAndBackup(phones: List<SettingsSubtype>, inBackup: List<SettingsSubtype>, name: String, keys: String) {
+    private fun deviceAndBackup(phones: List<SettingsSubtype>, inBackup: List<SettingsSubtype>, name: String, keys: String) =
+        deviceAndBackup(phones, inBackup, name to keys)
+
+    /** As above, the backup with the number rows [layouts] (name to keys). */
+    private fun deviceAndBackup(phones: List<SettingsSubtype>, inBackup: List<SettingsSubtype>, vararg layouts: Pair<String, String>) {
         real.edit().putBoolean("separate_settings_per_keyboard", true).commit()
         useKeyboards(ctx, real, *phones.toTypedArray())
         val list = SubtypeSettings.createPrefSubtypes(inBackup)
@@ -86,7 +90,9 @@ class RestoreSharedUnsavedLayoutTest {
                 helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
                 helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
             z.closeEntry()
-            z.putNextEntry(ZipEntry("unprotected/layouts/${type.name.lowercase()}/$name")); z.write(keys.toByteArray()); z.closeEntry()
+            for ((name, keys) in layouts) {
+                z.putNextEntry(ZipEntry("unprotected/layouts/${type.name.lowercase()}/$name")); z.write(keys.toByteArray()); z.closeEntry()
+            }
         }
     }
 
@@ -138,5 +144,32 @@ class RestoreSharedUnsavedLayoutTest {
             decisions = mapOf(hindiBackup to wholeMerge(hindiBackup, hindiPhone), englishBackup to wholeMerge(englishBackup, englishPhone)))
         assertEquals(setOf(numrow, temp, temp2), folder().list()!!.toSet())
         assertEquals(setOf("A", "C"), setOf(file(temp).readText(), file(temp2).readText()))
+    }
+
+    // round-6 review 20261013_L1_2 (owner 2026-10-13): another keyboard the merge gives a layout of the same unsaved name
+    // but other keys (a backup of this device, the layout edited since) doesn't use the device's layout: the restore
+    // renames the device's file and brings the backup's under the name. Fail before: it counted as a user, so no temp
+    // save and no warning; the device's layout was renamed, left unused and deleted by the cleanup (its keys lost)
+    @Test fun `a keyboard the backup gives a same-named unsaved layout with other keys is no user - the device's one is saved`() {
+        val p = unsaved("A")
+        val numrow = LayoutUtilsCustom.getLayoutName("My numrow", type)
+        val hindiPhone = hindi.withLayout(type, p).withId(1) // on the device's unsaved P
+        val englishPhone = english.withId(2) // not on P
+        val hindiBackup = hindi.withLayout(type, numrow).withId(1) // switches Hindi to My numrow
+        val englishBackup = english.withLayout(type, p).withId(2) // gives English the backup's P: other keys
+        deviceAndBackup(listOf(hindiPhone, englishPhone), listOf(hindiBackup, englishBackup), numrow to "B", p to "Z")
+        val englishMerge = wholeMerge(englishBackup, englishPhone)
+        val hindiMerge = wholeMerge(hindiBackup, hindiPhone)
+
+        val row = restoreDifferencesFrom(ctx, zip, hindiBackup, hindiPhone).filterIsInstance<RestoreMatch.Difference.Definition>()
+            .single { it.part == RestoreMatch.Part.Layout(type) }
+        assertEquals(warningText, RestoreMatch.unsavedWarning(ctx, row, restorePlanFrom(ctx, zip).unsavedSaves(hindiPhone, mapOf(englishBackup to englishMerge))))
+
+        restoreKeyboardsFrom(ctx, zip, listOf(hindiBackup, englishBackup), withSettings = true,
+            decisions = mapOf(hindiBackup to hindiMerge, englishBackup to englishMerge))
+        assertEquals(numrow, listed(1).layoutName(type))
+        assertEquals(p, listed(2).layoutName(type))
+        assertEquals("Z", file(p).readText(), "the backup's P under its name")
+        assertEquals("A", file(temp).readText(), "the device's keys, saved")
     }
 }
