@@ -2,6 +2,7 @@
 package helium314.keyboard
 
 import android.content.Context
+import android.os.Looper
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
@@ -45,6 +46,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -86,6 +88,10 @@ class SwitchedOffTileTest {
         SubtypeSettings.reloadEnabledSubtypes(ctx)
         LearnedStores.refresh(real)
         KeyboardProfiles.filesDir = filesDirBefore
+        // the work this test queued on the main thread (Compose's notice of the Advanced switch's state written above,
+        // the screen's last taps) done here: dropped at the end of the test, it left the next class's settings screens
+        // deaf to taps (EditingKeyboardTest's keyboard B didn't unfold)
+        shadowOf(Looper.getMainLooper()).idle()
     }
 
     /** Ids: a 1, b 2, c 3 (switched off), e 4 (switched off), f the shared set; pools: a 5, b 6, d 8 and e 9 (switched off);
