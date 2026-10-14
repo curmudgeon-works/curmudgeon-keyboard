@@ -23,10 +23,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import helium314.keyboard.latin.DictionaryFacilitatorImpl
 import helium314.keyboard.latin.R
+import helium314.keyboard.latin.personalization.LearnedKeyboards
 import helium314.keyboard.latin.personalization.LearningEventLog
 import helium314.keyboard.latin.personalization.LearnedStores
 import helium314.keyboard.latin.personalization.PersonalizationHelper
-import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.getSecondaryLocales
@@ -68,7 +68,7 @@ const val LIST_LEARNED = "learned"
 const val LIST_BLACKLISTED = "blacklisted"
 
 /** One row of the scripts list: [script] with its [locales], in learned-words [pool]. */
-private class ScriptRowData(val script: String, val locales: List<Locale>, val pool: Int)
+internal class ScriptRowData(val script: String, val locales: List<Locale>, val pool: Int)
 
 /** The scripts of the keyboard's languages, each with its two lists (2026-10-04): Learned (learned words and the
  *  personal dictionary together) and Blacklisted; per keyboard when keyboards don't share them. The personal
@@ -118,12 +118,12 @@ fun LearnedWordsScriptsScreen(onClickBack: () -> Unit) {
 }
 
 /** The rows of the scripts list: without a heading when the keyboards share their words, else under each keyboard. */
-private fun scriptSections(context: Context): List<Pair<String?, List<ScriptRowData>>> {
+internal fun scriptSections(context: Context): List<Pair<String?, List<ScriptRowData>>> {
     val real = context.realPrefs()
     if (LearnedStores.isShared(real))
         return listOf(null to scriptLocales().map { (script, locales) -> ScriptRowData(script, locales, LearnedStores.SHARED) })
     return SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.distinct().map { keyboard ->
-        val pool = KeyboardProfiles.idFor(real, keyboard)
+        val pool = LearnedKeyboards.poolFor(real, keyboard)
         val rows = (listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)).groupBy { it.script() }
             .map { (script, locales) -> ScriptRowData(script, locales, pool) }
         keyboardName(keyboard, context) to rows

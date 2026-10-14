@@ -63,7 +63,7 @@ object LearnedPools {
 
     /** The pools of the keyboards in the list. */
     fun keyboardPools(real: SharedPreferences): List<Int> =
-        SubtypeSettings.getEnabledSubtypes(true).map { KeyboardProfiles.idFor(real, it.toSettingsSubtype()) }.distinct()
+        SubtypeSettings.getEnabledSubtypes(true).map { LearnedKeyboards.poolFor(real, it.toSettingsSubtype()) }.distinct()
 
     /** Each of [pools] gets a copy of the shared learned words and blacklists (what it had of its own before is replaced). */
     fun separate(filesDir: File, io: LearnedStoreIo, pools: Collection<Int>): Boolean {

@@ -39,6 +39,7 @@ import helium314.keyboard.latin.common.FileUtils
 import helium314.keyboard.latin.database.Database
 import helium314.keyboard.latin.gesture.GestureDecoderVocabulary
 import helium314.keyboard.latin.personalization.LearnedEntry
+import helium314.keyboard.latin.personalization.LearnedKeyboards
 import helium314.keyboard.latin.personalization.LearnedStoreFiles
 import helium314.keyboard.latin.personalization.LearnedStoreIo
 import helium314.keyboard.latin.personalization.LearnedPools
@@ -511,7 +512,7 @@ private fun restoreAllSettings(ctx: Context, pending: PendingRestore, io: Learne
     // the backup's keyboards (review 2026-10-07: the phone's list, not reloaded yet, gave the phone's old keyboards ids
     // and copies, and the backup's keyboards new to the phone none)
     if (filesDir != null && !LearnedStores.isShared(real))
-        LearnedPools.separate(filesDir, io, pending.keyboards.map { KeyboardProfiles.idFor(real, it) }.distinct())
+        LearnedPools.separate(filesDir, io, pending.keyboards.map { LearnedKeyboards.poolFor(real, it) }.distinct())
     LearnedStores.refresh(real)
 }
 
@@ -803,13 +804,12 @@ private fun restoreLearnedWords(ctx: Context, backup: Map<String, Any?>, keyboar
                                 io: LearnedStoreIo) {
     val filesDir = ctx.filesDir ?: return
     val real = ctx.realPrefs()
-    val phoneShared = LearnedStores.isShared(real)
     val backupShared = backup[Settings.PREF_SHARE_LEARNED_WORDS] != false
     // (phone pool, script) -> the backup's stores and lists that go there
     val stores = LinkedHashMap<Pair<Int, String>, MutableSet<File>>()
     val lists = LinkedHashMap<Pair<Int, String>, MutableSet<File>>()
     for (keyboard in keyboards) {
-        val pool = if (phoneShared) LearnedStores.SHARED else KeyboardProfiles.idFor(real, keyboard)
+        val pool = LearnedKeyboards.poolFor(real, keyboard)
         val backupPool = if (backupShared) LearnedStores.SHARED else KeyboardProfiles.anyIdIn(backup, keyboard) ?: LearnedStores.SHARED
         val locales = listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)
         for (script in locales.map { it.script() }.distinct()) {

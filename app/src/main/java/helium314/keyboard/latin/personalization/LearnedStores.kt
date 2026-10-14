@@ -38,8 +38,7 @@ object LearnedStores {
     fun isShared(prefs: SharedPreferences) = prefs.getBoolean(Settings.PREF_SHARE_LEARNED_WORDS, Defaults.PREF_SHARE_LEARNED_WORDS)
 
     /** The pool of the selected keyboard. [real]: the preferences as stored (not a keyboard's profile view). */
-    fun poolFor(real: SharedPreferences): Int =
-        if (isShared(real)) SHARED else KeyboardProfiles.idFor(real, KeyboardProfiles.selectedKeyboard(real))
+    fun poolFor(real: SharedPreferences): Int = LearnedKeyboards.poolFor(real, KeyboardProfiles.selectedKeyboard(real))
 
     /** Re-reads which pool is in use (on every keyboard switch, and after the setting changed). A keyboard's own pool
      *  with nothing on disk yet (added since sharing went off) is first filled with a copy of the shared words, in the
