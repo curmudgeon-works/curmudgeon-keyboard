@@ -14,6 +14,7 @@ import helium314.keyboard.latin.personalization.putStoreForTest
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
+import helium314.keyboard.latin.utils.RemovedWords
 import helium314.keyboard.latin.utils.protectedPrefs
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.preferences.BackupRestoreJob
@@ -68,6 +69,7 @@ class FullRestoreRaceTest {
         KeyboardProfiles.loadGroups(real)
         ctx.filesDir.deleteRecursively()
         DeviceProtectedUtils.getFilesDir(ctx).deleteRecursively()
+        RemovedWords.cachedIn(ctx.filesDir).forEach { it.reload() } // (the lists held for the process: empty again)
         zip.delete()
     }
 
@@ -140,6 +142,24 @@ class FullRestoreRaceTest {
         val before = told()
         assertEquals(null, fullRestoreJob())
         assertEquals(before + 1, told(), "no new-dictionary broadcast without an activity: the keyboard kept its old dictionaries")
+    }
+
+    @Test fun `a strike on the old in-memory blacklist during the restore - the restored file wins, the strike on top`() {
+        backup(blacklist = "backupword\n")
+        val file = LearnedStores.blacklistFile(ctx.filesDir, "Latn", LearnedStores.SHARED)
+        file.parentFile!!.mkdirs()
+        file.writeText("oldword\n")
+        val list = RemovedWords.forFile(file)
+        list.reload() // (the keyboard holds the device's list, read)
+        assertEquals(setOf("oldword"), list.entries().keys)
+        // the keyboard's Remove right after the restore copied the list (its write would be the whole old list)
+        FullRestore.afterStep = { if (it == BLACKLIST) { list.strike("newstrike"); list.reload() } }
+        restoreEverythingFrom(ctx, zip)
+        val lines = file.readLines().filter { it.isNotEmpty() }.toSet()
+        assertTrue("backupword" in lines, "the old list was written over the restored one: $lines")
+        assertTrue("newstrike" in lines, "the strike made during the restore was lost: $lines")
+        assertFalse("oldword" in lines, "the old device's word came back: $lines")
+        assertEquals(setOf("backupword", "newstrike"), list.entries().keys, "the keyboard's list isn't the restored one")
     }
 
     private companion object {

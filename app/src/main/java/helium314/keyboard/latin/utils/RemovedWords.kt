@@ -4,6 +4,7 @@ package helium314.keyboard.latin.utils
 import android.content.Context
 import helium314.keyboard.latin.personalization.LearnedStoreMigration
 import helium314.keyboard.latin.personalization.LearnedStores
+import helium314.keyboard.latin.personalization.RestoreGate
 import java.io.File
 import java.io.IOException
 import java.util.Locale
@@ -52,6 +53,9 @@ object RemovedWords {
 
     /** The list objects held for files in [dir] (or below it). */
     fun cachedIn(dir: File): List<WordListFile> = (dir.absolutePath + File.separator).let { start -> lists.filterKeys { it.startsWith(start) }.values.toList() }
+
+    /** Waits for the list writes already started (a full restore, before its wipe: RestoreGate). */
+    fun awaitWrites() { io.submit { }.get() }
 
     // ------------------------------- the rule -------------------------------
 
@@ -342,15 +346,29 @@ object RemovedWords {
         // the whole list each time (a count changes in place; the lists are short), after the changes before it
         private fun write() = io.execute {
             synchronized(lock) {
-                try {
-                    if (file.isDirectory) file.delete()
-                    file.parentFile?.mkdirs()
-                    file.writeText(formatAll(byWord, allowedByWord))
-                    pending.clear()
-                } catch (e: IOException) {
-                    Log.e(TAG, "Exception while trying to write word list ${file.name}", e)
-                }
+                // while a full restore replaces the files (owner 2026-10-12: "A + B + swipe stats makes sense"), the
+                // whole list in memory is still the old device's: the changes stay pending, put on top of the restored
+                // file and written once it's done ([writePending])
+                if (RestoreGate.isSet) return@synchronized
+                writeLocked()
             }
+        }
+
+        private fun writeLocked() {
+            try {
+                if (file.isDirectory) file.delete()
+                file.parentFile?.mkdirs()
+                file.writeText(formatAll(byWord, allowedByWord))
+                pending.clear()
+            } catch (e: IOException) {
+                Log.e(TAG, "Exception while trying to write word list ${file.name}", e)
+            }
+        }
+
+        /** The changes kept in memory while a full restore ran (RestoreGate), written now, after what's being written;
+         *  nothing if there are none (call off the main thread, after [reload] put them on top of the restored file). */
+        fun writePending() {
+            io.submit { synchronized(lock) { if (pending.isNotEmpty()) writeLocked() } }.get()
         }
 
         // [word]'s row: its blocked row [entry], or none with null; an allowed row of it goes either way

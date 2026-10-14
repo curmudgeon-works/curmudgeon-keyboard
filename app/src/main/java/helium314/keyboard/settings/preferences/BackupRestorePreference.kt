@@ -958,7 +958,7 @@ private fun restoreRefresh(ctx: Context) {
 private fun restoreEverything(ctx: Context, file: File, promised: PendingRestore? = null) = LearnedKeyboards.withFiles {
     // [promised]: what the restore dialog showed of [file] (null: no dialog, tests), checked with the rest before the wipe
     checkFullBackup(file, promised) // (throws, nothing deleted)
-    underRestoreGate {
+    underRestoreGate(ctx) {
         replaceEverythingChecked(ctx, file)
         // (a backup from before the keyboards had ids: ids first, so the learned words' update finds each keyboard by its own)
         helium314.keyboard.latin.settings.KeyboardIdUpgrade.upgrade(ctx)
@@ -971,16 +971,26 @@ private fun restoreEverything(ctx: Context, file: File, promised: PendingRestore
  * [work] (the full restore's file copies, on this thread) with [RestoreGate] set, so the running keyboard can't save
  * what it still holds of the old device over the restored files (owner 2026-10-12: "A + B + swipe stats makes sense"):
  * the open learned-word stores are closed first, without saving (the restore replaces their files), and stay closed
- * until it's done. The gate goes after [work], when it failed too, so it never sticks. Only the full restore: a keyboard
- * restore never wipes, and it merges into the live stores and lists under their own locks.
+ * until it's done; the blacklists keep their changes in memory meanwhile, put on top of the restored files at the end
+ * and written then (a word removed during the restore stays removed). The gate goes after [work], when it failed too,
+ * so it never sticks. Only the full restore: a keyboard restore never wipes, and it merges into the live stores and
+ * lists under their own locks.
  */
-private fun underRestoreGate(work: () -> Unit) {
+private fun underRestoreGate(ctx: Context, work: () -> Unit) {
     RestoreGate.begin()
     try {
         PersonalizationHelper.reloadAllFromFiles()
+        RemovedWords.awaitWrites() // (one started before the gate lands before the wipe)
         work()
     } finally {
+        val filesDir = ctx.filesDir
+        // the blacklists the keyboard holds read the restored files, their changes since on top (still gated: a strike
+        // meanwhile stays pending too)
+        if (filesDir != null) for (list in RemovedWords.cachedIn(filesDir))
+            try { list.reload() } catch (t: Throwable) { Log.w("AdvancedScreen", "error reading a blacklist after restore", t) }
         RestoreGate.end()
+        if (filesDir != null) for (list in RemovedWords.cachedIn(filesDir))
+            try { list.writePending() } catch (t: Throwable) { Log.w("AdvancedScreen", "error writing a blacklist after restore", t) }
     }
 }
 
