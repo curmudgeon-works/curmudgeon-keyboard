@@ -13,8 +13,8 @@ import java.security.MessageDigest
  * per language (its folder "dicts/<tag>") and kind (the file name's start, "main" of "main_user.dict"):
  * - the backup's dictionary of a kind is the one it had selected ([inUse]); one the backup didn't use stays out;
  * - the same content anywhere for that language and kind on the device ([Action.SAME]): that copy is selected and
- *   renamed to the backup's name, a device file of that name with other content moved aside first to the next free
- *   "…_prev" ("_prev2" …) (owner 2026-10-12 B4: "When backups dict matches, yes select that copy and also rename that
+ *   renamed to the backup's name, a device file of that name with other content moved aside to the first free
+ *   "…_prev" ("_prev2" …) once the copy has left its own name (B3b: no gap) (owner 2026-10-12 B4: "When backups dict matches, yes select that copy and also rename that
  *   copy to backups"; before, nothing, and a match kept aside, e.g. "emoji_prev", stayed unused);
  * - none of that kind on the device: it comes in ([Action.NEW]);
  * - content differs: the backup's comes in and is selected, the device's of that name is renamed on disk to
@@ -27,6 +27,8 @@ import java.security.MessageDigest
  */
 internal object RestoreDictionaries {
     const val INTERNAL = "internal"
+    /** A matching copy's name while it steps aside (not listed: no "user.dict" ending). */
+    private const val MOVING = ".moving"
     private val suffix = "_" + DictionaryInfoUtils.USER_DICTIONARY_SUFFIX
 
     /** The app-wide selection of language [tag]'s dictionary of [kind] (e.g. "dict_selected_hi_main"). */
@@ -91,8 +93,13 @@ internal object RestoreDictionaries {
             // name, the device's of that name with other content moved aside first; then selected)
             if (backupName in same) return Step(tag, kind, backupName, Action.SAME, backupName)
             val match = same.sorted().first()
-            val renames = if (backupName in device) listOf(backupName to nextPrev(kind, device.keys), match to backupName)
-                else listOf(match to backupName)
+            // (the one of that name moved to the first prev free once the match has left its own name, review B3b: picked
+            // before, "main_prev" matching left "main_prev" empty and the old "main" went to "main_prev2"; so the match
+            // steps aside under a name the app doesn't list first)
+            val renames = if (backupName in device) {
+                val aside = backupName + MOVING
+                listOf(match to aside, backupName to nextPrev(kind, device.keys - match), aside to backupName)
+            } else listOf(match to backupName)
             return Step(tag, kind, backupName, Action.SAME, backupName, renames)
         }
         if (sameKind.isEmpty()) return Step(tag, kind, backupName, Action.NEW, target)
@@ -135,9 +142,16 @@ internal object RestoreDictionaries {
             it.delete()
             try { source.copyTo(it, overwrite = true) } catch (e: Exception) { it.delete(); throw e }
         }
+        // a rename that can't be done (or fails) puts back the ones done before it, and nothing more happens: no file
+        // is written over or left under a name the app doesn't list (review B3b, L3.4's spirit)
+        val done = ArrayList<Pair<File, File>>()
         for ((from, to) in step.renames) {
             val f = File(dir, from)
-            if (inside(f) && inside(File(dir, to)) && f.isFile && !File(dir, to).exists()) f.renameTo(File(dir, to))
+            val t = File(dir, to)
+            if (inside(f) && inside(t) && f.isFile && !t.exists() && f.renameTo(t)) { done += f to t; continue }
+            for ((a, b) in done.asReversed()) if (!a.exists()) b.renameTo(a)
+            incoming?.delete()
+            return false
         }
         if (incoming == null) {
             if (!target.isFile) return false // (the rename failed: the selection stays as it was)

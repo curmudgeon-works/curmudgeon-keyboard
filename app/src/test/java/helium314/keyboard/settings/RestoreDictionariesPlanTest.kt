@@ -27,7 +27,9 @@ class RestoreDictionariesPlanTest {
         assertEquals("main_user.dict", kept.target)
         assertEquals(true, kept.select)
         val taken = RestoreDictionaries.plan("hi", "main_user.dict", "x", mapOf("main_user.dict" to "a", "main_prev_user.dict" to "x"))
-        assertEquals(listOf("main_user.dict" to "main_prev2_user.dict", "main_prev_user.dict" to "main_user.dict"), taken.renames)
+        // (B3b: the match steps aside first, so the one of that name takes the prev it leaves free)
+        assertEquals(listOf("main_prev_user.dict" to "main_user.dict.moving", "main_user.dict" to "main_prev_user.dict",
+            "main_user.dict.moving" to "main_user.dict"), taken.renames)
         assertEquals(true, taken.select)
         // already under the backup's name: only selected
         val named = RestoreDictionaries.plan("hi", "emoji_user.dict", "x", mapOf("emoji_user.dict" to "x", "emoji_prev_user.dict" to "x"))

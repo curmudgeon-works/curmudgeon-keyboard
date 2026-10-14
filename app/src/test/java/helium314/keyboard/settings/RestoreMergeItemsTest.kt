@@ -269,6 +269,40 @@ class RestoreMergeItemsTest {
         assertEquals(ctx.getString(helium314.keyboard.latin.R.string.restore_summary_settings_only), restoreSummary(ctx, restored).lines().last())
     }
 
+    // fail before (B3b): the prev slot was picked while the match still held it: main_prev2 = A, main_prev empty
+    @Test fun `a matching prev copy becomes main and the old main takes the prev it left, no gap`() {
+        dictDir("fr").mkdirs(); dict("fr", "main_user.dict").writeText("A"); dict("fr", "main_prev_user.dict").writeText("X")
+        backup(listOf(frB), entries = mapOf("dicts/fr/main_user.dict" to "X".toByteArray()))
+        restoreDictionaries(ticked = true)
+        assertEquals(setOf("main_user.dict", "main_prev_user.dict"), dictDir("fr").list()!!.toSet())
+        assertEquals("X", dict("fr", "main_user.dict").readText())
+        assertEquals("A", dict("fr", "main_prev_user.dict").readText())
+        assertEquals("main_user.dict", selected("fr"))
+    }
+
+    // fail before (B3b): the old main went to main_prev3, main_prev2 left empty; now the first free prev, the one left
+    @Test fun `a matching prev2 copy becomes main, prev stays, the old main takes prev2`() {
+        dictDir("fr").mkdirs(); dict("fr", "main_user.dict").writeText("A")
+        dict("fr", "main_prev_user.dict").writeText("B"); dict("fr", "main_prev2_user.dict").writeText("X")
+        backup(listOf(frB), entries = mapOf("dicts/fr/main_user.dict" to "X".toByteArray()))
+        restoreDictionaries(ticked = true)
+        assertEquals(setOf("main_user.dict", "main_prev_user.dict", "main_prev2_user.dict"), dictDir("fr").list()!!.toSet())
+        assertEquals("X", dict("fr", "main_user.dict").readText())
+        assertEquals("B", dict("fr", "main_prev_user.dict").readText())
+        assertEquals("A", dict("fr", "main_prev2_user.dict").readText())
+    }
+
+    // (the safety: a rename that can't be done puts back the ones before it, nothing lost or hidden)
+    @Test fun `a match whose moves can't all be done changes nothing`() {
+        dictDir("fr").mkdirs(); dict("fr", "main_user.dict").writeText("A"); dict("fr", "main_prev_user.dict").writeText("X")
+        dict("fr", "main_user.dict.moving").mkdirs() // (the name the match steps aside under is taken: the first move can't go)
+        backup(listOf(frB), entries = mapOf("dicts/fr/main_user.dict" to "X".toByteArray()))
+        restoreDictionaries(ticked = true)
+        assertEquals("A", dict("fr", "main_user.dict").readText())
+        assertEquals("X", dict("fr", "main_prev_user.dict").readText())
+        assertEquals(null, selected("fr"))
+    }
+
     // fail before (L3.5): the other languages' new dictionaries came in silently with the clipboard
     @Test fun `a clipboard-only restore brings no dictionaries`() {
         val db = File(ctx.cacheDir, "clips-${System.nanoTime()}.db")
