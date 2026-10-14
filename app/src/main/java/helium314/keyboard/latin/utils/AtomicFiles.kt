@@ -26,15 +26,17 @@ object AtomicFiles {
      *  cut off left. At app start, before anything is written. */
     @JvmStatic
     fun init(context: Context) {
+        // (each storage on its own, never throwing: this runs at app start, before the device is unlocked too, when the
+        // other storage can't be reached; a storage left out writes its temporary files next to the target, as before)
         val roots = listOf(
-            context.filesDir to context.noBackupFilesDir,
-            DeviceProtectedUtils.getFilesDir(context) to DeviceProtectedUtils.getNoBackupFilesDir(context),
-        )
-        tmpDirs = roots.mapNotNull { (files, noBackup) ->
+            { context.filesDir to context.noBackupFilesDir },
+            { DeviceProtectedUtils.getFilesDir(context) to DeviceProtectedUtils.getNoBackupFilesDir(context) },
+        ).mapNotNull { runCatching(it).getOrNull() }
+        tmpDirs = roots.mapNotNull { (files, noBackup) -> runCatching {
             val root = files?.absoluteFile?.parentFile ?: return@mapNotNull null
             noBackup ?: return@mapNotNull null
             (root.path + File.separator) to File(noBackup, TMP_DIR).apply { deleteRecursively() }
-        }.distinctBy { it.first }
+        }.getOrNull() }.distinctBy { it.first }
     }
 
     // the folder for [file]'s temporary file: the one of its storage; for one in no storage the app knows (or before
