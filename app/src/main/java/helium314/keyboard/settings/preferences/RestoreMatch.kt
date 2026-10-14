@@ -62,13 +62,15 @@ internal object RestoreMatch {
 
     /** What differs in the definitions: the keys, the languages, accents, popup order, the other layouts, hint order and
      *  the localized number row. [sameLayout]: whether two layouts of a type are the same keys (by name, or two unsaved
-     *  ones by their keys: review 2026-10-11 R3). */
+     *  ones by their keys: review 2026-10-11 R3). One name on both is asked too: the device's file can have other keys
+     *  (review 2026-10-12 A1: it was never asked, the backup's keys came in and the keyboard switched silently). */
     fun definitionDifferences(phone: SettingsSubtype, backup: SettingsSubtype,
                               sameLayout: (LayoutType, String, String) -> Boolean = { _, a, b -> a == b }): List<Difference.Definition> {
         val out = mutableListOf<Difference.Definition>()
         fun layout(type: LayoutType) {
             val p = phone.layoutName(type); val b = backup.layoutName(type)
-            if (p != b && (p == null || b == null || !sameLayout(type, p, b))) out += Difference.Definition(Part.Layout(type), p, b)
+            if (p == null || b == null) { if (p != b) out += Difference.Definition(Part.Layout(type), p, b) }
+            else if (!sameLayout(type, p, b)) out += Difference.Definition(Part.Layout(type), p, b)
         }
         val p = entries(phone); val b = entries(backup)
         fun extra(key: String) {
@@ -141,29 +143,49 @@ internal object RestoreMatch {
 
     /** A row of "What to merge": what it is, with the device's and the backup's value. A custom key layout of the backup
      *  the device has under its name with other keys ([deviceRename]: the device's new name, or null) says so: "Keys:
-     *  Backup's My numrow; yours becomes My numrow 2" (owner 2026-10-12). */
+     *  Backup's My numrow; yours becomes My numrow 2" (owner 2026-10-12). An unsaved one of the device under the
+     *  backup's name with other keys: "Number row: device and backup differ" (owner 2026-10-12; with [unsavedWarning]
+     *  under it while ticked). */
     fun rowText(ctx: Context, difference: Difference, backup: SettingsSubtype,
                 deviceRename: (LayoutType, String) -> String? = { _, _ -> null }): String = when (difference) {
         is Difference.Menu -> ctx.getString(R.string.restore_differs_menu, ctx.getString(helium314.keyboard.settings.screens.groupTitle(difference.group)))
         is Difference.Definition -> {
             val clash = (difference.part as? Part.Layout)?.let { part -> difference.backup?.let { name -> deviceRename(part.type, name)?.let { name to it } } }
-            val label = when (val part = difference.part) {
-                is Part.Layout -> if (part.type == LayoutType.MAIN) ctx.getString(R.string.restore_part_keys) else ctx.getString(part.type.displayNameId)
-                is Part.Extra -> when (part.key) {
-                    ExtraValue.SECONDARY_LOCALES -> ctx.getString(R.string.restore_part_languages)
-                    ExtraValue.MORE_POPUPS -> ctx.getString(R.string.restore_part_accents)
-                    ExtraValue.POPUP_ORDER -> ctx.getString(R.string.restore_part_popup_order)
-                    ExtraValue.HINT_ORDER -> ctx.getString(R.string.restore_part_hint_order)
-                    ExtraValue.LOCALIZED_NUMBER_ROW -> ctx.getString(R.string.localized_number_row)
-                    else -> part.key
-                }
-            }
+            val label = label(ctx, difference.part)
             val phone = valueText(ctx, difference.part, difference.phone, backup)
             val inBackup = valueText(ctx, difference.part, difference.backup, backup)
-            if (clash != null) ctx.getString(R.string.restore_differs_key_layout, label,
+            // (an unsaved name has no name to show: "Unsaved layout" both sides)
+            val unsaved = clash != null && LayoutUtilsCustom.isPrivateLayout(clash.first)
+            if (unsaved && difference.phone == difference.backup) ctx.getString(R.string.restore_differs_unsaved, label)
+            else if (clash != null && !unsaved) ctx.getString(R.string.restore_differs_key_layout, label,
                 LayoutUtilsCustom.getDisplayName(clash.first), LayoutUtilsCustom.getDisplayName(clash.second))
             else if (phone == inBackup) ctx.getString(R.string.restore_differs_plain, label)
             else ctx.getString(R.string.restore_differs_row, label, phone, inBackup)
+        }
+    }
+
+    /** The warning under a ticked row of an unsaved key layout of the device the backup's replaces under its name
+     *  ([deviceSave]: the name the device's keys are saved as, or null), or null (owner 2026-10-12: "Unsaved number row
+     *  on the device will be saved as "temp_MMDD" to prevent loss of unsaved data"). */
+    fun unsavedWarning(ctx: Context, difference: Difference, deviceSave: (LayoutType, String) -> String?): String? {
+        val definition = difference as? Difference.Definition ?: return null
+        val part = definition.part as? Part.Layout ?: return null
+        val name = definition.phone?.takeIf { it == definition.backup && LayoutUtilsCustom.isPrivateLayout(it) } ?: return null
+        val saved = deviceSave(part.type, name) ?: return null
+        return ctx.getString(R.string.restore_unsaved_warning, label(ctx, part).lowercase(java.util.Locale.getDefault()),
+            LayoutUtilsCustom.getDisplayName(saved))
+    }
+
+    // what a row is ("Keys", "Number row", "Accents", …)
+    private fun label(ctx: Context, part: Part): String = when (part) {
+        is Part.Layout -> if (part.type == LayoutType.MAIN) ctx.getString(R.string.restore_part_keys) else ctx.getString(part.type.displayNameId)
+        is Part.Extra -> when (part.key) {
+            ExtraValue.SECONDARY_LOCALES -> ctx.getString(R.string.restore_part_languages)
+            ExtraValue.MORE_POPUPS -> ctx.getString(R.string.restore_part_accents)
+            ExtraValue.POPUP_ORDER -> ctx.getString(R.string.restore_part_popup_order)
+            ExtraValue.HINT_ORDER -> ctx.getString(R.string.restore_part_hint_order)
+            ExtraValue.LOCALIZED_NUMBER_ROW -> ctx.getString(R.string.localized_number_row)
+            else -> part.key
         }
     }
 

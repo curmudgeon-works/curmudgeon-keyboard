@@ -754,6 +754,12 @@
     <!-- a key layout the device has under the backup's name with other keys (owner 2026-10-12). %1$s: the row (e.g. Keys),
          %2$s: the key layout's name, %3$s: what the device's becomes, e.g. "My numrow 2" -->
     <string name="restore_differs_key_layout">%1$s: Backup\'s %2$s; yours becomes %3$s</string>
+    <!-- an unsaved key layout the device has under the backup's name with other keys (owner 2026-10-12). %s: the row
+         (e.g. Number row) -->
+    <string name="restore_differs_unsaved">%s: device and backup differ</string>
+    <!-- under that row while it's ticked (owner 2026-10-12). %1$s: the row in a sentence (e.g. number row), %2$s: the
+         name the device's keys are saved as (e.g. temp_1012) -->
+    <string name="restore_unsaved_warning">Warning: Unsaved %1$s on the device will be saved as \"%2$s\" to prevent loss of unsaved data</string>
     <!-- a row for a menu whose settings differ: %s the menu -->
     <string name="restore_differs_menu">%s settings</string>
     <string name="restore_part_keys">Keys</string>

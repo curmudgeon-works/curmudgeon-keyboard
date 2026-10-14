@@ -20,6 +20,7 @@ import helium314.keyboard.settings.preferences.SavedItemsMerge
 import helium314.keyboard.settings.preferences.restoreDifferencesFrom
 import helium314.keyboard.settings.preferences.restoreKeyboardsFrom
 import helium314.keyboard.settings.preferences.restorePlanFrom
+import helium314.keyboard.settings.preferences.restoreClock
 import helium314.keyboard.settings.preferences.settingsToJsonStream
 import org.json.JSONArray
 import org.json.JSONObject
@@ -61,6 +62,7 @@ class ReReview2R3Test {
         hindi = available("hi").withId(1); english = available("en-US").withId(2)
     }
     @After fun tearDown() {
+        restoreClock = { System.currentTimeMillis() }
         zip.delete(); folder.deleteRecursively(); LayoutUtilsCustom.onLayoutFileChanged()
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real); KeyboardProfiles.refreshImeId(real)
         SubtypeSettings.reloadEnabledSubtypes(ctx)
@@ -117,8 +119,11 @@ class ReReview2R3Test {
         assertEquals(setOf(a), folder.list()!!.toSet()) // (the backup's keys weren't brought for nothing)
     }
 
-    // (owner 2026-10-12: the backup's keeps its name; the phone's keys get a new unsaved name first, unused then: gone)
-    @Test fun `(a) ticked the keyboard gets the backup's keys, and the phone's unused unsaved file goes, a switched-off one's stays`() {
+    // (owner 2026-10-12: the backup's keeps its name; the phone's keys are saved as "temp_MMDD", owner 2026-10-12:
+    // "Unsaved number row on the device will be saved as "temp_MMDD" to prevent loss of unsaved data"; before, they got
+    // a new unsaved name, unused then, and went)
+    @Test fun `(a) ticked the keyboard gets the backup's keys, the phone's are saved as temp_MMDD, a switched-off one's stays`() {
+        restoreClock = { java.util.Calendar.getInstance().apply { set(2026, java.util.Calendar.OCTOBER, 12, 12, 0) }.timeInMillis }
         val a = unsaved("A"); val c = unsaved("C")
         val phone = hindi.withLayout(type, a).withId(1)
         val off = english.withLayout(type, c).withId(2)
@@ -132,7 +137,9 @@ class ReReview2R3Test {
         assertEquals(a, now, "the backup's keeps its name")
         assertEquals("B", file(a).readText())
         assertEquals("C", file(c).readText())
-        assertEquals(setOf(a, c), folder.list()!!.toSet(), "the phone's old keys, renamed and unused, are left over")
+        val temp = LayoutUtilsCustom.getLayoutName("temp_1012", type)
+        assertEquals("A", file(temp).readText(), "the phone's keys, saved")
+        assertEquals(setOf(a, c, temp), folder.list()!!.toSet())
     }
 
     @Test fun `(b) the same keys under another unsaved name - no row`() {

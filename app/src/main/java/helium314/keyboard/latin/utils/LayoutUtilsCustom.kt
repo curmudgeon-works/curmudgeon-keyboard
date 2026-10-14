@@ -215,6 +215,13 @@ object LayoutUtilsCustom {
         return CUSTOM_LAYOUT_PREFIX + scopePart + encodeBase36("${getDisplayName(layoutName)} $number") + "."
     }
 
+    /** The name of a named layout shown as [displayName], for the same languages as [scope] (a main layout's, see
+     *  [scopeOf]; other types have none). */
+    fun namedLayoutName(displayName: String, layoutType: LayoutType, scope: String): String {
+        val scopePart = if (layoutType == LayoutType.MAIN) "$scope." else ""
+        return CUSTOM_LAYOUT_PREFIX + scopePart + encodeBase36(displayName) + "."
+    }
+
     fun isCustomLayout(layoutName: String) = layoutName.startsWith(CUSTOM_LAYOUT_PREFIX)
 
     /** A keyboard's own copy of a deleted layout: "custom.<scope>.~<n>." (main) or "custom.~<n>." */

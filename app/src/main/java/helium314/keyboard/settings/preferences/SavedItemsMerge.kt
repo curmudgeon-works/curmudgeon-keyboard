@@ -203,11 +203,15 @@ internal object SavedItemsMerge {
      * The custom key layouts of the backup ([contents]: type and name -> keys; its layout files, and the keys its saved
      * Layouts keep) and the device's of the same name with other keys: the name each gets ([deviceRenames], owner
      * 2026-10-12: the backup's keeps its name, the device's becomes "My numrow 2"; an unsaved one a new unsaved name).
-     * Worked out once with the plan.
+     * An unsaved one a ticked "What to merge" row replaces on its keyboard is saved instead, under the name in
+     * [deviceSaves] (owner 2026-10-12: "Unsaved number row on the device will be saved as "temp_MMDD" to prevent loss
+     * of unsaved data"). Worked out once with the plan.
      */
     class KeyLayouts(val contents: Map<Pair<LayoutType, String>, ByteArray> = emptyMap(),
-                     val deviceRenames: Map<Pair<LayoutType, String>, String> = emptyMap()) {
+                     val deviceRenames: Map<Pair<LayoutType, String>, String> = emptyMap(),
+                     val deviceSaves: Map<Pair<LayoutType, String>, String> = emptyMap()) {
         fun deviceRename(type: LayoutType, name: String) = deviceRenames[type to name]
+        fun deviceSave(type: LayoutType, name: String) = deviceSaves[type to name]
     }
 
     // ---- everything ----
