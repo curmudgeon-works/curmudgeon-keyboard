@@ -186,6 +186,22 @@ class GhostRecordsTest {
         assertEquals(setOf(de), pools().keys)
     }
 
+    // (owner 2026-10-11 "OK": Layout & typing's Discard puts the learned words' records back with the keyboard's set)
+    @Test fun `h - Discard on Layout and typing after a layout change - the keyboard has its own pool again, no ghost`() {
+        keyboards(listOf(en, de))
+        for (leave in listOf(false, true)) {
+            val draft = helium314.keyboard.settings.LayoutDraft.of(ctx, en.toPref())
+            val changed = en.withLayout(LayoutType.MAIN, "dvorak")
+            SubtypeUtilsAdditional.changeAdditionalSubtype(en, changed, ctx) // (the layout picked on the screen)
+            assertEquals(mapOf(changed to 11, de to 12), pools())
+            if (leave) helium314.keyboard.settings.LayoutDraft.rejectOpen(ctx) // (the app left with the screen open)
+            else draft.reject(ctx) // (Discard)
+            assertEquals(en, selected(), "leave=$leave")
+            assertRecords(mapOf(en to 1, de to 2))
+            assertEquals(11, LearnedStores.currentPool, "leave=$leave")
+        }
+    }
+
     @Test fun `f - adding or copying a keyboard creates its records at once`() {
         keyboards(listOf(en))
         val added = createKeyboard(ctx, newKeyboardFor(ctx, Locale.GERMANY), null, StartSettings.Defaults)

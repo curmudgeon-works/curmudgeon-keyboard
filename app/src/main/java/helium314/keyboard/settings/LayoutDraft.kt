@@ -36,6 +36,9 @@ class LayoutDraft private constructor(
     // what the screens opened from here wrote with their Save: kept when the app is left (owner 2026-10-11, S2: "yes
     // let's keep saved subscreen changes"), undone by this screen's own Discard
     private val writes: SubScreenWrites = SubScreenWrites(dir, null) { false },
+    // whether the one-time learned-words update was done when the screen opened; null: a snapshot without the learned
+    // words' records (from before 2026-10-11), which Discard leaves as they are
+    private val learnedDone: Boolean? = null,
 ) {
     fun hasChanges(ctx: Context): Boolean = changedKeys(ctx).isNotEmpty() || layoutsChanged(ctx)
 
@@ -67,7 +70,7 @@ class LayoutDraft private constructor(
         val now = scoped(ctx)
         // the rows: every key of either snapshot, a "~" mark standing for its key
         val keys = (now.keys + prefs.keys).mapTo(HashSet()) { base(it) }
-        return keys.filterTo(HashSet()) { !switchState(it) && !KnownDefaults.same(plain(it), reads(now, it), reads(prefs, it)) }.mapTo(HashSet()) { plain(it) }
+        return keys.filterTo(HashSet()) { it !in learnedKeys && !switchState(it) && !KnownDefaults.same(plain(it), reads(now, it), reads(prefs, it)) }.mapTo(HashSet()) { plain(it) }
     }
 
     /** What [key] (full) reads as in [stored]: its value; a keyboard's key "at its default" (its "~" mark, see
@@ -98,6 +101,10 @@ class LayoutDraft private constructor(
         val real = ctx.realPrefs()
         val now = scoped(ctx)
         val prefs = if (keep) writes.over(this.prefs) else this.prefs
+        // the learned words' records as at the open too (owner 2026-10-11, "OK"): a keyboard a draft changed gets its own
+        // pool back, none is left on the changed identity; not if the one-time update ran meanwhile (its pools are new)
+        val learned = learnedDone != null && learnedDone == helium314.keyboard.latin.personalization.LearnedKeyboards.isDone(real)
+        fun puts(key: String) = !switchState(key) && (learned || key !in learnedKeys)
         // the keyboard in use stays as it is (the preview switched it, not a setting), unless the undo takes its
         // definition away: then the one it had when the screen opened. Same for each app's remembered keyboard (a
         // changed keyboard took the apps with it). Worked out against the snapshot's list before anything is written,
@@ -121,8 +128,8 @@ class LayoutDraft private constructor(
             .filterValues { it.toString().toSettingsSubtype() !in enabled }
             .mapValues { (key, _) -> listed(prefs[key] as? String) }
         real.edit {
-            for (key in now.keys) if (key !in prefs && !switchState(key)) remove(key)
-            for ((key, value) in prefs) if (now[key] != value && !switchState(key)) {
+            for (key in now.keys) if (key !in prefs && puts(key)) remove(key)
+            for ((key, value) in prefs) if (now[key] != value && puts(key)) {
                 if (value == null) remove(key) else KeyboardProfiles.put(this, key, value)
             }
             selectedBefore?.let { putString(Settings.PREF_SELECTED_SUBTYPE, it) }
@@ -207,16 +214,21 @@ class LayoutDraft private constructor(
         fun base(key: String) = if (plain(key).startsWith(TOMB)) key.substring(0, key.length - plain(key).length) + plain(key).removePrefix(TOMB) else key
         fun mark(key: String) = key.substring(0, key.length - plain(key).length) + TOMB + plain(key)
         fun inScope(plainKey: String) = plainKey in keys || prefixes.any { plainKey.startsWith(it) }
+        // the learned words' records, keyed by the keyboards' identities as "keyboard_profile_ids" is: put back with
+        // it (owner 2026-10-11), no setting of the screen (not in [keys]: no menu's, no saved Layout's, no change shown)
+        private val learnedKeys = setOf(helium314.keyboard.latin.personalization.LearnedKeyboards.PREF_POOLS,
+            helium314.keyboard.latin.personalization.LearnedKeyboards.PREF_POOL_NEXT) +
+            helium314.keyboard.latin.personalization.LearnedKeyboards.buttonPrefs
         /** A stored key a sub-screen's save is recorded with ([SubScreenWrites]): what the undo puts back, and the
          *  Custom labels; not which keyboard is in use. */
         private fun recorded(key: String): Boolean {
             val p = plain(key).removePrefix(TOMB)
-            return (inScope(p) && !switchState(base(key))) || LABELS.any { it.key == p }
+            return (inScope(p) && !switchState(base(key))) || LABELS.any { it.key == p } || key in learnedKeys
         }
 
         // (with the "at its default" marks of a keyboard's own set, so Discard puts those back too)
         private fun scoped(ctx: Context): Map<String, Any?> =
-            ctx.realPrefs().all.filterKeys { inScope(plain(it).removePrefix(helium314.keyboard.latin.settings.KeyboardProfiles.TOMBSTONE)) }
+            ctx.realPrefs().all.filterKeys { inScope(plain(it).removePrefix(helium314.keyboard.latin.settings.KeyboardProfiles.TOMBSTONE)) || it in learnedKeys }
 
         private fun layoutsDir(ctx: Context) = File(DeviceProtectedUtils.getFilesDir(ctx), "layouts")
         /** relative path -> size and time, enough to tell a change without reading */
@@ -239,8 +251,8 @@ class LayoutDraft private constructor(
         /** The running draft for [subtype], or a fresh snapshot. */
         fun of(ctx: Context, subtype: String): LayoutDraft = active ?: start(ctx, subtype).also { active = it }
 
-        private fun write(dir: File, subtype: String, hasLayouts: Boolean, prefs: Map<String, Any?>, labels: Set<String>) {
-            val json = JSONObject().put("subtype", subtype).put("layouts", hasLayouts)
+        private fun write(dir: File, subtype: String, hasLayouts: Boolean, prefs: Map<String, Any?>, labels: Set<String>, learnedDone: Boolean) {
+            val json = JSONObject().put("subtype", subtype).put("layouts", hasLayouts).put("learnedDone", learnedDone)
             json.put("labels", org.json.JSONArray(labels.toList()))
             json.put("prefs", JSONObject().also { o -> prefs.forEach { (k, v) -> AppearanceLooks.toJson(v)?.let { o.put(k, it) } } })
             File(dir, PREFS_FILE).writeText(json.toString())
@@ -275,8 +287,9 @@ class LayoutDraft private constructor(
             copy?.walkTopDown()?.filter { it.isFile }?.forEach { f -> f.setLastModified(File(live, f.relativeTo(copy).path).lastModified()) }
             val prefs = scoped(ctx)
             val labels = CustomLabels.stored(ctx.realPrefs(), LABELS)
-            write(dir, subtype, copy != null, prefs, labels)
-            return LayoutDraft(prefs, copy, dir, subtype, labels, SubScreenWrites(dir, live, ::recorded))
+            val learnedDone = helium314.keyboard.latin.personalization.LearnedKeyboards.isDone(ctx.realPrefs())
+            write(dir, subtype, copy != null, prefs, labels, learnedDone)
+            return LayoutDraft(prefs, copy, dir, subtype, labels, SubScreenWrites(dir, live, ::recorded), learnedDone)
         }
 
         /** A snapshot left on disk by a process that died with Layout & Typing open: put it back. Called at app start. */
@@ -294,7 +307,8 @@ class LayoutDraft private constructor(
                 val labels = json.optJSONArray("labels")?.let { a -> (0 until a.length()).mapTo(HashSet()) { a.getString(it) } }
                 // (what a sub-screen saved before the crash stays, as when the app is left)
                 val writes = SubScreenWrites.load(dir, layoutsDir(ctx), ::recorded)
-                LayoutDraft(prefs, copy, dir, json.getString("subtype"), labels, writes).reject(ctx, keepSubScreenSaves = true)
+                val learnedDone = if (json.has("learnedDone")) json.getBoolean("learnedDone") else null
+                LayoutDraft(prefs, copy, dir, json.getString("subtype"), labels, writes, learnedDone).reject(ctx, keepSubScreenSaves = true)
             }.onFailure { dir.deleteRecursively() }
         }
     }
