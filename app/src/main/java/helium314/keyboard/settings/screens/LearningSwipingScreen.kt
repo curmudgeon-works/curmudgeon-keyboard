@@ -57,6 +57,7 @@ internal val swipeTuningKeys = listOf(
  * tried and the swipe logs (moved from the Swiping screen), and how the keyboard learns (trusting your words, moved
  * from Text correction; the corrections log). The same for every keyboard (KeyboardProfiles' global keys). More
  * learning rules and swipe traits are to come here.
+ * Named "Fine-tune suggestions" since 2026-10-10, when the learning moved to its own menu ([FineTuneLearningScreen]).
  */
 @Composable
 fun LearningSwipingScreen(onClickBack: () -> Unit) {
@@ -67,7 +68,7 @@ fun LearningSwipingScreen(onClickBack: () -> Unit) {
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
     // every change applies at once; the top bar's tick keeps the changes since the screen opened, the cross undoes them
     val draft = helium314.keyboard.settings.rememberPrefsDraft("learnswipe",
-        swipeTuningKeys + listOf(Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, Settings.PREF_TRUST_TYPED_COUNT), onClickBack)
+        swipeTuningKeys, onClickBack)
     var statsGeneration by remember { mutableIntStateOf(0) }
     var askReset by remember { mutableStateOf<String?>(null) } // the tuning whose results the reset question is about
     val rows = remember(statsGeneration, b?.value) { GestureStats.read(ctx.realPrefs()) }
@@ -191,14 +192,7 @@ fun LearningSwipingScreen(onClickBack: () -> Unit) {
                 SettingsActivity.settingsContainer[Settings.PREF_RECORD_GESTURE_CORPUS]?.Preference()
                 SettingsActivity.settingsContainer[Settings.PREF_SWIPE_METRICS]?.Preference()
             } }
-            // ---- learning: when your own words win over corrections (moved from Text correction), and the log of what
-            // corrections do to the learned words
-            GroupTitle(R.string.learning_group)
-            androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.preferences.LocalPendingChange provides
-                (Settings.PREF_AUTOCORRECT_FREQUENT_WORDS in draft.pending || Settings.PREF_TRUST_TYPED_COUNT in draft.pending)) {
-                SettingsActivity.settingsContainer[Settings.PREF_AUTOCORRECT_FREQUENT_WORDS]?.Preference()
-            }
-            SettingsActivity.settingsContainer[Settings.PREF_LEARNING_LOG]?.Preference()
+            // (learning: on Fine-tune learning since 2026-10-10)
           }
         }
         }

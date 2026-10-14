@@ -104,14 +104,15 @@ fun AdvancedSettingsScreen(
         SettingsWithoutKey.SEPARATE_SETTINGS,
         *(if (separate) helium314.keyboard.latin.settings.KeyboardProfiles.Group.entries
             // (Refine suggestions & learning: no row while the menu isn't shown, see REFINE_MENU_SHOWN)
-            .filter { it != helium314.keyboard.latin.settings.KeyboardProfiles.Group.REFINE || helium314.keyboard.settings.REFINE_MENU_SHOWN }
+            .filter { (it != helium314.keyboard.latin.settings.KeyboardProfiles.Group.REFINE
+                && it != helium314.keyboard.latin.settings.KeyboardProfiles.Group.LEARNING) || helium314.keyboard.settings.REFINE_MENU_SHOWN }
             .map { it.prefKey }.toTypedArray() else emptyArray<String>()),
         // (learned & blacklisted words: always each keyboard's own since 2026-10-10, no switch)
         SettingsWithoutKey.DIVIDER, // a line above About (2026-10-06)
         SettingsWithoutKey.ABOUT_SCREEN, // last (moved from the main screen, 2026-10-04)
         // (once under Experimental; the emoji version is on Appearance's Emoji group, next to the emoji font, URL
         //  detection on Text correction's Correction group)
-        // (recording the swipe corpus and logging swipe results: on Refine suggestions & learning)
+        // (recording the swipe corpus and logging swipe results: on Fine-tune suggestions)
     )
     SearchSettingsScreen(
         onClickBack = onClickBack,
@@ -414,6 +415,7 @@ private fun groupTitle(group: helium314.keyboard.latin.settings.KeyboardProfiles
     helium314.keyboard.latin.settings.KeyboardProfiles.Group.SWIPE -> R.string.swipe_screen
     helium314.keyboard.latin.settings.KeyboardProfiles.Group.TEXT_CORRECTION -> R.string.settings_screen_correction
     helium314.keyboard.latin.settings.KeyboardProfiles.Group.REFINE -> R.string.learning_swiping_screen
+    helium314.keyboard.latin.settings.KeyboardProfiles.Group.LEARNING -> R.string.fine_tune_learning_screen
 }
 
 /** The icon a menu has on the main screen. */
@@ -423,6 +425,7 @@ private fun groupIcon(group: helium314.keyboard.latin.settings.KeyboardProfiles.
     helium314.keyboard.latin.settings.KeyboardProfiles.Group.SWIPE -> R.drawable.ic_settings_gesture
     helium314.keyboard.latin.settings.KeyboardProfiles.Group.TEXT_CORRECTION -> R.drawable.ic_settings_correction
     helium314.keyboard.latin.settings.KeyboardProfiles.Group.REFINE -> R.drawable.ic_settings_refine
+    helium314.keyboard.latin.settings.KeyboardProfiles.Group.LEARNING -> R.drawable.ic_settings_learning
 }
 
 /** "Use separate settings" (moved from the Keyboards screen): both ways ask first, saying what happens. */

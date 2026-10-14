@@ -172,13 +172,19 @@ fun KeyboardSettingsEntries(keyboard: SettingsSubtype, modifier: Modifier = Modi
     // (no Dictionaries: tapping a language in the keyboard's Languages list manages its dictionaries)
     // the settings few need (advanced only): Advanced; app-wide, so with separate settings it's one entry outside the
     // keyboards (AdvancedEntry), not one per keyboard
-    // "Refine swipe and learning" when the keyboard keeps its own (advanced only)
+    // "Fine-tune suggestions" when the keyboard keeps its own (advanced only)
     if (showRefine) RefineEntry(setId)
+    // "Fine-tune learning" under a keyboard that keeps it to itself (with separate settings: [groups] picks this
+    // keyboard's own menus); shared, it is once in [AdvancedEntry]
+    val real = ctx.realPrefs()
+    if (groups != null && shows(helium314.keyboard.latin.settings.KeyboardProfiles.Group.LEARNING)
+            && !helium314.keyboard.latin.settings.KeyboardProfiles.isShared(real, helium314.keyboard.latin.settings.KeyboardProfiles.Group.LEARNING))
+        LearningEntry(setId)
     if (showAdvanced) AdvancedEntry(setId)
     }
 }
 
-/** "Refine swipe and learning" (advanced only): once for all keyboards, or under each keyboard when it keeps its own. */
+/** "Fine-tune suggestions" (advanced only): once for all keyboards, or under each keyboard when it keeps its own. */
 @Composable
 fun RefineEntry(setId: () -> Int? = { null }) {
     if (!helium314.keyboard.settings.REFINE_MENU_SHOWN) return // (not in the public build yet)
@@ -194,12 +200,33 @@ fun RefineEntry(setId: () -> Int? = { null }) {
     }
 }
 
-/** The entries the same for every keyboard: "Refine suggestions & learning" (advanced only) and the app's own settings
- *  (App settings, once named Advanced; shown in simple mode too since 2026-10-06). */
+/** "Fine-tune learning" (advanced only, 2026-10-10): once for all keyboards, or under each keyboard when it keeps its own. */
+@Composable
+fun LearningEntry(setId: () -> Int? = { null }) {
+    if (!helium314.keyboard.settings.REFINE_MENU_SHOWN) return // (not in the public build yet, like Fine-tune suggestions)
+    val ctx = LocalContext.current
+    val advanced by SettingsMode.state(ctx)
+    AdvancedTint(advanced) {
+        Preference(
+            name = stringResource(R.string.fine_tune_learning_screen),
+            onClick = { setId()?.let { SettingsDestination.navigateTo(SettingsDestination.inSet(SettingsDestination.FineTuneLearning, it)) }
+                ?: SettingsDestination.navigateTo(SettingsDestination.FineTuneLearning, ctx) },
+            icon = R.drawable.ic_settings_learning // "school"
+        ) { NextScreenIcon() }
+    }
+}
+
+/** The entries the same for every keyboard: "Fine-tune suggestions" and "Fine-tune learning" (advanced only, each when
+ *  shared) and the app's own settings (App settings, once named Advanced; shown in simple mode too since 2026-10-06). */
 @Composable
 fun AdvancedEntry(setId: () -> Int? = { null }, showRefine: Boolean = true) {
     if (showRefine) RefineEntry(setId)
     val ctx = LocalContext.current
+    // (Fine-tune learning decides by its own group, so the callers' showRefine is about Fine-tune suggestions only)
+    val real = ctx.realPrefs()
+    if (!helium314.keyboard.latin.settings.KeyboardProfiles.isSeparate(real)
+            || helium314.keyboard.latin.settings.KeyboardProfiles.isShared(real, helium314.keyboard.latin.settings.KeyboardProfiles.Group.LEARNING))
+        LearningEntry(setId)
     Preference(
         name = stringResource(R.string.settings_screen_advanced),
         onClick = { setId()?.let { SettingsDestination.navigateTo(SettingsDestination.inSet(SettingsDestination.Advanced, it)) }

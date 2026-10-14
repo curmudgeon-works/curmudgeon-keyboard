@@ -14,4 +14,5 @@ const val REFINE_MENU_SHOWN = false
 fun hiddenFromSearch(key: String): Boolean =
     key == helium314.keyboard.latin.settings.Settings.PREF_CENTER_SUGGESTION_TEXT_TO_ENTER
         || (!REFINE_MENU_SHOWN && key != helium314.keyboard.latin.settings.Settings.PREF_SUGGESTION_COUNT
-            && helium314.keyboard.latin.settings.KeyboardProfiles.Group.REFINE.contains(key))
+            && (helium314.keyboard.latin.settings.KeyboardProfiles.Group.REFINE.contains(key)
+                || helium314.keyboard.latin.settings.KeyboardProfiles.Group.LEARNING.contains(key)))

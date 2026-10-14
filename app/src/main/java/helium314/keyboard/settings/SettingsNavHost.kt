@@ -112,6 +112,9 @@ fun SettingsNavHost(
         screen(SettingsDestination.LearningSwiping) {
             androidx.compose.runtime.CompositionLocalProvider(LocalSettingsMenu provides helium314.keyboard.latin.settings.KeyboardProfiles.Group.REFINE) { helium314.keyboard.settings.screens.LearningSwipingScreen(onClickBack = ::goBack) }
         }
+        screen(SettingsDestination.FineTuneLearning) {
+            androidx.compose.runtime.CompositionLocalProvider(LocalSettingsMenu provides helium314.keyboard.latin.settings.KeyboardProfiles.Group.LEARNING) { helium314.keyboard.settings.screens.FineTuneLearningScreen(onClickBack = ::goBack) }
+        }
         screen(SettingsDestination.Debug) {
             DebugScreen(onClickBack = ::goBack)
         }
@@ -224,6 +227,7 @@ object SettingsDestination {
     const val Subtype = "subtype/"
     const val SwipeTuning = "swipe_tuning/"
     const val LearningSwiping = "learning_swiping"
+    const val FineTuneLearning = "fine_tune_learning"
     const val Layouts = "layouts"
     const val LayoutFiles = "layout_files/"
     const val CustomizePopups = "customize_popups/"

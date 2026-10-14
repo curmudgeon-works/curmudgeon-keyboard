@@ -53,14 +53,16 @@ object KeyboardProfiles {
         APPEARANCE("share_group_appearance", false),
         SWIPE("share_group_swipe", false),
         TEXT_CORRECTION("share_group_correction", false),
-        REFINE("share_group_refine", true); // "Refine swipe and learning": your hand and your words, so one set by default
+        REFINE("share_group_refine", true), // "Fine-tune suggestions": your hand, so one set by default
+        LEARNING("share_group_learning", true); // "Fine-tune learning" (split from Refine 2026-10-10): your words, the same
 
         fun contains(key: String): Boolean = when (this) {
             LAYOUT -> helium314.keyboard.settings.LayoutDraft.inScope(key)
             APPEARANCE -> helium314.keyboard.settings.AppearanceLooks.onScreen(key)
             SWIPE -> key in helium314.keyboard.settings.screens.swipeSettingKeys
             TEXT_CORRECTION -> key in helium314.keyboard.settings.screens.correctionKeys
-            REFINE -> key in learningSwipingKeys
+            REFINE -> key in refineKeys
+            LEARNING -> key in learningKeys
         }
     }
 
@@ -129,13 +131,18 @@ object KeyboardProfiles {
         return map.keys().asSequence().map { map.optInt(it, SHARED) }.filter { it != SHARED }.distinct().toList()
     }
 
-    /** "Refine swipe and learning" (2026-10-04): shared by all keyboards unless its group is per keyboard ([Group.REFINE]). */
+    /** The old "Refine swipe and learning" menu (2026-10-04), split in two on 2026-10-10 ([refineKeys], [learningKeys]);
+     *  the one-time moves below still work on the whole of it. */
     private val learningSwipingKeys: Set<String> get() = setOf(
         Settings.PREF_GESTURE_TURN_WEIGHT, Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Settings.PREF_GESTURE_KUSHLER_WEIGHT,
         Settings.PREF_GESTURE_HISTORY_BOOST, Settings.PREF_GESTURE_FAST_COMMON_WORDS, Settings.PREF_GESTURE_CORNER_MISS, Settings.PREF_GESTURE_FAST_SPEED,
         Settings.PREF_SUGGESTION_COUNT, Settings.PREF_SUGGESTION_RULES, // Customize suggestions (from Text correction, 2026-10-06)
         Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, Settings.PREF_TRUST_TYPED_COUNT,
     )
+    /** "Fine-tune learning" (2026-10-10): how your own words are learned and trusted ([Group.LEARNING]). */
+    private val learningKeys: Set<String> get() = setOf(Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, Settings.PREF_TRUST_TYPED_COUNT)
+    /** "Fine-tune suggestions": the rest of the old Refine menu ([Group.REFINE]). */
+    private val refineKeys: Set<String> get() = learningSwipingKeys - learningKeys
     // ("share_user_history_": the retired per-language share switch, kept global so old keys stay where they are)
     // (language priorities are the keyboard's since 2026-10-07: a keyboard's own set holds its own when settings are
     // separate; the plain value is what the shared set, and every keyboard without its own, reads)
@@ -595,6 +602,7 @@ object KeyboardProfiles {
     fun settingsMoves(real: SharedPreferences) {
         migrateLearningSwiping(real)
         migrateSuggestionsToRefine(real)
+        splitLearningFromRefine(real)
         removeMovedMarkers(real)
         forgetSetting(real, "gesture_space_aware")
     }
@@ -649,6 +657,18 @@ object KeyboardProfiles {
             }
             putBoolean("suggestions_refine_moved", true)
         }.apply()
+    }
+
+    /** Once (2026-10-10): "Fine-tune learning" split from Refine. A phone that keeps Refine per keyboard keeps the
+     *  learning settings per keyboard too: their own values stay where they are, read through the new group. */
+    fun splitLearningFromRefine(real: SharedPreferences) {
+        if (real.getBoolean("learning_group_split_done", false)) return
+        real.edit().apply {
+            if (real.contains(Group.REFINE.prefKey) && !real.contains(Group.LEARNING.prefKey))
+                putBoolean(Group.LEARNING.prefKey, isShared(real, Group.REFINE))
+            putBoolean("learning_group_split_done", true)
+        }.commit()
+        loadGroups(real)
     }
 
     /** Once: a setting the app no longer has is switched off and then forgotten, in the plain settings and in every
