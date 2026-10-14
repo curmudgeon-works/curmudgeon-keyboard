@@ -706,7 +706,9 @@ private fun SavedLooksPreference(setting: Setting) {
             onDismissRequest = { saveAs = false },
             title = { Text(stringResource(R.string.appearance_look_save)) },
             initialText = stringResource(R.string.appearance_look_default_name, looks.size + 1),
-            checkTextValid = { name -> name.isNotBlank() && looks.none { it.name == name } },
+            // not a built-in theme's name either, as on the Layouts list (2026-10-10: a user theme named Curmudgeon took
+            // the built-in's place, and renaming it renamed every keyboard's built-in choice)
+            checkTextValid = { name -> name.isNotBlank() && (builtIn + looks).none { it.name == name } },
             onConfirmed = { name ->
                 store(looks + AppearanceLooks.Look(name,
                     AppearanceLooks.snapshot(prefs) + (AppearanceLooks.PICTURES to AppearanceLooks.savePictures(ctx))))
@@ -719,7 +721,7 @@ private fun SavedLooksPreference(setting: Setting) {
             onDismissRequest = { toRename = null },
             title = { Text(stringResource(R.string.appearance_look_rename)) },
             initialText = look.name,
-            checkTextValid = { name -> name.isNotBlank() && looks.none { it !== look && it.name == name } },
+            checkTextValid = { name -> name.isNotBlank() && (builtIn + looks).none { it !== look && it.name == name } },
             onConfirmed = { name ->
                 store(looks.map { if (it === look) AppearanceLooks.Look(name, it.values) else it })
                 KeyboardProfiles.replaceValueEverywhere(ctx.realPrefs(), AppearanceLooks.PREF_SELECTED, look.name, name)
