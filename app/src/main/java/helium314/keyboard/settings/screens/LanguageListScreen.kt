@@ -33,6 +33,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.common.Constants.Separators
@@ -190,6 +191,25 @@ private fun languagesFor(ctx: android.content.Context, keyboard: SettingsSubtype
             { it.localizedDisplayName(ctx.resources) }))
 }
 
+/**
+ * A language row's dictionaries as its subtext lists them: the added ones by their raw names ("main", "main_prev"), the
+ * built-in one first when it is in use or there is no added main one; each with whether it is the one in use of its
+ * kind ([helium314.keyboard.latin.dictionary.DictionarySelection.inUse]; review L3.3: shown highlighted).
+ */
+internal fun languageRowDictionaries(ctx: android.content.Context, locale: Locale): List<Pair<String, Boolean>> {
+    val (dicts, hasInternal) = getUserAndInternalDictionaries(ctx, locale)
+    val selection = helium314.keyboard.latin.dictionary.DictionarySelection
+    val kinds = (dicts.map { selection.typeOf(it) } + Dictionary.TYPE_MAIN).distinct()
+    val inUse = kinds.associateWith { selection.inUse(ctx, locale, dicts, hasInternal && it == Dictionary.TYPE_MAIN, it) }
+    val entries = dicts.mapTo(mutableListOf()) {
+        it.name.substringBefore("_${DictionaryInfoUtils.USER_DICTIONARY_SUFFIX}") to (inUse[selection.typeOf(it)] == it.name)
+    }
+    val internalInUse = inUse[Dictionary.TYPE_MAIN] == selection.INTERNAL
+    if (hasInternal && (internalInUse || entries.none { it.first == Dictionary.TYPE_MAIN }))
+        entries.add(0, ctx.getString(R.string.internal_dictionary_summary) to internalInUse)
+    return entries
+}
+
 @Composable
 private fun LanguageRow(locale: Locale, keyboard: SettingsSubtype, setKeyboard: (SettingsSubtype) -> Unit) {
     val ctx = LocalContext.current
@@ -199,12 +219,7 @@ private fun LanguageRow(locale: Locale, keyboard: SettingsSubtype, setKeyboard: 
     var showNoDictDialog by remember { mutableStateOf(false) }
     var showDictionaryDialog by remember { mutableStateOf(false) }
     var dictGeneration by remember { mutableIntStateOf(0) }
-    val dictionaryTypes = remember(locale, dictGeneration) {
-        val (dicts, hasInternal) = getUserAndInternalDictionaries(ctx, locale)
-        val types = dicts.mapTo(mutableListOf()) { it.name.substringBefore("_${DictionaryInfoUtils.USER_DICTIONARY_SUFFIX}") }
-        if (hasInternal && !types.contains(Dictionary.TYPE_MAIN)) types.add(0, ctx.getString(R.string.internal_dictionary_summary))
-        types
-    }
+    val dictionaryTypes = remember(locale, dictGeneration) { languageRowDictionaries(ctx, locale) }
     val hasDictionary = dictionaryTypes.isNotEmpty()
     val sameScript = locale.script() == keyboard.locale.script()
     // no dictionary = no suggestions for it; another script = can't be on this keyboard: both faded
@@ -217,9 +232,16 @@ private fun LanguageRow(locale: Locale, keyboard: SettingsSubtype, setKeyboard: 
                 Text(locale.localizedDisplayName(ctx.resources), style = MaterialTheme.typography.bodyLarge, color = nameColor)
                 Text(
                     when {
-                        !sameScript -> stringResource(R.string.language_other_script)
-                        hasDictionary -> dictionaryTypes.joinToString(", ")
-                        else -> stringResource(R.string.no_dictionary_short)
+                        !sameScript -> androidx.compose.ui.text.AnnotatedString(stringResource(R.string.language_other_script))
+                        // the raw names ("main, main_prev"), the one in use of each kind in bold (review L3.3)
+                        hasDictionary -> androidx.compose.ui.text.buildAnnotatedString {
+                            dictionaryTypes.forEachIndexed { i, (name, inUse) ->
+                                if (i > 0) append(", ")
+                                if (inUse) withStyle(androidx.compose.ui.text.SpanStyle(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)) { append(name) }
+                                else append(name)
+                            }
+                        }
+                        else -> androidx.compose.ui.text.AnnotatedString(stringResource(R.string.no_dictionary_short))
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = nameColor

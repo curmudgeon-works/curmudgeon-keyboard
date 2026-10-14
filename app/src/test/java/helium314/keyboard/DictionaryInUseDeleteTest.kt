@@ -10,6 +10,7 @@ import helium314.keyboard.latin.utils.DictionaryInfoUtils
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.dialogs.dictionaryDeleteBlockers
+import helium314.keyboard.settings.screens.languageRowDictionaries
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -61,5 +62,15 @@ class DictionaryInUseDeleteTest {
         assertEquals(listOf(en), dictionaryDeleteBlockers(ctx, Locale.US, prev))
         useKeyboards(ctx, real, de) // (English off every keyboard)
         assertEquals(emptyList(), dictionaryDeleteBlockers(ctx, Locale.US, prev))
+    }
+
+    // fail before (L3.3; compile: the row listed the names only, nothing said which one is in use)
+    @Test fun `the language row keeps the raw names and marks the one in use`() {
+        File(dir, "main_user.dict").writeText("x"); File(dir, "main_prev_user.dict").writeText("y")
+        File(dir, "emoji_user.dict").writeText("e")
+        fun added() = languageRowDictionaries(ctx, Locale.US).filter { it.first.startsWith("main") || it.first.startsWith("emoji") }.toSet()
+        assertEquals(setOf("main" to true, "main_prev" to false, "emoji" to true), added())
+        DictionarySelection.select(ctx, Locale.US, "main_prev_user.dict")
+        assertEquals(setOf("main" to false, "main_prev" to true, "emoji" to true), added())
     }
 }
