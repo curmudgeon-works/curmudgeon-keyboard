@@ -44,7 +44,7 @@ class OneSettingsWindowTest {
     private val key = Settings.PREF_AUTO_CORRECTION
     private val draftName = "onewindow"
 
-    @Before fun setUp() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
+    @Before fun setUp() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real); storeOneKeyboard(ctx, real) }
     @After fun tearDown() {
         ExecutorUtils.getBackgroundExecutor(ExecutorUtils.KEYBOARD).submit {}.get()
         shadowOf(Looper.getMainLooper()).idle()

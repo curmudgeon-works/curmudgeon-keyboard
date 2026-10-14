@@ -56,6 +56,7 @@ class LeavingKeepsChangesTest {
     @Before fun setUp() {
         reviveComposeMainDispatcher()
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
+        storeOneKeyboard(ctx, real)
         left = false
     }
     @After fun tearDown() {

@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import helium314.keyboard.latin.InputAttributes
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.realPrefs
 import org.junit.After
 import org.junit.Before
@@ -23,7 +24,7 @@ class TrailThicknessDefaultTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = ctx.realPrefs()
 
-    @Before fun setUp() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
+    @Before fun setUp() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real); storeOneKeyboard(ctx, real) }
     @After fun tearDown() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
 
     private fun thickness(): Int {
@@ -37,7 +38,7 @@ class TrailThicknessDefaultTest {
         assertEquals(60, thickness())
         assertFalse(real.contains(Settings.PREF_GESTURE_TRAIL_THICKNESS))
         assertEquals(60, SettingDefaults.of(Settings.PREF_GESTURE_TRAIL_THICKNESS)) // (what saved items and backups read)
-        real.edit().putInt(Settings.PREF_GESTURE_TRAIL_THICKNESS, 100).commit()
+        ctx.prefs().edit().putInt(Settings.PREF_GESTURE_TRAIL_THICKNESS, 100).commit() // (the keyboard's own setting)
         assertEquals(100, thickness())
     }
 }
