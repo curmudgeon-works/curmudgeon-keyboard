@@ -181,10 +181,16 @@ object LearnedKeyboards {
         if (pool == null || pool == LearnedStores.SHARED) return
         val app = context.applicationContext ?: context
         ExecutorUtils.getBackgroundExecutor(ExecutorUtils.KEYBOARD).execute {
+            // (review 2026-10-11: its files only go once every store and list of every script is merged; else they stay
+            // on disk, read by nobody, rather than lose words)
+            var merged = true
             if (target != null) try {
-                if (LearnedImport.importNow(app, target, listOf(pool), listOf(pool)) != null)
+                val result = LearnedImport.importNow(app, target, listOf(pool), listOf(pool))
+                if (result != null)
                     android.os.Handler(android.os.Looper.getMainLooper()).post { LearnedStores.notifyPoolChanged(target) }
-            } catch (e: Exception) { Log.e(TAG, "could not merge a deleted keyboard's words", e) }
+                merged = result?.complete == true
+            } catch (e: Exception) { Log.e(TAG, "could not merge a deleted keyboard's words", e); merged = false }
+            if (!merged) { Log.w(TAG, "a deleted keyboard's words could not all be merged: its files kept (pool $pool)"); return@execute }
             try { deleteWordsOf(app, pool) } catch (e: Exception) { Log.e(TAG, "could not delete a deleted keyboard's words", e) }
         }
     }

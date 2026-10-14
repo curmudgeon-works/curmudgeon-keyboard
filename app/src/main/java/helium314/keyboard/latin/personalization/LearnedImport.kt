@@ -29,8 +29,10 @@ object LearnedImport {
         return SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.distinct().filter { it != keyboard }
     }
 
-    /** What came in: the distinct learned words and blacklisted words taken from the other keyboards. */
-    class Result(val learned: Int, val blacklisted: Int)
+    /** What came in: the distinct learned words and blacklisted words taken from the other keyboards. [complete]: every
+     *  store and list of every script was read and written (false: one was left out, see the log); the delete of a
+     *  keyboard whose lists were merged into another only deletes its files then. */
+    class Result(val learned: Int, val blacklisted: Int, val complete: Boolean = true)
 
     /**
      * [keyboard] takes the learned words of [learnedFrom] and the blacklists of [blacklistedFrom], in the background (the
@@ -63,15 +65,17 @@ object LearnedImport {
         val filesDir = context.filesDir ?: return@withFiles null
         val io = LearnedKeyboards.storeIo
         val words = HashSet<String>()
+        var complete = true // (every store and list read and written: see Result.complete)
         for (script in learned.flatMap { LearnedStores.scriptsOnDisk(filesDir, it) }.toSortedSet()) {
             val add = learned.mapNotNull { from ->
-                LearnedStoreFiles.read(io, filesDir, script, from).also { if (it == null) Log.w(TAG, "$script: a store could not be read") }
+                LearnedStoreFiles.read(io, filesDir, script, from)
+                    .also { if (it == null) { Log.w(TAG, "$script: a store could not be read"); complete = false } }
             }.filter { it.isNotEmpty() }
             if (add.isEmpty()) continue
             val own = LearnedStoreFiles.read(io, filesDir, script, pool)
-            if (own == null) { Log.w(TAG, "$script: the keyboard's own store could not be read, left as it is"); continue }
+            if (own == null) { Log.w(TAG, "$script: the keyboard's own store could not be read, left as it is"); complete = false; continue }
             val merged = mergeHighest(listOf(own) + add)
-            if (!LearnedStoreFiles.write(io, filesDir, script, pool, merged)) { Log.w(TAG, "$script: could not be written"); continue }
+            if (!LearnedStoreFiles.write(io, filesDir, script, pool, merged)) { Log.w(TAG, "$script: could not be written"); complete = false; continue }
             add.forEach { store -> store.forEach { if (it.isWord) words.add(it.word) } }
             Log.i(TAG, "$script: ${countsOf(merged)} after the import from ${add.size} keyboards")
         }
@@ -79,15 +83,26 @@ object LearnedImport {
         for (script in lists.flatMap { LearnedStores.scriptsOnDisk(filesDir, it) }.toSortedSet()) {
             val add = lists.mapNotNull { from ->
                 val file = LearnedStores.blacklistFile(filesDir, script, from)
-                (RemovedWords.cached(file) ?: file.takeIf { it.isFile }?.let { RemovedWords.forFile(it) })
-                    ?.apply { reload() }?.entries()?.takeIf { it.isNotEmpty() }
+                val entries = (RemovedWords.cached(file) ?: file.takeIf { it.isFile }?.let { RemovedWords.forFile(it) })
+                    ?.apply { reload() }?.entries()
+                // (a list with something in its file that came out empty: its read failed)
+                if (entries.isNullOrEmpty() && file.isFile && file.length() > 0) {
+                    Log.w(TAG, "$script: a blacklist could not be read"); complete = false
+                }
+                entries?.takeIf { it.isNotEmpty() }
             }
             if (add.isEmpty()) continue
             val merged = RemovedWords.mergeLists(add)
-            RemovedWords.forFile(LearnedStores.blacklistFile(filesDir, script, pool)).combine(RemovedWords.formatAll(merged).lines())
+            val target = LearnedStores.blacklistFile(filesDir, script, pool)
+            RemovedWords.forFile(target).combine(RemovedWords.formatAll(merged).lines())
+            // (a failed write is only logged where it happens, and memory keeps the words: the file itself is checked)
+            val written = try { target.takeIf { it.isFile }?.let { RemovedWords.parseAll(it.readLines()) } } catch (e: Exception) { null }
+            if (written == null || merged.any { (word, entry) -> (written[word]?.strikes ?: 0) < entry.strikes }) {
+                Log.w(TAG, "$script: the blacklist could not be written"); complete = false
+            }
             removed.addAll(merged.keys)
             Log.i(TAG, "$script: ${merged.size} blacklisted words from ${add.size} keyboards")
         }
-        Result(words.size, removed.size)
+        Result(words.size, removed.size, complete)
     }
 }

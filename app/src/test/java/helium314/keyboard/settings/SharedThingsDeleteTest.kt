@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import helium314.keyboard.latin.common.Constants.Subtype.ExtraValue
 import helium314.keyboard.latin.personalization.BodyStoreIo
+import helium314.keyboard.latin.personalization.LearnedEntry
 import helium314.keyboard.latin.personalization.LearnedKeyboards
 import helium314.keyboard.latin.personalization.LearnedStoreIo
 import helium314.keyboard.latin.personalization.LearnedStores
@@ -12,6 +13,7 @@ import helium314.keyboard.latin.personalization.available
 import helium314.keyboard.latin.personalization.deleteLearnedFiles
 import helium314.keyboard.latin.personalization.idleUntil
 import helium314.keyboard.latin.personalization.readList
+import helium314.keyboard.latin.personalization.storedPools
 import helium314.keyboard.latin.personalization.useKeyboards
 import helium314.keyboard.latin.personalization.word
 import helium314.keyboard.latin.personalization.writeList
@@ -26,6 +28,7 @@ import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.shadows.ShadowLog
 import java.io.File
 import java.util.Locale
 import kotlin.test.Test
@@ -87,6 +90,33 @@ class SharedThingsDeleteTest {
         assertEquals(mapOf("alpha" to (2 to 100), "beta" to (5 to 110)), io.read(ce, "Latn", 6))
         assertEquals(RemovedWords.Entry(1), readList(ce, "Latn", 6)?.get("bad"))
         assertTrue(!LearnedStores.storeFile(ce, "Latn", 5).exists()) // (A's own files went)
+    }
+
+    @Test fun `a merge that didn't fully work keeps the deleted keyboard's lists on disk`() {
+        // (A on pool 9 here: nothing another test's background task logs about pool 5 can end the wait early)
+        useKeyboards(ctx, real, a, b, c)
+        real.edit().putBoolean(LearnedKeyboards.PREF_DONE, true)
+            .putString(LearnedKeyboards.PREF_POOLS, JSONObject(mapOf(a.toPref() to 9, b.toPref() to 6, c.toPref() to 7)).toString())
+            .putInt(LearnedKeyboards.PREF_POOL_NEXT, 10).commit()
+        io.store(ce, "Latn", 9, word("alpha", 2, 100))
+        io.store(ce, "Cyrl", 9, word("бета", 3, 120))
+        writeList(ce, "Latn", 9, "bad\n")
+        io.store(ce, "Latn", 6, word("beta", 1, 50))
+        // the Cyrillic store of the keyboard taking the lists can't be written
+        LearnedKeyboards.storeIo = object : LearnedStoreIo by io {
+            override fun writeFile(dir: File, locale: Locale, entries: List<LearnedEntry>) =
+                if (dir.name.contains("Cyrl")) false else io.writeFile(dir, locale, entries)
+        }
+        ShadowLog.reset()
+        LearnedKeyboards.deleteKeyboard(ctx, a, mergeInto = b)
+        // (the task's last word: the lists deleted, or kept)
+        idleUntil { ShadowLog.getLogsForTag("LearnedKeyboards").any { "pool 9" in it.msg } }
+        assertTrue(LearnedStores.storeFile(ce, "Latn", 9).exists())
+        assertTrue(LearnedStores.storeFile(ce, "Cyrl", 9).exists())
+        assertEquals(mapOf("бета" to (3 to 120)), io.read(ce, "Cyrl", 9))
+        assertEquals(RemovedWords.Entry(1), readList(ce, "Latn", 9)?.get("bad"))
+        assertEquals(mapOf("alpha" to (2 to 100), "beta" to (1 to 50)), io.read(ce, "Latn", 6)) // (what worked stays merged)
+        assertTrue(9 !in storedPools(real).values) // (no keyboard has those lists any more)
     }
 
     @Test fun `none picked - the lists go, nobody else changes`() {
