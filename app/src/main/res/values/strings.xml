@@ -340,6 +340,9 @@
     <string name="button_restore">Restore</string>
     <!-- Message when backup is restored successfully -->
     <string name="backup_restored">Backup restored</string>
+    <!-- added to the restore's done message when the backup's clipboard history couldn't be read (from a newer version,
+         or damaged): the rest was restored, the device's clipboard history left as it was (owner 2026-10-12) -->
+    <string name="restore_clipboard_skipped">Clipboard history couldn\'t be restored; your current clipboard was kept.</string>
     <!-- Above the progress bar while a backup is written -->
     <string name="backup_running">Backing up…</string>
     <!-- Above the progress bar while a backup is restored -->
