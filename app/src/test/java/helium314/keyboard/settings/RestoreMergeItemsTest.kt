@@ -171,13 +171,16 @@ class RestoreMergeItemsTest {
         restoreDictionaries(ticked = true)
         restoreDictionaries(ticked = true)
         assertEquals(setOf("main_user.dict", "main_prev_user.dict"), dictDir("fr").list()!!.toSet())
-        // the backup's content under another name on the device: nothing either
+        // the backup's content under another name on the device: that copy takes the backup's name and is selected, the
+        // device's of that name at the prev it left (owner 2026-10-12 B3: "select that copy and also rename that copy to
+        // backups"; B3b: no gap)
         File(ce, "dicts").deleteRecursively(); real.edit().remove("dict_selected_fr_main").commit()
         dictDir("fr").mkdirs(); dict("fr", "main_user.dict").writeText("device"); dict("fr", "main_prev_user.dict").writeText("backup")
         restoreDictionaries(ticked = true)
-        assertEquals("device", dict("fr", "main_user.dict").readText())
+        assertEquals("backup", dict("fr", "main_user.dict").readText())
+        assertEquals("device", dict("fr", "main_prev_user.dict").readText())
         assertEquals(setOf("main_user.dict", "main_prev_user.dict"), dictDir("fr").list()!!.toSet())
-        assertEquals(null, selected("fr"))
+        assertEquals("main_user.dict", selected("fr"))
     }
 
     @Test fun `a second clash keeps the earlier prev and names the next one main_prev2`() {
@@ -416,7 +419,10 @@ class RestoreMergeItemsTest {
         val restored = restoreChosenFrom(ctx, zip, listOf(frB, enB), settings = false, learnedWords = false, io = io,
             decisions = mapOf(enB to RestoreDecision.Separate()))
         val copy = restored.onDevice.getValue(enB)
-        assertFalse(copy.sameKeyboard(en), "the copy kept apart has its own id")
+        // (same id: the device's English is the one renumbered, the backup's keeps its id; both listed)
+        val english = SubtypeSettings.getEnabledSubtypes().map { with(SettingsSubtype) { it.toSettingsSubtype() } }
+            .filter { it.locale.toLanguageTag() == "en-US" }
+        assertEquals(2, english.mapNotNull { it.keyboardId }.distinct().size, "the copy kept apart and the device's English")
         assertEquals(copy.keyboardId, inUse().keyboardId)
     }
 

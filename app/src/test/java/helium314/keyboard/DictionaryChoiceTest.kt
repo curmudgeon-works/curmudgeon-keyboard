@@ -186,8 +186,9 @@ class DictionaryChoiceTest {
         val step = restoreEmoji(hi, "emoji_prev_user.dict") // (the backup's: the same as the device's prev)
         assertEquals(RestoreDictionaries.Action.SAME, step.action)
         assertEquals("emoji_prev_user.dict", File(dir(hi), "emoji_user.dict").readText(), "the match took the backup's name")
-        assertEquals("emoji_user.dict", File(dir(hi), "emoji_prev2_user.dict").readText(), "the device's of that name moved aside")
-        assertFalse(File(dir(hi), "emoji_prev_user.dict").exists())
+        // (into the prev the match left: no gap, review B3b)
+        assertEquals("emoji_user.dict", File(dir(hi), "emoji_prev_user.dict").readText(), "the device's of that name moved aside")
+        assertFalse(File(dir(hi), "emoji_prev2_user.dict").exists())
         assertEquals("emoji_user.dict", DictionarySelection.selected(ctx, hi, Dictionary.TYPE_EMOJI), "selected")
         assertEquals(listOf("emoji_user.dict"), engineEmoji(hi), "the engine uses the backup's version")
     }

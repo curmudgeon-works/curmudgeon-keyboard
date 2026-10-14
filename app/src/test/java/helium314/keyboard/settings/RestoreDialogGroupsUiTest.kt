@@ -42,7 +42,8 @@ import kotlin.test.assertTrue
  * unchecked, a row per backup keyboard and saved item, names as in the backup (no "(new)"), by section: KEYBOARDS ·
  * LAYOUTS & POPUPS · THEMES · PALETTES & IMAGES · FONTS; "Merge required" and "Required for …" under a row; "Tricky
  * merging ahead!" only with a ticked row that needs merging. No rows for settings, dictionaries, learned words or the
- * clipboard (they always come), no "For other clashes". The full restore shows nothing below the box.
+ * clipboard (they always come; since R-DICT, 2026-10-13, what no keyboard brings is an "Also restore" row, ticked), no
+ * "For other clashes". The full restore shows nothing below the box.
  * The device: English (k1) with its own French dictionary; the backup: French (k6) with another, Urdu's dictionary,
  * personal dictionary words and clipboard history, no learned words.
  */
@@ -112,8 +113,10 @@ class RestoreDialogGroupsUiTest {
         compose.onNodeWithText(line).assertDoesNotExist() // (French: no keyboard of its language here, nothing to merge)
         // (nothing to ask: the button restores)
         assertTrue(compose.onAllNodesWithText("Restore").fetchSemanticsNodes().size >= 2) // (the title and the button)
-        gone("(new)", "RESTORE THEIR", "AND MERGE", "Settings", "Dictionaries", "Learned words", "Clipboard history",
-            "FOR OTHER CLASHES", "Custom words", "Bring with them", "Also restore", "Urdu", "Prepare to do", "App data won't be deleted")
+        gone("(new)", "RESTORE THEIR", "AND MERGE", "Settings", "Learned words",
+            "FOR OTHER CLASHES", "Custom words", "Bring with them", "Prepare to do", "App data won't be deleted")
+        // (what no keyboard brings, in the backup here, ticked: owner 2026-10-13 R-DICT, the "Also restore" group)
+        for (row in listOf("Other dictionaries", "Clipboard history", "Android personal dictionary words")) box(row).assertIsOn()
     }
 
     // owner 2026-10-12: the backup's English (the device's, same id) on its Sunset, the device's Sunset other colors
@@ -163,7 +166,13 @@ class RestoreDialogGroupsUiTest {
         button("Restore").assertIsEnabled() // (French ticked)
         compose.onNodeWithText("French").performClick()
         box("French").assertIsOff()
+        button("Restore").assertIsEnabled() // (the "Also restore" rows still ticked, R-DICT)
+        val also = listOf("Other dictionaries", "Clipboard history", "Android personal dictionary words")
+        for (row in also) compose.onNodeWithText(row).performClick()
         button("Restore").assertIsNotEnabled()
+        compose.onNodeWithText("Clipboard history").performClick()
+        button("Restore").assertIsEnabled()
+        compose.onNodeWithText("Clipboard history").performClick()
         compose.onNodeWithText("French").performClick()
         button("Restore").assertIsEnabled()
         compose.onNodeWithText("French").performClick()

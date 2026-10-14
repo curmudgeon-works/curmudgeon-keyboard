@@ -28,8 +28,11 @@ class BackupClipboardWalTest {
     private val zip = File(ctx.cacheDir, "backup-wal.zip")
     private val copy = File(ctx.cacheDir, "backup-wal-copy.db")
 
-    private fun resetClipboard() =
+    // (both singletons: an earlier test's database is in that test's folder, gone; the backup copies this test's)
+    private fun resetClipboard() {
         ClipboardDao::class.java.getDeclaredField("instance").apply { isAccessible = true }.set(null, null)
+        Database::class.java.getDeclaredField("instance").apply { isAccessible = true }.set(null, null)
+    }
 
     @Before fun setUp() { resetClipboard() }
 

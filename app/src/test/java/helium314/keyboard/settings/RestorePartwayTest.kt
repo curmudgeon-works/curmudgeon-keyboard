@@ -117,8 +117,7 @@ class RestorePartwayTest {
         val renamed = withKeyboardName(qwerty, "$english 2").toPref().toSettingsSubtype()
         assertTrue(renamed in SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }, "the rename didn't happen before the failure")
         assertEquals("p", error, "not reported as a restore stopped partway")
-        // (the dialog's text for "p"; by name, so this test builds without it too)
-        val text = ctx.resources.getIdentifier("restore_partway", "string", R::class.java.`package`!!.name)
-        assertEquals("Restore stopped partway; some items may have been renamed or only partly restored.", ctx.getString(text))
+        // (the dialog's text for "p")
+        assertEquals("Restore stopped partway; some items may have been renamed or only partly restored.", ctx.getString(R.string.restore_partway))
     }
 }

@@ -101,7 +101,7 @@ class AllowedHereTest {
         assertEquals(emptyMap(), b.allowedEntries())
         assertNull(b.allowedFor("Zorp"))
         assertFalse(lists.isAllowedHere("zorp"))
-        assertEquals(listOf("Zorp"), fileB.readLines())
+        assertEquals(listOf("Zorp\t2"), fileB.readLines()) // (borrowed 1, allowed here: one more, M5 "Yes +1")
         // (the struck spelling another than the word removed: disallow takes the removed word's rows off)
         b.allow("Quux", 1); b.allow("quux", 1)
         b.strike("quux")

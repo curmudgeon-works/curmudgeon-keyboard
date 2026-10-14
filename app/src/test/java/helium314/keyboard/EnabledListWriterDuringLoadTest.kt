@@ -78,7 +78,8 @@ class EnabledListWriterDuringLoadTest {
         while (System.nanoTime() < end) {
             val state = thread.state
             if (state == Thread.State.TERMINATED) return
-            if (state == Thread.State.BLOCKED && thread.stackTrace.any { it.methodName.contains("changeEnabledSubtypes") }) return
+            // (on the list's lock: in its own change, or in a reload a preference write of it started)
+            if (state == Thread.State.BLOCKED && thread.stackTrace.any { it.className.endsWith("SubtypeSettings") }) return
             Thread.sleep(2)
         }
         fail("the writer neither finished nor waited for the list")
