@@ -642,6 +642,8 @@
     <string name="key_popups_none">No popups</string>
     <string name="key_popups_numpad">Number pad</string>
     <string name="key_popups_try">Try it here</string>
+    <!-- the try-it field while another keyboard is selected in Android: a tap opens the keyboard picker (owner 2026-10-14) -->
+    <string name="try_it_switch_to_preview">Switch to Curmudgeon to preview</string>
     <string name="layout_group_numpad">Number pad</string>
     <string name="layout_group_phone">Phone pad</string>
     <string name="bottom_rows_action_key">Show send key on emoji and clipboard panels</string>

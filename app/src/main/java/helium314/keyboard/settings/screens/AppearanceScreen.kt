@@ -839,6 +839,8 @@ internal class PreviewKeyboard( // (also the Preferences screen's, for the key s
 
     private fun show(emoji: Boolean = false, people: Boolean = false) {
         hideJob?.cancel()
+        // another keyboard selected in Android: nothing comes up, and no row moves for it ([TryItState.keyboardAllowed])
+        if (!tryIt.keyboardAllowed) return
         // "Bring up preview keyboard automatically" off: only the user's tap on the try-it box brings it up; a keyboard
         // already up (they tapped) still follows, e.g. to the emoji panel
         val auto = helium314.keyboard.latin.settings.Settings.getCurrentContext()?.prefs()

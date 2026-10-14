@@ -145,6 +145,8 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
                         !UncachedInputMethodManagerUtils.isThisImeEnabled(this, imm)
                     ) }
                     val selected by imeSelected.collectAsState()
+                    // the screens' try-it field and preview keyboard follow it (TryItBar)
+                    androidx.compose.runtime.CompositionLocalProvider(LocalImeSelected provides selected) {
                     if (spellchecker)
                         Scaffold(contentWindowInsets = WindowInsets.safeDrawing) { innerPadding ->
                             Column(Modifier.padding(innerPadding)) {
@@ -191,6 +193,7 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
                                 content = { Text("Crash report files found") },
                             )
                         }
+                    }
                     }
                     // what a restore has to say, once it's done (owner 2026-10-12: a dialog, not a toast)
                     helium314.keyboard.settings.preferences.AfterRestoreNote()
@@ -354,6 +357,11 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
         prefChanged()
     }
 }
+
+/** Whether this keyboard is the one selected in Android (the activity's check, again whenever the window regains the
+ *  focus): while it isn't, the try-it field brings up no keyboard and offers the switch instead (owner 2026-10-14: "Can we
+ *  show this message, but also prevent preview from coming up?"). True where no activity provides it. */
+val LocalImeSelected = androidx.compose.runtime.compositionLocalOf { true }
 
 // duplicate of SettingsActivity so we can launch it when the app icon is disabled in Android 9 and older
 class SettingsActivity2 : SettingsActivity()

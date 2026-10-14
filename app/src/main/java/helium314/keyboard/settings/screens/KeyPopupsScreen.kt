@@ -112,6 +112,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.focusProperties
 import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.latin.RichInputMethodManager
 import kotlin.math.roundToInt
@@ -725,7 +726,13 @@ enum class TryItMode { TEXT, NUMBER, PHONE, EMOJI, CLIPBOARD }
 class TryItState {
     var mode by mutableStateOf(TryItMode.TEXT)
     val focusRequester = FocusRequester()
+    /** False while this keyboard isn't the one selected in Android ([helium314.keyboard.settings.LocalImeSelected], set
+     *  by [TryItBar]): nothing brings a keyboard up then, the field's tap offers the switch instead (owner 2026-10-14). */
+    var keyboardAllowed = true
     fun show(mode: TryItMode, people: Boolean = false) {
+        // the one gate: every summon (the screens' dialogs and switches through PreviewKeyboard, the mode buttons, the
+        // items that ask for a pad) comes here
+        if (!keyboardAllowed) return
         this.mode = mode
         // emoji / clipboard: the keyboard is told before the field's focus starts it, so it opens on that panel
         if (mode == TryItMode.EMOJI || mode == TryItMode.CLIPBOARD)
@@ -750,6 +757,13 @@ fun TryItBar(keyboard: SettingsSubtype, state: TryItState, onFocus: (Boolean) ->
         }
     }
     var tryText by remember { mutableStateOf("") }
+    // another keyboard selected in Android: no keyboard comes up here (it would be that one, not this), the field says
+    // to switch and a tap on it opens Android's keyboard picker, as the bar on top does; back with this one, all as before
+    val selected = helium314.keyboard.settings.LocalImeSelected.current
+    state.keyboardAllowed = selected
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    val ctx = LocalContext.current
+    LaunchedEffect(selected) { if (!selected) focusManager.clearFocus(force = true) }
     Surface(tonalElevation = 3.dp, shadowElevation = 8.dp) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -758,7 +772,15 @@ fun TryItBar(keyboard: SettingsSubtype, state: TryItState, onFocus: (Boolean) ->
                 .padding(horizontal = 12.dp, vertical = 8.dp)
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
         ) {
-            OutlinedTextField(
+            if (!selected) androidx.compose.foundation.layout.Box(Modifier.weight(1f)) {
+                // (the field as it looks, never focused; the box over it takes the tap)
+                OutlinedTextField(
+                    value = "", onValueChange = { }, readOnly = true, singleLine = true,
+                    label = { Text(stringResource(R.string.try_it_switch_to_preview), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    modifier = Modifier.fillMaxWidth().focusProperties { canFocus = false },
+                )
+                androidx.compose.foundation.layout.Box(Modifier.matchParentSize().clickable { showKeyboardPicker(ctx) })
+            } else OutlinedTextField(
                 value = tryText, onValueChange = { tryText = it; onUsed() }, // typing in it: the preview is in use
                 label = { Text(stringResource(R.string.key_popups_try), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 singleLine = true,
@@ -777,8 +799,10 @@ fun TryItBar(keyboard: SettingsSubtype, state: TryItState, onFocus: (Boolean) ->
             )
             // which keyboard the preview shows: letters, the number pad, the phone pad, the emoji panel, the clipboard;
             // no check mark on the selected one (its background shows it), tight padding and at most 48 dp each, so five
-            // fit and still leave the field room on a 411 dp phone (Material's 58 dp minimum squeezed it to a column)
-            SingleChoiceSegmentedButtonRow(Modifier.padding(start = 8.dp)) {
+            // fit and still leave the field room on a 411 dp phone (Material's 58 dp minimum squeezed it to a column);
+            // none while another keyboard is selected, the field takes the whole width (owner 2026-10-14: "remove the
+            // 5 buttons in the case")
+            if (selected) SingleChoiceSegmentedButtonRow(Modifier.padding(start = 8.dp)) {
                 val modes = listOf(TryItMode.TEXT to "ABC", TryItMode.NUMBER to "123", TryItMode.PHONE to "\u260E",
                     TryItMode.EMOJI to "\uD83D\uDE00", TryItMode.CLIPBOARD to "\uD83D\uDCCB")
                 modes.forEachIndexed { index, (mode, label) ->
@@ -795,6 +819,11 @@ fun TryItBar(keyboard: SettingsSubtype, state: TryItState, onFocus: (Boolean) ->
             }
         }
     }
+}
+
+/** Opens Android's keyboard picker, as the "not your current keyboard" bar's Switch does (tests replace it). */
+internal var showKeyboardPicker: (Context) -> Unit = { ctx ->
+    (ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).showInputMethodPicker()
 }
 
 /** A built-in set ([name] resource) or one the user saved ([userName], with its per-key arrangement). */
