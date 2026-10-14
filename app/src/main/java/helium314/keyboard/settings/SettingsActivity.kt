@@ -3,6 +3,7 @@ package helium314.keyboard.settings
 
 import android.view.MotionEvent
 
+import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
@@ -218,18 +219,33 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
     override fun onStart() {
         super.onStart()
         prefs.registerOnSharedPreferenceChangeListener(this)
+        editsLeftOpen = false // (back in front: the edits go on)
     }
 
     override fun onStop() {
         prefs.unregisterOnSharedPreferenceChangeListener(this)
         // leaving the app with Appearance open undoes its changes that weren't kept; a file picker we opened
         // (background image, font) and rotating don't count
-        if (!isChangingConfigurations && !awaitingResult) { AppearanceDraft.rejectOpen(this); LayoutDraft.rejectOpen(this); PrefsDraft.rejectOpen(this) }
+        if (!isChangingConfigurations) { if (awaitingResult) editsLeftOpen = true else leaveOpenEdits() }
         super.onStop()
     }
 
+    override fun onDestroy() {
+        // the window closed counts as leaving too, also one stopped while a file picker it opened was in front (owner
+        // 2026-10-14, the settings key's fix A: it closes an older window; that one's drafts stayed running, and the next
+        // screen took them over, Layout & typing even for another keyboard). Only when its onStop left them running: a
+        // window already left has none of its own, and a draft running now is another window's
+        if (!isChangingConfigurations && editsLeftOpen) { editsLeftOpen = false; leaveOpenEdits() }
+        super.onDestroy()
+    }
+
+    /** The settings are left with a Save/Discard edit open: its changes that weren't kept are undone. */
+    private fun leaveOpenEdits() { AppearanceDraft.rejectOpen(this); LayoutDraft.rejectOpen(this); PrefsDraft.rejectOpen(this) }
+
     // an activity we started for a result (file pickers) is in front: this isn't leaving the app
     private var awaitingResult = false
+    // the window was stopped with a file picker in front, its open edits left running ([onDestroy])
+    private var editsLeftOpen = false
 
     @Deprecated("Deprecated in Java")
     override fun startActivityForResult(intent: Intent, requestCode: Int, options: Bundle?) {
@@ -294,6 +310,14 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
     }
 
     companion object {
+        /** The settings opened from outside them (the keyboard's settings key, the spell checker's settings): one
+         *  window, on its main screen. An older settings window in the task is closed (owner 2026-10-14: "I updated swipe
+         *  trail and had to press back a bunch to get to main settings screen": the new one landed on top of it, and Back
+         *  walked through the older window's screens); closing it counts as leaving it ([onDestroy]). */
+        @JvmStatic fun openFromOutside(context: Context): Intent = Intent(context, SettingsActivity2::class.java)
+            .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+
         /** When the screen (not a dialog) was last touched, uptime ms: the preview keyboard stays quiet until then. */
         @Volatile var lastTouchDown = 0L
         // public write so compose previews can show the screens

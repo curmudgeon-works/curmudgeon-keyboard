@@ -85,7 +85,7 @@ import helium314.keyboard.latin.utils.SubtypeLocaleUtils;
 import helium314.keyboard.latin.utils.SubtypeSettings;
 import helium314.keyboard.latin.utils.SubtypeState;
 import helium314.keyboard.latin.utils.ToolbarMode;
-import helium314.keyboard.settings.SettingsActivity2;
+import helium314.keyboard.settings.SettingsActivity;
 import kotlin.Unit;
 
 import java.io.FileDescriptor;
@@ -1751,12 +1751,8 @@ public class LatinIME extends InputMethodService implements
         if (mainKeyboardView != null) {
             mainKeyboardView.closing();
         }
-        final Intent intent = new Intent();
-        intent.setClass(LatinIME.this, SettingsActivity2.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
-                | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        startActivity(intent);
+        // one settings window, on its main screen: an older one is closed (see SettingsActivity.openFromOutside)
+        startActivity(SettingsActivity.openFromOutside(LatinIME.this));
     }
 
     public void launchEmojiSearch() {
