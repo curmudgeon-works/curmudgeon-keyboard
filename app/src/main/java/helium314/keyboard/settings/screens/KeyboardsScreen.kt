@@ -164,7 +164,7 @@ fun KeyboardsScreen(
                             if (folding) { if (isExpanded) expanded.remove(keyboard) else expanded.add(keyboard) }
                             else {
                                 SettingsDestination.navigateTo(SettingsDestination.inSet(SettingsDestination.withKeyboard(
-                                    SettingsDestination.Languages, keyboard), if (separate) KeyboardProfiles.idFor(real, keyboard) else null))
+                                    SettingsDestination.Languages, keyboard), if (separate) KeyboardProfiles.idForListed(real, keyboard) else null))
                             }
                         },
                         icon = R.drawable.ic_settings_layout, // a keyboard (the globe is for its languages)
@@ -204,7 +204,7 @@ fun KeyboardsScreen(
                     }
                     if (isExpanded)
                         KeyboardSettingsEntries(keyboard, Modifier.padding(start = 24.dp), showAdvanced = false,
-                            setId = { KeyboardProfiles.idFor(real, keyboard) },
+                            setId = { KeyboardProfiles.idForListed(real, keyboard) },
                             // with separate settings only the menus each keyboard keeps to itself
                             groups = if (separate) { g -> !sharedMenu(g) } else null,
                             showRefine = separate && !sharedMenu(KeyboardProfiles.Group.REFINE))
@@ -262,7 +262,7 @@ fun KeyboardsScreen(
                     KeyboardSettingsEntries(SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype(), showLanguages = false)
                 else if (enabled.size == 1)
                     KeyboardSettingsEntries(enabled[0].toSettingsSubtype(), showLanguages = false, showAdvanced = false,
-                        setId = { KeyboardProfiles.idFor(real, enabled[0].toSettingsSubtype()) })
+                        setId = { KeyboardProfiles.idForListed(real, enabled[0].toSettingsSubtype()) })
                 else
                     Text(
                         stringResource(R.string.separate_settings_hint), // (the menus below: the first keyboard's)
@@ -276,7 +276,7 @@ fun KeyboardsScreen(
                     // common set, the first keyboard's own settings are the common ones)
                     val main = KeyboardProfiles.mainKeyboard(real)
                     KeyboardSettingsEntries(main, showLanguages = false, showAdvanced = false,
-                        setId = { KeyboardProfiles.idFor(real, main) },
+                        setId = { KeyboardProfiles.idForListed(real, main) },
                         groups = { g -> sharedMenu(g) })
                 }
                 if (separate) AdvancedEntry(showRefine = sharedMenu(KeyboardProfiles.Group.REFINE))
@@ -441,12 +441,13 @@ private fun addNewKeyboard(ctx: Context, keyboard: SettingsSubtype) {
 internal fun startSettings(ctx: Context, keyboard: SettingsSubtype, start: StartSettings) {
     val real = ctx.realPrefs()
     val from = when (start) {
-        is StartSettings.From -> KeyboardProfiles.idFor(real, start.keyboard)
+        is StartSettings.From -> KeyboardProfiles.idForListed(real, start.keyboard) ?: KeyboardProfiles.START_DEFAULTS
         StartSettings.Common -> KeyboardProfiles.SHARED
         StartSettings.Defaults -> KeyboardProfiles.START_DEFAULTS
     }
     val otherScript = start is StartSettings.From &&
         with(helium314.keyboard.latin.utils.ScriptUtils) { start.keyboard.locale.script() != keyboard.locale.script() }
+    // (adding or copying a keyboard: one of the explicit moments that create its records, owner 2026-10-11)
     KeyboardProfiles.startKeyboardFrom(real, KeyboardProfiles.idFor(real, keyboard), from, noPopups = otherScript)
 }
 

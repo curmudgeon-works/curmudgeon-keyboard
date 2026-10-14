@@ -47,13 +47,15 @@ object LearnedStores {
     /** The pool the keyboard in use learns into and reads from (its own). */
     val currentPool get() = currentView.own
 
-    /** The pool of the selected keyboard (LearnedKeyboards). [real]: the preferences as stored (not a keyboard's profile view). */
-    fun poolFor(real: SharedPreferences): Int = LearnedKeyboards.poolFor(real, KeyboardProfiles.selectedKeyboard(real))
+    /** The pool of the selected keyboard (LearnedKeyboards), null when it has none (a lookup). [real]: the preferences as
+     *  stored (not a keyboard's profile view). */
+    fun poolFor(real: SharedPreferences): Int? = LearnedKeyboards.poolOrNull(real, KeyboardProfiles.selectedKeyboard(real))
 
-    /** The view of the selected keyboard (prefs only, no files). */
-    fun viewFor(real: SharedPreferences): LearnedView {
+    /** The view of the selected keyboard (prefs only, no files); null when it has no pool (owner 2026-10-11: lookups never
+     *  create records; e.g. a changed keyboard's pool moved, the selected keyboard not yet). */
+    fun viewFor(real: SharedPreferences): LearnedView? {
         val keyboard = KeyboardProfiles.selectedKeyboard(real)
-        val own = LearnedKeyboards.poolFor(real, keyboard)
+        val own = LearnedKeyboards.poolOrNull(real, keyboard) ?: return null
         if (!LearnedKeyboards.isDone(real)) return LearnedView(own)
         val learned = LearnedKeyboards.usesOthers(real, LearnedKeyboards.PREF_USE_OTHERS_LEARNED, keyboard)
         val blacklisted = LearnedKeyboards.usesOthers(real, LearnedKeyboards.PREF_USE_OTHERS_BLACKLISTED, keyboard)
@@ -84,7 +86,8 @@ object LearnedStores {
     /** Re-reads the view (on every keyboard switch, a change of the keyboard list or the buttons, after the one-time
      *  update, a reset or a restore); what's built from the learned words is rebuilt when it changed. */
     fun refresh(real: SharedPreferences) {
-        val view = try { viewFor(real) } catch (e: Exception) { Log.w(TAG, "could not read the pool", e); LearnedView(SHARED) }
+        // (no pool: the view stays as it is, a rename keeps the number; the net gives a listed keyboard its own)
+        val view = try { viewFor(real) } catch (e: Exception) { Log.w(TAG, "could not read the pool", e); LearnedView(SHARED) } ?: return
         val old = currentView
         if (view == old) return
         currentView = view

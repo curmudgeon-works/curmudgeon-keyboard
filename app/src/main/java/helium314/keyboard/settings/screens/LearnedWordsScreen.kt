@@ -120,7 +120,8 @@ fun LearnedWordsScriptsScreen(onClickBack: () -> Unit, keyboard: helium314.keybo
 
 /** The rows of [keyboard]'s scripts list: its own learned words (2026-10-10). */
 internal fun scriptRows(context: Context, keyboard: helium314.keyboard.latin.settings.SettingsSubtype): List<ScriptRowData> {
-    val pool = LearnedKeyboards.poolFor(context.realPrefs(), keyboard)
+    // (a lookup, owner 2026-10-11: a keyboard without a pool has no learned words to show)
+    val pool = LearnedKeyboards.poolOrNull(context.realPrefs(), keyboard) ?: return emptyList()
     return (listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)).groupBy { it.script() }
         .map { (script, locales) -> ScriptRowData(script, locales, pool) }
 }

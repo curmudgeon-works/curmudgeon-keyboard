@@ -92,7 +92,7 @@ object SavedItemDefaults {
             // (a Layout's popups only go on a keyboard of its script: the keyboards of this set, the main one's for all
             // while it is the common settings)
             val keyboards: List<SettingsSubtype> = ids.filterValues { it == id }.keys.map { it.toSettingsSubtype() } +
-                (if (id == KeyboardProfiles.mainId(real) && KeyboardProfiles.mainIsCommon(real)) enabled else emptyList())
+                (if (id == KeyboardProfiles.mainId(real, create = false) && KeyboardProfiles.mainIsCommon(real)) enabled else emptyList())
             val held = HashMap<String, Any>()
             chosen(LayoutPresets.PREF_SELECTED)?.takeIf { it !in builtInLayouts }?.let { name -> layouts.firstOrNull { it.name == name } }
                 ?.let { held.putAll(LayoutPresets.rememberedFor(it, keyboards)) }

@@ -43,10 +43,11 @@ object LearnedImport {
               blacklistedFrom: Collection<SettingsSubtype>, onDone: (Result?) -> Unit = {}) {
         if (learnedFrom.isEmpty() && blacklistedFrom.isEmpty()) return
         val real = DeviceProtectedUtils.getRealSharedPreferences(context)
-        val pool = LearnedKeyboards.poolFor(real, keyboard)
+        // (the keyboard just added: the net gave it one; the sources are lookups, owner 2026-10-11)
+        val pool = LearnedKeyboards.poolForListed(real, keyboard) ?: return
         if (pool == LearnedStores.SHARED) return // (before the update: no keyboard has its own words yet)
         fun poolsOf(keyboards: Collection<SettingsSubtype>) = keyboards.filter { it != keyboard }
-            .map { LearnedKeyboards.poolFor(real, it) }.filter { it != pool && it != LearnedStores.SHARED }.distinct()
+            .mapNotNull { LearnedKeyboards.poolOrNull(real, it) }.filter { it != pool && it != LearnedStores.SHARED }.distinct()
         val learned = poolsOf(learnedFrom)
         val lists = poolsOf(blacklistedFrom)
         val app = context.applicationContext ?: context

@@ -71,8 +71,9 @@ object LearnedKeyboards {
 
     // ---------------- which pool ----------------
 
-    /** The pool of [keyboard], a new one on first use. Before the update: the old rule (see the class). Prefs only: safe
-     *  before unlock and on the main thread. [real]: the preferences as stored. */
+    /** The pool of [keyboard], a new one if it has none. Only at the explicit moments (owner 2026-10-11: lookups never
+     *  create records; only add/copy/restore/upgrade and the net do); every reader: [poolOrNull]. Before the update: the
+     *  old rule (see the class). Prefs only: safe before unlock and on the main thread. [real]: the preferences as stored. */
     fun poolFor(real: SharedPreferences, keyboard: SettingsSubtype): Int {
         if (!isDone(real)) return if (shared(real)) LearnedStores.SHARED else KeyboardProfiles.idFor(real, keyboard)
         // (never calls into KeyboardProfiles while holding this: its hooks call in here)
@@ -86,6 +87,26 @@ object LearnedKeyboards {
             Log.i(TAG, "a new keyboard: pool $pool")
             return pool
         }
+    }
+
+    /** The pool of [keyboard], null when it has none (a lookup: never creates one). Before the update: the old rule, the
+     *  profile id only if it has one. */
+    fun poolOrNull(real: SharedPreferences, keyboard: SettingsSubtype): Int? {
+        if (!isDone(real)) return if (shared(real)) LearnedStores.SHARED else KeyboardProfiles.idOrNull(real, keyboard)
+        return synchronized(this) { pools(real).let { map -> keyboard.toPref().takeIf { map.has(it) }?.let { map.getInt(it) } } }
+    }
+
+    /** [keyboard]'s pool for a write a user asked for: its own, else one now if it's in the list (the net, for one
+     *  keyboard); null for a keyboard neither listed nor with a pool. Never from a preference listener. */
+    fun poolForListed(real: SharedPreferences, keyboard: SettingsSubtype): Int? =
+        poolOrNull(real, keyboard) ?: if (KeyboardProfiles.isListed(real, keyboard)) poolFor(real, keyboard) else null
+
+    /** The net's part (KeyboardProfiles.ensureListedRecords): [keyboard] gets a pool if it has none, once the update is
+     *  done (before it the profile id is the pool). @return whether one was created */
+    internal fun ensurePool(real: SharedPreferences, keyboard: SettingsSubtype): Boolean {
+        if (!isDone(real) || poolOrNull(real, keyboard) != null) return false
+        poolFor(real, keyboard)
+        return true
     }
 
     private fun nextFree(real: SharedPreferences, map: JSONObject): Int =
@@ -115,7 +136,7 @@ object LearnedKeyboards {
 
     /** The pools of the listed keyboards other than [keyboard] (whose pool is [own]): what its buttons read. */
     fun otherPools(real: SharedPreferences, keyboard: SettingsSubtype, own: Int): List<Int> =
-        listedKeyboards(real).filter { it.toPref() != keyboard.toPref() }.map { poolFor(real, it) }.distinct().filter { it != own }
+        listedKeyboards(real).filter { it.toPref() != keyboard.toPref() }.mapNotNull { poolOrNull(real, it) }.distinct().filter { it != own }
 
     private fun ids(json: String?): LinkedHashSet<String> = try {
         JSONArray(json ?: "[]").let { a -> (0 until a.length()).mapTo(LinkedHashSet()) { a.getString(it) } }
@@ -183,7 +204,13 @@ object LearnedKeyboards {
         }
         // [mergeInto] (picked in the delete dialog, 2026-10-11: "Merge these lists into one of those keyboards and refer
         // from others"): it takes the lists, merged into its own, before they're deleted, in the same task
-        val target = mergeInto?.let { poolFor(real, it) }?.takeIf { it != pool && it != LearnedStores.SHARED }
+        val target = mergeInto?.let { poolForListed(real, it) }?.takeIf { it != pool && it != LearnedStores.SHARED }
+        // (a pick with no pool to take them, not listed: the lists stay on disk rather than go unmerged)
+        if (mergeInto != null && target == null && pool != null && pool != LearnedStores.SHARED && poolOrNull(real, mergeInto) == null) {
+            Log.w(TAG, "the keyboard picked to take a deleted keyboard's lists has no pool: its files kept (pool $pool)")
+            KeyboardProfiles.onKeyboardDeleted(real, keyboard)
+            return
+        }
         KeyboardProfiles.onKeyboardDeleted(real, keyboard)
         if (pool == null || pool == LearnedStores.SHARED) return
         val app = context.applicationContext ?: context

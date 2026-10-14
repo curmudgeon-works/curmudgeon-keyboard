@@ -46,7 +46,9 @@ class NamesEverywhereTest {
     @Before fun setUp() {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
         real.edit().putBoolean("separate_settings_per_keyboard", true).commit()
-        // (the test's context is no activity: its prefs() is the keyboard in use's, the first set made: 1)
+        // (the test's context is no activity: its prefs() is the keyboard in use's, the first set made: 1; given here, owner
+        // 2026-10-11: lookups never create records; only add/copy/restore/upgrade and the net do)
+        KeyboardProfiles.idFor(real, KeyboardProfiles.selectedKeyboard(real))
         KeyboardProfiles.refreshImeId(real)
         assertEquals(1, KeyboardProfiles.imeId)
         assertEquals(2, KeyboardProfiles.idFor(real, SettingsSubtype(java.util.Locale.FRANCE, "")))

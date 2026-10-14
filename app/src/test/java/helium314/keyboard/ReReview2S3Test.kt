@@ -49,7 +49,8 @@ import kotlin.test.assertTrue
  * the keyboard lower in order as english 2?", "K, alert first before rename -- that wth just happened, ok/cancel".
  * Switched-off keyboards follow the switch too.
  * (Found 2026-10-11, not fixed here: changing the selected keyboard's definition, any way, gives its old identity a new
- * pool: LearnedStores' listener on the pools reads the selected keyboard before changeAdditionalSubtype writes it.)
+ * pool: LearnedStores' listener on the pools reads the selected keyboard before changeAdditionalSubtype writes it.
+ * Fixed 2026-10-11: lookups never create records, see GhostRecordsTest.)
  */
 @RunWith(RobolectricTestRunner::class)
 class ReReview2S3Test {

@@ -31,6 +31,9 @@ class App : Application() {
         // the keyboard list first: the Layout & Typing recovery below reloads it, and the other way round the list
         // was loaded twice and showed every keyboard twice until the next start (the "second keyboard", 2026-10-01)
         SubtypeSettings.init(this)
+        // the net (owner 2026-10-11: lookups never create records): every listed keyboard its id and pool, the default
+        // keyboard stored at a first start too; then again whenever the list is loaded again or added to (SubtypeSettings)
+        helium314.keyboard.latin.settings.KeyboardProfiles.ensureListedRecords(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(this))
         // the background pictures are per keyboard with separate settings: where they are, and a copy for the keyboards
         // that had their own set before that (the emoji font is one shared file in the font list, see FontLibrary: each
         // keyboard only stores its choice)

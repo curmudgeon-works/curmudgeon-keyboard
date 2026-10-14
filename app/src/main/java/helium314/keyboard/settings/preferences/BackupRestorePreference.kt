@@ -1061,7 +1061,7 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, asked: L
         if (SubtypeSettings.getEnabledSubtypes().none { it.toSettingsSubtype() == phoneKeyboard })
             SubtypeSettings.addEnabledSubtype(prefs, phoneKeyboard.toAdditionalSubtype())
         if (withSettings) {
-            val id = KeyboardProfiles.idFor(real, phoneKeyboard)
+            val id = KeyboardProfiles.idFor(real, phoneKeyboard) // (a restore brings it: creates, owner 2026-10-11)
             // exactly that set, its own only, a shared menu's values too (owner 2026-10-11: "restore should only apply to
             // that keyboard's settings"; the main keyboard's set is the common settings: restored, everyone sees it, owner
             // 2026-10-11: "yep"). Merged in parts: only its entries of the ticked menus, the others stay as they are
@@ -1470,7 +1470,7 @@ private fun restoreLearnedWords(ctx: Context, backup: Map<String, Any?>, keyboar
     val lists = LinkedHashMap<Pair<Int, String>, MutableSet<File>>()
     // (each keyboard as it was in the backup, and as it is on the phone now)
     for ((keyboard, onPhone) in keyboards) {
-        val pool = LearnedKeyboards.poolFor(real, onPhone)
+        val pool = LearnedKeyboards.poolFor(real, onPhone) // (a restore brings it: creates, owner 2026-10-11)
         val backupPool = LearnedKeyboards.poolIn(backup, keyboard)
         val locales = listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)
         if (backupPool != null) for (script in locales.map { it.script() }.distinct()) {

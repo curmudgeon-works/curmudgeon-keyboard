@@ -17,6 +17,8 @@ import helium314.keyboard.latin.common.Constants.Separators
 import helium314.keyboard.latin.common.LocaleUtils
 import helium314.keyboard.latin.define.DebugFlags
 import helium314.keyboard.latin.settings.Defaults
+import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.latin.settings.ProfilePreferences
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
@@ -67,6 +69,8 @@ object SubtypeSettings {
         val newString = createPrefSubtypes(subtypes)
         prefs.edit { putString(Settings.PREF_ENABLED_SUBTYPES, newString) }
 
+        // adding a keyboard: its records now (the net, owner 2026-10-11), before anything reads it in the list
+        KeyboardProfiles.ensureListedRecords((prefs as? ProfilePreferences)?.underlying ?: prefs)
         if (defaultFirst) enabledSubtypes.add(getDefaultEnabledSubtypes().first())
         if (newSubtype !in enabledSubtypes) {
             enabledSubtypes.add(newSubtype)
@@ -168,6 +172,7 @@ object SubtypeSettings {
         // ones too (in the additional list only; owner 2026-10-11: treated like switched-on ones), also when one now
         // equals a built-in keyboard and leaves the list: its set and learned words move to that definition
         val changed = LinkedHashMap<SettingsSubtype, SettingsSubtype>()
+        val lists = LinkedHashMap<String, String>()
         listOf(
             Settings.PREF_ADDITIONAL_SUBTYPES to Defaults.PREF_ADDITIONAL_SUBTYPES,
             Settings.PREF_ENABLED_SUBTYPES to Defaults.PREF_ENABLED_SUBTYPES,
@@ -192,11 +197,15 @@ object SubtypeSettings {
                 }
                 else subtype.toPref()
             }.joinToString(Separators.SETS)
-            editor.putString(key, new)
+            lists[key] = new
         }
-        editor.apply()
+        // the records move first, then the lists (owner 2026-10-11, the ghost records): the lists' write reloads them
+        // (Settings' listener), and the net then finds every listed keyboard with its records; the other way round it
+        // gave each changed keyboard new empty ones and the move stopped (the target has records)
         val real = context.realPrefs()
         for ((old, new) in changed) helium314.keyboard.latin.settings.KeyboardProfiles.onKeyboardChanged(real, old, new)
+        for ((key, new) in lists) editor.putString(key, new)
+        editor.apply()
         // the default for its type, in every set (shared, each keyboard's own, hidden ones too); 2026-10-07: only the
         // keyboard being edited followed, the others fell back to the built-in keys (rename) or kept the gone name and
         // took a layout saved later under it (delete). Deleted: a keyboard's own default goes back to the built-in one.
@@ -211,6 +220,7 @@ object SubtypeSettings {
         enabledSubtypes.clear()
         loadAdditionalSubtypes(context.prefs())
         loadEnabledSubtypes(context)
+        KeyboardProfiles.ensureListedRecords(context.realPrefs()) // (the net, owner 2026-10-11)
         if (RichInputMethodManager.isInitialized())
             RichInputMethodManager.getInstance().refreshSubtypeCaches()
     }

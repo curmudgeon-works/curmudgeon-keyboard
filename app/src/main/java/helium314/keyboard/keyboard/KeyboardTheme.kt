@@ -631,7 +631,8 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             val prefixes = listOf(Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
             val choices = listOf(Settings.PREF_THEME_COLORS, Settings.PREF_THEME_COLORS_NIGHT)
             val copy = prefixes.mapNotNull { p -> old[p + oldName]?.let { p + hidden to it } }.toMap()
-            val ids = keepOld.map { KeyboardProfiles.idFor(real, it) }
+            // (owner 2026-10-11: lookups never create records; a listed one gets its set from the net)
+            val ids = keepOld.mapNotNull { KeyboardProfiles.idForListed(real, it) }
             real.edit().apply {
                 for (id in ids) {
                     var keeps = false

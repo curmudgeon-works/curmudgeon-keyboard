@@ -136,14 +136,14 @@ object KeyboardProfiles {
         val idsNow = real.getString(PREF_IDS, null)
         mainIdMemo?.let { if (it.selected == enabled && it.ids == idsNow && !enabled.isNullOrEmpty()) return it.id }
         val keyboard = mainKeyboard(real)
-        val id = if (create) idFor(real, keyboard)
-            else ids(real).let { map -> keyboard.toPref().takeIf { map.has(it) }?.let { map.getInt(it) } } ?: return NO_SET
+        // (create: a write to the common settings; the main keyboard is the first listed, the net's own)
+        val id = if (create) idFor(real, keyboard) else idOrNull(real, keyboard) ?: return NO_SET
         mainIdMemo = MainMemo(enabled ?: "", real.getString(PREF_IDS, null), id) // (idFor may have added it)
         return id
     }
 
-    /** No set: nothing is stored under it (the main keyboard without an id yet, for a read). */
-    private const val NO_SET = Int.MIN_VALUE
+    /** No set: nothing is stored under it (a keyboard without an id, for a read); a write to it is dropped. */
+    const val NO_SET = Int.MIN_VALUE
     // (every preference read asks: the list and the ids aren't parsed again while neither changed)
     @Volatile private var mainIdMemo: MainMemo? = null
 
@@ -291,7 +291,9 @@ object KeyboardProfiles {
     /** Whether set [id] has anything stored of its own (a value or a mark). */
     fun hasOwnEntries(real: SharedPreferences, id: Int): Boolean = real.all.keys.any { it.startsWith("$PREFIX$id$SEPARATOR") }
 
-    /** Profile id of a keyboard, created on first use. */
+    /** Profile id of a keyboard, created if it has none. Only at the explicit moments (owner 2026-10-11: lookups never
+     *  create records; only add/copy/restore/upgrade and the net do): adding or copying a keyboard, a restore that brings
+     *  one, the one-time upgrades, the net ([ensureListedRecords]). Every reader: [idOrNull]. */
     @Synchronized
     fun idFor(real: SharedPreferences, keyboard: SettingsSubtype): Int {
         val map = ids(real)
@@ -302,6 +304,49 @@ object KeyboardProfiles {
         map.put(pref, id)
         real.edit().putString(PREF_IDS, map.toString()).putInt(PREF_NEXT_ID, id + 1).apply()
         return id
+    }
+
+    /** [keyboard]'s profile id, null when it has none (a lookup: never creates one). */
+    fun idOrNull(real: SharedPreferences, keyboard: SettingsSubtype): Int? =
+        ids(real).let { map -> keyboard.toPref().takeIf { map.has(it) }?.let { map.getInt(it) } }
+
+    /** Whether [keyboard] is in the keyboard list as stored. */
+    fun isListed(real: SharedPreferences, keyboard: SettingsSubtype): Boolean =
+        keyboard in helium314.keyboard.latin.utils.SubtypeSettings.createSettingsSubtypes(
+            real.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!)
+
+    /** [keyboard]'s id for a write a user asked for (a screen's tap, an update dialog): its own, else one now if it's in
+     *  the list (the net, for one keyboard); null for a keyboard neither listed nor with an id (nothing is written).
+     *  Never from a preference listener: one runs while a changed keyboard's records are on their way. */
+    fun idForListed(real: SharedPreferences, keyboard: SettingsSubtype): Int? =
+        idOrNull(real, keyboard) ?: if (isListed(real, keyboard)) idFor(real, keyboard) else null
+
+    /**
+     * The net (owner 2026-10-11: "Ok, A + net"): every keyboard in the list without an id or a pool gets them, at app
+     * start (App.onCreate) and when the list is loaded again or added to (SubtypeSettings.reloadEnabledSubtypes,
+     * addEnabledSubtype). The only automatic creation: a keyboard not
+     * in the list never gets records here, so a lookup's ghost can't appear. Not under this object's lock (the pools take
+     * LearnedKeyboards' own). @return whether anything was created
+     */
+    fun ensureListedRecords(real: SharedPreferences): Boolean {
+        val listed = helium314.keyboard.latin.utils.SubtypeSettings.createSettingsSubtypes(
+            real.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!).distinct()
+        if (listed.isEmpty()) return false
+        val selected = selectedKeyboard(real)
+        var created = false
+        var selectedGotId = false
+        for (keyboard in listed) {
+            if (idOrNull(real, keyboard) == null) {
+                idFor(real, keyboard)
+                created = true
+                if (keyboard == selected) selectedGotId = true
+            }
+            if (helium314.keyboard.latin.personalization.LearnedKeyboards.ensurePool(real, keyboard)) created = true
+        }
+        if (created) Log.i("KeyboardProfiles", "the net: records for listed keyboards without them")
+        // (the keyboard in use kept the id of before while it had none: its own now)
+        if (selectedGotId && isSeparate(real)) refreshImeId(real)
+        return created
     }
 
     /** The next profile id to be given out. */
@@ -512,8 +557,11 @@ object KeyboardProfiles {
         val selected = real.getString(Settings.PREF_SELECTED_SUBTYPE, Defaults.PREF_SELECTED_SUBTYPE)!!
         val idsNow = real.getString(PREF_IDS, null)
         mainMemo?.let { if (it.selected == selected && it.ids == idsNow) return it.id }
-        val id = idFor(real, selected.toSettingsSubtype())
-        mainMemo = MainMemo(selected, real.getString(PREF_IDS, null), id) // (idFor may have added it)
+        // a lookup (owner 2026-10-11: lookups never create records). None while a changed keyboard's records are on
+        // their way (the set moved, the selected keyboard not yet): no set, reads give defaults, writes are dropped (the
+        // net gives every listed keyboard one)
+        val id = idOrNull(real, selected.toSettingsSubtype()) ?: return NO_SET
+        mainMemo = MainMemo(selected, idsNow, id)
         return id
     }
     // (every preference read asks: the ids aren't parsed again while neither changed)
@@ -554,7 +602,10 @@ object KeyboardProfiles {
         // the learned words of the keyboard in use too, when each keyboard has its own
         helium314.keyboard.latin.personalization.LearnedStores.refresh(real)
         val old = imeId
-        imeId = if (isSeparate(real)) idFor(real, selectedKeyboard(real)) else SHARED
+        // (a lookup, owner 2026-10-11: none while a changed keyboard's records are on their way: the one of before while a
+        // keyboard has it, which a rename keeps, else no set; the net gives a listed keyboard its own)
+        imeId = if (!isSeparate(real)) SHARED else idOrNull(real, selectedKeyboard(real))
+            ?: old.takeIf { it == SHARED || it in idEntries(real).values } ?: NO_SET
         if (imeId != old) helium314.keyboard.latin.utils.LanguagePriority.clearCache() // (priorities are per keyboard)
         // another keyboard's background picture (see profileFile) and emoji font choice (emoji_font: the fonts are shared,
         // FontLibrary, but each keyboard picks its own)
@@ -873,13 +924,17 @@ class ProfilePreferences(private val real: SharedPreferences, private val ownSet
         // a value written: no longer "at its default"; removed in a set: marked "at its default" (what pickers and the
         // saved items' checks tell from nothing chosen)
         private fun alive(key: String) { if (inSet(key)) e.remove(k(KeyboardProfiles.TOMBSTONE + key)) }
-        override fun putString(key: String, value: String?) = apply { e.putString(k(key), value); alive(key) }
-        override fun putStringSet(key: String, values: MutableSet<String>?) = apply { e.putStringSet(k(key), values); alive(key) }
-        override fun putInt(key: String, value: Int) = apply { e.putInt(k(key), value); alive(key) }
-        override fun putLong(key: String, value: Long) = apply { e.putLong(k(key), value); alive(key) }
-        override fun putFloat(key: String, value: Float) = apply { e.putFloat(k(key), value); alive(key) }
-        override fun putBoolean(key: String, value: Boolean) = apply { e.putBoolean(k(key), value); alive(key) }
+        // (a keyboard without a set: nothing written, owner 2026-10-11: lookups never create records)
+        private fun noSet(key: String) = (KeyboardProfiles.setOf(real, id, key, ownSet) == KeyboardProfiles.NO_SET)
+            .also { if (it) Log.w("ProfilePreferences", "no set of its own: $key not written") }
+        override fun putString(key: String, value: String?) = apply { if (!noSet(key)) { e.putString(k(key), value); alive(key) } }
+        override fun putStringSet(key: String, values: MutableSet<String>?) = apply { if (!noSet(key)) { e.putStringSet(k(key), values); alive(key) } }
+        override fun putInt(key: String, value: Int) = apply { if (!noSet(key)) { e.putInt(k(key), value); alive(key) } }
+        override fun putLong(key: String, value: Long) = apply { if (!noSet(key)) { e.putLong(k(key), value); alive(key) } }
+        override fun putFloat(key: String, value: Float) = apply { if (!noSet(key)) { e.putFloat(k(key), value); alive(key) } }
+        override fun putBoolean(key: String, value: Boolean) = apply { if (!noSet(key)) { e.putBoolean(k(key), value); alive(key) } }
         override fun remove(key: String) = apply {
+            if (noSet(key)) return@apply
             e.remove(k(key))
             if (inSet(key)) e.putBoolean(k(KeyboardProfiles.TOMBSTONE + key), true)
         }

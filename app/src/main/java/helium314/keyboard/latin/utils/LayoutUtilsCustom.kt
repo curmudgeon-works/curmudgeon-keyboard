@@ -276,7 +276,9 @@ object LayoutUtilsCustom {
             if (own != null) return@filter own == name
             if (type == LayoutType.MAIN) return@filter false // (no own pick: the language's built-in letters)
             val prefs = if (separate) helium314.keyboard.latin.settings.ProfilePreferences(real) {
-                helium314.keyboard.latin.settings.KeyboardProfiles.idFor(real, kb) } else context.prefs()
+                // (a lookup, owner 2026-10-11: no set, its defaults)
+                helium314.keyboard.latin.settings.KeyboardProfiles.idOrNull(real, kb) ?: helium314.keyboard.latin.settings.KeyboardProfiles.NO_SET
+            } else context.prefs()
             Settings.readDefaultLayoutName(type, prefs) == name
         } + switchedOffKeyboards(context).filter { kb ->
             if (kb == except) return@filter false
