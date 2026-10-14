@@ -51,7 +51,6 @@ import helium314.keyboard.latin.settings.Defaults
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -94,7 +93,6 @@ class SubScreenSaveRealPathTest {
     /** Which of the two the host shows: the parent screen, or the sub-screen opened from it. */
     private var screen by mutableStateOf(PARENT)
     /** True for a moment: the sub-screen leaves the composition, to come back from its saved state. */
-    private var away by mutableStateOf(false)
     /** Which sub-screen (for a test that opens two). */
     private var subKey by mutableStateOf(0)
 
@@ -117,7 +115,7 @@ class SubScreenSaveRealPathTest {
         AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Sunset", mapOf(Settings.PREF_THEME_COLORS to "Warm",
             Settings.PREF_USER_COLORS_PREFIX + "Warm" to before))), now = true)
         KeyboardProfiles.loadGroups(real)
-        screen = PARENT; away = false; subKey = 0
+        screen = PARENT; subKey = 0
     }
     @After fun tearDown() {
         scenario?.close()
@@ -148,7 +146,7 @@ class SubScreenSaveRealPathTest {
         scenario = ActivityScenario.launch(SettingsActivity::class.java).onActivity { it.setContent {
             val saved = rememberSaveableStateHolder()
             if (screen == PARENT) saved.SaveableStateProvider(PARENT) { parent() }
-            else if (!away) saved.SaveableStateProvider(SUB + subKey) { sub { screen = PARENT } }
+            else saved.SaveableStateProvider(SUB + subKey) { sub { screen = PARENT } }
         } }
         idle()
     }
@@ -163,8 +161,6 @@ class SubScreenSaveRealPathTest {
     private fun shows(text: String) { compose.onNodeWithText(text).assertExists() }
     private fun systemBack() { scenario!!.onActivity { it.onBackPressedDispatcher.onBackPressed() }; idle() }
     private fun arrowBack() = clickIcon(ctx.getString(R.string.spoken_description_action_previous))
-    /** The sub-screen composed again from its saved state, as after a rotation (a fresh composition of it). */
-    private fun recomposeSub() { away = true; idle(); away = false; idle() }
 
     private val unsavedTitle get() = ctx.getString(R.string.unsaved_changes_title)
 
@@ -208,11 +204,9 @@ class SubScreenSaveRealPathTest {
         assertEquals(emptyList(), AppearanceDraft.savedPalettesOnDisk(ctx))
     }
 
-    // B1, the way the phone does it: the edit, then Back. Fails: ColorsScreen passes ::leave to SearchScreen, whose back
-    // lambdas keep the first composition's copy (a local function's references compare equal whatever they captured),
-    // and that copy reads `changed` as it was then (false): Back leaves at once, without the question, without the
-    // editor's save being recorded (Appearance's Discard question then doesn't name the palette)
-    @Ignore("real bug: the palette editor's top bar arrow leaves without asking after a change (stale ::leave)")
+    // B1, the way the phone does it: the edit, then Back. ColorsScreen passes ::leave to SearchScreen, whose back
+    // lambdas keep the first composition's copy (a local function's references compare equal whatever they captured):
+    // that copy must check for changes when Back is pressed, not take what it captured then (nothing changed yet)
     @Test fun `palette editor - Back after a colour change asks Save or Discard`() {
         appearance()
         screen = SUB; idle()
@@ -221,7 +215,6 @@ class SubScreenSaveRealPathTest {
         shows(unsavedTitle)
     }
 
-    @Ignore("real bug: the palette editor's system Back leaves without asking after a change (stale ::leave)")
     @Test fun `palette editor - system Back after a colour change asks Save or Discard`() {
         appearance()
         screen = SUB; idle()
@@ -230,14 +223,12 @@ class SubScreenSaveRealPathTest {
         shows(unsavedTitle)
     }
 
-    // B1 through the editor's own Save and exit, then Appearance's Discard. The editor is composed once more after the
-    // edit (as after a rotation) so that its Back sees the change: see the ignored tests above
+    // B1 through the editor's own Save and exit, then Appearance's Discard
     @Test fun `B1 - theme deleted on Appearance, palette edited and saved in the editor, Appearance's Discard undoes all`() {
         appearance()
         deleteSunsetOnAppearance()
         screen = SUB; idle() // the palette editor on Warm
         editWarm()
-        recomposeSub()
         arrowBack()
         shows(unsavedTitle)
         click(ctx.getString(R.string.save_and_exit))
@@ -253,7 +244,6 @@ class SubScreenSaveRealPathTest {
         appearance()
         screen = SUB; idle()
         editWarm()
-        recomposeSub()
         systemBack()
         click(ctx.getString(R.string.save_and_exit))
         shows(ctx.getString(R.string.update_item_title, "Warm"))
@@ -269,7 +259,6 @@ class SubScreenSaveRealPathTest {
         appearance()
         screen = SUB; idle()
         editWarm()
-        recomposeSub()
         arrowBack()
         click(ctx.getString(R.string.save_and_exit))
         shows(ctx.getString(R.string.update_item_theme, "Sunset"))
@@ -467,7 +456,6 @@ class SubScreenSaveRealPathTest {
         deleteSunsetOnAppearance()
         screen = SUB; idle()
         editWarm()
-        recomposeSub() // (see the ignored tests)
         systemBack()
         click(ctx.getString(R.string.save_and_exit))
         systemBack() // on Appearance

@@ -139,7 +139,10 @@ fun ColorsScreen(
         helium314.keyboard.settings.PrefSnapshot(prefs,
             if (made == null) now else now + paletteKeys(openedName).associateWith { null } + (prefKey to made))
     }
-    val changed = made != null || newThemeName.text != openedName || opened.changed()
+    // checked when it's asked, not taken from a composition: SearchScreen's back arrow and back gesture keep the
+    // [leave] they got first (a local function reference compares equal whatever it captured), so a value read here
+    // would stay what it was before the first change
+    fun changed() = made != null || newThemeName.text != openedName || opened.changed()
     fun putBack() {
         // only what changed goes back: a keyboard following the shared colours choice keeps following it (writing an
         // unchanged value through the keyboard's view would make it its own, review 2026-10-07 finding 10)
@@ -160,7 +163,7 @@ fun ColorsScreen(
         helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().setThemeNeedsReload()
     }
     var askLeave by rememberSaveable { mutableStateOf(false) }
-    fun leave() { if (changed) askLeave = true else onClickBack() }
+    fun leave() { if (changed()) askLeave = true else onClickBack() }
     var askUpdate by rememberSaveable { mutableStateOf(false) }
     /** Kept, and back to Appearance, whose Save or Discard decides it ([paletteEditorSaved]). */
     fun saveAndBack() {
