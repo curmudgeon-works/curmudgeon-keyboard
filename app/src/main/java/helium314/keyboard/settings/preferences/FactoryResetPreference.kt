@@ -66,11 +66,15 @@ fun FactoryResetPreference(setting: Setting) {
     val ctx = LocalContext.current
     var showDialog by rememberSaveable { mutableStateOf(false) }
     // (owner 2026-10-11: "After a successful backup, the button should become grey (unless the user cancels and clicks
-    // factory reset again)"; a cancelled or failed one leaves it on)
-    var backedUp by rememberSaveable { mutableStateOf(false) }
+    // factory reset again)"; a cancelled or failed one leaves it on). By the backups written since the dialog opened
+    // (review 2026-10-12 L2: a flag set by the backup's own callback was lost when the activity was made again while
+    // the backup ran: the callback set the old screen's flag, and the new screen showed Backup on after it)
+    var writtenAtOpen by rememberSaveable { mutableStateOf(BackupRestoreJob.backupsWritten) }
+    val backedUp = BackupRestoreJob.backupsWritten > writtenAtOpen
     var error: String? by rememberSaveable { mutableStateOf(null) }
-    val backupLauncher = backupLauncher(onError = { error = it }, onDone = { written -> if (written) backedUp = true })
-    Preference(name = setting.title, description = setting.description, onClick = { backedUp = false; showDialog = true })
+    val backupLauncher = backupLauncher(onError = { error = it })
+    Preference(name = setting.title, description = setting.description,
+        onClick = { writtenAtOpen = BackupRestoreJob.backupsWritten; showDialog = true })
     error?.let { InfoDialog(stringResource(R.string.backup_error, it.drop(1))) { error = null } }
     if (!showDialog) return
     FactoryResetDialog(

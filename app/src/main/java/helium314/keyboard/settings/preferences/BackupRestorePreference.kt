@@ -255,6 +255,7 @@ internal fun runBackup(ctx: Context, onError: (String) -> Unit, onDone: (Boolean
         } finally {
             BackupRestoreJob.post {
                 BackupRestoreJob.finish()
+                if (written && failure == null) BackupRestoreJob.backupWritten()
                 failure?.let(onError)
                 // (2026-10-11: true only for a backup written to the end; the factory reset's Backup greys out then)
                 onDone(written && failure == null)
@@ -364,6 +365,15 @@ internal object BackupRestoreJob {
     private val main by lazy { Handler(Looper.getMainLooper()) }
 
     val isRunning get() = running.get()
+
+    /** How many backups this process wrote to the end (observable; changed on the main thread): the factory reset's
+     *  Backup greys out once one more is written while its dialog is open, also after the activity was made again
+     *  meanwhile (review 2026-10-12 L2). */
+    var backupsWritten by mutableStateOf(0)
+        private set
+
+    /** A backup was written to the end; called on the main thread. */
+    fun backupWritten() { backupsWritten++ }
 
     /** A restore is running, also after its dialog closed (observable; set on the main thread): the screens that take a
      *  snapshot when they open wait for it to end ([helium314.keyboard.settings.WaitingForRestore], owner 2026-10-12 A5). */
