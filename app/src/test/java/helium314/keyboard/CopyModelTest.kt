@@ -149,4 +149,11 @@ class CopyModelTest {
         assertEquals("old", looks.getValue("Kept").values[Settings.PREF_USER_COLORS_PREFIX + hidden])
         assertEquals("new", looks.getValue("Updated").values[warm])
     }
+
+    @Test fun `a Custom label given while Appearance is open is no change of the screen`() {
+        val draft = AppearanceDraft.of(ctx)
+        CustomLabels.number(real, view(1), CustomLabels.Kind.THEME)
+        CustomLabels.number(real, view(2), CustomLabels.Kind.THEME)
+        assertFalse(draft.hasChanges(ctx))
+    }
 }

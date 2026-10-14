@@ -208,8 +208,9 @@ class AppearanceDraft private constructor(
         private fun reachesBeyond(stored: String): Boolean {
             val own = KeyboardProfiles.splitOwnKey(stored)
             val plain = (own?.second ?: stored).removePrefix(KeyboardProfiles.TOMBSTONE)
-            // (a keyboard's own theme settings: the update dialog writes them on the keyboards ticked there)
-            if (own != null && (AppearanceLooks.inScope(plain) || plain == CustomLabels.Kind.THEME.key)) return true
+            // (a keyboard's own theme settings: the update dialog writes them on the keyboards ticked there; not its Custom
+            // label, which the Themes row gives when it first shows one: that's no change of the screen)
+            if (own != null && AppearanceLooks.inScope(plain)) return true
             return plain == AppearanceLooks.PREF || plain == AppearanceLooks.PREF_SELECTED || plain == helium314.keyboard.keyboard.FontLibrary.PREF_HIDDEN
                 || plain == Settings.PREF_THEME_COLORS || plain == Settings.PREF_THEME_COLORS_NIGHT
                 || plain.startsWith(Settings.PREF_USER_COLORS_PREFIX) || plain.startsWith(Settings.PREF_USER_ALL_COLORS_PREFIX)
