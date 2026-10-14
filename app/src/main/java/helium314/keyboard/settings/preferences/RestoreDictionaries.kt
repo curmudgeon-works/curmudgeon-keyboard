@@ -122,21 +122,34 @@ internal object RestoreDictionaries {
     fun clashTags(steps: List<Step>): Set<String> = steps.filter { it.action == Action.CLASH }.mapTo(LinkedHashSet()) { it.tag }
 
     /** Carries out [step] in the language's folder [dir], the backup's file read from [source] (SAME: not read, the
-     *  device's copy is renamed); with [real], selects it on a clash or a match. */
-    fun apply(step: Step, dir: File, source: File, real: SharedPreferences) {
+     *  device's copy is renamed); with [real], selects it on a clash or a match. Returns whether it was carried out. */
+    fun apply(step: Step, dir: File, source: File, real: SharedPreferences): Boolean {
         val target = File(dir, step.target)
         // (never outside the folder, whatever the zip says)
         fun inside(f: File) = f.canonicalPath.startsWith(dir.canonicalPath + File.separator)
-        if (!inside(target)) return
+        if (!inside(target)) return false
         dir.mkdirs()
+        // the backup's is copied in beside first, under a name the app doesn't list: nothing of the device's moves before
+        // the copy succeeded (review L3.4)
+        val incoming = if (step.action == Action.SAME) null else File(dir, step.target + ".restoring").also {
+            it.delete()
+            try { source.copyTo(it, overwrite = true) } catch (e: Exception) { it.delete(); throw e }
+        }
         for ((from, to) in step.renames) {
             val f = File(dir, from)
             if (inside(f) && inside(File(dir, to)) && f.isFile && !File(dir, to).exists()) f.renameTo(File(dir, to))
         }
-        if (step.action == Action.SAME) {
-            if (!target.isFile) return // (the rename failed: the selection stays as it was)
-        } else source.copyTo(target, overwrite = true)
+        if (incoming == null) {
+            if (!target.isFile) return false // (the rename failed: the selection stays as it was)
+        } else {
+            // a device file still under the target's name (its rename failed) is never written over: it stays in use
+            if (target.exists()) { incoming.delete(); return false }
+            if (!incoming.renameTo(target)) {
+                try { incoming.copyTo(target) } finally { incoming.delete() }
+            }
+        }
         if (step.select) real.edit(commit = true) { putString(selectedKey(step.tag, step.kind), step.target) }
+        return true
     }
 
     /** The digests of a language folder's added dictionaries. */

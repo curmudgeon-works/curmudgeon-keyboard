@@ -256,6 +256,19 @@ class RestoreMergeItemsTest {
         assertEquals(ctx.getString(helium314.keyboard.latin.R.string.restore_summary_settings_dictionaries), restoreSummary(ctx, restored).lines().last())
     }
 
+    // fail before (L3.4): the device's dictionary couldn't be moved aside (here a folder holds the "…prev" name, so the
+    // rename is skipped, as a failed renameTo leaves it) and the backup's was copied over it: the device's was lost
+    @Test fun `a device dictionary that can't be moved aside is never written over`() {
+        dictDir("fr").mkdirs(); dict("fr", "main_user.dict").writeText("device")
+        dict("fr", "main_prev_user.dict").mkdirs() // (not a file: the plan names it the "…prev", the rename can't go there)
+        backup(listOf(frB), entries = mapOf("dicts/fr/main_user.dict" to "backup".toByteArray()))
+        val restored = restoreDictionaries(ticked = true)
+        assertEquals("device", dict("fr", "main_user.dict").readText())
+        assertEquals(null, selected("fr"))
+        assertEquals(setOf("main_user.dict", "main_prev_user.dict"), dictDir("fr").list()!!.toSet()) // (nothing left beside)
+        assertEquals(ctx.getString(helium314.keyboard.latin.R.string.restore_summary_settings_only), restoreSummary(ctx, restored).lines().last())
+    }
+
     // ---- 5. the clipboard merges (owner 2026-10-12: "yes, merge clipboard") ----
 
     // fail before: the device's clips were cleared and replaced by the backup's

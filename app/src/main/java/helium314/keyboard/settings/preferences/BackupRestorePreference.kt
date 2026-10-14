@@ -1486,7 +1486,7 @@ private fun restoreDictionaries(ctx: Context, backupPrefs: Map<String, Any?>, di
         if (step.action != RestoreDictionaries.Action.NEW && step.tag !in clashesFor) continue
         val dir = folders[step.tag] ?: continue
         try {
-            RestoreDictionaries.apply(step, dir, File(File(dictsDir, step.tag), step.backupName), ctx.realPrefs())
+            if (!RestoreDictionaries.apply(step, dir, File(File(dictsDir, step.tag), step.backupName), ctx.realPrefs())) continue
             any = true
             if (step.action == RestoreDictionaries.Action.CLASH && step.renames.isNotEmpty()) keptAside += step.tag
         } catch (t: Throwable) {
