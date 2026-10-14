@@ -99,6 +99,9 @@ fun AdvancedSettingsScreen(
         SettingsWithoutKey.HOW_SAVING_WORKS, // what each action does to each kind of thing, read only (2026-10-11)
         SettingsWithoutKey.BACKUP_RESTORE,
         SettingsWithoutKey.FACTORY_RESET,
+        // the settings event log, the keyboards' history too: app-wide, always shown (owner 2026-10-13, K1 placement;
+        // before, among the swipe logs on Learning & swiping, shown only while swiping was on)
+        Settings.PREF_LOG_SETTINGS,
         if (BuildConfig.DEBUG || prefs.getBoolean(DebugSettings.PREF_SHOW_DEBUG_SETTINGS, Defaults.PREF_SHOW_DEBUG_SETTINGS))
             SettingsWithoutKey.DEBUG_SETTINGS else null,
         // each keyboard its own settings or one set for all, and with separate settings which menus each keyboard keeps
@@ -389,7 +392,7 @@ fun createAdvancedSettings(context: Context) = listOf(
         }
     },
     // the settings event log (SettingsEventLog), the keyboards' history too: its own switch, on (owner 2026-10-12 K1;
-    // before, "Log swipe results" switched it)
+    // before, "Log swipe results" switched it); shown on App settings (2026-10-13)
     Setting(context, Settings.PREF_LOG_SETTINGS, R.string.log_settings_changes, R.string.log_settings_changes_summary) {
         SwitchPreference(it, Defaults.PREF_LOG_SETTINGS)
     },
