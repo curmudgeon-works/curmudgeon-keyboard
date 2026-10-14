@@ -149,8 +149,10 @@ object KeyboardIds {
     /**
      * [keyboard] (a phone keyboard) gets a new id, its came-from its id of before (owner 2026-10-11, restore "Keep as a
      * separate keyboard": "backup's ID should take priority", the phone's keyboard gets a new one), once: every list
-     * naming it, its settings set and pictures, its learned words' pool and buttons, and the apps that remembered it
-     * follow it to the new id. @return the keyboard as it is now
+     * naming it, its settings set and pictures, its learned words' pool and buttons follow it to the new id. The apps
+     * that remembered the keyboard stay on the old id, the restored keyboard's (owner 2026-10-12: "I think restored
+     * keyboard should take prio. User has just restored. They don't expect to be using the non-restored version").
+     * @return the keyboard as it is now
      */
     fun giveNewId(context: Context, keyboard: SettingsSubtype): SettingsSubtype {
         val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(context)
@@ -169,9 +171,7 @@ object KeyboardIds {
         }
         real.getString(Settings.PREF_SELECTED_SUBTYPE, null)?.let { runCatching { it.toSettingsSubtype() }.getOrNull() }
             ?.takeIf { it.keyboardId == old }?.let { editor.putString(Settings.PREF_SELECTED_SUBTYPE, renew(it)) }
-        for ((key, value) in real.all) if (key.startsWith(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX))
-            (value as? String)?.let { runCatching { it.toSettingsSubtype() }.getOrNull() }?.takeIf { it.keyboardId == old }
-                ?.let { editor.putString(key, renew(it)) }
+        // (the apps' memory is left on the old id: they open the restored keyboard, which keeps it)
         editor.commit()
         Log.i(TAG, "a phone keyboard got a new id (its old one is a restored keyboard's)")
         helium314.keyboard.latin.utils.SubtypeSettings.reloadEnabledSubtypes(context)

@@ -260,13 +260,16 @@ class KeyboardIdsTest {
         assertEquals("k1", phoneNow.keyboardFrom)
         assertEquals(en.withoutIds(), phoneNow.withoutIds())
         assertEquals(fromBackup, restored) // (the backup's id: "backup's ID should take priority")
-        // the phone keyboard's set, pool, selection and apps went with it to its new id; the restored one has its own
+        // the phone keyboard's set, pool and selection went with it to its new id; the restored one has its own
         assertEquals("phone", real.getString(KeyboardProfiles.ownKey(newId, font), null))
         assertEquals("backup", real.getString(idKey(1, font), null))
         assertEquals(11, storedPools(real)[newId])
         assertNotEquals(11, storedPools(real)["k1"])
         assertEquals(phoneNow, KeyboardProfiles.selectedKeyboard(real))
-        assertEquals(newId, real.getString(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX + "org.app", null)!!.toSettingsSubtype().keyboardId)
+        // (owner 2026-10-12: "I think restored keyboard should take prio. User has just restored. They don't expect to be
+        // using the non-restored version"; was: the apps went with the phone keyboard to its new id) the app that
+        // remembered the keyboard opens the restored one, which kept the id
+        assertEquals("k1", real.getString(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX + "org.app", null)!!.toSettingsSubtype().keyboardId)
         assertEquals(emptyList(), SwitchedOffKeyboards.list(real))
     }
 
