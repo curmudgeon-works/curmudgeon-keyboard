@@ -98,6 +98,9 @@ object LearnedKeyboards {
     private fun pools(real: SharedPreferences): JSONObject =
         try { JSONObject(real.getString(PREF_POOLS, null) ?: "{}") } catch (e: Exception) { JSONObject() }
 
+    /** The keyboards (pref strings) with a pool, switched-off ones too. */
+    fun poolKeys(real: SharedPreferences): Set<String> = pools(real).keys().asSequence().toSet()
+
     /** Whether [keyboard] uses the other keyboards' lists of button [pref] (one of [buttonPrefs]). */
     fun usesOthers(real: SharedPreferences, pref: String, keyboard: SettingsSubtype) = keyboard.toPref() in ids(real.getString(pref, null))
 

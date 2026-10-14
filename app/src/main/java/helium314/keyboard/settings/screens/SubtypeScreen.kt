@@ -193,6 +193,7 @@ fun SubtypeScreen(
             else enabled.firstOrNull { it.locale == currentSubtype.locale }?.also {
                 Log.w("SubtypeScreen", "edited keyboard not in the list (${currentSubtype.toPref()}), changing ${it.toPref()} instead")
             } ?: currentSubtype
+        if (!mayChangeKeyboard(ctx, from, subtype)) return // (another keyboard is that one already, switched off too)
         SubtypeUtilsAdditional.changeAdditionalSubtype(from, subtype, ctx)
         currentSubtypeString = subtype.toPref()
         holdPreview()

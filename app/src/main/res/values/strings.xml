@@ -595,6 +595,8 @@
     <string name="font_delete_theme">theme %s</string>
     <!-- a keyboard in that list, or in a palette's update question, switched off on the Languages screen (its own settings kept); %s = its name -->
     <string name="keyboard_switched_off">%s (switched off)</string>
+    <!-- rename, languages or layout would make a keyboard exactly another one (its settings and words would mix): not changed; %s = that keyboard's name, maybe "<name> (switched off)" -->
+    <string name="keyboard_definition_taken">Not changed: %s is already set up like this</string>
     <!-- deleting an added dictionary other keyboards use: not allowed -->
     <string name="dictionary_in_use_title">“%s” is in use</string>
     <string name="dictionary_in_use_message">These keyboards use it too, so it stays:\n%s</string>
