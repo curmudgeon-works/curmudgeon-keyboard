@@ -56,6 +56,15 @@ import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.settings.SettingsActivity
 import org.json.JSONObject
 
+/** The layout files screen's Save: the layouts stay, and Layout & Typing (the screen it was opened from) still holds
+ *  them; its own Save or Discard decides them, with everything else done there (owner 2026-10-11, option 1: "every
+ *  action is held until the screen's Save; Discard undoes it everywhere it reached"). Until then this rebased Layout &
+ *  Typing's snapshot of every keyboard's definition and every "layout_" key, the saved Layouts among them: a popup set
+ *  deleted there came back on its Discard, but the saved Layouts lost its name for good (same as review C2). */
+internal fun layoutFilesSaved() {
+    helium314.keyboard.latin.utils.SettingsEventLog.log("Layout files saved: held until Layout & Typing's Save")
+}
+
 /** The layouts edited here, one tab each: everything but the letters (own picker) and the symbols pages (popup editor). */
 private val LAYOUT_FILE_TYPES = listOf(
     LayoutType.NUMBER_ROW, LayoutType.NUMBER, LayoutType.NUMPAD, LayoutType.NUMPAD_LANDSCAPE, LayoutType.PHONE,
@@ -111,10 +120,7 @@ fun LayoutFilesScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
         LayoutUtilsCustom.onLayoutFileChanged()
         KeyboardSwitcher.getInstance().setThemeNeedsReload()
         (ctx.getActivity() as? SettingsActivity)?.prefChanged()
-        // saved for good: Layout & Typing (this screen's parent) takes it as its new starting point
-        helium314.keyboard.settings.LayoutDraft.rebaseOpen(ctx, setOf(Settings.PREF_ADDITIONAL_SUBTYPES, Settings.PREF_ENABLED_SUBTYPES,
-            Settings.PREF_SELECTED_SUBTYPE, "keyboard_profile_ids", Settings.PREF_LAYOUT_PREFIX + "*"),
-            LAYOUT_FILE_TYPES.map { it.name.lowercase() }.toSet())
+        layoutFilesSaved()
     }
 
     // (no files: layouts go in and out by copy and paste; the one file the app writes is the backup)

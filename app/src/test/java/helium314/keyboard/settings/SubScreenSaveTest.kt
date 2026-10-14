@@ -10,6 +10,7 @@ import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.KeyPopupOverrides
 import helium314.keyboard.settings.screens.customizePopupsSaved
 import helium314.keyboard.settings.screens.deletePopupSet
+import helium314.keyboard.settings.screens.layoutFilesSaved
 import helium314.keyboard.settings.screens.paletteEditorSaved
 import org.json.JSONObject
 import org.junit.After
@@ -102,5 +103,26 @@ class SubScreenSaveTest {
         // the saved Layout names it again, as the keyboards do
         assertEquals("Mine", LayoutPresets.load(real).single().values[KeyPopupOverrides.PREF_SELECTED_SET])
         assertFalse(real.contains(own(1, KeyPopupOverrides.PREF))) // the key edit is undone too
+    }
+
+    // the same with the layout files screen (opened from Layout & Typing): its Save rebased every keyboard's definition
+    // and every "layout_" key, the saved Layouts list among them
+    @Test fun `a popup set deleted on Layout and Typing comes back on its Discard after the layout files screen saved`() {
+        val layouts = java.io.File(DeviceProtectedUtils.getFilesDir(ctx), "layouts")
+        java.io.File(layouts, "number").apply { mkdirs() }.resolve("old.txt").writeText("old") // a layout from before
+        try {
+            val draft = LayoutDraft.of(ctx, "en_US:") // Layout & Typing opens
+            deletePopupSet(ctx, "Mine")
+            // the layout files screen: a number layout written as the keyboard's own, then Save
+            val written = java.io.File(layouts, "number").resolve("new.txt").apply { writeText("new") }
+            layoutFilesSaved()
+            assertTrue(draft.hasChanges(ctx)) // Layout & Typing shows unsaved changes
+            LayoutDraft.rejectOpen(ctx) // Layout & Typing's Discard
+            assertEquals("Mine", KeyPopupOverrides.loadSets(real).single().name)
+            assertEquals("Mine", real.getString(own(2, KeyPopupOverrides.PREF_SELECTED_SET), null))
+            assertEquals("Mine", LayoutPresets.load(real).single().values[KeyPopupOverrides.PREF_SELECTED_SET])
+            assertFalse(written.exists()) // the layout written there is undone too
+            assertTrue(java.io.File(layouts, "number").resolve("old.txt").exists())
+        } finally { layouts.deleteRecursively() }
     }
 }

@@ -23,36 +23,16 @@ import java.io.File
  * Not undone: what clipboard history settings already removed from the history.
  */
 class LayoutDraft private constructor(
-    private var prefs: Map<String, Any?>, // raw keys (a keyboard's own settings are stored as p<id>/<key>)
-    private var layoutsCopy: File?, // copy of the layouts folder, null when there was none
+    private val prefs: Map<String, Any?>, // raw keys (a keyboard's own settings are stored as p<id>/<key>)
+    private val layoutsCopy: File?, // copy of the layouts folder, null when there was none
     private val dir: File,
     /** The keyboard (subtype preference string) the screen was opened for. */
     val subtype: String,
 ) {
     fun hasChanges(ctx: Context): Boolean = changedKeys(ctx).isNotEmpty() || layoutsChanged(ctx)
 
-    /**
-     * A screen opened from here saved its part for good (its own tick): the preferences [keys] (plain keys; one ending
-     * in "*" stands for every key starting with it) and the layout [folders] (e.g. "number") as they are now become
-     * this snapshot's starting point, so this screen's Discard (or leaving the app) no longer undoes them.
-     */
-    fun rebase(ctx: Context, keys: Set<String>, folders: Set<String>) {
-        fun ours(key: String) = plain(base(key)).let { k -> k in keys || keys.any { it.endsWith("*") && k.startsWith(it.dropLast(1)) } }
-        val now = scoped(ctx)
-        prefs = prefs.filterKeys { !ours(it) } + now.filterKeys { ours(it) }
-        if (folders.isNotEmpty()) {
-            val live = layoutsDir(ctx)
-            val copy = layoutsCopy ?: File(dir, "layouts").also { layoutsCopy = it }
-            for (folder in folders) {
-                val target = File(copy, folder).apply { deleteRecursively() }
-                File(live, folder).takeIf { it.isDirectory }?.copyRecursively(target, overwrite = true)
-                // (the copies keep the live files' times, so they compare equal)
-                target.walkTopDown().filter { it.isFile }.forEach { f -> f.setLastModified(File(live, f.relativeTo(copy).path).lastModified()) }
-            }
-        }
-        write(dir, subtype, layoutsCopy != null, prefs)
-        helium314.keyboard.latin.utils.SettingsEventLog.log("Layout & Typing snapshot rebased: $keys $folders")
-    }
+    // (no rebase: the Save of a screen opened from here, Customize popups or the layout files, leaves this snapshot as
+    // it is, so this screen's Save or Discard decides those changes too; owner 2026-10-11, option 1, review C2)
 
     /** The changed preferences, as plain keys (without a keyboard's p<id>/ prefix). */
     fun changedKeys(ctx: Context): Set<String> {
@@ -203,9 +183,6 @@ class LayoutDraft private constructor(
 
         /** The running draft for [subtype], or a fresh snapshot. */
         fun of(ctx: Context, subtype: String): LayoutDraft = active ?: start(ctx, subtype).also { active = it }
-
-        /** A screen opened from Layout & Typing saved its part for good: see [rebase]. */
-        fun rebaseOpen(ctx: Context, keys: Set<String>, folders: Set<String> = emptySet()) { active?.rebase(ctx, keys, folders) }
 
         private fun write(dir: File, subtype: String, hasLayouts: Boolean, prefs: Map<String, Any?>) {
             val json = JSONObject().put("subtype", subtype).put("layouts", hasLayouts)
