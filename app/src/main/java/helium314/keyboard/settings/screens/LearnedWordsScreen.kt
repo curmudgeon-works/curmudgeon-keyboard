@@ -466,12 +466,21 @@ private fun deletePersonalRow(context: Context, p: PersonalEntry) {
 internal fun deleteWords(context: Context, script: String, pool: Int, scriptLocales: List<Locale>, items: List<Item>,
                          alsoFromPersonalDictionary: Boolean = true,
                          deletePersonal: (Context, PersonalEntry) -> Unit = ::deletePersonalRow) {
-    for (item in items) apply(context, script, pool, scriptLocales, item, alsoFromPersonalDictionary, deletePersonal)
+    // a word's capitalizations as the lists have them now, not as the screen read them (review L4.5: one learned or
+    // removed since the screen loaded stayed); each list read once, when needed
+    val learnedNow by lazy { readLearned(context, script, pool).map { it.first }.groupBy { it.lowercase() } }
+    val listedNow by lazy { RemovedWords.blacklist(context, script, pool).entries().keys.groupBy { it.lowercase() } }
+    for (item in items) {
+        val now = if (item.kind == Kind.YOURS) learnedNow[item.entry.key] else listedNow[item.entry.key]
+        apply(context, script, pool, scriptLocales, item, now.orEmpty(), alsoFromPersonalDictionary, deletePersonal)
+    }
 }
 
-private fun apply(context: Context, script: String, pool: Int, scriptLocales: List<Locale>, item: Item,
+/** [item] deleted; [now]: its capitalizations on its list at the time of the delete (with the ones the screen read). */
+private fun apply(context: Context, script: String, pool: Int, scriptLocales: List<Locale>, item: Item, now: List<String>,
                   alsoFromPersonalDictionary: Boolean, deletePersonal: (Context, PersonalEntry) -> Unit) {
     val entry = item.entry
+    val spellings = entry.spellings + now
     when (item.kind) {
         Kind.YOURS -> {
             // every capitalization of each spelling out of the script's learned words, no strike (a plain delete); the
@@ -480,11 +489,11 @@ private fun apply(context: Context, script: String, pool: Int, scriptLocales: Li
             try {
                 if (LearningEventLog.isEnabled()) {
                     val counts = LearningEventLog.countsIn(PersonalizationHelper.getUserHistoryDictionary(context, script, pool))
-                    for (word in entry.spellings)
+                    for (word in spellings)
                         LearningEventLog.log(LearningEventLog.REMOVED, LearningEventLog.SETTINGS, word, "",
                             LearnedStores.label(script, pool), counts)
                 }
-                DictionaryFacilitatorImpl.removeWords(context, script, pool, locales, entry.spellings, blacklist = false,
+                DictionaryFacilitatorImpl.removeWords(context, script, pool, locales, spellings, blacklist = false,
                     personal = alsoFromPersonalDictionary)
             } catch (e: Exception) {
                 Log.w("LearnedWordsScreen", "could not remove a word of $script", e)
@@ -495,9 +504,9 @@ private fun apply(context: Context, script: String, pool: Int, scriptLocales: Li
             if (alsoFromPersonalDictionary) for (p in entry.personal)
                 try { deletePersonal(context, p) } catch (e: Exception) { Log.w("LearnedWordsScreen", "could not delete a personal dictionary word", e) }
             // its recent and frequent uses go too (as LatinIME.removeSuggestion)
-            entry.spellings.forEach { HotWords.forget(it); FrequentLongWords.forget(it) }
+            spellings.forEach { HotWords.forget(it); FrequentLongWords.forget(it) }
         }
-        Kind.BLACKLISTED -> entry.listed.forEach { word ->
+        Kind.BLACKLISTED -> (entry.listed + now).distinct().forEach { word ->
             // its strikes go with it (and it's swipeable again)
             if (RemovedWords.blacklist(context, script, pool).remove(word)) {
                 helium314.keyboard.latin.gesture.GestureDecoderVocabulary.onWordUnblacklisted(LearnedStores.storeLocale(script), word)

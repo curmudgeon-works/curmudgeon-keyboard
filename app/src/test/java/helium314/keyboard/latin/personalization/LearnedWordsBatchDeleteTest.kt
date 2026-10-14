@@ -265,6 +265,18 @@ class LearnedWordsBatchDeleteTest {
         assertEquals(setOf("adn"), blacklist.entries().keys)
     }
 
+    // fail before (L4.5): the capitalizations were the ones the screen read; one learned or removed since stayed
+    @Test fun `the delete looks up the word's capitalizations at the time of the delete`() {
+        learn("alpha", "beta")
+        val lists = buildWordLists("Latn", store.counts.map { it.key to it.value }, emptyList(), blacklist.entries())
+        store.counts["aLpha"] = 2 // (learned after the screen read the list)
+        deleteWords(ctx, "Latn", pool, listOf(Locale.US), lists.yours.filter { it.word == "alpha" }.map { Item(it, Kind.YOURS) })
+        assertEquals(setOf("beta"), store.counts.keys)
+        blacklist.strike("tEh") // (removed after the screen read the list)
+        deleteWords(ctx, "Latn", pool, listOf(Locale.US), lists.blacklisted.filter { it.word == "teh" }.map { Item(it, Kind.BLACKLISTED) })
+        assertEquals(setOf("hte", "adn"), blacklist.entries().keys)
+    }
+
     // owner 2026-10-11 "DM21 ALLOWED HERE": a delete from Learned words forgets the count only
     @Test fun `a delete on Learned words forgets the count and keeps the allowed row`() {
         learn("zorp")
