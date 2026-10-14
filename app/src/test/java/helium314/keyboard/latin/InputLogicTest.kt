@@ -1522,8 +1522,12 @@ class InputLogicTest {
         laggyEditor = false
         staleText = null
 
-        // reset settings
+        // reset settings, the keyboard lists kept: a keyboard no list names has its writes dropped (2026-10-12, U9)
+        val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(latinIME)
+        val lists = listOf(Settings.PREF_ENABLED_SUBTYPES, Settings.PREF_ADDITIONAL_SUBTYPES, Settings.PREF_SELECTED_SUBTYPE)
+            .associateWith { real.getString(it, null) }
         latinIME.prefs().edit { clear() }
+        real.edit { lists.forEach { (key, value) -> if (value != null) putString(key, value) } }
 
         setText("") // (re)sets selection and composing word
     }

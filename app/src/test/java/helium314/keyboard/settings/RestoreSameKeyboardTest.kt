@@ -117,7 +117,7 @@ class RestoreSameKeyboardTest {
         assertEquals(listOf(phone), plan.candidates(accentsOnly, emptyMap()))
         val differences = RestoreMatch.definitionDifferences(phone, accentsOnly)
         assertEquals(listOf(RestoreMatch.Difference.Definition(RestoreMatch.Part.Extra(ExtraValue.MORE_POPUPS), "all", "main")), differences)
-        assertEquals("Accents: this phone Add all available variants, backup Add very common variants (default)",
+        assertEquals("Accents: this device Add all available variants, backup Add very common variants (default)",
             RestoreMatch.rowText(ctx, differences.single(), accentsOnly))
         // and the languages too for the test's backup
         assertEquals(listOf(RestoreMatch.Part.Extra(ExtraValue.SECONDARY_LOCALES), RestoreMatch.Part.Extra(ExtraValue.MORE_POPUPS)),
