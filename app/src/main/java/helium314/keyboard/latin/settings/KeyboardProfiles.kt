@@ -770,8 +770,6 @@ object KeyboardProfiles {
         real.edit().putBoolean("profile_files_migrated", true).apply()
     }
 
-    private val palettePrefixes = listOf(Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
-
     /** Set once [dropCommonSet] ran. */
     const val NO_COMMON_SET_DONE = "no_common_set_done"
 
@@ -782,9 +780,9 @@ object KeyboardProfiles {
      * main keyboard's own set instead, the backup's common set ignored: "fine to trash common set with upgrade and
      * restore"), its pictures too; then the common set's keyboard settings and pictures go. A keyboard with a set of its
      * own keeps it as it is, the main one and the others alike (owner 2026-10-11: "Main keyboard got the right treatment
-     * when common was trashed. Other keyboards should havr gotten the same."): no gap-filling from the common set, only
-     * the common colour palettes it lacks. An Add keyboard pick kept for later ("keyboard_start_from", before
-     * 2026-10-11) is dropped, not applied (owner 2026-10-11: "don't care about keyboards before this update really").
+     * when common was trashed. Other keyboards should havr gotten the same."): no gap-filling from the common set, and no
+     * copies of the common colour palettes either (owner 2026-10-11: deleted with the common set). An Add keyboard pick
+     * kept for later ("keyboard_start_from", before 2026-10-11) is dropped, not applied (owner 2026-10-11: "don't care about keyboards before this update really").
      * App-wide keys and one-time flags stay.
      */
     @Synchronized
@@ -807,15 +805,8 @@ object KeyboardProfiles {
         }
         // (the old bookkeeping; a pending Add keyboard pick isn't applied: a keyboard without a set got the common one)
         editor.remove(PREF_START_FROM).remove(PREF_SHARED_FROM)
-        // a keyboard with a set of its own (the main one and the others) gets the common colour palettes it lacks: named
-        // definitions its colour choice and palette list point at, not values (until palettes are app-wide, owner
-        // 2026-10-11)
-        if (fromCommon) {
-            val palettes = common.filterKeys { key -> palettePrefixes.any { key.startsWith(it) } }
-            val withSet = ids(real).let { map -> map.keys().asSequence().map { map.optInt(it, SHARED) } }.toSet() - without.toSet() - SHARED
-            for (id in withSet.filter { hasOwnEntries(real, it) }) for ((key, value) in palettes)
-                if (!all.containsKey(ownKey(id, key)) && !all.containsKey(ownKey(id, TOMBSTONE + key))) put(editor, ownKey(id, key), value)
-        }
+        // (owner 2026-10-11: the common set's palettes are deleted at the upgrade, no copies: "fine to delete due to our
+        // early stages"; a keyboard without a set has them in its copy above)
         for (key in common.keys) if (!isOneTimeFlag(key)) editor.remove(key)
         editor.putBoolean(NO_COMMON_SET_DONE, true)
         editor.commit()

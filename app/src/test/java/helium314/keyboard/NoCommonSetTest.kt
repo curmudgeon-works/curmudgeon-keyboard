@@ -152,9 +152,11 @@ class NoCommonSetTest {
         separate(true); KeyboardProfiles.Group.entries.forEach { KeyboardProfiles.setGroupShared(real, it, false) }
         assertEquals(-1f, view(3).getFloat(vGap, -1f))
         separate(false); KeyboardProfiles.loadGroups(real)
-        // each keyboard with a set gets the palettes it lacks (until palettes are app-wide, owner 2026-10-11)
-        assertEquals("colors", real.getString(own(1, palette), null))
-        assertEquals("colors", real.getString(own(3, palette), null))
+        // (owner 2026-10-11: the common set's palettes are deleted at the upgrade, no copies) keyboard 2, without a set,
+        // has it in its copy of the common set; the keyboards with a set get none
+        assertEquals("colors", real.getString(own(2, palette), null))
+        assertFalse(real.contains(own(1, palette)), "the main keyboard got the common set's palette")
+        assertFalse(real.contains(own(3, palette)), "keyboard 3 got the common set's palette")
         assertFalse(real.contains(palette))
 
         assertTrue(real.getBoolean(Settings.PREF_ADVANCED_SETTINGS, false), "an app-wide key went")

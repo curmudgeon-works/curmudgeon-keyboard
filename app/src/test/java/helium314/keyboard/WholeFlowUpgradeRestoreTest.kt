@@ -180,7 +180,8 @@ class WholeFlowUpgradeRestoreTest {
         val first = HashMap(real.all)
         // (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones) the common set
         // goes; US and French, each with a set of its own, keep their sets as they are: not filled up from the common set
-        // (owner 2026-10-11, the upgrade decided: no gap-filling; only a keyboard without a set gets a copy of it)
+        // (owner 2026-10-11, the upgrade decided: no gap-filling; only a keyboard without a set gets a copy of it; owner
+        // 2026-10-11: the common set's palettes are deleted at the upgrade, no copies; this phone's common set has none)
         assertEquals(sortedSetOf(LayoutPresets.PREF, AppearanceLooks.PREF, SavedItemDefaults.REMEMBERED_DONE, KeyboardProfiles.NO_COMMON_SET_DONE)
             + commonOf3afbeeebc, changedKeys(before, first), "the first upgrade changed more than the saved Layouts and themes")
         assertEquals(true, first[SavedItemDefaults.REMEMBERED_DONE])
