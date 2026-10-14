@@ -40,9 +40,10 @@ import kotlin.test.assertTrue
  * (owner 2026-10-11, R4: "should fix R4 too I think, bringing in the names of key groups if any") A restored saved
  * Layout brings the custom key layouts it names ("layout:<type>", its keys "layoutText:<type>"), even when no restored
  * keyboard uses them. None on the phone: it comes in as it is. The phone's under that name with the same keys: the
- * phone's. Other keys: the Layout's tick (backup wins the name if ticked): ticked, the Layout's keys take the name and
- * the phone's file gets the next number, every keyboard and saved Layout using it following; unticked, nothing changes
- * (the Layout keeps its keys as its own copy). Before: the Layout kept the name, which pointed at the phone's other keys.
+ * phone's. Other keys: the Layout's keys take the name and the phone's file gets the next number, every keyboard and
+ * saved Layout using it following (owner 2026-10-12: the backup's keeps its name, "yours becomes My numrow 2"; nothing
+ * asked about the file itself); the Layout unticked, it doesn't come in and nothing changes. Before: the Layout kept the
+ * name, which pointed at the phone's other keys.
  * (owner 2026-10-11: keyboards have unique ids) The phone's German is k1, the backup's US k2; a layout rename keeps the
  * keyboard's id (nothing moves); a restore again merges into the keyboard the first one brought.
  */
@@ -137,12 +138,14 @@ class RestoreLayoutKeyFilesTest {
         assertTrue(phoneKeyboard in enabled())
     }
 
-    @Test fun `other keys, ticked - the Layout's keys take the name, the phone's file is numbered and its users follow`() {
+    @Test fun `other keys - the Layout's keys take the name, the phone's file is numbered and its users follow`() {
         phone("A")
         file(numrow).writeText("A")
         backup("B")
-        assertEquals(listOf(Clash(Kind.LAYOUTS, "Work", null, files = listOf(FileClash(type, numrow, numrow2)))),
-            restorePlanFrom(ctx, zip).clashes)
+        // (owner 2026-10-12: no question for the file; the plan has the device's new name)
+        val plan = restorePlanFrom(ctx, zip)
+        assertEquals(emptyList(), plan.clashes)
+        assertEquals(numrow2, plan.items.keyLayouts.deviceRename(type, numrow))
         assertEquals("A", file(numrow).readText()) // (the dry run wrote nothing)
         restore()
         assertEquals("B", file(numrow).readText())
@@ -162,7 +165,8 @@ class RestoreLayoutKeyFilesTest {
         assertEquals("B", file(numrow).readText())
     }
 
-    @Test fun `other keys, unticked - nothing of the phone's changes, the Layout keeps its own keys`() {
+    // (owner 2026-10-12: an unticked item doesn't come in; the dialog keeps one a ticked keyboard uses ticked)
+    @Test fun `the Layout unticked - it doesn't come in, nothing of the phone's changes`() {
         phone("A")
         file(numrow).writeText("A")
         backup("B")
@@ -171,7 +175,6 @@ class RestoreLayoutKeyFilesTest {
         assertEquals("A", file(numrow).readText())
         assertTrue(phoneKeyboard in enabled())
         assertEquals(numrow, preset("Home").values[layoutKey])
-        assertEquals(numrow, preset("Work").values[layoutKey])
-        assertEquals("B", preset("Work").values["layoutText:${type.name}"])
+        assertEquals(listOf("Home"), LayoutPresets.load(real).map { it.name })
     }
 }

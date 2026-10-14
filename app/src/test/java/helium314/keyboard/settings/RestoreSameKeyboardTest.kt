@@ -167,7 +167,9 @@ class RestoreSameKeyboardTest {
         assertEquals(false, reads(restored)[Settings.PREF_SHOW_NUMBER_ROW])
     }
 
-    @Test fun `a changed keyboard whose custom layout comes in numbered replaces the phone's, naming the numbered one`() {
+    // (owner 2026-10-12: the backup's key layout keeps its name, the phone's is renamed "My numrow 2" first, its users
+    // following; was: the backup's came in as "My numrow 2")
+    @Test fun `a changed keyboard whose custom layout clashes replaces the phone's, the phone's layout numbered for its other users`() {
         // (review C1 with B4: the phone's en-US keyboard has other accents than the backup's, and the number row "My
         // numrow" both use has other keys on the phone; a German keyboard of the phone uses that "My numrow" too)
         val type = LayoutType.NUMBER_ROW
@@ -195,35 +197,38 @@ class RestoreSameKeyboardTest {
                 z.closeEntry()
                 z.putNextEntry(ZipEntry("unprotected/layouts/${type.name.lowercase()}/$numrow")); z.write("B".toByteArray()); z.closeEntry()
             }
-            // the dialog: on the phone, and differing in the accents and the number row (the one it would come in as)
+            // the dialog: on the phone, and differing in the accents and the number row (same name, other keys)
             val plan = restorePlanFrom(ctx, zip)
             val incoming = plan.incoming
             assertEquals(listOf(phoneKeyboard), plan.candidates(backupKeyboard, emptyMap()))
             assertEquals(listOf(RestoreMatch.Part.Extra(ExtraValue.MORE_POPUPS), RestoreMatch.Part.Layout(type)),
-                RestoreMatch.definitionDifferences(phoneKeyboard, incoming.getValue(backupKeyboard)).map { it.part })
-            assertEquals(numrow2, incoming.getValue(backupKeyboard).layoutName(type), "the name it would come in as")
+                RestoreMatch.definitionDifferences(phoneKeyboard, incoming.getValue(backupKeyboard), plan.sameLayout).map { it.part })
+            assertEquals(numrow, incoming.getValue(backupKeyboard).layoutName(type), "the backup's name")
+            assertEquals(numrow2, plan.items.keyLayouts.deviceRename(type, numrow), "the phone's becomes My numrow 2")
             assertFalse(LayoutUtilsCustom.getLayoutFile(numrow2, type, ctx).exists(), "the dialog writes nothing")
             // merged, everything ticked (was "Replace with the backup's")
             restoreKeyboardsFrom(ctx, zip, listOf(backupKeyboard), withSettings = true,
                 decisions = mapOf(backupKeyboard to RestoreDecision.Merge(phoneKeyboard)))
-            val restored = asPhone(backupKeyboard.withLayout(type, numrow2))
-            assertEquals(listOf(restored, german), enabled(), "one en-US keyboard, in its place, on My numrow 2")
-            assertEquals("A", LayoutUtilsCustom.getLayoutFile(numrow, type, ctx).readText(), "the phone's My numrow kept its keys")
-            assertEquals("B", LayoutUtilsCustom.getLayoutFile(numrow2, type, ctx).readText())
+            val restored = asPhone(backupKeyboard)
+            val germanNow = german.withLayout(type, numrow2)
+            assertEquals(listOf(restored, germanNow), enabled(), "one en-US keyboard, in its place, on My numrow; German follows its keys")
+            assertEquals("B", LayoutUtilsCustom.getLayoutFile(numrow, type, ctx).readText())
+            assertEquals("A", LayoutUtilsCustom.getLayoutFile(numrow2, type, ctx).readText(), "the phone's keys, renamed")
             // again: the dialog finds the same keyboard, nothing differing; restoring changes nothing
             val againPlan = restorePlanFrom(ctx, zip)
             assertEquals(listOf(restored), againPlan.candidates(backupKeyboard, emptyMap()))
-            assertEquals(emptyList(), RestoreMatch.definitionDifferences(restored, againPlan.incoming.getValue(backupKeyboard)))
-            // unanswered: comes in as a keyboard of its own with the backup's id, on the "My numrow 2" it brought before
+            assertEquals(emptyList(), RestoreMatch.definitionDifferences(restored, againPlan.incoming.getValue(backupKeyboard), againPlan.sameLayout))
+            // unanswered: comes in as a keyboard of its own with the backup's id, on the "My numrow" it brought before
             // (owner 2026-10-11: keyboards have unique ids; was: the same as the phone's, not restored)
             restoreKeyboardsFrom(ctx, zip, listOf(backupKeyboard), withSettings = true)
-            assertEquals(setOf(restored, german, backupKeyboard.withLayout(type, numrow2)), enabled().toSet())
+            assertEquals(setOf(restored, germanNow, backupKeyboard), enabled().toSet())
             assertEquals(3, enabled().size)
             assertEquals(setOf(numrow, numrow2), folder.list()!!.toSet())
         } finally { folder.deleteRecursively(); LayoutUtilsCustom.onLayoutFileChanged() }
     }
 
-    @Test fun `choosing parts, a number row taken from the backup comes in numbered, one kept is the phone's file`() {
+    // (owner 2026-10-12: the backup's keeps the name, the phone's file is renamed first; was: the backup's numbered)
+    @Test fun `choosing parts, a number row taken from the backup keeps its name, one kept is the phone's file`() {
         val type = LayoutType.NUMBER_ROW
         val numrow = LayoutUtilsCustom.getLayoutName("My numrow", type)
         val numrow2 = LayoutUtilsCustom.getLayoutName("My numrow 2", type)
@@ -250,13 +255,13 @@ class RestoreSameKeyboardTest {
             }
         }
         try {
-            // only the number row ticked: the phone's accents, the backup's keys as "My numrow 2"
+            // only the number row ticked: the phone's accents, the backup's keys as "My numrow", the phone's renamed
             setUpBoth()
             restoreKeyboardsFrom(ctx, zip, listOf(backupKeyboard), withSettings = true, decisions = mapOf(backupKeyboard to
                 RestoreDecision.Merge(phoneKeyboard, parts = setOf(RestoreMatch.Part.Layout(type)), menus = emptySet())))
-            assertEquals(listOf(phoneKeyboard.withLayout(type, numrow2).toPref().toSettingsSubtype()), enabled())
-            assertEquals("A", LayoutUtilsCustom.getLayoutFile(numrow, type, ctx).readText())
-            assertEquals("B", LayoutUtilsCustom.getLayoutFile(numrow2, type, ctx).readText())
+            assertEquals(listOf(phoneKeyboard.withLayout(type, numrow).toPref().toSettingsSubtype()), enabled())
+            assertEquals("B", LayoutUtilsCustom.getLayoutFile(numrow, type, ctx).readText())
+            assertEquals("A", LayoutUtilsCustom.getLayoutFile(numrow2, type, ctx).readText())
             // only the accents ticked: the phone's "My numrow", and no file comes in
             setUpBoth()
             restoreKeyboardsFrom(ctx, zip, listOf(backupKeyboard), withSettings = true, decisions = mapOf(backupKeyboard to

@@ -115,8 +115,9 @@ class ReReview2R5Test {
         assertEquals(2, data.pending.keyboards.size)
         assertEquals(before.incoming.keys, plan.incoming.keys)
         assertEquals(before.incoming.mapValues { unnamed(it.value) }, plan.incoming.mapValues { unnamed(it.value) })
-        assertTrue(plan.incoming.any { (k, v) -> k.layoutName(type) != v.layoutName(type) },
-            "(the backup's number row wasn't renamed: ${plan.incoming})")
+        // (owner 2026-10-12: the backup's keeps its name; the device's unsaved number row gets a new one, planned here)
+        assertEquals(plan.incoming.keys.toList(), plan.incoming.values.toList())
+        assertTrue(plan.items.keyLayouts.deviceRenames.isNotEmpty(), "(the device's number row wasn't planned a new name)")
         assertEquals(before.enabled, plan.enabled)
         assertEquals(before.switchedOff, plan.switchedOff)
         for (k in data.pending.keyboards) {

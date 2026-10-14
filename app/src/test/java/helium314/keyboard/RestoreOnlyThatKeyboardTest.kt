@@ -155,7 +155,7 @@ class RestoreOnlyThatKeyboardTest {
         assertTrue(real.getBoolean(own(2, autoCap), false)) // (its own set, read once separate settings are on)
     }
 
-    // (owner 2026-10-11: backup wins the name if ticked; before, with copies off the restore wrote a Custom label for a
+    // (owner 2026-10-12: replaced when ticked; owner 2026-10-11 had the backup win the name; before, with copies off the restore wrote a Custom label for a
     // theme not brought in, and this checked it landed in Hindi's own set; now no label is written, the choice is)
     @Test fun `the restored keyboard's theme choice of a shared menu lands in its own set, the Sunset clash ticked or not`() {
         val sunset = JSONObject().put("name", "Sunset").put("values", JSONObject().put(gap, JSONObject().put("f", 5.0)))
@@ -170,7 +170,8 @@ class RestoreOnlyThatKeyboardTest {
             assertFalse(real.contains(own(1, AppearanceLooks.PREF_SELECTED)), "the shared set got Hindi's choice")
             assertEquals("Sunset", real.getString(own(2, AppearanceLooks.PREF_SELECTED), null))
             assertFalse(real.contains(own(2, label)))
-            assertEquals(if (ticked) listOf("Sunset 2", "Sunset") else listOf("Sunset"), AppearanceLooks.load(real).map { it.name })
+            // (owner 2026-10-12: ticked, replaced, the suggested answer: the device's Sunset is the backup's)
+            assertEquals(listOf("Sunset"), AppearanceLooks.load(real).map { it.name })
             assertEquals(if (ticked) 5f else 1f, AppearanceLooks.load(real).last().values[gap])
         }
     }

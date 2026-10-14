@@ -35,7 +35,8 @@ import kotlin.test.assertTrue
 
 /**
  * The restore dialog, driven (owner 2026-10-11): "Delete app data and restore from backup" on top, checked; the keyboard
- * list greyed out and no line; OK asks before it wipes. Unchecked: the keyboards enabled and ticked, the line shown.
+ * list greyed out and no line; OK asks before it wipes. Unchecked: the keyboards enabled and ticked; "Tricky merging
+ * ahead!" only with a ticked row that needs merging (owner 2026-10-12).
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w400dp-h2400dp")
@@ -46,9 +47,9 @@ class RestoreTopCheckboxUiTest {
     private var scenario: ActivityScenario<SettingsActivity>? = null
     // (owner 2026-10-12: the top checkbox reads "Full restore (delete app data)"; was "Delete app data and restore from backup")
     private val top = "Full restore (delete app data)"
-    // (owner 2026-10-12: the line under the unchecked checkbox; was "App data won't be deleted. Each selected keyboard
-    // will be merged or added, based on your selection on next screens.")
-    private val line = "Prepare to do super-complex merging! Select what you want to bring in from the backup:"
+    // (owner 2026-10-12: the line under the unchecked checkbox, only with a ticked row that needs merging; was "Prepare to
+    // do super-complex merging! …", and before that "App data won't be deleted. …")
+    private val line = "Tricky merging ahead!"
     private val marker = Settings.PREF_CLIPBOARD_HISTORY_SIZE
 
     @Before fun setUp() {
@@ -102,12 +103,12 @@ class RestoreTopCheckboxUiTest {
         assertTrue(zip.exists(), "the backup file stays while the dialog is open")
     }
 
-    @Test fun `unchecked, keyboards enabled and ticked, the line shown`() {
+    @Test fun `unchecked, keyboards enabled and ticked, no line when nothing needs merging`() {
         show()
         compose.onNodeWithText(top).performClick()
         box(top).assertIsOff()
         compose.onNodeWithText("French", substring = true).assertIsEnabled()
         box("French").assertIsOn()
-        compose.onNodeWithText(line).assertExists()
+        compose.onNodeWithText(line).assertDoesNotExist() // (no French keyboard here: nothing to merge)
     }
 }

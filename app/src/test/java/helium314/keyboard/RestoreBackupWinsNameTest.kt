@@ -35,13 +35,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
 /**
- * Restoring some keyboards, a backup's saved item clashing with the phone's (owner 2026-10-11: "yes, backup wins the
- * name if ticked"; ticked to start with), for palettes, themes, Layouts and popup sets alike:
- * (a) same name, other content: ticked, the backup's is "Sunset", the phone's "Sunset 2", and every keyboard and saved
- * item on the phone that named Sunset names the backup's (so "Sunset 2" is unused); unticked, the backup's doesn't come
- * in ("backup's doesn't come in at all") and the restored keyboard names the phone's Sunset.
- * (b) the same content under another name: ticked, the phone's is renamed to the backup's name everywhere; unticked,
- * nothing renamed, the restored keyboard names the phone's.
+ * Restoring some keyboards, a backup's saved item clashing with the device's, for palettes, themes, Layouts and popup
+ * sets alike (owner 2026-10-12, the restore redesign: asked, Replace or Keep both; Replace of the first candidate to start
+ * with; was owner 2026-10-11 "backup wins the name if ticked"):
+ * (a) same name, other content: Replace, the device's becomes the backup's, every keyboard and saved item naming it
+ * takes it; Keep both, the backup's is "Sunset", the device's "Sunset 2", its users following. Unticked, the backup's
+ * doesn't come in and the restored keyboard names the device's Sunset.
+ * (b) the same content under another name: Replace, the device's is renamed to the backup's name everywhere; unticked,
+ * nothing renamed, the restored keyboard names the device's.
  * The restore dialog's dry run names them as the real run does (R3, R6).
  * (owner 2026-10-11: keyboards have unique ids) The phone's keyboard is "k1", the backup's "k2"; their sets "pk1/", "pk2/".
  */
@@ -134,17 +135,29 @@ class RestoreBackupWinsNameTest {
         backup(mapOf(theme to "Sunset", gap to 3f), mapOf(looks(look("Sunset", 3.0))))
     }
 
-    @Test fun `same-name theme ticked - the backup's is Sunset, the phone's Sunset 2, every phone keyboard on Sunset names the backup's`() {
+    @Test fun `same-name theme replaced - the device's Sunset is the backup's, the device keyboard on it takes its look`() {
         sunsetClash()
         assertEquals(listOf(Clash(Kind.THEMES, "Sunset", "Sunset", "Sunset 2")), restorePlanFrom(ctx, zip).clashes)
         restore()
         val list = AppearanceLooks.load(real)
+        assertEquals(listOf("Sunset"), list.map { it.name })
+        assertEquals(3f, list.single().values[gap])
+        assertEquals("Sunset", phoneOwn(theme))
+        assertEquals(3f, phoneOwn(gap), "they take the backup's look (owner 2026-10-12)")
+        assertEquals("Sunset", restoredOwn(theme))
+    }
+
+    // owner 2026-10-12: Keep both, "yours becomes Sunset 2 (keyboards using it keep their look)"
+    @Test fun `same-name theme kept both - the backup's is Sunset, the device's Sunset 2 with its keyboard on it`() {
+        sunsetClash()
+        restore(SavedItemsMerge.Choices(answers = mapOf((Kind.THEMES to "Sunset") to SavedItemsMerge.Answer.KeepBoth)))
+        val list = AppearanceLooks.load(real)
         assertEquals(listOf("Sunset 2", "Sunset"), list.map { it.name })
         assertEquals(3f, list.single { it.name == "Sunset" }.values[gap])
         assertEquals(1f, list.single { it.name == "Sunset 2" }.values[gap])
-        assertEquals("Sunset", phoneOwn(theme))
+        assertEquals("Sunset 2", phoneOwn(theme))
+        assertEquals(1f, phoneOwn(gap))
         assertEquals("Sunset", restoredOwn(theme))
-        assertEquals(emptySet(), naming(theme, "Sunset 2")) // (unused right after the restore)
     }
 
     @Test fun `same-name theme unticked - the backup's is absent, the restored keyboard names the phone's Sunset`() {
@@ -191,17 +204,25 @@ class RestoreBackupWinsNameTest {
 
     // ---- palettes: the phone's saved themes naming them follow too ----
 
-    @Test fun `same-name palette ticked - the backup's colors are Warm, the phone's Warm 2, the phone's keyboard and theme stay on Warm`() {
+    @Test fun `same-name palette - replaced, Warm has the backup's colors; kept both, the device's is Warm 2 with its users`() {
         phone(mapOf(slot to "Warm"), mapOf(Settings.PREF_USER_COLORS_PREFIX + "Warm" to colorsA, looks(look("Mine", 1.0, "Warm"))))
         backup(mapOf(slot to "Warm"), mapOf(Settings.PREF_USER_COLORS_PREFIX + "Warm" to colorsB))
         assertEquals(listOf(Clash(Kind.PALETTES, "Warm", "Warm", "Warm 2")), restorePlanFrom(ctx, zip).clashes)
         restore()
         assertEquals(colorsB, real.all[Settings.PREF_USER_COLORS_PREFIX + "Warm"])
-        assertEquals(colorsA, real.all[Settings.PREF_USER_COLORS_PREFIX + "Warm 2"])
+        assertEquals(null, real.all[Settings.PREF_USER_COLORS_PREFIX + "Warm 2"])
         assertEquals("Warm", phoneOwn(slot))
         assertEquals("Warm", restoredOwn(slot))
         assertEquals("Warm", AppearanceLooks.load(real).single { it.name == "Mine" }.values[slot])
-        assertEquals(emptySet(), naming(slot, "Warm 2"))
+        // kept both (owner 2026-10-12): the device's keyboard and theme follow its Warm 2
+        real.edit().clear().commit()
+        phone(mapOf(slot to "Warm"), mapOf(Settings.PREF_USER_COLORS_PREFIX + "Warm" to colorsA, looks(look("Mine", 1.0, "Warm"))))
+        restore(SavedItemsMerge.Choices(answers = mapOf((Kind.PALETTES to "Warm") to SavedItemsMerge.Answer.KeepBoth)))
+        assertEquals(colorsB, real.all[Settings.PREF_USER_COLORS_PREFIX + "Warm"])
+        assertEquals(colorsA, real.all[Settings.PREF_USER_COLORS_PREFIX + "Warm 2"])
+        assertEquals("Warm 2", phoneOwn(slot))
+        assertEquals("Warm", restoredOwn(slot))
+        assertEquals("Warm 2", AppearanceLooks.load(real).single { it.name == "Mine" }.values[slot])
     }
 
     @Test fun `different-name same-colors palette ticked - the phone's is renamed Hot in every keyboard and theme, unticked nothing`() {
@@ -237,14 +258,14 @@ class RestoreBackupWinsNameTest {
         assertEquals("Mine", LayoutPresets.load(real).single { it.name == "Home" }.values[popups])
     }
 
-    @Test fun `same-name popup set ticked - the backup's is Mine, the phone's Mine 2, the phone's keyboard and Layout stay on Mine`() {
+    @Test fun `same-name popup set replaced - Mine is the backup's, the device's keyboard and Layout stay on Mine`() {
         val phoneSets = KeyPopupOverrides.PREF_SETS to JSONArray(listOf(popupSet("Mine", "à"))).toString()
         phone(mapOf(popups to "Mine"), mapOf(phoneSets, presets(preset("Home", true, "Mine"))))
         backup(mapOf(popups to "Mine"), mapOf(sets(popupSet("Mine", "á"))))
         restore()
         val list = KeyPopupOverrides.loadSets(real)
-        assertEquals(listOf("Mine 2", "Mine"), list.map { it.name })
-        assertEquals(listOf("á"), list.single { it.name == "Mine" }.overrides["a"])
+        assertEquals(listOf("Mine"), list.map { it.name })
+        assertEquals(listOf("á"), list.single().overrides["a"])
         assertEquals("Mine", phoneOwn(popups))
         assertEquals("Mine", LayoutPresets.load(real).single { it.name == "Home" }.values[popups])
         assertEquals(emptySet(), naming(popups, "Mine 2"))
@@ -260,10 +281,11 @@ class RestoreBackupWinsNameTest {
         assertEquals(listOf("Work"), LayoutPresets.load(real).map { it.name })
         assertEquals(false, LayoutPresets.load(real).single().values[numberRow])
         assertEquals("Work", restoredOwn(layout))
+        // (replaced, the suggested answer, owner 2026-10-12: the device's Work is the backup's, its keyboard on it)
         restore()
         val list = LayoutPresets.load(real)
-        assertEquals(listOf("Work 2", "Work"), list.map { it.name })
-        assertEquals(true, list.single { it.name == "Work" }.values[numberRow])
+        assertEquals(listOf("Work"), list.map { it.name })
+        assertEquals(true, list.single().values[numberRow])
         assertEquals("Work", phoneOwn(layout))
         assertEquals(emptySet(), naming(layout, "Work 2"))
     }

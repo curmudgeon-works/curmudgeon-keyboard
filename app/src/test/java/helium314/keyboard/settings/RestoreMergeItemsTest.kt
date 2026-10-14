@@ -50,7 +50,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
 /**
- * A partial restore's "And merge" and "Restore their" rows as the owner decided them (2026-10-12): learned words take
+ * A partial restore's learned words, dictionaries, personal dictionary words and clipboard as the owner decided them
+ * (2026-10-12; the dialog's rows for them are gone since, all always come, owner 2026-10-12): learned words take
  * the higher count (DM18), the Learned words row brings the personal dictionary words too (the "Custom words" row
  * dropped), Dictionaries: same nothing / new comes in / differs: the backup's selected, the device's kept aside as
  * "…_prev"; other languages' new dictionaries come in silently; the clipboard merges.
@@ -218,7 +219,8 @@ class RestoreMergeItemsTest {
         assertEquals(null, selected("ko"))
     }
 
-    @Test fun `the Dictionaries subtext names the restored keyboards' languages whose dictionary clashes`() {
+    // (owner 2026-10-12: no Dictionaries row any more, dictionaries always come; the "Backup restored" dialog says so)
+    @Test fun `the plan names the restored keyboards' languages whose dictionary clashes, and the summary says yours are kept aside`() {
         dictDir("fr").mkdirs(); dict("fr", "main_user.dict").writeText("device")
         dictDir("ko").mkdirs(); dict("ko", "main_user.dict").writeText("device ko")
         dictDir("de").mkdirs(); dict("de", "main_user.dict").writeText("same")
@@ -226,8 +228,8 @@ class RestoreMergeItemsTest {
             "dicts/ko/main_user.dict" to "backup ko".toByteArray(), "dicts/de/main_user.dict" to "same".toByteArray()))
         assertEquals(setOf("fr", "ko"), dictionaryClashesFrom(ctx, zip))
         assertEquals(listOf("fr"), restorePlanFrom(ctx, zip).dictionaryClashLanguages(listOf(frB)))
-        assertEquals("French: Backup is prioritized, yours is kept aside as \"…prev\"",
-            ctx.getString(helium314.keyboard.latin.R.string.restore_dictionaries_clash, "French"))
+        assertEquals("Settings and dictionaries restored; your dictionaries kept as \"…prev\".",
+            ctx.getString(helium314.keyboard.latin.R.string.restore_summary_settings))
     }
 
     // ---- 5. the clipboard merges (owner 2026-10-12: "yes, merge clipboard") ----

@@ -31,10 +31,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Restoring some keyboards with a custom key layout the phone has under the same name (owner 2026-10-11: "Yes", the
- * pattern of fonts and pictures): the same keys are the phone's file; other keys come in as "My numrow 2" and the
- * restored keyboard, its default for the type and the restored Layouts name that one. The phone's file, and every other
- * keyboard using it, keep their keys (before: the backup's file was written over the phone's).
+ * Restoring some keyboards with a custom key layout the phone has under the same name: the same keys are the phone's
+ * file; other keys keep the backup's name, and the phone's file becomes "My numrow 2" first, every keyboard, default and
+ * Layout using it following, so they keep their keys (owner 2026-10-12: "Backup's My numrow; yours becomes My numrow 2";
+ * flips owner 2026-10-11, where the backup's came in as "My numrow 2"; before that, the backup's file was written over
+ * the phone's).
  * (owner 2026-10-11: keyboards have unique ids) The keyboards have ids (phone German k1, backup US k2); a restore again
  * merges into the keyboard the first one brought (unasked, it would come in as a second keyboard).
  */
@@ -103,29 +104,28 @@ class PartialRestoreLayoutsTest {
     private fun ownDefault(keyboard: SettingsSubtype) = real.getString(KeyboardProfiles.ownKey(keyboard.keyboardId!!, defaultKey), null)
 
 
-    @Test fun `other keys under a name the phone has come in numbered, and only the restored keyboard uses them`() {
+    @Test fun `other keys under a name the phone has keep the name, the phone's file is numbered and its keyboard follows`() {
         file(numrow).writeText("A")
         backup("B")
         restoreKeyboardsFrom(ctx, zip, listOf(backupKeyboard), withSettings = true)
-        assertEquals("A", file(numrow).readText()) // (the phone's file kept its keys)
-        assertEquals("B", file(numrow2).readText())
+        assertEquals("B", file(numrow).readText()) // (the backup's keeps the name)
+        assertEquals("A", file(numrow2).readText()) // (the phone's keys, renamed)
         assertEquals("My numrow 2", LayoutUtilsCustom.getDisplayName(numrow2))
-        val restored = backupKeyboard.withLayout(type, numrow2)
-        assertTrue(restored in enabled(), "the restored keyboard uses My numrow 2: ${enabled()}")
-        assertTrue(backupKeyboard !in enabled(), "no keyboard of the backup's on the phone's My numrow")
-        assertTrue(phoneKeyboard in enabled()) // (the other keyboard still on My numrow, keys A)
-        assertEquals(numrow2, ownDefault(restored))
+        val moved = phoneKeyboard.withLayout(type, numrow2)
+        assertTrue(backupKeyboard in enabled(), "the restored keyboard on My numrow: ${enabled()}")
+        assertTrue(moved in enabled(), "the phone's keyboard follows its keys to My numrow 2: ${enabled()}")
+        assertEquals(numrow, ownDefault(backupKeyboard))
         val preset = LayoutPresets.load(real).single()
-        assertEquals(numrow2, preset.values["layout:${type.name}"])
-        assertEquals(numrow2, preset.values[defaultKey])
+        assertEquals(numrow, preset.values["layout:${type.name}"])
+        assertEquals(numrow, preset.values[defaultKey])
 
         // again, merged into the restored keyboard: nothing new
-        restoreKeyboardsFrom(ctx, zip, listOf(backupKeyboard), withSettings = true, decisions = mapOf(backupKeyboard to RestoreDecision.Merge(restored)))
+        restoreKeyboardsFrom(ctx, zip, listOf(backupKeyboard), withSettings = true, decisions = mapOf(backupKeyboard to RestoreDecision.Merge(backupKeyboard)))
         assertEquals(setOf(numrow, numrow2), folder.list()!!.toSet())
-        assertEquals("A", file(numrow).readText())
-        assertEquals(listOf(phoneKeyboard, restored), enabled().sortedBy { it.locale.toLanguageTag() })
+        assertEquals("B", file(numrow).readText())
+        assertEquals(listOf(moved, backupKeyboard), enabled().sortedBy { it.locale.toLanguageTag() })
         assertEquals(1, LayoutPresets.load(real).size)
-        assertEquals(numrow2, ownDefault(restored))
+        assertEquals(numrow, ownDefault(backupKeyboard))
     }
 
     @Test fun `the same keys under the same name are the phone's file`() {
@@ -145,9 +145,9 @@ class PartialRestoreLayoutsTest {
         // (owner 2026-10-11: restore matches by language and asks: answered "merge into the phone's", all ticked)
         restoreKeyboardsFrom(ctx, zip, listOf(backupKeyboard), withSettings = true,
             decisions = mapOf(backupKeyboard to RestoreDecision.Merge(backupKeyboard)))
-        assertEquals("A", file(numrow).readText())
-        assertEquals("B", file(numrow2).readText())
-        assertEquals(listOf(backupKeyboard.withLayout(type, numrow2), phoneKeyboard), enabled())
+        assertEquals("B", file(numrow).readText())
+        assertEquals("A", file(numrow2).readText())
+        assertEquals(listOf(backupKeyboard, phoneKeyboard.withLayout(type, numrow2)), enabled())
     }
 
     @Test fun `a name the phone doesn't have comes in as it is`() {
@@ -159,7 +159,8 @@ class PartialRestoreLayoutsTest {
         assertTrue(backupKeyboard in enabled())
     }
 
-    @Test fun `an unsaved layout with other keys under its name gets a new unsaved one, reused on a second restore`() {
+    // (owner 2026-10-12: the backup's keeps its name; the phone's unsaved one gets a new unsaved name, its keyboard following)
+    @Test fun `an unsaved layout with other keys under its name keeps it, the phone's gets a new unsaved one`() {
         val private = "custom.~abc."
         file(private).writeText("A")
         phoneKeyboards(phoneKeyboard, SettingsSubtype(Locale.UK, "").withLayout(type, private).withId(3)) // (a phone keyboard's own)
@@ -173,11 +174,12 @@ class PartialRestoreLayoutsTest {
             z.putNextEntry(ZipEntry("unprotected/${type.folderName()}/$private")); z.write("B".toByteArray()); z.closeEntry()
         }
         restoreKeyboardsFrom(ctx, zip, listOf(kb), withSettings = true)
-        assertEquals("A", file(private).readText())
+        assertEquals("B", file(private).readText())
         val restored = enabled().single { it.locale == Locale.US }
-        val name = restored.layoutName(type)!!
+        assertEquals(private, restored.layoutName(type))
+        val name = enabled().single { it.locale == Locale.UK }.layoutName(type)!!
         assertTrue(LayoutUtilsCustom.isPrivateLayout(name) && name != private, name)
-        assertEquals("B", file(name).readText())
+        assertEquals("A", file(name).readText())
         restoreKeyboardsFrom(ctx, zip, listOf(kb), withSettings = true, // (again, merged into it: the same keyboard, no new file)
             decisions = mapOf(kb to RestoreDecision.Merge(restored)))
         assertEquals(listOf(restored), enabled().filter { it.locale == Locale.US })

@@ -34,8 +34,9 @@ import kotlin.test.assertFalse
 /**
  * Owner 2026-10-11, restoring some keyboards: "keep everything existing and also add whatever was in the backup", by
  * content ("Items inside items must be renamed together"), and the restored keyboard pointing at what its items became;
- * a second restore of the same backup adds nothing. A taken name: the backup's wins it if ticked, the phone's gets the
- * next number (owner 2026-10-11: backup wins the name if ticked; before, the backup's came in numbered).
+ * a second restore of the same backup adds nothing. A taken name: asked (owner 2026-10-12), Replace (the device's is the
+ * backup's) or Keep both (the backup's keeps the name, the device's gets the next number; owner 2026-10-11 had the
+ * backup's win it if ticked; before that, the backup's came in numbered).
  * (owner 2026-10-11: keyboards have unique ids) The backup is of this build: its keyboard has id k1, its set "pk1/"; a
  * restore again merges into the keyboard the first one brought (unasked, it would come in as a second keyboard).
  */
@@ -97,11 +98,14 @@ class PartialRestoreItemsTest {
         assertEquals(1, AppearanceLooks.load(real).size)
     }
 
-    // (owner 2026-10-11: backup wins the name if ticked; before, the backup's came in as "Mine 2")
-    @Test fun `a taken name with other content - ticked the backup's wins it, the phone's is numbered, the Layout inside and the keyboard name the backup's`() {
+    private fun keepBoth(kind: SavedItemsMerge.Kind, name: String) =
+        SavedItemsMerge.Choices(answers = mapOf((kind to name) to SavedItemsMerge.Answer.KeepBoth))
+
+    // (owner 2026-10-12: Keep both, the backup's keeps the name; before, the backup's came in as "Mine 2")
+    @Test fun `a taken name with other content - kept both the backup's keeps it, the phone's is numbered, the Layout inside and the keyboard name the backup's`() {
         KeyPopupOverrides.saveSets(real, listOf(KeyPopupOverrides.UserSet("Mine", "all", null, mapOf("a" to listOf("à")))))
         backup()
-        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true)
+        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true, names = keepBoth(SavedItemsMerge.Kind.POPUP_SETS, "Mine"))
         assertEquals(listOf("Mine 2", "Mine"), KeyPopupOverrides.loadSets(real).map { it.name })
         assertEquals(listOf("à"), KeyPopupOverrides.loadSets(real).first().overrides["a"]) // (the phone's, numbered)
         assertEquals(listOf("á"), KeyPopupOverrides.loadSets(real).last().overrides["a"])
@@ -149,7 +153,9 @@ class PartialRestoreItemsTest {
         assertEquals("Sunset 3", SavedItemsMerge.freeName("Sunset", setOf("Sunset", "Sunset 2")))
     }
 
-    @Test fun `a font whose name the phone uses for another file comes in numbered, and the keyboard names that one`() {
+    // (owner 2026-10-12: Keep both, the backup's keeps the name, the device's is numbered; before, the backup's was
+    // "Mine 2.ttf". Replace, the suggested answer: the device's file is the backup's)
+    @Test fun `a font whose name the phone uses for another file - kept both, the phone's is numbered; replaced, the backup's`() {
         val fonts = File(DeviceProtectedUtils.getFilesDir(ctx), "fonts").apply { mkdirs() }
         File(fonts, "Mine.ttf").writeText("the phone's")
         ZipOutputStream(zip.outputStream()).use { z ->
@@ -162,14 +168,23 @@ class PartialRestoreItemsTest {
             z.closeEntry()
             z.putNextEntry(ZipEntry("unprotected/fonts/Mine.ttf")); z.write("the backup's".toByteArray()); z.closeEntry()
         }
-        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true)
-        assertEquals("the phone's", File(fonts, "Mine.ttf").readText())
-        assertEquals("the backup's", File(fonts, "Mine 2.ttf").readText())
-        assertEquals("font:Mine 2.ttf", ownChoice(Settings.PREF_KEY_FONT))
-        assertEquals("font:Mine 2.ttf", AppearanceLooks.load(real).single().values[Settings.PREF_KEY_FONT])
+        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true, names = keepBoth(SavedItemsMerge.Kind.FONTS, "Mine.ttf"))
+        assertEquals("the backup's", File(fonts, "Mine.ttf").readText())
+        assertEquals("the phone's", File(fonts, "Mine 2.ttf").readText())
+        assertEquals("font:Mine.ttf", ownChoice(Settings.PREF_KEY_FONT))
+        assertEquals("font:Mine.ttf", AppearanceLooks.load(real).single().values[Settings.PREF_KEY_FONT])
         restoreAgain() // (again: nothing new)
         assertEquals(setOf("Mine.ttf", "Mine 2.ttf"), fonts.list()!!.toSet())
         assertEquals(1, AppearanceLooks.load(real).size)
+        // replaced: the device's Mine.ttf is the backup's, nothing numbered
+        fonts.deleteRecursively(); fonts.mkdirs()
+        File(fonts, "Mine.ttf").writeText("the phone's")
+        real.edit().clear().putBoolean("separate_settings_per_keyboard", true).commit(); KeyboardProfiles.loadGroups(real)
+        helium314.keyboard.latin.utils.SubtypeSettings.reloadEnabledSubtypes(ctx)
+        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true)
+        assertEquals("the backup's", File(fonts, "Mine.ttf").readText())
+        assertEquals(setOf("Mine.ttf"), fonts.list()!!.toSet())
+        assertEquals("font:Mine.ttf", ownChoice(Settings.PREF_KEY_FONT))
         fonts.deleteRecursively()
     }
 
@@ -191,11 +206,11 @@ class PartialRestoreItemsTest {
 
     // review C6 2026-10-11: two items both at the default but remembering different values apply differently with
     // "Saved items take new defaults" off, so they are not the same content
-    // (owner 2026-10-11: backup wins the name if ticked; before, the backup's came in as "Work 2")
-    @Test fun `a Layout remembering another value for an unpicked setting is another Layout - the backup's wins the name`() {
+    // (owner 2026-10-12: kept both, the backup's keeps the name; before, the backup's came in as "Work 2")
+    @Test fun `a Layout remembering another value for an unpicked setting is another Layout - kept both, the backup's keeps the name`() {
         phoneWorkRemembering(150)
         backupWorkRemembering(300)
-        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true)
+        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true, names = keepBoth(SavedItemsMerge.Kind.LAYOUTS, "Work"))
         val layouts = LayoutPresets.load(real)
         assertEquals(listOf("Work 2", "Work"), layouts.map { it.name })
         assertEquals(150, (layouts[0].remembered[Settings.PREF_KEY_LONGPRESS_TIMEOUT] as Number).toInt())
@@ -211,8 +226,8 @@ class PartialRestoreItemsTest {
         assertEquals("Work", ownChoice(LayoutPresets.PREF_SELECTED))
     }
 
-    // (owner 2026-10-11: backup wins the name if ticked; before, the backup's came in as "Sunset 2")
-    @Test fun `a theme remembering another value for an unpicked setting is another theme - the backup's wins the name`() {
+    // (owner 2026-10-12: kept both, the backup's keeps the name; before, the backup's came in as "Sunset 2")
+    @Test fun `a theme remembering another value for an unpicked setting is another theme - kept both, the backup's keeps the name`() {
         AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Sunset", mapOf(Settings.PREF_KEY_HORIZONTAL_GAP to null),
             mapOf(Settings.PREF_KEY_HORIZONTAL_GAP to 1f))), now = true)
         ZipOutputStream(zip.outputStream()).use { z ->
@@ -225,7 +240,7 @@ class PartialRestoreItemsTest {
                 helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
             z.closeEntry()
         }
-        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true)
+        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true, names = keepBoth(SavedItemsMerge.Kind.THEMES, "Sunset"))
         assertEquals(listOf("Sunset 2", "Sunset"), AppearanceLooks.load(real).map { it.name })
         assertEquals(1f, AppearanceLooks.load(real).first().remembered[Settings.PREF_KEY_HORIZONTAL_GAP]) // (the phone's, numbered)
         assertEquals("Sunset", ownChoice(AppearanceLooks.PREF_SELECTED))

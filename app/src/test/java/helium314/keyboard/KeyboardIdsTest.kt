@@ -258,7 +258,9 @@ class KeyboardIdsTest {
         val newId = assertNotNull(phoneNow.keyboardId)
         assertNotEquals("k1", newId)
         assertEquals("k1", phoneNow.keyboardFrom)
-        assertEquals(en.withoutIds(), phoneNow.withoutIds())
+        // (owner 2026-10-12: kept both, the backup's keeps the name, the phone's becomes "… 2")
+        assertEquals(en.withoutIds(), phoneNow.without(ExtraValue.KEYBOARD_NAME).withoutIds())
+        assertEquals(keyboardName(en, ctx) + " 2", keyboardName(phoneNow, ctx))
         assertEquals(fromBackup, restored) // (the backup's id: "backup's ID should take priority")
         // the phone keyboard's set, pool and selection went with it to its new id; the restored one has its own
         assertEquals("phone", real.getString(KeyboardProfiles.ownKey(newId, font), null))
@@ -273,7 +275,8 @@ class KeyboardIdsTest {
         assertEquals(emptyList(), SwitchedOffKeyboards.list(real))
     }
 
-    @Test fun `the first question marks the phone keyboard with the backup keyboard's id, nothing picked`() {
+    // (owner 2026-10-12: picked to start with, "Suggested: same keyboard as in the backup"; was a hint only, nothing picked)
+    @Test fun `the first question marks the phone keyboard with the backup keyboard's id and picks it`() {
         val twin = plain.withId(3)
         phone(twin, en)
         val fromBackup = plain.with(ExtraValue.MORE_POPUPS, "all").withId(1)
@@ -283,8 +286,8 @@ class KeyboardIdsTest {
         assertEquals(listOf(twin, en), question.options)
         assertTrue(question.isSameKeyboard(en))
         assertFalse(question.isSameKeyboard(twin))
-        assertNull(question.picked) // (a hint only, owner 2026-10-11)
-        assertEquals("(same keyboard as in the backup)", ctx.getString(R.string.restore_same_keyboard_hint))
+        assertEquals(MergeQuestion.Pick(en), question.picked)
+        assertEquals("Suggested: same keyboard as in the backup", ctx.getString(R.string.restore_same_keyboard_suggested))
     }
 
     @Test fun `what differs never lists the id or where it came from`() {

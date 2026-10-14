@@ -117,6 +117,7 @@ class ReReview2R3Test {
         assertEquals(setOf(a), folder.list()!!.toSet()) // (the backup's keys weren't brought for nothing)
     }
 
+    // (owner 2026-10-12: the backup's keeps its name; the phone's keys get a new unsaved name first, unused then: gone)
     @Test fun `(a) ticked the keyboard gets the backup's keys, and the phone's unused unsaved file goes, a switched-off one's stays`() {
         val a = unsaved("A"); val c = unsaved("C")
         val phone = hindi.withLayout(type, a).withId(1)
@@ -128,11 +129,10 @@ class ReReview2R3Test {
         val decision = plan.mergeDecision(phone, differences, differences, learnedRow = false, learnedTicked = false, name = null)
         restoreKeyboardsFrom(ctx, zip, listOf(phone), withSettings = true, decisions = mapOf(phone to decision))
         val now = enabled().single().layoutName(type)!!
-        assertTrue(LayoutUtilsCustom.isPrivateLayout(now) && now != a, now)
-        assertEquals("B", file(now).readText())
-        assertFalse(file(a).exists(), "the phone's old unsaved file is left over")
+        assertEquals(a, now, "the backup's keeps its name")
+        assertEquals("B", file(a).readText())
         assertEquals("C", file(c).readText())
-        assertEquals(setOf(now, c), folder.list()!!.toSet())
+        assertEquals(setOf(a, c), folder.list()!!.toSet(), "the phone's old keys, renamed and unused, are left over")
     }
 
     @Test fun `(b) the same keys under another unsaved name - no row`() {

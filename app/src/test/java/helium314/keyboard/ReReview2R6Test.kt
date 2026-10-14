@@ -26,9 +26,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * (review 2026-10-11 R6) The restore question's dry run names the backup's key layouts as the restore does: a name it
- * numbered earlier in the same run counts as taken (before: the dry run saw only the files on the phone, so the backup's
- * "My numrow 2" kept its name though the backup's "My numrow" had just come in under it).
+ * (review 2026-10-11 R6) The restore question names the backup's key layouts as the restore does. Owner 2026-10-12 (one
+ * plan): the backup's keep their names, and the phone's "My numrow" with other keys gets a name neither the phone nor the
+ * backup has, "My numrow 3" (the backup has a "My numrow 2"), planned once and done by the run.
  */
 @RunWith(RobolectricTestRunner::class)
 class ReReview2R6Test {
@@ -88,9 +88,12 @@ class ReReview2R6Test {
         val restored = SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }
         val wet = mapOf(first to restored.single { it.locale == Locale.US }.layoutName(type),
             second to restored.single { it.locale == Locale.UK }.layoutName(type))
-        assertEquals(numrow2, wet[first]) // (My numrow -> My numrow 2)
-        assertEquals("C", file(wet[second]!!).readText()) // (My numrow 2 -> a free numbered name, keys C)
-        assertEquals("A", file(numrow).readText()); assertEquals("B", file(numrow2).readText())
+        assertEquals(numrow, wet[first])
+        assertEquals(numrow2, wet[second])
+        assertEquals("B", file(numrow).readText()); assertEquals("C", file(numrow2).readText())
+        val numrow3 = LayoutUtilsCustom.getLayoutName("My numrow 3", type)
+        assertEquals("A", file(numrow3).readText()) // (the phone's keys, renamed first)
+        assertEquals(numrow3, restored.single { it.locale == Locale.GERMANY }.layoutName(type))
         assertEquals(wet, dry)
     }
 }

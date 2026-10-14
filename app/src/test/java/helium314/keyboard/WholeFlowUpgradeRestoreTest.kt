@@ -318,11 +318,12 @@ class WholeFlowUpgradeRestoreTest {
         SubtypeSettings.reloadEnabledSubtypes(ctx) // (the list as stored, not an earlier test's)
     }
 
-    // (owner 2026-10-11: backup wins the name if ticked; before, the backup's Work came in as "Work 2")
+    // (owner 2026-10-12: Work kept both, the backup's keeps the name, the phone's is Work 2 and French follows it, keeping
+    // its look; owner 2026-10-11 had French on the name, the backup's; before, the backup's Work came in as "Work 2")
     // (owner 2026-10-11: keyboards have unique ids) the old backup's keyboards get ids when it is read (counted here: US
     // k1000, French k1001); unasked, US comes in as a keyboard of its own with its id; the second restore merges it into
     // the phone's US (unasked, it would come in as a second US keyboard)
-    @Test fun `US restored on its own from a 3afbeeebc backup - its Work wins the name, the phone's is Work 2, again adds nothing, French untouched`() {
+    @Test fun `US restored on its own from a 3afbeeebc backup - Work kept both, the phone's is Work 2, again adds nothing, French keeps its look`() {
         backupOf(phoneOn3afbeeebc())
         newPhoneWithOtherWork()
         val phoneWork = LayoutPresets.load(real).single()
@@ -330,8 +331,12 @@ class WholeFlowUpgradeRestoreTest {
         val backupUs = us.withId(1000)
 
         countingIds()
-        restoreKeyboardsFrom(ctx, zip, listOf(backupUs), withSettings = true)
+        restoreKeyboardsFrom(ctx, zip, listOf(backupUs), withSettings = true, names = helium314.keyboard.settings.preferences.SavedItemsMerge.Choices(
+            answers = mapOf((helium314.keyboard.settings.preferences.SavedItemsMerge.Kind.LAYOUTS to "Work") to
+                helium314.keyboard.settings.preferences.SavedItemsMerge.Answer.KeepBoth)))
         restoreFollowUp(ctx)
+        // (French follows its Work, now "Work 2": its own values as they were)
+        val frenchNow = french + (idKey(1, LayoutPresets.PREF_SELECTED) to "Work 2")
 
         val layouts = LayoutPresets.load(real)
         assertEquals(listOf("Work 2", "Work"), layouts.map { it.name })
@@ -350,9 +355,8 @@ class WholeFlowUpgradeRestoreTest {
         assertEquals("Sunset", real.getString(own(usId, AppearanceLooks.PREF_SELECTED), null))
         assertEquals(true, real.all[own(usId, numberRow)])
         assertEquals(3f, real.all[own(usId, gap)])
-        // (French still names "Work", the backup's now; its own values as they were)
         assertEquals(fr.withId(1), listedById(real, kid(1)), "the phone's French keyboard changed")
-        assertEquals(french, real.all.filterKeys { it.startsWith(idKey(1, "")) }, "the phone's French keyboard changed")
+        assertEquals(frenchNow, real.all.filterKeys { it.startsWith(idKey(1, "")) }, "the phone's French keyboard changed")
         val saved = listOf(LayoutPresets.PREF, AppearanceLooks.PREF, KeyPopupOverrides.PREF_SETS).associateWith { real.all[it] }
 
         countingIds()
@@ -367,6 +371,6 @@ class WholeFlowUpgradeRestoreTest {
         assertEquals(2, storedEnabled(real).size, "the second restore added a keyboard")
         assertEquals(us, listedById(real, usId)?.withoutIds(), "the merge didn't keep the phone US's id")
         assertEquals("Work", real.getString(own(usId, LayoutPresets.PREF_SELECTED), null))
-        assertEquals(french, real.all.filterKeys { it.startsWith(idKey(1, "")) }, "the phone's French keyboard changed")
+        assertEquals(frenchNow, real.all.filterKeys { it.startsWith(idKey(1, "")) }, "the phone's French keyboard changed")
     }
 }

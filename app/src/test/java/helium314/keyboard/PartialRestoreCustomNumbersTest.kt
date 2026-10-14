@@ -29,9 +29,10 @@ import kotlin.test.assertEquals
 
 /**
  * Restoring some keyboards: the backup's palettes come into the phone's one list (owner 2026-10-11: palettes are one
- * app-wide list; backup wins the name if ticked): the same colors under another name, ticked, rename the phone's; a name
- * the phone uses for other colors, ticked, is the backup's and the phone's gets the next number (before: the backup's
- * was numbered). An older backup's copies in a set or a saved theme come in the same way, its kept
+ * app-wide list; owner 2026-10-12: asked, Replace or Keep both): the same colors under another name, replaced, rename the
+ * phone's; a name the phone uses for other colors, replaced, takes the backup's colors, kept both, is the backup's and the
+ * phone's gets the next number, its users following (owner 2026-10-11 had the backup win the name with the phone's users
+ * on it; before that, the backup's was numbered). An older backup's copies in a set or a saved theme come in the same way, its kept
  * copies "~custom:N" as "Palette N" (before: renumbered "~custom:M"). Its "Custom" labels come in as they are (owner
  * 2026-10-11: labels are just "Custom", no number).
  * (owner 2026-10-11: keyboards have unique ids) The phone's German is k1, the backup's US k2, their sets "pk1/" and "pk2/".
@@ -129,16 +130,25 @@ class PartialRestoreCustomNumbersTest {
         assertEquals(null, palette("Warm"))
     }
 
-    // (owner 2026-10-11: backup wins the name if ticked; before, the backup's came in as "Warm 2")
-    @Test fun `a restored palette whose name the phone uses for other colors - ticked it takes the name, the phone's is numbered`() {
+    // (owner 2026-10-12: replaced, the suggested answer, the phone's Warm has the backup's colors; kept both, the backup's
+    // takes the name and the phone's is numbered, its keyboard following; before, the backup's came in as "Warm 2")
+    @Test fun `a restored palette whose name the phone uses for other colors - replaced or kept both`() {
         phone(own = mapOf(Settings.PREF_THEME_COLORS to "Warm"), shared = mapOf(Settings.PREF_USER_COLORS_PREFIX + "Warm" to "x"))
         backup(own = mapOf(Settings.PREF_THEME_COLORS to "Warm"), extra = mapOf(Settings.PREF_USER_COLORS_PREFIX + "Warm" to "y"))
         restoreKeyboardsFrom(ctx, zip, listOf(restored), withSettings = true)
         assertEquals("Warm", restoredOwn(Settings.PREF_THEME_COLORS))
         assertEquals("y", palette("Warm"))
+        assertEquals(null, palette("Warm 2"))
+        assertEquals("Warm", real.all[idKey(1, Settings.PREF_THEME_COLORS)]) // (the phone's keyboard shows the backup's colors)
+        // kept both
+        real.edit().clear().commit()
+        phone(own = mapOf(Settings.PREF_THEME_COLORS to "Warm"), shared = mapOf(Settings.PREF_USER_COLORS_PREFIX + "Warm" to "x"))
+        restoreKeyboardsFrom(ctx, zip, listOf(restored), withSettings = true, names = SavedItemsMerge.Choices(
+            answers = mapOf((SavedItemsMerge.Kind.PALETTES to "Warm") to SavedItemsMerge.Answer.KeepBoth)))
+        assertEquals("Warm", restoredOwn(Settings.PREF_THEME_COLORS))
+        assertEquals("y", palette("Warm"))
         assertEquals("x", palette("Warm 2"))
-        // (the phone's keyboard on Warm now shows the backup's colors, "Warm 2" is unused)
-        assertEquals("Warm", real.all[idKey(1, Settings.PREF_THEME_COLORS)])
+        assertEquals("Warm 2", real.all[idKey(1, Settings.PREF_THEME_COLORS)]) // (the phone's keyboard keeps its colors)
     }
 
     @Test fun `a restored palette whose name the phone uses for other colors - unticked it doesn't come in`() {

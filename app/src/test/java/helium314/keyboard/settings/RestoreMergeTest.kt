@@ -48,7 +48,9 @@ import kotlin.test.assertTrue
 /**
  * A restore of some keyboards matches by language and asks (owner 2026-10-11: "only check if language is same"): merge
  * the backup's keyboard into one phone keyboard of its language (switched-off ones too), then what to merge, or keep it
- * separate; either way with a name. The real restore does exactly what was answered (review R1).
+ * separate (Keep both); either way with a name. The real restore does exactly what was answered (review R1). Kept both,
+ * the backup's keeps its name and the phone's of that name becomes "… 2" (owner 2026-10-12; flips 2026-10-11's
+ * "English (US) 2" for the backup's).
  * (owner 2026-10-11: keyboards have unique ids) QWERTY is "k1", Dvorak "k2", Colemak "k3", in the phone and in the
  * backup alike (a backup of this phone); a merge keeps the phone keyboard's id, one added keeps the backup's.
  */
@@ -118,7 +120,8 @@ class RestoreMergeTest {
             Settings.PREF_ADDITIONAL_SUBTYPES, Settings.PREF_SELECTED_SUBTYPE))
     }
 
-    @Test fun `(a) R1 - only Dvorak kept separate - the phone's QWERTY is untouched, Dvorak comes in as English (US) 2`() {
+    // (owner 2026-10-12: Keep both, the backup's keeps its name; was: Dvorak came in as English (US) 2)
+    @Test fun `(a) R1 - only Dvorak kept both - the phone's QWERTY keeps its set as English (US) 2, Dvorak comes in as English (US)`() {
         phoneAndBackup(listOf(qwerty), listOf(qwerty, dvorak))
         val id = kid(1)
         val qwertySet = real.all.filterKeys { KeyboardProfiles.splitOwnKey(it)?.first == id }
@@ -126,19 +129,20 @@ class RestoreMergeTest {
         assertTrue(plan.asks(dvorak))
         assertEquals(listOf(qwerty), plan.candidates(dvorak, emptyMap()))
         val question = MergeQuestion(plan, dvorak, listOf(dvorak), emptyMap())
-        assertEquals("$english 2", question.separateName)
-        question.picked = MergeQuestion.Pick(null)
+        assertEquals(english, question.separateName)
+        assertEquals(MergeQuestion.Pick(null), question.picked) // (no phone keyboard with its id: Keep both to start with)
         assertTrue(question.canGoOn)
         restoreKeyboardsFrom(ctx, zip, listOf(dvorak), withSettings = true, decisions = mapOf(dvorak to question.separate))
-        val added = withKeyboardName(dvorak, "$english 2").toPref().toSettingsSubtype()
-        assertEquals(listOf(qwerty, added), enabled())
-        assertEquals("$english 2", customKeyboardName(added))
-        assertEquals(qwerty, listedById(real, id))
-        assertEquals(kid(2), added.keyboardId, "the backup's id")
+        val renamed = withKeyboardName(qwerty, "$english 2").toPref().toSettingsSubtype()
+        assertEquals(listOf(renamed, dvorak), enabled())
+        assertEquals("$english 2", customKeyboardName(renamed))
+        assertEquals(english, name(dvorak))
+        assertEquals(renamed, listedById(real, id))
+        assertEquals(kid(2), dvorak.keyboardId, "the backup's id")
         assertEquals(qwertySet, real.all.filterKeys { KeyboardProfiles.splitOwnKey(it)?.first == id }, "QWERTY's set changed")
-        assertEquals(false, reads(qwerty)[Settings.PREF_SHOW_NUMBER_ROW])
-        assertEquals(true, reads(added)[Settings.PREF_SHOW_NUMBER_ROW])
-        assertEquals(3f, reads(added)[Settings.PREF_KEY_HORIZONTAL_GAP])
+        assertEquals(false, reads(renamed)[Settings.PREF_SHOW_NUMBER_ROW])
+        assertEquals(true, reads(dvorak)[Settings.PREF_SHOW_NUMBER_ROW])
+        assertEquals(3f, reads(dvorak)[Settings.PREF_KEY_HORIZONTAL_GAP])
     }
 
     @Test fun `(a) R1 - a keyboard chosen without an answer replaces nothing`() {
@@ -198,13 +202,14 @@ class RestoreMergeTest {
         assertEquals(listOf(qwerty), enabled())
     }
 
-    @Test fun `(d) two English keyboards on the phone are both offered, nothing picked`() {
+    // (owner 2026-10-12: something is always picked; none has its id: Keep both)
+    @Test fun `(d) two English keyboards on the phone are both offered, Keep both picked`() {
         phoneAndBackup(listOf(qwerty, colemak), listOf(dvorak))
         val plan = restorePlanFrom(ctx, zip)
         val question = MergeQuestion(plan, dvorak, listOf(dvorak), emptyMap())
         assertEquals(listOf(qwerty, colemak), question.options)
-        assertNull(question.picked)
-        assertFalse(question.canGoOn)
+        assertEquals(MergeQuestion.Pick(null), question.picked)
+        assertTrue(question.canGoOn)
         question.picked = MergeQuestion.Pick(colemak)
         assertTrue(question.canGoOn)
     }
@@ -227,16 +232,16 @@ class RestoreMergeTest {
         assertEquals(7f, real.getFloat(idKey(1, Settings.PREF_KEY_HORIZONTAL_GAP), 0f))
     }
 
-    @Test fun `(f) a taken name is prefilled numbered, and a typed duplicate name is taken when the keyboards still differ`() {
+    // (owner 2026-10-12: kept both, the backup's keeps its name, the phone's of that name gets the next free one; was:
+    // the backup's prefilled numbered)
+    @Test fun `(f) kept both, the backup's keeps its name and the phone's of that name gets the next free number`() {
         val second = withKeyboardName(colemak, "$english 2").toPref().toSettingsSubtype()
         phoneAndBackup(listOf(qwerty, second), listOf(dvorak))
         assertEquals("$english 2", name(second))
         val plan = restorePlanFrom(ctx, zip)
-        assertEquals("$english 3", plan.prefillName(dvorak, RestoreDecision.Separate(), listOf(dvorak), emptyMap()))
-        // the same name as the phone's QWERTY: other keys, another keyboard
-        val duplicate = RestoreDecision.Separate(english)
-        restoreKeyboardsFrom(ctx, zip, listOf(dvorak), withSettings = false, decisions = mapOf(dvorak to duplicate))
-        assertEquals(listOf(qwerty, second, dvorak), enabled())
+        assertEquals(english, plan.prefillName(dvorak, RestoreDecision.Separate(), listOf(dvorak), emptyMap()))
+        restoreKeyboardsFrom(ctx, zip, listOf(dvorak), withSettings = false, decisions = mapOf(dvorak to RestoreDecision.Separate(english)))
+        assertEquals(listOf(withKeyboardName(qwerty, "$english 3").toPref().toSettingsSubtype(), second, dvorak), enabled())
         assertEquals(english, name(dvorak))
         // a merge keeps the phone keyboard's own name
         assertEquals(english, plan.prefillName(dvorak, RestoreDecision.Merge(qwerty, parts = setOf(RestoreMatch.Part.Layout(main)), menus = emptySet()), listOf(dvorak), emptyMap()))
@@ -254,8 +259,8 @@ class RestoreMergeTest {
             menus = emptySet()), listOf(dvorak), emptyMap()))
         val work = withKeyboardName(qwerty, "Work").toPref().toSettingsSubtype()
         assertEquals("Work", plan.prefillName(dvorak, RestoreDecision.Merge(work), listOf(dvorak), emptyMap()))
-        // kept separate: still the next free name
-        assertEquals("$english 2", plan.prefillName(dvorak, RestoreDecision.Separate(), listOf(dvorak), emptyMap()))
+        // kept both: the backup's own name (owner 2026-10-12)
+        assertEquals(english, plan.prefillName(dvorak, RestoreDecision.Separate(), listOf(dvorak), emptyMap()))
         // and what "What to merge" starts with
         val question = MergeQuestion(plan, dvorak, listOf(dvorak), emptyMap())
         val differences = RestoreMatch.definitionDifferences(qwerty, plan.incoming.getValue(dvorak))
@@ -304,8 +309,8 @@ class RestoreMergeTest {
         assertEquals(emptyList(), plan.candidates(dvorak, first))
         assertEquals(emptyList(), MergeQuestion(plan, dvorak, listOf(qwerty, dvorak), first).options)
         assertEquals(listOf(qwerty), plan.candidates(qwerty, first), "its own pick stays offered")
-        // kept apart: its name is compared with what the other one becomes
-        assertEquals("$english 2", plan.prefillName(dvorak, RestoreDecision.Separate(), listOf(qwerty, dvorak), first))
+        // kept both: its own name (owner 2026-10-12)
+        assertEquals(english, plan.prefillName(dvorak, RestoreDecision.Separate(), listOf(qwerty, dvorak), first))
     }
 
     @Test fun `a name is a Rename's - its languages' name is no name of its own, another text is`() {
@@ -320,14 +325,18 @@ class RestoreMergeTest {
         assertNotNull(named(qwerty, "$english 2").getExtraValueOf(ExtraValue.KEYBOARD_NAME))
     }
 
-    // owner 2026-10-11: "Yes, count up pls."
+    // owner 2026-10-11: "Yes, count up pls." (owner 2026-10-12: kept both, the backup's keeps its name; the phone's of
+    // that name is the one numbered)
     @Test fun `a taken copy's name counts its number up - English (US) (2) gives English (US) (3)`() {
         val copy2 = qwerty.withoutIds().with(ExtraValue.KEYBOARD_COPY, "2").withId(6)
         val backupCopy = dvorak.with(ExtraValue.KEYBOARD_COPY, "2").toPref().toSettingsSubtype()
         phoneAndBackup(listOf(qwerty, copy2), listOf(backupCopy))
         assertEquals("$english (2)", name(copy2))
         val plan = restorePlanFrom(ctx, zip)
-        assertEquals("$english (3)", plan.prefillName(backupCopy, RestoreDecision.Separate(), listOf(backupCopy), emptyMap()))
+        assertEquals("$english (2)", plan.prefillName(backupCopy, RestoreDecision.Separate(), listOf(backupCopy), emptyMap()))
+        restoreKeyboardsFrom(ctx, zip, listOf(backupCopy), withSettings = false, decisions = mapOf(backupCopy to RestoreDecision.Separate()))
+        assertEquals("$english (3)", name(listedById(real, kid(6))!!))
+        assertEquals("$english (2)", name(listedById(real, kid(2))!!))
     }
 
     @Test fun `a taken custom name counts its number up - Work 2 gives Work 3, Sunset gives Sunset 2`() {
@@ -337,8 +346,14 @@ class RestoreMergeTest {
         val backupSunset = withKeyboardName(dvorak.withoutIds().withLayout(LayoutType.NUMBER_ROW, "x").withId(7), "Sunset").toPref().toSettingsSubtype()
         phoneAndBackup(listOf(work2, sunset), listOf(backupWork2, backupSunset))
         val plan = restorePlanFrom(ctx, zip)
-        assertEquals("Work 3", plan.prefillName(backupWork2, RestoreDecision.Separate(), listOf(backupWork2), emptyMap()))
-        assertEquals("Sunset 2", plan.prefillName(backupSunset, RestoreDecision.Separate(), listOf(backupSunset), emptyMap()))
+        assertEquals("Work 2", plan.prefillName(backupWork2, RestoreDecision.Separate(), listOf(backupWork2), emptyMap()))
+        assertEquals("Sunset", plan.prefillName(backupSunset, RestoreDecision.Separate(), listOf(backupSunset), emptyMap()))
+        restoreKeyboardsFrom(ctx, zip, listOf(backupWork2, backupSunset), withSettings = false,
+            decisions = mapOf(backupWork2 to RestoreDecision.Separate(), backupSunset to RestoreDecision.Separate()))
+        assertEquals("Work 3", name(listedById(real, kid(3))!!))
+        assertEquals("Sunset 2", name(listedById(real, kid(1))!!))
+        assertEquals("Work 2", name(listedById(real, kid(2))!!))
+        assertEquals("Sunset", name(listedById(real, kid(7))!!))
     }
 
     // owner 2026-10-11: "Yes learned and blacklisted words should both come, ticked on by default. Not off."
