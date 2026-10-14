@@ -272,7 +272,7 @@ fun KeyboardsScreen(
                 onConfirmed = {
                     if (keyboard.isAdditionalSubtype(ctx.prefs())) SubtypeUtilsAdditional.removeAdditionalSubtype(ctx, keyboard.toAdditionalSubtype())
                     SubtypeSettings.removeEnabledSubtype(ctx, keyboard.toAdditionalSubtype())
-                    KeyboardProfiles.onKeyboardDeleted(real, keyboard)
+                    helium314.keyboard.latin.personalization.LearnedKeyboards.deleteKeyboard(ctx, keyboard) // (its words too)
                     keyboardToDelete = null
                     generation++
                 },

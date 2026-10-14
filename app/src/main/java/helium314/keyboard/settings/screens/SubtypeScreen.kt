@@ -310,7 +310,7 @@ fun SubtypeScreen(
             LayoutDraft.close() // deleting keeps the changes so far: a Discard mustn't bring the keyboard back
             if (currentSubtype.isAdditionalSubtype(prefs)) SubtypeUtilsAdditional.removeAdditionalSubtype(ctx, currentSubtype.toAdditionalSubtype())
             SubtypeSettings.removeEnabledSubtype(ctx, currentSubtype.toAdditionalSubtype())
-            KeyboardProfiles.onKeyboardDeleted(ctx.realPrefs(), currentSubtype)
+            helium314.keyboard.latin.personalization.LearnedKeyboards.deleteKeyboard(ctx, currentSubtype) // (its words too)
             onClickBack()
         } },
         // the screen's name (the keyboard's name goes under it when settings are separate per keyboard)

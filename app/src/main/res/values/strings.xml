@@ -573,7 +573,7 @@
     <string name="copy_keyboard_with_settings">Ok: All its settings</string>
     <string name="copy_keyboard_common_settings">The common settings</string>
     <string name="delete_keyboard_title">Delete this keyboard?</string>
-    <string name="delete_keyboard_message">\"%s\" will be removed, with its languages, their priorities and its layout choice. This cannot be undone. Learned words and dictionaries are kept.</string>
+    <string name="delete_keyboard_message">\"%s\" will be removed, with its languages, their priorities and its layout choice. This cannot be undone. Its learned and blacklisted words are deleted too. Dictionaries are kept.</string>
     <!-- Asked once when a keyboard is added (2026-10-10). %s: the new keyboard's name -->
     <string name="import_words_title">Start %s with words from your other keyboards?</string>
     <string name="import_words_button">Import</string>

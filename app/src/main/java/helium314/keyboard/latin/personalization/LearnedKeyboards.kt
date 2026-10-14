@@ -164,6 +164,34 @@ object LearnedKeyboards {
         if (changed) editor.apply()
     }
 
+    /**
+     * The settings' Delete of [keyboard] (2026-10-10: its words go with it): what KeyboardProfiles.onKeyboardDeleted does,
+     * then its learned words and blacklists deleted in the background, under [files]. The pool is read before the entry
+     * goes; pool 0 (the shared words of before) is never touched.
+     */
+    fun deleteKeyboard(context: Context, keyboard: SettingsSubtype) {
+        val real = DeviceProtectedUtils.getRealSharedPreferences(context)
+        val pool = if (!isDone(real)) null else synchronized(this) {
+            pools(real).let { map -> keyboard.toPref().takeIf { map.has(it) }?.let { map.getInt(it) } }
+        }
+        KeyboardProfiles.onKeyboardDeleted(real, keyboard)
+        if (pool == null || pool == LearnedStores.SHARED) return
+        val app = context.applicationContext ?: context
+        ExecutorUtils.getBackgroundExecutor(ExecutorUtils.KEYBOARD).execute {
+            try { deleteWordsOf(app, pool) } catch (e: Exception) { Log.e(TAG, "could not delete a deleted keyboard's words", e) }
+        }
+    }
+
+    /** [pool]'s stores and lists deleted, unless a keyboard has it (again). Background only. */
+    internal fun deleteWordsOf(context: Context, pool: Int) = withFiles {
+        if (pool == LearnedStores.SHARED || !UserManagerCompat.isUserUnlocked(context)) return@withFiles
+        val real = DeviceProtectedUtils.getRealSharedPreferences(context)
+        val inUse = synchronized(this) { pools(real).let { map -> map.keys().asSequence().any { map.optInt(it) == pool } } }
+        if (inUse) return@withFiles
+        deletePool(context.filesDir ?: return@withFiles, storeIo, pool)
+        Log.i(TAG, "a deleted keyboard's learned words and blacklists deleted (pool $pool)")
+    }
+
     // ---------------- the one-time update ----------------
 
     private class Plan(val pools: LinkedHashMap<String, Int>, var next: Int) {
