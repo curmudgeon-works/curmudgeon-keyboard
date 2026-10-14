@@ -40,6 +40,7 @@ object KeyboardProfiles {
         Settings.PREF_CLIPBOARD_HISTORY_SIZE, Settings.PREF_CLIPBOARD_HISTORY_PINNED_FIRST,
         Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_SWIPE_METRICS, Settings.PREF_AUTO_PREVIEW_KEYBOARD, // logs of the user's swiping: one file, one switch
         Settings.PREF_LEARNING_LOG, // and of what corrections do to the learned words
+        Settings.PREF_LOG_SETTINGS, // and of the settings changes, the keyboards' history
         PREF_SEPARATE, OLD_IDS, OLD_NEXT_ID, PREF_START_FROM, PREF_SHARED_FROM, // (all but the first: old bookkeeping)
         "key_popup_sets", // saved popup sets are meant to be reused across keyboards
         "appearance_looks", // saved looks too

@@ -301,6 +301,7 @@ fun SubtypeScreen(
     if (askDelete) DeleteKeyboardDialog(currentSubtype, onDismissRequest = { askDelete = false }) { mergeInto ->
         askDelete = false
         LayoutDraft.close() // deleting keeps the changes so far: a Discard mustn't bring the keyboard back
+        logDeleted(ctx, currentSubtype, mergeInto) // (owner 2026-10-12 K1)
         if (currentSubtype.isAdditionalSubtype(prefs)) SubtypeUtilsAdditional.removeAdditionalSubtype(ctx, currentSubtype.toAdditionalSubtype())
         SubtypeSettings.removeEnabledSubtype(ctx, currentSubtype.toAdditionalSubtype())
         helium314.keyboard.latin.personalization.LearnedKeyboards.deleteKeyboard(ctx, currentSubtype, mergeInto) // (its words too)

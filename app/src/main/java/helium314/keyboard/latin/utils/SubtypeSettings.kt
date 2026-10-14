@@ -68,7 +68,7 @@ object SubtypeSettings {
     fun addEnabledSubtype(prefs: SharedPreferences, newSubtype: InputMethodSubtype): SettingsSubtype {
         val real = (prefs as? ProfilePreferences)?.underlying ?: prefs
         val subtype = newSubtype.toSettingsSubtype().let { if (it.keyboardId == null) KeyboardIds.fresh(real, it) else it }
-        helium314.keyboard.latin.utils.SettingsEventLog.log("keyboard added: ${subtype.toPref()}")
+        // (the event log's line is the action's: created, copied, restored, switched on; owner 2026-10-12 K1)
         // (the list is stored from the first start on, see [loadEnabledSubtypes]; found empty all the same: the default
         // keyboard is stored first, as at a first start, so the settings made on it stay with a listed keyboard)
         val stored = createSettingsSubtypes(real.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!)
@@ -110,7 +110,8 @@ object SubtypeSettings {
 
     /** @return whether subtype was actually removed */
     fun removeEnabledSubtype(context: Context, subtype: InputMethodSubtype): Boolean {
-        helium314.keyboard.latin.utils.SettingsEventLog.log("keyboard removed: ${subtype.toSettingsSubtype().toPref()}")
+        // (the event log's line is the action's: switched off, deleted; before, "keyboard removed", twice for a delete;
+        // owner 2026-10-12 K1)
         val prefs = context.prefs()
         if (!removeEnabledSubtype(prefs, subtype.toSettingsSubtype())) {
             if (SubtypeUtilsAdditional.isAdditionalSubtype(subtype) || subtype.toSettingsSubtype().keyboardId != null)

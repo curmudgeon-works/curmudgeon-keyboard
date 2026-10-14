@@ -508,6 +508,9 @@
     <string name="auto_preview_keyboard_summary">Settings you change show their effect on a keyboard right away. Off: it appears only when you tap \"Try it here\"</string>
     <string name="swipe_metrics">Log swipe results</string>
     <string name="swipe_metrics_summary">Keep a local log of how each swipe ends: first choice right, picked from the strip, or never offered (deleted, retyped or edited), with the decode time. Nothing leaves the phone.</string>
+    <!-- the settings event log's switch (keyboards created, switched off, deleted… and other settings changes) -->
+    <string name="log_settings_changes">Log settings changes</string>
+    <string name="log_settings_changes_summary">Keep a local log of changes to the settings and the keyboards (settings_events.log in this app\'s external files folder). Nothing typed is in it, and nothing leaves the device.</string>
     <string name="swipe_metrics_week">Last 7 days</string>
     <string name="swipe_metrics_all">All time</string>
     <string name="swipe_metrics_none">No swipes logged yet</string>

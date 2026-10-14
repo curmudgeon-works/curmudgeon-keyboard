@@ -19,16 +19,16 @@ class SettingsEventLogTest {
 
     private fun settle() { Thread.sleep(300) } // the log writes on its own thread
 
-    @Test fun `watched preferences are logged whoever writes them, only while diagnostics are on`() {
+    @Test fun `watched preferences are logged whoever writes them, only while Log settings changes is on`() {
         file.delete()
         val prefs = ctx.realPrefs()
-        prefs.edit().putBoolean(Settings.PREF_SWIPE_METRICS, false).commit()
+        prefs.edit().putBoolean(Settings.PREF_LOG_SETTINGS, false).commit()
         SettingsEventLog.init(ctx)
         prefs.edit().putString(Settings.PREF_ENABLED_SUBTYPES, "while-off").commit()
         settle()
         assertFalse(file.exists() && file.readText().contains("while-off"))
 
-        prefs.edit().putBoolean(Settings.PREF_SWIPE_METRICS, true).commit()
+        prefs.edit().putBoolean(Settings.PREF_LOG_SETTINGS, true).commit()
         prefs.edit().putString(Settings.PREF_ENABLED_SUBTYPES, "en-US").commit()
         prefs.edit().putBoolean("separate_settings_per_keyboard", true).commit()
         SettingsEventLog.log("direct event")

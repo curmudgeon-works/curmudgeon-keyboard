@@ -388,6 +388,11 @@ fun createAdvancedSettings(context: Context) = listOf(
             }
         }
     },
+    // the settings event log (SettingsEventLog), the keyboards' history too: its own switch, on (owner 2026-10-12 K1;
+    // before, "Log swipe results" switched it)
+    Setting(context, Settings.PREF_LOG_SETTINGS, R.string.log_settings_changes, R.string.log_settings_changes_summary) {
+        SwitchPreference(it, Defaults.PREF_LOG_SETTINGS)
+    },
     // what corrections do to the learned words, laid out like the swipe results above
     Setting(context, Settings.PREF_LEARNING_LOG, R.string.learning_log, R.string.learning_log_summary) { def ->
         val ctx = LocalContext.current

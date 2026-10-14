@@ -209,6 +209,8 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_ADVANCED_SETTINGS = "advanced_settings";
     public static final String PREF_RECORD_GESTURE_CORPUS = "record_gesture_corpus";
     public static final String PREF_SWIPE_METRICS = "swipe_metrics";
+    // the settings event log (SettingsEventLog): its own switch since 2026-10-12 (before: PREF_SWIPE_METRICS)
+    public static final String PREF_LOG_SETTINGS = "log_settings_changes";
     public static final String PREF_LEARNING_LOG = "learning_log";
     // one pool of learned & blacklisted words for all keyboards, or one per keyboard (see LearnedStores)
     public static final String PREF_SHARE_LEARNED_WORDS = "share_learned_words";

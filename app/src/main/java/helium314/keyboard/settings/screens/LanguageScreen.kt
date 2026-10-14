@@ -116,7 +116,12 @@ private fun SubtypeRow(subtype: InputMethodSubtype, isEnabled: Boolean) {
             onCheckedChange = {
                 if (it && !dictsAvailable(subtype.locale(), ctx))
                     showNoDictDialog = true
-                if (it) { SubtypeSettings.addEnabledSubtype(ctx.prefs(), subtype); askImport = true }
+                if (it) {
+                    val listed = SubtypeSettings.addEnabledSubtype(ctx.prefs(), subtype)
+                    // (one without an id is a new keyboard; owner 2026-10-12 K1)
+                    helium314.keyboard.latin.utils.SettingsEventLog.keyboard(ctx, if (subtype.toSettingsSubtype().keyboardId == null) "created" else "switched on", listed)
+                    askImport = true
+                }
                 else switchOffKeyboard(ctx, subtype) // (the first one off: the next is the main, as a reorder)
             }
         )

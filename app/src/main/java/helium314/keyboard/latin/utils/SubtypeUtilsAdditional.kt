@@ -96,10 +96,13 @@ object SubtypeUtilsAdditional {
      * Keyboard [from] becomes [to] (rename, keys, languages, accents), in its place in the lists, the selected keyboard
      * and the apps' memory. It keeps its id (owner 2026-10-11, keyboards have unique ids: its settings, pictures and
      * learned words are found by it, nothing moves; [to] without one gets [from]'s). [from] == [to]: registers it.
+     * [action]: the event log's word for it ("renamed"; null: the caller writes its own line); a registration writes none
+     * (owner 2026-10-12 K1: one line per action, the caller's).
      */
-    fun changeAdditionalSubtype(from: SettingsSubtype, givenTo: SettingsSubtype, context: Context) {
+    fun changeAdditionalSubtype(from: SettingsSubtype, givenTo: SettingsSubtype, context: Context, action: String? = "changed") {
         val to = if (givenTo.keyboardId == null && from.keyboardId != null) givenTo.withIdOf(from).toPref().toSettingsSubtype() else givenTo
-        helium314.keyboard.latin.utils.SettingsEventLog.log("keyboard changed: ${from.toPref()} -> ${to.toPref()}")
+        if (action != null && from != to)
+            helium314.keyboard.latin.utils.SettingsEventLog.keyboard(context, action, to, "was " + helium314.keyboard.latin.utils.SettingsEventLog.describe(context, from))
         if (from != to) { changedTo.remove(to.toPref()); changedTo[from.toPref()] = to.toPref() }
         val prefs = context.prefs()
         // read now because there may be an intermediate state where the subtype is invalid and thus removed

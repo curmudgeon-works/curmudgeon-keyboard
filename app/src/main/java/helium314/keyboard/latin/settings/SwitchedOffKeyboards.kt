@@ -41,6 +41,7 @@ object SwitchedOffKeyboards {
         if (SubtypeSettings.getEnabledSubtypes(true).any { it.toSettingsSubtype().sameKeyboard(keyboard) }) return false
         SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, keyboard, context) // (its set and pool stay: its id)
         SubtypeSettings.addEnabledSubtype(context.prefs(), keyboard.toAdditionalSubtype())
+        helium314.keyboard.latin.utils.SettingsEventLog.keyboard(context, "switched on", keyboard) // (owner 2026-10-12 K1)
         return true
     }
 }

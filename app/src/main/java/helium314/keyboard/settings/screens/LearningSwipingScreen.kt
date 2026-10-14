@@ -193,6 +193,7 @@ fun LearningSwipingScreen(onClickBack: () -> Unit) {
                 GroupTitle(R.string.swipe_logging)
                 SettingsActivity.settingsContainer[Settings.PREF_RECORD_GESTURE_CORPUS]?.Preference()
                 SettingsActivity.settingsContainer[Settings.PREF_SWIPE_METRICS]?.Preference()
+                SettingsActivity.settingsContainer[Settings.PREF_LOG_SETTINGS]?.Preference() // (next to it, owner 2026-10-12 K1)
             } }
             // (learning: on Fine-tune learning since 2026-10-10)
           }

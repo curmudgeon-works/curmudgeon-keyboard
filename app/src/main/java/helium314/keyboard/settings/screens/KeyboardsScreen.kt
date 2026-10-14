@@ -381,7 +381,7 @@ internal fun takenKeyboards(ctx: Context): Set<SettingsSubtype> =
 /** Rename's OK: the renamed keyboard (typed duplicates allowed: its id keeps it apart, owner 2026-10-11). */
 internal fun renameKeyboard(ctx: Context, keyboard: SettingsSubtype, name: String): SettingsSubtype {
     val renamed = withKeyboardName(keyboard, name)
-    if (renamed != keyboard) SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, renamed, ctx) // (its id stays: its settings with it)
+    if (renamed != keyboard) SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, renamed, ctx, action = "renamed") // (its id stays: its settings with it)
     return renamed
 }
 
@@ -416,6 +416,7 @@ private fun copyKeyboard(ctx: Context, source: SettingsSubtype): SettingsSubtype
     val copy = helium314.keyboard.latin.settings.KeyboardIds.fresh(ctx.realPrefs(), numbered, from = source.keyboardId)
     SubtypeUtilsAdditional.changeAdditionalSubtype(copy, copy, ctx) // registers it
     SubtypeSettings.addEnabledSubtype(ctx.prefs(), copy.toAdditionalSubtype())
+    helium314.keyboard.latin.utils.SettingsEventLog.keyboard(ctx, "copied", copy, "from " + helium314.keyboard.latin.utils.SettingsEventLog.describe(ctx, source)) // (owner 2026-10-12 K1)
     return copy
 }
 
@@ -424,6 +425,7 @@ private fun addNewKeyboard(ctx: Context, keyboard: SettingsSubtype): SettingsSub
     val added = helium314.keyboard.latin.settings.KeyboardIds.fresh(ctx.realPrefs(), keyboard.withoutIds())
     SubtypeUtilsAdditional.changeAdditionalSubtype(added, added, ctx) // registers it
     SubtypeSettings.addEnabledSubtype(ctx.prefs(), added.toAdditionalSubtype())
+    helium314.keyboard.latin.utils.SettingsEventLog.keyboard(ctx, "created", added) // (owner 2026-10-12 K1)
     return added
 }
 
@@ -463,9 +465,19 @@ private fun startWords(ctx: Context, keyboard: SettingsSubtype, learned: List<Se
  *  it out does nothing (an added keyboard's definition marks it as one, so no listed keyboard is taken for it). */
 internal fun deleteKeyboard(ctx: Context, keyboard: SettingsSubtype, mergeInto: SettingsSubtype?) {
     if (KeyboardProfiles.mainBlocksDelete(ctx.realPrefs(), keyboard)) return // (see DeleteKeyboardDialog)
+    logDeleted(ctx, keyboard, mergeInto)
     if (keyboard.isAdditionalSubtype(ctx.prefs())) SubtypeUtilsAdditional.removeAdditionalSubtype(ctx, keyboard.toAdditionalSubtype())
     SubtypeSettings.removeEnabledSubtype(ctx, keyboard.toAdditionalSubtype())
     helium314.keyboard.latin.personalization.LearnedKeyboards.deleteKeyboard(ctx, keyboard, mergeInto) // (its words too)
+}
+
+/** The event log's one line of a delete (owner 2026-10-12 K1): whether it was switched off (its tile's Delete), and the
+ *  keyboard taking its lists. */
+internal fun logDeleted(ctx: Context, keyboard: SettingsSubtype, mergeInto: SettingsSubtype?) {
+    val listed = SubtypeSettings.getEnabledSubtypes(true).any { it.toSettingsSubtype().sameKeyboard(keyboard) }
+    val detail = listOfNotNull(if (listed) null else "was switched off",
+        mergeInto?.let { "its lists merged into " + helium314.keyboard.latin.utils.SettingsEventLog.describe(ctx, it) }).joinToString(", ").ifEmpty { null }
+    helium314.keyboard.latin.utils.SettingsEventLog.keyboard(ctx, "deleted", keyboard, detail)
 }
 
 /** The new main keyboard when the first keyboard is another one than [mainBefore] now while its settings are the common
@@ -496,6 +508,7 @@ internal fun onOrderChanged(ctx: Context, mainBefore: SettingsSubtype): Boolean 
 internal fun switchOffKeyboard(ctx: Context, subtype: android.view.inputmethod.InputMethodSubtype): Boolean {
     val mainBefore = KeyboardProfiles.mainKeyboard(ctx.realPrefs())
     SubtypeSettings.removeEnabledSubtype(ctx, subtype)
+    helium314.keyboard.latin.utils.SettingsEventLog.keyboard(ctx, "switched off", subtype.toSettingsSubtype()) // (owner 2026-10-12 K1)
     return onOrderChanged(ctx, mainBefore)
 }
 

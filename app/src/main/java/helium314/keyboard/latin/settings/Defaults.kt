@@ -199,6 +199,7 @@ object Defaults {
     const val PREF_SYMBOL_POPUP_MAP = ""
     const val PREF_RECORD_GESTURE_CORPUS = false
     const val PREF_SWIPE_METRICS = false
+    const val PREF_LOG_SETTINGS = true // the settings event log, the keyboards' history too (owner 2026-10-12 K1: on)
     const val PREF_LEARNING_LOG = false
     const val PREF_SHARE_LEARNED_WORDS = true
     const val PREF_AUTO_PREVIEW_KEYBOARD = true // settings bring the preview keyboard up by themselves

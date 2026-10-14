@@ -1594,7 +1594,7 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, plan: Re
             if (name !in keepNames || device.keyboardId in targets) continue
             val renamed = RestoreDecision.named(device, RestorePlan.nextFreeName(name, taken).also { taken += it }, nameOf)
             changing()
-            SubtypeUtilsAdditional.changeAdditionalSubtype(device, renamed, ctx)
+            SubtypeUtilsAdditional.changeAdditionalSubtype(device, renamed, ctx, action = "renamed")
         }
     }
     // the device's key layout files of a name the restore brings with other keys: renamed first, as the editor's rename
@@ -1672,9 +1672,12 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, plan: Re
         val replace = replaces[keyboard]
         // registers it; merged, the device keyboard picked is changed into it (in its place, its id kept: its set and
         // learned words its own, as a Rename does); a switched-off one is switched on (restored)
-        SubtypeUtilsAdditional.changeAdditionalSubtype(replace?.phone ?: phoneKeyboard, phoneKeyboard, ctx)
+        SubtypeUtilsAdditional.changeAdditionalSubtype(replace?.phone ?: phoneKeyboard, phoneKeyboard, ctx, action = null)
         if (SubtypeSettings.getEnabledSubtypes().none { it.toSettingsSubtype().sameKeyboard(phoneKeyboard) })
             SubtypeSettings.addEnabledSubtype(prefs, phoneKeyboard.toAdditionalSubtype())
+        // (one line, owner 2026-10-12 K1)
+        helium314.keyboard.latin.utils.SettingsEventLog.keyboard(ctx, "restored", phoneKeyboard,
+            replace?.phone?.let { "merged into the device's " + helium314.keyboard.latin.utils.SettingsEventLog.describe(ctx, it) })
         if (withSettings) {
             val id = phoneKeyboard.keyboardId ?: continue // (always one: a backup is given ids when read)
             // exactly that set, its own only, a shared menu's values too (owner 2026-10-11: "restore should only apply to
