@@ -11,13 +11,15 @@ import java.util.Locale
 /**
  * Which main dictionary a language uses (2026-10-12, backlog "DICTIONARY CHOICE"), picked in the language's dictionary
  * dialog: the internal one, the added main dictionary ("main_user.dict"), or another added main-type file (a restore
- * keeps the device's old one aside as "main_prev.user.dict", "main_prev2.user.dict"…; any "<type>…user.dict").
+ * keeps the device's old one aside as "main_prev_user.dict", "main_prev2_user.dict"…; any "<type>_…user.dict").
  *
  * Stored per language, for all keyboards (owner: "A lang will always have a single dict across keyboards"): the
  * app-wide preference `dict_selected_<language tag>_<type>` (e.g. `dict_selected_hi_main`), holding the selected
- * file's name in the language's dictionary folder, or [INTERNAL]. The restore uses the same preference: on a clash it
- * keeps the device's dictionary aside under a "_prev" name and selects the backup's by writing its file name here
- * ([select]).
+ * file's name in the language's dictionary folder, or [INTERNAL]. The restore uses the same preference
+ * (RestoreDictionaries): on a clash it renames the device's "<type>_user.dict" to the next free "_prev" name, brings
+ * the backup's in as "<type>_user.dict" and selects it; on a device copy with the backup's content it renames that copy
+ * to the backup's name and selects it. The dialog won't delete the version in use while a keyboard has the language;
+ * a deleted selected file's selection is cleared.
  *
  * With nothing selected, or the selected file gone: "main_user.dict" if there, else the internal one, never a "_prev"
  * file (before, the first file of a kind in the folder listing's order won); only with no internal dictionary for the
@@ -48,7 +50,7 @@ object DictionarySelection {
     fun clear(ctx: Context, locale: Locale, type: String = Dictionary.TYPE_MAIN) =
         prefs(ctx).edit { remove(prefKey(locale, type)) }
 
-    /** A dictionary file's kind by its name, as the folder names them: "main_user.dict", "main_prev.user.dict" and
+    /** A dictionary file's kind by its name, as the folder names them: "main_user.dict", "main_prev_user.dict" and
      *  "main.dict" are "main". */
     fun typeOf(file: File): String = file.name.substringBefore("_").substringBefore(".")
 
