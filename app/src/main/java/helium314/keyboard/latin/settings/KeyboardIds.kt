@@ -55,9 +55,13 @@ object KeyboardIds {
         value.orEmpty().split(Separators.SETS).mapNotNull { if (it.isEmpty()) null else runCatching { it.toSettingsSubtype() }.getOrNull() }
 
     /** The keyboards of the lists as stored: the enabled ones, then those only in the added list. */
-    fun phoneKeyboards(real: SharedPreferences): List<SettingsSubtype> {
-        val enabled = definitions(real.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES))
-        val added = definitions(real.getString(Settings.PREF_ADDITIONAL_SUBTYPES, Defaults.PREF_ADDITIONAL_SUBTYPES))
+    fun phoneKeyboards(real: SharedPreferences): List<SettingsSubtype> =
+        phoneKeyboards(real.getString(Settings.PREF_ENABLED_SUBTYPES, null), real.getString(Settings.PREF_ADDITIONAL_SUBTYPES, null))
+
+    /** [phoneKeyboards] of the lists as read ([enabledPref], [addedPref]; null: not stored, the default). */
+    fun phoneKeyboards(enabledPref: String?, addedPref: String?): List<SettingsSubtype> {
+        val enabled = definitions(enabledPref ?: Defaults.PREF_ENABLED_SUBTYPES)
+        val added = definitions(addedPref ?: Defaults.PREF_ADDITIONAL_SUBTYPES)
         return enabled + added.filter { a -> enabled.none { it.sameKeyboard(a) } }
     }
 

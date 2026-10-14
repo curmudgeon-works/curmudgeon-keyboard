@@ -73,6 +73,8 @@ class SavedItemDefaultsTest {
     }
 
     @Test fun `a theme likewise, and it isn't shown changed while the keyboard has what it applied`() {
+        // (the keyboard on the phone: a write for no keyboard of the phone is dropped, 2026-10-12)
+        storeKeyboards(ctx, real, listOf(keyboard), reload = false)
         val sunset = AppearanceLooks.Look("Sunset", mapOf(gap to null), mapOf(gap to 0.5f))
         AppearanceLooks.save(real, listOf(sunset), now = true)
         val loaded = AppearanceLooks.load(real).single()

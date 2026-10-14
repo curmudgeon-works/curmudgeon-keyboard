@@ -46,6 +46,9 @@ class CustomLabelOriginTest {
         real.edit().clear()
             .putBoolean("separate_settings_per_keyboard", true)
             .commit()
+        // (keyboards 1-3 on the phone: a write for no keyboard of the phone is dropped, 2026-10-12)
+        storeKeyboards(ctx, real, (1..3).map { helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.US, "").withId(it) },
+            selected = null, reload = false)
         KeyboardProfiles.loadGroups(real)
     }
     @After fun tearDown() {

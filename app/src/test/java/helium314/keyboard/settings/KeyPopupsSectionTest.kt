@@ -2,6 +2,7 @@
 package helium314.keyboard.settings
 
 import android.content.Context
+import helium314.keyboard.withId
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -39,6 +40,8 @@ class KeyPopupsSectionTest {
 
     @Before fun setUp() {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
+        // (a keyboard on the phone, the main one: a write for no keyboard of the phone is dropped, 2026-10-12)
+        helium314.keyboard.storeKeyboards(ctx, real, listOf(SettingsSubtype(java.util.Locale.US, "").withId(1)), reload = false)
         KeyboardProfiles.refreshImeId(real)
         SettingsMode.set(ctx, true) // (the presets row is advanced; the state outlives a test)
     }

@@ -133,7 +133,7 @@ object KeyboardProfiles {
      *  the same (defensive, a read writes nothing): the keyboards loaded, else the default keyboard, else the selected. */
     fun mainKeyboard(real: SharedPreferences): SettingsSubtype {
         val enabled = real.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!
-        enabled.split(helium314.keyboard.latin.common.Constants.Separators.SETS).firstOrNull { it.isNotEmpty() }?.let { return it.toSettingsSubtype() }
+        enabled.split(Separators.SETS).firstOrNull { it.isNotEmpty() }?.let { return it.toSettingsSubtype() }
         return runCatching { helium314.keyboard.latin.utils.SubtypeSettings.getEnabledSubtypes(true).firstOrNull()?.toSettingsSubtype() }.getOrNull()
             ?: real.getString(Settings.PREF_SELECTED_SUBTYPE, Defaults.PREF_SELECTED_SUBTYPE)!!.toSettingsSubtype()
     }
@@ -526,16 +526,28 @@ object KeyboardProfiles {
      *  no keyboard has. */
     fun scopedId(real: SharedPreferences, id: String): String {
         if (!isSeparate(real)) return SHARED
-        val lists = real.getString(Settings.PREF_ENABLED_SUBTYPES, null) + Separators.SETS + real.getString(Settings.PREF_ADDITIONAL_SUBTYPES, null)
-        val known = knownMemo?.takeIf { it.first == lists }?.second
-            ?: KeyboardIds.phoneKeyboards(real).mapNotNullTo(HashSet()) { it.keyboardId }.also { knownMemo = lists to it }
-        if (id in known) return id
+        if (id in phoneIds(real)) return id
         if (goneLogged.add(id)) Log.i("KeyboardProfiles", "set $id is gone: its screens edit the main set")
         return mainEditingId(real)
     }
 
-    @Volatile private var knownMemo: Pair<String, Set<String>>? = null
+    /** The ids of the phone's keyboards as stored ([KeyboardIds.phoneKeyboards]: listed or switched off). Every write
+     *  through a [ProfilePreferences] view asks too (one for a set of another id is dropped, 2026-10-12), so the lists
+     *  aren't parsed again while they didn't change. */
+    fun phoneIds(real: SharedPreferences): Set<String> {
+        val enabled = real.getString(Settings.PREF_ENABLED_SUBTYPES, null)
+        val added = real.getString(Settings.PREF_ADDITIONAL_SUBTYPES, null)
+        knownMemo?.let { if (it.enabled == enabled && it.added == added) return it.ids }
+        val ids = KeyboardIds.phoneKeyboards(enabled, added).mapNotNullTo(HashSet()) { it.keyboardId }
+        knownMemo = KnownMemo(enabled, added, ids)
+        return ids
+    }
+
+    private class KnownMemo(val enabled: String?, val added: String?, val ids: Set<String>)
+    @Volatile private var knownMemo: KnownMemo? = null
     private val goneLogged: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+    // (a write dropped for a set no keyboard of the phone has: logged once per set, ProfilePreferences)
+    internal val droppedLogged: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
     /** Whether the look (Appearance settings and background pictures) of set [a] differs from set [b]'s: a keyboard
      *  switch reloads the theme only then (re-review 2026-10-07: it reloaded, with a blink, on every switch). Shared
@@ -884,8 +896,22 @@ class ProfilePreferences(private val real: SharedPreferences, private val ownSet
     private inner class Editor(private val e: SharedPreferences.Editor, private val id: String) : SharedPreferences.Editor {
         private fun k(key: String) = KeyboardProfiles.prefixedKey(real, id, key, ownSet)
         // (a keyboard without a set: nothing written, owner 2026-10-11: lookups never create records)
-        private fun noSet(key: String) = (KeyboardProfiles.setOf(real, id, key, ownSet) == KeyboardProfiles.NO_SET)
-            .also { if (it) Log.w("ProfilePreferences", "no set of its own: $key not written") }
+        // (nor a set no keyboard of the phone has, listed or switched off, 2026-10-12 U9: during a whole restore the
+        // keyboard in use, typing in another app, wrote its emoji recents and toolbar state to its id of before the
+        // backup, or with separate settings off to the main keyboard of the list in memory; a backup without that
+        // keyboard left "p<id>/" records of no keyboard, a ghost: its id taken, carried by later backups. The common
+        // settings' set is the first listed keyboard's, so it is one; restoreSet, put and the copies write the stored
+        // file itself, never through here)
+        private fun noSet(key: String): Boolean {
+            val set = KeyboardProfiles.setOf(real, id, key, ownSet) ?: return false
+            if (set == KeyboardProfiles.NO_SET) {
+                Log.w("ProfilePreferences", "no set of its own: $key not written")
+                return true
+            }
+            if (set in KeyboardProfiles.phoneIds(real)) return false
+            if (KeyboardProfiles.droppedLogged.add(set)) Log.i("ProfilePreferences", "set $set is no keyboard's: its writes are dropped")
+            return true
+        }
         override fun putString(key: String, value: String?) = apply { if (!noSet(key)) { e.putString(k(key), value) } }
         override fun putStringSet(key: String, values: MutableSet<String>?) = apply { if (!noSet(key)) { e.putStringSet(k(key), values) } }
         override fun putInt(key: String, value: Int) = apply { if (!noSet(key)) { e.putInt(k(key), value) } }

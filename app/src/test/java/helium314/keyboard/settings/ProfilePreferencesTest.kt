@@ -137,6 +137,10 @@ class ProfilePreferencesTest {
         val colemak = helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.US, "KeyboardLayoutSet=MAIN:colemak")
         // (owner 2026-10-11: keyboards have unique ids) a layout change keeps the id: the set stays, nothing moves
         val q = KeyboardProfiles.idOf(qwerty.withId(4))!!; val c = KeyboardProfiles.idOf(colemak.withId(5))!!
+        // (both on the phone, switched off: a write for no keyboard of the phone is dropped, 2026-10-12)
+        val added = real.getString(helium314.keyboard.latin.settings.Settings.PREF_ADDITIONAL_SUBTYPES, "")!!
+        real.edit().putString(helium314.keyboard.latin.settings.Settings.PREF_ADDITIONAL_SUBTYPES, added + ";" +
+            helium314.keyboard.latin.utils.SubtypeSettings.createPrefSubtypes(listOf(qwerty.withId(4), colemak.withId(5)))).commit()
         set(q).edit().putInt("theme_size", 1).commit(); set(c).edit().putInt("theme_size", 2).commit()
         val previewing = colemak.withIdOf(qwerty.withId(4)) // previewing Colemak on the QWERTY keyboard
         assertEquals(q, KeyboardProfiles.idOf(previewing))

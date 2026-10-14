@@ -29,6 +29,8 @@ class HeldDeletesTest {
 
     @Before fun setUp() {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
+        // (a keyboard on the phone, the main one: a write for no keyboard of the phone is dropped, 2026-10-12)
+        storeKeyboards(ctx, real, listOf(helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.US, "").withId(1)), reload = false)
         FontLibrary.dir(ctx).mkdirs(); font.writeText("not really a font")
         ctx.prefs().edit().putString(Settings.PREF_KEY_FONT, FontLibrary.PREFIX + "Mine.ttf").commit()
     }

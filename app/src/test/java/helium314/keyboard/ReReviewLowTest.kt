@@ -37,6 +37,9 @@ class ReReviewLowTest {
         val lp = helium314.keyboard.latin.utils.LanguagePriority
         val hi = java.util.Locale.forLanguageTag("hi")
         real.edit().putBoolean("separate_settings_per_keyboard", true).commit()
+        // (both on the phone: a write for no keyboard of the phone is dropped, 2026-10-12)
+        storeKeyboards(ctx, real, listOf(helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.US, "").withId(2),
+            helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.GERMANY, "").withId(3)), selected = null, reload = false)
         val own = helium314.keyboard.latin.settings.ProfilePreferences(real) { kid(2) }
         val other = helium314.keyboard.latin.settings.ProfilePreferences(real) { kid(3) }
         lp.set(other, hi, lp.LOW)

@@ -36,6 +36,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import java.util.Locale
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -209,6 +210,39 @@ class GhostRecordsTest {
             assertRecords(mapOf(en to 11, de to 12))
             assertEquals(11, LearnedStores.currentPool, "leave=$leave")
         }
+    }
+
+    // (2026-10-12 U9: the keyboard in use writes its emoji recents, emoji page and toolbar state as you type; during a
+    // whole restore its id was of before the backup. A write for no keyboard of the phone is dropped, not a ghost set)
+    @Test fun `i - a write for the keyboard in use that is no keyboard of the phone creates no set`() {
+        keyboards(listOf(en))
+        real.edit().putString(Settings.PREF_SELECTED_SUBTYPE, de.toPref()).commit() // (k2: in neither list)
+        KeyboardProfiles.refreshImeId(real)
+        assertEquals(kid(2), KeyboardProfiles.imeId)
+        ctx.prefs().edit().putString(Settings.PREF_EMOJI_RECENT_KEYS, "[]").commit()
+        assertFalse(real.all.keys.any { it.startsWith("p${kid(2)}/") }, "a set of a keyboard not on the phone")
+    }
+
+    @Test fun `j - the restore window - a write with separate settings off lands in no keyboard of the list in memory`() {
+        keyboards(listOf(en)) { it.putBoolean("separate_settings_per_keyboard", false) }
+        KeyboardProfiles.refreshImeId(real)
+        // (as a whole restore: the preferences cleared, the backup's lines not in yet, nothing reloaded)
+        real.edit().clear().commit()
+        ctx.prefs().edit().putString(Settings.PREF_EMOJI_RECENT_KEYS, "[]").putBoolean(Settings.PREF_TOOLBAR_OPENED_BY_KEY, true).commit()
+        assertEquals(emptySet(), KeyboardProfiles.setIds(real.all), "a set of the keyboard list in memory")
+    }
+
+    @Test fun `k - writes for a listed keyboard, a switched-off one and the common settings still land in their sets`() {
+        keyboards(listOf(en)) { it.putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(en, de))) }
+        ctx.prefs().edit().putString(Settings.PREF_EMOJI_RECENT_KEYS, "[1]").commit() // (the keyboard in use, k1)
+        ProfilePreferences(real) { kid(2) }.edit().putString(Settings.PREF_EMOJI_RECENT_KEYS, "[2]").commit() // (switched off)
+        assertEquals("[1]", real.getString(idKey(1, Settings.PREF_EMOJI_RECENT_KEYS), null))
+        assertEquals("[2]", real.getString(idKey(2, Settings.PREF_EMOJI_RECENT_KEYS), null))
+        // separate settings off: the main keyboard's set, the common settings
+        real.edit().putBoolean("separate_settings_per_keyboard", false).commit()
+        KeyboardProfiles.refreshImeId(real)
+        ctx.prefs().edit().putString(Settings.PREF_EMOJI_RECENT_KEYS, "[3]").commit()
+        assertEquals("[3]", real.getString(idKey(1, Settings.PREF_EMOJI_RECENT_KEYS), null))
     }
 
     @Test fun `f - adding or copying a keyboard creates its records at once`() {

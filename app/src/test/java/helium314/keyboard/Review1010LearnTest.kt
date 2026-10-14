@@ -40,7 +40,11 @@ class Review1010LearnTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
 
-    @Before fun setUp() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
+    @Before fun setUp() {
+        real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
+        // (a keyboard on the phone, the main one: a write for no keyboard of the phone is dropped, 2026-10-12)
+        storeKeyboards(ctx, real, listOf(SettingsSubtype(Locale.US, "").withId(1)), reload = false)
+    }
     @After fun tearDown() {
         AppearanceDraft.close()
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)

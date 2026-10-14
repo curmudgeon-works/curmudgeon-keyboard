@@ -119,6 +119,8 @@ class CustomLabelsDiscardOriginTest {
      *  Old and a popup set OldSet deleted before; with Layout and Typing open Work and Mine are deleted, and keyboard 4
      *  chooses Layout Home and a built-in popup set. */
     private fun layoutScenario(): Map<String, Any?> {
+        // (keyboards 1-4 on the phone: a write for no keyboard of the phone is dropped, 2026-10-12)
+        storeKeyboards(ctx, real, (1..4).map { SettingsSubtype(Locale.US, "").withId(it) }, selected = null, reload = false)
         LayoutPresets.save(real, listOf(LayoutPresets.Preset("Work", mapOf(Settings.PREF_SHOW_NUMBER_ROW to true)),
             LayoutPresets.Preset("Home", emptyMap())))
         KeyPopupOverrides.saveSets(real, listOf(KeyPopupOverrides.UserSet("Mine", "all", null, mapOf("a" to listOf("à")))))

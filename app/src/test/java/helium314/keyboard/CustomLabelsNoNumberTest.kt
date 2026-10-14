@@ -61,6 +61,9 @@ class CustomLabelsNoNumberTest {
     }
 
     @Test fun `an older numbered label still reads as a label, a new one is written as 1`() {
+        // (both on the phone: a write for no keyboard of the phone is dropped, 2026-10-12)
+        storeKeyboards(ctx, real, listOf(SettingsSubtype(Locale.US, "").withId(1), SettingsSubtype(Locale.FRANCE, "").withId(2)),
+            selected = null, reload = false)
         real.edit().putInt(own(1, theme), 7).commit()
         assertTrue(CustomLabels.has(view(1), CustomLabels.Kind.THEME))
         CustomLabels.mark(view(1), CustomLabels.Kind.THEME)
