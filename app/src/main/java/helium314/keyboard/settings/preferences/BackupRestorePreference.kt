@@ -567,8 +567,8 @@ private fun RestoreChoiceDialog(pending: PendingRestore, plan: RestorePlan, onDi
             Column {
                 // (a backup without a keyboard list: checked, it can only be restored whole)
                 CheckRow(stringResource(R.string.restore_delete_app_data), top.wipe, top.canPickKeyboards) { top.check(it) }
-                // checked: greyed out, every row showing what the full restore brings (all of it), in the same groups;
-                // the saved items that clash mean nothing then, hidden
+                // checked: nothing below it, a full restore has nothing to choose (owner 2026-10-12, "with the box
+                // ticked, hide every row below it. <- ok"; the greyed rows of before were not the owner's)
                 val wipe = top.wipe
                 val rows = top.rowsEnabled
                 // unchecked: the line under it (owner 2026-10-12, replaces "App data won't be deleted…")
@@ -579,42 +579,44 @@ private fun RestoreChoiceDialog(pending: PendingRestore, plan: RestorePlan, onDi
                 // OTHER CLASHES)
                 @Composable fun Heading(text: Int) = Text(stringResource(text).uppercase(), style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.padding(top = 12.dp, bottom = 2.dp))
-                if (pending.keyboards.isNotEmpty()) Heading(R.string.restore_keyboards)
-                pending.keyboards.forEach { keyboard ->
-                    val name = keyboardName(keyboard, ctx).let { if (plan.asks(keyboard)) it else stringResource(R.string.restore_keyboard_new, it) }
-                    CheckRow(name, top.ticked(keyboard), rows) { if (it) selected.add(keyboard) else selected.remove(keyboard) }
-                }
-                // RESTORE THEIR: Settings · Dictionaries (owner 2026-10-12, v3)
-                Heading(R.string.restore_their)
-                CheckRow(stringResource(R.string.restore_settings), wipe || settings, rows && withKeyboards) { settings = it }
-                if (pending.hasDictionaries) {
-                    // the restored keyboards' languages whose dictionary differs from the device's: the backup's is
-                    // selected, the device's kept aside as "…_prev" (owner 2026-10-12)
-                    val clashing = if (wipe) emptyList() else plan.dictionaryClashLanguages(selected).map { tag ->
-                        Locale.forLanguageTag(tag).localizedDisplayName(ctx.resources) }
-                    CheckRow(stringResource(R.string.restore_dictionaries), wipe || dictionaries, rows && withKeyboards,
-                        subtext = if (clashing.isEmpty()) null else stringResource(R.string.restore_dictionaries_clash, clashing.joinToString(", "))
-                    ) { dictionaries = it }
-                }
-                // AND MERGE: Learned words (with Android's personal dictionary words) · Clipboard history
-                if (pending.hasWords || pending.hasClipboard) {
-                    Heading(R.string.restore_and_merge)
-                    if (pending.hasWords)
-                        CheckRow(stringResource(R.string.restore_learned_words), wipe || learnedWords, rows && withKeyboards) { learnedWords = it }
-                    if (pending.hasClipboard) CheckRow(stringResource(R.string.restore_clipboard), wipe || clipboard, rows) { clipboard = it }
-                }
-                // FOR OTHER CLASHES: the backup's saved items clashing with the device's, by kind, each ticked to start
-                // with (owner 2026-10-11: "backup wins the name if ticked"; every keyboard too: a keyboard restore never
-                // wipes). The other backup items, new saved items and dictionaries of other languages, come in silently
-                // (owner 2026-10-12: "All silent")
-                if (!wipe && settings && withKeyboards && plan.clashes.isNotEmpty()) {
-                    Heading(R.string.restore_clashes)
-                    Text(stringResource(R.string.restore_clashes_note), style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 4.dp))
-                    plan.clashes.groupBy { it.kind }.toSortedMap().forEach { (kind, clashes) ->
-                        Text(stringResource(clashKindTitle(kind)), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
-                        clashes.forEach { clash ->
-                            CheckRow(clashRowText(ctx, clash), clash.key !in unticked) { if (it) unticked.remove(clash.key) else unticked.add(clash.key) }
+                if (!wipe) {
+                    if (pending.keyboards.isNotEmpty()) Heading(R.string.restore_keyboards)
+                    pending.keyboards.forEach { keyboard ->
+                        val name = keyboardName(keyboard, ctx).let { if (plan.asks(keyboard)) it else stringResource(R.string.restore_keyboard_new, it) }
+                        CheckRow(name, top.ticked(keyboard), rows) { if (it) selected.add(keyboard) else selected.remove(keyboard) }
+                    }
+                    // RESTORE THEIR: Settings · Dictionaries (owner 2026-10-12, v3)
+                    Heading(R.string.restore_their)
+                    CheckRow(stringResource(R.string.restore_settings), wipe || settings, rows && withKeyboards) { settings = it }
+                    if (pending.hasDictionaries) {
+                        // the restored keyboards' languages whose dictionary differs from the device's: the backup's is
+                        // selected, the device's kept aside as "…_prev" (owner 2026-10-12)
+                        val clashing = if (wipe) emptyList() else plan.dictionaryClashLanguages(selected).map { tag ->
+                            Locale.forLanguageTag(tag).localizedDisplayName(ctx.resources) }
+                        CheckRow(stringResource(R.string.restore_dictionaries), wipe || dictionaries, rows && withKeyboards,
+                            subtext = if (clashing.isEmpty()) null else stringResource(R.string.restore_dictionaries_clash, clashing.joinToString(", "))
+                        ) { dictionaries = it }
+                    }
+                    // AND MERGE: Learned words (with Android's personal dictionary words) · Clipboard history
+                    if (pending.hasWords || pending.hasClipboard) {
+                        Heading(R.string.restore_and_merge)
+                        if (pending.hasWords)
+                            CheckRow(stringResource(R.string.restore_learned_words), wipe || learnedWords, rows && withKeyboards) { learnedWords = it }
+                        if (pending.hasClipboard) CheckRow(stringResource(R.string.restore_clipboard), wipe || clipboard, rows) { clipboard = it }
+                    }
+                    // FOR OTHER CLASHES: the backup's saved items clashing with the device's, by kind, each ticked to start
+                    // with (owner 2026-10-11: "backup wins the name if ticked"; every keyboard too: a keyboard restore never
+                    // wipes). The other backup items, new saved items and dictionaries of other languages, come in silently
+                    // (owner 2026-10-12: "All silent")
+                    if (!wipe && settings && withKeyboards && plan.clashes.isNotEmpty()) {
+                        Heading(R.string.restore_clashes)
+                        Text(stringResource(R.string.restore_clashes_note), style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 4.dp))
+                        plan.clashes.groupBy { it.kind }.toSortedMap().forEach { (kind, clashes) ->
+                            Text(stringResource(clashKindTitle(kind)), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
+                            clashes.forEach { clash ->
+                                CheckRow(clashRowText(ctx, clash), clash.key !in unticked) { if (it) unticked.remove(clash.key) else unticked.add(clash.key) }
+                            }
                         }
                     }
                 }

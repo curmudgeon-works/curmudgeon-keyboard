@@ -118,14 +118,11 @@ class RestoreDialogGroupsUiTest {
             "App data won't be deleted")
     }
 
-    @Test fun `the full restore's greyed view shows the same groups, ticked`() {
+    // owner 2026-10-12: a full restore has nothing to choose, nothing shows below the box
+    @Test fun `the full restore shows nothing below the box`() {
         show()
         compose.onNodeWithText(line).assertDoesNotExist()
-        for (heading in listOf("KEYBOARDS", "RESTORE THEIR", "AND MERGE")) compose.onNodeWithText(heading).assertExists()
-        for (row in listOf("Settings", "Dictionaries", "Learned words", "Clipboard history")) {
-            box(row).assertIsOn()
-            box(row).assertIsNotEnabled()
-        }
-        gone("Custom words", "Bring with them", "Also restore", "FOR OTHER CLASHES")
+        gone("KEYBOARDS", "RESTORE THEIR", "AND MERGE", "Settings", "Dictionaries", "Learned words", "Clipboard history",
+            "Custom words", "Bring with them", "Also restore", "FOR OTHER CLASHES")
     }
 }

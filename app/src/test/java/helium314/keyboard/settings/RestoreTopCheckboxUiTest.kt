@@ -87,10 +87,10 @@ class RestoreTopCheckboxUiTest {
     private fun box(text: String) =
         compose.onNode(androidx.compose.ui.test.isToggleable() and androidx.compose.ui.test.hasParent(androidx.compose.ui.test.hasText(text, substring = true)))
 
-    @Test fun `checked by default, keyboards greyed out, no line, OK asks before wiping`() {
+    @Test fun `checked by default, no keyboards or rows below, no line, OK asks before wiping`() {
         show()
         box(top).assertIsOn()
-        compose.onNodeWithText("French", substring = true).assertIsNotEnabled()
+        compose.onNodeWithText("French", substring = true).assertDoesNotExist()
         compose.onNodeWithText(line).assertDoesNotExist()
         compose.onNodeWithText(ctx.getString(android.R.string.ok)).performClick()
         // the question, nothing wiped yet
