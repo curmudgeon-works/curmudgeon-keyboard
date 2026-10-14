@@ -157,6 +157,7 @@ internal val savingGuide: List<SavingTab> = listOf(
         SavingRow(R.string.saving_kind_key_layouts, R.string.saving_partial_files),
         SavingRow(R.string.saving_kind_dictionaries, R.string.saving_partial_dictionaries),
         SavingRow(R.string.saving_kind_learned, R.string.saving_partial_words),
+        SavingRow(R.string.saving_kind_clips, R.string.saving_partial_clips), // (the merge keeps both sides' pins)
         SavingRow(R.string.restore_clipboard, R.string.saving_partial_clips), // ("Clipboard history")
         SavingRow(R.string.saved_items_take_new_defaults, R.string.saving_partial_switch),
     )),
@@ -190,6 +191,7 @@ internal val savingGuide: List<SavingTab> = listOf(
         SavingRow(R.string.saving_kind_learned, R.string.saving_reset_words),
         SavingRow(R.string.saving_kind_blacklisted, R.string.saving_reset_words),
         SavingRow(R.string.saving_kind_clips, R.string.saving_reset_clips),
+        SavingRow(R.string.restore_clipboard, R.string.saving_reset_clipboard), // ("Clipboard history")
     )),
     SavingTab(R.string.saving_tab_separate, listOf(
         SavingRow(R.string.saving_kind_keyboards, R.string.saving_separate_on),
@@ -197,6 +199,8 @@ internal val savingGuide: List<SavingTab> = listOf(
         SavingRow(R.string.saving_kind_keyboards, R.string.saving_separate_first_delete),
         SavingRow(R.string.saving_kind_keyboards, R.string.saving_separate_reorder),
         SavingRow(R.string.saving_kind_layouts, R.string.saving_separate_items),
+        SavingRow(R.string.saving_kind_themes, R.string.saving_separate_items),
+        SavingRow(R.string.saving_kind_popups, R.string.saving_separate_items),
         SavingRow(R.string.saving_kind_palettes, R.string.saving_separate_items),
         SavingRow(R.string.saving_kind_learned, R.string.saving_separate_words),
     )),
@@ -287,6 +291,7 @@ internal val savingShort: Map<Int, Int> = mapOf(
     R.string.saving_reset_items to R.string.saving_short_gone_unless_ticked,
     R.string.saving_reset_words to R.string.saving_short_gone_unless_ticked,
     R.string.saving_reset_clips to R.string.saving_short_gone_unless_ticked,
+    R.string.saving_reset_clipboard to R.string.saving_short_gone_unless_ticked,
     R.string.saving_separate_on to R.string.saving_short_separate_keyboards,
     R.string.saving_separate_items to R.string.saving_short_separate_items,
     R.string.saving_separate_words to R.string.saving_short_separate_words,

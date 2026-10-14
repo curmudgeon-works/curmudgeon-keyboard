@@ -113,6 +113,18 @@ class HowSavingWorksTest {
         assertTrue("brings the dictionaries of its languages, no tick" in texts[1], texts[1])
     }
 
+    // owner 2026-10-14 ("A. yes fill."): no "—" where the action does something. Fail before: these cells were empty
+    @Test fun `the grid fills clipboard history on reset, pins on partial restore, themes and popup sets on separate`() {
+        fun action(title: String) = savingActions.first { ctx.getString(it.title) == title }
+        val reset = savingCell(R.string.restore_clipboard, action("Factory reset"))
+        assertEquals(listOf(R.string.saving_reset_clipboard), reset)
+        assertTrue("\"${ctx.getString(R.string.factory_reset_clipboard)}\" is ticked" in ctx.getString(reset.single()))
+        assertEquals(listOf(R.string.saving_partial_clips), savingCell(R.string.saving_kind_clips, action("Partial restore")))
+        assertTrue("pins are kept" in ctx.getString(R.string.saving_partial_clips))
+        for (kind in listOf(R.string.saving_kind_themes, R.string.saving_kind_popups))
+            assertEquals(listOf(R.string.saving_separate_items), savingCell(kind, action("Separate settings on/off")), ctx.getString(kind))
+    }
+
     // owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones
     @Test fun `separate settings rows - the first keyboard's settings, nothing copied, delete and reorder`() {
         val separate = savingGuide.last().rows.map { it.text }

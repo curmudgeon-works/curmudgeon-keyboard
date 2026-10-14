@@ -143,6 +143,7 @@
     <string name="saving_reset_items">Go, unless \"Saved layouts &amp; popups …\" is ticked. Ticked with the keyboards, each keyboard also keeps its popups, key layouts, pictures, palettes and fonts, and its chosen Layout, popup set and theme are applied again (changes made on top of them are undone). \"Saved items take new defaults\" stays as it is.</string>
     <string name="saving_reset_words">Go, unless ticked. Words kept but not the keyboards: the removed keyboards\' learned and blacklisted words join the default keyboard\'s, every script.</string>
     <string name="saving_reset_clips">Gone, pins too, unless ticked.</string>
+    <string name="saving_reset_clipboard">Cleared, unless \"Clipboard history\" is ticked.</string>
 
     <!-- Separate settings on / off -->
     <string name="saving_separate_on">On: each keyboard uses its own settings, as it left them. Nothing is copied; a keyboard added has its own from the start.</string>
