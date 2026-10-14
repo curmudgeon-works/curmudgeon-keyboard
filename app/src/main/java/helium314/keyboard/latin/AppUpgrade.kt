@@ -39,6 +39,7 @@ import helium314.keyboard.latin.utils.mainLayoutNameOrQwerty
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.protectedPrefs
 import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.latin.utils.KeyPopupOverrides
 import helium314.keyboard.settings.LayoutPresets
 import helium314.keyboard.settings.AppearanceLooks
 import helium314.keyboard.latin.utils.realPrefs
@@ -65,6 +66,53 @@ fun checkVersionUpgrade(context: Context) {
     pickedOnlyUpgrade(context.realPrefs(), freshInstall = oldVersion == 0)
     heliBoardLayoutPins(context, context.realPrefs(), freshInstall = oldVersion == 0)
     ownSetUpgrades(context.realPrefs(), freshInstall = oldVersion == 0)
+    keepUserPopupSetsSymbolMap(context.realPrefs())
+}
+
+/** Set once [keepUserPopupSetsSymbolMap] ran (a backup from before carries none: its restore runs it again). */
+const val USER_POPUP_SETS_MAP_DONE = "user_popup_sets_symbol_map_done"
+
+/**
+ * A popup set the user saved before sets kept their own letter-to-symbol map (before 2026-10-07) showed the default map,
+ * Curmudgeon's; 0.3.012 made the default none (HeliBoard extra's) and such a set, still selected, lost its symbols
+ * (owner 2026-10-11: "For user selected or user-defined popups, layouts, themes, etc, upgrade should not flip these
+ * settings to default"). The set gets the map it showed, and so does each keyboard that selected it and reads no map of
+ * its own or the common settings', and each saved Layout naming it without one. Keyboards that never picked a set keep
+ * following the default.
+ */
+internal fun keepUserPopupSetsSymbolMap(real: SharedPreferences) {
+    if (real.getBoolean(USER_POPUP_SETS_MAP_DONE, false)) return
+    val sets = KeyPopupOverrides.loadSets(real)
+    val lacking = sets.filter { it.symbolMap == null }.mapTo(HashSet()) { it.name }
+    if (lacking.isNotEmpty()) {
+        val map = Defaults.CURMUDGEON_SYMBOL_POPUP_MAP
+        val selected = KeyPopupOverrides.PREF_SELECTED_SET
+        val symbolMap = Settings.PREF_SYMBOL_POPUP_MAP
+        KeyPopupOverrides.saveSets(real, sets.map {
+            if (it.name in lacking) KeyPopupOverrides.UserSet(it.name, it.morePopups, it.symbolsLayout, it.overrides, map, it.popupOrder) else it })
+        val sharedHasMap = real.contains(symbolMap)
+        real.edit {
+            if (real.getString(selected, null) in lacking && !sharedHasMap) putString(symbolMap, map)
+            for (id in KeyboardProfiles.idEntries(real).values.toSet()) {
+                if (id == KeyboardProfiles.SHARED || !KeyboardProfiles.hasOwnEntries(real, id)) continue
+                val own = KeyboardProfiles.ownKey(id, selected)
+                val choice = if (real.contains(own)) real.getString(own, null)
+                    else if (real.contains(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + selected))) null
+                    else real.getString(selected, null)
+                if (choice !in lacking || real.contains(KeyboardProfiles.ownKey(id, symbolMap))) continue
+                val atDefault = real.contains(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + symbolMap))
+                if (!atDefault && sharedHasMap) continue // (it reads the common settings' map: someone picked that)
+                remove(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + symbolMap))
+                putString(KeyboardProfiles.ownKey(id, symbolMap), map)
+            }
+        }
+        val presets = helium314.keyboard.settings.LayoutPresets.load(real)
+        if (presets.any { it.values[selected] in lacking && it.values[symbolMap] == null })
+            helium314.keyboard.settings.LayoutPresets.save(real, presets.map {
+                if (it.values[selected] in lacking && it.values[symbolMap] == null)
+                    helium314.keyboard.settings.LayoutPresets.Preset(it.name, it.values + (symbolMap to map), it.builtIn) else it })
+    }
+    real.edit { putBoolean(USER_POPUP_SETS_MAP_DONE, true) }
 }
 
 /** Set once [heliBoardLayoutPins] ran (a backup from before carries none: its restore runs it again). */
