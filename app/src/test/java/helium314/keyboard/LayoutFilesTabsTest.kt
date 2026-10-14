@@ -115,6 +115,8 @@ class LayoutFilesTabsTest {
         // question "the built-in QWERTY keys")
         compose.onNodeWithText("App's original").assertExists()
         compose.onNodeWithText(ctx.getString(R.string.layout_files_builtin_button)).performClick()
+        // (owner 2026-10-14: "Keep App's original": the dialog's title too, not "Built-in")
+        compose.onNode(hasText("App's original") and hasAnyAncestor(isDialog())).assertExists()
         compose.onNode(hasText("Replace this tab with the original ", substring = true)
             and hasText(" that came with the app? Your changes in it will be lost.", substring = true) and hasAnyAncestor(isDialog())).assertExists()
         val language = Locale.US.let { with(helium314.keyboard.latin.common.LocaleUtils) { it.localizedDisplayName(ctx.resources) } }

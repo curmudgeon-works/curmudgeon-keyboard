@@ -174,7 +174,8 @@ fun LayoutFilesScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     androidx.activity.compose.BackHandler(enabled = changed.isNotEmpty()) { leave() }
     if (askBuiltIn) helium314.keyboard.settings.dialogs.ConfirmationDialog(
         onDismissRequest = { askBuiltIn = false },
-        title = { Text(stringResource(R.string.layout_files_builtin)) },
+        // owner 2026-10-14: "Keep App's original": the title says what the button said
+        title = { Text(stringResource(R.string.layout_files_builtin_button)) },
         // (the letters: which built-in keys, for which language, JSON-L; the symbols page a preset chose: by the preset's
         // name, JSON-S2)
         content = { Text(when {
