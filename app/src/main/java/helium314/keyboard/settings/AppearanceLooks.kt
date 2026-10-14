@@ -125,6 +125,18 @@ object AppearanceLooks {
         return if (o.length() == 0) NO_PICTURES else LIB + o.toString()
     }
 
+    /** The background pictures as they are now, held for the Themes list's Cancel: copies in a folder of their own
+     *  (by slot, the old look format [applyPictures] still reads), not in the library; [deletePictures] removes them.
+     *  (review 2026-10-08 area 4 #6: every list open added the keyboard's pictures to the library, so a picture
+     *  forgotten there came back.) One folder, made again at each open: a process killed with the list open leaves no
+     *  more than one. */
+    fun holdPictures(ctx: Context): String {
+        val dir = picturesDir(ctx, HELD).apply { deleteRecursively(); mkdirs() }
+        for (live in livePictures(ctx)) if (live.isFile) runCatching { live.copyTo(java.io.File(dir, slotOf(live.name)), overwrite = true) }
+        return HELD
+    }
+    private const val HELD = "held" // (saved looks name a uuid folder, or the library)
+
     private fun refsOf(id: String): JSONObject? = if (id.startsWith(LIB)) runCatching { JSONObject(id.removePrefix(LIB)) }.getOrNull() else null
 
     /** Looks saved before 2026-10-07 kept a folder of picture copies: each becomes library names (the copies join the

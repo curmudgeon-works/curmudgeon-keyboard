@@ -637,7 +637,7 @@ private fun SavedLooksPreference(setting: Setting) {
     val initial = remember(showList) { AppearanceLooks.current(prefs) }
     // the background pictures when the list opened, to put back on Cancel (a copy, made only while the list is open)
     // (saved across rotation: review 2026-10-06, each rotation made another copy and the first was never deleted)
-    val initialPicturesId = androidx.compose.runtime.saveable.rememberSaveable(showList) { if (showList) AppearanceLooks.savePictures(ctx) else NO_COPY }
+    val initialPicturesId = androidx.compose.runtime.saveable.rememberSaveable(showList) { if (showList) AppearanceLooks.holdPictures(ctx) else NO_COPY }
     val initialPictures = initialPicturesId.takeIf { it != NO_COPY }?.let { AppearanceLooks.Look("", mapOf(AppearanceLooks.PICTURES to it)) }
     var confirmed by remember(showList) { mutableStateOf(false) }
     var previewed: AppearanceLooks.Look? by remember(showList) { mutableStateOf(null) } // the one tapped, on the keyboard now

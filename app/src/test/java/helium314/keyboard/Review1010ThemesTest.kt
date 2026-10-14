@@ -5,6 +5,8 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import helium314.keyboard.keyboard.FontLibrary
 import helium314.keyboard.keyboard.KeyboardTheme
+import helium314.keyboard.latin.common.PictureFraming
+import helium314.keyboard.latin.common.PictureLibrary
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.ProfilePreferences
 import helium314.keyboard.latin.settings.Settings
@@ -124,5 +126,40 @@ class Review1010ThemesTest {
         val look = AppearanceLooks.load(real).single()
         assertEquals("default", look.values[Settings.PREF_KEY_FONT])
         assertEquals("font:Y", look.values[Settings.PREF_EMOJI_FONT])
+    }
+
+    // ---- #6: the Themes list's Cancel copy of the pictures stays out of the library ----
+
+    private fun live() = Settings.getCustomBackgroundFile(ctx, false, false)
+    private fun clearPictures() {
+        DeviceProtectedUtils.getFilesDir(ctx).listFiles { f -> f.name.startsWith("custom_background_image") }?.forEach { it.delete() }
+        PictureLibrary.dir(ctx).deleteRecursively()
+    }
+    @After fun removePictures() = clearPictures()
+
+    @Test fun `opening the Themes list doesn't put a forgotten picture back in the library, and Cancel still puts it back`() {
+        clearPictures()
+        live().apply { parentFile?.mkdirs(); writeText("picture P") }
+        PictureFraming.fileFor(live()).writeText("framing P")
+        // P was in the library and the user forgot it there; the keyboard keeps its own copy
+        assertTrue(PictureLibrary.list(ctx).isEmpty())
+        val held = AppearanceLooks.holdPictures(ctx) // the list opens
+        assertTrue(PictureLibrary.list(ctx).isEmpty(), "the forgotten picture is back in the library")
+        // a theme is previewed (another picture, no framing), then Cancel
+        live().writeText("picture Q"); PictureFraming.fileFor(live()).delete()
+        val look = AppearanceLooks.Look("", mapOf(AppearanceLooks.PICTURES to held))
+        AppearanceLooks.applyPictures(ctx, look)
+        assertEquals("picture P", live().readText())
+        assertEquals("framing P", PictureFraming.fileFor(live()).readText())
+        AppearanceLooks.deletePictures(ctx, look)
+        assertFalse(java.io.File(ctx.filesDir, "looks").listFiles().orEmpty().any { it.listFiles().orEmpty().isNotEmpty() })
+    }
+
+    @Test fun `Cancel after opening the Themes list with no picture takes a previewed picture off again`() {
+        clearPictures()
+        val held = AppearanceLooks.holdPictures(ctx)
+        live().apply { parentFile?.mkdirs(); writeText("picture Q") }
+        AppearanceLooks.applyPictures(ctx, AppearanceLooks.Look("", mapOf(AppearanceLooks.PICTURES to held)))
+        assertFalse(live().exists())
     }
 }
