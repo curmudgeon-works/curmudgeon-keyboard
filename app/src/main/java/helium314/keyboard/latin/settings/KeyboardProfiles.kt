@@ -116,7 +116,8 @@ object KeyboardProfiles {
     }
 
     /** What a factory reset keeping the keyboards keeps of their sets (owner 2026-10-11, ticks mean keep): which set is
-     *  whose, the next id, separate settings and the shared menus, so each keyboard reads its set as before. */
+     *  whose, the next id, separate settings and the shared menus, so each keyboard reads its set as before (owner
+     *  2026-10-11: "yes, OK"). */
     val setStructureKeys: Set<String> get() = setOf(PREF_IDS, PREF_NEXT_ID, PREF_SEPARATE) + Group.entries.map { it.prefKey }
 
     /** "keyboard_shared_from", the old record of where shared settings came from (before 2026-10-11): unread. */

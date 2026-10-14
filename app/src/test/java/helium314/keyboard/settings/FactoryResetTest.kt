@@ -212,6 +212,54 @@ class FactoryResetTest {
         assertFalse(real.contains(Settings.PREF_KEY_LONGPRESS_TIMEOUT))
     }
 
+    // ---- chosen items applied again (owner 2026-10-11: "yes, c is good for both ticked") ----
+
+    /** One keyboard (set 1, separate settings off) on saved Layout Work (backspace repeat 70 ms) and saved theme Sunset
+     *  (key gap 3%), both tweaked since (90 ms, 5%: "Custom · from …"), and a setting of no item. */
+    private fun onWorkAndSunset(): Pair<LayoutPresets.Preset, AppearanceLooks.Look> {
+        useKeyboards(ctx, real, a)
+        profileIds(real, mapOf(a to 1), next = 2)
+        val keys = LayoutType.entries.mapNotNull { type -> a.layoutName(type)?.let { "layout:" + type.name to it } }.toMap()
+        LayoutPresets.save(real, listOf(LayoutPresets.Preset("Work", keys + mapOf(Settings.PREF_BACKSPACE_REPEAT_INTERVAL to 70))))
+        AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Sunset", mapOf(Settings.PREF_KEY_HORIZONTAL_GAP to 3f))), now = true)
+        real.edit {
+            putString(own(1, LayoutPresets.PREF_SELECTED), "Work")
+            putInt(own(1, Settings.PREF_BACKSPACE_REPEAT_INTERVAL), 90)
+            putInt(own(1, CustomLabels.Kind.LAYOUT.key), CustomLabels.SET)
+            putString(own(1, AppearanceLooks.PREF_SELECTED), "Sunset")
+            putFloat(own(1, Settings.PREF_KEY_HORIZONTAL_GAP), 5f)
+            putInt(own(1, CustomLabels.Kind.THEME.key), CustomLabels.SET)
+            putInt(own(1, Settings.PREF_KEY_LONGPRESS_TIMEOUT), 999)
+        }
+        return LayoutPresets.load(real).single() to AppearanceLooks.load(real).single()
+    }
+
+    @Test fun `keyboards and own items kept - each keyboard's saved Layout and theme are applied again, tweaks undone`() {
+        val (work, sunset) = onWorkAndSunset()
+        reset(ResetKeep(keyboards = true, own = true))
+        assertEquals(70, real.getInt(own(1, Settings.PREF_BACKSPACE_REPEAT_INTERVAL), 0), "the Layout's value again")
+        assertEquals(3f, real.getFloat(own(1, Settings.PREF_KEY_HORIZONTAL_GAP), 0f), "the theme's value again")
+        assertEquals("Work", real.getString(own(1, LayoutPresets.PREF_SELECTED), null))
+        assertEquals("Sunset", real.getString(own(1, AppearanceLooks.PREF_SELECTED), null))
+        // the rows show Work and Sunset, no "Custom" label
+        assertFalse(real.contains(own(1, CustomLabels.Kind.LAYOUT.key)))
+        assertFalse(real.contains(own(1, CustomLabels.Kind.THEME.key)))
+        val keyboard = SubtypeSettings.getEnabledSubtypes(true).first().toSettingsSubtype()
+        assertFalse(LayoutPresets.isTweaked(ctx, keyboard, work), "the Layouts row would say Custom")
+        assertFalse(AppearanceLooks.isTweaked(ctx, sunset), "the Themes row would say Custom")
+        // a setting of no item: its default
+        assertFalse(real.contains(own(1, Settings.PREF_KEY_LONGPRESS_TIMEOUT)))
+    }
+
+    @Test fun `keyboards alone - the chosen Layout and theme go, their settings back to the defaults`() {
+        onWorkAndSunset()
+        reset(ResetKeep(keyboards = true))
+        for (key in listOf(Settings.PREF_BACKSPACE_REPEAT_INTERVAL, Settings.PREF_KEY_HORIZONTAL_GAP,
+                LayoutPresets.PREF_SELECTED, AppearanceLooks.PREF_SELECTED, Settings.PREF_KEY_LONGPRESS_TIMEOUT))
+            assertFalse(real.contains(own(1, key)), key)
+        assertFalse(real.contains(LayoutPresets.PREF))
+    }
+
     @Test fun `which stored values count as a keyboard's use of own items`() {
         val keep = ResetKeep(keyboards = true, own = true)
         val palettes = setOf("Warm")

@@ -173,13 +173,15 @@ internal fun keptOnReset(key: String, keep: ResetKeep, value: Any? = null, ownPa
     if (!keep.own) return false
     if (plain == null) return key == KeyPopupOverrides.PREF_SETS || key == helium314.keyboard.settings.AppearanceLooks.PREF
         || key == helium314.keyboard.settings.LayoutPresets.PREF || helium314.keyboard.settings.Palettes.isKey(key)
+        // (how the saved items apply, read by the choices applied again below: kept with them, 2026-10-11)
+        || key == helium314.keyboard.settings.SavedItemDefaults.PREF
     // (a keyboard reset is a new keyboard: none of the old ones' uses)
     return keep.keyboards && isOwnItemUse(plain, value, ownPalettes)
 }
 
 /** A keyboard's setting [plain] (stored [value]) that uses one of the user's own items: its per-key popups, the popup
  *  set chosen and its letter-to-symbol map (and their "Custom" label), a custom key layout as its default of a type, a
- *  palette of the user's ([ownPalettes]) for its colours, a loaded font. (Its pictures are files: kept beside.) */
+ *  palette of the user's ([ownPalettes]) for its colors, a loaded font. (Its pictures are files: kept beside.) */
 internal fun isOwnItemUse(plain: String, value: Any?, ownPalettes: Set<String>): Boolean = when (plain) {
     KeyPopupOverrides.PREF, KeyPopupOverrides.PREF_SELECTED_SET, Settings.PREF_SYMBOL_POPUP_MAP,
     helium314.keyboard.settings.CustomLabels.Kind.POPUPS.key, helium314.keyboard.settings.CustomLabels.Kind.POPUPS.fromKey -> true
@@ -189,12 +191,56 @@ internal fun isOwnItemUse(plain: String, value: Any?, ownPalettes: Set<String>):
         && value is String && LayoutUtilsCustom.isCustomLayout(value)
 }
 
+/** What a keyboard chose that is applied again after a reset keeping keyboards and own items, as choosing it applies it. */
+private val reappliedChoices = listOf(helium314.keyboard.settings.LayoutPresets.PREF_SELECTED,
+    KeyPopupOverrides.PREF_SELECTED_SET, helium314.keyboard.settings.AppearanceLooks.PREF_SELECTED)
+
+/** Each set's chosen saved Layout, popup set and theme in [all] (the stored preferences): set id -> key -> name. */
+internal fun chosenItems(all: Map<String, *>): Map<Int, Map<String, String>> {
+    val result = HashMap<Int, HashMap<String, String>>()
+    for ((key, value) in all) {
+        val (id, plain) = KeyboardProfiles.splitOwnKey(key) ?: continue
+        if (plain in reappliedChoices && value is String) result.getOrPut(id) { HashMap() }[plain] = value
+    }
+    return result
+}
+
+/**
+ * After a reset keeping the keyboards and own items (owner 2026-10-11: "if the keyboard retains its use of saved or
+ * preset Layouts, then why do keygaps get reset?" -> "yes, c is good for both ticked"): each listed keyboard with
+ * [chosen] items gets them again as choosing them does (built-in Layouts and themes too; "Saved items take new
+ * defaults" as set): the Layout (settings and keys), then the popup set, then the theme (settings and pictures).
+ * Tweaks on top of an item go back to its values; an item gone since is skipped.
+ */
+private fun reapplyChosenItems(ctx: Context, chosen: Map<Int, Map<String, String>>) {
+    if (chosen.isEmpty()) return
+    val real = ctx.realPrefs()
+    // (looked up again each time: a Layout or popup set can change the keyboard's identity, its set id stays)
+    fun keyboardOf(id: Int) = KeyboardProfiles.idEntries(real).entries.firstOrNull { it.value == id }?.key?.toSettingsSubtype()
+        ?.takeIf { KeyboardProfiles.isListed(real, it) }
+    val layouts = helium314.keyboard.settings.LayoutPresets.builtIn(ctx) + helium314.keyboard.settings.LayoutPresets.load(real)
+    val looks = helium314.keyboard.settings.AppearanceLooks.builtIn(ctx) + helium314.keyboard.settings.AppearanceLooks.load(real)
+    val sets = KeyPopupOverrides.loadSets(real)
+    val takeNew = helium314.keyboard.settings.SavedItemDefaults.takeNewDefaults(real)
+    for ((id, items) in chosen) try {
+        items[helium314.keyboard.settings.LayoutPresets.PREF_SELECTED]?.let { name -> layouts.firstOrNull { it.name == name } }
+            ?.let { preset -> keyboardOf(id)?.let { helium314.keyboard.settings.LayoutPresets.applyToOther(ctx, it, preset) } }
+        items[KeyPopupOverrides.PREF_SELECTED_SET]?.let { name -> sets.firstOrNull { it.name == name } }
+            ?.let { set -> keyboardOf(id)?.let { helium314.keyboard.settings.screens.applySetToOther(ctx, it, set, takeNew) } }
+        items[helium314.keyboard.settings.AppearanceLooks.PREF_SELECTED]?.let { name -> looks.firstOrNull { it.name == name } }
+            ?.let { look -> keyboardOf(id)?.let { helium314.keyboard.settings.AppearanceLooks.applyToOther(ctx, it, look) } }
+    } catch (e: Exception) { helium314.keyboard.latin.utils.Log.e("FactoryReset", "a keyboard's chosen items not applied again", e) }
+}
+
 private fun factoryReset(ctx: Context, keep: ResetKeep) {
     val prefs = ctx.realPrefs()
     // (the learned words were reset before, see the dialog; the buttons to use other keyboards' lists go with the settings)
     Settings.getInstance().stopListener()
     val all = prefs.all
     val ownPalettes = helium314.keyboard.settings.Palettes.list(all).keys
+    // each keyboard's saved Layout, popup set and theme, chosen again after the reset (owner 2026-10-11: "c is good for
+    // both ticked")
+    val chosen = if (keep.keyboards && keep.own) chosenItems(all) else emptyMap()
     prefs.edit { all.filterNot { (key, value) -> keptOnReset(key, keep, value, ownPalettes) }.keys.forEach { remove(it) } }
     KeyboardProfiles.loadGroups(prefs) // (the shared menus as they are now)
     helium314.keyboard.latin.gesture.GestureStats.reload() // (its cached rows would come back over the reset)
@@ -223,6 +269,7 @@ private fun factoryReset(ctx: Context, keep: ResetKeep) {
     Settings.getInstance().startListener()
     SubtypeSettings.reloadEnabledSubtypes(ctx)
     LayoutUtilsCustom.removeMissingLayouts(ctx)
+    reapplyChosenItems(ctx, chosen)
     GestureDecoderVocabulary.clear()
     (ctx.getActivity() as? SettingsActivity)?.prefChanged()
     // the keyboards' sets start again: no screen stays open on a set id that is gone or now another keyboard's
