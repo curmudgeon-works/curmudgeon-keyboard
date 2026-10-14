@@ -106,7 +106,7 @@ internal object RestoreMatch {
         return shownMenus().filter { it in differing }.map { Difference.Menu(it) }
     }
 
-    /** What the phone's keyboard [keyboard] reads now: the shared set with its own on top, plain keys. */
+    /** What the phone's keyboard [keyboard] holds now: its own set, plain keys (no common set since 2026-10-11). */
     fun phoneSettings(real: SharedPreferences, keyboard: SettingsSubtype): Map<String, Any?> =
         KeyboardProfiles.effectiveSettingsIn(real.all, keyboard)
 

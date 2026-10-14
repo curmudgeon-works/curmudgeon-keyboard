@@ -77,7 +77,7 @@ class EditingKeyboardTest {
             putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a, b)))
             putString(Settings.PREF_SELECTED_SUBTYPE, a.toPref())
         }
-        KeyboardProfiles.enable(real, listOf(a, b), keepExisting = false)
+        KeyboardProfiles.enable(real)
         SubtypeSettings.reloadEnabledSubtypes(ctx)
         KeyboardProfiles.refreshImeId(real)
         idA = KeyboardProfiles.idFor(real, a)
@@ -257,7 +257,7 @@ class EditingKeyboardTest {
         activity.runOnUiThread { helium314.keyboard.settings.preferences.runRestore(activity, {}, R.string.backup_restored) {
             real.edit().clear().putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(b, a)))
                 .putString(Settings.PREF_SELECTED_SUBTYPE, a.toPref()).commit()
-            KeyboardProfiles.enable(real, listOf(b, a), keepExisting = false)
+            KeyboardProfiles.enable(real)
         } }
         // (the restore runs on a worker since 2026-10-10 and finishes on the main thread: wait for it to end)
         val until = System.currentTimeMillis() + 5000

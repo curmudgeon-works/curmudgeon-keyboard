@@ -53,7 +53,8 @@ import kotlin.collections.component1
 import kotlin.collections.component2
 import kotlin.collections.set
 
-fun checkVersionUpgrade(context: Context) {
+/** [restoring]: right after a whole restore, whose backup may be from before a step (see restoreFollowUp). */
+fun checkVersionUpgrade(context: Context, restoring: Boolean = false) {
     // the settings as stored (review 2026-10-06 Low: through context.prefs() the steps saw one keyboard's view)
     val prefs = context.realPrefs()
     val oldVersion = prefs.getInt(Settings.PREF_VERSION_CODE, 0)
@@ -69,6 +70,9 @@ fun checkVersionUpgrade(context: Context) {
     keepUserPopupSetsSymbolMap(context.realPrefs())
     // (last: after the steps above changed saved items) saved items remember what their unpicked settings show today
     helium314.keyboard.settings.SavedItemDefaults.rememberToday(context.realPrefs())
+    // (after every step that still knows the common set) no common set: each keyboard its own, the main's for all
+    // (owner 2026-10-11); a restored backup's common set is ignored ("fine to trash common set with upgrade and restore")
+    KeyboardProfiles.dropCommonSet(context.realPrefs(), fromCommon = !restoring)
 }
 
 /** Set once [keepUserPopupSetsSymbolMap] ran (a backup from before carries none: its restore runs it again). */
@@ -153,7 +157,7 @@ internal fun heliBoardLayoutPins(context: Context, real: SharedPreferences, fres
         val all = real.all
         real.edit {
             for (id in setOf(KeyboardProfiles.SHARED) + ids) {
-                fun own(key: String) = KeyboardProfiles.prefixedKey(id, key)
+                fun own(key: String) = if (id == KeyboardProfiles.SHARED) key else KeyboardProfiles.ownKey(id, key) // (the old common set: plain)
                 fun marked(key: String) = id != KeyboardProfiles.SHARED && all.containsKey(own(KeyboardProfiles.TOMBSTONE + key))
                 // what the set reads: its own value, else (not marked "at the default") the shared one
                 fun reads(key: String): Any? = all[own(key)] ?: if (marked(key)) null else all[key]
@@ -305,7 +309,7 @@ private fun ownSetUpgrades(real: SharedPreferences, freshInstall: Boolean) {
         // an id with no set of its own (learned words only, or settings never separate): nothing to move, and
         // nothing written (review 2026-10-06 Low: a partial set that came alive once settings were made separate)
         if (!KeyboardProfiles.hasOwnEntries(real, id)) continue
-        fun k(key: String) = KeyboardProfiles.prefixedKey(id, key)
+        fun k(key: String) = KeyboardProfiles.ownKey(id, key)
         if (!real.getBoolean(k("fonts_follow_migrated"), false)) real.edit {
             // its own "same font as the keys" (on unless this set turned it off) and key font (else the shared one)
             val follows = real.all[k(Settings.PREF_FONT_FOLLOWS_KEY_TEXT)] as? Boolean ?: true

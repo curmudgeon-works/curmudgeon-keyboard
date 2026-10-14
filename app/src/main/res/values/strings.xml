@@ -636,6 +636,8 @@
     <!-- after a restore with one set of settings for all (separate settings off), which the restore leaves off: %s the keyboard(s) -->
     <string name="restore_settings_hidden_one">%s\'s settings were restored. You\'ll see them once you turn on Use separate settings in App settings.</string>
     <string name="restore_settings_hidden_many">The settings of %s were restored. You\'ll see them once you turn on Use separate settings in App settings.</string>
+    <!-- after a restore of the first keyboard while its settings are the common ones: %s the keyboard -->
+    <string name="restore_settings_main">%s\'s settings were restored. All keyboards use them, as they\'re the common settings.</string>
     <string name="restore_differs_choose_message">A ticked item takes the backup\'s. An unticked item keeps this phone\'s.</string>
     <!-- what to merge, while something is ticked (owner 2026-10-11) -->
     <string name="restore_replaces_settings">Selected items replace this keyboard\'s settings, including any unsaved changes.</string>
@@ -691,6 +693,10 @@
     <string name="copy_keyboard_with_settings">Ok: All its settings</string>
     <string name="copy_keyboard_common_settings">The common settings</string>
     <string name="delete_keyboard_title">Delete this keyboard?</string>
+    <!-- the first keyboard can't be deleted while its settings are the common ones: %s the keyboard -->
+    <string name="delete_keyboard_main_blocked">%s\'s settings are the common ones. Move another keyboard to the top first.</string>
+    <!-- a reorder made another keyboard the first while settings are common or a menu is shared: %s the keyboard -->
+    <string name="common_settings_now_from">Common settings now come from %s</string>
     <string name="delete_keyboard_message">\"%s\" will be removed, with its languages, their priorities and its layout choice. This cannot be undone. Its learned and blacklisted words are deleted too. Dictionaries are kept.</string>
     <!-- Keyboards screen, Advanced: one tile for the keyboards neither listed nor deleted (switched off before, or from an
          old backup), unfolding them (2026-10-11). %d = how many -->
@@ -732,17 +738,19 @@
     <string name="per_keyboard_title">Separate settings per keyboard</string>
     <string name="settings_category_this_app">App settings</string>
     <!-- %s is a menu name like Appearance -->
-    <string name="per_keyboard_group_on_message">Each keyboard will have its own %s settings again: the ones it had before, or, for a keyboard without its own, the ones all keyboards use now. The keyboard they were shared from keeps the changes made meanwhile.</string>
+    <!-- %1$s is a menu name like Appearance, %2$s the first keyboard in the list -->
+    <string name="per_keyboard_group_on_message">Each keyboard will have its own %1$s settings again, the ones it had before. %2$s keeps the changes made meanwhile.</string>
     <string name="per_keyboard_group_off_title">Same %s for all keyboards</string>
-    <string name="per_keyboard_group_off_message">All keyboards will use one keyboard\'s %s settings. Each keyboard\'s own settings there stay saved and come back when this menu is per keyboard again; the keyboard you pick keeps the changes you make meanwhile. Use the settings of:</string>
-    <string name="separate_settings_per_keyboard_summary">Off: the settings below apply to every keyboard. On: each keyboard has its own, starting from a copy of the shared ones</string>
-    <string name="separate_settings_enable_message">Every keyboard will use its own settings.\n\nTurning this off later gives all keyboards the primary keyboard\'s settings. Each keyboard\'s own settings stay saved and come back when you turn this on again; the primary keyboard keeps the changes you make meanwhile.</string>
+    <!-- %1$s is a menu name like Appearance, %2$s the first keyboard in the list -->
+    <string name="per_keyboard_group_off_message">All keyboards will use the %1$s settings of %2$s, the first keyboard in the list. Each keyboard\'s own settings there stay saved and come back when this menu is per keyboard again. A change there, from any keyboard, changes %2$s\'s settings. To use another keyboard\'s, move it to the top of the list first.</string>
+    <string name="separate_settings_per_keyboard_summary">Off: every keyboard uses the settings of the first keyboard in the list. On: each keyboard uses its own</string>
+    <string name="separate_settings_enable_message">Every keyboard will use its own settings.\n\nTurning this off later gives all keyboards the settings of the first keyboard in the list. Each keyboard\'s own settings stay saved and come back when you turn this on again; changes made meanwhile change the first keyboard\'s settings.</string>
     <string name="separate_settings_hint">Each keyboard\'s own settings are under its entry above: tap a keyboard to unfold them. The menus all keyboards share are below. Which menus each keyboard keeps to itself, and the switch for separate settings: App settings, Per keyboard.</string>
     <string name="separate_settings_turn_on">Ok: Use separate settings</string>
     <string name="separate_settings_keep_one">Cancel: Keep one set</string>
     <string name="separate_settings_disable_title">Common settings for all keyboards</string>
-    <!-- %1$s: the name of the primary keyboard (the first in the list) -->
-    <string name="separate_settings_disable_message">All keyboards will use the settings of the primary keyboard, %1$s.\n\nEach keyboard\'s own settings stay saved and come back when you turn separate settings on again. %1$s keeps the changes you make meanwhile.</string>
+    <!-- %1$s: the name of the first keyboard in the list -->
+    <string name="separate_settings_disable_message">All keyboards will use the settings of the first keyboard in the list, %1$s.\n\nEach keyboard\'s own settings stay saved and come back when you turn separate settings on again. A change made meanwhile, from any keyboard, changes %1$s\'s settings. To use another keyboard\'s, move it to the top of the list first.</string>
     <string name="separate_settings_use_primary">Ok: Use common settings</string>
     <string name="separate_settings_keep_separate">Cancel: Keep separate settings</string>
     <string name="language_list_summary">Higher priority languages win when matches are close</string>

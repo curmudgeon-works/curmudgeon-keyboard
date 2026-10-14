@@ -56,7 +56,7 @@ class ReReview2R7Test {
         useKeyboards(ctx, real, en, hi)
         profileIds(real, mapOf(en to 1, hi to 2), 3)
         real.edit().putFloat(gap, 2f).putBoolean(autoCap, false).commit()
-        KeyboardProfiles.disable(real, hi)
+        KeyboardProfiles.disable(real)
         KeyboardProfiles.loadGroups(real)
     }
     @After fun tearDown() { zip.delete(); real.edit().clear().commit(); KeyboardProfiles.loadGroups(real); SubtypeSettings.reloadEnabledSubtypes(ctx) }
@@ -93,7 +93,7 @@ class ReReview2R7Test {
         assertEquals("The settings of ${keyboardName(hi, ctx)}, ${keyboardName(en, ctx)} were restored. You'll see them once you turn on Use separate settings in App settings.",
             hiddenSettingsNote(ctx, listOf(hi, en)))
         // separate settings on: Hindi reads the backup's, English the common ones
-        KeyboardProfiles.enable(real, listOf(en, hi), keepExisting = true)
+        KeyboardProfiles.enable(real)
         assertEquals(5f, view(2).getFloat(gap, 0f))
         assertEquals(true, view(2).getBoolean(autoCap, false))
         assertEquals(2f, view(1).getFloat(gap, 0f))

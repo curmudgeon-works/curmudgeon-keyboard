@@ -68,7 +68,7 @@ class ProfilePreferencesTest {
     @Test fun restoredSetReadsBackupDefaultsNotPhoneShared() {
         // the phone's shared set has auto-correct off; the backup's keyboard left it at its default (not stored)
         real.edit().putBoolean("auto_correction", false).putInt("theme_size", 3).putBoolean("fonts_follow_migrated", true).commit()
-        KeyboardProfiles.write(real, 1, mapOf("theme_size" to 5), markDefaults = true)
+        KeyboardProfiles.restoreSet(real, 1, mapOf("theme_size" to 5))
         val own = set(1)
         assertEquals(true, own.getBoolean("auto_correction", true)) // the default, not the phone's shared false
         assertEquals(5, own.getInt("theme_size", 0)) // the backup's value
@@ -184,7 +184,7 @@ class ProfilePreferencesTest {
     @Test fun aMenuMadeSharedTakesTheChosenKeyboardsValuesAndKeepsTheOwnCopies() {
         real.edit().putBoolean(autoCap, true).putBoolean("p1/$autoCap", true).putBoolean("p2/$autoCap", false).commit()
         assertFalse(KeyboardProfiles.isGlobal(autoCap))
-        KeyboardProfiles.setGroupShared(real, correction, true, winnerId = 2)
+        KeyboardProfiles.setGroupShared(real, correction, true)
         assertTrue(KeyboardProfiles.isGlobal(autoCap))
         assertFalse(real.getBoolean(autoCap, true)) // keyboard 2's value
         // (owner 2026-10-11: sharing a menu keeps each keyboard's own) stored, unread while shared
@@ -197,15 +197,15 @@ class ProfilePreferencesTest {
 
     @Test fun theChosenKeyboardAtItsDefaultLeavesTheSharedValueAtItsDefault() {
         real.edit().putBoolean(autoCap, false).putBoolean("p1/~$autoCap", true).commit() // keyboard 1: "Default"
-        KeyboardProfiles.setGroupShared(real, correction, true, winnerId = 1)
+        KeyboardProfiles.setGroupShared(real, correction, true)
         assertFalse(real.contains(autoCap))
         assertTrue(real.contains("p1/~$autoCap")) // (owner 2026-10-11: sharing a menu keeps each keyboard's own)
     }
 
     @Test fun aMenuBackToPerKeyboardStartsEachKeyboardFromTheSharedValues() {
-        KeyboardProfiles.setGroupShared(real, correction, true, winnerId = 1)
+        KeyboardProfiles.setGroupShared(real, correction, true)
         real.edit().putBoolean(autoCap, false).commit()
-        KeyboardProfiles.setGroupShared(real, correction, false, winnerId = KeyboardProfiles.SHARED)
+        KeyboardProfiles.setGroupShared(real, correction, false)
         assertFalse(KeyboardProfiles.isGlobal(autoCap))
         assertFalse(set(1).getBoolean(autoCap, true))
         set(1).edit().putBoolean(autoCap, true).commit()
@@ -213,25 +213,25 @@ class ProfilePreferencesTest {
     }
 
     @Test fun aSettingOnTwoMenusBelongsToThePerKeyboardOne() {
-        KeyboardProfiles.setGroupShared(real, correction, true, winnerId = 1)
+        KeyboardProfiles.setGroupShared(real, correction, true)
         // Swipe still per keyboard: the setting stays each keyboard's own, and shared Text correction doesn't show it
         assertFalse(KeyboardProfiles.isGlobal(spaceAfterSwipe))
         assertTrue(KeyboardProfiles.hiddenOn(real, correction, spaceAfterSwipe))
         assertFalse(KeyboardProfiles.hiddenOn(real, KeyboardProfiles.Group.SWIPE, spaceAfterSwipe))
         assertFalse(KeyboardProfiles.hiddenOn(real, correction, autoCap)) // only on Text correction: shown
         // both shared: one value, shown on both
-        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.SWIPE, true, winnerId = 1)
+        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.SWIPE, true)
         assertTrue(KeyboardProfiles.isGlobal(spaceAfterSwipe))
         assertFalse(KeyboardProfiles.hiddenOn(real, correction, spaceAfterSwipe))
         // without separate settings nothing is hidden
         real.edit().putBoolean("separate_settings_per_keyboard", false).commit()
-        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.SWIPE, false, winnerId = KeyboardProfiles.SHARED)
+        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.SWIPE, false)
         assertFalse(KeyboardProfiles.hiddenOn(real, correction, spaceAfterSwipe))
     }
 
     @Test fun refineSwipeAndLearningIsSharedUntilMadePerKeyboard() {
         assertTrue(KeyboardProfiles.isGlobal(turn))
-        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.REFINE, false, winnerId = KeyboardProfiles.SHARED)
+        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.REFINE, false)
         assertFalse(KeyboardProfiles.isGlobal(turn))
         set(1).edit().putFloat(turn, 0.3f).commit()
         assertEquals(0.3f, real.getFloat("p1/$turn", 0f))

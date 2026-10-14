@@ -71,7 +71,7 @@ class PartialRestoreItemsTest {
         }
     }
     private fun own() = ProfilePreferences(real) { KeyboardProfiles.idFor(real, keyboard) }
-    private fun ownChoice(key: String) = real.getString(KeyboardProfiles.prefixedKey(KeyboardProfiles.idFor(real, keyboard), key), null)
+    private fun ownChoice(key: String) = real.getString(KeyboardProfiles.prefixedKey(real, KeyboardProfiles.idFor(real, keyboard), key), null)
 
     @Test fun `new items come in under their names, and a second restore adds nothing`() {
         backup()

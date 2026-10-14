@@ -52,7 +52,7 @@ class LayoutDraftTest {
             real.edit().putBoolean("separate_settings_per_keyboard", true)
                 .putString(Settings.PREF_ENABLED_SUBTYPES, a.toPref()).putString(Settings.PREF_SELECTED_SUBTYPE, a.toPref()).commit()
             val id = KeyboardProfiles.idFor(real, a)
-            real.edit().putInt(KeyboardProfiles.prefixedKey(id, Settings.PREF_KEY_LONGPRESS_TIMEOUT), 333).commit() // its own
+            real.edit().putInt(KeyboardProfiles.prefixedKey(real, id, Settings.PREF_KEY_LONGPRESS_TIMEOUT), 333).commit() // its own
             Settings.init(ctx) // (the keyboard loaded: its listener reloads on every change)
             Settings.getInstance().loadSettings(ctx, java.util.Locale.US,
                 helium314.keyboard.latin.InputAttributes(android.view.inputmethod.EditorInfo(), false, ctx.packageName))
@@ -75,7 +75,7 @@ class LayoutDraftTest {
             SubtypeUtilsAdditional.changeAdditionalSubtype(a, changed, ctx)
             again.accept()
             assertEquals(id, KeyboardProfiles.idFor(real, changed))
-            assertEquals(333, real.getInt(KeyboardProfiles.prefixedKey(KeyboardProfiles.idFor(real, changed), Settings.PREF_KEY_LONGPRESS_TIMEOUT), -1))
+            assertEquals(333, real.getInt(KeyboardProfiles.prefixedKey(real, KeyboardProfiles.idFor(real, changed), Settings.PREF_KEY_LONGPRESS_TIMEOUT), -1))
         } finally {
             real.edit().clear().commit()
             KeyboardProfiles.refreshImeId(real)

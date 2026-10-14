@@ -53,8 +53,8 @@ class ShareMenuKeepsOwnTest {
     }
     @After fun tearDown() { KeyboardProfiles.deleteAllFiles(); real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
 
-    private fun share(winner: Int) = KeyboardProfiles.setGroupShared(real, appearance, true, winner)
-    private fun unshare() = KeyboardProfiles.setGroupShared(real, appearance, false, KeyboardProfiles.SHARED)
+    private fun share(winner: Int) = KeyboardProfiles.setGroupShared(real, appearance, true)
+    private fun unshare() = KeyboardProfiles.setGroupShared(real, appearance, false)
 
     // (owner 2026-10-11: labels are just "Custom", no number; only kept palettes are numbered)
     @Test fun `own values and labels stay stored while shared and come back`() {

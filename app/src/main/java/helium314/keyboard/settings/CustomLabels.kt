@@ -35,17 +35,11 @@ object CustomLabels {
     fun detach(real: SharedPreferences, selectedKey: String, name: String, kind: Kind) {
         val ids = real.all.mapNotNull { (stored, value) ->
             if (value != name) null
-            else if (stored == selectedKey) KeyboardProfiles.SHARED
             else KeyboardProfiles.splitOwnKey(stored)?.takeIf { it.second == selectedKey }?.first
         }.toSet()
-        for (id in ids) {
-            if (id == KeyboardProfiles.SHARED || !KeyboardProfiles.isGlobal(kind.key)) {
-                val view = helium314.keyboard.latin.settings.ProfilePreferences(real) { id }
-                mark(view, kind)
-                view.edit(commit = true) { putString(kind.fromKey, name) } // (labelled before too: "from" it now)
-            }
-            else markOwn(real, id, kind, name) // (a keyboard's own set hidden by a shared menu: its own label)
-        }
+        // each set its own label and origin, in its own set (a shared menu's label: the main keyboard's set has it for
+        // all, the others' hidden ones come back; owner 2026-10-11: no separate common set); labelled before too: "from" it now
+        for (id in ids) markOwn(real, id, kind, name)
     }
 
     /** Set [id]'s own label for [kind]: in its own set also while the menu is shared, hidden then (owner 2026-10-11:

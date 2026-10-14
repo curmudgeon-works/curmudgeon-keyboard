@@ -85,7 +85,7 @@ class RestoreOnlyThatKeyboardTest {
     // (owner 2026-10-11: restore matches by language and asks: Hindi answered "merge into the phone's Hindi", all ticked)
     private val whole get() = mapOf(hi to helium314.keyboard.settings.preferences.RestoreDecision.Merge(hi))
 
-    private fun unshare() = KeyboardProfiles.setGroupShared(real, appearance, false, KeyboardProfiles.SHARED)
+    private fun unshare() = KeyboardProfiles.setGroupShared(real, appearance, false)
 
     @Test fun `a shared menu's values go to the keyboard's own hidden set, not the shared one`() {
         backup()

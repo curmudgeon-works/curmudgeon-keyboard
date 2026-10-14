@@ -632,12 +632,16 @@ private fun RestoreChooseDialog(question: MergeQuestion, target: SettingsSubtype
 }
 
 /** What the restore says when done, if [keyboards] got their settings while one set is for all (owner 2026-10-11, R7:
- *  "should inform so it doesn't look like nothing happened"), else null. */
+ *  "should inform so it doesn't look like nothing happened"), else null: the others' wait in their own sets, the main
+ *  keyboard's are the common settings, which all keyboards use now (owner 2026-10-11, no separate common set). */
 internal fun hiddenSettingsNote(ctx: Context, keyboards: List<SettingsSubtype>): String? {
     if (keyboards.isEmpty()) return null
-    val names = keyboards.map { keyboardName(it, ctx) }
-    return if (names.size == 1) ctx.getString(R.string.restore_settings_hidden_one, names.single())
+    val main = KeyboardProfiles.mainKeyboard(ctx.realPrefs()).takeIf { it in keyboards }
+    val names = keyboards.filter { it != main }.map { keyboardName(it, ctx) }
+    val others = if (names.isEmpty()) null else if (names.size == 1) ctx.getString(R.string.restore_settings_hidden_one, names.single())
         else ctx.getString(R.string.restore_settings_hidden_many, names.joinToString(", "))
+    val mainNote = main?.let { ctx.getString(R.string.restore_settings_main, keyboardName(it, ctx)) }
+    return listOfNotNull(mainNote, others).joinToString("\n")
 }
 
 /** The steps of restoring [pending]'s job: each of its entries, then the learned words (the settings: see runRestore). */
@@ -934,8 +938,8 @@ internal fun restoreKeyboardsFrom(ctx: Context, file: File, keyboards: List<Sett
  * the priorities of its languages, in its own set only; other keyboards stay as they are. A custom layout the phone has
  * under the same name with other keys comes in numbered ([restoreLayoutFiles]), and the keyboard names that one.
  * With one set of settings for all, separate settings stay off (owner 2026-10-11: R7, a restore never turns separate
- * settings on): the keyboard's own set waits behind the common one until they are turned on.
- * The result: each restored keyboard as it is on the phone now, and those whose settings wait so.
+ * settings on): the keyboard's own set waits until they are turned on, the main keyboard's is what all keyboards use.
+ * The result: each restored keyboard as it is on the phone now, and those restored while settings are one for all.
  */
 private fun restoreKeyboards(ctx: Context, pending: PendingRestore, asked: List<SettingsSubtype>, withSettings: Boolean,
                              asCopies: Boolean = true, decisions: Map<SettingsSubtype, RestoreDecision> = emptyMap()
@@ -973,9 +977,6 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, asked: L
     }
     if (chosen.isEmpty()) return emptyMap<SettingsSubtype, SettingsSubtype>() to emptyList() // (nothing to bring, nothing touched)
     val replaces = chosen.mapNotNull { keyboard -> (decisions[keyboard] as? RestoreDecision.Merge)?.let { keyboard to it.replace } }.toMap()
-    // what the partly merged keyboards read now (before any change), for the menus that stay the phone's
-    val phoneSettings = if (!withSettings) emptyMap() else
-        replaces.filterValues { it.menus != null }.mapValues { (_, plan) -> RestoreMatch.phoneSettings(real, plan.phone) }
     // (a keyboard merged in parts: only its ticked parts and menus come from the backup)
     fun takesLayout(keyboard: SettingsSubtype, type: LayoutType) = replaces[keyboard]?.takes(RestoreMatch.Part.Layout(type)) != false
     fun takesSetting(keyboard: SettingsSubtype, key: String) =
@@ -1059,36 +1060,31 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, asked: L
             SubtypeSettings.addEnabledSubtype(prefs, phoneKeyboard.toAdditionalSubtype())
         if (withSettings) {
             val id = KeyboardProfiles.idFor(real, phoneKeyboard)
-            // exactly that set, its own only, a shared menu's values too, hidden there (owner 2026-10-11: "restore should
-            // only apply to that keyboard's settings"): a setting the backup leaves at its default gets a default mark,
-            // so it doesn't read the phone's shared value instead. Merged in parts: only its entries of the ticked menus
-            // (the others stay, hidden ones too); with one set for all, the phone's values it read for the others
+            // exactly that set, its own only, a shared menu's values too (owner 2026-10-11: "restore should only apply to
+            // that keyboard's settings"; the main keyboard's set is the common settings: restored, everyone sees it, owner
+            // 2026-10-11: "yep"). Merged in parts: only its entries of the ticked menus, the others stay as they are
             val restored = settings.getValue(keyboard)
-            val phoneValues = phoneSettings[keyboard]
-            if (phoneValues != null && !wasSeparate) KeyboardProfiles.restoreSet(real, id, RestoreMatch.settings(plan!!, phoneValues, restored))
-            else if (phoneValues != null) KeyboardProfiles.restoreSet(real, id, restored) { takesSetting(keyboard, it) }
+            if (plan?.menus != null) KeyboardProfiles.restoreSet(real, id, restored) { takesSetting(keyboard, it) }
             else KeyboardProfiles.restoreSet(real, id, restored)
-            // (one set for all: turning separate settings on later gives it this set, not the common one)
-            if (!wasSeparate) KeyboardProfiles.restoredBehindShared(real, id)
             // an item it chose that wasn't brought in (its name is the phone's for other content, copies off): it names
             // none and shows "Custom" (owner 2026-10-11, option 2); of the menus taken from the backup only
             renames?.customKinds(backupSettings.getValue(keyboard).filterKeys { takesSetting(keyboard, it) })?.forEach {
                 helium314.keyboard.settings.CustomLabels.markOwn(real, id, it) }
-            // its languages' priorities, into its own set (not the shared one, which every other keyboard reads: review
-            // session 2026-10-07): the backup's own copy for this keyboard first, else the backup's shared value
-            // (merged in parts: only when its languages are the backup's)
+            // its languages' priorities, into its own set (review session 2026-10-07): the backup's own copy for this
+            // keyboard (an old backup's common value is ignored, owner 2026-10-11: "fine to trash common set with upgrade
+            // and restore"; merged in parts: only when its languages are the backup's)
             val backupId = KeyboardProfiles.idIn(backup, keyboard)
             if (plan?.takes(RestoreMatch.Part.Extra(helium314.keyboard.latin.common.Constants.Subtype.ExtraValue.SECONDARY_LOCALES)) != false) real.edit {
                 for (locale in listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues))
                     for (key in LanguagePriority.keys(locale).filter { LanguagePriority.isPriorityKey(it) }) {
-                        val value = (backupId?.let { backup[KeyboardProfiles.ownKey(it, key)] } ?: backup[key]) as? Int ?: continue
+                        val value = backupId?.let { backup[KeyboardProfiles.ownKey(it, key)] } as? Int ?: continue
                         putInt(KeyboardProfiles.ownKey(id, key), value)
                     }
             }
             // its own pictures in the backup, or the backup's shared ones when it had no set of its own (merged in
             // parts: with Appearance ticked)
             if (plan?.takes(KeyboardProfiles.Group.APPEARANCE) != false)
-                KeyboardProfiles.restoreFiles(pictureFiles, KeyboardProfiles.idIn(backup, keyboard) ?: KeyboardProfiles.SHARED, id,
+                KeyboardProfiles.restoreFiles(pictureFiles, KeyboardProfiles.idIn(backup, keyboard), id,
                     perKeyboardBackup = backup["profile_files_migrated"] == true)
         }
     }
@@ -1309,8 +1305,10 @@ internal fun restoreFollowUp(ctx: Context) {
     // the restored file's menu sharing first: the upgrade steps find each keyboard's own keys by it (re-review
     // 2026-10-07: they ran with the phone's, and a backup's HeliBoard keyboards missed their pins)
     KeyboardProfiles.loadGroups(ctx.realPrefs())
-    checkVersionUpgrade(ctx)
+    // (the moves first, as at app start: the last upgrade step drops an old backup's common set, which they still move
+    // values into; 2026-10-11)
     KeyboardProfiles.settingsMoves(ctx.realPrefs())
+    checkVersionUpgrade(ctx, restoring = true)
 }
 
 /** Reads the preferences entry of a backup, the keyboards listed in it and the names of all its entries. */

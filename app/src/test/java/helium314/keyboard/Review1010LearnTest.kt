@@ -98,9 +98,9 @@ class Review1010LearnTest {
     @Test fun `a keyboard with only defaults doesn't mark the one-time flags`() {
         val keyboard = separateWithFlags()
         val id = KeyboardProfiles.idFor(real, keyboard)
-        KeyboardProfiles.write(real, id, emptyMap(), markDefaults = true) // Add keyboard -> "defaults only"
+        KeyboardProfiles.clearSet(real, id) // Add keyboard -> "defaults only"
         for (flag in flags) assertFalse(real.contains(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + flag)), flag)
-        KeyboardProfiles.disable(real, keyboard) // separate settings OFF, shared from that keyboard
+        KeyboardProfiles.disable(real) // separate settings OFF, shared from that keyboard
         for (flag in flags) assertTrue(real.getBoolean(flag, false), "$flag dropped: its move runs again")
     }
 
@@ -108,7 +108,7 @@ class Review1010LearnTest {
         val keyboard = separateWithFlags()
         val id = KeyboardProfiles.idFor(real, keyboard)
         real.edit().apply { flags.forEach { putBoolean(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + it), true) } }.commit()
-        KeyboardProfiles.disable(real, keyboard)
+        KeyboardProfiles.disable(real)
         for (flag in flags) assertTrue(real.getBoolean(flag, false), "$flag dropped: its move runs again")
     }
 

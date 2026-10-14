@@ -262,11 +262,13 @@ class CopyModelTest {
     // (owner 2026-10-11: labels are just "Custom", no number; only kept palettes are numbered)
     @Test fun `a Custom label moves with its menu when the menu becomes shared`() {
         CustomLabels.mark(view(1), CustomLabels.Kind.THEME) // (keyboard 2: no copy)
-        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.APPEARANCE, true, 2)
-        assertFalse(CustomLabels.has(view(1), CustomLabels.Kind.THEME)) // (keyboard 2's choice won: no label)
+        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.APPEARANCE, true)
+        // (owner 2026-10-11: no separate common set) US's, the common one: its label for all
+        assertTrue(CustomLabels.has(view(2), CustomLabels.Kind.THEME))
         // (owner 2026-10-11: sharing a menu keeps each keyboard's own) kept, unread, back when per keyboard again
-        assertEquals(1, real.getInt(own(1, CustomLabels.Kind.THEME.key), 0))
-        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.APPEARANCE, false, KeyboardProfiles.SHARED)
+        assertEquals(1, real.getInt(own(1, CustomLabels.Kind.THEME.key), 0)); assertFalse(real.contains(own(2, CustomLabels.Kind.THEME.key)))
+        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.APPEARANCE, false)
         assertTrue(CustomLabels.has(view(1), CustomLabels.Kind.THEME))
+        assertFalse(CustomLabels.has(view(2), CustomLabels.Kind.THEME))
     }
 }

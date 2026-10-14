@@ -94,7 +94,7 @@ class PartialRestoreLayoutsTest {
     private fun LayoutType.folderName() = "layouts/${name.lowercase()}"
 
     private fun enabled() = SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }
-    private fun ownDefault(keyboard: SettingsSubtype) = real.getString(KeyboardProfiles.prefixedKey(KeyboardProfiles.idFor(real, keyboard), defaultKey), null)
+    private fun ownDefault(keyboard: SettingsSubtype) = real.getString(KeyboardProfiles.prefixedKey(real, KeyboardProfiles.idFor(real, keyboard), defaultKey), null)
 
     @Test fun `other keys under a name the phone has come in numbered, and only the restored keyboard uses them`() {
         file(numrow).writeText("A")

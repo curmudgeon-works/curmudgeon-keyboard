@@ -50,8 +50,8 @@ class SharedEditsStayTest {
     }
     @After fun tearDown() { KeyboardProfiles.deleteAllFiles(); real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
 
-    private fun share(winner: Int) = KeyboardProfiles.setGroupShared(real, appearance, true, winner)
-    private fun unshare() = KeyboardProfiles.setGroupShared(real, appearance, false, KeyboardProfiles.SHARED)
+    private fun share(winner: Int) = KeyboardProfiles.setGroupShared(real, appearance, true)
+    private fun unshare() = KeyboardProfiles.setGroupShared(real, appearance, false)
 
     @Test fun `a menu's edits while shared stay with the keyboard it was shared from`() {
         share(1)
@@ -62,9 +62,9 @@ class SharedEditsStayTest {
     }
 
     @Test fun `the main switch's edits while off stay with the keyboard the settings came from`() {
-        KeyboardProfiles.disable(real, english)
+        KeyboardProfiles.disable(real)
         view(1).edit().putFloat(gap, 3f).commit()
-        KeyboardProfiles.enable(real, listOf(english, hindi), keepExisting = true)
+        KeyboardProfiles.enable(real)
         assertEquals(3f, view(1).getFloat(gap, 0f), "English lost the edit")
         assertEquals(4f, view(2).getFloat(gap, 0f))
     }

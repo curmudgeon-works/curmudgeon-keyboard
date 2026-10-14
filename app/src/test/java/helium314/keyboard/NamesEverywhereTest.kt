@@ -136,7 +136,7 @@ class NamesEverywhereTest {
 
     @Test fun `a deleted popup set leaves the shared popups with the Layout menu shared`() {
         val key = KeyPopupOverrides.PREF_SELECTED_SET
-        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.LAYOUT, true, winnerId = 1)
+        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.LAYOUT, true)
         saveSetsST()
         real.edit().putString(key, "S").putString(KeyPopupOverrides.PREF, popups).commit()
         deletePopupSet(ctx, "S")

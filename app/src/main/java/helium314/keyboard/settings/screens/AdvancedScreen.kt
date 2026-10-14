@@ -472,14 +472,12 @@ private fun SeparateSettingsPreference(setting: Setting) {
     Preference(name = setting.title, description = stringResource(R.string.separate_settings_per_keyboard_summary),
         onClick = { asking = true }) { Switch(checked = separate, onCheckedChange = { asking = true }) }
     if (!asking) return
-    val enabledNow = helium314.keyboard.latin.utils.SubtypeSettings.getEnabledSubtypes(true)
-        .map { with(helium314.keyboard.latin.settings.SettingsSubtype) { it.toSettingsSubtype() } }
     if (!separate)
         ConfirmationDialog(
             onDismissRequest = { asking = false },
-            // each keyboard gets its saved settings back; one without starts from a copy of the common ones
+            // each keyboard reads its own set again (owner 2026-10-11: no separate common set, nothing copied)
             onConfirmed = {
-                helium314.keyboard.latin.settings.KeyboardProfiles.enable(real, enabledNow, keepExisting = true)
+                helium314.keyboard.latin.settings.KeyboardProfiles.enable(real)
                 helium314.keyboard.latin.settings.KeyboardProfiles.refreshImeId(real)
                 separate = true; asking = false
             },
@@ -489,13 +487,13 @@ private fun SeparateSettingsPreference(setting: Setting) {
             cancelButtonText = stringResource(R.string.separate_settings_keep_one), // (Android's order: Cancel, then OK)
         )
     else {
-        // the primary keyboard: the first in the list (and in the switching order)
-        val primary = enabledNow.firstOrNull()
-            ?: with(helium314.keyboard.latin.settings.SettingsSubtype) { helium314.keyboard.latin.utils.SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype() }
+        // the main keyboard: the first in the list (owner 2026-10-11: "Not the keyboard you pick, but the first keyboard
+        // in our list"), whose own set every keyboard reads then
+        val primary = helium314.keyboard.latin.settings.KeyboardProfiles.mainKeyboard(real)
         ConfirmationDialog(
             onDismissRequest = { asking = false },
             onConfirmed = {
-                helium314.keyboard.latin.settings.KeyboardProfiles.disable(real, primary)
+                helium314.keyboard.latin.settings.KeyboardProfiles.disable(real)
                 helium314.keyboard.latin.settings.KeyboardProfiles.refreshImeId(real)
                 separate = false; asking = false
             },
@@ -507,8 +505,9 @@ private fun SeparateSettingsPreference(setting: Setting) {
     }
 }
 
-/** One menu under Per keyboard: on = each keyboard its own settings there, off = one set for all keyboards. Going to
- *  one set asks whose settings all keyboards take: the primary keyboard's preselected. */
+/** One menu under Per keyboard: on = each keyboard its own settings there, off = one set for all keyboards, the main
+ *  keyboard's (the first in the list): both ways ask first, no keyboard to pick (owner 2026-10-11, no separate common
+ *  set: "Ok" to the first keyboard for all shared menus). */
 @Composable
 private fun GroupPreference(setting: Setting, group: helium314.keyboard.latin.settings.KeyboardProfiles.Group) {
     val ctx = LocalContext.current
@@ -522,12 +521,9 @@ private fun GroupPreference(setting: Setting, group: helium314.keyboard.latin.se
         }
     }
     if (!asking) return
-    val keyboards = helium314.keyboard.latin.utils.SubtypeSettings.getEnabledSubtypes(true)
-        .map { with(helium314.keyboard.latin.settings.SettingsSubtype) { it.toSettingsSubtype() } }
-    fun applyChoice(shared: Boolean, winner: helium314.keyboard.latin.settings.SettingsSubtype?) {
-        val winnerId = winner?.let { helium314.keyboard.latin.settings.KeyboardProfiles.idFor(real, it) }
-            ?: helium314.keyboard.latin.settings.KeyboardProfiles.SHARED
-        helium314.keyboard.latin.settings.KeyboardProfiles.setGroupShared(real, group, shared, winnerId)
+    val main = keyboardName(helium314.keyboard.latin.settings.KeyboardProfiles.mainKeyboard(real), ctx)
+    fun apply(shared: Boolean) {
+        helium314.keyboard.latin.settings.KeyboardProfiles.setGroupShared(real, group, shared)
         helium314.keyboard.latin.settings.KeyboardProfiles.refreshImeId(real)
         KeyboardSwitcher.getInstance().setThemeNeedsReload()
         perKeyboard = !shared; asking = false
@@ -535,25 +531,16 @@ private fun GroupPreference(setting: Setting, group: helium314.keyboard.latin.se
     if (!perKeyboard)
         ConfirmationDialog(
             onDismissRequest = { asking = false },
-            onConfirmed = { applyChoice(false, null) },
+            onConfirmed = { apply(false) },
             title = { Text(setting.title) },
-            content = { Text(stringResource(R.string.per_keyboard_group_on_message, setting.title)) },
+            content = { Text(stringResource(R.string.per_keyboard_group_on_message, setting.title, main)) },
         )
-    else if (keyboards.size < 2) applyChoice(true, keyboards.firstOrNull()) // nothing to choose from
     else
-        // whose settings all keyboards take: the primary keyboard (the first in the list) unless another is picked
-        helium314.keyboard.settings.dialogs.ListPickerDialog(
+        ConfirmationDialog(
             onDismissRequest = { asking = false },
-            items = keyboards,
-            onItemSelected = { applyChoice(true, it) },
-            title = { Column {
-                Text(stringResource(R.string.per_keyboard_group_off_title, setting.title))
-                Text(stringResource(R.string.per_keyboard_group_off_message, setting.title),
-                    style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
-            } },
-            selectedItem = keyboards.first(),
-            getItemName = { keyboardName(it, ctx) },
-            confirmImmediately = false,
+            onConfirmed = { apply(true) },
+            title = { Text(stringResource(R.string.per_keyboard_group_off_title, setting.title)) },
+            content = { Text(stringResource(R.string.per_keyboard_group_off_message, setting.title, main)) },
         )
 }
 

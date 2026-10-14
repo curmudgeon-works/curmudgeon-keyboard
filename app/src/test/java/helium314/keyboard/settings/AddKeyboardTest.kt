@@ -52,10 +52,10 @@ class AddKeyboardTest {
         real.edit().putBoolean(KeyboardProfiles.ownKey(KeyboardProfiles.idFor(real, b), Settings.PREF_SHOW_NUMBER_ROW), true)
             .putBoolean(Settings.PREF_SHOW_NUMBER_ROW, false).commit()
     }
-    private fun separateOn() = KeyboardProfiles.enable(real, listOf(a, b, added), keepExisting = true)
+    private fun separateOn() = KeyboardProfiles.enable(real)
 
     @Test fun `separate settings - the new keyboard starts as the keyboard picked`() {
-        KeyboardProfiles.enable(real, listOf(a, b), keepExisting = true); bWithItsOwn()
+        KeyboardProfiles.enable(real); bWithItsOwn()
         startSettings(ctx, added, StartSettings.From(b))
         assertTrue(numberRow(added))
     }

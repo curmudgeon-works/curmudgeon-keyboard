@@ -134,8 +134,10 @@ fun KeyboardsScreen(
                 var dragOffset by remember { mutableFloatStateOf(0f) }
                 fun persistOrder() {
                     val value = SubtypeSettings.createPrefSubtypes(order)
+                    val mainBefore = KeyboardProfiles.mainKeyboard(real)
                     ctx.prefs().edit { putString(Settings.PREF_ENABLED_SUBTYPES, value) }
                     SubtypeSettings.reloadEnabledSubtypes(ctx)
+                    onOrderChanged(ctx, mainBefore)
                     generation++
                 }
                 HorizontalDivider() // under the title bar, above the first keyboard (like the other screens' first group)
@@ -263,17 +265,18 @@ fun KeyboardsScreen(
                         setId = { KeyboardProfiles.idFor(real, enabled[0].toSettingsSubtype()) })
                 else
                     Text(
-                        stringResource(R.string.separate_settings_hint),
+                        stringResource(R.string.separate_settings_hint), // (the menus below: the first keyboard's)
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                     )
                 // with separate settings: Advanced once, for all keyboards (its settings are app-wide)
                 if (separate && enabled.size > 1) {
-                    // the menus every keyboard shares, once (they edit one set for all)
-                    val inUse = SubtypeSettings.getSelectedSubtype(ctx.prefs()).toSettingsSubtype()
-                    KeyboardSettingsEntries(inUse, showLanguages = false, showAdvanced = false,
-                        setId = { KeyboardProfiles.idFor(real, inUse) },
+                    // the menus every keyboard shares, once: the main keyboard's set (owner 2026-10-11: no separate
+                    // common set, the first keyboard's own settings are the common ones)
+                    val main = KeyboardProfiles.mainKeyboard(real)
+                    KeyboardSettingsEntries(main, showLanguages = false, showAdvanced = false,
+                        setId = { KeyboardProfiles.idFor(real, main) },
                         groups = { g -> sharedMenu(g) })
                 }
                 if (separate) AdvancedEntry(showRefine = sharedMenu(KeyboardProfiles.Group.REFINE))
@@ -435,7 +438,8 @@ private fun addNewKeyboard(ctx: Context, keyboard: SettingsSubtype) {
 
 /**
  * The settings [keyboard] starts from, as picked when it was added: another keyboard's own (as that one reads them now),
- * the common ones, or every default. With one set for all keyboards the pick is kept for when settings are made separate.
+ * the common ones (the first keyboard's), or every default: its own set, made at once (owner 2026-10-11: every keyboard
+ * always has its own set; with one set for all keyboards it reads the first keyboard's until settings are separate).
  * A source of another script keeps its popups to itself (they're for its letters): the new keyboard has the default popups.
  */
 internal fun startSettings(ctx: Context, keyboard: SettingsSubtype, start: StartSettings) {
@@ -466,9 +470,25 @@ private fun startWords(ctx: Context, keyboard: SettingsSubtype, learned: List<Se
  *  an added keyboard; [mergeInto] takes its lists ([DeleteKeyboardDialog]). Switched off, it isn't in the list: taking
  *  it out does nothing (an added keyboard's definition marks it as one, so no listed keyboard is taken for it). */
 internal fun deleteKeyboard(ctx: Context, keyboard: SettingsSubtype, mergeInto: SettingsSubtype?) {
+    if (KeyboardProfiles.mainBlocksDelete(ctx.realPrefs(), keyboard)) return // (see DeleteKeyboardDialog)
     if (keyboard.isAdditionalSubtype(ctx.prefs())) SubtypeUtilsAdditional.removeAdditionalSubtype(ctx, keyboard.toAdditionalSubtype())
     SubtypeSettings.removeEnabledSubtype(ctx, keyboard.toAdditionalSubtype())
     helium314.keyboard.latin.personalization.LearnedKeyboards.deleteKeyboard(ctx, keyboard, mergeInto) // (its words too)
+}
+
+/** The keyboard list was reordered: when another keyboard is first now while its settings are the common ones (separate
+ *  settings off, a menu shared), every keyboard reads the new first one's at once (owner 2026-10-11: "yep"): the keyboard
+ *  reloads its look and a line says so. */
+internal fun onOrderChanged(ctx: Context, mainBefore: SettingsSubtype) {
+    val real = ctx.realPrefs()
+    val main = KeyboardProfiles.mainKeyboard(real)
+    if (main == mainBefore || !KeyboardProfiles.mainIsCommon(real)) return
+    helium314.keyboard.latin.utils.SettingsEventLog.log("the main keyboard is ${main.toPref()} now")
+    KeyboardProfiles.refreshImeId(real)
+    helium314.keyboard.settings.preferences.clearSettingsCaches()
+    helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().setThemeNeedsReload()
+    (ctx.getActivity() as? helium314.keyboard.settings.SettingsActivity)?.prefChanged()
+    android.widget.Toast.makeText(ctx, ctx.getString(R.string.common_settings_now_from, keyboardName(main, ctx)), android.widget.Toast.LENGTH_LONG).show()
 }
 
 /**
@@ -480,6 +500,12 @@ internal fun deleteKeyboard(ctx: Context, keyboard: SettingsSubtype, mergeInto: 
 @Composable
 internal fun DeleteKeyboardDialog(keyboard: SettingsSubtype, onDismissRequest: () -> Unit, onConfirmed: (SettingsSubtype?) -> Unit) {
     val ctx = LocalContext.current
+    // the first keyboard while its settings are the common ones: not deleted (owner 2026-10-11: "can't delete when
+    // common settings are selected. User should be asked to push it down in prio order first.")
+    if (KeyboardProfiles.mainBlocksDelete(ctx.realPrefs(), keyboard)) {
+        helium314.keyboard.settings.dialogs.InfoDialog(ctx.getString(R.string.delete_keyboard_main_blocked, keyboardName(keyboard, ctx)), onDismissRequest)
+        return
+    }
     val readers = remember(keyboard) { helium314.keyboard.latin.personalization.LearnedKeyboards.listReaders(ctx.realPrefs(), keyboard) }
     var pick: SettingsSubtype? by remember { mutableStateOf(null) }
     helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog(

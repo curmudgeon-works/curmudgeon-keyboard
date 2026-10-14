@@ -62,13 +62,11 @@ object SavedItemDefaults {
         set.popupOrder?.takeIf { KeyPopupOverrides.ORDER in set.atDefault }?.let { Settings.PREF_POPUP_KEYS_ORDER to it }).toMap()
 
     /**
-     * The switch flipped to [takeNew]: every keyboard set (the shared one and each keyboard's own, hidden ones too) gets
-     * it at once for the user's Layout, theme and popup set it chose (owner 2026-10-11, review A2/A3). For each setting
-     * such an item holds at its default with a remembered value: off, a set storing no value of its own for it gets the
-     * remembered one (a keyboard's own set that reads a value the shared set picked keeps reading that); on, a set
-     * storing just that value has it taken off, a keyboard's own then reads the default (a mark) where the shared set
-     * still holds a value, else it holds nothing, as before it was turned off (review 2026-10-11 S4: it was marked
-     * either way, so a value picked in the shared set later no longer reached it).
+     * The switch flipped to [takeNew]: every keyboard's set (the main keyboard's, the common settings, among them; hidden
+     * ones too) gets it at once for the user's Layout, theme and popup set it chose (owner 2026-10-11, review A2/A3). For
+     * each setting such an item holds at its default with a remembered value: off, a set storing no value of its own for
+     * it gets the remembered one; on, a set storing just that value has it taken off, as before it was turned off (owner
+     * 2026-10-11: no separate common set, so no common value to fall back on).
      * By value, no notes per keyboard (owner: a value set by hand to exactly the remembered one moves with the switch).
      * A popup set's accents level is the keyboard's (in its identity): the keyboards get it, switched-off ones too, as
      * [plan] says (worked out before the switch is written: the screen asks first when it renames one).
@@ -86,22 +84,15 @@ object SavedItemDefaults {
         val enabled = SubtypeSettings.createSettingsSubtypes(real.getString(Settings.PREF_ENABLED_SUBTYPES, "")!!)
         val editor = real.edit()
         var changed = false
-        val sharedDropped = HashSet<String>() // (taken off the shared set in this pass: it goes first)
-        for (id in listOf(KeyboardProfiles.SHARED) + before.keys.mapNotNull { KeyboardProfiles.splitOwnKey(it)?.first }.distinct().sorted()) {
-            // what set [id] chose for [key]: its own entry, nothing where marked, else the shared one; a shared menu's
-            // own entries too, kept hidden until the menu is per keyboard again (owner 2026-10-11: "Deleting should
-            // not happen. Behavior should be same")
-            fun chosen(key: String): String? = when {
-                id == KeyboardProfiles.SHARED -> before[key] as? String
-                KeyboardProfiles.isAppWide(key) -> null
-                before.containsKey(KeyboardProfiles.ownKey(id, key)) -> before[KeyboardProfiles.ownKey(id, key)] as? String
-                before.containsKey(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + key)) -> null
-                KeyboardProfiles.isGlobal(key) -> null // (a shared menu, nothing of its own: the shared set's choice)
-                else -> before[key] as? String
-            }
-            // (a Layout's popups only go on a keyboard of its script: the keyboards of this set)
-            val keyboards: List<SettingsSubtype> = if (id == KeyboardProfiles.SHARED) enabled + ids.keys.map { it.toSettingsSubtype() }
-                else ids.filterValues { it == id }.keys.map { it.toSettingsSubtype() }
+        for (id in before.keys.mapNotNull { KeyboardProfiles.splitOwnKey(it)?.first }.distinct().sorted()) {
+            // what set [id] chose for [key]: its own entry; a shared menu's own entries too, kept hidden until the menu is
+            // per keyboard again (owner 2026-10-11: "Deleting should not happen. Behavior should be same")
+            fun chosen(key: String): String? =
+                if (KeyboardProfiles.isAppWide(key)) null else before[KeyboardProfiles.ownKey(id, key)] as? String
+            // (a Layout's popups only go on a keyboard of its script: the keyboards of this set, the main one's for all
+            // while it is the common settings)
+            val keyboards: List<SettingsSubtype> = ids.filterValues { it == id }.keys.map { it.toSettingsSubtype() } +
+                (if (id == KeyboardProfiles.mainId(real) && KeyboardProfiles.mainIsCommon(real)) enabled else emptyList())
             val held = HashMap<String, Any>()
             chosen(LayoutPresets.PREF_SELECTED)?.takeIf { it !in builtInLayouts }?.let { name -> layouts.firstOrNull { it.name == name } }
                 ?.let { held.putAll(LayoutPresets.rememberedFor(it, keyboards)) }
@@ -110,23 +101,16 @@ object SavedItemDefaults {
             chosen(KeyPopupOverrides.PREF_SELECTED_SET)?.let { name -> sets.firstOrNull { it.name == name } }
                 ?.let { held.putAll(remembered(it)) } // (the set's map and order over a Layout's: the set is chosen on its own)
             for ((key, value) in held) {
-                if (id == KeyboardProfiles.SHARED) {
-                    if (!takeNew && !before.containsKey(key)) { KeyboardProfiles.put(editor, key, value); changed = true }
-                    else if (takeNew && atChosenDefault(key, before[key], held)) { editor.remove(key); sharedDropped.add(key); changed = true }
-                    continue
-                }
-                if (KeyboardProfiles.isAppWide(key)) continue // (the shared set's)
+                if (KeyboardProfiles.isAppWide(key)) continue // (no keyboard's)
                 val own = KeyboardProfiles.ownKey(id, key)
                 val mark = KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + key)
                 if (!takeNew) {
                     if (before.containsKey(own)) continue
-                    if (!before.containsKey(mark) && before.containsKey(key)) continue // (it reads what the shared set picked)
                     KeyboardProfiles.put(editor, own, value)
                     editor.remove(mark)
                     changed = true
                 } else if (before.containsKey(own) && atChosenDefault(key, before[own], held)) {
                     editor.remove(own)
-                    if (before.containsKey(key) && key !in sharedDropped) editor.putBoolean(mark, true)
                     changed = true
                 }
             }
@@ -165,12 +149,12 @@ object SavedItemDefaults {
     fun accentsPlan(real: SharedPreferences, takeNew: Boolean, nameOf: (SettingsSubtype) -> String): AccentsPlan {
         val before = real.all
         val sets = KeyPopupOverrides.loadSets(real)
-        val separate = KeyboardProfiles.isSeparate(real)
         val enabled = SubtypeSettings.createSettingsSubtypes(real.getString(Settings.PREF_ENABLED_SUBTYPES, "")!!).distinct()
         val off = SwitchedOffKeyboards.list(real).filter { it !in enabled }
         // [keyboard] (its set: the one it reads now) as [named] after the switch
         fun followed(keyboard: SettingsSubtype, named: SettingsSubtype = keyboard): SettingsSubtype {
-            val id = if (separate) KeyboardProfiles.anyIdIn(before, keyboard) ?: KeyboardProfiles.SHARED else KeyboardProfiles.SHARED
+            // (the set it reads: its own, the main keyboard's with one set for all or Layout shared; no separate common set)
+            val id = KeyboardProfiles.anyIdIn(before, keyboard) ?: KeyboardProfiles.SHARED
             val set = ProfilePreferences(real) { id }.getString(KeyPopupOverrides.PREF_SELECTED_SET, null)
                 ?.let { name -> sets.firstOrNull { it.name == name } }?.takeIf { KeyPopupOverrides.ACCENTS in it.atDefault }
                 ?: return named

@@ -41,7 +41,7 @@ fun rememberPrefSnapshot(prefs: SharedPreferences, keys: Collection<String>, key
 
 /**
  * Like [PrefSnapshot], but of what is stored for the set [setId] itself: its own value, its "at the default" mark, or
- * neither (it follows the shared value). Cancel then leaves a keyboard that followed the shared value following it;
+ * neither (at its default; before 2026-10-11 it followed the common set). Cancel then leaves it as it was;
  * reading the values through the keyboard's view gave the shared value, and putting that back made it the keyboard's
  * own (review 2026-10-07, finding 10).
  */
@@ -49,8 +49,8 @@ class RawPrefSnapshot(private val real: SharedPreferences, private val setId: In
     private val stored: Map<String, Any?> = keys.flatMap { rawKeys(it) }.associateWith { real.all[it] }
 
     private fun rawKeys(key: String): List<String> {
-        val own = KeyboardProfiles.prefixedKey(setId, key)
-        return if (own == key) listOf(key) else listOf(own, KeyboardProfiles.prefixedKey(setId, KeyboardProfiles.TOMBSTONE + key))
+        val own = KeyboardProfiles.prefixedKey(real, setId, key)
+        return if (own == key) listOf(key) else listOf(own, KeyboardProfiles.prefixedKey(real, setId, KeyboardProfiles.TOMBSTONE + key))
     }
 
     /** Puts back what was stored; true when anything had changed, so the caller reloads. */
