@@ -148,15 +148,11 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
         val current = currentPopupPreset(prefs, keyboard, presets, overrides)
         @Composable fun presetName(p: Preset) = p.userName ?: stringResource(p.name)
         // the keyboard's popups differ from the set it chose (edits stay on the keyboard until saved, 2026-10-11): it
-        // shows "Custom · from Mine"; no set and no built-in recipe: "Custom"
-        val chosenSet = current?.userName?.let { name -> userSets.firstOrNull { it.name == name } }
-        val differs = chosenSet != null && popupSetDiffers(prefs, keyboard, chosenSet, overrides,
+        // shows "Custom · from Mine"; no set: "from" the built-in it has the recipe of (review E2, popupsRow)
+        val row = popupsRow(ctx, prefs, keyboard, presets, userSets, overrides,
             helium314.keyboard.settings.SavedItemDefaults.takeNewDefaults(ctx.realPrefs()))
-        val custom = current == null || differs
-        val rowLabel = if (!custom) presetName(current!!) else remember(custom, chosenSet?.name, generation) {
-            helium314.keyboard.settings.CustomLabels.mark(prefs, helium314.keyboard.settings.CustomLabels.Kind.POPUPS)
-            helium314.keyboard.settings.CustomLabels.text(ctx, prefs, helium314.keyboard.settings.CustomLabels.Kind.POPUPS, chosenSet?.name)
-        }
+        val custom = row.custom
+        val rowLabel = row.text ?: ""
         // every arrangement belongs to a set of the user's own: into the selected one, or into a new one to be named
         fun storeInSet(name: String, all: Map<String, List<String>>) {
             storePopupSet(ctx, keyboard, name, accentsValue, symbolsLayout, all)
@@ -498,6 +494,32 @@ internal fun popupPresets(keyboard: SettingsSubtype, userSets: List<KeyPopupOver
         else builtIn
     } + userSets.map { Preset(0, it.morePopups, it.symbolsLayout, it.name, it.overrides, symbolMap = it.symbolMap, popupOrder = it.popupOrder,
         follows = if (takeNew) it.atDefault else emptySet()) }
+
+/** The presets row for [keyboard] ([prefs]: its settings view, [overrides] its own arrangement): the user's set it chose,
+ *  else the built-in whose recipe it has; a keyboard with its own arrangement on a built-in's recipe (or one that never
+ *  chose any) differs from that built-in, a recipe no built-in has from the default one: "Custom · from HeliBoard extra",
+ *  and the built-in's plain name once it matches again; its set deleted: "Custom · from Mine" until it chooses one
+ *  (review E2: the same rules as Themes and Layouts, [helium314.keyboard.settings.CustomLabels.row]). */
+internal fun popupsRow(ctx: Context, prefs: SharedPreferences, keyboard: SettingsSubtype, presets: List<Preset>,
+                       userSets: List<KeyPopupOverrides.UserSet>, overrides: Map<String, List<String>>, takeNew: Boolean
+): helium314.keyboard.settings.CustomLabels.Row {
+    val current = currentPopupPreset(prefs, keyboard, presets, overrides)
+    val chosenSet = current?.userName?.let { name -> userSets.firstOrNull { it.name == name } }
+    val builtIns = presets.filter { it.userName == null }
+    val from = current
+        ?: currentPopupPreset(prefs, keyboard, builtIns, emptyMap()) // (the recipe, its own arrangement on top)
+        ?: builtIns.firstOrNull { it.morePopups == Defaults.PREF_MORE_POPUP_KEYS && it.symbolsLayout == null // the default
+            && (it.symbolMap == null || it.symbolMap == Defaults.PREF_SYMBOL_POPUP_MAP)
+            && (it.popupOrder == null || it.popupOrder == Defaults.PREF_POPUP_KEYS_ORDER) }
+    val name = from?.let { it.userName ?: ctx.getString(it.name) }
+    val kind = helium314.keyboard.settings.CustomLabels.Kind.POPUPS
+    val row = helium314.keyboard.settings.CustomLabels.row(ctx, prefs, kind, KeyPopupOverrides.PREF_SELECTED_SET, name) {
+        current == null || (chosenSet != null && popupSetDiffers(prefs, keyboard, chosenSet, overrides, takeNew)) }
+    if (name != null || row.custom || current != null) return row
+    // (no built-in to name, none being the default: plain "Custom")
+    helium314.keyboard.settings.CustomLabels.mark(prefs, kind)
+    return helium314.keyboard.settings.CustomLabels.Row(helium314.keyboard.settings.CustomLabels.text(ctx, null), true)
+}
 
 /** The preset the presets row names for [keyboard] (settings [prefs], its own arrangement [overrides]): its chosen set
  *  of the user's own; else a built-in whose recipe it has, when it has no arrangement of its own (2026-10-08: a keyboard

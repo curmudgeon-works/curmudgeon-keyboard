@@ -6,6 +6,8 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.settings.KeyboardProfiles
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * "Custom": the label of a keyboard whose Layout, theme or popups differ from the saved item it chose (or whose item
@@ -16,7 +18,9 @@ import helium314.keyboard.latin.settings.KeyboardProfiles
  * Int: any value > 0 (older ones are numbers) means "has a label"; written as [SET].
  * The item deleted: its name at that moment is stored next to the label ([Kind.fromKey]) and still shown, "Custom · from
  * Work", until the copy goes (owner 2026-10-11: "I see, so reference that name with rename. Hardcode with delete?"):
- * while the item exists the label references it, a rename shows the new name.
+ * while the item exists the label references it, a rename shows the new name. That stored name alone tells a deleted
+ * item ([deleted]); a keyboard that never chose one is a copy of the built-in default, "Custom · from Curmudgeon" (review
+ * E2, [row]).
  */
 object CustomLabels {
     enum class Kind(val key: String) { LAYOUT("custom_label_layout"), THEME("custom_label_theme"), POPUPS("custom_label_popups");
@@ -54,15 +58,63 @@ object CustomLabels {
         }
     }
 
-    /** The stored keys of every set's label of [kinds] and its origin (plain or "p<id>/"): what an editing screen
-     *  records when it opens, so its Discard can drop the labels added meanwhile ([removeNew]). */
+    /** The stored keys of every set's label of [kinds] and its origin (plain or "p<id>/"). */
     fun stored(real: SharedPreferences, kinds: Collection<Kind>): Set<String> {
         val keys = kinds.flatMapTo(HashSet()) { listOf(it.key, it.fromKey) }
         return real.all.keys.filterTo(HashSet()) { (KeyboardProfiles.splitOwnKey(it)?.second ?: it) in keys }
     }
 
-    /** Discard: the labels of [kinds] stored now but not in [before] go, so a Discard leaves no stray "Custom" (review
-     *  D2); those there before stay as they are. */
+    /** Every set's label of [kinds] and its origin as stored (raw key -> value): what an editing screen records when it
+     *  opens, so its Discard puts them back exactly ([putBack]). */
+    fun storedValues(real: SharedPreferences, kinds: Collection<Kind>): Map<String, Any?> {
+        val keys = stored(real, kinds)
+        return real.all.filterKeys { it in keys }
+    }
+
+    /** Discard: the labels of [kinds] and their origins exactly as in [before] ([storedValues] at the open): those added
+     *  since go (review D2), those changed or cleared since come back with their origin, "from Work" too (review E3:
+     *  before, a label or origin cleared on the screen stayed cleared). */
+    fun putBack(real: SharedPreferences, kinds: Collection<Kind>, before: Map<String, Any?>) {
+        val now = storedValues(real, kinds)
+        if (now == before) return
+        real.edit(commit = true) {
+            for (key in now.keys) if (key !in before) remove(key)
+            for ((key, value) in before) if (now[key] != value) { if (value == null) remove(key) else KeyboardProfiles.put(this, key, value) }
+        }
+    }
+
+    /** The labels of [kinds] as an editing screen found them when it opened, for its Discard ([putBack]); kept on disk
+     *  with its snapshot ([toJson], [fromJson]). */
+    class Opened private constructor(private val values: Map<String, Any?>?, private val keys: Set<String>) {
+        /** Discard: the labels and origins as they were ([CustomLabels.putBack]); a snapshot of before review E3 has
+         *  only the keys: the labels added since go ([removeNew]). */
+        fun putBack(real: SharedPreferences, kinds: Collection<Kind>) {
+            if (values != null) CustomLabels.putBack(real, kinds, values) else CustomLabels.removeNew(real, kinds, keys)
+        }
+
+        /** Into the snapshot's [json]: "labelValues" (raw key -> typed value), and "labels" (the keys) as before. */
+        fun toJson(json: JSONObject) {
+            json.put("labels", JSONArray(keys.toList()))
+            values?.let { v -> json.put(VALUES, JSONObject().also { o -> v.forEach { (k, x) -> AppearanceLooks.toJson(x)?.let { o.put(k, it) } } }) }
+        }
+
+        companion object {
+            private const val VALUES = "labelValues"
+            fun of(real: SharedPreferences, kinds: Collection<Kind>): Opened = CustomLabels.storedValues(real, kinds).let { Opened(it, it.keys) }
+
+            /** From a snapshot's [json]; null: one from before review D2 without labels (they stay as they are). */
+            fun fromJson(json: JSONObject): Opened? {
+                json.optJSONObject(VALUES)?.let { o ->
+                    val values = o.keys().asSequence().associateWith { AppearanceLooks.fromJson(o.getJSONObject(it)) }
+                    return Opened(values, values.keys)
+                }
+                return json.optJSONArray("labels")?.let { a -> Opened(null, (0 until a.length()).mapTo(HashSet()) { a.getString(it) }) }
+            }
+        }
+    }
+
+    /** Discard with a snapshot of before review E3 (only the keys): the labels of [kinds] stored now but not in [before]
+     *  go; those there before stay as they are. */
     fun removeNew(real: SharedPreferences, kinds: Collection<Kind>, before: Set<String>) {
         val added = stored(real, kinds) - before
         if (added.isNotEmpty()) real.edit(commit = true) { added.forEach { remove(it) } }
@@ -73,6 +125,43 @@ object CustomLabels {
 
     /** The deleted item the keyboard's copy of [kind] came from, while it has the label. */
     fun origin(prefs: SharedPreferences, kind: Kind): String? = if (has(prefs, kind)) prefs.getString(kind.fromKey, null) else null
+
+    /** The item of [kind] the keyboard ([prefs]) had chosen was deleted (its choice at [selectedKey] gone with it): only
+     *  a delete stores the origin's name ([detach]), so a label without one is a copy of an item that exists, the
+     *  built-in default included for a keyboard that never chose one (review E2: "deleted" was the label alone, and a
+     *  never-chosen keyboard's first change showed plain "Custom" for good). */
+    fun deleted(prefs: SharedPreferences, kind: Kind, selectedKey: String): Boolean =
+        prefs.getString(selectedKey, null) == null && origin(prefs, kind) != null
+
+    /** What a saved-item row shows: [text] (null: nothing), and whether it's the keyboard's copy, "Custom" ([custom]). */
+    class Row(val text: String?, val custom: Boolean)
+
+    /** The row of [kind] for the keyboard ([prefs], its choice at [selectedKey]). [chosen]: the item it reads, the one it
+     *  chose while that exists, or the built-in default when it never chose one (null: none to name). [differs]: the
+     *  keyboard's settings differ from [chosen]. Its chosen item deleted: "Custom · from Work" until it chooses again;
+     *  else differing: "Custom · from Curmudgeon" (labelled from now on, [mark]), and the item's plain name again once
+     *  it matches (review E2, the same for a never-chosen keyboard as for a chosen built-in or saved item). */
+    fun row(ctx: Context, prefs: SharedPreferences, kind: Kind, selectedKey: String, chosen: String?, differs: () -> Boolean): Row {
+        if (deleted(prefs, kind, selectedKey)) return Row(text(ctx, origin(prefs, kind)), true)
+        if (chosen == null || !differs()) return Row(chosen, false)
+        mark(prefs, kind)
+        return Row(text(ctx, chosen), true)
+    }
+
+    /** The Themes row for the keyboard ([prefs]: its settings view; [ctx]: the screen editing it), [builtIn] and [looks]
+     *  the built-in and saved themes: its chosen theme, none chosen the default look, Dynamic (on Android 12 and up). */
+    fun themeRow(ctx: Context, prefs: SharedPreferences, builtIn: List<AppearanceLooks.Look>, looks: List<AppearanceLooks.Look>): Row {
+        val chosenName = prefs.getString(AppearanceLooks.PREF_SELECTED, null)
+            ?: ctx.getString(R.string.theme_preset_dynamic).takeIf { android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S }
+        val chosen = chosenName?.let { name -> (builtIn + looks).firstOrNull { it.name == name } }
+        return row(ctx, prefs, Kind.THEME, AppearanceLooks.PREF_SELECTED, chosen?.name) { AppearanceLooks.isTweaked(ctx, chosen!!) }
+    }
+
+    /** The Layouts row for [keyboard] ([prefs]: its settings view; [ctx]: the screen editing it), [chosen] the Layout it
+     *  reads: its chosen one, none chosen the default, Curmudgeon. */
+    fun layoutRow(ctx: Context, prefs: SharedPreferences, keyboard: helium314.keyboard.latin.settings.SettingsSubtype,
+                  chosen: LayoutPresets.Preset): Row =
+        row(ctx, prefs, Kind.LAYOUT, LayoutPresets.PREF_SELECTED, chosen.name) { LayoutPresets.isTweaked(ctx, keyboard, chosen) }
 
     /** The keyboard chose an item again (or its copy was saved as one): no label, no stored origin. */
     fun clear(prefs: SharedPreferences, kind: Kind) {

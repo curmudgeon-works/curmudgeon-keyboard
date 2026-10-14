@@ -27,9 +27,10 @@ class AppearanceDraft private constructor(
     // themes, each set's theme choice and palettes, so Discard undoes a rename or delete everywhere it reached (owner
     // 2026-10-11: "Every action on an editing screen ... is held until Save; Discard undoes it everywhere it reached")
     private val reached: Map<String, Any?> = emptyMap(),
-    // the theme Custom labels stored when the screen opened (any set): Discard drops the ones added since
-    // (review D2); not part of hasChanges, as a label alone is no change of the screen. Null: none dropped
-    private val labels: Set<String>? = null,
+    // the theme Custom labels and their origins stored when the screen opened (any set): Discard puts them back exactly
+    // (review D2: the ones added since go; E3: a cleared one, "from Work" too, comes back); not part of hasChanges, as a
+    // label alone is no change of the screen. Null: left as they are
+    private val labels: CustomLabels.Opened? = null,
     // what the palette editor wrote with its Save: kept when the app is left (owner 2026-10-11, S2: "yes let's keep
     // saved subscreen changes"), undone by Appearance's own Discard
     private val writes: SubScreenWrites = SubScreenWrites(dir, null) { false },
@@ -146,7 +147,7 @@ class AppearanceDraft private constructor(
             for ((key, value) in reached) if (now[key] != value) KeyboardProfiles.put(this, key, value)
         }.commit()
         AppearanceLooks.applyScreen(ctx, prefs, ProfilePreferences(real) { setId })
-        labels?.let { CustomLabels.removeNew(real, LABELS, it) }
+        labels?.putBack(real, LABELS)
         if (keep) { writes.writeTo(real); AppearanceLooks.reload(ctx) }
         discard()
     }
@@ -240,7 +241,7 @@ class AppearanceDraft private constructor(
             val prefs = currentPrefs(ctx)
             val setId = PrefsDraft.currentSetId(ctx)
             val reached = reachedNow(ctx)
-            val labels = CustomLabels.stored(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx), LABELS)
+            val labels = CustomLabels.Opened.of(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx), LABELS)
             writeSnapshot(dir, setId, prefs, files, reached, labels)
             return AppearanceDraft(prefs, files, dir, setId, reached, labels, SubScreenWrites(dir, null, ::recorded))
         }
@@ -268,9 +269,9 @@ class AppearanceDraft private constructor(
         private fun reachedNow(ctx: Context): Map<String, Any?> =
             helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx).all.filterKeys { reachesBeyond(it) }
 
-        private fun writeSnapshot(dir: File, setId: String, prefs: Map<String, Any?>, files: Map<File, Saved?>, reached: Map<String, Any?>, labels: Set<String>?) {
+        private fun writeSnapshot(dir: File, setId: String, prefs: Map<String, Any?>, files: Map<File, Saved?>, reached: Map<String, Any?>, labels: CustomLabels.Opened?) {
             val json = JSONObject().put("set", setId)
-            labels?.let { json.put("labels", org.json.JSONArray(it.toList())) }
+            labels?.toJson(json)
             json.put("prefs", JSONObject().also { o -> prefs.forEach { (k, v) -> AppearanceLooks.toJson(v)?.let { o.put(k, it) } } })
             json.put("reached", JSONObject().also { o -> reached.forEach { (k, v) -> AppearanceLooks.toJson(v)?.let { o.put(k, it) } } })
             json.put("files", JSONObject().also { o -> files.forEach { (live, saved) ->
@@ -298,7 +299,7 @@ class AppearanceDraft private constructor(
                 val reached = r?.keys()?.asSequence()?.associateWith { AppearanceLooks.fromJson(r.getJSONObject(it)) }
                     ?: reachedNow(ctx)
                 // (a snapshot from before review D2 has no "labels": the labels stay as they are now)
-                val labels = json.optJSONArray("labels")?.let { a -> (0 until a.length()).mapTo(HashSet()) { a.getString(it) } }
+                val labels = CustomLabels.Opened.fromJson(json)
                 // (what the palette editor saved before the crash stays, as when the app is left)
                 val writes = SubScreenWrites.load(dir, null, ::recorded)
                 val draft = AppearanceDraft(prefs, files, dir, json.optString("set", KeyboardProfiles.SHARED), reached, labels, writes)

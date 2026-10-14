@@ -69,17 +69,15 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
     val changed = (ctx.getActivity() as? helium314.keyboard.settings.SettingsActivity)?.prefChanged?.collectAsState()
     val chosen = prefs.getString(LayoutPresets.PREF_SELECTED, null)?.let { name -> all.firstOrNull { it.name == name } }
         ?: builtIn.first()
-    // its Layout was deleted: its copy, "Custom", until it chooses one again
-    val detached = prefs.getString(LayoutPresets.PREF_SELECTED, null) == null
-        && helium314.keyboard.settings.CustomLabels.has(prefs, helium314.keyboard.settings.CustomLabels.Kind.LAYOUT)
-    val tweaked = detached || remember(changed?.value, keyboard, chosen, generation) { LayoutPresets.isTweaked(ctx, keyboard, chosen) }
-    // differs from it: the keyboard's own copy, "Custom · from Work" (2026-10-11, no number since; was "unsaved")
-    val customText = if (!tweaked) null else remember(tweaked, chosen.name, generation) {
-        helium314.keyboard.settings.CustomLabels.mark(prefs, helium314.keyboard.settings.CustomLabels.Kind.LAYOUT)
-        helium314.keyboard.settings.CustomLabels.text(ctx, prefs, helium314.keyboard.settings.CustomLabels.Kind.LAYOUT, chosen.name.takeIf { !detached })
-    }
+    // differs from it (none chosen: Curmudgeon, the default): the keyboard's own copy, "Custom · from Work" (2026-10-11, no
+    // number since; was "unsaved"); its Layout deleted: "Custom · from Work" until it chooses one again (review E2: only a
+    // stored origin means deleted, CustomLabels.row)
+    val row = remember(changed?.value, keyboard, chosen, generation, prefs.getString(LayoutPresets.PREF_SELECTED, null),
+        helium314.keyboard.settings.CustomLabels.origin(prefs, helium314.keyboard.settings.CustomLabels.Kind.LAYOUT)) {
+        helium314.keyboard.settings.CustomLabels.layoutRow(ctx, prefs, keyboard, chosen) }
+    val tweaked = row.custom
     Preference(name = stringResource(R.string.layout_presets),
-        description = customText ?: chosen.name, descriptionItalic = tweaked,
+        description = row.text ?: chosen.name, descriptionItalic = tweaked,
         onClick = { showList = true }) { NextScreenIcon() }
     // which of the user's Layouts differ from the keyboard as it was when the list opened: those get the save icon
     val differs = remember(showList, generation) { presets.associateWith { LayoutPresets.isTweaked(ctx, keyboard, it) } }

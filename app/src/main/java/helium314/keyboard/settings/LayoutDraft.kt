@@ -30,9 +30,10 @@ class LayoutDraft private constructor(
     private val dir: File,
     /** The keyboard (subtype preference string) the screen was opened for. */
     val subtype: String,
-    // the Layout and popup Custom labels stored when the screen opened (any set): Discard drops the ones added
-    // since (review D2); out of [changedKeys], as a label alone is no change of the screen. Null: none dropped
-    private val labels: Set<String>? = null,
+    // the Layout and popup Custom labels and their origins stored when the screen opened (any set): Discard puts them
+    // back exactly (review D2: the ones added since go; E3: a cleared one, "from Work" too, comes back); out of
+    // [changedKeys], as a label alone is no change of the screen. Null: left as they are
+    private val labels: CustomLabels.Opened? = null,
     // what the screens opened from here wrote with their Save: kept when the app is left (owner 2026-10-11, S2: "yes
     // let's keep saved subscreen changes"), undone by this screen's own Discard
     private val writes: SubScreenWrites = SubScreenWrites(dir, null) { false },
@@ -143,7 +144,7 @@ class LayoutDraft private constructor(
         Settings.getValues()?.let { Settings.getInstance().loadSettings(Settings.getCurrentContext(), it.mLocale, it.mInputAttributes) }
         KeyboardLayoutSet.onSystemLocaleChanged()
         runCatching { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
-        labels?.let { CustomLabels.removeNew(real, LABELS, it) }
+        labels?.putBack(real, LABELS)
         if (keep) writes.writeTo(real) // (a Custom label a sub-screen's save handed out stays too)
         rejectedSubtype = if (keep) listed(subtype) ?: subtype else subtype
         discard()
@@ -239,9 +240,9 @@ class LayoutDraft private constructor(
         /** The running draft for [subtype], or a fresh snapshot. */
         fun of(ctx: Context, subtype: String): LayoutDraft = active ?: start(ctx, subtype).also { active = it }
 
-        private fun write(dir: File, subtype: String, hasLayouts: Boolean, prefs: Map<String, Any?>, labels: Set<String>, learnedDone: Boolean) {
+        private fun write(dir: File, subtype: String, hasLayouts: Boolean, prefs: Map<String, Any?>, labels: CustomLabels.Opened, learnedDone: Boolean) {
             val json = JSONObject().put("subtype", subtype).put("layouts", hasLayouts).put("learnedDone", learnedDone)
-            json.put("labels", org.json.JSONArray(labels.toList()))
+            labels.toJson(json)
             json.put("prefs", JSONObject().also { o -> prefs.forEach { (k, v) -> AppearanceLooks.toJson(v)?.let { o.put(k, it) } } })
             File(dir, PREFS_FILE).writeText(json.toString())
         }
@@ -274,7 +275,7 @@ class LayoutDraft private constructor(
             // copies keep the live files' times, so an unchanged folder compares equal
             copy?.walkTopDown()?.filter { it.isFile }?.forEach { f -> f.setLastModified(File(live, f.relativeTo(copy).path).lastModified()) }
             val prefs = scoped(ctx)
-            val labels = CustomLabels.stored(ctx.realPrefs(), LABELS)
+            val labels = CustomLabels.Opened.of(ctx.realPrefs(), LABELS)
             val learnedDone = helium314.keyboard.latin.personalization.LearnedKeyboards.isDone(ctx.realPrefs())
             write(dir, subtype, copy != null, prefs, labels, learnedDone)
             return LayoutDraft(prefs, copy, dir, subtype, labels, SubScreenWrites(dir, live, ::recorded), learnedDone)
@@ -292,7 +293,7 @@ class LayoutDraft private constructor(
                 val prefs = p.keys().asSequence().associateWith { AppearanceLooks.fromJson(p.getJSONObject(it)) }
                 val copy = if (json.optBoolean("layouts")) File(dir, "layouts") else null
                 // (a snapshot from before review D2 has no "labels": the labels stay as they are now)
-                val labels = json.optJSONArray("labels")?.let { a -> (0 until a.length()).mapTo(HashSet()) { a.getString(it) } }
+                val labels = CustomLabels.Opened.fromJson(json)
                 // (what a sub-screen saved before the crash stays, as when the app is left)
                 val writes = SubScreenWrites.load(dir, layoutsDir(ctx), ::recorded)
                 val learnedDone = if (json.has("learnedDone")) json.getBoolean("learnedDone") else null
