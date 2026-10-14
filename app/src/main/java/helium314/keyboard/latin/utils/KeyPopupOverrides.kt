@@ -65,6 +65,8 @@ object KeyPopupOverrides {
     }
 
     fun saveSets(prefs: SharedPreferences, sets: List<UserSet>) {
+        // (a list that can't be read loaded as empty: kept aside first, as saved Layouts and themes do; 2026-10-11)
+        helium314.keyboard.settings.keepBrokenAside(prefs, PREF_SETS)
         val arr = JSONArray()
         for (set in sets) arr.put(JSONObject().apply {
             put("name", set.name); put("morePopups", set.morePopups); put("symbolsLayout", set.symbolsLayout ?: "")

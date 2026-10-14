@@ -139,6 +139,21 @@ class ReReviewLowTest {
         assertNull(real.all.keys.firstOrNull { it.startsWith("layout_presets_broken_") })
     }
 
+    // D7 (2026-10-11): the popup sets list too (a save after a failed load wrote over it for good)
+    @Test fun `a popup sets list that can't be read is kept aside before a save`() {
+        val sets = helium314.keyboard.latin.utils.KeyPopupOverrides
+        real.edit().putString(sets.PREF_SETS, "[{broken").commit()
+        assertEquals(emptyList(), sets.loadSets(real))
+        sets.saveSets(real, listOf(helium314.keyboard.latin.utils.KeyPopupOverrides.UserSet("Mine", "all", null, mapOf("a" to listOf("á")))))
+        val aside = real.all.keys.filter { it.startsWith(sets.PREF_SETS + "_broken_") }
+        assertEquals(1, aside.size)
+        assertEquals("[{broken", real.getString(aside[0], null))
+        assertEquals(listOf("Mine"), sets.loadSets(real).map { it.name })
+        // a readable list is saved over as usual, nothing more put aside
+        sets.saveSets(real, emptyList())
+        assertEquals(1, real.all.keys.count { it.startsWith(sets.PREF_SETS + "_broken_") })
+    }
+
     // C4
     @Test fun `a renamed or deleted theme is followed in every keyboard's set`() {
         real.edit().putString(AppearanceLooks.PREF_SELECTED, "Mine").putString("p2/" + AppearanceLooks.PREF_SELECTED, "Mine")
