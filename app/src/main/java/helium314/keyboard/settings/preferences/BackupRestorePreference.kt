@@ -56,6 +56,7 @@ import helium314.keyboard.latin.personalization.LearnedStoreIo
 import helium314.keyboard.latin.personalization.LearnedStoreMigration
 import helium314.keyboard.latin.personalization.LearnedStores
 import helium314.keyboard.latin.personalization.PersonalizationHelper
+import helium314.keyboard.latin.personalization.RestoreGate
 import helium314.keyboard.latin.personalization.UserHistoryDictionary
 import helium314.keyboard.latin.personalization.byScript
 import helium314.keyboard.latin.personalization.countsOf
@@ -938,8 +939,10 @@ private fun restoreRefresh(ctx: Context) {
     clearSettingsCaches()
     Settings.getInstance().startListener()
     SubtypeSettings.reloadEnabledSubtypes(ctx)
-    val newDictBroadcast = Intent(DictionaryPackConstants.NEW_DICTIONARY_INTENT_ACTION)
-    ctx.getActivity()?.sendBroadcast(newDictBroadcast)
+    // (through the app, to this app: with no screen open, e.g. a restore that ended after its screen closed, nothing
+    // reloaded the keyboard's dictionaries before; the keyboard's receiver is the app's own)
+    val newDictBroadcast = Intent(DictionaryPackConstants.NEW_DICTIONARY_INTENT_ACTION).setPackage(ctx.packageName)
+    (ctx.getActivity() ?: ctx.applicationContext).sendBroadcast(newDictBroadcast)
     LayoutUtilsCustom.onLayoutFileChanged()
     LayoutUtilsCustom.removeMissingLayouts(ctx)
     (ctx.getActivity() as? SettingsActivity)?.prefChanged()
@@ -953,18 +956,32 @@ private fun restoreRefresh(ctx: Context) {
 /** The whole backup replaces everything, as before; a backup from before each keyboard had its own learned words is
  *  then updated as the phone was (2026-10-10). */
 private fun restoreEverything(ctx: Context, file: File, promised: PendingRestore? = null) = LearnedKeyboards.withFiles {
-    replaceEverything(ctx, file, promised)
-    // (a backup from before the keyboards had ids: ids first, so the learned words' update finds each keyboard by its own)
-    helium314.keyboard.latin.settings.KeyboardIdUpgrade.upgrade(ctx)
-    LearnedKeyboards.updateOnce(ctx)
+    // [promised]: what the restore dialog showed of [file] (null: no dialog, tests), checked with the rest before the wipe
+    checkFullBackup(file, promised) // (throws, nothing deleted)
+    underRestoreGate {
+        replaceEverythingChecked(ctx, file)
+        // (a backup from before the keyboards had ids: ids first, so the learned words' update finds each keyboard by its own)
+        helium314.keyboard.latin.settings.KeyboardIdUpgrade.upgrade(ctx)
+        LearnedKeyboards.updateOnce(ctx)
+    }
     // (the flag of a full restore that didn't finish stays: runRestore clears it once its follow-up finished too)
 }
 
-/** [promised]: what the restore dialog showed of [file] (null: no dialog, tests), checked with the rest before the wipe
- *  ([checkFullBackup]). */
-private fun replaceEverything(ctx: Context, file: File, promised: PendingRestore?) {
-    checkFullBackup(file, promised) // (throws, nothing deleted)
-    replaceEverythingChecked(ctx, file)
+/**
+ * [work] (the full restore's file copies, on this thread) with [RestoreGate] set, so the running keyboard can't save
+ * what it still holds of the old device over the restored files (owner 2026-10-12: "A + B + swipe stats makes sense"):
+ * the open learned-word stores are closed first, without saving (the restore replaces their files), and stay closed
+ * until it's done. The gate goes after [work], when it failed too, so it never sticks. Only the full restore: a keyboard
+ * restore never wipes, and it merges into the live stores and lists under their own locks.
+ */
+private fun underRestoreGate(work: () -> Unit) {
+    RestoreGate.begin()
+    try {
+        PersonalizationHelper.reloadAllFromFiles()
+        work()
+    } finally {
+        RestoreGate.end()
+    }
 }
 
 /**

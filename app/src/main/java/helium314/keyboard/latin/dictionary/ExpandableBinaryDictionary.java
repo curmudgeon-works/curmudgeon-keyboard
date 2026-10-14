@@ -24,6 +24,7 @@ import helium314.keyboard.latin.makedict.FormatSpec;
 import helium314.keyboard.latin.makedict.ProbabilityInfo;
 import helium314.keyboard.latin.makedict.UnsupportedFormatException;
 import helium314.keyboard.latin.makedict.WordProperty;
+import helium314.keyboard.latin.personalization.RestoreGate;
 import helium314.keyboard.latin.settings.SettingsValuesForSuggestion;
 import helium314.keyboard.latin.utils.AsyncResultHolder;
 import helium314.keyboard.latin.utils.CombinedFormatUtils;
@@ -175,6 +176,8 @@ abstract public class ExpandableBinaryDictionary extends Dictionary {
     public int getFrequency(final String word) {
         if (mLock.readLock().tryLock()) {
             try {
+                // (not open yet, or kept closed while a full restore runs: RestoreGate)
+                if (mBinaryDictionary == null) return NOT_A_PROBABILITY;
                 return mBinaryDictionary.getFrequency(word);
             } finally {
                 mLock.readLock().unlock();
@@ -599,6 +602,11 @@ abstract public class ExpandableBinaryDictionary extends Dictionary {
     /** Loads the dictionary from its file (or creates it) unless it's loaded. Under the write lock. */
     private void ensureLoadedLocked() {
         if (getBinaryDictionary() != null && !isNeededToRecreate()) return;
+        // a full restore replaces the files now (owner 2026-10-12: "A + B + swipe stats makes sense"): nothing opens
+        // until it's done, so the old words can't be saved over the restored ones (every update and save of a store
+        // that isn't open does nothing); no wait (the restore runs on the executor this load runs on): the next use
+        // after it loads
+        if (RestoreGate.blocks()) return;
         // (the learned words wait here while their files are being moved into new stores, see UserHistoryDictionary)
         awaitBeforeLoad();
         final File dictFile = mDictFile;
@@ -671,10 +679,12 @@ abstract public class ExpandableBinaryDictionary extends Dictionary {
     @Nullable
     public WordProperty[] getAllWordPropertiesBlocking() {
         final ArrayList<WordProperty> list = new ArrayList<>();
+        final AtomicBoolean kept = new AtomicBoolean(false);
         final boolean ok = runLockedAndWait(() -> {
             ensureLoadedLocked();
             final BinaryDictionary binaryDictionary = getBinaryDictionary();
-            if (binaryDictionary == null) return;
+            // (kept closed while a full restore runs, RestoreGate: unread, not empty)
+            if (binaryDictionary == null) { kept.set(RestoreGate.blocks()); return; }
             int token = 0;
             do {
                 final BinaryDictionary.GetNextWordPropertyResult result = binaryDictionary.getNextWordProperty(token);
@@ -683,7 +693,7 @@ abstract public class ExpandableBinaryDictionary extends Dictionary {
                 token = result.mNextToken;
             } while (token != 0);
         });
-        return ok ? list.toArray(new WordProperty[0]) : null;
+        return ok && !kept.get() ? list.toArray(new WordProperty[0]) : null;
     }
 
     /**
