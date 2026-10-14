@@ -14,6 +14,7 @@ import helium314.keyboard.settings.dialogs.dictionaryDeleteBlockers
 import helium314.keyboard.settings.dialogs.dictionaryDisplayName
 import helium314.keyboard.settings.dialogs.deleteDictionary
 import helium314.keyboard.settings.dialogs.dictionaryInUse
+import helium314.keyboard.settings.dialogs.removeDictionaryQuestion
 import helium314.keyboard.settings.dialogs.replaceAndDelete
 import helium314.keyboard.settings.screens.keyboardName
 import org.junit.After
@@ -116,6 +117,15 @@ class DictionaryInUseDialogTest {
         // 20261013_F4 (owner: "4. A"): case 2 of another kind names the kind. Fail before: "the only dictionary"
         assertEquals("Used by: ${name(da)}. It is the only emoji dictionary for this language, so it can't be deleted while a keyboard uses the language.",
             dialog(danish, emoji, da).message)
+    }
+
+    // round-6 review 20261013_L3_2: the plain delete's question names the dictionary as everywhere else. Fail before
+    // (compile: the question was inline): "main" for both added main ones
+    @Test fun `the plain delete's question names the dictionary`() {
+        assertEquals("Really remove user-added dictionary \"Main dictionary\"?",
+            removeDictionaryQuestion(ctx, File(dir(danish), "main_user.dict")))
+        assertEquals("Really remove user-added dictionary \"Main dictionary (main_prev)\"?",
+            removeDictionaryQuestion(ctx, File(dir(danish), "main_prev_user.dict")))
     }
 
     // 20261013_F6 (owner: "6. A"): a plain delete (not in use) redraws the dialog's list, through the callback Replace

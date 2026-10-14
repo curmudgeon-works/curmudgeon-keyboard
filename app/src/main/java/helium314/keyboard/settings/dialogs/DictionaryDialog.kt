@@ -140,7 +140,6 @@ private fun DictionaryDetails(dict: File, locale: Locale, keyboard: helium314.ke
                               /** Another dictionary was selected (the in-use dialog's Replace). */
                               onSelectionChanged: () -> Unit = { }) {
     val header = DictionaryInfoUtils.getDictionaryFileHeaderOrNull(dict) ?: return
-    val type = header.mIdString.substringBefore(":")
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
     // (by the file, as the in-use dialog names it: two added main ones were both "Main dictionary", 20261013_L12-NAMES)
@@ -193,7 +192,7 @@ private fun DictionaryDetails(dict: File, locale: Locale, keyboard: helium314.ke
             content = {
                 // (the old Dictionaries screen, no keyboard asking: who uses it, none or the one, owner 2026-10-11)
                 val users = if (keyboard != null) null else remember { allDictionaryUsers(context, locale) }
-                Text(stringResource(R.string.remove_dictionary_message, type) + when {
+                Text(removeDictionaryQuestion(context, dict) + when {
                     users == null -> ""
                     users.isEmpty() -> "\n\n" + stringResource(R.string.dictionary_used_by_none)
                     else -> "\n\n" + stringResource(R.string.dictionary_used_by_one, dictionaryUserNames(context, users.take(1)).first())
@@ -202,6 +201,11 @@ private fun DictionaryDetails(dict: File, locale: Locale, keyboard: helium314.ke
         )
     }
 }
+
+/** The plain delete's question for [dict]: named as everywhere else, "Main dictionary (main_prev)" (round-6 review
+ *  20261013_L3_2; before, the raw kind "main", the same for two added main ones). */
+internal fun removeDictionaryQuestion(context: android.content.Context, dict: File): String =
+    context.getString(R.string.remove_dictionary_message, dictionaryDisplayName(context, dict.name))
 
 /** The plain delete of [dict] (not in use): the file goes, a selection naming it is cleared, the keyboard reloads, and
  *  the dialog's list for the language is drawn again through [onSelectionChanged], as after the in-use dialog's Replace
