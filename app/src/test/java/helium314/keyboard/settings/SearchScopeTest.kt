@@ -76,6 +76,15 @@ class SearchScopeTest {
         assertEquals(listOf(2 to "@  (Email)"), popupSearchRows(groups, 0, "@") { it })
     }
 
+    // round-7 review 20261013_L9_3: a word in brackets is a word. Fail before: "(Web address)" split into "(Web", which
+    // "web" doesn't start
+    @Test fun `Customize popups - a word in brackets is found`() {
+        val groups = listOf(1 to listOf("a", "b"), 2 to listOf(".  (Web address)", "@  (Email)"))
+        assertEquals(listOf(2 to ".  (Web address)"), popupSearchRows(groups, 1, "web") { it })
+        assertEquals(listOf(2 to "@  (Email)"), popupSearchRows(groups, 1, "email") { it })
+        assertEquals(listOf(2 to ".  (Web address)"), popupSearchRows(groups, 1, "address") { it })
+    }
+
     // owner 2026-10-13: "Keyboard screen search bar should only search items in that screen too", "Whole app search should
     // only be from the main screen of Curmedgeon Keyboard Settings"
     @Test fun `a keyboard's own screen finds its menu entries, not the settings under them`() {

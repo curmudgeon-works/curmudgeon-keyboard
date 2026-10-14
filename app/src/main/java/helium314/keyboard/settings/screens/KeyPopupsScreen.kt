@@ -709,7 +709,8 @@ internal fun <K> popupSearchRows(groups: List<Pair<Int, List<K>>>, tab: Int, sea
     val term = search.trim()
     if (term.isEmpty()) return groups[tab.coerceAtMost(groups.lastIndex)].let { (t, keys) -> keys.map { t to it } }
     return groups.flatMap { (t, keys) -> keys.map { t to it } }
-        .filter { (_, k) -> title(k).split(" ", "_").any { it.startsWith(term, true) } }
+        // (words split on brackets too: "(Web address)" is found by "web", round-7 review 20261013_L9_3)
+        .filter { (_, k) -> title(k).split(" ", "_", "(", ")").any { it.startsWith(term, true) } }
 }
 
 /** A text field to try the keyboard being edited: focusing it opens that keyboard, changes rebuild it live. */
