@@ -18,22 +18,24 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/** A screen opened from Layout & Typing saves for good: Layout & Typing's Discard no longer undoes it. Discard after a
- *  layout change leaves no stray keyboard entry behind. */
+/** Customize popups' Save leaves its change to Layout & Typing's Save or Discard. Discard after a layout change leaves
+ *  no stray keyboard entry behind. */
 @RunWith(RobolectricTestRunner::class)
 class LayoutDraftTest {
-    @Test fun nestedSaveIsNoLongerAChangeOfTheParent() {
+    // until 2026-10-11 this asserted the old rule (the popup editor's tick was saved for good: the parent's Discard kept
+    // it). Owner 2026-10-11, option 1: a sub-screen's Save only keeps the change and goes back; the parent's Save or
+    // Discard decides it (review C2: that rebase also kept a popup set deleted on the parent)
+    @Test fun nestedSaveIsStillAChangeOfTheParent() {
         val ctx = ApplicationProvider.getApplicationContext<Context>()
         val real = ctx.realPrefs()
         real.edit().clear().commit()
         val draft = LayoutDraft.of(ctx, "en-US:")
         real.edit().putString("key_popups", "{\"e\":[\"é\"]}").putBoolean(Settings.PREF_SHOW_NUMBER_ROW, false).commit() // (on is its default: no change)
         assertTrue(draft.changedKeys(ctx).containsAll(setOf("key_popups", Settings.PREF_SHOW_NUMBER_ROW)))
-        LayoutDraft.rebaseOpen(ctx, setOf("key_popups")) // the popup editor's tick
-        assertFalse("key_popups" in draft.changedKeys(ctx)) // saved for good
-        assertTrue(Settings.PREF_SHOW_NUMBER_ROW in draft.changedKeys(ctx)) // the parent's own change still pending
+        helium314.keyboard.settings.screens.customizePopupsSaved() // the popup editor's tick
+        assertTrue(draft.changedKeys(ctx).containsAll(setOf("key_popups", Settings.PREF_SHOW_NUMBER_ROW))) // both pending
         draft.reject(ctx) // the parent's cross
-        assertTrue(real.getString("key_popups", null) == "{\"e\":[\"é\"]}") // kept
+        assertFalse(real.contains("key_popups")) // undone, the popup edit too
         assertFalse(real.contains(Settings.PREF_SHOW_NUMBER_ROW)) // undone
     }
 

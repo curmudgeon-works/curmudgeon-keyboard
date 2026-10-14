@@ -434,6 +434,15 @@ internal fun updateSetInLayout(real: SharedPreferences, layoutName: String, set:
     })
 }
 
+/** Customize popups' Save (the tick, or "Save and exit"): the change stays, and Layout & Typing (the screen it was
+ *  opened from) still holds it; its own Save or Discard decides it, with everything else done there (owner 2026-10-11,
+ *  option 1: "every action is held until the screen's Save; Discard undoes it everywhere it reached"). Until then this
+ *  rebased Layout & Typing's snapshot of the popup sets too, which this screen no longer writes: a set deleted there
+ *  stayed deleted after its Discard, while the saved Layouts got its name back (review C2). */
+internal fun customizePopupsSaved() {
+    helium314.keyboard.latin.utils.SettingsEventLog.log("Customize popups saved: held until Layout & Typing's Save")
+}
+
 internal fun deletePopupSet(ctx: Context, name: String) {
     val real = ctx.realPrefs()
     helium314.keyboard.settings.CustomLabels.detach(real, KeyPopupOverrides.PREF_SELECTED_SET, name,
@@ -544,16 +553,17 @@ fun CustomizePopupsScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     fun leave() { if (changed) askLeave = true else onClickBack() }
     androidx.activity.compose.BackHandler(enabled = changed) { leave() }
     if (askReject) helium314.keyboard.settings.dialogs.DiscardChangesDialog({ askReject = false }) { putBack() }
-    // saving here is for good: Layout & Typing (this screen's parent) takes it as its new starting point
-    fun saveForGood() {
-        helium314.keyboard.settings.LayoutDraft.rebaseOpen(ctx, setOf(KeyPopupOverrides.PREF, KeyPopupOverrides.PREF_SELECTED_SET, KeyPopupOverrides.PREF_SETS))
+    // kept here (this screen's cross no longer puts it back); Layout & Typing's Save or Discard decides it (owner
+    // 2026-10-11, see customizePopupsSaved)
+    fun save() {
+        customizePopupsSaved()
         opened = now()
     }
-    if (askAccept) helium314.keyboard.settings.dialogs.SaveChangesDialog({ askAccept = false }) { saveForGood() }
+    if (askAccept) helium314.keyboard.settings.dialogs.SaveChangesDialog({ askAccept = false }) { save() }
     if (askLeave) helium314.keyboard.settings.dialogs.UnsavedChangesDialog(
         onKeepWorking = { askLeave = false },
         onDiscardAndExit = { askLeave = false; putBack(); onClickBack() },
-        onSaveAndExit = { askLeave = false; saveForGood(); onClickBack() },
+        onSaveAndExit = { askLeave = false; save(); onClickBack() },
     )
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),

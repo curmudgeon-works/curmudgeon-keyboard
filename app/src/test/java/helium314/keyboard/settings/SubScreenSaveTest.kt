@@ -4,9 +4,12 @@ package helium314.keyboard.settings
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.latin.settings.ProfilePreferences
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.KeyPopupOverrides
+import helium314.keyboard.settings.screens.customizePopupsSaved
+import helium314.keyboard.settings.screens.deletePopupSet
 import helium314.keyboard.settings.screens.paletteEditorSaved
 import org.json.JSONObject
 import org.junit.After
@@ -15,6 +18,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -81,5 +85,22 @@ class SubScreenSaveTest {
         assertTrue(AppearanceDraft.activeOrNull()!!.hasChanges(ctx))
         AppearanceDraft.activeOrNull()!!.accept(ctx) // Appearance's Save
         assertEquals(edited, real.getString(Settings.PREF_USER_COLORS_PREFIX + "Warm", null))
+    }
+
+    // C2
+    @Test fun `a popup set deleted on Layout and Typing comes back on its Discard after Customize popups saved`() {
+        val draft = LayoutDraft.of(ctx, "en_US:") // Layout & Typing opens
+        deletePopupSet(ctx, "Mine")
+        assertTrue(KeyPopupOverrides.loadSets(real).isEmpty())
+        // Customize popups: a key edited on the edited keyboard, then Save
+        KeyPopupOverrides.save(ProfilePreferences(real) { 1 }, mapOf("e" to listOf("é")))
+        customizePopupsSaved()
+        assertTrue(draft.hasChanges(ctx)) // Layout & Typing shows unsaved changes
+        LayoutDraft.rejectOpen(ctx) // Layout & Typing's Discard
+        assertEquals("Mine", KeyPopupOverrides.loadSets(real).single().name)
+        assertEquals("Mine", real.getString(own(2, KeyPopupOverrides.PREF_SELECTED_SET), null))
+        // the saved Layout names it again, as the keyboards do
+        assertEquals("Mine", LayoutPresets.load(real).single().values[KeyPopupOverrides.PREF_SELECTED_SET])
+        assertFalse(real.contains(own(1, KeyPopupOverrides.PREF))) // the key edit is undone too
     }
 }
