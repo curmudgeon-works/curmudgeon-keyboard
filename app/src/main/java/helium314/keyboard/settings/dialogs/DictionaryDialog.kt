@@ -165,11 +165,12 @@ private fun DictionaryDetails(dict: File, locale: Locale, keyboard: helium314.ke
             modifier = Modifier.padding(start = 10.dp, top = 0.dp, end = 10.dp, bottom = 12.dp)
         )
     }
-    // used by other keyboards: no delete (owner 2026-10-11: "No delete allowed if other keyboards using dict"); the dialog
-    // names them and, opened from a keyboard with it as a second language, offers to turn it off there instead
+    // the version in use while any keyboard has the language: no delete (review L3.2; before, owner 2026-10-11: "No delete
+    // allowed if other keyboards using dict", which let the asking keyboard's only copy go). The dialog says how to free
+    // it and, opened from a keyboard with it as a second language, offers to turn it off there instead
     val context = LocalContext.current
-    val others = if (!showDeleteDialog) emptyList() else remember(showDeleteDialog) { dictionaryUsers(context, locale, keyboard) }
-    if (showDeleteDialog && others.isNotEmpty()) {
+    val blockers = if (!showDeleteDialog) emptyList() else remember(showDeleteDialog) { dictionaryDeleteBlockers(context, locale, dict) }
+    if (showDeleteDialog && blockers.isNotEmpty()) {
         val canTurnOff = keyboard != null && onTurnOff != null && keyboard.locale != locale
         ThreeButtonAlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -177,8 +178,7 @@ private fun DictionaryDetails(dict: File, locale: Locale, keyboard: helium314.ke
             confirmButtonText = if (canTurnOff) stringResource(R.string.dictionary_turn_off_here) else null,
             cancelButtonText = stringResource(if (canTurnOff) android.R.string.cancel else android.R.string.ok),
             title = { Text(stringResource(R.string.dictionary_in_use_title, type)) },
-            content = { Text(stringResource(R.string.dictionary_in_use_message,
-                dictionaryUserNames(context, others).joinToString("\n"))) },
+            content = { Text(stringResource(R.string.dictionary_in_use_delete_message)) },
         )
     } else if (showDeleteDialog) {
         ConfirmationDialog(
@@ -186,6 +186,9 @@ private fun DictionaryDetails(dict: File, locale: Locale, keyboard: helium314.ke
             confirmButtonText = stringResource(R.string.remove),
             onConfirmed = {
                 dict.delete()
+                // (a selection naming a file no longer there is cleared, never left behind)
+                val kind = DictionarySelection.typeOf(dict)
+                if (DictionarySelection.selected(context, locale, kind) == dict.name) DictionarySelection.clear(context, locale, kind)
                 context.sendBroadcast(Intent(DictionaryPackConstants.NEW_DICTIONARY_INTENT_ACTION))
             },
             content = {
@@ -207,6 +210,17 @@ internal fun dictionaryUsers(context: android.content.Context, locale: Locale,
                              keyboard: helium314.keyboard.latin.settings.SettingsSubtype?): List<helium314.keyboard.latin.settings.SettingsSubtype> {
     val users = allDictionaryUsers(context, locale) // (the edited keyboard left out by its id)
     return if (keyboard != null) users.filter { !it.sameKeyboard(keyboard) } else if (users.size < 2) emptyList() else users
+}
+
+/** The keyboards keeping the added dictionary [dict] of [locale] from being deleted (review L3.2): it is the version of
+ *  its kind in use ([DictionarySelection.inUse]: selected, or the default name; also the only copy, and an added main
+ *  one over the built-in), and every keyboard with the language, the asking one too, on or off, uses it. A version not
+ *  in use can go; so can the one in use once no keyboard has the language. */
+internal fun dictionaryDeleteBlockers(context: android.content.Context, locale: Locale, dict: File): List<helium314.keyboard.latin.settings.SettingsSubtype> {
+    val (files, hasInternal) = getUserAndInternalDictionaries(context, locale)
+    val kind = DictionarySelection.typeOf(dict)
+    val inUse = DictionarySelection.inUse(context, locale, files, kind == Dictionary.TYPE_MAIN && hasInternal, kind)
+    return if (inUse != dict.name) emptyList() else allDictionaryUsers(context, locale)
 }
 
 /** Every keyboard with [locale] as its language or a second one: the enabled ones, then the switched-off ones (owner
