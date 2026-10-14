@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import helium314.keyboard.latin.InputAttributes
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.screens.swipeSettingKeys
 import org.junit.After
@@ -40,5 +41,20 @@ class RetiredTrailSwitchTest {
         assertFalse(Settings.PREF_GESTURE_PREVIEW_TRAIL in swipe, "$swipe")
         assertFalse(Settings.PREF_GESTURE_PREVIEW_TRAIL in SettingsActivity.settingsContainer.filter(term).map { it.key })
         assertTrue(SettingsActivity.settingsContainer[Settings.PREF_GESTURE_PREVIEW_TRAIL] == null)
+    }
+
+    // the thickness is a per-keyboard (Swipe group) setting: written through the keyboard's view, as the slider does
+    // (round-7b review 20261014_L8: the first version wrote the plain key, which nothing reads). Fail before: the stored
+    // switch (off) turned the trail off at any thickness
+    @Test fun `the trail follows its thickness only`() {
+        fun trailOn(): Boolean {
+            Settings.init(ctx)
+            Settings.getInstance().loadSettings(ctx, Locale.US, InputAttributes(android.view.inputmethod.EditorInfo(), false, ctx.packageName))
+            return Settings.getValues().mGestureTrailEnabled
+        }
+        real.edit().putBoolean(Settings.PREF_GESTURE_PREVIEW_TRAIL, false).commit()
+        assertTrue(trailOn(), "the retired switch still read")
+        ctx.prefs().edit().putInt(Settings.PREF_GESTURE_TRAIL_THICKNESS, 0).commit()
+        assertFalse(trailOn(), "thickness 0 is the trail off")
     }
 }
