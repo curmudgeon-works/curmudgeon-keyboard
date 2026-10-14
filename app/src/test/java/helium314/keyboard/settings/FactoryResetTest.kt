@@ -258,6 +258,28 @@ class FactoryResetTest {
         assertFalse(real.contains(own(1, Settings.PREF_KEY_LONGPRESS_TIMEOUT)))
     }
 
+    @Test fun `keyboards and own items kept - a switched-off keyboard's saved Layout and theme are applied again too`() {
+        // a listed; b (set k2) switched off (in the added list only) on its saved Layout Work and theme Sunset, tweaked
+        useKeyboards(ctx, real, a)
+        real.edit().putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a, b))).commit()
+        SubtypeSettings.reloadEnabledSubtypes(ctx)
+        val keys = LayoutType.entries.mapNotNull { type -> b.layoutName(type)?.let { "layout:" + type.name to it } }.toMap()
+        LayoutPresets.save(real, listOf(LayoutPresets.Preset("Work", keys + mapOf(Settings.PREF_BACKSPACE_REPEAT_INTERVAL to 70))))
+        AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Sunset", mapOf(Settings.PREF_KEY_HORIZONTAL_GAP to 3f))), now = true)
+        real.edit {
+            putString(own(2, LayoutPresets.PREF_SELECTED), "Work")
+            putInt(own(2, Settings.PREF_BACKSPACE_REPEAT_INTERVAL), 90)
+            putString(own(2, AppearanceLooks.PREF_SELECTED), "Sunset")
+            putFloat(own(2, Settings.PREF_KEY_HORIZONTAL_GAP), 5f)
+        }
+        reset(ResetKeep(keyboards = true, own = true))
+        assertEquals(listOf(a.toPref()), listed(), "b stays switched off")
+        assertEquals(70, real.getInt(own(2, Settings.PREF_BACKSPACE_REPEAT_INTERVAL), 0), "the Layout's value again")
+        assertEquals(3f, real.getFloat(own(2, Settings.PREF_KEY_HORIZONTAL_GAP), 0f), "the theme's value again")
+        assertEquals("Work", real.getString(own(2, LayoutPresets.PREF_SELECTED), null))
+        assertEquals("Sunset", real.getString(own(2, AppearanceLooks.PREF_SELECTED), null))
+    }
+
     @Test fun `keyboards alone - the chosen Layout and theme go, their settings back to the defaults`() {
         onWorkAndSunset()
         reset(ResetKeep(keyboards = true))

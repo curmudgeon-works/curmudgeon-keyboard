@@ -220,9 +220,9 @@ internal fun chosenItems(all: Map<String, *>): Map<String, Map<String, String>> 
 private fun reapplyChosenItems(ctx: Context, chosen: Map<String, Map<String, String>>) {
     if (chosen.isEmpty()) return
     val real = ctx.realPrefs()
-    // (looked up again each time: a Layout or popup set can change the keyboard's definition, its id stays)
-    fun keyboardOf(id: String) = SubtypeSettings.createSettingsSubtypes(
-        real.getString(Settings.PREF_ENABLED_SUBTYPES, helium314.keyboard.latin.settings.Defaults.PREF_ENABLED_SUBTYPES)!!).firstOrNull { it.keyboardId == id }
+    // (looked up again each time: a Layout or popup set can change the keyboard's definition, its id stays; switched-off
+    // keyboards too, review round 5 M9: they keep their chosen items as the listed ones do)
+    fun keyboardOf(id: String) = helium314.keyboard.latin.settings.KeyboardIds.phoneKeyboards(real).firstOrNull { it.keyboardId == id }
     val layouts = helium314.keyboard.settings.LayoutPresets.builtIn(ctx) + helium314.keyboard.settings.LayoutPresets.load(real)
     val looks = helium314.keyboard.settings.AppearanceLooks.builtIn(ctx) + helium314.keyboard.settings.AppearanceLooks.load(real)
     val sets = KeyPopupOverrides.loadSets(real)
