@@ -225,7 +225,9 @@ object AppearanceLooks {
         if (failed) { made.forEach { it.delete() }; return false }
         // the looks naming their copies are on disk before the library's picture goes (as in [migratePictureFolders])
         if (changed != looks) save(prefs, changed, now = true)
-        PictureLibrary.remove(picture)
+        // with Appearance open the picture waits for its Save: the file is held, Discard brings it back with the themes
+        // as they were (review H1)
+        if (AppearanceDraft.activeOrNull()?.holdPictureDelete(picture) != true) PictureLibrary.remove(picture)
         return true
     }
 
@@ -233,6 +235,8 @@ object AppearanceLooks {
      *  removed at app start, once a crashed Appearance screen's changes are undone (a Discard can bring a deleted
      *  theme back, so not at once). */
     fun pruneOwnedPictures(ctx: Context, prefs: SharedPreferences) {
+        // (not with Appearance open: its Discard can bring back a theme naming a copy no theme names now, review H1)
+        if (AppearanceDraft.activeOrNull() != null) return
         val files = ownedDir(ctx).listFiles()?.takeIf { it.isNotEmpty() } ?: return
         val named = load(prefs).flatMap { look ->
             val refs = (look.values[PICTURES] as? String)?.let { refsOf(it) } ?: return@flatMap emptyList()
