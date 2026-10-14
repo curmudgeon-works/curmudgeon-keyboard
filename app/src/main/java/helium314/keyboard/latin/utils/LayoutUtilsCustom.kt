@@ -249,12 +249,18 @@ object LayoutUtilsCustom {
 
     /** A private layout (one keyboard's, unnamed) with [text] as its keys; returns its name. */
     fun makePrivateLayout(text: String, layoutType: LayoutType, scope: String, context: Context): String {
+        val name = newPrivateLayoutName(layoutType, scope) { getLayoutFile(it, layoutType, context).exists() }
+        getLayoutFile(name, layoutType, context).writeText(text)
+        onLayoutFileChanged()
+        return name
+    }
+
+    /** A free name for a new private layout ([taken]: whether a name is in use), as [makePrivateLayout] gives it. */
+    fun newPrivateLayoutName(layoutType: LayoutType, scope: String, taken: (String) -> Boolean): String {
         val scopePart = if (layoutType == LayoutType.MAIN) "$scope." else ""
         var number = System.currentTimeMillis()
         var name: String
-        do { name = CUSTOM_LAYOUT_PREFIX + scopePart + PRIVATE_MARK + number++.toString(36) + "." } while (getLayoutFile(name, layoutType, context).exists())
-        getLayoutFile(name, layoutType, context).writeText(text)
-        onLayoutFileChanged()
+        do { name = CUSTOM_LAYOUT_PREFIX + scopePart + PRIVATE_MARK + number++.toString(36) + "." } while (taken(name))
         return name
     }
 

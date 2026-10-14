@@ -75,13 +75,17 @@ internal sealed class RestoreDecision {
  * The restore dialog's questions for a backup's keyboards (no Compose screens here): [incoming], each backup keyboard as
  * it would come in (its custom key layouts named as the restore names them); the phone's keyboards, [enabled] and
  * [switchedOff] (owner 2026-10-11: switched-off keyboards are treated like switched-on ones); [nameOf], a keyboard's
- * name as the screens show it.
+ * name as the screens show it. For "What to merge" (review 2026-10-11 R3): [sameLayout], whether two key layouts of a
+ * type are the same keys (an unsaved one compared by its keys); [backupSettings], a backup keyboard's settings with its
+ * saved items named as the restore would name them (with copies or not).
  */
 internal class RestorePlan(
     val incoming: Map<SettingsSubtype, SettingsSubtype>,
     val enabled: List<SettingsSubtype>,
     val switchedOff: List<SettingsSubtype>,
     val nameOf: (SettingsSubtype) -> String,
+    val sameLayout: (helium314.keyboard.latin.utils.LayoutType, String, String) -> Boolean = { _, a, b -> a == b },
+    val backupSettings: (SettingsSubtype, Boolean) -> Map<String, Any?> = { _, _ -> emptyMap() },
 ) {
     val phone = (enabled + switchedOff).distinct()
 

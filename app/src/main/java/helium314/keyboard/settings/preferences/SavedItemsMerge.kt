@@ -91,13 +91,14 @@ internal object SavedItemsMerge {
     }
 
     /** [keyboards]: the restored keyboards' settings as in the backup (plain keys), [phone]: the phone's stored settings
-     *  without the sets the restore replaces, for the kept palettes' numbers (see [RestoredCustomCopies]). */
+     *  without the sets the restore replaces, for the kept palettes' numbers (see [RestoredCustomCopies]). Not [write]:
+     *  the renames only, the phone's lists untouched (review 2026-10-11 R3: the restore question compares with them). */
     fun merge(ctx: Context, real: SharedPreferences, backup: Map<String, Any?>, asCopies: Boolean,
               fonts: Map<String, String> = emptyMap(), pictures: Map<String, String> = emptyMap(),
               keyLayouts: Map<LayoutType, Map<String, String>> = emptyMap(),
-              keyboards: Collection<Map<String, Any?>> = emptyList(), phone: Map<String, Any?> = real.all): Renames {
+              keyboards: Collection<Map<String, Any?>> = emptyList(), phone: Map<String, Any?> = real.all, write: Boolean = true): Renames {
         // the backup's lists, read as the phone reads its own (a scratch store, gone afterwards)
-        val scratch = ctx.getSharedPreferences("restore_saved_items", Context.MODE_PRIVATE)
+        val scratch = ctx.getSharedPreferences(if (write) "restore_saved_items" else "restore_saved_items_dry", Context.MODE_PRIVATE)
         scratch.edit(commit = true) {
             clear()
             for (key in listOf(KeyPopupOverrides.PREF_SETS, LayoutPresets.PREF, AppearanceLooks.PREF))
@@ -118,7 +119,7 @@ internal object SavedItemsMerge {
                 phoneSets += KeyPopupOverrides.UserSet(name, set.morePopups, set.symbolsLayout, set.overrides, set.symbolMap, set.popupOrder, set.atDefault)
                 setNames[set.name] = name
             }
-            KeyPopupOverrides.saveSets(real, phoneSets)
+            if (write) KeyPopupOverrides.saveSets(real, phoneSets)
 
             // Layouts: their popup set and custom key layouts named as on the phone now, then by content (values, and the remembered ones: SavedItemDefaults.sameContent)
             val builtInLayouts = LayoutPresets.builtIn(ctx).map { it.name }.toSet()
@@ -137,7 +138,7 @@ internal object SavedItemsMerge {
                 phoneLayouts += LayoutPresets.Preset(name, values, remembered = preset.remembered)
                 layoutNames[preset.name] = name
             }
-            LayoutPresets.save(real, phoneLayouts)
+            if (write) LayoutPresets.save(real, phoneLayouts)
 
             // themes, by content (values and remembered, likewise)
             val builtInThemes = AppearanceLooks.builtIn(ctx).map { it.name }.toSet()
@@ -159,7 +160,7 @@ internal object SavedItemsMerge {
                 phoneThemes += AppearanceLooks.Look(name, look.values, look.remembered)
                 themeNames[look.name] = name
             }
-            AppearanceLooks.save(real, phoneThemes, now = true)
+            if (write) AppearanceLooks.save(real, phoneThemes, now = true)
             return Renames(setNames, layoutNames, themeNames, fonts, keyLayouts, palettes, mapOf(KeyPopupOverrides.PREF_SELECTED_SET to setsNotBrought,
                 LayoutPresets.PREF_SELECTED to layoutsNotBrought, AppearanceLooks.PREF_SELECTED to themesNotBrought))
         } finally {

@@ -61,12 +61,14 @@ internal object RestoreMatch {
     private val laterParts = listOf(ExtraValue.HINT_ORDER, ExtraValue.LOCALIZED_NUMBER_ROW)
 
     /** What differs in the definitions: the keys, the languages, accents, popup order, the other layouts, hint order and
-     *  the localized number row. */
-    fun definitionDifferences(phone: SettingsSubtype, backup: SettingsSubtype): List<Difference.Definition> {
+     *  the localized number row. [sameLayout]: whether two layouts of a type are the same keys (by name, or two unsaved
+     *  ones by their keys: review 2026-10-11 R3). */
+    fun definitionDifferences(phone: SettingsSubtype, backup: SettingsSubtype,
+                              sameLayout: (LayoutType, String, String) -> Boolean = { _, a, b -> a == b }): List<Difference.Definition> {
         val out = mutableListOf<Difference.Definition>()
         fun layout(type: LayoutType) {
             val p = phone.layoutName(type); val b = backup.layoutName(type)
-            if (p != b) out += Difference.Definition(Part.Layout(type), p, b)
+            if (p != b && (p == null || b == null || !sameLayout(type, p, b))) out += Difference.Definition(Part.Layout(type), p, b)
         }
         val p = entries(phone); val b = entries(backup)
         fun extra(key: String) {
@@ -111,8 +113,9 @@ internal object RestoreMatch {
     /** Everything that differs: the definitions, and with [withSettings] the menus' settings ([phoneSettings] and
      *  [backupSettings]). Empty: nothing to ask. */
     fun differences(phone: SettingsSubtype, backup: SettingsSubtype, withSettings: Boolean,
-                    phoneSettings: () -> Map<String, Any?>, backupSettings: () -> Map<String, Any?>): List<Difference> =
-        definitionDifferences(phone, backup) + if (withSettings) menuDifferences(phoneSettings(), backupSettings()) else emptyList()
+                    phoneSettings: () -> Map<String, Any?>, backupSettings: () -> Map<String, Any?>,
+                    sameLayout: (LayoutType, String, String) -> Boolean = { _, a, b -> a == b }): List<Difference> =
+        definitionDifferences(phone, backup, sameLayout) + if (withSettings) menuDifferences(phoneSettings(), backupSettings()) else emptyList()
 
     /** The definition the replaced keyboard gets: the backup's whole, or the phone's with the ticked parts the backup's. */
     fun definition(replace: Replace, backup: SettingsSubtype): SettingsSubtype {

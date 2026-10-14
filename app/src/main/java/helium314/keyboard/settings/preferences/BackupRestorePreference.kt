@@ -421,8 +421,7 @@ private fun RestoreChoiceDialog(pending: PendingRestore, onDismiss: () -> Unit, 
             try { hidden = restoreChosen(ctx, pending, choice) } finally { pending.file.delete() }
         }
     }
-    fun differences(keyboard: SettingsSubtype, phone: SettingsSubtype) = RestoreMatch.differences(phone, plan.incoming.getValue(keyboard), settings,
-        { RestoreMatch.phoneSettings(ctx.realPrefs(), phone) }, { restoredSettings(ctx, pending.prefs, keyboard) })
+    fun differences(keyboard: SettingsSubtype, phone: SettingsSubtype) = restoreDifferences(ctx, plan, keyboard, phone, settings, asCopies)
     // the next keyboard to ask about, or the restore when all are answered
     fun answered(keyboard: SettingsSubtype, decision: RestoreDecision) {
         answers[keyboard] = decision
@@ -459,7 +458,7 @@ private fun RestoreChoiceDialog(pending: PendingRestore, onDismiss: () -> Unit, 
                 onCancel = { asking = null; answers.clear() }, // back to the restore dialog, nothing restored (as before)
                 onNext = { pick -> if (pick.phone == null) answered(asked, question.separate) else choosing = pick.phone })
             else androidx.compose.runtime.key(target) {
-                RestoreChooseDialog(question, target, remember(settings) { differences(asked, target) },
+                RestoreChooseDialog(question, target, remember(settings, asCopies) { differences(asked, target) },
                     wordsRow = learnedWords && pending.hasLearnedWords,
                     onCancel = { choosing = null }, // back to the first question
                     onConfirmed = { answered(asked, it) })
@@ -941,13 +940,23 @@ internal fun restoreKeyboardsFrom(ctx: Context, file: File, keyboards: List<Sett
 private fun restoreKeyboards(ctx: Context, pending: PendingRestore, asked: List<SettingsSubtype>, withSettings: Boolean,
                              asCopies: Boolean = true, decisions: Map<SettingsSubtype, RestoreDecision> = emptyMap()
 ): Pair<Map<SettingsSubtype, SettingsSubtype>, List<SettingsSubtype>> {
+    // the unsaved layouts no keyboard uses go once all is restored, not between the keyboards (review 2026-10-11 R3: one
+    // only a restored keyboard's settings name went before they were written)
+    LayoutUtilsCustom.cleanupHeld++
+    try { return restoreKeyboardsHeld(ctx, pending, asked, withSettings, asCopies, decisions) }
+    finally { LayoutUtilsCustom.cleanupHeld--; LayoutUtilsCustom.removeUnusedPrivateLayouts(ctx) }
+}
+
+private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, asked: List<SettingsSubtype>, withSettings: Boolean,
+                                 asCopies: Boolean, decisions: Map<SettingsSubtype, RestoreDecision>
+): Pair<Map<SettingsSubtype, SettingsSubtype>, List<SettingsSubtype>> {
     val real = ctx.realPrefs()
     val prefs = ctx.prefs()
     val backup = pending.prefs
     val nameOf = { keyboard: SettingsSubtype -> keyboardName(keyboard, ctx) }
     // never two keyboards of one definition (one identity): compared as they would come in, as the dialog does
     val chosen = run {
-        val incoming = incomingKeyboards(ctx, pending)
+        val incoming = incomingKeyboards(pending, dryLayouts(ctx, pending))
         val phone = phoneKeyboards(real).let { (on, off) -> (on + off).toMutableList() }
         asked.filter { keyboard ->
             val decision = decisions[keyboard]
@@ -1106,36 +1115,82 @@ private fun phoneKeyboards(real: SharedPreferences): Pair<List<SettingsSubtype>,
     return enabled to off
 }
 
-/** For the restore dialog: [pending]'s keyboards as they would come in, their custom key layouts named as
- *  [restoreLayoutFiles] would name them (nothing written; an unsaved layout that would get a new name keeps its own). */
-private fun incomingKeyboards(ctx: Context, pending: PendingRestore): Map<SettingsSubtype, SettingsSubtype> {
-    val wanted = pending.keyboards.flatMap { keyboard -> LayoutType.entries.mapNotNull { type -> keyboard.layoutName(type)?.let { type to it } } }
-        .filter { LayoutUtilsCustom.isCustomLayout(it.second) }.toSet()
-    val keyLayouts = if (wanted.isEmpty()) emptyMap() else try {
-        restoreLayoutFiles(ctx, pending, wanted, pending.keyboards, write = false)
-    } catch (e: Exception) { emptyMap() } // (then compared as in the backup)
-    return pending.keyboards.associateWith { renamedLayouts(it, keyLayouts) }
+/** The custom key layouts of a restore of [pending]'s keyboards as [restoreLayoutFiles] would bring them, nothing written:
+ *  the [renames], by type, and the files it would write, [planned] (path to keys). */
+private class DryLayouts(val renames: Map<LayoutType, Map<String, String>>, private val planned: Map<String, ByteArray>, private val dir: File) {
+    private fun keysOf(type: LayoutType, name: String): ByteArray? =
+        File(File(dir, type.folder), name).let { f -> planned[f.path] ?: f.takeIf { it.isFile }?.readBytes() }
+
+    /** Whether [a] and [b] are the same keys: one name, or two unsaved layouts with the same keys (review 2026-10-11 R3;
+     *  owner 2026-10-11: "Screen 2 should handle unsaved items as named yes"). */
+    fun same(type: LayoutType, a: String, b: String) = a == b || (LayoutUtilsCustom.isPrivateLayout(a) && LayoutUtilsCustom.isPrivateLayout(b)
+        && keysOf(type, a)?.let { x -> keysOf(type, b)?.contentEquals(x) } == true)
 }
 
-/** The restore dialog's questions for [pending]'s keyboards: each as it would come in, and the phone's keyboards. */
+/** [DryLayouts] for [pending]'s keyboards: their key layouts and their settings' defaults for the types. An unsaved one
+ *  with other keys than the phone's of its name gets its planned new name, as the restore gives it one (R3). */
+private fun dryLayouts(ctx: Context, pending: PendingRestore): DryLayouts {
+    val wanted = (pending.keyboards.flatMap { keyboard -> LayoutType.entries.mapNotNull { type -> keyboard.layoutName(type)?.let { type to it } } } +
+        pending.keyboards.flatMap { keyboard -> val values = restoredSettings(ctx, pending.prefs, keyboard)
+            LayoutType.entries.mapNotNull { type -> (values[Settings.PREF_LAYOUT_PREFIX + type.name] as? String)?.let { type to it } } })
+        .filter { LayoutUtilsCustom.isCustomLayout(it.second) }.toSet()
+    val planned = HashMap<String, ByteArray>()
+    val renames = if (wanted.isEmpty()) emptyMap() else try {
+        restoreLayoutFiles(ctx, pending, wanted, pending.keyboards, write = false, planned = planned)
+    } catch (e: Exception) { planned.clear(); emptyMap() } // (then compared as in the backup)
+    return DryLayouts(renames, planned, DeviceProtectedUtils.getFilesDir(ctx))
+}
+
+/** For the restore dialog: [pending]'s keyboards as they would come in, their custom key layouts named as [dry] has them. */
+private fun incomingKeyboards(pending: PendingRestore, dry: DryLayouts): Map<SettingsSubtype, SettingsSubtype> =
+    pending.keyboards.associateWith { renamedLayouts(it, dry.renames) }
+
+/** The restore dialog's questions for [pending]'s keyboards: each as it would come in, and the phone's keyboards. A
+ *  backup keyboard's settings are compared with its saved items named as the merge would name them, worked out with
+ *  nothing written (R3: before, the backup's "Sunset" coming in as "Sunset 2" compared as "Sunset"). */
 private fun restorePlan(ctx: Context, pending: PendingRestore): RestorePlan {
-    val (enabled, off) = phoneKeyboards(ctx.realPrefs())
-    return RestorePlan(incomingKeyboards(ctx, pending), enabled, off) { keyboardName(it, ctx) }
+    val real = ctx.realPrefs()
+    val (enabled, off) = phoneKeyboards(real)
+    val dry = dryLayouts(ctx, pending)
+    val renames = HashMap<Boolean, SavedItemsMerge.Renames?>()
+    fun renames(asCopies: Boolean) = renames.getOrPut(asCopies) {
+        try {
+            val files = restoreLibraryFiles(ctx, pending, write = false)
+            SavedItemsMerge.merge(ctx, real, pending.prefs, asCopies, files.first, files.second, dry.renames,
+                pending.keyboards.map { KeyboardProfiles.effectiveSettingsIn(pending.prefs, it) }, real.all, write = false)
+        } catch (e: Exception) { null } // (then compared as in the backup)
+    }
+    return RestorePlan(incomingKeyboards(pending, dry), enabled, off, nameOf = { keyboardName(it, ctx) }, sameLayout = dry::same,
+        backupSettings = { keyboard, asCopies -> restoredSettings(ctx, pending.prefs, keyboard).let { renames(asCopies)?.apply(it) ?: it } })
 }
 
 /** The restore dialog's questions for the backup [file]'s keyboards (tests). */
 internal fun restorePlanFrom(ctx: Context, file: File): RestorePlan = restorePlan(ctx, readBackup(file))
+
+/** "What to merge" for the backup [keyboard] into the phone's [phone]: what differs ([RestoreMatch.differences]), the
+ *  key layouts and saved items as the restore would bring them in ([plan]; R3). */
+private fun restoreDifferences(ctx: Context, plan: RestorePlan, keyboard: SettingsSubtype, phone: SettingsSubtype,
+                               withSettings: Boolean, asCopies: Boolean): List<RestoreMatch.Difference> =
+    RestoreMatch.differences(phone, plan.incoming.getValue(keyboard), withSettings,
+        { RestoreMatch.phoneSettings(ctx.realPrefs(), phone) }, { plan.backupSettings(keyboard, asCopies) }, plan.sameLayout)
+
+/** [restoreDifferences] for the backup [file] (tests). */
+internal fun restoreDifferencesFrom(ctx: Context, file: File, keyboard: SettingsSubtype, phone: SettingsSubtype,
+                                    withSettings: Boolean = true, asCopies: Boolean = true): List<RestoreMatch.Difference> =
+    restoreDifferences(ctx, restorePlanFrom(ctx, file), keyboard, phone, withSettings, asCopies)
 
 /**
  * The custom key layouts [wanted] (type to name) out of the backup, for [chosen] keyboards restored on their own: one the
  * phone has under the same name with the same keys is the phone's; a name the phone uses for other keys gets the next
  * free number ("My numrow 2", reusing a numbered one with these keys, so a second restore adds nothing). An unsaved one
  * (a keyboard's own) gets a new unsaved name, reusing one with these keys only if no keyboard but the same one uses it.
- * Nothing on the phone is written over. The renames, by type. Not [write]: what they would be, nothing written (an
- * unsaved one that would get a new name is left out).
+ * Nothing on the phone is written over. The renames, by type. Not [write]: what they would be, nothing written, the
+ * files it would write in [planned] (path to keys); an unsaved one's new name is planned too (review 2026-10-11 R3; owner
+ * 2026-10-11: "Screen 2 should handle unsaved items as named yes").
  */
 private fun restoreLayoutFiles(ctx: Context, pending: PendingRestore, wanted: Set<Pair<LayoutType, String>>,
-                               chosen: List<SettingsSubtype>, write: Boolean = true): Map<LayoutType, Map<String, String>> {
+                               chosen: List<SettingsSubtype>, write: Boolean = true,
+                               planned: HashMap<String, ByteArray> = HashMap()): Map<LayoutType, Map<String, String>> {
     val byPath = wanted.associateBy { (type, name) -> type.folder + File.separator + name }
     val contents = LinkedHashMap<Pair<LayoutType, String>, ByteArray>()
     ZipInputStream(FileInputStream(pending.file)).use { zip ->
@@ -1150,7 +1205,6 @@ private fun restoreLayoutFiles(ctx: Context, pending: PendingRestore, wanted: Se
     val dir = DeviceProtectedUtils.getFilesDir(ctx)
     // not [write]: the files it would have written, as if written (review 2026-10-11 R6: else a name numbered earlier in
     // the run looked free to a later one)
-    val planned = HashMap<String, ByteArray>()
     fun exists(f: File) = f.path in planned || f.exists()
     fun bytesOf(f: File) = planned[f.path] ?: f.readBytes()
     fun put(f: File, bytes: ByteArray) { if (write) f.writeBytes(bytes) else planned[f.path] = bytes }
@@ -1163,7 +1217,10 @@ private fun restoreLayoutFiles(ctx: Context, pending: PendingRestore, wanted: Se
         if (!target.canonicalPath.startsWith(folderDir.canonicalPath + File.separator)) continue
         if (!exists(target)) { if (write) folderDir.mkdirs(); put(target, bytes); continue }
         if (bytesOf(target).contentEquals(bytes)) continue
-        val newName = if (LayoutUtilsCustom.isPrivateLayout(name)) privateLayoutFor(ctx, type, name, bytes, chosen, renames, write) ?: continue
+        val newName = if (LayoutUtilsCustom.isPrivateLayout(name)) privateLayoutFor(ctx, type, name, bytes, chosen, renames)
+            ?: LayoutUtilsCustom.scopeOf(name, type).let { scope ->
+                if (write) LayoutUtilsCustom.makePrivateLayout(String(bytes), type, scope, ctx)
+                else LayoutUtilsCustom.newPrivateLayoutName(type, scope) { exists(File(folderDir, it)) }.also { put(File(folderDir, it), bytes) } }
         else generateSequence(2) { it + 1 }.map { LayoutUtilsCustom.numberedLayoutName(name, type, it) }
             .first { val f = File(folderDir, it); !exists(f) || bytesOf(f).contentEquals(bytes) }
             .also { val f = File(folderDir, it); if (!exists(f)) put(f, bytes) }
@@ -1174,9 +1231,9 @@ private fun restoreLayoutFiles(ctx: Context, pending: PendingRestore, wanted: Se
 }
 
 /** For [restoreLayoutFiles]: an unsaved layout of the phone with [bytes] that only [chosen]'s keyboards naming [name] use
- *  (a restore of the same backup before), else a new one ([write]; else null); its name. */
+ *  (a restore of the same backup before), its name; null: none (a new one comes in). */
 private fun privateLayoutFor(ctx: Context, type: LayoutType, name: String, bytes: ByteArray, chosen: List<SettingsSubtype>,
-                             renames: Map<LayoutType, Map<String, String>>, write: Boolean = true): String? {
+                             renames: Map<LayoutType, Map<String, String>>): String? {
     val scope = LayoutUtilsCustom.scopeOf(name, type)
     // a keyboard with its unsaved layouts left out, its named ones as they came in
     fun normalized(kb: SettingsSubtype) = LayoutType.entries.fold(kb) { k, t ->
@@ -1192,17 +1249,22 @@ private fun privateLayoutFor(ctx: Context, type: LayoutType, name: String, bytes
             && file.readBytes().contentEquals(bytes)
             && phone.filter { it.layoutName(type) == candidate }.let { users -> users.isNotEmpty() && users.all { normalized(it) in owners } }
     }
-    return reusable?.name ?: if (write) LayoutUtilsCustom.makePrivateLayout(String(bytes), type, scope, ctx) else null
+    return reusable?.name
 }
 
 /**
  * The backup's loaded fonts and pictures (FontLibrary, PictureLibrary) into the phone's lists, for keyboards restored on
  * their own: a file the phone has under the same name with the same content is the phone's; a name the phone uses for
- * another file gets the next free number ("Mine 2.ttf"). The renames, fonts and pictures, by file name.
+ * another file gets the next free number ("Mine 2.ttf"). The renames, fonts and pictures, by file name. Not [write]:
+ * what they would be, nothing written (review 2026-10-11 R3: the restore question compares with them).
  */
-private fun restoreLibraryFiles(ctx: Context, pending: PendingRestore): Pair<Map<String, String>, Map<String, String>> {
+private fun restoreLibraryFiles(ctx: Context, pending: PendingRestore, write: Boolean = true): Pair<Map<String, String>, Map<String, String>> {
     val fonts = HashMap<String, String>(); val pictures = HashMap<String, String>()
     val dir = DeviceProtectedUtils.getFilesDir(ctx)
+    // (not [write]: the files it would have written, as if written)
+    val planned = HashMap<String, ByteArray>()
+    fun File.there() = path in planned || exists()
+    fun File.bytes() = planned[path] ?: readBytes()
     ZipInputStream(FileInputStream(pending.file)).use { zip ->
         var entry: ZipEntry? = zip.nextEntry
         while (entry != null) {
@@ -1215,15 +1277,15 @@ private fun restoreLibraryFiles(ctx: Context, pending: PendingRestore): Pair<Map
                 var target = File(folderDir, fileName)
                 // (and never outside the app's folder, whatever the zip says)
                 if (target.canonicalPath.startsWith(folderDir.canonicalPath + File.separator)) {
-                    if (!target.exists() || !target.readBytes().contentEquals(bytes)) {
-                        if (target.exists()) {
+                    if (!target.there() || !target.bytes().contentEquals(bytes)) {
+                        if (target.there()) {
                             // the next free number, reusing a numbered one with this content (a second restore adds nothing)
                             val base = fileName.substringBeforeLast('.', fileName); val ext = fileName.substringAfterLast('.', "").let { if (it.isEmpty()) "" else ".$it" }
                             target = generateSequence(2) { it + 1 }.map { File(folderDir, "$base $it$ext") }
-                                .first { !it.exists() || it.readBytes().contentEquals(bytes) }
+                                .first { !it.there() || it.bytes().contentEquals(bytes) }
                             (if (folder == "fonts") fonts else pictures)[fileName] = target.name
                         }
-                        if (!target.exists()) { folderDir.mkdirs(); target.writeBytes(bytes) }
+                        if (!target.there()) { if (write) { folderDir.mkdirs(); target.writeBytes(bytes) } else planned[target.path] = bytes }
                     }
                 }
             }
