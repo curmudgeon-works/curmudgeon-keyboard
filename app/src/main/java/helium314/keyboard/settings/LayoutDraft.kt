@@ -132,9 +132,16 @@ class LayoutDraft private constructor(
         }
         // (no listener runs when the keyboard isn't loaded yet, e.g. at app start)
         KeyboardProfiles.refreshImeId(real)
+        // the layout files as at the open: copied in beside first, then swapped in, so the live folder is never gone
+        // while the copy still has to be made (review B4w.1: a copy failing after the delete left neither, and the crash
+        // undo then deleted the draft's folder, the last copy)
         val live = layoutsDir(ctx)
-        live.deleteRecursively()
-        layoutsCopy?.copyRecursively(live, overwrite = true)
+        if (layoutsCopy != null) {
+            val incoming = File(live.parentFile, live.name + ".restoring").apply { deleteRecursively() }
+            layoutsCopy.copyRecursively(incoming, overwrite = true)
+            live.deleteRecursively()
+            if (!incoming.renameTo(live)) { incoming.copyRecursively(live, overwrite = true); incoming.deleteRecursively() }
+        } else live.deleteRecursively()
         if (keep) writes.writeTo(real) // (the files; the keys are in the edit above)
         LayoutUtilsCustom.onLayoutFileChanged()
         SubtypeSettings.reloadEnabledSubtypes(ctx)
@@ -287,7 +294,9 @@ class LayoutDraft private constructor(
             if (File(dir(ctx), PREFS_FILE).exists()) helium314.keyboard.latin.utils.SettingsEventLog.log("Layout & Typing snapshot found at app start: recovering")
             val dir = dir(ctx)
             val json = runCatching { JSONObject(File(dir, PREFS_FILE).readText()) }.getOrNull()
-            if (json == null) { dir.deleteRecursively(); return }
+            // (a snapshot that can't be read: the key layouts of its copy missing now go back first, then the folder;
+            // review B4w.1, as AppearanceDraft's held files, B4)
+            if (json == null) { runCatching { putMissingLayoutsBack(ctx, dir) }; dir.deleteRecursively(); return }
             runCatching {
                 val p = json.getJSONObject("prefs")
                 val prefs = p.keys().asSequence().associateWith { AppearanceLooks.fromJson(p.getJSONObject(it)) }
@@ -298,7 +307,21 @@ class LayoutDraft private constructor(
                 val writes = SubScreenWrites.load(dir, layoutsDir(ctx), ::recorded)
                 val learnedDone = if (json.has("learnedDone")) json.getBoolean("learnedDone") else null
                 LayoutDraft(prefs, copy, dir, json.getString("subtype"), labels, writes, learnedDone).reject(ctx, keepSubScreenSaves = true)
-            }.onFailure { dir.deleteRecursively() }
+            }.onFailure { runCatching { putMissingLayoutsBack(ctx, dir) }; dir.deleteRecursively() }
+        }
+
+        /** The key layout files of the snapshot's copy in [dir] that the live folder lacks, copied back (never over a live
+         *  one): what was deleted with the screen open isn't lost with the draft's folder (review B4w.1). */
+        private fun putMissingLayoutsBack(ctx: Context, dir: File) {
+            val copy = File(dir, "layouts")
+            if (!copy.isDirectory) return
+            val live = layoutsDir(ctx)
+            var any = false
+            copy.walkTopDown().filter { it.isFile }.forEach { f ->
+                val target = File(live, f.relativeTo(copy).path)
+                if (!target.exists()) { f.copyTo(target); any = true }
+            }
+            if (any) LayoutUtilsCustom.onLayoutFileChanged()
         }
     }
 }
