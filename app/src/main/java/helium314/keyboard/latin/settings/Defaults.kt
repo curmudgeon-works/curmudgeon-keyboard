@@ -162,7 +162,7 @@ object Defaults {
     const val PREF_GESTURE_HISTORY_BOOST = 64 // added to a learned word's frequency (0..255 scale) in the swipe vocabulary
     const val PREF_GESTURE_FAST_TYPING_COOLDOWN = 500
     const val PREF_GESTURE_TRAIL_FADEOUT_DURATION = 800
-    const val PREF_GESTURE_TRAIL_THICKNESS = 100
+    const val PREF_GESTURE_TRAIL_THICKNESS = 60 // percent; owner 2026-10-14: "starting trail thickness should be thinner, 60%" (100 before)
     /** Curmudgeon's orange (2026-10-07, "B", a little softer than the #FF8C00 of 0.3.008): the Black with orange
      *  theme's trail, strip and accent, and the settings app under that theme (AppLook). */
     const val CURMUDGEON_ORANGE = 0xFFF5963A.toInt()
