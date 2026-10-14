@@ -68,6 +68,7 @@ class EditingKeyboardTest {
     private var settingsBefore: Any? = null
 
     @Before fun setUp() {
+        helium314.keyboard.reviveComposeMainDispatcher() // (Compose's main-thread dispatcher freed if an earlier test class left it waiting for a dropped message, 2026-10-11)
         settingsBefore = loadedSettings.get(Settings.getInstance())
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
         val imm = ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager

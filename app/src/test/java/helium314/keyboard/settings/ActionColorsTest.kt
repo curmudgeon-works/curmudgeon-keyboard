@@ -41,7 +41,10 @@ class ActionColorsTest {
     private val real = ctx.realPrefs()
     private val scheme = AppLook.curmudgeonScheme
 
-    @Before fun setUp() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
+    @Before fun setUp() {
+        helium314.keyboard.reviveComposeMainDispatcher() // (Compose's main-thread dispatcher freed if an earlier test class left it waiting for a dropped message, 2026-10-11)
+        real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
+    }
     @After fun tearDown() {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
         SubtypeSettings.reloadEnabledSubtypes(ctx)
