@@ -16,6 +16,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 
 /** The upgrade steps that rename or move a stored value reach every keyboard's own set, not the shared one only. */
@@ -74,7 +75,10 @@ class OwnSetRenamesTest {
         val two = ProfilePreferences(real) { 2 }
         assertEquals(Settings.TOOLBAR_IN_PLACE, Settings.readToolbarVisibility(two))
         assertEquals(Defaults.PREF_SHOW_SUGGESTIONS, two.getBoolean(Settings.PREF_SHOW_SUGGESTIONS, Defaults.PREF_SHOW_SUGGESTIONS))
-        // the shared set as the plain step leaves it
-        assertEquals(Settings.TOOLBAR_ABOVE, Settings.readToolbarVisibility(real))
+        // the shared set as the plain step leaves it: now the first keyboard's, which had no set (owner 2026-10-11: no
+        // separate common set; the first keyboard's own settings are the common ones)
+        assertEquals(Settings.TOOLBAR_ABOVE, Settings.readToolbarVisibility(ProfilePreferences(real) { KeyboardProfiles.SHARED }))
+        assertFalse(real.contains(Settings.PREF_TOOLBAR_VISIBILITY))
+
     }
 }

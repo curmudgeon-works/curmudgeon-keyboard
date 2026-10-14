@@ -54,11 +54,13 @@ class RestoreOnlyThatKeyboardTest {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real); KeyboardProfiles.filesDir = null
         SubtypeSettings.init(ctx)
         en = available("en-US"); hi = available("hi")
-        // the phone: English (1) and Hindi (2), separate settings, Appearance shared (gap 2), each keyboard's own gap hidden
+        // the phone: English (1) and Hindi (2), separate settings, Appearance shared (gap 2: English's, the first
+        // keyboard's; owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones),
+        // Hindi's own gap hidden
         useKeyboards(ctx, real, en, hi)
         profileIds(real, mapOf(en to 1, hi to 2), 3)
         real.edit().putBoolean("separate_settings_per_keyboard", true).putBoolean(appearance.prefKey, true)
-            .putFloat(gap, 2f).putFloat(own(1, gap), 1f).putFloat(own(2, gap), 4f)
+            .putFloat(own(1, gap), 2f).putFloat(own(2, gap), 4f)
             .putBoolean(own(1, autoCap), false).putBoolean(own(2, autoCap), false).commit()
         KeyboardProfiles.loadGroups(real)
     }
@@ -92,24 +94,24 @@ class RestoreOnlyThatKeyboardTest {
         val before = outsideHindi()
         restoreKeyboardsFrom(ctx, zip, listOf(hi), withSettings = true, decisions = whole)
         assertEquals(before, outsideHindi())
-        assertEquals(2f, real.getFloat(gap, 0f), "the shared gap changed")
+        assertEquals(2f, real.getFloat(own(1, gap), 0f), "the shared gap changed")
         assertEquals(2f, view(1).getFloat(gap, 0f)); assertEquals(2f, view(2).getFloat(gap, 0f)) // (shared, for all)
         assertEquals(5f, real.getFloat(own(2, gap), 0f), "Hindi's own gap is not the backup's")
         assertTrue(view(2).getBoolean(autoCap, false)) // (a per-keyboard menu, as before)
         unshare()
         assertEquals(5f, view(2).getFloat(gap, 0f))
-        assertEquals(1f, view(1).getFloat(gap, 0f))
+        assertEquals(2f, view(1).getFloat(gap, 0f))
     }
 
     @Test fun `a hidden own value the backup's keyboard lacks goes, as the whole set is replaced, and nothing else changes`() {
-        real.edit().putFloat(vgap, 7f).putFloat(own(2, vgap), 8f).putFloat(own(1, vgap), 6f).commit()
+        real.edit().putFloat(own(2, vgap), 8f).putFloat(own(1, vgap), 6f).commit()
         backup()
         val before = outsideHindi()
         restoreKeyboardsFrom(ctx, zip, listOf(hi), withSettings = true, decisions = whole)
         assertEquals(before, outsideHindi())
-        assertFalse(real.contains(own(2, vgap))) // (the backup's Hindi read the default there: a mark)
-        assertTrue(real.contains(own(2, KeyboardProfiles.TOMBSTONE + vgap)))
-        assertEquals(7f, view(2).getFloat(vgap, 0f)) // (the mark is not read while shared)
+        assertFalse(real.contains(own(2, vgap))) // (the backup's Hindi read the default there)
+        assertEquals(6f, view(2).getFloat(vgap, 0f)) // (English's while shared)
+
         unshare()
         assertEquals(0f, view(2).getFloat(vgap, 0f))
         assertEquals(6f, view(1).getFloat(vgap, 0f))

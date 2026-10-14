@@ -122,7 +122,11 @@ class WholeFlowUpgradeRestoreTest {
         "moved_markers_removed" to true, "profile_files_migrated" to true, "picture_library_migrated" to true,
     )
 
+    /** The keyboard settings of 3afbeeebc's common set (above). */
+    private val commonOf3afbeeebc = listOf(Settings.PREF_VIBRATE_ON, Settings.PREF_SOUND_ON, gap, Settings.PREF_THEME_DAY_NIGHT)
+
     private fun write(prefs: Map<String, Any>) {
+
         real.edit().apply { for ((key, value) in prefs) KeyboardProfiles.put(this, key, value) }.commit()
         KeyboardProfiles.loadGroups(real)
     }
@@ -174,12 +178,16 @@ class WholeFlowUpgradeRestoreTest {
 
         appStart()
         val first = HashMap(real.all)
-        assertEquals(sortedSetOf(LayoutPresets.PREF, AppearanceLooks.PREF, SavedItemDefaults.REMEMBERED_DONE),
-            changedKeys(before, first), "the first upgrade changed more than the saved Layouts and themes")
+        // (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones) the common set
+        // goes; French, with a set of its own, keeps what it read from it where its own held nothing (to be confirmed),
+        // US, the first keyboard, keeps its own set as it is
+        val filled = commonOf3afbeeebc.filter { !before.containsKey(own(2, it)) && !before.containsKey(mark(2, it)) }.associate { own(2, it) to before[it] }
+        assertEquals(sortedSetOf(LayoutPresets.PREF, AppearanceLooks.PREF, SavedItemDefaults.REMEMBERED_DONE, KeyboardProfiles.NO_COMMON_SET_DONE)
+            + commonOf3afbeeebc + filled.keys, changedKeys(before, first), "the first upgrade changed more than the saved Layouts and themes")
         assertEquals(true, first[SavedItemDefaults.REMEMBERED_DONE])
         assertFalse(first.containsKey(SavedItemDefaults.PREF), "the switch was written down")
-        // no keyboard's setting changed, and nothing written as a default
-        assertEquals(live(before), live(first))
+        // no other keyboard's setting changed, and nothing written as a default
+        assertEquals(live(before) - commonOf3afbeeebc + filled, live(first))
         // the saved items: picked values as they were, unpicked ones remember today's default
         val layouts = LayoutPresets.load(real)
         assertEquals(oldLayouts.map { it.name to it.values }, layouts.map { it.name to it.values })
@@ -236,7 +244,8 @@ class WholeFlowUpgradeRestoreTest {
         assertRemembersToday("Sunset", sunset.values, sunset.remembered)
         assertEquals(old[KeyPopupOverrides.PREF_SETS], real.all[KeyPopupOverrides.PREF_SETS])
         // every keyboard's settings as in the backup: nothing of the phone's left, nothing written down with the switch off
-        assertEquals(live(old), live(real.all), "live settings differ from the backup's")
+        // (the backup's common set dropped: owner 2026-10-11, "fine to trash common set with upgrade and restore")
+        assertEquals(live(old) - commonOf3afbeeebc, live(real.all), "live settings differ from the backup's")
         assertEquals(old["keyboard_profile_ids"], real.all["keyboard_profile_ids"])
         assertEquals(old[Settings.PREF_ENABLED_SUBTYPES], real.all[Settings.PREF_ENABLED_SUBTYPES])
 

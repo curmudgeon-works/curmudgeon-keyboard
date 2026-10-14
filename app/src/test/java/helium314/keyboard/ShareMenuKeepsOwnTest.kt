@@ -26,7 +26,9 @@ import kotlin.test.assertTrue
 
 /**
  * A menu made shared keeps each keyboard's own settings for it, as the main switch does, and made per keyboard again
- * each keyboard reads its own (owner 2026-10-11: "Deleting should not happen. Behavior should be same").
+ * each keyboard reads its own (owner 2026-10-11: "Deleting should not happen. Behavior should be same"). (owner
+ * 2026-10-11: no separate common set; the first keyboard's own settings are the common ones: US, set 1, first in the
+ * list; nothing is copied either way.)
  */
 @RunWith(RobolectricTestRunner::class)
 class ShareMenuKeepsOwnTest {
@@ -46,6 +48,7 @@ class ShareMenuKeepsOwnTest {
             .putBoolean("separate_settings_per_keyboard", true)
             .putString("keyboard_profile_ids", JSONObject().put(us.toPref(), 1).put(fr.toPref(), 2).put(de.toPref(), 3).toString())
             .putInt("keyboard_profile_next_id", 4)
+            .putString(Settings.PREF_ENABLED_SUBTYPES, helium314.keyboard.latin.utils.SubtypeSettings.createPrefSubtypes(listOf(us, fr, de)))
             .commit()
         KeyboardProfiles.loadGroups(real)
         KeyboardProfiles.filesDir = DeviceProtectedUtils.getFilesDir(ctx)
@@ -81,10 +84,10 @@ class ShareMenuKeepsOwnTest {
     @Test fun `a keyboard with nothing of its own reads the shared values after unshare`() {
         view(1).edit().putFloat(gap, 2f).commit()
         share(1)
-        view(3).edit().putFloat(gap, 3f).commit() // (the shared set, while shared)
+        view(3).edit().putFloat(gap, 3f).commit() // (the shared set, while shared: US's)
         unshare()
-        assertEquals(3f, view(3).getFloat(gap, 0f))
-        assertEquals(3f, view(1).getFloat(gap, 0f)) // (owner 2026-10-11: B, the shared keyboard keeps the edits)
+        assertEquals(0f, view(3).getFloat(gap, 0f)) // (its own: nothing, the default; no copy of US's)
+        assertEquals(3f, view(1).getFloat(gap, 0f)) // (US keeps the edits: they were its own)
     }
 
     @Test fun `a font deleted while shared is gone from a hidden own set too`() {
@@ -105,27 +108,27 @@ class ShareMenuKeepsOwnTest {
         view(2).edit().putFloat(gap, 4f).commit()
         pic(1).writeText("one"); pic(2).writeText("two")
         share(1)
-        assertEquals("one", pic(KeyboardProfiles.SHARED).readText())
+        assertEquals(pic(1), KeyboardProfiles.profileFile(ctx, "custom_background_image")) // (the shared picture: US's)
         assertEquals("two", pic(2).readText(), "2's own picture went")
-        pic(KeyboardProfiles.SHARED).writeText("shared") // changed while shared
+        pic(1).writeText("shared") // changed while shared
         unshare()
-        assertEquals("shared", pic(1).readText()) // (owner 2026-10-11: B, the shared keyboard keeps the edits)
+        assertEquals("shared", pic(1).readText()) // (US keeps the edits: its own)
         assertEquals("two", pic(2).readText())
-        assertEquals("shared", pic(3).readText()) // (3 had nothing of its own)
+        assertFalse(pic(3).exists()) // (3 had nothing of its own: nothing copied)
     }
 
     @Test fun `the winner's default mark makes the shared value default, other marks stay`() {
-        real.edit().putFloat(gap, 5f).commit()
         view(1).edit().remove(gap).commit() // 1: "Default"
         view(2).edit().remove(gap).commit()
         share(1)
-        assertFalse(real.contains(gap))
+        assertEquals(0f, view(3).getFloat(gap, 0f))
         assertTrue(real.contains(own(2, KeyboardProfiles.TOMBSTONE + gap)))
-        real.edit().putFloat(gap, 6f).commit()
+        view(3).edit().putFloat(gap, 6f).commit() // (US's set)
         assertEquals(6f, view(2).getFloat(gap, 0f)) // (the mark is not read while shared)
         unshare()
         assertEquals(0f, view(2).getFloat(gap, 0f)) // its own "Default" again
     }
+
 
     @Test fun `the saved-items switch flipped while shared reaches the hidden own sets`() {
         AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Sunset", mapOf(gap to null), mapOf(gap to 0.5f))), now = true)

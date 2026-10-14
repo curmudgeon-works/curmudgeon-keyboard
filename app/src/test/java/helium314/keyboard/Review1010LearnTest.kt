@@ -144,7 +144,13 @@ class Review1010LearnTest {
         val zip = File(ctx.cacheDir, "review1010.zip")
         ZipOutputStream(FileOutputStream(zip)).use { out ->
             out.putNextEntry(ZipEntry("preferences.json"))
-            settingsToJsonStream(mapOf<String?, Any?>(priorityKey to LanguagePriority.LOW), out)
+            // (the first keyboard's own set: owner 2026-10-11, no separate common set; the first keyboard's own settings
+            // are the common ones, and an old backup's common set is dropped)
+            val first = helium314.keyboard.latin.settings.SettingsSubtype(Locale.US, "")
+            settingsToJsonStream(mapOf<String?, Any?>(helium314.keyboard.latin.settings.Settings.PREF_ENABLED_SUBTYPES to first.toPref(),
+                "keyboard_profile_ids" to """{"${first.toPref()}":1}""", "keyboard_profile_next_id" to 2,
+                helium314.keyboard.latin.settings.Settings.PREF_VERSION_CODE to helium314.keyboard.latin.BuildConfig.MIGRATION_VERSION,
+                "p1/$priorityKey" to LanguagePriority.LOW), out)
             out.closeEntry()
         }
         warmCaches(LanguagePriority.HIGH)
@@ -152,18 +158,19 @@ class Review1010LearnTest {
             assertTrue(runRestore(ctx, {}, R.string.backup_restored, 1) { restoreEverythingFrom(ctx, zip) })
             idle { !BackupRestoreJob.isRunning }
         } finally { zip.delete() }
-        assertEquals(LanguagePriority.LOW, real.getInt(priorityKey, 0), "not restored")
+        assertEquals(LanguagePriority.LOW, ctx.prefs().getInt(priorityKey, 0), "not restored")
         assertCachesCleared("restore", LanguagePriority.LOW)
     }
 
     @Test fun `a factory reset clears the caches of the settings it removed`() {
-        real.edit().putInt(priorityKey, LanguagePriority.LOW).commit()
+        ctx.prefs().edit().putInt(priorityKey, LanguagePriority.LOW).commit() // (the first keyboard's set)
         warmCaches(LanguagePriority.LOW)
         var done = false
         startFactoryReset(ctx, keyboards = true, learnedWords = false, clipboard = false, custom = false) { done = true }
         idle { done }
         assertTrue(done, "the reset never ran")
-        assertFalse(real.contains(priorityKey), "not reset")
+        assertFalse(ctx.prefs().contains(priorityKey), "not reset")
+
         assertCachesCleared("reset", LanguagePriority.HIGH)
     }
 }

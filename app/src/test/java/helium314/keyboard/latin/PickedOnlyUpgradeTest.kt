@@ -189,11 +189,16 @@ class PickedOnlyUpgradeTest {
             real.edit().clear().commit()
             real.edit { putInt(Settings.PREF_VERSION_CODE, 3008); putBoolean(PICKED_ONLY_DONE, true); for ((key, value) in old) store(this, key, value) }
             checkVersionUpgrade(ctx)
-            for ((key, value) in old.filterKeys { it != padding(1) && it != padding(3) }) assertEquals(value, real.all[key], key)
+            // (in the first keyboard's set now, which had none: owner 2026-10-11, no separate common set; the first
+            // keyboard's own settings are the common ones)
+            val first = helium314.keyboard.latin.settings.ProfilePreferences(real) { KeyboardProfiles.SHARED }.all
+            for ((key, value) in old.filterKeys { it != padding(1) && it != padding(3) }) assertEquals(value, first[key], key)
         } finally { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
         // one keyboard restored on its own from a 0.3.007 backup
-        val restored = helium314.keyboard.settings.preferences.restoredSettings(ctx, old,
-            helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.US, ""))
+        val keyboard = helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.US, "")
+        val restored = helium314.keyboard.settings.preferences.restoredSettings(ctx,
+            old.mapKeys { "p1/${it.key}" } + ("keyboard_profile_ids" to """{"${keyboard.toPref()}":1}"""), keyboard)
+
         for (key in old.keys) assertNull(restored[key], key)
     }
 

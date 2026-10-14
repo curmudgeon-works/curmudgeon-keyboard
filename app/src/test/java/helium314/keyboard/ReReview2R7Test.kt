@@ -45,6 +45,7 @@ class ReReview2R7Test {
     private val autoCap = Settings.PREF_AUTO_CAP
     private lateinit var en: SettingsSubtype
     private lateinit var hi: SettingsSubtype
+    private val de get() = available("de-DE")
     private fun view(id: Int) = ProfilePreferences(real) { id }
     private fun own(id: Int, key: String) = KeyboardProfiles.ownKey(id, key)
 
@@ -52,11 +53,13 @@ class ReReview2R7Test {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real); KeyboardProfiles.filesDir = null
         SubtypeSettings.init(ctx)
         en = available("en-US"); hi = available("hi")
-        // the phone: English (1) and Hindi (2) on one set for all (gap 2, auto-caps off), the common set from Hindi
+        // the phone: English (1) and Hindi (2) on one set for all (gap 2, auto-caps off): English's, the first keyboard's
+        // (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones)
         useKeyboards(ctx, real, en, hi)
         profileIds(real, mapOf(en to 1, hi to 2), 3)
-        real.edit().putFloat(gap, 2f).putBoolean(autoCap, false).commit()
+        real.edit().putFloat(own(1, gap), 2f).putBoolean(own(1, autoCap), false).commit()
         KeyboardProfiles.disable(real)
+
         KeyboardProfiles.loadGroups(real)
     }
     @After fun tearDown() { zip.delete(); real.edit().clear().commit(); KeyboardProfiles.loadGroups(real); SubtypeSettings.reloadEnabledSubtypes(ctx) }
@@ -90,8 +93,13 @@ class ReReview2R7Test {
         assertEquals(listOf(hi), hidden)
         assertEquals("${keyboardName(hi, ctx)}'s settings were restored. You'll see them once you turn on Use separate settings in App settings.",
             hiddenSettingsNote(ctx, hidden))
-        assertEquals("The settings of ${keyboardName(hi, ctx)}, ${keyboardName(en, ctx)} were restored. You'll see them once you turn on Use separate settings in App settings.",
+        // (English is the first keyboard: its settings are the common ones; owner 2026-10-11, no separate common set)
+        assertEquals("The settings of ${keyboardName(hi, ctx)}, ${keyboardName(de, ctx)} were restored. You'll see them once you turn on Use separate settings in App settings.",
+            hiddenSettingsNote(ctx, listOf(hi, de)))
+        assertEquals("${keyboardName(en, ctx)}'s settings were restored. All keyboards use them, as they're the common settings.\n" +
+            "${keyboardName(hi, ctx)}'s settings were restored. You'll see them once you turn on Use separate settings in App settings.",
             hiddenSettingsNote(ctx, listOf(hi, en)))
+
         // separate settings on: Hindi reads the backup's, English the common ones
         KeyboardProfiles.enable(real)
         assertEquals(5f, view(2).getFloat(gap, 0f))

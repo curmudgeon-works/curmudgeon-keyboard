@@ -60,16 +60,18 @@ class SubtypeTest {
 
         // edit enabled resource subtype
         val from = SubtypeSettings.getResourceSubtypesForLocale("es".constructLocale()).first()
+        // (added to an empty list the keyboards it showed stay first: owner 2026-10-11, no separate common set; the first
+        // keyboard's own settings are the common ones)
         SubtypeSettings.addEnabledSubtype(prefs, from)
         val to = from.toSettingsSubtype().withLayout(LayoutType.SYMBOLS, "symbols_arabic")
         SubtypeUtilsAdditional.changeAdditionalSubtype(from.toSettingsSubtype(), to, latinIME)
-        assertEquals(to, SubtypeSettings.getEnabledSubtypes(false).single().toSettingsSubtype())
+        assertEquals(to, SubtypeSettings.getEnabledSubtypes(false).last().toSettingsSubtype())
 
         // change the new subtype to effectively be the same as original resource subtype
         val toNew = to.withoutLayout(LayoutType.SYMBOLS)
         assertEquals(from.toSettingsSubtype(), toNew)
         SubtypeUtilsAdditional.changeAdditionalSubtype(to, toNew, latinIME)
         assertEquals(emptyList(), SubtypeSettings.getAdditionalSubtypes().map { it.toSettingsSubtype() })
-        assertEquals(from.toSettingsSubtype(), SubtypeSettings.getEnabledSubtypes(false).single().toSettingsSubtype())
+        assertEquals(from.toSettingsSubtype(), SubtypeSettings.getEnabledSubtypes(false).last().toSettingsSubtype())
     }
 }

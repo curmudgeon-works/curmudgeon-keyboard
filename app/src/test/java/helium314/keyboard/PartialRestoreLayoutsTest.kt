@@ -84,7 +84,9 @@ class PartialRestoreLayoutsTest {
             z.putNextEntry(ZipEntry("preferences.json"))
             settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to backupKeyboard.toPref(),
                 Settings.PREF_ADDITIONAL_SUBTYPES to backupKeyboard.toPref(),
-                LayoutPresets.PREF to JSONArray(listOf(work)).toString(), defaultKey to numrow,
+                // (its own set: owner 2026-10-11, no separate common set; a backup's common set is ignored)
+                LayoutPresets.PREF to JSONArray(listOf(work)).toString(), "p1/$defaultKey" to numrow,
+                "keyboard_profile_ids" to JSONObject().put(backupKeyboard.toPref(), 1).toString(),
                 helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
                 helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
             z.closeEntry()
@@ -94,7 +96,8 @@ class PartialRestoreLayoutsTest {
     private fun LayoutType.folderName() = "layouts/${name.lowercase()}"
 
     private fun enabled() = SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }
-    private fun ownDefault(keyboard: SettingsSubtype) = real.getString(KeyboardProfiles.prefixedKey(real, KeyboardProfiles.idFor(real, keyboard), defaultKey), null)
+    private fun ownDefault(keyboard: SettingsSubtype) = real.getString(KeyboardProfiles.ownKey(KeyboardProfiles.idFor(real, keyboard), defaultKey), null)
+
 
     @Test fun `other keys under a name the phone has come in numbered, and only the restored keyboard uses them`() {
         file(numrow).writeText("A")

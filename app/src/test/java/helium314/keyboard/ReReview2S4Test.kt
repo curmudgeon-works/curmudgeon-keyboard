@@ -27,7 +27,9 @@ import kotlin.test.assertTrue
 /**
  * Review 2026-10-11 S4: the switch "Saved items take new defaults" turned off and back on left a keyboard's own set a
  * "default" mark where it held nothing, so a value later picked in the shared set no longer reached it. Back on, the
- * mark goes only where the shared set (after the same pass) holds a value.
+ * mark goes only where the shared set (after the same pass) holds a value. (owner 2026-10-11: no separate common set;
+ * the first keyboard's own settings are the common ones: no shared value to keep a mark against, so back on the own
+ * value just goes; keyboard 1, US, is the first.)
  */
 @RunWith(RobolectricTestRunner::class)
 class ReReview2S4Test {
@@ -36,6 +38,7 @@ class ReReview2S4Test {
     private val longPress = Settings.PREF_KEY_LONGPRESS_TIMEOUT
     private val gap = Settings.PREF_KEY_HORIZONTAL_GAP
     private val us = SettingsSubtype(Locale.US, "")
+    private val fr = SettingsSubtype(Locale.FRANCE, "")
 
     @Before fun setUp() { real.edit().clear().commit() }
     @After fun tearDown() { AppearanceDraft.close(); real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
@@ -48,7 +51,8 @@ class ReReview2S4Test {
      *  Sunset (gap at its default, 0.5 when saved). */
     private fun separateWithWorkAndSunset() {
         real.edit().putBoolean("separate_settings_per_keyboard", true)
-            .putString("keyboard_profile_ids", JSONObject().put(us.toPref(), 1).toString())
+            .putString("keyboard_profile_ids", JSONObject().put(us.toPref(), 1).put(fr.toPref(), 2).toString())
+            .putString(Settings.PREF_ENABLED_SUBTYPES, helium314.keyboard.latin.utils.SubtypeSettings.createPrefSubtypes(listOf(us, fr)))
             .commit()
         KeyboardProfiles.loadGroups(real)
         LayoutPresets.save(real, listOf(LayoutPresets.Preset("Work", mapOf(longPress to null), remembered = mapOf(longPress to 300))))
@@ -75,37 +79,36 @@ class ReReview2S4Test {
             assertFalse(real.contains(mark(1, key)), "a default mark for $key where the set held nothing")
         }
         assertEquals(Defaults.PREF_KEY_LONGPRESS_TIMEOUT, view(1).getInt(longPress, Defaults.PREF_KEY_LONGPRESS_TIMEOUT))
-        // a value picked later in the shared set reaches it
-        real.edit().putInt(longPress, 200).commit()
+        // a value picked later is read, no mark in its way
+        view(1).edit().putInt(longPress, 200).commit()
         assertEquals(200, view(1).getInt(longPress, Defaults.PREF_KEY_LONGPRESS_TIMEOUT))
     }
 
     @Test fun `off then on - the shared set holds a value - the own set gets its mark back and reads the default`() {
         separateWithWorkAndSunset()
-        real.edit().putInt(longPress, 200).putBoolean(mark(1, longPress), true).commit() // (it read the default, not 200)
+        real.edit().putBoolean(mark(1, longPress), true).commit() // (it read the default)
         choose()
         flip(false)
         assertEquals(300, real.getInt(own(1, longPress), 0))
         assertFalse(real.contains(mark(1, longPress)))
         flip(true)
         assertFalse(real.contains(own(1, longPress)))
-        assertTrue(real.contains(mark(1, longPress)))
-        assertEquals(200, real.getInt(longPress, 0))
+        assertFalse(real.contains(longPress))
         assertEquals(Defaults.PREF_KEY_LONGPRESS_TIMEOUT, view(1).getInt(longPress, Defaults.PREF_KEY_LONGPRESS_TIMEOUT))
     }
 
     @Test fun `off then on - the shared set drops its value in the same pass - no mark on the own set`() {
         separateWithWorkAndSunset()
-        real.edit().putString(LayoutPresets.PREF_SELECTED, "Work").commit() // (the shared set chose Work too)
+        real.edit().putBoolean("separate_settings_per_keyboard", false).commit() // (one set for all: US's)
         choose()
         flip(false)
-        assertEquals(300, real.getInt(longPress, 0)) // (the shared set's own written)
         assertEquals(300, real.getInt(own(1, longPress), 0))
-        flip(true)
+        assertEquals(300, view(2).getInt(longPress, 0)) // (keyboard 2 reads US's)
         assertFalse(real.contains(longPress))
+        flip(true)
         assertFalse(real.contains(own(1, longPress)))
-        assertFalse(real.contains(mark(1, longPress)), "a default mark though the shared set holds nothing")
-        real.edit().putInt(longPress, 200).commit()
-        assertEquals(200, view(1).getInt(longPress, Defaults.PREF_KEY_LONGPRESS_TIMEOUT))
+        assertFalse(real.contains(mark(1, longPress)), "a default mark where the set held nothing")
+        assertEquals(Defaults.PREF_KEY_LONGPRESS_TIMEOUT, view(2).getInt(longPress, Defaults.PREF_KEY_LONGPRESS_TIMEOUT))
     }
+
 }

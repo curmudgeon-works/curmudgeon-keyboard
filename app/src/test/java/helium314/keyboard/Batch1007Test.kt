@@ -109,7 +109,10 @@ class Batch1007Test {
         snapshot.restore() // Cancel
         assertFalse(real.contains("p1/$key"), "the shared colour was written into keyboard 1's own set")
         assertFalse(real.contains("p1/${KeyboardProfiles.TOMBSTONE}$key"))
-        assertEquals(0xFF0000FF.toInt(), own.getInt(key, 0), "keyboard 1 still follows the shared value")
+        // (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones: nothing of its
+        // own is the default, not a common value)
+        assertEquals(0, own.getInt(key, 0), "keyboard 1 isn't at its default")
+
         // and a keyboard's own value comes back as its own
         own.edit { putInt(key, 0xFF111111.toInt()) }
         val again = RawPrefSnapshot(real, 1, listOf(key))

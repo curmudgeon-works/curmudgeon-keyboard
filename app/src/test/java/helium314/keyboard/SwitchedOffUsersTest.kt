@@ -51,9 +51,12 @@ class SwitchedOffUsersTest {
 
     @Before fun setUp() {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
-        assertEquals(1, KeyboardProfiles.idFor(real, a))
-        assertEquals(2, KeyboardProfiles.idFor(real, b))
+        // (the ids written, not given out: with one set of settings a write anywhere, the app's start work too, gives the
+        // first keyboard its set id; owner 2026-10-11: no separate common set; the first keyboard's own settings are the
+        // common ones)
         real.edit {
+            putString("keyboard_profile_ids", org.json.JSONObject().put(a.toPref(), 1).put(b.toPref(), 2).toString())
+            putInt("keyboard_profile_next_id", 3)
             putBoolean("separate_settings_per_keyboard", true)
             putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a)))
             putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a)))
@@ -64,8 +67,11 @@ class SwitchedOffUsersTest {
             }
         }
         SubtypeSettings.reloadEnabledSubtypes(ctx)
+        assertEquals(1, KeyboardProfiles.idFor(real, a))
+        assertEquals(2, KeyboardProfiles.idFor(real, b))
     }
-    @After fun tearDown() {
+    @After
+ fun tearDown() {
         AppearanceDraft.close()
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
         SubtypeSettings.reloadEnabledSubtypes(ctx)
@@ -94,7 +100,8 @@ class SwitchedOffUsersTest {
     }
 
     @Test fun `only following the shared choice it is not asked, nor named twice`() {
-        real.edit { for (kind in Kind.entries) remove(KeyboardProfiles.ownKey(2, kind.key)).putString(kind.key, "Mine") }
+        // (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones: A's choice)
+        real.edit { for (kind in Kind.entries) remove(KeyboardProfiles.ownKey(2, kind.key)) }
         for (kind in Kind.entries) {
             assertEquals(emptyList(), others(kind), kind.name)
             assertEquals(listOf("Work"), deleteKeepersText(ctx, kind.plural, kind.key, "Mine", a)!!.substringAfter("\n").lines())

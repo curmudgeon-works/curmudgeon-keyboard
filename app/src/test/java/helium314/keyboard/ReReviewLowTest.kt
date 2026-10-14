@@ -38,11 +38,15 @@ class ReReviewLowTest {
         val hi = java.util.Locale.forLanguageTag("hi")
         real.edit().putBoolean("separate_settings_per_keyboard", true).commit()
         val own = helium314.keyboard.latin.settings.ProfilePreferences(real) { 2 }
-        lp.set(real, hi, lp.LOW)
-        assertEquals(lp.LOW, lp.get(own, hi)) // nothing of its own: the shared value
+        val other = helium314.keyboard.latin.settings.ProfilePreferences(real) { 3 }
+        lp.set(other, hi, lp.LOW)
+        // nothing of its own: the default, not another set's (owner 2026-10-11: no separate common set; the first
+        // keyboard's own settings are the common ones)
+        assertEquals(lp.get(real, hi), lp.get(own, hi))
         lp.set(own, hi, lp.HIGH)
         assertEquals(lp.HIGH, lp.get(own, hi))
-        assertEquals(lp.LOW, lp.get(real, hi)) // the shared one unchanged
+        assertEquals(lp.LOW, lp.get(other, hi)) // the other one unchanged
+
         assertTrue(real.contains("p2/language_priority_hi"))
         assertFalse(KeyboardProfiles.isGlobal("language_priority_hi"))
     }

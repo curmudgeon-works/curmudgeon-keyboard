@@ -71,7 +71,9 @@ class BackupRestoreJobTest {
     @Test fun `a real restore's progress fills to its last step, then the dialog closes`() {
         ZipOutputStream(FileOutputStream(zip)).use { out ->
             out.putNextEntry(ZipEntry("preferences.json"))
-            settingsToJsonStream(mapOf<String?, Any?>("restored_key" to true), out)
+            // (an app-wide key: an old backup's keyboard settings are dropped by the follow-up, owner 2026-10-11, no separate
+            // common set; the first keyboard's own settings are the common ones)
+            settingsToJsonStream(mapOf<String?, Any?>(helium314.keyboard.latin.settings.Settings.PREF_ADVANCED_SETTINGS to true), out)
             out.closeEntry()
             out.putNextEntry(ZipEntry("protected_preferences.json"))
             settingsToJsonStream(emptyMap<String?, Any?>(), out)
@@ -90,7 +92,7 @@ class BackupRestoreJobTest {
         val last = shown.last()
         assertEquals(4, last.total)
         assertEquals(4, last.done, "the bar didn't fill: ${shown.map { "${it.done}/${it.total}" }}")
-        assertTrue(ctx.realPrefs().getBoolean("restored_key", false), "the backup wasn't restored")
+        assertTrue(ctx.realPrefs().getBoolean(helium314.keyboard.latin.settings.Settings.PREF_ADVANCED_SETTINGS, false), "the backup wasn't restored")
         assertTrue(ShadowToast.showedToast(restored))
     }
 

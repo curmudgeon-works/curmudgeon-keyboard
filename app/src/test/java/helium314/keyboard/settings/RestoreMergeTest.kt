@@ -75,20 +75,26 @@ class RestoreMergeTest {
         real.edit().putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(keyboards))
             .putBoolean("separate_settings_per_keyboard", true).commit()
         useKeyboards(ctx, real, *keyboards.toTypedArray())
-        keyboards.forEach { KeyboardProfiles.idFor(real, it) }
-        real.edit().putBoolean(Settings.PREF_SHOW_NUMBER_ROW, false).putFloat(Settings.PREF_KEY_HORIZONTAL_GAP, 1f).commit()
+        // (each keyboard's settings its own set, the phone's and the backup's; owner 2026-10-11: no separate common set;
+        // the first keyboard's own settings are the common ones)
+        val ids = keyboards.map { KeyboardProfiles.idFor(real, it) }
+        real.edit().apply { for (id in ids) putBoolean(KeyboardProfiles.ownKey(id, Settings.PREF_SHOW_NUMBER_ROW), false)
+            .putFloat(KeyboardProfiles.ownKey(id, Settings.PREF_KEY_HORIZONTAL_GAP), 1f) }.commit()
         writeBackup(inBackup)
     }
 
     private fun writeBackup(inBackup: List<SettingsSubtype>) {
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("preferences.json"))
-            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to SubtypeSettings.createPrefSubtypes(inBackup),
+            settingsToJsonStream(HashMap<String?, Any?>(mapOf(Settings.PREF_ENABLED_SUBTYPES to SubtypeSettings.createPrefSubtypes(inBackup),
                 Settings.PREF_ADDITIONAL_SUBTYPES to SubtypeSettings.createPrefSubtypes(inBackup),
                 Settings.PREF_SELECTED_SUBTYPE to inBackup.first().toPref(),
-                Settings.PREF_SHOW_NUMBER_ROW to true, Settings.PREF_KEY_HORIZONTAL_GAP to 3f,
+                "keyboard_profile_ids" to org.json.JSONObject(inBackup.withIndex().associate { (i, k) -> k.toPref() to 51 + i }).toString(),
                 helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
-                helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
+                helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true) +
+                inBackup.indices.flatMap { i -> listOf(KeyboardProfiles.ownKey(51 + i, Settings.PREF_SHOW_NUMBER_ROW) to true,
+                    KeyboardProfiles.ownKey(51 + i, Settings.PREF_KEY_HORIZONTAL_GAP) to 3f) }), z)
+
             z.closeEntry()
         }
     }

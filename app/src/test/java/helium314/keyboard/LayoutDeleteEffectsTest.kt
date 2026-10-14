@@ -115,7 +115,7 @@ class LayoutDeleteEffectsTest {
         val b = available("de-DE")
         val c = available("en-GB")
         keyboards(false, a, b, c)
-        real.edit().putString(defaultKey, x).commit()
+        real.edit().putString("p1/$defaultKey", x).commit() // (the first keyboard's: owner 2026-10-11, no separate common set; the first keyboard's own settings are the common ones)
         val effects = LayoutUtilsCustom.deleteEffects(x, type, ctx)
         assertEquals(listOf("en-US", "de-DE", "en-GB"), names(effects.first))
         assertEquals(emptyList(), names(effects.second))
@@ -128,7 +128,7 @@ class LayoutDeleteEffectsTest {
         val b = available("de-DE")
         val c = available("en-GB")
         keyboards(false, a, b, c)
-        real.edit().putString(defaultKey, "number_row").putString("p3/$defaultKey", x).commit() // C's set kept behind the scenes
+        real.edit().putString("p1/$defaultKey", "number_row").putString("p3/$defaultKey", x).commit() // C's set kept behind the scenes
         val effects = LayoutUtilsCustom.deleteEffects(x, type, ctx)
         assertEquals(listOf("en-GB"), names(effects.first))
         assertEquals(emptyList(), names(effects.second))

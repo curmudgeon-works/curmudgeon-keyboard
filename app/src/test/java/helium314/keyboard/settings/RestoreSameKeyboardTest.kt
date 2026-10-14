@@ -63,11 +63,17 @@ class RestoreSameKeyboardTest {
         real.edit().putString(Settings.PREF_ADDITIONAL_SUBTYPES, phone.toPref()).putBoolean("separate_settings_per_keyboard", true).commit() // (a keyboard of the user's)
         useKeyboards(ctx, real, phone)
         assertEquals(listOf(phone), enabled())
-        real.edit().putBoolean(Settings.PREF_SHOW_NUMBER_ROW, false).putFloat(Settings.PREF_KEY_HORIZONTAL_GAP, 1f).commit()
+        // (each keyboard's settings its own set, the phone's and the backup's; owner 2026-10-11: no separate common set;
+        // the first keyboard's own settings are the common ones)
+        val own = KeyboardProfiles.idFor(real, phone)
+        real.edit().putBoolean(KeyboardProfiles.ownKey(own, Settings.PREF_SHOW_NUMBER_ROW), false)
+            .putFloat(KeyboardProfiles.ownKey(own, Settings.PREF_KEY_HORIZONTAL_GAP), 1f).commit()
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("preferences.json"))
             settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to backup.toPref(), Settings.PREF_SELECTED_SUBTYPE to backup.toPref(),
-                Settings.PREF_SHOW_NUMBER_ROW to true, Settings.PREF_KEY_HORIZONTAL_GAP to 3f,
+                "keyboard_profile_ids" to org.json.JSONObject().put(backup.toPref(), 1).toString(),
+                KeyboardProfiles.ownKey(1, Settings.PREF_SHOW_NUMBER_ROW) to true, KeyboardProfiles.ownKey(1, Settings.PREF_KEY_HORIZONTAL_GAP) to 3f,
+
                 helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
                 helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
             z.closeEntry()

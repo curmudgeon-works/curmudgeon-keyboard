@@ -60,17 +60,21 @@ class AddKeyboardTest {
         assertTrue(numberRow(added))
     }
 
+    // (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones: A's. The keyboard
+    // added gets its own set at once, read once settings are separate)
     @Test fun `one set for all - the pick waits, then the keyboard starts as the one picked`() {
         bWithItsOwn()
         startSettings(ctx, added, StartSettings.From(b))
-        assertFalse(KeyboardProfiles.hasOwnSettings(real, added)) // nothing of its own while all share one set
+        assertTrue(KeyboardProfiles.hasOwnSettings(real, added)) // its own at once
+        assertFalse(ProfilePreferences(real) { KeyboardProfiles.idFor(real, added) }.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, false)) // (A's for now)
         separateOn()
         assertTrue(numberRow(added))
         assertFalse(numberRow(a)) // (the others as before: the common settings)
     }
 
     @Test fun `one set for all - defaults picked, the keyboard starts at every default once separate`() {
-        real.edit().putBoolean(Settings.PREF_SHOW_NUMBER_ROW, true).commit() // the common settings: number row on
+        real.edit().putBoolean(KeyboardProfiles.ownKey(KeyboardProfiles.idFor(real, a), Settings.PREF_SHOW_NUMBER_ROW), true).commit() // the common settings, A's: number row on
+
         startSettings(ctx, added, StartSettings.Defaults)
         separateOn()
         assertFalse(numberRow(added))

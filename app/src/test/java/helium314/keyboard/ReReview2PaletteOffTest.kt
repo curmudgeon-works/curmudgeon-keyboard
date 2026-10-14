@@ -73,7 +73,7 @@ class ReReview2PaletteOffTest {
         keepOld(users())
         val kept = real.getString(bChoice, null)!!
         assertTrue(KeyboardTheme.isHiddenPalette(kept), kept)
-        assertEquals("old", real.getString(Settings.PREF_USER_COLORS_PREFIX + kept, null))
+        assertEquals("old", real.getString(KeyboardProfiles.ownKey(2, Settings.PREF_USER_COLORS_PREFIX + kept), null)) // (in its own set: owner 2026-10-11, no separate common set)
         assertEquals("Warm", real.getString(KeyboardProfiles.ownKey(1, Settings.PREF_THEME_COLORS), null)) // (the edited one: new)
     }
 

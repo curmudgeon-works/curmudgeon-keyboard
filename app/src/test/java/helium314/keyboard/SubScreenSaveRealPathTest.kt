@@ -109,8 +109,11 @@ class SubScreenSaveRealPathTest {
             .putString("keyboard_profile_ids", JSONObject().put(kb1.toPref(), 1).put(kb2.toPref(), 2).toString())
             .putString(own(2, AppearanceLooks.PREF_SELECTED), "Sunset")
             .putString(own(2, Settings.PREF_THEME_COLORS), "Warm")
-            .putString(Settings.PREF_USER_COLORS_PREFIX + "Warm", before)
-            .putString(Settings.PREF_THEME_COLORS, "Warm")
+            // (keyboard 1's own, the first keyboard's: owner 2026-10-11, no separate common set; the first keyboard's own
+            // settings are the common ones)
+            .putString(Settings.PREF_ENABLED_SUBTYPES, kb1.toPref())
+            .putString(own(1, Settings.PREF_USER_COLORS_PREFIX + "Warm"), before)
+            .putString(own(1, Settings.PREF_THEME_COLORS), "Warm")
             .commit()
         AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Sunset", mapOf(Settings.PREF_THEME_COLORS to "Warm",
             Settings.PREF_USER_COLORS_PREFIX + "Warm" to before))), now = true)
@@ -196,10 +199,10 @@ class SubScreenSaveRealPathTest {
         assertEquals("Sunset", real.getString(own(2, AppearanceLooks.PREF_SELECTED), null)) // on keyboard 2 too
         assertEquals("Warm", real.getString(own(2, Settings.PREF_THEME_COLORS), null)) // its colours choice as it was
         assertEquals(before, ctx.prefs().getString(Settings.PREF_USER_COLORS_PREFIX + "Warm", null)) // the edit undone
-        assertEquals(before, real.getString(Settings.PREF_USER_COLORS_PREFIX + "Warm", null))
-        assertFalse(real.contains(own(1, Settings.PREF_USER_COLORS_PREFIX + "Warm")))
+        assertEquals(before, real.getString(own(1, Settings.PREF_USER_COLORS_PREFIX + "Warm"), null))
+        assertFalse(real.contains(Settings.PREF_USER_COLORS_PREFIX + "Warm"))
         // no palette kept aside by the update question is left
-        assertEquals(listOf(Settings.PREF_USER_COLORS_PREFIX + "Warm"),
+        assertEquals(listOf(own(1, Settings.PREF_USER_COLORS_PREFIX + "Warm")),
             real.all.keys.filter { it.contains(Settings.PREF_USER_COLORS_PREFIX) }.sorted())
         assertEquals(emptyList(), AppearanceDraft.savedPalettesOnDisk(ctx))
     }
@@ -465,7 +468,7 @@ class SubScreenSaveRealPathTest {
         assertEquals(listOf("Sunset"), AppearanceLooks.load(real).map { it.name })
         assertEquals("Sunset", real.getString(own(2, AppearanceLooks.PREF_SELECTED), null))
         assertEquals(before, ctx.prefs().getString(Settings.PREF_USER_COLORS_PREFIX + "Warm", null))
-        assertFalse(real.contains(own(1, Settings.PREF_USER_COLORS_PREFIX + "Warm")))
+        assertFalse(real.contains(Settings.PREF_USER_COLORS_PREFIX + "Warm"))
     }
 
     // review S2 (owner 2026-10-11, S2: "yes let's keep saved subscreen changes"): leaving the app (the activity stopped,
@@ -539,6 +542,7 @@ class SubScreenSaveRealPathTest {
     }
 
     companion object {
+
         private const val PARENT = "parent"
         private const val SUB = "sub"
     }

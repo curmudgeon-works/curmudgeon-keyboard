@@ -43,6 +43,7 @@ class ThemePicturesOtherKeyboardTest {
         assertEquals(1, KeyboardProfiles.idFor(real, a))
         assertEquals(2, KeyboardProfiles.idFor(real, b))
         real.edit { putBoolean("separate_settings_per_keyboard", true) } // (Appearance per keyboard by default)
+        real.edit { putString(Settings.PREF_ENABLED_SUBTYPES, helium314.keyboard.latin.utils.SubtypeSettings.createPrefSubtypes(listOf(a, b))) } // (A first)
         clearPictures()
     }
     @After fun tearDown() {
@@ -62,9 +63,11 @@ class ThemePicturesOtherKeyboardTest {
         assertEquals("framing A", PictureFraming.fileFor(live(screenB)).readText())
         assertFalse(AppearanceLooks.isTweaked(screenB, look))
         assertEquals("picture A", live(screenA).readText()) // A's own untouched
-        // and with separate settings off (the shared files): the same theme applies there too
+        // and with separate settings off (the first keyboard's files, A's: owner 2026-10-11, no separate common set; the
+        // first keyboard's own settings are the common ones): the same theme applies there too
         real.edit { putBoolean("separate_settings_per_keyboard", false) }
-        assertEquals("custom_background_image", live(ctx).name)
+        assertEquals("custom_background_image_p1", live(ctx).name)
+
         AppearanceLooks.applyPictures(ctx, look)
         assertEquals("picture A", live(ctx).readText())
         assertFalse(AppearanceLooks.isTweaked(ctx, look))

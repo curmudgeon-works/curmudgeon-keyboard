@@ -23,7 +23,9 @@ import kotlin.test.assertFalse
 /**
  * Edits made while settings are shared stay with the keyboard whose settings were made the shared ones; the others get
  * their own back (owner 2026-10-11: "Edits made while a menu is shared should only affect the main keyboard who's menu
- * is indeed being changed. So B."). For one menu and for the main switch alike.
+ * is indeed being changed. So B."). For one menu and for the main switch alike. (owner 2026-10-11: no separate common
+ * set; the first keyboard's own settings are the common ones: English, first in the list, is that keyboard, its own set
+ * the one edited meanwhile; nothing is handed back.)
  */
 @RunWith(RobolectricTestRunner::class)
 class SharedEditsStayTest {
@@ -41,6 +43,7 @@ class SharedEditsStayTest {
             .putBoolean("separate_settings_per_keyboard", true)
             .putString("keyboard_profile_ids", JSONObject().put(english.toPref(), 1).put(hindi.toPref(), 2).toString())
             .putInt("keyboard_profile_next_id", 3)
+            .putString(Settings.PREF_ENABLED_SUBTYPES, helium314.keyboard.latin.utils.SubtypeSettings.createPrefSubtypes(listOf(english, hindi)))
             .commit()
         KeyboardProfiles.loadGroups(real)
         KeyboardProfiles.filesDir = DeviceProtectedUtils.getFilesDir(ctx)
@@ -95,8 +98,10 @@ class SharedEditsStayTest {
         fun pic(id: Int) = File(dir, "custom_background_image" + if (id == KeyboardProfiles.SHARED) "" else "_p$id")
         pic(1).writeText("one"); pic(2).writeText("two")
         share(1)
-        pic(KeyboardProfiles.SHARED).writeText("new")
+        assertEquals(pic(1), KeyboardProfiles.profileFile(ctx, "custom_background_image")) // (the shared picture: English's)
+        pic(1).writeText("new")
         unshare()
+
         assertEquals("new", pic(1).readText(), "English lost the picture")
         assertEquals("two", pic(2).readText())
     }

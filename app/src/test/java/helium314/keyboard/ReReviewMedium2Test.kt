@@ -85,14 +85,17 @@ class ReReviewMedium2Test {
     }
 
     // 3
-    @Test fun `a copy with one set of settings for all keyboards gets no own set`() {
-        // (since 2026-10-10 the settings picked wait for separate settings, see AddKeyboardTest: still no frozen own set)
+    @Test fun `a copy with one set of settings for all keyboards gets its own set at once`() {
+        // (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones: every
+        // keyboard has its own set at once, from the settings picked, read once settings are separate)
         val source = SettingsSubtype(Locale.US, "")
         val copy = SettingsSubtype(Locale.UK, "")
+        real.edit().putInt(KeyboardProfiles.ownKey(KeyboardProfiles.idFor(real, source), Settings.PREF_KEY_LONGPRESS_TIMEOUT), 400).commit()
         startSettings(ctx, copy, StartSettings.From(source))
-        startSettings(ctx, copy, StartSettings.Common)
-        kotlin.test.assertFalse(KeyboardProfiles.hasOwnSettings(real, copy))
+        kotlin.test.assertTrue(KeyboardProfiles.hasOwnSettings(real, copy))
+        assertEquals(400, real.getInt(KeyboardProfiles.ownKey(KeyboardProfiles.idFor(real, copy), Settings.PREF_KEY_LONGPRESS_TIMEOUT), 0))
     }
+
 
     // 4
     @Test fun `the swipe log follows the word shown first, not the decoder's raw first word`() {

@@ -44,12 +44,16 @@ class Review1010ThemesTest {
     // ---- #3: palette rename and delete in the shared set reach the keyboards' hidden own sets ----
 
     // separate settings off; keyboard 1's own set (kept from earlier) names the shared palette "My theme" with no colours
-    // of its own, keyboard 2's own set has its own "My theme"
+    // of its own, keyboard 2's own set has its own "My theme". (owner 2026-10-11: no separate common set; the first
+    // keyboard's own settings are the common ones: keyboard 3, first in the list, holds the shared palette; a set that
+    // follows its rename gets a copy of the colours, as no set reads another's)
+    private val first = helium314.keyboard.latin.settings.SettingsSubtype(java.util.Locale.FRANCE, "")
     private fun hiddenSetsNamingMyTheme() {
         real.edit()
-            .putString("keyboard_profile_ids", """{"en_US:":1,"de_DE:":2}""")
-            .putString(Settings.PREF_USER_COLORS_PREFIX + "My theme", "[]")
-            .putString(colors, "My theme")
+            .putString("keyboard_profile_ids", """{"en_US:":1,"de_DE:":2,"${first.toPref()}":3}""")
+            .putString(Settings.PREF_ENABLED_SUBTYPES, first.toPref())
+            .putString("p3/${Settings.PREF_USER_COLORS_PREFIX}My theme", "[]")
+            .putString("p3/$colors", "My theme")
             .putString("p1/$colors", "My theme").putString("p1/$night", "My theme")
             .putString("p2/$colors", "My theme").putString("p2/${Settings.PREF_USER_COLORS_PREFIX}My theme", "[]")
             .commit()
@@ -62,10 +66,11 @@ class Review1010ThemesTest {
         KeyboardTheme.deleteUserColors(ctx, set(1), "My theme") // (separate off: the shared set)
         val kept = real.getString("p1/$colors", null)!!
         assertTrue(KeyboardTheme.isHiddenPalette(kept))
-        assertTrue(real.contains(Settings.PREF_USER_COLORS_PREFIX + kept)) // (its colours, under the kept name)
-        assertFalse(real.contains(Settings.PREF_USER_COLORS_PREFIX + "My theme")) // (the shared palette's old name is gone)
+        assertTrue(real.contains("p3/${Settings.PREF_USER_COLORS_PREFIX}$kept")) // (its colours, under the kept name)
+        assertTrue(real.contains("p1/${Settings.PREF_USER_COLORS_PREFIX}$kept")) // (keyboard 1's copy)
+        assertFalse(real.contains("p3/${Settings.PREF_USER_COLORS_PREFIX}My theme")) // (the shared palette's old name is gone)
         // a new palette that takes the free name later is not picked up by keyboard 1 when separate settings come back
-        real.edit().putString(Settings.PREF_USER_COLORS_PREFIX + "My theme", "[]").putBoolean("separate_settings_per_keyboard", true).commit()
+        real.edit().putString("p3/${Settings.PREF_USER_COLORS_PREFIX}My theme", "[]").putBoolean("separate_settings_per_keyboard", true).commit()
         assertEquals(kept, set(1).getString(colors, null))
         // keyboard 2's own palette of that name stays its choice
         assertEquals("My theme", real.getString("p2/$colors", null))
@@ -74,7 +79,8 @@ class Review1010ThemesTest {
     @Test fun `a palette renamed in the shared set is renamed in a hidden set that read it`() {
         hiddenSetsNamingMyTheme()
         assertTrue(KeyboardTheme.renameUserColors("My theme", "Work", set(1)))
-        assertEquals("Work", real.getString(colors, null))
+        assertEquals("Work", real.getString("p3/$colors", null))
+        assertEquals("[]", real.getString("p1/${Settings.PREF_USER_COLORS_PREFIX}Work", null)) // (keyboard 1's copy)
         assertEquals("Work", real.getString("p1/$colors", null))
         assertEquals("Work", real.getString("p1/$night", null))
         assertEquals("My theme", real.getString("p2/$colors", null))
@@ -93,7 +99,8 @@ class Review1010ThemesTest {
         real.edit().putBoolean("separate_settings_per_keyboard", true).commit()
         KeyboardTheme.deleteUserColors(ctx, set(2), "My theme")
         assertEquals("My theme", real.getString("p1/$colors", null))
-        assertEquals("My theme", real.getString(colors, null))
+        assertEquals("My theme", real.getString("p3/$colors", null))
+
     }
 
     // ---- #4: saved Layouts and themes follow a renamed or deleted name they carry ----

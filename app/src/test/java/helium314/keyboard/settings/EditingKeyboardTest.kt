@@ -118,8 +118,10 @@ class EditingKeyboardTest {
         real.edit { putBoolean("separate_settings_per_keyboard", false) }
         activity.prefs().edit { putBoolean(key, false) }
         KeyboardScopeContext(activity, idB).prefs().edit { putInt(Settings.PREF_KEY_LONGPRESS_TIMEOUT, 333) }
-        assertEquals(false, real.getBoolean(key, true), "separate settings off: not the plain key")
-        assertEquals(333, real.getInt(Settings.PREF_KEY_LONGPRESS_TIMEOUT, 0), "separate settings off: not the plain key")
+        // (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones: A's)
+        assertEquals(false, real.getBoolean(own(idA), true), "separate settings off: not the first keyboard's set")
+        assertEquals(333, real.getInt(KeyboardProfiles.ownKey(idA, Settings.PREF_KEY_LONGPRESS_TIMEOUT), 0), "separate settings off: not the first keyboard's set")
+        assertFalse(real.contains(key) || real.contains(Settings.PREF_KEY_LONGPRESS_TIMEOUT))
         real.edit { putBoolean("separate_settings_per_keyboard", true) }
 
         KeyboardScopeContext(activity, 99).prefs().edit { putInt(Settings.PREF_KEY_LONGPRESS_TIMEOUT, 444) }
@@ -256,7 +258,10 @@ class EditingKeyboardTest {
         // the backup's ids replace the phone's: B's old id is A's now
         activity.runOnUiThread { helium314.keyboard.settings.preferences.runRestore(activity, {}, R.string.backup_restored) {
             real.edit().clear().putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(b, a)))
-                .putString(Settings.PREF_SELECTED_SUBTYPE, a.toPref()).commit()
+                .putString(Settings.PREF_SELECTED_SUBTYPE, a.toPref())
+                .putString("keyboard_profile_ids", org.json.JSONObject().put(a.toPref(), idB).put(b.toPref(), idA).toString())
+                .putInt("keyboard_profile_next_id", 3).commit()
+
             KeyboardProfiles.enable(real)
         } }
         // (the restore runs on a worker since 2026-10-10 and finishes on the main thread: wait for it to end)

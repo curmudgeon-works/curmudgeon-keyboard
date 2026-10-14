@@ -48,6 +48,11 @@ class PartialRestoreItemsTest {
     @Before fun setUp() { real.edit().clear().putBoolean("separate_settings_per_keyboard", true).commit(); KeyboardProfiles.loadGroups(real) }
     @After fun tearDown() { zip.delete(); real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
 
+    // the backup's keyboard: set 1, its settings its own (owner 2026-10-11: no separate common set; a backup's plain
+    // keyboard settings, an old common set, are ignored)
+    private val ids = "keyboard_profile_ids" to JSONObject().put(keyboard.toPref(), 1).toString()
+    private fun b(key: String) = KeyboardProfiles.ownKey(1, key)
+
     private fun set(name: String, a: String) = JSONObject().put("name", name).put("morePopups", "all").put("symbolsLayout", "")
         .put("overrides", JSONObject().put("a", JSONArray(listOf(a))))
 
@@ -59,12 +64,12 @@ class PartialRestoreItemsTest {
         val sunset = JSONObject().put("name", "Sunset").put("values", JSONObject().put(Settings.PREF_KEY_HORIZONTAL_GAP, JSONObject().put("f", 3.0)))
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("preferences.json"))
-            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to keyboard.toPref(),
+            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to keyboard.toPref(), ids,
                 KeyPopupOverrides.PREF_SETS to JSONArray(listOf(set("Mine", "á"))).toString(),
                 LayoutPresets.PREF to JSONArray(listOf(work)).toString(),
                 AppearanceLooks.PREF to JSONArray(listOf(sunset)).toString(),
-                KeyPopupOverrides.PREF_SELECTED_SET to "Mine", LayoutPresets.PREF_SELECTED to "Work",
-                AppearanceLooks.PREF_SELECTED to "Sunset", Settings.PREF_KEY_HORIZONTAL_GAP to 3f, // (the keyboard on Sunset's look)
+                b(KeyPopupOverrides.PREF_SELECTED_SET) to "Mine", b(LayoutPresets.PREF_SELECTED) to "Work",
+                b(AppearanceLooks.PREF_SELECTED) to "Sunset", b(Settings.PREF_KEY_HORIZONTAL_GAP) to 3f, // (the keyboard on Sunset's look)
                 helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
                 helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
             z.closeEntry()
@@ -140,7 +145,7 @@ class PartialRestoreItemsTest {
         File(fonts, "Mine.ttf").writeText("the phone's")
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("preferences.json"))
-            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to keyboard.toPref(), Settings.PREF_KEY_FONT to "font:Mine.ttf",
+            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to keyboard.toPref(), ids, b(Settings.PREF_KEY_FONT) to "font:Mine.ttf",
                 AppearanceLooks.PREF to JSONArray(listOf(JSONObject().put("name", "Sunset").put("values",
                     JSONObject().put(Settings.PREF_KEY_FONT, JSONObject().put("s", "font:Mine.ttf"))))).toString(),
                 helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
@@ -165,8 +170,8 @@ class PartialRestoreItemsTest {
             .put(Settings.PREF_KEY_LONGPRESS_TIMEOUT, JSONObject().put("d", true).put("v", JSONObject().put("i", remembered))))
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("preferences.json"))
-            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to keyboard.toPref(),
-                LayoutPresets.PREF to JSONArray(listOf(work)).toString(), LayoutPresets.PREF_SELECTED to "Work",
+            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to keyboard.toPref(), ids,
+                LayoutPresets.PREF to JSONArray(listOf(work)).toString(), b(LayoutPresets.PREF_SELECTED) to "Work",
                 helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
                 helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
             z.closeEntry()
@@ -201,10 +206,10 @@ class PartialRestoreItemsTest {
             mapOf(Settings.PREF_KEY_HORIZONTAL_GAP to 1f))), now = true)
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("preferences.json"))
-            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to keyboard.toPref(),
+            settingsToJsonStream(mapOf(Settings.PREF_ENABLED_SUBTYPES to keyboard.toPref(), ids,
                 AppearanceLooks.PREF to JSONArray(listOf(JSONObject().put("name", "Sunset").put("values", JSONObject()
                     .put(Settings.PREF_KEY_HORIZONTAL_GAP, JSONObject().put("d", true).put("v", JSONObject().put("f", 3.0)))))).toString(),
-                AppearanceLooks.PREF_SELECTED to "Sunset",
+                b(AppearanceLooks.PREF_SELECTED) to "Sunset",
                 helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
                 helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
             z.closeEntry()

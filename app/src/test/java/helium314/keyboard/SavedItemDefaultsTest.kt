@@ -239,8 +239,9 @@ class SavedItemDefaultsTest {
 
     @Test fun `A3 - switch on, choose, flip off - the remembered values are written, so a new default doesn't reach them`() {
         separateWithWorkAndSunset()
-        // the shared set picked a long press; keyboard 4 reads it, and chooses Work through its own entry only
-        real.edit().putInt(longPress, 200).putString(own(4, LayoutPresets.PREF_SELECTED), "Work").commit()
+        // keyboard 4 chooses Work through its own entry only (owner 2026-10-11: no separate common set; the first
+        // keyboard's own settings are the common ones: no shared pick to read, so it gets Work's value too)
+        real.edit().putString(own(4, LayoutPresets.PREF_SELECTED), "Work").commit()
         choose(keyboard); choose(fr); choose(de)
         view(3).edit().putInt(longPress, 400).commit()
         assertFalse(real.contains(own(1, longPress))) // (on: nothing stored, at the default: marked)
@@ -251,8 +252,9 @@ class SavedItemDefaultsTest {
             assertEquals(0.5f, real.getFloat(own(id, gap), 0f), "set $id doesn't hold Sunset's gap")
         }
         assertEquals(400, real.getInt(own(3, longPress), 0)) // (its own pick)
-        assertFalse(real.contains(own(4, longPress))) // (the shared pick it reads stays)
-        assertEquals(200, real.getInt(longPress, 0))
+        assertEquals(300, real.getInt(own(4, longPress), 0))
+        assertFalse(real.contains(longPress))
+
         assertFalse(LayoutPresets.isTweaked(KeyboardScopeContext(ctx, 1), keyboard, LayoutPresets.load(real).single()))
         // and back on: gone again
         flip(true)
