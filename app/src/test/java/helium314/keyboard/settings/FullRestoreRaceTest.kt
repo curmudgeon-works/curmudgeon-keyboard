@@ -163,30 +163,37 @@ class FullRestoreRaceTest {
         assertEquals(before + 1, told(), "no new-dictionary broadcast without an activity: the keyboard kept its old dictionaries")
     }
 
-    @Test fun `a strike on the old in-memory blacklist during the restore - the restored file wins, the strike on top`() {
-        backup(blacklist = "backupword\n")
+    // owner 2026-10-13 (C, "It's a silly edge case tbh -- removal when restore is running. Who even cares"): a Remove
+    // while a full restore runs isn't kept; the restored list is the backup's, and a word's count is the restored one.
+    // Fail before: the Remove was held and made again on the restored list ("newstrike" in it, "zorp" 3)
+    @Test fun `a Remove during the restore is not on the restored list, and nothing is counted twice`() {
+        backup(blacklist = "backupword\nzorp\t2\n")
         val file = LearnedStores.blacklistFile(ctx.filesDir, "Latn", LearnedStores.SHARED)
         file.parentFile!!.mkdirs()
-        file.writeText("oldword\n")
+        file.writeText("oldword\nzorp\t2\n")
         val list = RemovedWords.forFile(file)
         list.reload() // (the keyboard holds the device's list, read)
-        assertEquals(setOf("oldword"), list.entries().keys)
-        // the keyboard's Remove right after the restore copied the list (its write would be the whole old list)
-        FullRestore.afterStep = { if (it == BLACKLIST) { list.strike("newstrike"); list.reload() } }
+        assertEquals(setOf("oldword", "zorp"), list.entries().keys)
+        // the keyboard's Removes right after the restore copied the list (a write would be the whole old list)
+        FullRestore.afterStep = { if (it == BLACKLIST) { list.strike("newstrike"); list.strike("zorp"); list.reload() } }
         restoreEverythingFrom(ctx, zip)
-        val lines = file.readLines().filter { it.isNotEmpty() }.toSet()
-        assertTrue("backupword" in lines, "the old list was written over the restored one: $lines")
-        assertTrue("newstrike" in lines, "the strike made during the restore was lost: $lines")
-        assertFalse("oldword" in lines, "the old device's word came back: $lines")
-        assertEquals(setOf("backupword", "newstrike"), list.entries().keys, "the keyboard's list isn't the restored one")
+        RemovedWords.awaitWrites()
+        assertEquals(setOf("backupword", "zorp\t2"), file.readLines().filter { it.isNotEmpty() }.toSet(), "the restored list")
+        assertEquals(mapOf("backupword" to RemovedWords.Entry(1), "zorp" to RemovedWords.Entry(2)), list.entries(),
+            "the keyboard's list isn't the restored one")
+        // after the restore a Remove counts on from the restored count, once
+        assertEquals(3, list.strike("zorp"))
+        RemovedWords.awaitWrites()
+        assertEquals(setOf("backupword", "zorp\t3"), file.readLines().filter { it.isNotEmpty() }.toSet())
     }
 
     /**
      * Round-5 review B1, 20261013_L7: a Remove just before a full restore, its write queued but not run when the gate
      * comes. Fail before: the write found the gate set and wrote nothing, the change stayed in memory as no restore change,
-     * and the re-read after the restore put the old list's count ("zorp" 3) on top of the restored file.
+     * and the re-read after the restore put the old list's count ("zorp" 3) on top of the restored file. (Written before
+     * the wipe until 2026-10-13; since, dropped at the restore's start: the restore replaces the file anyway.)
      */
-    @Test fun `a strike whose write is still queued when the gate comes - written before the wipe, the restored file as in the backup`() {
+    @Test fun `a strike whose write is still queued when the gate comes - the restored file as in the backup`() {
         backup(blacklist = "backupword\n")
         val file = LearnedStores.blacklistFile(ctx.filesDir, "Latn", LearnedStores.SHARED)
         file.parentFile!!.mkdirs()
@@ -210,46 +217,6 @@ class FullRestoreRaceTest {
         val lines = file.readLines().filter { it.isNotEmpty() }.toSet()
         assertEquals(setOf("backupword"), lines, "the old list's count was put on top of the restored file")
         assertEquals(setOf("backupword"), list.entries().keys, "the keyboard's list isn't the restored one")
-    }
-
-    /**
-     * Round-5 review B2, 20261013_L8: a Remove after the restore re-read a list but before the gate went (here while the
-     * restore waits to drop the swipe statistics) is made on the restored list and written with it. Fail before: it
-     * stayed recorded as a restore change, and the next full restore made it again ("late" back on a backup without it).
-     */
-    @Test fun `a strike after a list's re-read, before the gate goes - written once, never made again by the next full restore`() {
-        backup(blacklist = "backupword\n")
-        val file = LearnedStores.blacklistFile(ctx.filesDir, "Latn", LearnedStores.SHARED)
-        file.parentFile!!.mkdirs()
-        file.writeText("oldword\n")
-        val list = RemovedWords.forFile(file)
-        list.reload() // (the keyboard holds the device's list, read)
-        val holding = CountDownLatch(1)
-        var struck = false
-        FullRestore.afterStep = { step ->
-            if (step == BLACKLIST) {
-                // the restore's drop of the swipe statistics waits (its lock held) until the Remove, made once the list
-                // reads the restored file
-                Thread {
-                    synchronized(GestureStats) {
-                        holding.countDown()
-                        val until = System.currentTimeMillis() + 10_000
-                        while (!list.contains("backupword") && System.currentTimeMillis() < until) Thread.sleep(1)
-                        if (RestoreGate.isSet && list.contains("backupword")) { list.strike("late"); struck = true }
-                    }
-                }.start()
-                holding.await()
-            }
-        }
-        restoreEverythingFrom(ctx, zip)
-        assertTrue(struck, "the Remove didn't come between the list's re-read and the gate's end")
-        assertEquals(setOf("backupword", "late"), file.readLines().filter { it.isNotEmpty() }.toSet(), "the Remove on the restored list, written")
-        // the next full restore, of a backup without it
-        FullRestore.afterStep = null
-        backup(blacklist = "backupword\n")
-        restoreEverythingFrom(ctx, zip)
-        assertEquals(setOf("backupword"), file.readLines().filter { it.isNotEmpty() }.toSet(), "the earlier restore's Remove was made again")
-        assertEquals(setOf("backupword"), list.entries().keys)
     }
 
     @Test fun `the swipe statistics after a full restore are the backup's, not the old ones in memory`() {

@@ -1285,86 +1285,37 @@ private fun restoreEverything(ctx: Context, file: File, promised: PendingRestore
  * [work] (the full restore's file copies, on this thread) with [RestoreGate] set, so the running keyboard can't save
  * what it still holds of the old device over the restored files (owner 2026-10-12: "A + B + swipe stats makes sense"):
  * the open learned-word stores are closed first, without saving (the restore replaces their files), and stay closed
- * until it's done; the blacklists keep their changes in memory meanwhile, put on top of the restored files at the end
- * and written then (a word removed during the restore stays removed); the swipe statistics aren't written meanwhile,
- * and what they held is dropped at the end. The gate goes after [work], when it failed too, so it never sticks. Only
- * the full restore: a keyboard restore never wipes, and it merges into the live stores and lists under their own locks.
+ * until it's done; the blacklists' changes not written yet are dropped, and a change to them meanwhile isn't kept; the
+ * swipe statistics aren't written meanwhile, and what they held is dropped at the end. The gate goes after [work], when
+ * it failed too, so it never sticks. Only the full restore: a keyboard restore never wipes, and it merges into the live
+ * stores and lists under their own locks.
  */
 private fun underRestoreGate(ctx: Context, work: () -> Unit) {
-    // the device's keyboards' pools before the wipe: a blacklist change made meanwhile goes to its keyboard's list after
-    // the restore, found by the keyboard's id (review 2026-10-12 L2: by the pool number, the file's name, it went to
-    // whichever keyboard has that number in the backup)
-    val poolsBefore = LearnedKeyboards.poolEntries(ctx.realPrefs())
     RestoreGate.begin()
     try {
         PersonalizationHelper.reloadAllFromFiles()
-        // the blacklist changes not written yet, written before the wipe with the gate bypassed: a write queued before
-        // the gate finds it set and writes nothing, so without this a change made just before the restore stayed in
-        // memory, unrecorded, and was put on top of the restored file as the old list's count (round-5 review B1,
-        // 20261013_L7). After begin(), so no change falls between the two: one made since is recorded and made again
-        RemovedWords.writeAllPending()
+        // the removed words (blacklists): their changes not written yet dropped, after begin(), under each list's lock;
+        // from here until the gate goes a change to a list (Remove, the strip's "+", Un-blacklist, allowed here, a
+        // Remove's disallow) isn't kept, and the lists read the restored files at the end, plainly.
+        // In round 5 (2026-10-12/13: L2, L7, L8, L11) the changes made during a full restore were held in a queue and
+        // made again on the restored lists, by keyboard; removed 2026-10-13 to simplify, owner: "It's a silly edge case
+        // tbh -- removal when restore is running. Who even cares" (round-6 review: 20261013_L8_2 to 20261013_L11_2 were
+        // all in that queue). A change made while a full restore runs is lost
+        RemovedWords.discardAllPending()
         work()
     } finally {
         val filesDir = ctx.filesDir
-        // the blacklists the keyboard holds read the restored files; the changes made on them meanwhile are taken off
-        // them first, to be made again by keyboard below, in one step with the read (round-5 review B2, 20261013_L8:
-        // no change between the two; still gated: a strike after it is made on the restored list, kept pending)
-        val gated = ArrayList<Pair<RemovedWords.WordListFile, List<RemovedWords.GatedOp>>>()
+        // the blacklists the keyboard holds read the restored files, the gate still set (no change kept meanwhile)
         if (filesDir != null) for (list in RemovedWords.cachedIn(filesDir))
-            try {
-                list.takeGatedAndReload().takeIf { it.isNotEmpty() }?.let { gated.add(list to it) }
-            } catch (t: Throwable) { Log.w("AdvancedScreen", "error reading a blacklist after restore", t) }
+            try { list.reload() } catch (t: Throwable) { Log.w("AdvancedScreen", "error reading a blacklist after restore", t) }
         // the swipe statistics read the restored settings at their next use (what they held is the old device's, never
         // written while gated)
         helium314.keyboard.latin.gesture.GestureStats.reload()
         RestoreGate.end()
-        // the changes recorded since a list's read are on the restored list already: dropped, never made again (they
-        // stayed and the next full restore made them again, 20261013_L8)
-        RemovedWords.dropGatedOps()
-        if (filesDir != null && gated.isNotEmpty())
-            try { redoBlacklistChanges(ctx, filesDir, poolsBefore, gated) }
-            catch (t: Throwable) { Log.w("AdvancedScreen", "error making the blacklist changes again after restore", t) }
+        // what the restore itself changed on a list (the per-keyboard update's copies), kept pending while gated: written
         if (filesDir != null) for (list in RemovedWords.cachedIn(filesDir))
             try { list.writePending() } catch (t: Throwable) { Log.w("AdvancedScreen", "error writing a blacklist after restore", t) }
     }
-}
-
-/**
- * The blacklist changes made during a full restore ([gated]: each list's, as made) made again on the restored lists
- * (review 2026-10-12 L2): a keyboard's own list's on the list of the keyboard with that id after the restore (its pool
- * there, [poolsBefore]: the pools before the wipe); none if the restore brought no keyboard with that id. The lists of
- * no keyboard (the shared pool, a per-language list of before) on the same file. As made: a strike is one more on the
- * restored count, never the count it made on the old list.
- */
-private fun redoBlacklistChanges(ctx: Context, filesDir: File, poolsBefore: Map<String, Int>,
-                                 gated: List<Pair<RemovedWords.WordListFile, List<RemovedWords.GatedOp>>>) {
-    val keyboardOfPool = poolsBefore.entries.associate { (id, pool) -> pool to id }
-    val real = ctx.realPrefs()
-    val poolsNow = LearnedKeyboards.poolEntries(real)
-    for ((list, ops) in gated) {
-        val parsed = LearnedStores.blacklistPoolAndScript(filesDir, list.file)
-        if (parsed == null) { list.redo(ops); continue }
-        val (pool, script) = parsed
-        val id = if (pool == LearnedStores.SHARED) null else keyboardOfPool[pool]
-        val target = if (pool == LearnedStores.SHARED) pool else id?.let { poolsNow[it] }
-        if (target == null) {
-            Log.i("AdvancedScreen", "blacklist changes during the restore dropped: their keyboard isn't in the backup")
-            continue
-        }
-        // a strike made again as the keyboard's Remove makes it: over the lists the restored keyboard borrows (its
-        // "Blacklisted" button), so a word allowed over a borrowed 2 with no own strikes gets 3 (owner 2026-10-12 M5;
-        // round-5 review B5, 20261013_L11: it got 1)
-        // (the keyboard as the restored settings list it: the enabled list in memory is the old device's until the
-        // restore's follow-up reloads it)
-        val borrowed = id?.let { kbId ->
-            (SubtypeSettings.createSettingsSubtypes(real.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!) +
-                helium314.keyboard.latin.settings.SwitchedOffKeyboards.list(real))
-                .firstOrNull { it.keyboardId == kbId }?.let { LearnedStores.viewOf(real, it) }?.othersBlacklisted
-                ?.map { RemovedWords.forFile(LearnedStores.blacklistFile(filesDir, script, it)) }
-        }.orEmpty()
-        RemovedWords.forFile(LearnedStores.blacklistFile(filesDir, script, target)).redo(ops, borrowed)
-    }
-    RemovedWords.awaitWrites()
 }
 
 /**

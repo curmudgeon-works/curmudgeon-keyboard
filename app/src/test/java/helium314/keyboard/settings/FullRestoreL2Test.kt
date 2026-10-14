@@ -142,8 +142,10 @@ class FullRestoreL2Test {
     }
 
     // L2 (3): a blacklist change made while the restore ran was put on top of the restored file of the same pool number
-    // (its file name), whichever keyboard has that number in the backup, with the count it made on the old list
-    @Test fun `a strike during the restore goes to its keyboard's restored list by id, one more on the restored count`() {
+    // (its file name), whichever keyboard has that number in the backup, with the count it made on the old list. Since
+    // 2026-10-13 (owner: "It's a silly edge case tbh -- removal when restore is running. Who even cares") such a change
+    // isn't kept at all (until then made again on its keyboard's restored list, by id): no list gets it
+    @Test fun `a strike during the restore is kept on no restored list, neither its keyboard's nor the pool number's`() {
         // the device: keyboard k1 learns into pool 11, "word" removed twice
         real.edit().putString(LearnedKeyboards.PREF_POOLS, "{\"k1\":11}").putInt(LearnedKeyboards.PREF_POOL_NEXT, 12)
             .putBoolean(LearnedKeyboards.PREF_DONE, true).commit()
@@ -174,52 +176,9 @@ class FullRestoreL2Test {
         restoreEverythingFrom(ctx, zip)
 
         val k1File = LearnedStores.blacklistFile(ctx.filesDir, "Latn", 5)
-        assertEquals(listOf("word\t5"), k1File.readLines().filter { it.isNotEmpty() }, "k1's restored list: one more strike")
-        assertEquals(RemovedWords.Entry(5), RemovedWords.forFile(k1File).entries()["word"])
+        assertEquals(listOf("word\t4"), k1File.readLines().filter { it.isNotEmpty() }, "k1's restored list: as in the backup")
+        assertEquals(RemovedWords.Entry(4), RemovedWords.forFile(k1File).entries()["word"])
         assertEquals(listOf("other"), deviceFile.readLines().filter { it.isNotEmpty() }, "k2's list got k1's strike")
         assertEquals(setOf("other"), list.entries().keys)
-    }
-
-    // round-5 review B5, 20261013_L11: a Remove during the restore of a word allowed here over a borrowed 2, with no own
-    // strikes, was made again on the restored list as the list's own strike alone (1), not as the keyboard's Remove (3,
-    // owner 2026-10-12 M5: "borrowed 2, no own: 3")
-    @Test fun `a strike during the restore of a word allowed over a borrowed 2 - made again as the keyboard's Remove, 3`() {
-        val k2 = SettingsSubtype(Locale.GERMANY, "").withId(2)
-        val both = keyboard.toPref() + helium314.keyboard.latin.common.Constants.Separators.SETS + k2.toPref()
-        // the device: k1 (pool 11) uses k2's (pool 12) blacklist, "word" removed twice on k2 and allowed on k1
-        real.edit().putString(LearnedKeyboards.PREF_POOLS, "{\"k1\":11,\"k2\":12}").putInt(LearnedKeyboards.PREF_POOL_NEXT, 13)
-            .putBoolean(LearnedKeyboards.PREF_DONE, true).putString(LearnedKeyboards.PREF_USE_OTHERS_BLACKLISTED, "[\"k1\"]")
-            .putString(Settings.PREF_ENABLED_SUBTYPES, both).commit()
-        LearnedStores.init(ctx) // (the view reads other keyboards' lists only once unlocked: the app known)
-        val own = LearnedStores.blacklistFile(ctx.filesDir, "Latn", 11)
-        val other = LearnedStores.blacklistFile(ctx.filesDir, "Latn", 12)
-        own.parentFile!!.mkdirs(); other.parentFile!!.mkdirs()
-        own.writeText("word\tallowed\t2\n"); other.writeText("word\t2\n")
-        val lists = RemovedWords.Lists(RemovedWords.forFile(own), listOf(RemovedWords.forFile(other)))
-        lists.ensureLoaded(); RemovedWords.forFile(own).reload(); RemovedWords.forFile(other).reload()
-        // the backup: the same, k1 in pool 5, k2 in pool 6
-        ZipOutputStream(zip.outputStream()).use { z ->
-            z.putNextEntry(ZipEntry("blacklists/k5/Latn.txt")); z.write("word\tallowed\t2\n".toByteArray()); z.closeEntry()
-            z.putNextEntry(ZipEntry("blacklists/k6/Latn.txt")); z.write("word\t2\n".toByteArray()); z.closeEntry()
-            z.putNextEntry(ZipEntry("preferences.json"))
-            settingsToJsonStream(mapOf<String?, Any?>(Settings.PREF_ENABLED_SUBTYPES to both,
-                Settings.PREF_ADDITIONAL_SUBTYPES to both, Settings.PREF_SELECTED_SUBTYPE to keyboard.toPref(),
-                KeyboardIdUpgrade.DONE to true, Settings.PREF_VERSION_CODE to helium314.keyboard.latin.BuildConfig.MIGRATION_VERSION,
-                LearnedKeyboards.PREF_POOLS to "{\"k1\":5,\"k2\":6}", LearnedKeyboards.PREF_POOL_NEXT to 7,
-                LearnedKeyboards.PREF_DONE to true, LearnedKeyboards.PREF_USE_OTHERS_BLACKLISTED to "[\"k1\"]"), z)
-            z.closeEntry()
-            z.putNextEntry(ZipEntry("protected_preferences.json"))
-            settingsToJsonStream(emptyMap<String?, Any?>(), z)
-            z.closeEntry()
-        }
-        // k1's Remove of "word" (its own list and the borrowed one, as it holds them) while the restore copies the files
-        FullRestore.afterStep = { if (it == "preferences.json") assertEquals(3, lists.strike("word")) }
-        restoreEverythingFrom(ctx, zip)
-
-        val k1File = LearnedStores.blacklistFile(ctx.filesDir, "Latn", 5)
-        assertEquals(listOf("word\t3"), k1File.readLines().filter { it.isNotEmpty() }, "k1's restored list: the borrowed 2 and one more")
-        assertEquals(RemovedWords.Entry(3), RemovedWords.forFile(k1File).entries()["word"])
-        assertEquals(listOf("word\t2"), LearnedStores.blacklistFile(ctx.filesDir, "Latn", 6).readLines().filter { it.isNotEmpty() },
-            "the borrowed list is read only")
     }
 }

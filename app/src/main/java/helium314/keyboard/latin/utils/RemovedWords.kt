@@ -60,18 +60,11 @@ object RemovedWords {
     /** Waits for the list writes already started. */
     fun awaitWrites() { io.submit { }.get() }
 
-    /** A full restore, its gate set and before its wipe (RestoreGate): every list's changes not written yet written now,
-     *  the gate bypassed, after the writes queued before (round-5 review B1, 20261013_L7: a write queued just before the
-     *  gate found it set and wrote nothing, and the change, recorded as no restore change, was put on top of the restored
-     *  file as the old list's count). A change made since the gate is recorded too ([WordListFile.takeGated]) and made
-     *  again after the restore; the files written here are replaced by the restore. */
-    fun writeAllPending() { for (list in lists.values) list.writePending() }
-
-    /** A full restore's end, after RestoreGate.end(): the changes recorded since each list's re-read
-     *  ([WordListFile.takeGatedAndReload]) were made on the restored list already (and are written with it): dropped,
-     *  never made again (round-5 review B2, 20261013_L8: they stayed recorded and the next full restore made them again,
-     *  an extra strike). */
-    fun dropGatedOps() { for (list in lists.values) list.dropGated() }
+    /** A full restore, its gate set and before its wipe (RestoreGate): every list's changes not written yet dropped (the
+     *  restore replaces the files; one written now could be put on top of the restored file as the old list's count,
+     *  round-5 review B1). A change made from here until the gate goes isn't kept ([WordListFile.strike] etc.): see the
+     *  restore's removed-words step (BackupRestorePreference, round-6 review 2026-10-13, owner). */
+    fun discardAllPending() { for (list in lists.values) list.discardPending() }
 
     // ------------------------------- the rule -------------------------------
 
@@ -276,16 +269,6 @@ object RemovedWords {
     fun formatAll(entries: Map<String, Entry>, allowed: Map<String, Int> = emptyMap()): String =
         (entries.keys + allowed.keys).sorted().joinToString("") { formatRow(it, entries[it], allowed[it]) + "\n" }
 
-    /** A change made on a list while a full restore ran (RestoreGate), as it was made: one more strike, not the count it
-     *  made then (review 2026-10-12 L2). At the restore's end it is made again on the restored list of the same keyboard
-     *  ([WordListFile.takeGated], [WordListFile.redo]). */
-    sealed interface GatedOp { val word: String }
-    data class GatedStrike(override val word: String) : GatedOp
-    data class GatedConfirm(override val word: String) : GatedOp
-    data class GatedTakeOff(override val word: String) : GatedOp
-    data class GatedAllow(override val word: String, val level: Int) : GatedOp
-    data class GatedDisallow(override val word: String) : GatedOp
-
     // a change in memory, not written yet: the word's row now, its own entry and its allowed part (either may be null)
     private class Change(val entry: Entry?, val allowed: Int?)
 
@@ -303,52 +286,17 @@ object RemovedWords {
         private val allowsWhileLoading = HashMap<String, Int>()
         @Volatile private var loaded = false
         private val lock = Any()
-        // the changes made while a full restore ran, as made ([GatedOp])
-        private val gatedOps = ArrayList<GatedOp>()
 
-        private fun recordGated(op: GatedOp) { if (RestoreGate.isSet) gatedOps.add(op) }
-
-        /**
-         * The changes made on this list while a full restore ran ([GatedOp]), taken off it: not put on top of its file
-         * again (the file of this pool number can be another keyboard's after the restore, and their counts are the old
-         * list's); the caller makes them again, by keyboard, with [redo] (review 2026-10-12 L2).
-         */
-        fun takeGated(): List<GatedOp> = synchronized(lock) {
-            val ops = gatedOps.toList()
-            gatedOps.clear()
-            // (a strike or disallow changes the lowercase spelling too, L4.2)
-            for (op in ops) for (w in setOf(op.word, op.word.lowercase())) { pending.remove(w); strikesWhileLoading.remove(w); allowsWhileLoading.remove(w) }
-            ops
+        /** The changes not written yet dropped, under the list's lock ([discardAllPending]); the next read is the
+         *  file's alone. */
+        internal fun discardPending() {
+            synchronized(lock) { pending.clear(); strikesWhileLoading.clear(); allowsWhileLoading.clear() }
         }
 
-        /** [takeGated] and the file read again in one step under the list's lock, after what's being written (call off
-         *  the main thread): no change can come between the two (round-5 review B2, 20261013_L8: a strike between them
-         *  counted on from the old list and the read put that count on top of the restored file). A change made after
-         *  it is made on the restored list. */
-        fun takeGatedAndReload(): List<GatedOp> = io.submit<List<GatedOp>> {
-            // (as [read]: the migration waited for outside the lock)
-            LearnedStoreMigration.awaitDone()
-            synchronized(lock) { takeGated().also { readNow() } }
-        }.get()
-
-        /** The changes recorded while a full restore ran, dropped ([dropGatedOps]). */
-        internal fun dropGated() { synchronized(lock) { gatedOps.clear() } }
-
-        /** [ops] made on this list (read first), as made: a strike is one more on the count it has here, made as the
-         *  keyboard's Remove makes it, over the lists it borrows ([borrowed]: a word allowed here over a borrowed 2 and
-         *  no own strikes gets 3, owner 2026-10-12 M5; round-5 review B5, 20261013_L11: it got 1). Call off the main
-         *  thread. */
-        fun redo(ops: List<GatedOp>, borrowed: List<WordListFile> = emptyList()) {
-            val lists = Lists(this, borrowed)
-            lists.ensureLoaded()
-            for (op in ops) when (op) {
-                is GatedStrike -> lists.strike(op.word)
-                is GatedConfirm -> confirm(op.word)
-                is GatedTakeOff -> takeOff(op.word)
-                is GatedAllow -> allow(op.word, op.level)
-                is GatedDisallow -> disallow(op.word)
-            }
-        }
+        // a change while a full restore runs isn't kept (round-6 review 2026-10-13, owner: "It's a silly edge case tbh --
+        // removal when restore is running. Who even cares"): checked under the list's lock, so none comes after the
+        // restore's [discardPending] (the gate is set before it)
+        private fun restoreRunning() = RestoreGate.isSet
 
         fun contains(word: String) = byWord.containsKey(word)
 
@@ -442,7 +390,8 @@ object RemovedWords {
             allowedByWord.keys.retainAll(allowedResult.keys)
             loaded = true
             // the changes made while the list couldn't be read (never written then, [writeLocked]) are written now, on
-            // top of the file as read; while a full restore runs they stay pending ([writePending] writes them)
+            // top of the file as read; while a full restore runs they stay pending (only the restore's own, e.g. the
+            // per-keyboard update's copy: [writePending] writes them after it)
             if (pending.isNotEmpty() && !RestoreGate.isSet) writeLocked()
         }
 
@@ -450,8 +399,8 @@ object RemovedWords {
         private fun write() = io.execute {
             synchronized(lock) {
                 // while a full restore replaces the files (owner 2026-10-12: "A + B + swipe stats makes sense"), the
-                // whole list in memory is still the old device's: the changes stay pending, put on top of the restored
-                // file and written once it's done ([writePending])
+                // whole list in memory is still the old device's: nothing is written (the restore's own changes stay
+                // pending, written once it's done: [writePending])
                 if (RestoreGate.isSet) return@synchronized
                 writeLocked()
             }
@@ -471,9 +420,9 @@ object RemovedWords {
             }
         }
 
-        /** The changes kept in memory while a full restore ran (RestoreGate), written now, after what's being written;
-         *  nothing if there are none (call off the main thread, after [reload] put them on top of the restored file; or
-         *  before the restore's wipe, [writeAllPending]). */
+        /** The changes kept in memory while a full restore ran (RestoreGate: the restore's own), written now, after what's
+         *  being written; nothing if there are none (call off the main thread, after [reload] put them on top of the
+         *  restored file). */
         fun writePending() {
             io.submit { synchronized(lock) { if (pending.isNotEmpty()) writeLocked() } }.get()
         }
@@ -493,10 +442,9 @@ object RemovedWords {
         fun allow(word: String, level: Int): Boolean {
             if (!loaded) { if (LearnedStoreMigration.isRunning) reloadAsync() else read() }
             synchronized(lock) {
-                if (allowedByWord[word] == level) return false
+                if (restoreRunning() || allowedByWord[word] == level) return false
                 if (!loaded) allowsWhileLoading[word] = level
                 set(word, byWord[word], level)
-                recordGated(GatedAllow(word, level))
                 return true
             }
         }
@@ -512,6 +460,7 @@ object RemovedWords {
             // lock): the strike counts from what's in memory and the read catches up in the background
             if (!loaded) { if (LearnedStoreMigration.isRunning) reloadAsync() else read() }
             return synchronized(lock) {
+                if (restoreRunning()) return@synchronized byWord[word]?.strikes ?: 0 // (not kept: the count as it is)
                 if (!loaded) { strikesWhileLoading[word] = (strikesWhileLoading[word] ?: 0) + 1; allowsWhileLoading.remove(word) }
                 strikeNow(word, floor)
             }
@@ -525,7 +474,6 @@ object RemovedWords {
             val lower = word.lowercase()
             if (lower != word && allowedByWord.containsKey(lower)) set(lower, byWord[lower], null)
             set(word, Entry(strikes), null)
-            recordGated(GatedStrike(word))
             return strikes
         }
 
@@ -534,19 +482,19 @@ object RemovedWords {
         fun disallow(word: String) {
             if (!loaded) { if (LearnedStoreMigration.isRunning) reloadAsync() else read() }
             synchronized(lock) {
+                if (restoreRunning()) return
                 // (only the allowed part: own strikes of the spelling stay in its row, owner 2026-10-12 one row holds both)
                 for (spelling in setOf(word, word.lowercase()))
                     if (allowedByWord.containsKey(spelling)) set(spelling, byWord[spelling], null)
-                recordGated(GatedDisallow(word))
             }
         }
 
         /** [word] (3rd strike, typed often enough) brought back with the strip's "+". @return false if it wasn't waiting */
         fun confirm(word: String): Boolean = synchronized(lock) {
+            if (restoreRunning()) return false
             val entry = byWord[word] ?: return false
             if (!needsConfirmation(entry.strikes) || entry.confirmed) return false
             set(word, entry.copy(confirmed = true), allowedByWord[word])
-            recordGated(GatedConfirm(word))
             true
         }
 
@@ -555,9 +503,8 @@ object RemovedWords {
         fun remove(word: String): Boolean {
             if (!loaded) reload()
             synchronized(lock) {
-                if (!byWord.containsKey(word)) return false
+                if (restoreRunning() || !byWord.containsKey(word)) return false
                 set(word, null, allowedByWord[word])
-                recordGated(GatedTakeOff(word))
             }
             return true
         }
@@ -565,9 +512,8 @@ object RemovedWords {
         /** [word] taken off the list as it is in memory (no wait for a read: an unread list has nothing to take off; an
          *  allowed part stays, as with [remove]). @return false if it wasn't there */
         fun takeOff(word: String): Boolean = synchronized(lock) {
-            if (!byWord.containsKey(word)) return false
+            if (restoreRunning() || !byWord.containsKey(word)) return false
             set(word, null, allowedByWord[word])
-            recordGated(GatedTakeOff(word))
             true
         }
 
