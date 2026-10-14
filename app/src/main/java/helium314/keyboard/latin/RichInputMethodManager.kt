@@ -74,7 +74,7 @@ class RichInputMethodManager private constructor() {
         if (currentIndex == -1) {
             Log.w(TAG, "Can't find current subtype in enabled subtypes: subtype=" +
                     SubtypeLocaleUtils.getSubtypeNameForLogging(currentSubtype))
-            return if (onlyCurrentIme) enabledSubtypes[0] // just return first enabled subtype
+            return if (onlyCurrentIme) enabledSubtypes.firstOrNull() // just return first enabled subtype
             else null
         }
         val nextIndex = (currentIndex + 1) % enabledSubtypes.size
