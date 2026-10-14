@@ -104,7 +104,7 @@ object AppearanceLooks {
     // a slot is the plain picture name, the same on every keyboard (custom_background_image[_landscape][_night]): a
     // keyboard's own file has its set's "_p<id>" on it, which themes saved before 2026-10-10 kept, so applied on another
     // keyboard none matched and its pictures were deleted (review 2026-10-08 M5); old names are read without it (2026-10-10)
-    private val keyboardSuffix = Regex("_p\\d+$")
+    private val keyboardSuffix = Regex("_p-?\\d+$") // (-: KeyboardProfiles.NO_SET, a first keyboard without an id yet)
     internal fun slotOf(fileName: String): String =
         if (fileName.endsWith(".framing")) slotOf(fileName.removeSuffix(".framing")) + ".framing"
         else fileName.replace(keyboardSuffix, "")

@@ -576,14 +576,25 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             if (prefs is ProfilePreferences && !prefs.writesShared(Settings.PREF_THEME_COLORS)) return
             val all = real.all
             val editor = real.edit()
+            val prefixes = listOf(Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
+            // (the palette as the edited set has it now: no set reads another's, so a set that follows gets a copy;
+            // owner 2026-10-11, no separate common set)
+            val colorsNow = if (to == null) emptyMap() else prefs.all.filterKeys { k -> prefixes.any { k == it + to } }
+            val colorsOfName = prefs.all.filterKeys { k -> prefixes.any { k == it + name } }
             for ((stored, value) in all) {
                 if (value != name) continue
                 val (id, key) = KeyboardProfiles.splitOwnKey(stored) ?: continue
                 if (key != Settings.PREF_THEME_COLORS && key != Settings.PREF_THEME_COLORS_NIGHT) continue
-                val ownColors = listOf(Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
-                    .any { all.containsKey(KeyboardProfiles.ownKey(id, it + name)) }
-                if (ownColors) continue
-                if (to != null) editor.putString(stored, to)
+                if (prefs is ProfilePreferences && prefs.setOf(key) == id) continue // (the edited set itself)
+                // its own colours, unless they are the copy it got following the edited set (the Discard of a rename
+                // takes it back)
+                val own = prefixes.mapNotNull { p -> KeyboardProfiles.ownKey(id, p + name).takeIf { all.containsKey(it) }?.let { p + name to all[it] } }.toMap()
+                if (own.isNotEmpty() && own != colorsOfName) continue
+                if (to != null) {
+                    editor.putString(stored, to)
+                    for (k in own.keys) editor.remove(KeyboardProfiles.ownKey(id, k))
+                    for ((k, v) in colorsNow) if (!all.containsKey(KeyboardProfiles.ownKey(id, k))) KeyboardProfiles.put(editor, KeyboardProfiles.ownKey(id, k), v)
+                }
                 else editor.remove(stored).putBoolean(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + key), true)
             }
             editor.apply()
@@ -622,13 +633,17 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             val copy = prefixes.mapNotNull { p -> old[p + oldName]?.let { p + hidden to it } }.toMap()
             val ids = keepOld.map { KeyboardProfiles.idFor(real, it) }
             real.edit().apply {
-                for ((key, value) in copy) KeyboardProfiles.put(this, key, value)
-                for (id in ids) for (key in choices) {
-                    // (its own set's choice first: with one set of settings the view reads the shared set, and a
-                    // switched-off keyboard is asked by its own choice; owner 2026-10-11)
-                    val own = KeyboardProfiles.ownKey(id, key)
-                    val chosen = if (real.contains(own)) real.getString(own, null) else ProfilePreferences(real) { id }.getString(key, null)
-                    if (chosen == name) putString(own, hidden)
+                for (id in ids) {
+                    var keeps = false
+                    for (key in choices) {
+                        // (its own set's choice first: with one set of settings the view reads the main keyboard's, and
+                        // a switched-off keyboard is asked by its own choice; owner 2026-10-11)
+                        val own = KeyboardProfiles.ownKey(id, key)
+                        val chosen = if (real.contains(own)) real.getString(own, null) else ProfilePreferences(real) { id }.getString(key, null)
+                        if (chosen == name) { putString(own, hidden); keeps = true }
+                    }
+                    // the kept copy in its own set, where it reads it (owner 2026-10-11: no separate common set to put it in)
+                    if (keeps) for ((key, value) in copy) KeyboardProfiles.put(this, KeyboardProfiles.ownKey(id, key), value)
                 }
             }.commit()
             val looks = helium314.keyboard.settings.AppearanceLooks.load(real)

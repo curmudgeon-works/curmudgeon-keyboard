@@ -752,7 +752,9 @@ private fun replaceEverything(ctx: Context, file: File) = keepingPhoneChoices(ct
                 FileUtils.copyStreamToNewFile(zip, restoredDb)
             } else if (entry.name == PREFS_FILE_NAME) {
                 val prefLines = String(zip.readBytes()).split("\n")
-                val prefs = ctx.prefs()
+                // as stored, not through a keyboard's view (2026-10-11: with no common set the view put the backup's
+                // plain keys into the first keyboard's set; the follow-up's upgrade step deals with an old common set)
+                val prefs = ctx.realPrefs()
                 prefs.edit { clear() }
                 readJsonLinesToSettings(prefLines, prefs)
             } else if (entry.name == PROTECTED_PREFS_FILE_NAME) {

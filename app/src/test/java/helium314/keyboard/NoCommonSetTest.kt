@@ -136,7 +136,8 @@ class NoCommonSetTest {
     }
 
     @Test fun `the upgrade gives keyboards without a set the common one, then the common set goes`() {
-        real.edit().putFloat(gap, 7f).putFloat(vGap, 1.5f).putBoolean(Settings.PREF_ADVANCED_SETTINGS, true)
+        val palette = Settings.PREF_USER_COLORS_PREFIX + "Warm"
+        real.edit().putFloat(gap, 7f).putFloat(vGap, 1.5f).putBoolean(Settings.PREF_ADVANCED_SETTINGS, true).putString(palette, "colors")
             .putFloat(own(1, gap), 2f) // the main keyboard: a set of its own, without the vertical gap
             .putFloat(own(3, gap), 9f) // keyboard 3: a set of its own; keyboard 2: none
             .commit()
@@ -145,6 +146,12 @@ class NoCommonSetTest {
         assertFalse(real.contains(gap)); assertFalse(real.contains(vGap))
         assertEquals(2f, real.getFloat(own(1, gap), 0f)); assertFalse(real.contains(own(1, vGap)), "the main keyboard was gap-filled")
         assertEquals(9f, real.getFloat(own(3, gap), 0f))
+        // (to be confirmed) another keyboard with a set keeps what it read from the common set where its own held nothing;
+        // the main keyboard only the palettes it lacks
+        assertEquals(1.5f, real.getFloat(own(3, vGap), 0f))
+        assertEquals("colors", real.getString(own(1, palette), null))
+        assertFalse(real.contains(palette))
+
         assertTrue(real.getBoolean(Settings.PREF_ADVANCED_SETTINGS, false), "an app-wide key went")
         assertTrue(real.getBoolean(KeyboardProfiles.NO_COMMON_SET_DONE, false))
         // a second run changes nothing
@@ -154,7 +161,18 @@ class NoCommonSetTest {
         assertEquals(before, real.all)
     }
 
+    @Test fun `a keyboard added with one set for all starts from its pick at the upgrade`() {
+        // keyboard 2 and 3 without a set; 3 was added picking "keyboard 1's settings" (kept for later before 2026-10-11)
+        real.edit().putFloat(gap, 7f).putFloat(own(1, gap), 2f).putFloat(own(1, vGap), 1f)
+            .putString("keyboard_start_from", JSONObject().put("3", JSONObject().put("from", 1).put("noPopups", false)).toString()).commit()
+        KeyboardProfiles.dropCommonSet(real, fromCommon = true)
+        assertEquals(2f, real.getFloat(own(3, gap), 0f)); assertEquals(1f, real.getFloat(own(3, vGap), 0f))
+        assertEquals(7f, real.getFloat(own(2, gap), 0f))
+        assertFalse(real.contains("keyboard_start_from"))
+    }
+
     @Test fun `the version check runs the upgrade`() {
+
         real.edit().putFloat(gap, 7f).putInt(Settings.PREF_VERSION_CODE, BuildConfig.MIGRATION_VERSION).commit()
         checkVersionUpgrade(ctx)
         assertTrue(real.getBoolean(KeyboardProfiles.NO_COMMON_SET_DONE, false))

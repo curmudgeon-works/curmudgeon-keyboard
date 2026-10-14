@@ -302,6 +302,10 @@ internal fun pickedOnlyUpgrade(real: SharedPreferences, freshInstall: Boolean) {
  * set's values and its "done" flags. Each set keeps its own flags.
  */
 private fun ownSetUpgrades(real: SharedPreferences, freshInstall: Boolean) {
+    // (once the common set is gone every set there was had its steps, in the same start, before it: a set made since is
+    // new, nothing of before to move; owner 2026-10-11, no separate common set; a fresh install's first keyboard's set
+    // came after the plain steps, and its key font went to the symbols and suggestions at the next start)
+    if (real.getBoolean(KeyboardProfiles.NO_COMMON_SET_DONE, false)) return
     val ids = runCatching { org.json.JSONObject(real.getString("keyboard_profile_ids", "{}")!!) }.getOrNull() ?: return
     for (name in ids.keys()) {
         val id = ids.optInt(name, KeyboardProfiles.SHARED)
@@ -439,7 +443,10 @@ internal fun keepUnbundledMainDict(context: Context, dir: java.io.File, file: ja
 
 private object AppUpgrade {
     fun onUpgrade(context: Context) {
-        val prefs = context.prefs()
+        // the settings as stored, as the steps after it: upstream's settings are the plain ones, which the last step
+        // gives the keyboards (2026-10-11: through a keyboard's view they went into the first keyboard's set, which then
+        // counted as one of its own and got none of them; owner 2026-10-11, no separate common set)
+        val prefs = context.realPrefs()
         val oldVersion = prefs.getInt(Settings.PREF_VERSION_CODE, 0)
         // clear extracted dictionaries, in case updated version contains newer ones
         DictionaryInfoUtils.getCacheDirectories(context).forEach {

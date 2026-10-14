@@ -56,15 +56,21 @@ object SubtypeSettings {
     fun addEnabledSubtype(prefs: SharedPreferences, newSubtype: InputMethodSubtype) {
         helium314.keyboard.latin.utils.SettingsEventLog.log("keyboard added: ${newSubtype.toSettingsSubtype().toPref()}")
         val subtype = newSubtype.toSettingsSubtype()
-        val subtypes = createSettingsSubtypes(prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!) + subtype
+        // no list stored yet (a fresh install): the keyboards it shows stay in it, the first one's set being the common
+        // settings (owner 2026-10-11: no separate common set; before, the added one replaced them, and the settings
+        // made so far stayed with a keyboard no longer listed)
+        val stored = createSettingsSubtypes(prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!)
+        val subtypes = stored.ifEmpty { getEnabledSubtypes(true).map { it.toSettingsSubtype() } } + subtype
         val newString = createPrefSubtypes(subtypes)
         prefs.edit { putString(Settings.PREF_ENABLED_SUBTYPES, newString) }
 
+        val shownKept = stored.isEmpty() && enabledSubtypes.isEmpty()
+        if (shownKept) enabledSubtypes.addAll(getDefaultEnabledSubtypes())
         if (newSubtype !in enabledSubtypes) {
             enabledSubtypes.add(newSubtype)
             // order = the order keyboards were added (also the switching order); the pref string keeps it across restarts
             RichInputMethodManager.getInstance().refreshSubtypeCaches()
-        }
+        } else if (shownKept) RichInputMethodManager.getInstance().refreshSubtypeCaches()
     }
 
     /** @return whether subtype was actually removed */
