@@ -884,10 +884,14 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
     }
 
     override fun removeWord(word: String) {
-        // this keyboard's learned words and blacklist only (owner 2026-10-10: "We should only delete from current keyboard
-        // and move it into that keyboard's blacklist"): no more deleting from Android's personal dictionary, which every
-        // keyboard reads; the blacklist keeps the word out of this keyboard's suggestions
         removeWords(listOf(word))
+        // and out of Android's personal dictionary for real: the in-memory copy alone came back with its next reload
+        // (2026-10-04; taken out 2026-10-10 by mistake, back 2026-10-11, owner: "previous behavior was fine. Remove would
+        // delete words out of android dict")
+        val context = dictionaryGroups.firstNotNullOfOrNull { it.getSubDict(Dictionary.TYPE_USER)?.mContext } ?: return
+        val locales = locales
+        // (the provider can be missing or fail on some devices, see addToPersonalDictionaryIfInvalidButInHistory)
+        scope.launch { runCatching { deleteFromPersonalDictionary(context, word, locales) } }
     }
 
     /**
@@ -1113,8 +1117,10 @@ private class DictionaryGroup(
         // learned as "hello"; "HELLO" with caps lock)
         val lower = word.lowercase(locale)
         val forms = linkedSetOf(word, lower, word.uppercase(locale), lower.replaceFirstChar { it.titlecase(locale) })
-        // (not from the personal dictionary: Android's, every keyboard's; the blacklist keeps it out here, 2026-10-10)
-        for (form in forms) history?.removeUnigramEntryDynamically(form)
+        for (form in forms) {
+            history?.removeUnigramEntryDynamically(form)
+            getSubDict(Dictionary.TYPE_USER)?.removeUnigramEntryDynamically(form)
+        }
         // and from the swipe vocabularies already built (the removed words list keeps it out of rebuilds), when they are
         // [history]'s keyboard's ([swipe]); the learned copy of [pool] only
         if (swipe) GestureDecoderVocabulary.onWordRemoved(locale, word, pool)
