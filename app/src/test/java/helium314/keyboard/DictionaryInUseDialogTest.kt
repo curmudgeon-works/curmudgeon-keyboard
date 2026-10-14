@@ -1,0 +1,115 @@
+// SPDX-License-Identifier: GPL-3.0-only
+package helium314.keyboard
+
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
+import helium314.keyboard.latin.dictionary.DictionarySelection
+import helium314.keyboard.latin.personalization.available
+import helium314.keyboard.latin.personalization.useKeyboards
+import helium314.keyboard.latin.settings.SettingsSubtype
+import helium314.keyboard.latin.utils.DictionaryInfoUtils
+import helium314.keyboard.latin.utils.SubtypeSettings
+import helium314.keyboard.latin.utils.realPrefs
+import helium314.keyboard.settings.dialogs.dictionaryDeleteBlockers
+import helium314.keyboard.settings.dialogs.dictionaryInUse
+import helium314.keyboard.settings.dialogs.replaceAndDelete
+import helium314.keyboard.settings.screens.keyboardName
+import org.junit.After
+import org.junit.Before
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import java.io.File
+import java.util.Locale
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+
+/**
+ * Round-5 review B6, owner 2026-10-13 (20261013_L12): the "in use" dialog when the trash can is tapped on a dictionary a
+ * keyboard uses names the dictionary and the keyboards using it, and says what frees it by case; the only button besides
+ * Cancel/OK replaces it with the language's next dictionary and deletes it, offered only when the keyboard asking is the
+ * only one using it and there is another. Fail before (compile: one text for every case, "turn the language off on this
+ * keyboard", wrong with no keyboard, a main language or several keyboards; the raw kind "main" as the title; no Replace).
+ */
+@RunWith(RobolectricTestRunner::class)
+class DictionaryInUseDialogTest {
+    private val ctx: Context = ApplicationProvider.getApplicationContext()
+    private val real = ctx.realPrefs()
+    private val en by lazy { available("en-US").withId(1) }
+    private val en2 by lazy { available("en-US").withId(3) }
+    private val da by lazy { available("da").withId(2) } // (no built-in Danish dictionary)
+    private val danish = Locale.forLanguageTag("da")
+    private fun dir(locale: Locale) = File(DictionaryInfoUtils.getCacheDirectoryForLocale(locale, ctx)!!)
+
+    @Before fun setUp() {
+        real.edit().clear().commit()
+        SubtypeSettings.init(ctx)
+        for (l in listOf(Locale.US, danish)) { dir(l).deleteRecursively(); dir(l).mkdirs() }
+    }
+    @After fun tearDown() {
+        for (l in listOf(Locale.US, danish)) dir(l).deleteRecursively()
+        real.edit().clear().commit()
+        SubtypeSettings.reloadEnabledSubtypes(ctx)
+    }
+
+    private fun name(kb: SettingsSubtype) = keyboardName(kb, ctx)
+    private fun dialog(locale: Locale, dict: File, keyboard: SettingsSubtype?) =
+        dictionaryInUse(ctx, locale, dict, keyboard, dictionaryDeleteBlockers(ctx, locale, dict))
+
+    @Test fun `case 1 - the only keyboard using it, the built-in there - replaced with it and deleted`() {
+        useKeyboards(ctx, real, en)
+        val main = File(dir(Locale.US), "main_user.dict").apply { writeText("x") } // (over the built-in English one)
+        val d = dialog(Locale.US, main, en)
+        assertEquals("“Main dictionary” is in use", d.title)
+        assertEquals("Used by: ${name(en)}. To delete it, select another version first.", d.message)
+        assertEquals("Replace with Internal main dictionary and delete this one", d.replaceButton)
+        replaceAndDelete(ctx, Locale.US, main, d.replaceWith!!)
+        assertFalse(main.exists())
+        assertEquals(DictionarySelection.INTERNAL, DictionarySelection.selected(ctx, Locale.US))
+    }
+
+    @Test fun `case 1 - no built-in, the next added one of the kind replaces it`() {
+        useKeyboards(ctx, real, da)
+        val main = File(dir(danish), "main_user.dict").apply { writeText("x") }
+        val prev = File(dir(danish), "main_prev_user.dict").apply { writeText("y") }
+        File(dir(danish), "emoji_user.dict").writeText("e") // (another kind: never the replacement)
+        val d = dialog(danish, main, da)
+        assertEquals("Replace with main_prev and delete this one", d.replaceButton)
+        replaceAndDelete(ctx, danish, main, d.replaceWith!!)
+        assertFalse(main.exists())
+        assertEquals(prev.name, DictionarySelection.selected(ctx, danish))
+        // the one now in use, with the other one gone: the only one
+        val again = dialog(danish, prev, da)
+        assertEquals("“main_prev” is in use", again.title)
+        assertNull(again.replaceButton)
+    }
+
+    @Test fun `case 2 - the only keyboard using it, no other dictionary - OK only`() {
+        useKeyboards(ctx, real, da)
+        val main = File(dir(danish), "main_user.dict").apply { writeText("x") }
+        val d = dialog(danish, main, da)
+        assertEquals("Used by: ${name(da)}. It is the only dictionary for this language, so it can't be deleted while a keyboard uses the language.", d.message)
+        assertNull(d.replaceButton)
+        assertNull(d.replaceWith)
+    }
+
+    @Test fun `case 3 - other keyboards use it too - those keyboards, OK only`() {
+        useKeyboards(ctx, real, en, en2)
+        val main = File(dir(Locale.US), "main_user.dict").apply { writeText("x") }
+        val d = dialog(Locale.US, main, en)
+        assertEquals("Used by: ${name(en)}, ${name(en2)}. To delete it, select another version for those keyboards first.", d.message)
+        assertNull(d.replaceButton)
+    }
+
+    @Test fun `case 4 - from the Dictionaries screen - that keyboard or those keyboards, OK only`() {
+        useKeyboards(ctx, real, en)
+        val main = File(dir(Locale.US), "main_user.dict").apply { writeText("x") }
+        val one = dialog(Locale.US, main, null)
+        assertEquals("Used by: ${name(en)}. To delete it, select another version for that keyboard first.", one.message)
+        assertNull(one.replaceButton)
+        useKeyboards(ctx, real, en, en2)
+        assertEquals("Used by: ${name(en)}, ${name(en2)}. To delete it, select another version for those keyboards first.",
+            dialog(Locale.US, main, null).message)
+    }
+}

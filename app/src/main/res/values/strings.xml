@@ -693,10 +693,21 @@
     <string name="font_delete_theme">theme %s</string>
     <!-- a keyboard in that list, or in a palette's update question, switched off on the Languages screen (its own settings kept); %s = its name -->
     <string name="keyboard_switched_off">%s (switched off)</string>
-    <!-- deleting the added dictionary version in use while any keyboard has its language: not allowed (review L3.2) -->
+    <!-- deleting the added dictionary version in use while any keyboard has its language: not allowed (review L3.2); %s = the dictionary's name -->
     <string name="dictionary_in_use_title">“%s” is in use</string>
-    <string name="dictionary_in_use_delete_message">This dictionary is in use. Switch to another version, or turn the language off on this keyboard, to delete it.</string>
-    <string name="dictionary_turn_off_here">Turn the language off here</string>
+    <!-- the start of that dialog's text; %s = the keyboards using it, comma-separated -->
+    <string name="dictionary_in_use_users">Used by: %s.</string>
+    <!-- opened from the only keyboard using it, another dictionary for the language there -->
+    <string name="dictionary_in_use_select_first">To delete it, select another version first.</string>
+    <!-- opened from the only keyboard using it, no other dictionary for the language -->
+    <string name="dictionary_in_use_only_one">It is the only dictionary for this language, so it can\'t be deleted while a keyboard uses the language.</string>
+    <!-- other keyboards using it too, or opened from no keyboard -->
+    <plurals name="dictionary_in_use_select_for">
+        <item quantity="one">To delete it, select another version for that keyboard first.</item>
+        <item quantity="other">To delete it, select another version for those keyboards first.</item>
+    </plurals>
+    <!-- the dialog's button: selects the other dictionary, then deletes this one; %s = the other dictionary's name -->
+    <string name="dictionary_replace_and_delete">Replace with %s and delete this one</string>
     <string name="dictionary_used_by_none">No keyboard uses it.</string>
     <string name="dictionary_used_by_one">%s uses it and loses this dictionary.</string>
     <!-- deleting a keyboard whose word lists other keyboards read -->

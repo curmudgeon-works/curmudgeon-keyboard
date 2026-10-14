@@ -51,9 +51,8 @@ import helium314.keyboard.dictionarypack.DictionaryPackConstants
 fun DictionaryDialog(
     onDismissRequest: () -> Unit,
     locale: Locale,
-    /** The keyboard whose language row opened it, with how to turn the language off there; null from the Dictionaries screen. */
+    /** The keyboard whose language row opened it; null from the Dictionaries screen. */
     keyboard: helium314.keyboard.latin.settings.SettingsSubtype? = null,
-    onTurnOff: (() -> Unit)? = null,
 ) {
     val ctx = LocalContext.current
     val (dictionaries, hasInternal) = getUserAndInternalDictionaries(ctx, locale)
@@ -103,14 +102,14 @@ fun DictionaryDialog(
                     )
                 }
                 if (mainDict != null)
-                    DictionaryDetails(mainDict, locale, keyboard, onTurnOff, selectableRow(mainDict), greyed)
+                    DictionaryDetails(mainDict, locale, keyboard, selectableRow(mainDict), greyed) { selectionChanged++ }
                 if (addonDicts.isNotEmpty()) {
                     HorizontalDivider()
                     Text(stringResource(R.string.dictionary_category_title),
                         modifier = Modifier.padding(vertical = 12.dp),
                         style = MaterialTheme.typography.titleSmall
                     )
-                    addonDicts.forEach { DictionaryDetails(it, locale, keyboard, onTurnOff, selectableRow(it), greyed) }
+                    addonDicts.forEach { DictionaryDetails(it, locale, keyboard, selectableRow(it), greyed) { selectionChanged++ } }
                 }
                 val dictString = createDictionaryTextAnnotated(locale)
                 if (dictString.isNotEmpty()) {
@@ -134,11 +133,12 @@ fun DictionaryDialog(
 
 @Composable
 private fun DictionaryDetails(dict: File, locale: Locale, keyboard: helium314.keyboard.latin.settings.SettingsSubtype?,
-                              onTurnOff: (() -> Unit)?,
                               /** An added dictionary's row: whether it is in use among those of its kind, and selecting
                                *  it; null: not selectable. */
                               main: Pair<Boolean, () -> Unit>? = null,
-                              greyed: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Unspecified) {
+                              greyed: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Unspecified,
+                              /** Another dictionary was selected (the in-use dialog's Replace). */
+                              onSelectionChanged: () -> Unit = { }) {
     val header = DictionaryInfoUtils.getDictionaryFileHeaderOrNull(dict) ?: return
     val type = header.mIdString.substringBefore(":")
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -166,19 +166,24 @@ private fun DictionaryDetails(dict: File, locale: Locale, keyboard: helium314.ke
         )
     }
     // the version in use while any keyboard has the language: no delete (review L3.2; before, owner 2026-10-11: "No delete
-    // allowed if other keyboards using dict", which let the asking keyboard's only copy go). The dialog says how to free
-    // it and, opened from a keyboard with it as a second language, offers to turn it off there instead
+    // allowed if other keyboards using dict", which let the asking keyboard's only copy go). The dialog names the
+    // keyboards using it and says how to free it; opened from the only keyboard using it, with another dictionary for
+    // the language, it offers to replace it with that one and delete it (owner 2026-10-13, 20261013_L12; the "Turn the
+    // language off here" button is gone: "If it's not replaceable then turn off button shouldn't exist")
     val context = LocalContext.current
     val blockers = if (!showDeleteDialog) emptyList() else remember(showDeleteDialog) { dictionaryDeleteBlockers(context, locale, dict) }
     if (showDeleteDialog && blockers.isNotEmpty()) {
-        val canTurnOff = keyboard != null && onTurnOff != null && keyboard.locale != locale
+        val inUse = remember(blockers) { dictionaryInUse(context, locale, dict, keyboard, blockers) }
         ThreeButtonAlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            onConfirmed = { onTurnOff?.invoke() },
-            confirmButtonText = if (canTurnOff) stringResource(R.string.dictionary_turn_off_here) else null,
-            cancelButtonText = stringResource(if (canTurnOff) android.R.string.cancel else android.R.string.ok),
-            title = { Text(stringResource(R.string.dictionary_in_use_title, type)) },
-            content = { Text(stringResource(R.string.dictionary_in_use_delete_message)) },
+            onConfirmed = {
+                inUse.replaceWith?.let { replaceAndDelete(context, locale, dict, it) }
+                onSelectionChanged()
+            },
+            confirmButtonText = inUse.replaceButton,
+            cancelButtonText = stringResource(if (inUse.replaceButton != null) android.R.string.cancel else android.R.string.ok),
+            title = { Text(inUse.title) },
+            content = { Text(inUse.message) },
         )
     } else if (showDeleteDialog) {
         ConfirmationDialog(
@@ -202,6 +207,57 @@ private fun DictionaryDetails(dict: File, locale: Locale, keyboard: helium314.ke
             }
         )
     }
+}
+
+/** What the "in use" dialog says when the trash can is tapped on [dict], the version of its kind in use for [locale]
+ *  that [blockers] keep ([dictionaryDeleteBlockers], not empty); [keyboard]: the one whose language row opened it, null
+ *  from the Dictionaries screen (owner 2026-10-13, 20261013_L12). [replaceWith]: what its Replace button selects
+ *  ([DictionarySelection.INTERNAL] or a file name), with [replaceButton] its text; null: no such button (OK only). */
+internal class DictionaryInUse(val title: String, val message: String, val replaceWith: String?, val replaceButton: String?)
+
+internal fun dictionaryInUse(context: android.content.Context, locale: Locale, dict: File,
+                             keyboard: helium314.keyboard.latin.settings.SettingsSubtype?,
+                             blockers: List<helium314.keyboard.latin.settings.SettingsSubtype>): DictionaryInUse {
+    val title = context.getString(R.string.dictionary_in_use_title, dictionaryDisplayName(context, dict.name))
+    val usedBy = context.getString(R.string.dictionary_in_use_users, dictionaryUserNames(context, blockers).joinToString(", "))
+    // (the asking keyboard the only one using it: replaced when there is another, main or second language alike)
+    val sole = keyboard != null && blockers.size == 1 && blockers.single().sameKeyboard(keyboard)
+    val next = if (sole) nextDictionary(context, locale, dict) else null
+    val case = when {
+        next != null -> context.getString(R.string.dictionary_in_use_select_first)
+        sole -> context.getString(R.string.dictionary_in_use_only_one)
+        else -> context.resources.getQuantityString(R.plurals.dictionary_in_use_select_for, blockers.size)
+    }
+    return DictionaryInUse(title, "$usedBy $case", next,
+        next?.let { context.getString(R.string.dictionary_replace_and_delete, dictionaryDisplayName(context, it)) })
+}
+
+/** The dictionary that replaces [dict] (its kind) for [locale]: the built-in one if the language has one of the kind,
+ *  else the next added one of the kind in the list (by name, after [dict], then from the start); null: none (owner
+ *  2026-10-13, 20261013_L12: "Next = Built-in if the language has one, else the next user-added dictionary"). */
+internal fun nextDictionary(context: android.content.Context, locale: Locale, dict: File): String? {
+    val (files, hasInternal) = getUserAndInternalDictionaries(context, locale)
+    val kind = DictionarySelection.typeOf(dict)
+    if (kind == Dictionary.TYPE_MAIN && hasInternal) return DictionarySelection.INTERNAL
+    val names = files.filter { DictionarySelection.isAdded(it) && DictionarySelection.typeOf(it) == kind }.map { it.name }.sorted()
+    val at = names.indexOf(dict.name)
+    return (names.drop(at + 1) + names.take(at.coerceAtLeast(0))).firstOrNull { it != dict.name }
+}
+
+/** [next] ([nextDictionary]) selected for [locale] in place of [dict], then [dict] deleted: the in-use dialog's Replace
+ *  (owner 2026-10-13, 20261013_L12: "Replace with <next> and delete this one"). The keyboard loads the new one. */
+internal fun replaceAndDelete(context: android.content.Context, locale: Locale, dict: File, next: String) {
+    DictionarySelection.select(context, locale, next, DictionarySelection.typeOf(dict))
+    dict.delete()
+    context.sendBroadcast(Intent(DictionaryPackConstants.NEW_DICTIONARY_INTENT_ACTION))
+}
+
+/** A dictionary's name in the dialogs: the built-in one's, the added main one's ("Main dictionary"), else the name the
+ *  language row shows ("main_prev", "emoji"). */
+internal fun dictionaryDisplayName(context: android.content.Context, name: String): String = when (name) {
+    DictionarySelection.INTERNAL -> context.getString(R.string.internal_dictionary_summary)
+    DictionarySelection.DEFAULT_USER_MAIN -> context.getString(R.string.main_dictionary)
+    else -> name.removeSuffix("_" + DictionaryInfoUtils.USER_DICTIONARY_SUFFIX)
 }
 
 /** The enabled keyboards with [locale] as a language, but [keyboard] (the one asking: a language row). (No keyboard

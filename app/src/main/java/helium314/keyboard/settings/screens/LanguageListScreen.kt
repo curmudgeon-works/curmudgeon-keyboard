@@ -273,8 +273,7 @@ private fun LanguageRow(locale: Locale, keyboard: SettingsSubtype, setKeyboard: 
         if (showNoDictDialog)
             MissingDictionaryDialog({ showNoDictDialog = false }, locale)
         if (showDictionaryDialog)
-            DictionaryDialog({ showDictionaryDialog = false; dictGeneration++ }, locale, keyboard,
-                onTurnOff = { showDictionaryDialog = false; setKeyboard(withLanguagePriority(ctx, keyboard, locale, OFF)) })
+            DictionaryDialog({ showDictionaryDialog = false; dictGeneration++ }, locale, keyboard)
         // (no "learned words count for all languages" switch any more: learned words are per script, shared by the
         // script's languages; see LearnedStores)
     }
