@@ -100,11 +100,19 @@ fun LayoutFilesScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     // what is there as the screen opens: what it changes from here is kept by its Save when the app is left (owner
     // 2026-10-11, S2: "yes let's keep saved subscreen changes")
     rememberSaveable { helium314.keyboard.settings.LayoutDraft.subScreenOpenedOpen(ctx); true }
-    // (the type's default built-in, every tab alike: also for a symbols page a popup preset chose, e.g. Arabic's; that
-    // one shows as the keyboard uses it, and goes to a copy of its own only once edited)
-    // (the letters: the main language's default letters layout, with its extra keys, as the Keys row's editor shows a
-    // built-in one)
-    fun builtInName(type: LayoutType) = if (type != LayoutType.MAIN) type.default else languageDefaultLayout(keyboard.locale)
+    // the type's default built-in; the letters: the main language's default letters layout, with its extra keys, as the
+    // Keys row's editor shows a built-in one (JSON-L); the symbols page: the one the keyboard's popup preset chose, e.g.
+    // Arabic's (JSON-S2), as the screen opened
+    val symbols = remember { presetSymbols(ctx, prefs, helium314.keyboard.latin.utils.SubtypeUtilsAdditional.current(keyboard.toPref()).toSettingsSubtype()) }
+    fun builtInName(type: LayoutType) = when (type) {
+        LayoutType.MAIN -> languageDefaultLayout(keyboard.locale)
+        LayoutType.SYMBOLS -> symbols.layout ?: type.default
+        else -> type.default
+    }
+    // the keyboard with [type]'s built-in: the symbols page stored as its preset stores it (none for the default one, so
+    // the Default preset still matches, JSON-S2)
+    fun withBuiltIn(kb: SettingsSubtype, type: LayoutType) =
+        if (type == LayoutType.SYMBOLS && symbols.layout == null) kb.withoutLayout(type) else kb.withLayout(type, builtInName(type))
     fun builtInContent(type: LayoutType, name: String) =
         if (type == LayoutType.MAIN) LayoutUtils.getContentWithPlus(name, keyboard.locale, ctx) else LayoutUtils.getContent(type, name, ctx)
     fun builtIn(type: LayoutType) = builtInContent(type, builtInName(type))
@@ -137,7 +145,7 @@ fun LayoutFilesScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
             val text = texts[t]!!
             val current = after.layoutName(t)
             after = when {
-                text == builtIn(t) -> after.withLayout(t, builtInName(t))
+                text == builtIn(t) -> withBuiltIn(after, t)
                 // (its own copy, rewritten in place: of the letters, only one scoped to its language)
                 current != null && LayoutUtilsCustom.isPrivateLayout(current) && LayoutUtilsCustom.scopeOf(current, t) == scope(t) -> {
                     helium314.keyboard.latin.utils.AtomicFiles.write(LayoutUtilsCustom.getLayoutFile(current, t, ctx), text); after }
@@ -167,11 +175,16 @@ fun LayoutFilesScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     if (askBuiltIn) helium314.keyboard.settings.dialogs.ConfirmationDialog(
         onDismissRequest = { askBuiltIn = false },
         title = { Text(stringResource(R.string.layout_files_builtin)) },
-        // (the letters: which built-in keys, for which language, JSON-L)
-        content = { Text(if (type != LayoutType.MAIN) stringResource(R.string.layout_files_builtin_confirm)
-            else stringResource(R.string.layout_files_builtin_confirm_letters,
+        // (the letters: which built-in keys, for which language, JSON-L; the symbols page a preset chose: by the preset's
+        // name, JSON-S2)
+        content = { Text(when {
+            type == LayoutType.MAIN -> stringResource(R.string.layout_files_builtin_confirm_letters,
                 helium314.keyboard.latin.utils.SubtypeLocaleUtils.getLayoutDisplayNameInSystemLocale(builtInName(type), keyboard.locale),
-                keyboard.locale.localizedDisplayName(ctx.resources))) },
+                keyboard.locale.localizedDisplayName(ctx.resources))
+            type == LayoutType.SYMBOLS && symbols.layout != null && symbols.presetName != null ->
+                stringResource(R.string.layout_files_builtin_confirm_symbols, symbols.presetName!!)
+            else -> stringResource(R.string.layout_files_builtin_confirm)
+        }) },
         onConfirmed = { texts[type] = builtIn(type) },
     )
     if (askLeave) helium314.keyboard.settings.dialogs.UnsavedChangesDialog(

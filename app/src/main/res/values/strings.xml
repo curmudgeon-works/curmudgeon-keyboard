@@ -426,6 +426,8 @@
     <string name="layout_files_own_name">My layout</string>
     <string name="layout_files_builtin">Built-in</string>
     <string name="layout_files_builtin_confirm">Replace this tab with the built-in layout? Your changes in it will be lost.</string>
+    <!-- the same on the Symbols tab of a keyboard whose popup preset chose a symbols page: %s the preset (e.g. Arabic) -->
+    <string name="layout_files_builtin_confirm_symbols">Replace this tab with the built-in symbols page of %s? Your changes in it will be lost.</string>
     <!-- the same on the letters' tab (Keys): %1$s the built-in layout (e.g. QWERTY), %2$s the keyboard's main language -->
     <string name="layout_files_builtin_confirm_letters">Replace this tab with the built-in %1$s keys for %2$s? Your changes in it will be lost.</string>
     <string name="layout_files_load">Load file</string>

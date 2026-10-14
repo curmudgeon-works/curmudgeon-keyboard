@@ -135,9 +135,53 @@ class LayoutFilesTabsTest {
         val name = kbNow().layoutName(LayoutType.SYMBOLS)!!
         assertTrue(LayoutUtilsCustom.isPrivateLayout(name), "not the keyboard's own copy: $name")
         assertEquals("$builtIn\n", LayoutUtilsCustom.getLayoutFile(name, LayoutType.SYMBOLS, ctx).readText())
-        // edited back to the built-in text: the built-in layout again
+        // edited back to the built-in text: the built-in layout again, stored as the Default preset stores it (none),
+        // so that preset still matches (JSON-S2; was "symbols", which no preset names)
         field().performTextReplacement(builtIn); compose.waitForIdle()
         saveWithTick()
-        assertEquals("symbols", kbNow().layoutName(LayoutType.SYMBOLS))
+        assertEquals(null, kbNow().layoutName(LayoutType.SYMBOLS))
+    }
+
+    private fun presetOf(kb: SettingsSubtype) =
+        helium314.keyboard.settings.screens.currentPopupPreset(helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(ctx), kb,
+            helium314.keyboard.settings.screens.popupPresets(kb, emptyList()), emptyMap())
+
+    // fail before (JSON-S2): Built-in gave "symbols" stored by name, and the Default preset no longer matched
+    @Test fun `default keyboard - an edit and Built-in leave no symbols entry, and its preset still matches`() {
+        val before = presetOf(kbNow())
+        show()
+        compose.onNodeWithText(ctx.getString(LayoutType.SYMBOLS.displayNameId)).performScrollTo().performClick()
+        compose.waitForIdle()
+        val builtIn = fieldText()
+        field().performTextReplacement("$builtIn\n"); compose.waitForIdle()
+        saveWithTick()
+        compose.onNodeWithText(ctx.getString(R.string.layout_files_builtin)).performClick()
+        compose.onNode(hasText(ctx.getString(R.string.layout_files_builtin_confirm)) and hasAnyAncestor(isDialog())).assertExists()
+        compose.onNode(hasText(ctx.getString(android.R.string.ok)) and hasAnyAncestor(isDialog())).performClick()
+        compose.waitForIdle()
+        saveWithTick()
+        assertEquals(null, kbNow().layoutName(LayoutType.SYMBOLS))
+        assertEquals(before, presetOf(kbNow()))
+    }
+
+    // fail before (JSON-S2): Built-in on an Arabic-preset keyboard gave the default symbols page
+    @Test fun `Arabic-preset keyboard - Built-in gives Arabic's symbols page and names the preset`() {
+        val arabic = SubtypeSettings.getResourceSubtypesForLocale(Locale.forLanguageTag("ar")).first().toSettingsSubtype()
+            .withLayout(LayoutType.SYMBOLS, "symbols_arabic").withId(3)
+        storeKeyboards(ctx, real, listOf(kb1, arabic))
+        scenario = ActivityScenario.launch(SettingsActivity::class.java).onActivity {
+            it.setContent { LayoutFilesScreen(arabic, {}) } }
+        compose.waitForIdle()
+        compose.onNodeWithText(ctx.getString(LayoutType.SYMBOLS.displayNameId)).performScrollTo().performClick()
+        compose.waitForIdle()
+        val arabicPage = LayoutUtils.getContent(LayoutType.SYMBOLS, "symbols_arabic", ctx)
+        assertEquals(arabicPage, fieldText())
+        field().performTextReplacement("$arabicPage\n"); compose.waitForIdle()
+        compose.onNodeWithText(ctx.getString(R.string.layout_files_builtin)).performClick()
+        compose.onNode(hasText(ctx.getString(R.string.layout_files_builtin_confirm_symbols, ctx.getString(R.string.key_popups_preset_arabic)))
+            and hasAnyAncestor(isDialog())).assertExists()
+        compose.onNode(hasText(ctx.getString(android.R.string.ok)) and hasAnyAncestor(isDialog())).performClick()
+        compose.waitForIdle()
+        assertEquals(arabicPage, fieldText())
     }
 }

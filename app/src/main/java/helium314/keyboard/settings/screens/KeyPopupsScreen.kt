@@ -497,6 +497,29 @@ internal fun popupPresets(keyboard: SettingsSubtype, userSets: List<KeyPopupOver
     } + userSets.map { Preset(0, it.morePopups, it.symbolsLayout, it.name, it.overrides, symbolMap = it.symbolMap, popupOrder = it.popupOrder,
         follows = if (takeNew) it.atDefault else emptySet()) }
 
+/** The symbols page a keyboard's popup preset chose: [layout] (null: none, the default page) and the preset's name
+ *  ([presetName], null for the default one). */
+internal data class PresetSymbols(val layout: String?, val presetName: String?)
+
+/**
+ * The symbols page [keyboard]'s popup preset chose ([prefs]: its settings view), the "Built-in" of its Symbols tab in
+ * the JSON editor (owner 2026-10-13, JSON-S2): the user's set it chose, its page; else a built-in page it names (as a
+ * preset sets it); else, a copy of its own, the built-in preset with a page whose recipe it has otherwise; else none.
+ */
+internal fun presetSymbols(ctx: Context, prefs: SharedPreferences, keyboard: SettingsSubtype): PresetSymbols {
+    val sets = KeyPopupOverrides.loadSets(ctx.realPrefs())
+    prefs.getString(KeyPopupOverrides.PREF_SELECTED_SET, null)?.let { name ->
+        sets.firstOrNull { it.name == name }?.let { return PresetSymbols(it.symbolsLayout, it.name) } }
+    val builtIns = popupPresets(keyboard, sets).filter { it.userName == null && it.symbolsLayout != null }
+    fun named(layout: String) = builtIns.firstOrNull { it.symbolsLayout == layout }?.let { ctx.getString(it.name) }
+    val now = keyboard.layoutName(LayoutType.SYMBOLS)
+    if (now == null) return PresetSymbols(null, null)
+    if (!helium314.keyboard.latin.utils.LayoutUtilsCustom.isCustomLayout(now)) return PresetSymbols(now, named(now))
+    val preset = builtIns.firstOrNull { p ->
+        currentPopupPreset(prefs, keyboard.withLayout(LayoutType.SYMBOLS, p.symbolsLayout!!), listOf(p), emptyMap()) != null }
+    return PresetSymbols(preset?.symbolsLayout, preset?.let { ctx.getString(it.name) })
+}
+
 /** The presets row for [keyboard] ([prefs]: its settings view, [overrides] its own arrangement): the user's set it chose,
  *  else the built-in whose recipe it has; a keyboard with its own arrangement on a built-in's recipe (or one that never
  *  chose any) differs from that built-in, a recipe no built-in has from the default one: "Custom · from HeliBoard extra",
