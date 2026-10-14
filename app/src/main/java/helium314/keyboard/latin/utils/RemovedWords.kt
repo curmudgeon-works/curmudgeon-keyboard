@@ -334,12 +334,15 @@ object RemovedWords {
         /** The changes recorded while a full restore ran, dropped ([dropGatedOps]). */
         internal fun dropGated() { synchronized(lock) { gatedOps.clear() } }
 
-        /** [ops] made on this list (read first), as made: a strike is one more on the count it has here. Call off the
-         *  main thread. */
-        fun redo(ops: List<GatedOp>) {
-            ensureLoaded()
+        /** [ops] made on this list (read first), as made: a strike is one more on the count it has here, made as the
+         *  keyboard's Remove makes it, over the lists it borrows ([borrowed]: a word allowed here over a borrowed 2 and
+         *  no own strikes gets 3, owner 2026-10-12 M5; round-5 review B5, 20261013_L11: it got 1). Call off the main
+         *  thread. */
+        fun redo(ops: List<GatedOp>, borrowed: List<WordListFile> = emptyList()) {
+            val lists = Lists(this, borrowed)
+            lists.ensureLoaded()
             for (op in ops) when (op) {
-                is GatedStrike -> strike(op.word)
+                is GatedStrike -> lists.strike(op.word)
                 is GatedConfirm -> confirm(op.word)
                 is GatedTakeOff -> takeOff(op.word)
                 is GatedAllow -> allow(op.word, op.level)

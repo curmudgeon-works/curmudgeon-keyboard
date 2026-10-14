@@ -1308,17 +1308,30 @@ private fun underRestoreGate(ctx: Context, work: () -> Unit) {
 private fun redoBlacklistChanges(ctx: Context, filesDir: File, poolsBefore: Map<String, Int>,
                                  gated: List<Pair<RemovedWords.WordListFile, List<RemovedWords.GatedOp>>>) {
     val keyboardOfPool = poolsBefore.entries.associate { (id, pool) -> pool to id }
-    val poolsNow = LearnedKeyboards.poolEntries(ctx.realPrefs())
+    val real = ctx.realPrefs()
+    val poolsNow = LearnedKeyboards.poolEntries(real)
     for ((list, ops) in gated) {
         val parsed = LearnedStores.blacklistPoolAndScript(filesDir, list.file)
         if (parsed == null) { list.redo(ops); continue }
         val (pool, script) = parsed
-        val target = if (pool == LearnedStores.SHARED) pool else keyboardOfPool[pool]?.let { poolsNow[it] }
+        val id = if (pool == LearnedStores.SHARED) null else keyboardOfPool[pool]
+        val target = if (pool == LearnedStores.SHARED) pool else id?.let { poolsNow[it] }
         if (target == null) {
             Log.i("AdvancedScreen", "blacklist changes during the restore dropped: their keyboard isn't in the backup")
             continue
         }
-        RemovedWords.forFile(LearnedStores.blacklistFile(filesDir, script, target)).redo(ops)
+        // a strike made again as the keyboard's Remove makes it: over the lists the restored keyboard borrows (its
+        // "Blacklisted" button), so a word allowed over a borrowed 2 with no own strikes gets 3 (owner 2026-10-12 M5;
+        // round-5 review B5, 20261013_L11: it got 1)
+        // (the keyboard as the restored settings list it: the enabled list in memory is the old device's until the
+        // restore's follow-up reloads it)
+        val borrowed = id?.let { kbId ->
+            (SubtypeSettings.createSettingsSubtypes(real.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!) +
+                helium314.keyboard.latin.settings.SwitchedOffKeyboards.list(real))
+                .firstOrNull { it.keyboardId == kbId }?.let { LearnedStores.viewOf(real, it) }?.othersBlacklisted
+                ?.map { RemovedWords.forFile(LearnedStores.blacklistFile(filesDir, script, it)) }
+        }.orEmpty()
+        RemovedWords.forFile(LearnedStores.blacklistFile(filesDir, script, target)).redo(ops, borrowed)
     }
     RemovedWords.awaitWrites()
 }

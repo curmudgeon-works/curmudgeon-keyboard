@@ -6,6 +6,7 @@ import android.content.SharedPreferences
 import androidx.core.os.UserManagerCompat
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.RemovedWords
@@ -53,8 +54,11 @@ object LearnedStores {
 
     /** The view of the selected keyboard (prefs only, no files); null when it has no pool (owner 2026-10-11: lookups never
      *  create records; e.g. a changed keyboard's pool moved, the selected keyboard not yet). */
-    fun viewFor(real: SharedPreferences): LearnedView? {
-        val keyboard = KeyboardProfiles.selectedKeyboard(real)
+    fun viewFor(real: SharedPreferences): LearnedView? = viewOf(real, KeyboardProfiles.selectedKeyboard(real))
+
+    /** [viewFor] of [keyboard], selected or not (a full restore makes a Remove made meanwhile again on the keyboard's
+     *  lists, 20261013_L11). */
+    fun viewOf(real: SharedPreferences, keyboard: SettingsSubtype): LearnedView? {
         val own = LearnedKeyboards.poolOrNull(real, keyboard) ?: return null
         if (!LearnedKeyboards.isDone(real)) return LearnedView(own)
         val learned = LearnedKeyboards.usesOthers(real, LearnedKeyboards.PREF_USE_OTHERS_LEARNED, keyboard)
