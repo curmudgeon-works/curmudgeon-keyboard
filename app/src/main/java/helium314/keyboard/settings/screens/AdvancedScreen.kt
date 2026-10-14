@@ -118,6 +118,9 @@ internal fun appSettingsItems(prefs: android.content.SharedPreferences, real: an
         // the settings event log, the keyboards' history too: app-wide, always shown (owner 2026-10-13, K1 placement;
         // before, among the swipe logs on Learning & swiping, shown only while swiping was on)
         Settings.PREF_LOG_SETTINGS,
+        // the swipe logs and the learning log, while the Fine-tune screens that show them are hidden: here, advanced only,
+        // so the screens (and with them the search) still reach them (owner 2026-10-14, option B: "fine")
+        *(if (helium314.keyboard.settings.REFINE_MENU_SHOWN) emptyArray() else hiddenMenuLogKeys.toTypedArray()),
         if (BuildConfig.DEBUG || prefs.getBoolean(DebugSettings.PREF_SHOW_DEBUG_SETTINGS, Defaults.PREF_SHOW_DEBUG_SETTINGS))
             SettingsWithoutKey.DEBUG_SETTINGS else null,
         // each keyboard its own settings or one set for all, and with separate settings which menus each keyboard keeps
@@ -138,8 +141,12 @@ internal fun appSettingsItems(prefs: android.content.SharedPreferences, real: an
     )
 }
 
+/** The logs drawn on the Fine-tune screens, on App settings while those are hidden ([helium314.keyboard.settings.REFINE_MENU_SHOWN]).
+ *  (Before [advancedOnlyAppSettings]: top-level values start in file order.) */
+internal val hiddenMenuLogKeys = listOf(Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_SWIPE_METRICS, Settings.PREF_LEARNING_LOG)
+
 /** The App settings shown only in advanced mode. */
-internal val advancedOnlyAppSettings = setOf(Settings.PREF_LEAVING_KEEPS_CHANGES)
+internal val advancedOnlyAppSettings = setOf(Settings.PREF_LEAVING_KEEPS_CHANGES) + hiddenMenuLogKeys
 
 @SuppressLint("ApplySharedPref")
 fun createAdvancedSettings(context: Context) = listOf(

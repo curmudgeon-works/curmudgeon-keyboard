@@ -136,7 +136,15 @@ internal val savingGuide: List<SavingTab> = listOf(
         SavingRow(R.string.saving_kind_palettes, R.string.saving_backup_items),
         SavingRow(R.string.saving_kind_keyboards, R.string.saving_backup_keyboards),
         SavingRow(R.string.saving_kind_fonts, R.string.saving_backup_files),
+        // (the kinds those two sentences name get their cells in the grid too, 2026-10-14)
+        SavingRow(R.string.saving_kind_pictures, R.string.saving_backup_files),
+        SavingRow(R.string.saving_kind_key_layouts, R.string.saving_backup_files),
+        SavingRow(R.string.saving_kind_dictionaries, R.string.saving_backup_files),
         SavingRow(R.string.saving_kind_learned, R.string.saving_backup_words),
+        SavingRow(R.string.saving_kind_blacklisted, R.string.saving_backup_words),
+        SavingRow(R.string.saving_kind_personal, R.string.saving_backup_words),
+        SavingRow(R.string.saving_kind_clips, R.string.saving_backup_words),
+        SavingRow(R.string.restore_clipboard, R.string.saving_backup_words), // ("Clipboard history")
     )),
     SavingTab(R.string.saving_tab_partial, listOf(
         SavingRow(R.string.saving_kind_keyboards, R.string.saving_partial_keyboards),

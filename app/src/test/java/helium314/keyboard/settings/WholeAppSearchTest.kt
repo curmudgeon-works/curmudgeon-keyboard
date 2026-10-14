@@ -107,4 +107,18 @@ class WholeAppSearchTest {
         assertTrue(SettingsWithoutKey.LEARNED_WORDS in found(ctx.getString(R.string.learned_words)))
         assertTrue(SettingsWithoutKey.EDIT_PERSONAL_DICTIONARY in found(ctx.getString(R.string.edit_personal_dictionary)))
     }
+
+    // owner 2026-10-14, option B "fine": the logs the hidden Fine-tune screens draw are on App settings (advanced only)
+    // while those are hidden, so the main screen's search still finds them. Fail before: found from no screen
+    @Test fun `the logs of the hidden Fine-tune screens are on App settings and found`() {
+        KeyboardProfiles.disable(real)
+        if (REFINE_MENU_SHOWN) return
+        val appSettings = appSettingsItems(ctx.prefs(), real)
+        for (key in listOf(Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_SWIPE_METRICS, Settings.PREF_LEARNING_LOG)) {
+            assertTrue(key in appSettings, key)
+            assertTrue(key in helium314.keyboard.settings.screens.advancedOnlyAppSettings, key)
+            val title = container[key]!!.title
+            assertTrue(key in found(title), "$key: ${found(title)}")
+        }
+    }
 }

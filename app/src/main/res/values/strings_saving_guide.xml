@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- App settings > How saving works (2026-10-11): what each action does to each kind of thing, read only. Each line
-     describes how the app behaves now: change it together with the behaviour. -->
+     describes how the app behaves now: change it together with the behavior. -->
 <resources>
     <string name="saving_guide_title">How saving works</string>
     <string name="saving_guide_summary">What choosing, editing, deleting, restoring and updating do to your Layouts, themes and word lists</string>
@@ -52,7 +52,7 @@
     <string name="saving_summary_saved_items_title">Saved Layouts, themes and popup sets</string>
     <string name="saving_summary_saved_items_text">Changing a setting changes this keyboard only, shown as \"Custom · from Sunset\". The saved item changes only with its save icon in the list.</string>
     <string name="saving_summary_one_or_all_title">One keyboard or all</string>
-    <string name="saving_summary_one_or_all_text">With separate settings on, a change stays on the keyboard you\'re editing. Off, every keyboard uses the first keyboard\'s settings, so a change reaches all of them. Backup, restore, app update and factory reset each have their own tab.</string>
+    <string name="saving_summary_one_or_all_text">With separate settings on, a change stays on the keyboard you\'re editing. Off, every keyboard uses the first keyboard\'s settings, so a change reaches all of them. Backup, restore, app update and factory reset each have their own column below.</string>
 
     <!-- Choose -->
     <string name="saving_choose_layouts">Puts all its settings and keys on this keyboard. The built-in Layouts always follow the latest defaults.</string>
