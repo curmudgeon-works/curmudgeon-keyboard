@@ -1049,6 +1049,12 @@ private fun restoreLayoutFiles(ctx: Context, pending: PendingRestore, wanted: Se
     }
     val renames = HashMap<LayoutType, HashMap<String, String>>()
     val dir = DeviceProtectedUtils.getFilesDir(ctx)
+    // not [write]: the files it would have written, as if written (review 2026-10-11 R6: else a name numbered earlier in
+    // the run looked free to a later one)
+    val planned = HashMap<String, ByteArray>()
+    fun exists(f: File) = f.path in planned || f.exists()
+    fun bytesOf(f: File) = planned[f.path] ?: f.readBytes()
+    fun put(f: File, bytes: ByteArray) { if (write) f.writeBytes(bytes) else planned[f.path] = bytes }
     // (named ones first: whether an unsaved one's keyboard is the same is seen with its named layouts as they came in)
     for ((key, bytes) in contents.entries.sortedBy { LayoutUtilsCustom.isPrivateLayout(it.key.second) }) {
         val (type, name) = key
@@ -1056,12 +1062,12 @@ private fun restoreLayoutFiles(ctx: Context, pending: PendingRestore, wanted: Se
         val target = File(folderDir, name)
         // (never outside the app's folder, whatever the zip says)
         if (!target.canonicalPath.startsWith(folderDir.canonicalPath + File.separator)) continue
-        if (!target.exists()) { if (write) { folderDir.mkdirs(); target.writeBytes(bytes) }; continue }
-        if (target.readBytes().contentEquals(bytes)) continue
+        if (!exists(target)) { if (write) folderDir.mkdirs(); put(target, bytes); continue }
+        if (bytesOf(target).contentEquals(bytes)) continue
         val newName = if (LayoutUtilsCustom.isPrivateLayout(name)) privateLayoutFor(ctx, type, name, bytes, chosen, renames, write) ?: continue
         else generateSequence(2) { it + 1 }.map { LayoutUtilsCustom.numberedLayoutName(name, type, it) }
-            .first { val f = File(folderDir, it); !f.exists() || f.readBytes().contentEquals(bytes) }
-            .also { val f = File(folderDir, it); if (write && !f.exists()) f.writeBytes(bytes) }
+            .first { val f = File(folderDir, it); !exists(f) || bytesOf(f).contentEquals(bytes) }
+            .also { val f = File(folderDir, it); if (!exists(f)) put(f, bytes) }
         renames.getOrPut(type) { HashMap() }[name] = newName
     }
     if (write) LayoutUtilsCustom.onLayoutFileChanged()
