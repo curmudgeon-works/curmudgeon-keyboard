@@ -66,10 +66,11 @@ internal fun layoutFilesSaved() {
     helium314.keyboard.settings.LayoutDraft.subScreenSavedOpen(helium314.keyboard.settings.LayoutDraft.SubScreen.LAYOUT_FILES) // (named in its Discard question)
 }
 
-/** The layouts edited here, one tab each: everything but the letters (own picker) and the symbols pages (popup editor). */
+/** The layouts edited here, one tab each: everything but the letters (own picker). The symbols page too (owner
+ *  2026-10-13, JSON-S): the popup editor doesn't edit it, it only chooses one through its presets (e.g. Arabic's). */
 private val LAYOUT_FILE_TYPES = listOf(
     LayoutType.NUMBER_ROW, LayoutType.NUMBER, LayoutType.NUMPAD, LayoutType.NUMPAD_LANDSCAPE, LayoutType.PHONE,
-    LayoutType.PHONE_SYMBOLS, LayoutType.MORE_SYMBOLS, LayoutType.FUNCTIONAL, LayoutType.EMOJI_BOTTOM, LayoutType.CLIPBOARD_BOTTOM,
+    LayoutType.PHONE_SYMBOLS, LayoutType.SYMBOLS, LayoutType.MORE_SYMBOLS, LayoutType.FUNCTIONAL, LayoutType.EMOJI_BOTTOM, LayoutType.CLIPBOARD_BOTTOM,
 )
 private const val FILE_FORMAT = "curmudgeon-layouts"
 
@@ -86,6 +87,8 @@ fun LayoutFilesScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     // what is there as the screen opens: what it changes from here is kept by its Save when the app is left (owner
     // 2026-10-11, S2: "yes let's keep saved subscreen changes")
     rememberSaveable { helium314.keyboard.settings.LayoutDraft.subScreenOpenedOpen(ctx); true }
+    // (the type's default built-in, every tab alike: also for a symbols page a popup preset chose, e.g. Arabic's; that
+    // one shows as the keyboard uses it, and goes to a copy of its own only once edited)
     fun builtIn(type: LayoutType) = LayoutUtils.getContent(type, type.default, ctx)
     // the keyboard as it is now (a save here changes its definition)
     fun kb() = helium314.keyboard.latin.utils.SubtypeUtilsAdditional.current(keyboard.toPref()).toSettingsSubtype()
