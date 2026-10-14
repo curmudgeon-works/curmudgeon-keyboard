@@ -1299,8 +1299,11 @@ private fun underRestoreGate(ctx: Context, work: () -> Unit) {
         // Remove's disallow) isn't kept, and the lists read the restored files at the end, plainly.
         // In round 5 (2026-10-12/13: L2, L7, L8, L11) the changes made during a full restore were held in a queue and
         // made again on the restored lists, by keyboard; removed 2026-10-13 to simplify, owner: "It's a silly edge case
-        // tbh -- removal when restore is running. Who even cares" (round-6 review: 20261013_L8_2 to 20261013_L11_2 were
-        // all in that queue). A change made while a full restore runs is lost
+        // tbh -- removal when restore is running. Who even cares". Of the round-6 review's findings in this chain, only
+        // 20261013_L9_2 and 20261013_L10_2 were in that queue, and the removal fixed them; 20261013_L8_2 is only narrowed
+        // (the window from end() until the keyboard reloads its pool stays); 20261013_L11_2 (a failed re-read, then the
+        // catch-up write: failure on failure) wasn't touched and was closed by the owner as accepted (2026-10-14; round-7
+        // review 20261013_L4_3). A change made while a full restore runs is lost
         RemovedWords.discardAllPending()
         work()
     } finally {
