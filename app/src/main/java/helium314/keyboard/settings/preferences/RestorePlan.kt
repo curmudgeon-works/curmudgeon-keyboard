@@ -326,8 +326,8 @@ internal class RestoreDialogState(private val keyboards: List<SettingsSubtype>) 
 /**
  * The restore dialog keyboard by keyboard (owner 2026-10-12, the restore redesign; no Compose screens here): screen 1's
  * rows, the backup's keyboards ([top]) and its saved items by section ([sections], names as in the backup), and the
- * questions after it ([questions]): one per ticked row that needs merging, in screen 1's order (keyboards, Layouts &
- * popups, themes, palettes & images, fonts). Every row starts ticked; an item a ticked keyboard uses (or a ticked Layout
+ * questions after it ([questions]): one per ticked row that needs merging, the parts first, then the items using them,
+ * then the keyboards, as the restore writes them (owner 2026-10-12 A4). Every row starts ticked; an item a ticked keyboard uses (or a ticked Layout
  * or theme) is ticked and can't be unticked, "Required for …" ([requiredFor]), and is free again once nothing ticked uses
  * it. The answers are kept through Back and through unticking: a row unticked drops its question, ticked again its
  * earlier answer comes back. All of it reads [plan], made once when the backup was read.
@@ -383,9 +383,13 @@ internal class RestoreFlow(val plan: RestorePlan, val keyboards: List<SettingsSu
         data class Item(val kind: SavedItemsMerge.Kind, val key: String) : Question()
     }
 
-    /** One per ticked row that needs merging ("Merge required"), in screen 1's order. */
-    val questions: List<Question> get() = restoring().filter { plan.asks(it) }.map { Question.Keyboard(it) } +
-        sections.flatMap { items(it) }.filter { it.mergeRequired && ticked(it.kind to it.key) }.map { Question.Item(it.kind, it.key) }
+    /** One per ticked row that needs merging ("Merge required"): the parts (palettes, fonts, pictures, popup sets), then
+     *  the items using them (Layouts, themes), then the keyboards, the order the restore writes them in, so a keyboard's
+     *  "What to merge" shows the names the item answers give (owner 2026-10-12 A4: "asking sub-items, then items, then
+     *  keyboards makes sense"; before, keyboards first, their previews assumed Replace for every item). */
+    val questions: List<Question> get() =
+        SavedItemsMerge.applyOrder.flatMap { plan.items.of(it) }.filter { it.mergeRequired && ticked(it.kind to it.key) }
+            .map { Question.Item(it.kind, it.key) } + restoring().filter { plan.asks(it) }.map { Question.Keyboard(it) }
 
     /** "Tricky merging ahead!": the full restore unticked and a ticked row that needs merging (owner 2026-10-12). */
     val trickyAhead get() = !top.wipe && questions.isNotEmpty()

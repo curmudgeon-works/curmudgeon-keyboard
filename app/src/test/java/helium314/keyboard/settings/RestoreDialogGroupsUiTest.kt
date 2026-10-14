@@ -144,7 +144,11 @@ class RestoreDialogGroupsUiTest {
         box("Sunset").assertIsEnabled()
         compose.onNodeWithText("English (US)").performClick()
         compose.onNodeWithText("Next").performClick()
+        // (A4: the theme's question first, then the keyboard's)
         compose.onNodeWithText("1 of 2").assertExists()
+        compose.onNodeWithText("Suggested: same keyboard as in the backup").assertDoesNotExist()
+        compose.onNodeWithText("Next").performClick()
+        compose.onNodeWithText("2 of 2").assertExists()
         compose.onNodeWithText("Suggested: same keyboard as in the backup").assertExists()
     }
 

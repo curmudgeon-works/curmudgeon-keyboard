@@ -47,6 +47,10 @@ internal object SavedItemsMerge {
     /** The kinds of saved item, in the order their clashes are listed. */
     enum class Kind { PALETTES, THEMES, LAYOUTS, POPUP_SETS, FONTS, PICTURES }
 
+    /** The kinds in the order [apply] writes them: the parts (palettes, fonts, pictures, popup sets), then the items using
+     *  them (Layouts, themes). The restore's questions follow it (owner 2026-10-12 A4). */
+    val applyOrder = listOf(Kind.PALETTES, Kind.FONTS, Kind.PICTURES, Kind.POPUP_SETS, Kind.LAYOUTS, Kind.THEMES)
+
     /** A custom key layout [name] of [type] the backup brings, the device's with other keys: the device's becomes
      *  [phoneNewName] first, every keyboard and saved Layout using it following, and the backup's takes [name]
      *  (owner 2026-10-12: "Backup's My numrow; yours becomes My numrow 2"). */

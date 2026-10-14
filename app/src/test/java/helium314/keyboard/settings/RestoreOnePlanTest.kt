@@ -272,6 +272,31 @@ class RestoreOnePlanTest {
 
     // ---- the questions ----
 
+    // owner 2026-10-12 A4: the items first, then the keyboards, so "What to merge" reads the items' real answers. Fail
+    // before: the keyboard's question came first, the theme's answer wasn't there yet when its "What to merge" was worked
+    // out (Replace assumed: the backup's Sunset taking the device's name, not "Sunset 2")
+    @Test fun `the item questions come before the keyboards, and a keyboard's question sees the items' answers`() {
+        val backupEnglish = sunsetOnBoth()
+        val plan = restorePlanFrom(ctx, zip)
+        val flow = RestoreFlow(plan, plan.incoming.keys.toList())
+        flow.top.check(false)
+        assertEquals(listOf(RestoreFlow.Question.Item(Kind.THEMES, "Sunset"), RestoreFlow.Question.Keyboard(backupEnglish)), flow.questions)
+        assertFalse(flow.begin())
+        val item = flow.itemQuestion(flow.current as RestoreFlow.Question.Item)!!
+        item.picked = Answer.KeepBoth
+        flow.keep(item)
+        assertFalse(flow.next())
+        assertEquals(RestoreFlow.Question.Keyboard(backupEnglish), flow.current)
+        assertTrue(flow.isLast)
+        // (what KeyboardQuestion's "What to merge" reads when it opens)
+        assertEquals(Answer.KeepBoth, flow.choices().answers[Kind.THEMES to "Sunset"])
+    }
+
+    @Test fun `the item questions follow the order the restore writes the kinds in`() {
+        assertEquals(listOf(Kind.PALETTES, Kind.FONTS, Kind.PICTURES, Kind.POPUP_SETS, Kind.LAYOUTS, Kind.THEMES), SavedItemsMerge.applyOrder)
+        assertEquals(Kind.entries.toSet(), SavedItemsMerge.applyOrder.toSet(), "every kind asked about")
+    }
+
     @Test fun `Back keeps every answer and tick, and an unticked row's answer comes back when ticked again`() {
         val deviceEnglish = available("en-US").withId(1)
         device(listOf(deviceEnglish), extra = mapOf(looks(look("Sunset", 1.0))))
@@ -281,10 +306,20 @@ class RestoreOnePlanTest {
         val flow = RestoreFlow(plan, plan.incoming.keys.toList())
         flow.top.check(false)
         val sunset = Kind.THEMES to "Sunset"
-        assertEquals(listOf(RestoreFlow.Question.Keyboard(backupEnglish), RestoreFlow.Question.Item(Kind.THEMES, "Sunset")), flow.questions)
+        // (A4: the items first, then the keyboards)
+        assertEquals(listOf(RestoreFlow.Question.Item(Kind.THEMES, "Sunset"), RestoreFlow.Question.Keyboard(backupEnglish)), flow.questions)
         assertTrue(flow.trickyAhead)
         assertFalse(flow.begin())
         assertEquals(0, flow.index)
+        // the theme, answered Replace, then Next to the keyboard
+        assertEquals(RestoreFlow.Question.Item(Kind.THEMES, "Sunset"), flow.current)
+        val item = flow.itemQuestion(flow.current as RestoreFlow.Question.Item)!!
+        assertEquals(Answer.KeepBoth, item.picked, "the same name, other content: Keep both suggested (owner 2026-10-12, A2)")
+        item.picked = Answer.Replace("Sunset")
+        flow.keep(item)
+        assertFalse(flow.next())
+        assertEquals(1, flow.index)
+        assertTrue(flow.isLast)
         // the keyboard: the device's with its id picked to start with; "What to merge" with Appearance ticked, then Back
         val question = flow.mergeQuestion(backupEnglish)
         assertEquals(MergeQuestion.Pick(deviceEnglish), question.picked)
@@ -295,20 +330,15 @@ class RestoreOnePlanTest {
         choice.ticked.add(differences[0])
         flow.keep(choice, decide = false)
         flow.back()
-        assertFalse(flow.choosing); assertEquals(0, flow.index)
-        // Keep both instead, named Mine; Next to the theme, answered Keep both, then Back
+        assertFalse(flow.choosing); assertEquals(1, flow.index)
+        // Keep both instead, named Mine; Back to the theme: its answer kept; Next again: the keyboard's kept
         question.picked = MergeQuestion.Pick(null)
         question.separateName = "Mine"
         flow.keep(question)
-        assertFalse(flow.next())
-        assertEquals(RestoreFlow.Question.Item(Kind.THEMES, "Sunset"), flow.current)
-        assertTrue(flow.isLast)
-        val item = flow.itemQuestion(flow.current as RestoreFlow.Question.Item)!!
-        assertEquals(Answer.KeepBoth, item.picked, "the same name, other content: Keep both suggested (owner 2026-10-12, A2)")
-        item.picked = Answer.Replace("Sunset")
-        flow.keep(item)
         flow.back()
         assertEquals(0, flow.index)
+        assertEquals(Answer.Replace("Sunset"), flow.itemQuestion(flow.current as RestoreFlow.Question.Item)!!.picked)
+        assertFalse(flow.next())
         val again = flow.mergeQuestion(backupEnglish)
         assertEquals(MergeQuestion.Pick(null), again.picked)
         assertEquals("Mine", again.separateName)
@@ -316,7 +346,7 @@ class RestoreOnePlanTest {
         assertEquals(listOf(differences[0]), flow.mergeChoice(again, deviceEnglish, differences, wordsRow = false).ticked.toList(),
             "What to merge's ticks kept")
         // back to screen 1: the theme unticked drops its question, ticked again its answer is back
-        flow.back()
+        flow.back(); flow.back()
         assertEquals(-1, flow.index)
         flow.tick(sunset, false)
         assertEquals(listOf(RestoreFlow.Question.Keyboard(backupEnglish)), flow.questions)
@@ -368,7 +398,7 @@ class RestoreOnePlanTest {
         assertFalse(sunset.keepBothRenames, "the device's Sunset is Dusk by then: the backup's comes in as Sunset, no number")
         assertEquals("Already taken by Dusk", ctx.getString(helium314.keyboard.latin.R.string.restore_item_taken, "Dusk"))
         flow.keep(sunset)
-        assertTrue(flow.isLast)
+        assertFalse(flow.isLast, "the keyboard's question comes after the items (A4)")
         run(flow, deviceEnglish)
         assertEquals(mapOf("Dusk" to 1f, "Sunset" to 3f), themes())
         assertEquals("Dusk", own(kid(1), theme), "the device's English follows its theme, renamed Dusk")
