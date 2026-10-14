@@ -132,6 +132,12 @@ object LayoutUtilsCustom {
             .distinct().filter { it.layoutName(layoutType) == layoutName }
         for (keyboard in users)
             SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, keyboard.withLayout(layoutType, makePrivateCopy(layoutName, layoutType, context)), context)
+        // and where it is the default for its type (any set, hidden ones too): the default becomes an unnamed copy, so
+        // the keyboards using the default keep the keys (owner 2026-10-11: "yes, should follow standard pattern")
+        val real = context.realPrefs()
+        val defaultKey = Settings.PREF_LAYOUT_PREFIX + layoutType.name
+        if (real.all.any { (stored, value) -> value == layoutName && (KeyboardProfiles.splitOwnKey(stored)?.second ?: stored) == defaultKey })
+            KeyboardProfiles.replaceValueEverywhere(real, defaultKey, layoutName, makePrivateCopy(layoutName, layoutType, context))
         getLayoutFile(layoutName, layoutType, context).delete()
         onLayoutFileChanged()
         SubtypeSettings.onRenameLayout(layoutType, layoutName, null, context)
@@ -139,11 +145,11 @@ object LayoutUtilsCustom {
     }
 
     /**
-     * What [deleteLayout] does to the enabled keyboards, in the Keyboards screen's order, for the delete warning:
-     * first the ones whose own pick it is (they keep its keys as an unsaved layout of their own), second the ones
-     * without a pick of their own for [layoutType] that have it as their default: what they read now (the shared value
-     * with separate settings off or the Layout menu shared) or what their own set keeps, hidden too (they go back to the
-     * default keys). A keyboard that picks another layout is in neither: it uses none of this one.
+     * What [deleteLayout] does to the enabled keyboards, in the Keyboards screen's order, for the delete warning: the
+     * ones whose own pick it is, then the ones without a pick of their own for [layoutType] that have it as their default
+     * (what they read now, or what their own set keeps, hidden too). All keep its keys, as an unsaved layout (2026-10-11,
+     * the standard delete pattern; until then the second ones went back to the default keys): the second list is empty.
+     * A keyboard that picks another layout uses none of this one.
      */
     fun deleteEffects(layoutName: String, layoutType: LayoutType, context: Context): Pair<List<SettingsSubtype>, List<SettingsSubtype>> {
         val real = context.realPrefs()
@@ -157,7 +163,7 @@ object LayoutUtilsCustom {
             ProfilePreferences(real) { id ?: KeyboardProfiles.SHARED }.getString(key, null) == layoutName
                 || id != null && all[KeyboardProfiles.ownKey(id, key)] == layoutName
         }
-        return keeps to backToDefault
+        return (keeps + backToDefault) to emptyList()
     }
 
     /** The delete warning's text for [keeps] and [backToDefault] (keyboard names, see [deleteEffects]); null: none. */
@@ -263,7 +269,10 @@ object LayoutUtilsCustom {
         val used = (SubtypeSettings.createSettingsSubtypes(prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!)
             + SubtypeSettings.createSettingsSubtypes(prefs.getString(Settings.PREF_ADDITIONAL_SUBTYPES, Defaults.PREF_ADDITIONAL_SUBTYPES)!!)
             + prefs.getString(Settings.PREF_SELECTED_SUBTYPE, Defaults.PREF_SELECTED_SUBTYPE)!!.toSettingsSubtype())
-            .flatMap { kb -> LayoutType.entries.mapNotNull { kb.layoutName(it) } }.toSet()
+            .flatMap { kb -> LayoutType.entries.mapNotNull { kb.layoutName(it) } }.toSet() +
+            // (an unnamed copy can be a type's default too, in any set: a deleted default's keys kept, 2026-10-11)
+            context.realPrefs().all.filter { (stored, _) -> (KeyboardProfiles.splitOwnKey(stored)?.second ?: stored).startsWith(Settings.PREF_LAYOUT_PREFIX) }
+                .values.filterIsInstance<String>()
         var removed = false
         for (type in LayoutType.entries)
             for (file in getLayoutFiles(type, context))

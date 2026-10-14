@@ -81,9 +81,10 @@ class LayoutDeleteEffectsTest {
         val (keeps, back) = effects
         for (kb in keeps) {
             val index = before.indexOf(kb)
-            val pick = enabled()[index].layoutName(type)!!
-            assertTrue(LayoutUtilsCustom.isPrivateLayout(pick), "${kb.locale} named as keeping the keys, but picks $pick")
-            assertEquals("1 2 3", file(pick).readText())
+            // its own pick, or (2026-10-11) the default of its set: an unnamed copy of the keys either way
+            val name = enabled()[index].layoutName(type) ?: Settings.readDefaultLayoutName(type, ProfilePreferences(real) { index + 1 })
+            assertTrue(LayoutUtilsCustom.isPrivateLayout(name), "${kb.locale} named as keeping the keys, but uses $name")
+            assertEquals("1 2 3", file(name).readText())
         }
         for (kb in back) {
             val index = before.indexOf(kb)
@@ -96,45 +97,46 @@ class LayoutDeleteEffectsTest {
         }
     }
 
-    @Test fun `separate settings on - the pick keeps the keys, the own default goes back, another pick is untouched`() {
+    @Test fun `separate settings on - the pick and the own default keep the keys, another pick is untouched`() {
         val a = available("en-US").withLayout(type, x) // picks x
         val b = available("de-DE") // x is the default in its own set
         val c = available("en-GB").withLayout(type, y) // picks y, its own default x: uses none of x
         keyboards(true, a, b, c)
         real.edit().putString("p2/$defaultKey", x).putString("p3/$defaultKey", x).commit()
         val effects = LayoutUtilsCustom.deleteEffects(x, type, ctx)
-        assertEquals(listOf("en-US"), names(effects.first))
-        assertEquals(listOf("de-DE"), names(effects.second))
+        assertEquals(listOf("en-US", "de-DE"), names(effects.first)) // (2026-10-11: the default's users keep the keys too)
+        assertEquals(emptyList(), names(effects.second))
         LayoutUtilsCustom.deleteLayout(x, type, ctx)
         assertOutcome(effects, listOf(a, b, c), mapOf(2 to "7 8 9"))
     }
 
-    @Test fun `separate settings off - the keyboards reading the shared default go back, the pick keeps the keys`() {
+    @Test fun `separate settings off - the keyboards reading the shared default keep the keys too`() {
         val a = available("en-US").withLayout(type, x)
         val b = available("de-DE")
         val c = available("en-GB")
         keyboards(false, a, b, c)
         real.edit().putString(defaultKey, x).commit()
         val effects = LayoutUtilsCustom.deleteEffects(x, type, ctx)
-        assertEquals(listOf("en-US"), names(effects.first))
-        assertEquals(listOf("de-DE", "en-GB"), names(effects.second))
+        assertEquals(listOf("en-US", "de-DE", "en-GB"), names(effects.first))
+        assertEquals(emptyList(), names(effects.second))
         LayoutUtilsCustom.deleteLayout(x, type, ctx)
         assertOutcome(effects, listOf(a, b, c), emptyMap())
     }
 
-    @Test fun `separate settings off - a hidden set's default is named and goes back to the default keys`() {
+    @Test fun `separate settings off - a hidden set's default is named and keeps the keys`() {
         val a = available("en-US")
         val b = available("de-DE")
         val c = available("en-GB")
         keyboards(false, a, b, c)
         real.edit().putString(defaultKey, "number_row").putString("p3/$defaultKey", x).commit() // C's set kept behind the scenes
         val effects = LayoutUtilsCustom.deleteEffects(x, type, ctx)
-        assertEquals(emptyList(), names(effects.first))
-        assertEquals(listOf("en-GB"), names(effects.second))
+        assertEquals(listOf("en-GB"), names(effects.first))
+        assertEquals(emptyList(), names(effects.second))
         LayoutUtilsCustom.deleteLayout(x, type, ctx)
         real.edit().putBoolean("separate_settings_per_keyboard", true).commit() // its set in use again
         assertOutcome(effects, listOf(a, b, c), mapOf(0 to "number_row", 1 to "number_row"))
-        assertEquals(builtIn, Settings.readDefaultLayoutName(type, ProfilePreferences(real) { 3 }))
+        // (its default kept the keys, as an unnamed copy)
+        Settings.readDefaultLayoutName(type, ProfilePreferences(real) { 3 }).let { assertTrue(LayoutUtilsCustom.isPrivateLayout(it)); assertEquals("1 2 3", file(it).readText()) }
     }
 
     @Test fun `the warning text - none, one, many, both`() {

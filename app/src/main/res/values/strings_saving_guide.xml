@@ -70,7 +70,7 @@
     <string name="saving_delete_palettes">Off the list. Keyboards and saved themes using it keep its colours as Custom N. One nothing uses is deleted.</string>
     <string name="saving_delete_fonts">Off the list; keyboards and themes using it keep it. One nothing uses: you\'re asked whether to delete the file for good.</string>
     <string name="saving_delete_pictures">Off the picture list; keyboards and themes keep their copies.</string>
-    <string name="saving_delete_key_layouts">Keyboards that chose it keep its keys as an unsaved layout of their own; keyboards that only had it as their default for that kind of layout go back to the default keys.</string>
+    <string name="saving_delete_key_layouts">Off the list. Every keyboard using it keeps its keys as an unsaved layout of its own, whether it chose it or had it as the default for that part.</string>
     <string name="saving_delete_keyboards">Its learned and blacklisted words go too. Keyboards reading them (\"Use lists from other keyboards\") are named, and one you pick can take them, merged into its own.</string>
     <string name="saving_delete_dictionaries">Only if no other keyboard has the language; if one does, you can turn the language off on this keyboard instead.</string>
     <string name="saving_delete_learned">Delete in the Learned list: gone as if never typed, also for keyboards reading this list.</string>
