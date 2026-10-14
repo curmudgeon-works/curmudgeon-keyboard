@@ -81,6 +81,8 @@ fun NewDictionaryDialog(
                     // replaced main dict, remove the one created from internal data
                     val internalMainDictFile = File(cacheDir, DictionaryInfoUtils.MAIN_DICT_FILE_NAME)
                     internalMainDictFile.delete()
+                    // the one just added is used, not one selected before (2026-10-12, DictionarySelection)
+                    helium314.keyboard.latin.dictionary.DictionarySelection.clear(ctx, locale)
                 }
                 val newDictBroadcast = Intent(DictionaryPackConstants.NEW_DICTIONARY_INTENT_ACTION)
                 ctx.sendBroadcast(newDictBroadcast)

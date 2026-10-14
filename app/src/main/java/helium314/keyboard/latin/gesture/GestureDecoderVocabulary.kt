@@ -8,6 +8,7 @@ import helium314.keyboard.gesture.Vocabulary
 import helium314.keyboard.latin.common.LocaleUtils.constructLocale
 import helium314.keyboard.latin.common.LocaleUtils
 import helium314.keyboard.latin.dictionary.Dictionary
+import helium314.keyboard.latin.dictionary.DictionarySelection
 import helium314.keyboard.latin.personalization.LearnedStores
 import helium314.keyboard.latin.personalization.PersonalizationHelper
 import helium314.keyboard.latin.settings.Settings
@@ -710,8 +711,13 @@ object GestureDecoderVocabulary {
     private fun findMainDictFile(context: Context, locale: Locale): File? {
         val cached = DictionaryInfoUtils.getCachedDictsForLocale(locale, context)
             .filter { it.name.startsWith(DictionaryInfoUtils.DEFAULT_MAIN_DICT) && it.name.endsWith(".dict") }
-        cached.firstOrNull { it.name.endsWith(DictionaryInfoUtils.USER_DICTIONARY_SUFFIX) }?.let { return it }
-        cached.firstOrNull()?.let { return it }
+        // the added one in use, as typing picks it (DictionarySelection, 2026-10-12: before, the first added main file
+        // in the folder listing's order, e.g. a restore's "_prev" one)
+        val hasInternal = cached.any { !DictionarySelection.isAdded(it) } || DictionaryInfoUtils.getAssetsDictionaryList(context).orEmpty()
+            .filter { it.startsWith(DictionaryInfoUtils.DEFAULT_MAIN_DICT + "_") }
+            .let { LocaleUtils.getBestMatch(locale, it) { f -> DictionaryInfoUtils.extractLocaleFromAssetsDictionaryFile(f) } } != null
+        DictionarySelection.mainAdded(cached, DictionarySelection.selected(context, locale), hasInternal)?.let { return it }
+        cached.firstOrNull { !DictionarySelection.isAdded(it) }?.let { return it }
         // not cached yet: extract the assets dict for this language, like DictionaryFactory does
         // same matching as typing (DictionaryFactory): a dictionary of another script never counts, so a Hinglish
         // keyboard doesn't swipe against main_hi (Devanagari) now that both are bundled

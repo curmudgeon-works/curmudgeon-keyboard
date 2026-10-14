@@ -26,11 +26,8 @@ object DictionaryFactory {
     //  allow users to block certain dictionaries (not sure how this should work exactly)
     fun createMainDictionaryCollection(context: Context, locale: Locale, useEmojiDict: Boolean): DictionaryCollection {
         val dictList = LinkedList<Dictionary>()
-        val (extracted, nonExtracted) = getAvailableDictsForLocale(locale, context, useEmojiDict)
-        extracted.sortedBy { !it.name.endsWith(DictionaryInfoUtils.USER_DICTIONARY_SUFFIX) }.forEach {
-            // we sort to have user dicts first, so they have priority over internal dicts of the same type
-            checkAndAddDictionaryToListIfNewType(it, dictList, locale)
-        }
+        val (extracted, nonExtracted) = dictionaryFilesInOrder(context, locale, useEmojiDict)
+        extracted.forEach { checkAndAddDictionaryToListIfNewType(it, dictList, locale) }
         nonExtracted.forEach { filename ->
             val type = filename.substringBefore("_")
             if (dictList.any { it.mDictType == type }) return@forEach
@@ -38,6 +35,22 @@ object DictionaryFactory {
             checkAndAddDictionaryToListIfNewType(extractedFile, dictList, locale)
         }
         return DictionaryCollection(Dictionary.TYPE_MAIN, locale, dictList, FloatArray(dictList.size) { 1f })
+    }
+
+    /**
+     * The language's dictionary files as [createMainDictionaryCollection] tries them (the first loading one of each kind
+     * is used), with the bundled ones not extracted yet: added ones first, so they have priority over internal ones of
+     * the same kind; of the added main dictionaries only the one in use ([DictionarySelection]: the selected one, none
+     * when the internal one is; with no selection "main_user.dict"). (Before 2026-10-12 every added main file was
+     * tried, the first in the folder listing's order winning, e.g. a restore's "_prev" one.)
+     */
+    internal fun dictionaryFilesInOrder(context: Context, locale: Locale, useEmojiDict: Boolean): Pair<List<File>, List<String>> {
+        val (extracted, nonExtracted) = getAvailableDictsForLocale(locale, context, useEmojiDict)
+        val hasInternal = extracted.any { !DictionarySelection.isAdded(it) && DictionarySelection.typeOf(it) == Dictionary.TYPE_MAIN }
+            || nonExtracted.any { it.substringBefore("_") == Dictionary.TYPE_MAIN }
+        val main = DictionarySelection.mainAdded(extracted.toList(), DictionarySelection.selected(context, locale), hasInternal)
+        return DictionarySelection.withoutUnused(extracted.toList(), main)
+            .sortedBy { !DictionarySelection.isAdded(it) } to nonExtracted
     }
 
     fun getAvailableDictsForLocale(locale: Locale, context: Context, useEmojiDict: Boolean): Pair<Array<out File>, List<String>> {

@@ -180,7 +180,9 @@ object KeyboardProfiles {
     // (the palettes: one app-wide list, as saved themes and Layouts; owner 2026-10-11: "palettes are one app-wide list".
     // A keyboard's light and dark colors name one; helium314.keyboard.settings.Palettes)
     private val globalPrefixes = listOf(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX, "share_user_history_", LanguagePriority.PREF_ADDED_PREFIX, "debug_", "gesture_stats",
-        Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
+        Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX,
+        // a language's dictionary choice, the same on every keyboard (2026-10-12, owner: "A lang will always have a single dict across keyboards")
+        helium314.keyboard.latin.dictionary.DictionarySelection.PREF_PREFIX)
 
     /** A key of the app itself (never a keyboard's), whatever the menus' sharing: the keyboard list, the saved themes and
      *  Layouts, the logs' switches… (re-review 2026-10-07: what a shared menu holds for all keyboards is not app-wide,
