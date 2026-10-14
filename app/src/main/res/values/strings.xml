@@ -330,6 +330,9 @@
     <!-- Error message when the full restore's check of the backup, before it deletes anything, fails: nothing was
          deleted (owner 2026-10-12: "Yes, check backup before wipe") -->
     <string name="restore_unreadable">This backup can\'t be read; nothing was changed.</string>
+    <!-- Error message when a keyboard by keyboard restore failed after it had changed something on the device (new ids,
+         renamed keyboards or key layouts, restored parts): nothing is undone (owner 2026-10-12, A3: no rollback, say so) -->
+    <string name="restore_partway">Restore stopped partway; some items may have been renamed or only partly restored.</string>
     <!-- At the top of the main settings screen after a full restore failed partway, after its wipe, until a full
          restore finishes (owner 2026-10-12: "Yes add this"); its button opens the restore's file picker -->
     <string name="full_restore_unfinished">The full restore didn\'t finish.</string>

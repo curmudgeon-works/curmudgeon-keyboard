@@ -145,6 +145,8 @@ private fun BackupRestoreErrorDialog(error: String, onDismiss: () -> Unit) {
             stringResource(R.string.backup_error, error.drop(1))
         // (the full restore found the backup unreadable before it deleted anything, owner 2026-10-12)
         else if (error.startsWith("u")) stringResource(R.string.restore_unreadable)
+        // (a keyboard by keyboard restore that failed after it changed something: nothing undone, A3 owner 2026-10-12)
+        else if (error.startsWith("p")) stringResource(R.string.restore_partway)
         else stringResource(R.string.restore_error, error.drop(1)),
         onDismiss
     )
@@ -987,6 +989,10 @@ internal fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: In
             failure = "u"
             unchanged = true
             Log.w("AdvancedScreen", "backup unreadable, nothing restored", t)
+        } catch (t: RestoreStoppedPartway) {
+            // (what it changed stays: "Restore stopped partway; …", owner 2026-10-12 A3: no rollback)
+            failure = "p"
+            Log.w("AdvancedScreen", "restore stopped partway", t)
         } catch (t: Throwable) {
             failure = "r" + t.message
             Log.w("AdvancedScreen", "error during restore", t)
@@ -1152,6 +1158,10 @@ private fun checkFullBackup(file: File, promised: PendingRestore?) {
 
 /** The full restore found its backup unreadable before deleting anything ([checkFullBackup]): nothing was changed. */
 internal class UnreadableBackupException(message: String, cause: Throwable? = null) : Exception(message, cause)
+
+/** A keyboard by keyboard restore that failed ([cause]) after it had changed something on the device: what it changed
+ *  stays, and [runRestore] says so (owner 2026-10-12, A3: no rollback; "Restore stopped partway; …"). */
+internal class RestoreStoppedPartway(cause: Throwable) : Exception(cause.message, cause)
 
 private fun replaceEverythingChecked(ctx: Context, file: File) = keepingPhoneChoices(ctx) {
     val restoredDb = ctx.getDatabasePath(Database.NAME + "_restored")
@@ -1326,28 +1336,39 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, plan: Res
             entry = zip.nextEntry
         }
     }
-    // the device side, then the saved items, the dictionaries (between them and the keyboards), the settings and the
-    // keyboards (owner 2026-10-12: "A keyboard never arrives before what it names")
-    val restored = restoreKeyboards(ctx, pending, plan, restoring, choice.settings, choice.names, choice.decisions) {
-        restoreDictionaries(ctx, pending.prefs, dictsDir, dictFolders, clashesFor = tags)
-        dictsDir.deleteRecursively()
+    // from here on the device changes; a failure after the first change is one partway: nothing is undone, and the
+    // restore says so (owner 2026-10-12, A3); one before it fails as before
+    var changed = false
+    val changing = { changed = true }
+    try {
+        // the device side, then the saved items, the dictionaries (between them and the keyboards), the settings and the
+        // keyboards (owner 2026-10-12: "A keyboard never arrives before what it names")
+        val restored = restoreKeyboards(ctx, pending, plan, restoring, choice.settings, choice.names, choice.decisions, changing) {
+            changing()
+            restoreDictionaries(ctx, pending.prefs, dictsDir, dictFolders, clashesFor = tags)
+            dictsDir.deleteRecursively()
+        }
+        // (the learned words, the clips and the personal dictionary words change the device too)
+        changing()
+        if (choice.learnedWords) {
+            // (merged: with its learned words ticked only; kept both: its own words into a pool of its own, owner 2026-10-12)
+            restoreLearnedWords(ctx, pending.prefs, restored.onDevice.filterKeys { (choice.decisions[it] as? RestoreDecision.Merge)?.learnedWords != false }
+                .toList(), learnedDir, io)
+            learnedDir.deleteRecursively()
+        }
+        // merged into the device's clips (owner 2026-10-12: "yes, merge clipboard"; the full restore still replaces them)
+        if (choice.clipboard) Database.copyFromDb(restoredDb, ctx,
+            mergeKeeping = ctx.prefs().getInt(Settings.PREF_CLIPBOARD_HISTORY_SIZE, Defaults.PREF_CLIPBOARD_HISTORY_SIZE))
+        // Android's personal dictionary words: a word missing for its locale is added (never fail the whole restore over it)
+        personalWords?.let { words ->
+            try { restorePersonalDictionary(ctx, words) } catch (t: Throwable) { Log.w("AdvancedScreen", "error restoring personal dictionary", t) }
+        }
+        BackupRestoreJob.step() // (the learned words)
+        LayoutUtilsCustom.onLayoutFileChanged()
+        return restored
+    } catch (t: Throwable) {
+        throw if (changed) RestoreStoppedPartway(t) else t
     }
-    if (choice.learnedWords) {
-        // (merged: with its learned words ticked only; kept both: its own words into a pool of its own, owner 2026-10-12)
-        restoreLearnedWords(ctx, pending.prefs, restored.onDevice.filterKeys { (choice.decisions[it] as? RestoreDecision.Merge)?.learnedWords != false }
-            .toList(), learnedDir, io)
-        learnedDir.deleteRecursively()
-    }
-    // merged into the device's clips (owner 2026-10-12: "yes, merge clipboard"; the full restore still replaces them)
-    if (choice.clipboard) Database.copyFromDb(restoredDb, ctx,
-        mergeKeeping = ctx.prefs().getInt(Settings.PREF_CLIPBOARD_HISTORY_SIZE, Defaults.PREF_CLIPBOARD_HISTORY_SIZE))
-    // Android's personal dictionary words: a word missing for its locale is added (never fail the whole restore over it)
-    personalWords?.let { words ->
-        try { restorePersonalDictionary(ctx, words) } catch (t: Throwable) { Log.w("AdvancedScreen", "error restoring personal dictionary", t) }
-    }
-    BackupRestoreJob.step() // (the learned words)
-    LayoutUtilsCustom.onLayoutFileChanged()
-    return restored
 }
 
 /**
@@ -1465,17 +1486,17 @@ internal fun restoreKeyboardsFrom(ctx: Context, file: File, keyboards: List<Sett
  */
 private fun restoreKeyboards(ctx: Context, pending: PendingRestore, plan: RestorePlan, asked: List<SettingsSubtype>, withSettings: Boolean,
                              names: SavedItemsMerge.Choices = SavedItemsMerge.Choices(), decisions: Map<SettingsSubtype, RestoreDecision> = emptyMap(),
-                             beforeKeyboards: () -> Unit = { }): Restored {
+                             changing: () -> Unit = { }, beforeKeyboards: () -> Unit = { }): Restored {
     // the unsaved layouts no keyboard uses go once all is restored, not between the keyboards (review 2026-10-11 R3: one
     // only a restored keyboard's settings name went before they were written)
     LayoutUtilsCustom.cleanupHeld++
-    try { return restoreKeyboardsHeld(ctx, pending, plan, asked, withSettings, names, decisions, beforeKeyboards) }
+    try { return restoreKeyboardsHeld(ctx, pending, plan, asked, withSettings, names, decisions, changing, beforeKeyboards) }
     finally { LayoutUtilsCustom.cleanupHeld--; LayoutUtilsCustom.removeUnusedPrivateLayouts(ctx) }
 }
 
 private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, plan: RestorePlan, asked: List<SettingsSubtype>, withSettings: Boolean,
                                  names: SavedItemsMerge.Choices, askedDecisions: Map<SettingsSubtype, RestoreDecision>,
-                                 beforeKeyboards: () -> Unit): Restored {
+                                 changing: () -> Unit, beforeKeyboards: () -> Unit): Restored {
     var decisions = askedDecisions
     val real = ctx.realPrefs()
     val prefs = ctx.prefs()
@@ -1532,6 +1553,7 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, plan: Re
         for (device in on + off) {
             val old = device.keyboardId ?: continue
             if (old !in adding) continue
+            changing()
             helium314.keyboard.latin.settings.KeyboardIds.giveNewId(ctx, device).keyboardId?.let { idMap[old] = it }
         }
     }
@@ -1557,6 +1579,7 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, plan: Re
             val name = nameOf(device)
             if (name !in keepNames || device.keyboardId in targets) continue
             val renamed = RestoreDecision.named(device, RestorePlan.nextFreeName(name, taken).also { taken += it }, nameOf)
+            changing()
             SubtypeUtilsAdditional.changeAdditionalSubtype(device, renamed, ctx)
         }
     }
@@ -1569,7 +1592,7 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, plan: Re
     // it there, so they keep their keys. Kept both, or another keyboard's: a new unsaved name, as before.
     for ((type, name) in wanted) {
         val to = unsavedSaves[type to name]?.takeIf { it.first == name }?.second ?: keyLayouts.deviceRename(type, name)
-        to?.let { renamePhoneLayoutFile(ctx, SavedItemsMerge.FileClash(type, name, it)) }
+        to?.let { changing(); renamePhoneLayoutFile(ctx, SavedItemsMerge.FileClash(type, name, it)) }
     }
     // one a ticked row replaces with another layout, unused by every other keyboard then and with other keys than the
     // backup's: its keys saved under the name the warning showed, a copy (owner 2026-10-12: "give it same treatment of
@@ -1579,7 +1602,7 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, plan: Re
         if (save.first == name) continue
         val from = LayoutUtilsCustom.getLayoutFile(name, type, ctx)
         val to = LayoutUtilsCustom.getLayoutFile(save.second, type, ctx)
-        if (from.isFile && !to.exists()) { from.copyTo(to); LayoutUtilsCustom.onLayoutFileChanged() }
+        if (from.isFile && !to.exists()) { changing(); from.copyTo(to); LayoutUtilsCustom.onLayoutFileChanged() }
     }
     // the merge targets as they are now (R4: their key layouts renamed; a new id)
     fun mapTargets() {
@@ -1590,6 +1613,7 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, plan: Re
 
     // ---- the backup's things, parts before what uses them (owner 2026-10-12): key layouts; palettes, fonts and pictures,
     // popup sets, Layouts, themes; the dictionaries; the settings; the keyboards ----
+    changing() // (from here on each step changes the device)
     writeKeyLayouts(ctx, keyLayouts, wanted)
     val applied = if (withSettings) SavedItemsMerge.apply(ctx, real, plan.items, names, write = true, files = backupFiles(pending)) else null
     // the device's keyboards that used an item now the backup's take it ("they take the backup's look"), by the plan's
