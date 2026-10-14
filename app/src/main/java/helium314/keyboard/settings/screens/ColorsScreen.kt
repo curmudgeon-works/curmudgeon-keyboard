@@ -79,19 +79,21 @@ internal fun paletteEditorSaved(opened: String, now: String) {
 }
 
 /** The other keyboards and the saved themes that use palette [openedName] (saved as [newName]), for the edit and delete
- *  questions (out of the screen for the tests): the enabled keyboards, none with one set of settings, then the
- *  switched-off ones whose own set chose it ([otherUsers]); none with Appearance shared (every keyboard reads the edited
- *  one's choice), except the saved themes. Palettes are one app-wide list (owner 2026-10-11), so whoever names it sees
- *  an edit. [prefs]: the editor's view (the keyboard edited is the draft's). */
+ *  questions (out of the screen for the tests): the keyboards whose own set chose it, enabled then switched-off, shown
+ *  or hidden ([otherUsers]), the same ones with one set of settings or Appearance shared (owner 2026-10-12: "our saving
+ *  policies should not be affected by the common/separate toggle at all."), then the saved themes. Palettes are one
+ *  app-wide list (owner 2026-10-11), so whoever names it sees an edit. [prefs]: the editor's view (the keyboard edited
+ *  is the draft's). */
 internal fun paletteUsers(ctx: Context, @Suppress("UNUSED_PARAMETER") prefs: SharedPreferences, openedName: String, newName: String): Pair<List<helium314.keyboard.latin.settings.SettingsSubtype>, List<String>> {
     val real = ctx.realPrefs()
     val names = setOf(openedName, newName)
     val themes = helium314.keyboard.settings.Palettes.themesUsing(real, names)
     val editingId = helium314.keyboard.settings.PrefsDraft.currentSetId(ctx)
     val edited = helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(real, editingId)
-    // (one without a set of its own yet reads the shared set: listed too, its set comes when it takes the default or the
-    // old colors; review 2026-10-11 C8. The switched-off ones whose own set chose it come last, whether or not separate
-    // settings is on: owner 2026-10-11, "<name> (switched off)")
+    // (one that only reads the common settings' choice reads the edited set: not listed, it has the edit; one without
+    // an id has no set to take the default or the old colors in (owner 2026-10-11: lookups never create records), so it
+    // isn't either, review 2026-10-11 C8 as it stands since 2026-10-12. The switched-off ones whose own set chose it come
+    // last: owner 2026-10-11, "<name> (switched off)")
     val keyboards = otherUsers(ctx, helium314.keyboard.settings.Palettes.slots, edited, helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE) { _, v -> v in names }
     return keyboards to themes
 }

@@ -138,15 +138,23 @@ fun switchedOffUsing(ctx: Context, keys: Collection<String>, edited: SettingsSub
     }
 }
 
-/** The other keyboards whose chosen saved item through [keys] [matches], for the update dialog's ticks (2026-10-11):
- *  none with [group]'s menu shared (every keyboard already has the change); with one set of settings (or no keyboard's
- *  set edited) only the switched-off ones, whose own set keeps its choice (owner 2026-10-11: they are asked too). */
+/** The other keyboards whose own set chose a saved item through [keys] ([matches]), for the update questions' ticks
+ *  (palettes, themes, Layouts, popup sets): the enabled ones in the Keyboards screen's order, then the switched-off ones
+ *  (owner 2026-10-11: they are asked too), each by what its own stored set names, shown or hidden
+ *  ([helium314.keyboard.latin.settings.KeyboardProfiles.ownSetUsers]). The same ones whatever separate settings and
+ *  [group]'s sharing (owner 2026-10-12: "our saving policies should not be affected by the common/separate toggle at
+ *  all."; until then a shared menu asked none and one set of settings only the switched-off ones). Not the set being
+ *  edited nor [edited]; one that reads the item only through the common settings reads the edited set: not asked.
+ *  [group]: not read (kept for the callers, the menu the item is on). */
 fun otherUsers(ctx: Context, keys: Collection<String>, edited: SettingsSubtype?,
-               group: helium314.keyboard.latin.settings.KeyboardProfiles.Group, matches: (key: String, value: String?) -> Boolean): List<SettingsSubtype> {
+               @Suppress("UNUSED_PARAMETER") group: helium314.keyboard.latin.settings.KeyboardProfiles.Group,
+               matches: (key: String, value: String?) -> Boolean): List<SettingsSubtype> {
     val real = ctx.realPrefs()
-    if (helium314.keyboard.latin.settings.KeyboardProfiles.isShared(real, group)) return emptyList()
-    if (!helium314.keyboard.latin.settings.KeyboardProfiles.isSeparate(real) || edited == null) return switchedOffUsing(ctx, keys, edited, matches)
-    return keyboardsUsing(ctx, keys, edited, matches).filter { !it.sameKeyboard(edited) }
+    val enabled = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }
+    // (which keyboards are switched off: the one helper, [SwitchedOffKeyboards.list]; 2026-10-11)
+    val off = helium314.keyboard.latin.settings.SwitchedOffKeyboards.list(real).filter { kb -> enabled.none { it.sameKeyboard(kb) } }
+    return helium314.keyboard.latin.settings.KeyboardProfiles.ownSetUsers(real, enabled + off, keys,
+        helium314.keyboard.latin.settings.KeyboardProfiles.editingId(ctx), edited, matches)
 }
 
 /** [otherUsers] of the saved item [name] chosen under [key]. */

@@ -84,9 +84,11 @@ class ReReview2PaletteOffTest {
     }
 
     // (owner 2026-10-11: palettes are one app-wide list, no keyboard has a copy of its own: the "own copy" case is gone)
-    @Test fun `not named with Appearance shared, nor without a choice of its own`() {
+    // (owner 2026-10-12: "our saving policies should not be affected by the common/separate toggle at all.": with
+    // Appearance shared its own set still chose it, so it is named; until then it wasn't)
+    @Test fun `named with Appearance shared too, not without a choice of its own`() {
         real.edit { putBoolean(KeyboardProfiles.Group.APPEARANCE.prefKey, true) }; KeyboardProfiles.loadGroups(real)
-        assertEquals(emptyList(), users())
+        assertEquals(listOf(offName()), userNames(ctx, users()))
         real.edit { putBoolean(KeyboardProfiles.Group.APPEARANCE.prefKey, false) }; KeyboardProfiles.loadGroups(real)
         real.edit { remove(bChoice).putString(Settings.PREF_THEME_COLORS, "Warm") }
         assertEquals(emptyList(), users()) // (only following the shared choice: its own set chose nothing)

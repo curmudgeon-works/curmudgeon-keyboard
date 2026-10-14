@@ -270,6 +270,26 @@ object KeyboardProfiles {
         }
     }
 
+    /** The keyboards (in [keyboards]' order) whose own stored set names a saved item through [keys] ([matches] gets the
+     *  plain key and the value), shown or hidden behind the common settings: the ones an update question asks
+     *  (owner 2026-10-12: "our saving policies should not be affected by the common/separate toggle at all."). Each
+     *  keyboard keeps its own set ("p<id>/<key>") with separate settings off and a menu shared too, so the same ones
+     *  are asked in every mode. Not the set being edited ([editingId], and the set its writes go to, [setOf]: the main
+     *  keyboard's for the common settings), nor [edited]; one that only reads the item through the common settings
+     *  reads the edited set, no user of its own. A keyboard without an id has no set: never one. Reads only. */
+    fun ownSetUsers(real: SharedPreferences, keyboards: List<SettingsSubtype>, keys: Collection<String>, editingId: String,
+                    edited: SettingsSubtype?, matches: (key: String, value: String?) -> Boolean): List<SettingsSubtype> {
+        val editedSets = keys.associateWith { setOf(real, editingId, it) }
+        return keyboards.filter { keyboard ->
+            val id = keyboard.keyboardId ?: return@filter false
+            if (id == editingId || keyboard.sameKeyboard(edited)) return@filter false
+            keys.any { key ->
+                val own = ownKey(id, key)
+                id != editedSets[key] && real.contains(own) && matches(key, real.getString(own, null))
+            }
+        }
+    }
+
     /** Whether set [id] has anything stored of its own. */
     fun hasOwnEntries(real: SharedPreferences, id: String): Boolean = real.all.keys.any { it.startsWith("$PREFIX$id$SEPARATOR") }
 
@@ -911,4 +931,55 @@ class ProfilePreferences(private val real: SharedPreferences, private val ownSet
         return set == KeyboardProfiles.mainId(real) && (id == KeyboardProfiles.SHARED || (!ownSet && !KeyboardProfiles.isSeparate(real))
             || KeyboardProfiles.isGlobal(key))
     }
+}
+
+/**
+ * Keyboard set [id] exactly as stored: every key of a set is "p<id>/<key>" ([KeyboardProfiles.ownKey]), whatever
+ * separate settings and the menus' sharing say (a [ProfilePreferences] view reads and writes the main keyboard's set
+ * there); app-wide keys plain. What an update or a kept old version of a saved item writes on another keyboard: its own
+ * set, shown or hidden behind the common settings (owner 2026-10-12: "our saving policies should not be affected by the
+ * common/separate toggle at all."). Listeners get the keys as stored.
+ */
+class OwnSetPreferences(private val real: SharedPreferences, private val id: String) : SharedPreferences {
+    // (a plain key: [KeyboardProfiles.setOf] names no set for it, whatever the id)
+    private fun k(key: String) = if (KeyboardProfiles.setOf(real, id, key) == null) key else KeyboardProfiles.ownKey(id, key)
+
+    override fun getAll(): MutableMap<String, *> {
+        val result = HashMap<String, Any?>()
+        for ((key, value) in real.all) {
+            val own = KeyboardProfiles.splitOwnKey(key)
+            if (own == null) { if (KeyboardProfiles.setOf(real, id, key) == null) result[key] = value }
+            else if (own.first == id) result[own.second] = value
+        }
+        return result
+    }
+    override fun getString(key: String, defValue: String?) = real.getString(k(key), defValue)
+    override fun getStringSet(key: String, defValues: MutableSet<String>?) = real.getStringSet(k(key), defValues)
+    override fun getInt(key: String, defValue: Int) = real.getInt(k(key), defValue)
+    override fun getLong(key: String, defValue: Long) = real.getLong(k(key), defValue)
+    override fun getFloat(key: String, defValue: Float) = real.getFloat(k(key), defValue)
+    override fun getBoolean(key: String, defValue: Boolean) = real.getBoolean(k(key), defValue)
+    override fun contains(key: String) = real.contains(k(key))
+
+    override fun edit(): SharedPreferences.Editor = Editor(real.edit())
+
+    private inner class Editor(private val e: SharedPreferences.Editor) : SharedPreferences.Editor {
+        override fun putString(key: String, value: String?) = apply { e.putString(k(key), value) }
+        override fun putStringSet(key: String, values: MutableSet<String>?) = apply { e.putStringSet(k(key), values) }
+        override fun putInt(key: String, value: Int) = apply { e.putInt(k(key), value) }
+        override fun putLong(key: String, value: Long) = apply { e.putLong(k(key), value) }
+        override fun putFloat(key: String, value: Float) = apply { e.putFloat(k(key), value) }
+        override fun putBoolean(key: String, value: Boolean) = apply { e.putBoolean(k(key), value) }
+        // (just removed: nothing stored is the default; owner 2026-10-11, no default marks)
+        override fun remove(key: String) = apply { e.remove(k(key)) }
+        // (this set's own entries only, never the whole file)
+        override fun clear() = apply { real.all.keys.filter { KeyboardProfiles.splitOwnKey(it)?.first == id }.forEach { e.remove(it) } }
+        override fun commit() = e.commit()
+        override fun apply() = e.apply()
+    }
+
+    override fun registerOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) =
+        real.registerOnSharedPreferenceChangeListener(listener)
+    override fun unregisterOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) =
+        real.unregisterOnSharedPreferenceChangeListener(listener)
 }

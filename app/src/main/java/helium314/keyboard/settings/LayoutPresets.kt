@@ -205,14 +205,16 @@ object LayoutPresets {
      *  the update dialog (2026-10-11): its settings, its keys, the name, no Custom label. */
     fun applyToOther(ctx: Context, keyboard: SettingsSubtype, preset: Preset) {
         val real = ctx.realPrefs()
-        // (one without a set of its own yet reads the shared set, so it was listed: it gets its set now, as opening its
-        // settings gives one, then the change; before, it was skipped; review 2026-10-11 C8)
+        // (listed by its own set's choice since 2026-10-12, so it has a set; review 2026-10-11 C8 was one without a set
+        // of its own yet, read through the shared set)
         // (owner 2026-10-11: lookups never create records; a listed one gets its set from the net, one neither listed nor
         // with a set is left alone)
         val id = KeyboardProfiles.idForListed(real, keyboard) ?: return
-        // (its own set, with one set of settings too: a switched-off keyboard is asked by its own choice; owner
-        // 2026-10-11)
-        val view = helium314.keyboard.latin.settings.ProfilePreferences(real, ownSet = true) { id }
+        // (its own set as stored, shown or hidden: with one set of settings or the menu shared too, as it was asked by
+        // its own set's choice; a ProfilePreferences view writes a shared menu's settings to the main keyboard's set.
+        // Owner 2026-10-11: a switched-off keyboard is asked by its own choice; owner 2026-10-12: "our saving policies
+        // should not be affected by the common/separate toggle at all.")
+        val view = helium314.keyboard.latin.settings.OwnSetPreferences(real, id)
         applySettings(ctx, settingsFor(keyboard, preset, SavedItemDefaults.takeNewDefaults(real)), view)
         view.edit { putString(PREF_SELECTED, preset.name) }
         CustomLabels.clear(view, CustomLabels.Kind.LAYOUT)
