@@ -189,13 +189,7 @@ private fun DictionaryDetails(dict: File, locale: Locale, keyboard: helium314.ke
         ConfirmationDialog(
             onDismissRequest = { showDeleteDialog = false },
             confirmButtonText = stringResource(R.string.remove),
-            onConfirmed = {
-                dict.delete()
-                // (a selection naming a file no longer there is cleared, never left behind)
-                val kind = DictionarySelection.typeOf(dict)
-                if (DictionarySelection.selected(context, locale, kind) == dict.name) DictionarySelection.clear(context, locale, kind)
-                context.sendBroadcast(Intent(DictionaryPackConstants.NEW_DICTIONARY_INTENT_ACTION))
-            },
+            onConfirmed = { deleteDictionary(context, locale, dict, onSelectionChanged) },
             content = {
                 // (the old Dictionaries screen, no keyboard asking: who uses it, none or the one, owner 2026-10-11)
                 val users = if (keyboard != null) null else remember { allDictionaryUsers(context, locale) }
@@ -207,6 +201,18 @@ private fun DictionaryDetails(dict: File, locale: Locale, keyboard: helium314.ke
             }
         )
     }
+}
+
+/** The plain delete of [dict] (not in use): the file goes, a selection naming it is cleared, the keyboard reloads, and
+ *  the dialog's list for the language is drawn again through [onSelectionChanged], as after the in-use dialog's Replace
+ *  (round-5 review 20261013_F6: the deleted row stayed until the dialog was opened again). */
+internal fun deleteDictionary(context: android.content.Context, locale: Locale, dict: File, onSelectionChanged: () -> Unit) {
+    dict.delete()
+    // (a selection naming a file no longer there is cleared, never left behind)
+    val kind = DictionarySelection.typeOf(dict)
+    if (DictionarySelection.selected(context, locale, kind) == dict.name) DictionarySelection.clear(context, locale, kind)
+    context.sendBroadcast(Intent(DictionaryPackConstants.NEW_DICTIONARY_INTENT_ACTION))
+    onSelectionChanged()
 }
 
 /** What the "in use" dialog says when the trash can is tapped on [dict], the version of its kind in use for [locale]

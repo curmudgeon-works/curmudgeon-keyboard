@@ -12,6 +12,7 @@ import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.dialogs.dictionaryDeleteBlockers
 import helium314.keyboard.settings.dialogs.dictionaryDisplayName
+import helium314.keyboard.settings.dialogs.deleteDictionary
 import helium314.keyboard.settings.dialogs.dictionaryInUse
 import helium314.keyboard.settings.dialogs.replaceAndDelete
 import helium314.keyboard.settings.screens.keyboardName
@@ -115,6 +116,19 @@ class DictionaryInUseDialogTest {
         // 20261013_F4 (owner: "4. A"): case 2 of another kind names the kind. Fail before: "the only dictionary"
         assertEquals("Used by: ${name(da)}. It is the only emoji dictionary for this language, so it can't be deleted while a keyboard uses the language.",
             dialog(danish, emoji, da).message)
+    }
+
+    // 20261013_F6 (owner: "6. A"): a plain delete (not in use) redraws the dialog's list, through the callback Replace
+    // uses. Fail before (compile: the delete was inline in the dialog and called nothing; its row stayed)
+    @Test fun `a plain delete redraws the list`() {
+        useKeyboards(ctx, real, da)
+        File(dir(danish), "main_user.dict").writeText("x")
+        val prev = File(dir(danish), "main_prev_user.dict").apply { writeText("y") }
+        assertEquals(emptyList(), dictionaryDeleteBlockers(ctx, danish, prev)) // (not in use: the plain delete)
+        var redrawn = 0
+        deleteDictionary(ctx, danish, prev) { redrawn++ }
+        assertFalse(prev.exists())
+        assertEquals(1, redrawn)
     }
 
     @Test fun `case 3 - other keyboards use it too - those keyboards, OK only`() {
