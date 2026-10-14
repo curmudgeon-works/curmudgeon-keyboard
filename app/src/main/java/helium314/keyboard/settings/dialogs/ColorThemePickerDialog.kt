@@ -195,6 +195,9 @@ private fun AddColorRow(onDismissRequest: () -> Unit, targetScreen: String, pref
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().clickable {
             val from = prefs.getString(prefKey, if (isNight) Defaults.PREF_THEME_COLORS_NIGHT else Defaults.PREF_THEME_COLORS)!!
+            // the editor opens on the palette made here: its Save keeps the palette when the app is left (owner
+            // 2026-10-11, S2: "yes let's keep saved subscreen changes")
+            helium314.keyboard.settings.AppearanceDraft.paletteEditorOpenedOpen(ctx)
             KeyboardTheme.writeUserColors(prefs, defaultName, KeyboardTheme.seedUserColors(ctx, prefs, from, isNight))
             KeyboardTheme.writeUserMoreColors(prefs, defaultName, Defaults.PREF_USER_MORE_COLORS)
             prefs.edit { putString(prefKey, defaultName) }

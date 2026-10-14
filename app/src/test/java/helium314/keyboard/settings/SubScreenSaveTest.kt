@@ -72,7 +72,7 @@ class SubScreenSaveTest {
         real.edit().putString(Settings.PREF_USER_COLORS_PREFIX + "Warm", edited).commit()
         paletteEditorSaved("Warm", "Warm")
         assertTrue(AppearanceDraft.activeOrNull()!!.hasChanges(ctx)) // Appearance shows unsaved changes
-        AppearanceDraft.rejectOpen(ctx) // Appearance's Discard
+        AppearanceDraft.activeOrNull()!!.reject(ctx) // Appearance's Discard
         assertEquals("Sunset", AppearanceLooks.load(real).single().name)
         assertEquals("Sunset", real.getString(own(2, AppearanceLooks.PREF_SELECTED), null))
         assertEquals("Warm", real.getString(own(2, Settings.PREF_THEME_COLORS), null))
@@ -97,7 +97,7 @@ class SubScreenSaveTest {
         KeyPopupOverrides.save(ProfilePreferences(real) { 1 }, mapOf("e" to listOf("é")))
         customizePopupsSaved()
         assertTrue(draft.hasChanges(ctx)) // Layout & Typing shows unsaved changes
-        LayoutDraft.rejectOpen(ctx) // Layout & Typing's Discard
+        draft.reject(ctx) // Layout & Typing's Discard
         assertEquals("Mine", KeyPopupOverrides.loadSets(real).single().name)
         assertEquals("Mine", real.getString(own(2, KeyPopupOverrides.PREF_SELECTED_SET), null))
         // the saved Layout names it again, as the keyboards do
@@ -117,7 +117,7 @@ class SubScreenSaveTest {
             val written = java.io.File(layouts, "number").resolve("new.txt").apply { writeText("new") }
             layoutFilesSaved()
             assertTrue(draft.hasChanges(ctx)) // Layout & Typing shows unsaved changes
-            LayoutDraft.rejectOpen(ctx) // Layout & Typing's Discard
+            draft.reject(ctx) // Layout & Typing's Discard
             assertEquals("Mine", KeyPopupOverrides.loadSets(real).single().name)
             assertEquals("Mine", real.getString(own(2, KeyPopupOverrides.PREF_SELECTED_SET), null))
             assertEquals("Mine", LayoutPresets.load(real).single().values[KeyPopupOverrides.PREF_SELECTED_SET])
@@ -134,7 +134,7 @@ class SubScreenSaveTest {
         paletteEditorSaved("Warm", "Hot") // saved again, renamed: one entry, by the new name
         assertEquals(listOf("Hot"), draft.savedPalettes())
         assertEquals(listOf("Hot"), AppearanceDraft.savedPalettesOnDisk(ctx)) // kept with the snapshot
-        AppearanceDraft.rejectOpen(ctx) // Appearance's Discard
+        AppearanceDraft.activeOrNull()!!.reject(ctx) // Appearance's Discard
         assertEquals(emptyList(), AppearanceDraft.savedPalettesOnDisk(ctx))
         assertEquals(emptyList(), AppearanceDraft.of(ctx).savedPalettes()) // the next snapshot starts with none
     }
@@ -148,9 +148,61 @@ class SubScreenSaveTest {
         val both = listOf(LayoutDraft.SubScreen.POPUPS, LayoutDraft.SubScreen.LAYOUT_FILES)
         assertEquals(both, draft.savedSubScreens())
         assertEquals(both, LayoutDraft.savedSubScreensOnDisk(ctx))
-        LayoutDraft.rejectOpen(ctx) // Layout & Typing's Discard
+        draft.reject(ctx) // Layout & Typing's Discard
         assertEquals(emptyList(), LayoutDraft.savedSubScreensOnDisk(ctx))
         assertEquals(emptyList(), LayoutDraft.of(ctx, "en_US:").savedSubScreens())
+    }
+
+    // review S2 (owner 2026-10-11, S2: "yes let's keep saved subscreen changes"): the undo after a crash is no Discard
+    // either: what a sub-screen saved stays, the parent's own changes go
+    @Test fun `after a crash, Customize popups' save stays and the parent's set delete is undone`() {
+        LayoutDraft.of(ctx, "en_US:")
+        deletePopupSet(ctx, "Mine")
+        LayoutDraft.subScreenOpenedOpen(ctx) // Customize popups opens
+        KeyPopupOverrides.save(ProfilePreferences(real) { 1 }, mapOf("e" to listOf("é")))
+        customizePopupsSaved()
+        val edit = real.getString(own(1, KeyPopupOverrides.PREF), null)
+        LayoutDraft.forgetActiveForTest() // the process died
+        LayoutDraft.recoverAfterCrash(ctx) // the next app start
+        assertEquals(edit, real.getString(own(1, KeyPopupOverrides.PREF), null))
+        assertEquals("Mine", KeyPopupOverrides.loadSets(real).single().name)
+        assertEquals("Mine", real.getString(own(2, KeyPopupOverrides.PREF_SELECTED_SET), null))
+    }
+
+    @Test fun `after a crash, the palette editor's save stays and the parent's theme delete is undone`() {
+        AppearanceDraft.of(ctx)
+        AppearanceLooks.save(real, emptyList(), now = true)
+        AppearanceLooks.choiceRenamed(ctx, "Sunset", null)
+        AppearanceDraft.paletteEditorOpenedOpen(ctx) // the editor opens
+        real.edit().putString(Settings.PREF_USER_COLORS_PREFIX + "Warm", edited).commit()
+        paletteEditorSaved("Warm", "Warm")
+        AppearanceDraft.forgetActiveForTest()
+        AppearanceDraft.recoverAfterCrash(ctx)
+        assertEquals(edited, real.getString(Settings.PREF_USER_COLORS_PREFIX + "Warm", null))
+        assertEquals("Sunset", AppearanceLooks.load(real).single().name)
+        assertEquals("Sunset", real.getString(own(2, AppearanceLooks.PREF_SELECTED), null))
+    }
+
+    // a key the parent changed too, after the sub-screen saved it: the sub-screen's saved value wins when the app is left
+    @Test fun `leaving the app - a key the parent changed after the sub-screen saved it goes back to the saved value`() {
+        LayoutDraft.of(ctx, "en_US:")
+        LayoutDraft.subScreenOpenedOpen(ctx)
+        KeyPopupOverrides.save(ProfilePreferences(real) { 1 }, mapOf("e" to listOf("é")))
+        customizePopupsSaved()
+        val edit = real.getString(own(1, KeyPopupOverrides.PREF), null)
+        KeyPopupOverrides.save(ProfilePreferences(real) { 1 }, mapOf("e" to listOf("è"))) // the parent, afterwards
+        LayoutDraft.rejectOpen(ctx) // the app left
+        assertEquals(edit, real.getString(own(1, KeyPopupOverrides.PREF), null))
+    }
+
+    // the parent's own Discard is unchanged: it undoes the sub-screen's save too
+    @Test fun `the parent's Discard still undoes a recorded sub-screen save`() {
+        val draft = LayoutDraft.of(ctx, "en_US:")
+        LayoutDraft.subScreenOpenedOpen(ctx)
+        KeyPopupOverrides.save(ProfilePreferences(real) { 1 }, mapOf("e" to listOf("é")))
+        customizePopupsSaved()
+        draft.reject(ctx) // Layout & Typing's Discard
+        assertFalse(real.contains(own(1, KeyPopupOverrides.PREF)))
     }
 
     @Test fun `a sub-screen saved without its parent open records nothing`() {

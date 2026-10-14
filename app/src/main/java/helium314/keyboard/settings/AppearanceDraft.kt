@@ -15,7 +15,8 @@ import java.io.File
  * (the live keyboard is the preview), so "reject all" means putting this snapshot back: the appearance
  * preferences and the custom background / font files.
  * The snapshot is also on disk while the screen is open: changes not accepted are discarded when the app is left
- * (SettingsActivity.onStop) and, after a crash, when the app starts again ([recoverAfterCrash]).
+ * (SettingsActivity.onStop) and, after a crash, when the app starts again ([recoverAfterCrash]); what the palette
+ * editor saved stays then ([SubScreenWrites]), only Appearance's own Discard undoes it too.
  */
 class AppearanceDraft private constructor(
     private val prefs: Map<String, Any?>,
@@ -29,6 +30,9 @@ class AppearanceDraft private constructor(
     // the theme Custom labels stored when the screen opened (any set): Discard takes back the ones handed out since
     // (review D2); not part of hasChanges, as a label alone is no change of the screen. Null: none taken back
     private val labels: Set<String>? = null,
+    // what the palette editor wrote with its Save: kept when the app is left (owner 2026-10-11, S2: "yes let's keep
+    // saved subscreen changes"), undone by Appearance's own Discard
+    private val writes: SubScreenWrites = SubScreenWrites(dir, null) { false },
 ) {
     /** A copy of a custom file, with the size and time the live one had (enough to tell a change, no reading). */
     class Saved(val copy: File, val length: Long, val modified: Long)
@@ -68,8 +72,13 @@ class AppearanceDraft private constructor(
     /** The palettes (stored names) saved in the palette editor since the screen opened. */
     fun savedPalettes(): List<String> = savedPalettes.toList()
 
+    /** The palette editor opens (or "Add your own" is about to make a palette for it): what it changes from here is
+     *  told at its Save ([paletteSaved]). */
+    fun paletteEditorOpened(ctx: Context) = writes.opened(ctx)
+
     /** The palette editor saved, the palette opened as [opened] and now called [now] (renamed: one entry, the new name). */
     fun paletteSaved(opened: String, now: String) {
+        writes.saved()
         savedPalettes -= opened
         savedPalettes += now
         File(dir, SUB_SAVES_FILE).writeText(org.json.JSONArray(savedPalettes.toList()).toString())
@@ -120,9 +129,12 @@ class AppearanceDraft private constructor(
         if (saved == null) live.exists() else !live.exists() || live.length() != saved.length || live.lastModified() != saved.modified
     }.keys.mapTo(HashSet()) { it.name }
 
-    /** Back to the snapshot; the live keyboard reloads. */
-    fun reject(ctx: Context) {
-        helium314.keyboard.latin.utils.SettingsEventLog.log("Appearance draft put back")
+    /** Back to the snapshot; the live keyboard reloads. [keepSubScreenSaves] (the app left, or the undo after a crash):
+     *  what the palette editor saved stays as saved (a key Appearance changed too: the editor's saved value);
+     *  Appearance's Discard: undone too. */
+    fun reject(ctx: Context, keepSubScreenSaves: Boolean = false) {
+        val keep = keepSubScreenSaves && !writes.isEmpty()
+        helium314.keyboard.latin.utils.SettingsEventLog.log("Appearance draft put back" + if (keep) ", palette editor saves kept" else "")
         for ((live, saved) in files) {
             if (saved == null) live.delete()
             else { saved.copy.copyTo(live, overwrite = true); live.setLastModified(saved.modified) }
@@ -140,6 +152,7 @@ class AppearanceDraft private constructor(
         }.commit()
         AppearanceLooks.applyScreen(ctx, prefs, ProfilePreferences(real) { setId })
         labels?.let { CustomLabels.removeNew(real, LABELS, it) }
+        if (keep) { writes.writeTo(real); AppearanceLooks.reload(ctx) }
         discard()
     }
 
@@ -161,6 +174,7 @@ class AppearanceDraft private constructor(
     private fun discard() {
         dir.deleteRecursively()
         savedPalettes.clear()
+        writes.clear()
         if (active === this) active = null
         version.intValue++
     }
@@ -209,6 +223,9 @@ class AppearanceDraft private constructor(
         /** [AppearanceDraft.holdFiles] of the running draft, if there is one. */
         fun holdFilesOpen(files: List<File>) { active?.holdFiles(files) }
 
+        /** [AppearanceDraft.paletteEditorOpened] of the running draft, if there is one. */
+        fun paletteEditorOpenedOpen(ctx: Context) { active?.paletteEditorOpened(ctx) }
+
         /** [AppearanceDraft.paletteSaved] of the running draft, if there is one. */
         fun paletteSavedOpen(opened: String, now: String) { active?.paletteSaved(opened, now) }
 
@@ -220,8 +237,9 @@ class AppearanceDraft private constructor(
                 ?.let { a -> List(a.length()) { a.getString(it) } } ?: emptyList()
 
 
-        /** The app is left (or the screen goes to the background) with the screen open: changes not accepted are undone. */
-        fun rejectOpen(ctx: Context) { active?.reject(ctx) }
+        /** The app is left (or the screen goes to the background) with the screen open: changes not accepted are undone,
+         *  but not what the palette editor saved (owner 2026-10-11, S2: "yes let's keep saved subscreen changes"). */
+        fun rejectOpen(ctx: Context) { active?.reject(ctx, keepSubScreenSaves = true) }
 
         private fun start(ctx: Context): AppearanceDraft {
             val dir = dir(ctx).apply { deleteRecursively(); mkdirs() }
@@ -233,7 +251,7 @@ class AppearanceDraft private constructor(
             val reached = reachedNow(ctx)
             val labels = CustomLabels.stored(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx), LABELS)
             writeSnapshot(dir, setId, prefs, files, reached, labels)
-            return AppearanceDraft(prefs, files, dir, setId, reached, labels)
+            return AppearanceDraft(prefs, files, dir, setId, reached, labels, SubScreenWrites(dir, null, ::recorded))
         }
 
         /** A stored key beyond the edited set that the screen's saved items reach ([reached]): the saved themes; in
@@ -260,6 +278,12 @@ class AppearanceDraft private constructor(
             return if (plain in stored) stored[plain] else all[plain]
         }
         private val AT_DEFAULT = Any() // a mark whose default isn't known: equal only to itself
+        /** A stored key the palette editor's save is recorded with ([SubScreenWrites]): what the undo puts back (on the
+         *  screen, in any set, or reached beyond it), and the theme Custom label. */
+        private fun recorded(stored: String): Boolean {
+            val plain = LayoutDraft.plain(stored).removePrefix(KeyboardProfiles.TOMBSTONE)
+            return reachesBeyond(stored) || AppearanceLooks.onScreen(plain) || LABELS.any { it.key == plain }
+        }
         private fun reachedNow(ctx: Context): Map<String, Any?> =
             helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx).all.filterKeys { reachesBeyond(it) }
 
@@ -294,11 +318,13 @@ class AppearanceDraft private constructor(
                     ?: reachedNow(ctx)
                 // (a snapshot from before review D2 has no "labels": the labels stay as they are now)
                 val labels = json.optJSONArray("labels")?.let { a -> (0 until a.length()).mapTo(HashSet()) { a.getString(it) } }
-                val draft = AppearanceDraft(prefs, files, dir, json.optInt("set", KeyboardProfiles.SHARED), reached, labels)
+                // (what the palette editor saved before the crash stays, as when the app is left)
+                val writes = SubScreenWrites.load(dir, null, ::recorded)
+                val draft = AppearanceDraft(prefs, files, dir, json.optInt("set", KeyboardProfiles.SHARED), reached, labels, writes)
                 // (the deletes made before the crash: undone too, their fonts moved back)
                 runCatching { org.json.JSONArray(File(dir, HELD_FILE).readText()) }.getOrNull()
                     ?.let { a -> for (i in 0 until a.length()) draft.held += a.getString(i) }
-                draft.reject(ctx)
+                draft.reject(ctx, keepSubScreenSaves = true)
             }.onFailure { dir.deleteRecursively() }
         }
     }

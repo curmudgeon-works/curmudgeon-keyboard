@@ -532,6 +532,9 @@ fun NavRow(title: String, summary: String? = null, onClick: () -> Unit) {
 fun CustomizePopupsScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
+    // what is there as the screen opens: what it changes from here is kept by its Save when the app is left (owner
+    // 2026-10-11, S2: "yes let's keep saved subscreen changes")
+    rememberSaveable { helium314.keyboard.settings.LayoutDraft.subScreenOpenedOpen(ctx); true }
     var generation by remember { mutableIntStateOf(0) }
     val groups = remember(keyboard, generation) { keysWithPopups(ctx, keyboard) }
     val overrides = remember(generation) { KeyPopupOverrides.load(prefs) }

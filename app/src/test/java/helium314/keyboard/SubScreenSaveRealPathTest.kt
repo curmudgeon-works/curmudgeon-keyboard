@@ -468,6 +468,76 @@ class SubScreenSaveRealPathTest {
         assertFalse(real.contains(own(1, Settings.PREF_USER_COLORS_PREFIX + "Warm")))
     }
 
+    // review S2 (owner 2026-10-11, S2: "yes let's keep saved subscreen changes"): leaving the app (the activity stopped,
+    // SettingsActivity.onStop) puts back only the parent's own changes; what a sub-screen saved stays as saved
+    private fun leaveApp() { scenario!!.moveToState(androidx.lifecycle.Lifecycle.State.CREATED); idle() }
+
+    @Test fun `S2 - Customize popups saved, then the app left - the popup edit stays, the parent's set delete is undone`() {
+        layoutSetup()
+        layout { back -> CustomizePopupsScreen(kb1, back) }
+        deleteMineOnLayout() // the parent's own change
+        screen = SUB; idle()
+        editKeyP()
+        val edit = real.getString(own(1, KeyPopupOverrides.PREF), null)
+        systemBack()
+        click(ctx.getString(R.string.save_and_exit))
+        leaveApp()
+        assertEquals(edit, real.getString(own(1, KeyPopupOverrides.PREF), null)) // the saved popup edit stays
+        assertEquals(listOf("Mine"), KeyPopupOverrides.loadSets(real).map { it.name }) // the parent's delete is undone
+        assertEquals("Mine", real.getString(own(2, KeyPopupOverrides.PREF_SELECTED_SET), null))
+        assertEquals(layoutsAtOpen, real.getString(LayoutPresets.PREF, null))
+        assertEquals(emptyList(), LayoutDraft.savedSubScreensOnDisk(ctx)) // the draft is gone, its records with it
+    }
+
+    @Test fun `S2 - palette editor saved, then the app left - the palette change stays, the parent's theme delete is undone`() {
+        appearance()
+        deleteSunsetOnAppearance() // the parent's own change
+        screen = SUB; idle()
+        editWarm()
+        val edit = ctx.prefs().getString(Settings.PREF_USER_COLORS_PREFIX + "Warm", null)
+        arrowBack()
+        click(ctx.getString(R.string.save_and_exit))
+        assertEquals(PARENT, screen)
+        leaveApp()
+        assertEquals(edit, ctx.prefs().getString(Settings.PREF_USER_COLORS_PREFIX + "Warm", null)) // the saved palette stays
+        assertTrue(edit != before)
+        assertEquals(listOf("Sunset"), AppearanceLooks.load(real).map { it.name }) // the parent's delete is undone
+        assertEquals("Sunset", real.getString(own(2, AppearanceLooks.PREF_SELECTED), null))
+        assertEquals(emptyList(), AppearanceDraft.savedPalettesOnDisk(ctx))
+        assertEquals(null, AppearanceDraft.activeOrNull())
+    }
+
+    @Test fun `S2 - layout files saved, then the app left - the file and the keyboard's definition stay, the parent's set delete is undone`() {
+        layoutSetup()
+        layout { back -> LayoutFilesScreen(kb1, back) }
+        deleteMineOnLayout() // the parent's own change
+        screen = SUB; idle()
+        editNumberRow()
+        systemBack()
+        click(ctx.getString(R.string.save_and_exit))
+        val files = layoutFiles().associate { it.path to it.readText() }
+        val keyboards = keyboardsNow()
+        assertTrue(files.isNotEmpty()); assertTrue(keyboards != keyboardsAtOpen)
+        leaveApp()
+        assertEquals(files, layoutFiles().associate { it.path to it.readText() }) // the layout written there stays
+        assertEquals(keyboards, keyboardsNow()) // and the keyboard naming it (definition, in use, its set's id)
+        assertEquals(listOf("Mine"), KeyPopupOverrides.loadSets(real).map { it.name }) // the parent's delete is undone
+        assertEquals("Mine", real.getString(own(2, KeyPopupOverrides.PREF_SELECTED_SET), null))
+        assertEquals(emptyList(), LayoutDraft.savedSubScreensOnDisk(ctx))
+    }
+
+    // a sub-screen opened and edited but not saved: leaving the app undoes its edit with the parent's
+    @Test fun `S2 - Customize popups edited but not saved, then the app left - all is undone`() {
+        layoutSetup()
+        layout { back -> CustomizePopupsScreen(kb1, back) }
+        deleteMineOnLayout()
+        screen = SUB; idle()
+        editKeyP()
+        leaveApp()
+        assertFalse(real.contains(own(1, KeyPopupOverrides.PREF)))
+        assertEquals(listOf("Mine"), KeyPopupOverrides.loadSets(real).map { it.name })
+    }
+
     companion object {
         private const val PARENT = "parent"
         private const val SUB = "sub"

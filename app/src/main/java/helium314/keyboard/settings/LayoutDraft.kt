@@ -11,6 +11,7 @@ import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSub
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.LayoutUtilsCustom
 import helium314.keyboard.latin.utils.SubtypeSettings
+import helium314.keyboard.latin.utils.SubtypeUtilsAdditional
 import helium314.keyboard.latin.utils.realPrefs
 import org.json.JSONObject
 import java.io.File
@@ -19,7 +20,8 @@ import java.io.File
  * What Layout & Typing looked like when it was opened, for its Keep / Discard (like [AppearanceDraft]): the
  * preferences its rows and sub-screens write (read from the raw store, so a keyboard's own copies are included)
  * and the custom layout files. Kept on disk while the screen is open: changes not kept are undone when the app is
- * left (SettingsActivity.onStop) and, after a crash, at the next app start ([recoverAfterCrash]).
+ * left (SettingsActivity.onStop) and, after a crash, at the next app start ([recoverAfterCrash]); what a screen opened
+ * from here saved stays then ([SubScreenWrites]), only this screen's Discard undoes it too.
  * Not undone: what clipboard history settings already removed from the history.
  */
 class LayoutDraft private constructor(
@@ -31,6 +33,9 @@ class LayoutDraft private constructor(
     // the Layout and popup Custom labels stored when the screen opened (any set): Discard takes back the ones handed out
     // since (review D2); out of [changedKeys], as a label alone is no change of the screen. Null: none taken back
     private val labels: Set<String>? = null,
+    // what the screens opened from here wrote with their Save: kept when the app is left (owner 2026-10-11, S2: "yes
+    // let's keep saved subscreen changes"), undone by this screen's own Discard
+    private val writes: SubScreenWrites = SubScreenWrites(dir, null) { false },
 ) {
     fun hasChanges(ctx: Context): Boolean = changedKeys(ctx).isNotEmpty() || layoutsChanged(ctx)
 
@@ -44,9 +49,13 @@ class LayoutDraft private constructor(
     /** The sub-screens saved since the screen opened. */
     fun savedSubScreens(): List<SubScreen> = savedSubScreens.toList()
 
+    /** A screen opened from here ([SubScreen]) shows: what it changes is told at its Save ([subScreenSaved]). */
+    fun subScreenOpened(ctx: Context) = writes.opened(ctx)
+
     /** [screen] saved with this screen open. */
     fun subScreenSaved(screen: SubScreen) {
         savedSubScreens += screen
+        writes.saved()
         File(dir, SUB_SAVES_FILE).writeText(org.json.JSONArray(savedSubScreens.map { it.name }).toString())
     }
 
@@ -80,11 +89,15 @@ class LayoutDraft private constructor(
 
     private fun layoutsChanged(ctx: Context) = listing(layoutsDir(ctx)) != listing(layoutsCopy)
 
-    /** Back to the snapshot: preferences, layout files, the keyboards and the live keyboard. */
-    fun reject(ctx: Context) {
-        helium314.keyboard.latin.utils.SettingsEventLog.log("Layout & Typing draft put back (snapshot of $subtype)")
+    /** Back to the snapshot: preferences, layout files, the keyboards and the live keyboard. [keepSubScreenSaves] (the
+     *  app left, or the undo after a crash): what a screen opened from here saved stays as saved, over the snapshot
+     *  (a key this screen changed too: the sub-screen's saved value); this screen's Discard: undone too. */
+    fun reject(ctx: Context, keepSubScreenSaves: Boolean = false) {
+        val keep = keepSubScreenSaves && !writes.isEmpty()
+        helium314.keyboard.latin.utils.SettingsEventLog.log("Layout & Typing draft put back (snapshot of $subtype)" + if (keep) ", sub-screen saves kept" else "")
         val real = ctx.realPrefs()
         val now = scoped(ctx)
+        val prefs = if (keep) writes.over(this.prefs) else this.prefs
         // the keyboard in use stays as it is (the preview switched it, not a setting), unless the undo takes its
         // definition away: then the one it had when the screen opened. Same for each app's remembered keyboard (a
         // changed keyboard took the apps with it). Worked out against the snapshot's list before anything is written,
@@ -92,11 +105,21 @@ class LayoutDraft private constructor(
         // changed keyboard in use but not in the restored list, and gave it a new empty set that stayed (review
         // 2026-10-07: a stray keyboard entry, and the same change made again and kept opened on that empty set)
         val enabled = SubtypeSettings.createSettingsSubtypes(prefs[Settings.PREF_ENABLED_SUBTYPES] as? String ?: "")
+        // a keyboard as it is in the list put back: itself, or (sub-screen saves kept) what a sub-screen's save made of
+        // it (the layout files change the keyboard's definition), else one of the same language
+        fun listed(keyboard: String?): String? {
+            if (keyboard == null || keyboard.toSettingsSubtype() in enabled) return keyboard
+            if (!keep) return null
+            var k: String = keyboard
+            for (i in 0 until 20) { k = SubtypeUtilsAdditional.changedTo[k] ?: break; if (k.toSettingsSubtype() in enabled) return k }
+            return enabled.firstOrNull { it.locale == keyboard.toSettingsSubtype().locale }?.toPref()
+        }
         val selected = real.getString(Settings.PREF_SELECTED_SUBTYPE, null)?.toSettingsSubtype()
-        val selectedBefore = if (selected != null && selected !in enabled) prefs[Settings.PREF_SELECTED_SUBTYPE] as? String else null
+        val selectedBefore = if (selected != null && selected !in enabled)
+            (prefs[Settings.PREF_SELECTED_SUBTYPE] as? String).let { if (keep) listed(it) else it } else null
         val apps = real.all.filterKeys { it.startsWith(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX) }
             .filterValues { it.toString().toSettingsSubtype() !in enabled }
-            .mapValues { (key, _) -> (prefs[key] as? String)?.takeIf { it.toSettingsSubtype() in enabled } }
+            .mapValues { (key, _) -> listed(prefs[key] as? String) }
         real.edit {
             for (key in now.keys) if (key !in prefs && !switchState(key)) remove(key)
             for ((key, value) in prefs) if (now[key] != value && !switchState(key)) {
@@ -110,6 +133,7 @@ class LayoutDraft private constructor(
         val live = layoutsDir(ctx)
         live.deleteRecursively()
         layoutsCopy?.copyRecursively(live, overwrite = true)
+        if (keep) writes.writeTo(real) // (the files; the keys are in the edit above)
         LayoutUtilsCustom.onLayoutFileChanged()
         SubtypeSettings.reloadEnabledSubtypes(ctx)
         // the settings values the edit's listeners built read the keyboard list before that reload (still with the
@@ -119,7 +143,8 @@ class LayoutDraft private constructor(
         KeyboardLayoutSet.onSystemLocaleChanged()
         runCatching { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
         labels?.let { CustomLabels.removeNew(real, LABELS, it) }
-        rejectedSubtype = subtype
+        if (keep) writes.writeTo(real) // (a Custom label a sub-screen's save handed out stays too)
+        rejectedSubtype = if (keep) listed(subtype) ?: subtype else subtype
         discard()
     }
 
@@ -129,6 +154,7 @@ class LayoutDraft private constructor(
     private fun discard() {
         dir.deleteRecursively()
         savedSubScreens.clear()
+        writes.clear()
         if (active === this) active = null
     }
 
@@ -181,6 +207,12 @@ class LayoutDraft private constructor(
         fun base(key: String) = if (plain(key).startsWith(TOMB)) key.substring(0, key.length - plain(key).length) + plain(key).removePrefix(TOMB) else key
         fun mark(key: String) = key.substring(0, key.length - plain(key).length) + TOMB + plain(key)
         fun inScope(plainKey: String) = plainKey in keys || prefixes.any { plainKey.startsWith(it) }
+        /** A stored key a sub-screen's save is recorded with ([SubScreenWrites]): what the undo puts back, and the
+         *  Custom labels; not which keyboard is in use. */
+        private fun recorded(key: String): Boolean {
+            val p = plain(key).removePrefix(TOMB)
+            return (inScope(p) && !switchState(base(key))) || LABELS.any { it.key == p }
+        }
 
         // (with the "at its default" marks of a keyboard's own set, so Discard puts those back too)
         private fun scoped(ctx: Context): Map<String, Any?> =
@@ -217,8 +249,12 @@ class LayoutDraft private constructor(
         /** The screen is left with nothing changed, or a keyboard deleted: the snapshot goes. */
         fun close() { active?.discard() }
 
-        /** The app is left with the screen open: changes not kept are undone. */
-        fun rejectOpen(ctx: Context) { active?.reject(ctx) }
+        /** The app is left with the screen open: changes not kept are undone, but not what a screen opened from here
+         *  saved (owner 2026-10-11, S2: "yes let's keep saved subscreen changes"). */
+        fun rejectOpen(ctx: Context) { active?.reject(ctx, keepSubScreenSaves = true) }
+
+        /** [LayoutDraft.subScreenOpened] of the running draft, if there is one. */
+        fun subScreenOpenedOpen(ctx: Context) { active?.subScreenOpened(ctx) }
 
         /** [LayoutDraft.subScreenSaved] of the running draft, if there is one. */
         fun subScreenSavedOpen(screen: SubScreen) { active?.subScreenSaved(screen) }
@@ -240,7 +276,7 @@ class LayoutDraft private constructor(
             val prefs = scoped(ctx)
             val labels = CustomLabels.stored(ctx.realPrefs(), LABELS)
             write(dir, subtype, copy != null, prefs, labels)
-            return LayoutDraft(prefs, copy, dir, subtype, labels)
+            return LayoutDraft(prefs, copy, dir, subtype, labels, SubScreenWrites(dir, live, ::recorded))
         }
 
         /** A snapshot left on disk by a process that died with Layout & Typing open: put it back. Called at app start. */
@@ -256,7 +292,9 @@ class LayoutDraft private constructor(
                 val copy = if (json.optBoolean("layouts")) File(dir, "layouts") else null
                 // (a snapshot from before review D2 has no "labels": the labels stay as they are now)
                 val labels = json.optJSONArray("labels")?.let { a -> (0 until a.length()).mapTo(HashSet()) { a.getString(it) } }
-                LayoutDraft(prefs, copy, dir, json.getString("subtype"), labels).reject(ctx)
+                // (what a sub-screen saved before the crash stays, as when the app is left)
+                val writes = SubScreenWrites.load(dir, layoutsDir(ctx), ::recorded)
+                LayoutDraft(prefs, copy, dir, json.getString("subtype"), labels, writes).reject(ctx, keepSubScreenSaves = true)
             }.onFailure { dir.deleteRecursively() }
         }
     }

@@ -128,6 +128,10 @@ fun ColorsScreen(
     // just made counts as a change, its Discard deletes it and selects the colours from before
     val prefKey = if (isNight) Settings.PREF_THEME_COLORS_NIGHT else Settings.PREF_THEME_COLORS
     val openedName = rememberSaveable { themeName }
+    // what is there as the editor opens (a palette just made: before "Add your own" made it, see AddColorRow): what it
+    // changes from here is kept by its Save when the app is left (owner 2026-10-11, S2: "yes let's keep saved subscreen
+    // changes")
+    rememberSaveable { if (made == null) helium314.keyboard.settings.AppearanceDraft.paletteEditorOpenedOpen(ctx); true }
     fun paletteKeys(name: String) = listOf(Settings.PREF_USER_COLORS_PREFIX + name, Settings.PREF_USER_MORE_COLORS_PREFIX + name,
         Settings.PREF_USER_ALL_COLORS_PREFIX + name)
     val opened = rememberSaveable(saver = androidx.compose.runtime.saveable.Saver<helium314.keyboard.settings.PrefSnapshot, HashMap<String, Any?>>(

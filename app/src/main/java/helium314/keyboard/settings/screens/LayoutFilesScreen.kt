@@ -83,6 +83,9 @@ private const val FILE_FORMAT = "curmudgeon-layouts"
 fun LayoutFilesScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
+    // what is there as the screen opens: what it changes from here is kept by its Save when the app is left (owner
+    // 2026-10-11, S2: "yes let's keep saved subscreen changes")
+    rememberSaveable { helium314.keyboard.settings.LayoutDraft.subScreenOpenedOpen(ctx); true }
     fun builtIn(type: LayoutType) = LayoutUtils.getContent(type, type.default, ctx)
     // the keyboard as it is now (a save here changes its definition)
     fun kb() = helium314.keyboard.latin.utils.SubtypeUtilsAdditional.current(keyboard.toPref()).toSettingsSubtype()
