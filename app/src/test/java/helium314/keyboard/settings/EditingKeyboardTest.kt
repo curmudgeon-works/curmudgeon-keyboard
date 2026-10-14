@@ -259,6 +259,10 @@ class EditingKeyboardTest {
                 .putString(Settings.PREF_SELECTED_SUBTYPE, a.toPref()).commit()
             KeyboardProfiles.enable(real, listOf(b, a), keepExisting = false)
         } }
+        // (the restore runs on a worker since 2026-10-10 and finishes on the main thread: wait for it to end)
+        val until = System.currentTimeMillis() + 5000
+        while (helium314.keyboard.settings.preferences.BackupRestoreJob.isRunning && System.currentTimeMillis() < until) { idle(); Thread.sleep(20) }
+        assertFalse(helium314.keyboard.settings.preferences.BackupRestoreJob.isRunning, "the restore didn't end")
         frames(1000)
         assertEquals(idB, KeyboardProfiles.idFor(real, a), "(the restore didn't swap the ids)")
         assertEquals(1, shown(mainTitle), "still on B's screen after the restore")

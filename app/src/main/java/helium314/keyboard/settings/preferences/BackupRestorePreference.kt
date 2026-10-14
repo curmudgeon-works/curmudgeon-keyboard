@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Build
 import android.provider.UserDictionary
+import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
 import androidx.activity.compose.ManagedActivityResultLauncher
@@ -17,6 +18,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Surface
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,6 +34,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.layout.widthIn
 import helium314.keyboard.dictionarypack.DictionaryPackConstants
 import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.keyboard.emoji.SupportedEmojis
@@ -86,7 +92,8 @@ import java.io.OutputStream
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
-import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
@@ -132,8 +139,9 @@ fun BackupRestorePreference(setting: Setting) {
         )
     }
     pendingRestore?.let { pending ->
-        RestoreChoiceDialog(pending, onDismiss = { pending.file.delete(); pendingRestore = null }, onError = { error = it })
+        RestoreChoiceDialog(pending, onDismiss = { pendingRestore = null }, onError = { error = it })
     }
+    BackupRestoreJob.progress?.let { ProgressDialog(it) }
     if (error != null) {
         InfoDialog(
             if (error!!.startsWith("b"))
@@ -147,75 +155,184 @@ fun BackupRestorePreference(setting: Setting) {
 private fun backupLauncher(onError: (String) -> Unit): ManagedActivityResultLauncher<Intent, ActivityResult> {
     val ctx = LocalContext.current
     return filePicker { uri ->
-        // zip all files matching the backup patterns
-        // essentially this is the typed words information, and user-added dictionaries
-        val filesDir = ctx.filesDir ?: return@filePicker
-        val filesPath = filesDir.path + File.separator
-        val files = mutableListOf<File>()
-        filesDir.walk().forEach { file ->
-            val path = file.path.replace(filesPath, "")
-            if (file.isFile && backupFilePatterns.any { path.matches(it) })
-                files.add(file)
-        }
-        val protectedFilesDir = DeviceProtectedUtils.getFilesDir(ctx)
-        val protectedFilesPath = protectedFilesDir.path + File.separator
-        val protectedFiles = mutableListOf<File>()
-        protectedFilesDir.walk().forEach { file ->
-            val path = file.path.replace(protectedFilesPath, "")
-            if (file.isFile && backupFilePatterns.any { path.matches(it) })
-                protectedFiles.add(file)
-        }
-        val wait = CountDownLatch(1)
-        ExecutorUtils.getBackgroundExecutor(ExecutorUtils.KEYBOARD).execute {
-            try {
-                ctx.getActivity()?.contentResolver?.openOutputStream(uri)?.use { os ->
-                    // write files to zip
-                    val zipStream = ZipOutputStream(os)
-                    files.forEach {
-                        val fileStream = FileInputStream(it).buffered()
-                        zipStream.putNextEntry(ZipEntry(it.path.replace(filesPath, "")))
-                        fileStream.copyTo(zipStream, 1024)
-                        fileStream.close()
-                        zipStream.closeEntry()
-                    }
-                    protectedFiles.forEach {
-                        val fileStream = FileInputStream(it).buffered()
-                        zipStream.putNextEntry(ZipEntry(it.path.replace(protectedFilesDir.path, "unprotected")))
-                        fileStream.copyTo(zipStream, 1024)
-                        fileStream.close()
-                        zipStream.closeEntry()
-                    }
-                    val dbFile = ctx.getDatabasePath(Database.NAME)
-                    if (dbFile.exists()) {
-                        val fileStream = FileInputStream(dbFile).buffered()
-                        zipStream.putNextEntry(ZipEntry(Database.NAME))
-                        fileStream.copyTo(zipStream, 1024)
-                        fileStream.close()
-                        zipStream.closeEntry()
-                    }
-                    zipStream.putNextEntry(ZipEntry(PREFS_FILE_NAME))
-                    // every keyboard's set, not just the edited one: what is stored (the settings you picked, and the keyboards'
-                    // "reset to default" marks), so a setting left at its default follows the defaults of the version it's
-                    // restored on (0.3.008; from 2026-10-03 every default was written out, which froze them)
-                    settingsToJsonStream(ctx.realPrefs().all.mapKeys { it.key as String? }, zipStream)
-                    zipStream.closeEntry()
-                    zipStream.putNextEntry(ZipEntry(PROTECTED_PREFS_FILE_NAME))
-                    settingsToJsonStream(ctx.protectedPrefs().all, zipStream)
-                    zipStream.closeEntry()
-                    // fork: include the system personal dictionary (words added via "edit personal dictionary")
-                    zipStream.putNextEntry(ZipEntry(PERSONAL_DICT_FILE_NAME))
-                    zipStream.write(Json.encodeToString(readPersonalDictionary(ctx)).toByteArray())
-                    zipStream.closeEntry()
-                    zipStream.close()
-                }
-            } catch (t: Throwable) {
-                onError("b" + t.message)
-                Log.w("AdvancedScreen", "error during backup", t)
-            } finally {
-                wait.countDown()
+        val resolver = ctx.getActivity()?.contentResolver ?: return@filePicker
+        runBackup(ctx, onError) { resolver.openOutputStream(uri) }
+    }
+}
+
+/**
+ * Writes the backup to the stream [open] gives, on the keyboard executor with the progress dialog up (review
+ * 2026-10-08 M2, 2026-10-10: the screen thread waited for it, and a touch meanwhile was an ANR). False when a backup or
+ * restore is running already. [onError] is called on the main thread.
+ */
+internal fun runBackup(ctx: Context, onError: (String) -> Unit, open: () -> OutputStream?): Boolean {
+    if (!BackupRestoreJob.start(R.string.backup_running, 1)) return false
+    ExecutorUtils.getBackgroundExecutor(ExecutorUtils.KEYBOARD).execute {
+        var failure: String? = null
+        try {
+            writeBackup(ctx, open)
+        } catch (t: Throwable) {
+            failure = "b" + t.message
+            Log.w("AdvancedScreen", "error during backup", t)
+        } finally {
+            BackupRestoreJob.post {
+                BackupRestoreJob.finish()
+                failure?.let(onError)
             }
         }
-        wait.await()
+    }
+    return true
+}
+
+private fun writeBackup(ctx: Context, open: () -> OutputStream?) {
+    // zip all files matching the backup patterns
+    // essentially this is the typed words information, and user-added dictionaries
+    val filesDir = ctx.filesDir ?: return
+    val filesPath = filesDir.path + File.separator
+    val files = mutableListOf<File>()
+    filesDir.walk().forEach { file ->
+        val path = file.path.replace(filesPath, "")
+        if (file.isFile && backupFilePatterns.any { path.matches(it) })
+            files.add(file)
+    }
+    val protectedFilesDir = DeviceProtectedUtils.getFilesDir(ctx)
+    val protectedFilesPath = protectedFilesDir.path + File.separator
+    val protectedFiles = mutableListOf<File>()
+    protectedFilesDir.walk().forEach { file ->
+        val path = file.path.replace(protectedFilesPath, "")
+        if (file.isFile && backupFilePatterns.any { path.matches(it) })
+            protectedFiles.add(file)
+    }
+    // a step per file, the clipboard, the two settings files and the custom words
+    BackupRestoreJob.setTotal(files.size + protectedFiles.size + 4)
+    open()?.use { os ->
+        // write files to zip
+        val zipStream = ZipOutputStream(os)
+        files.forEach {
+            val fileStream = FileInputStream(it).buffered()
+            zipStream.putNextEntry(ZipEntry(it.path.replace(filesPath, "")))
+            fileStream.copyTo(zipStream, 1024)
+            fileStream.close()
+            zipStream.closeEntry()
+            BackupRestoreJob.step()
+        }
+        protectedFiles.forEach {
+            val fileStream = FileInputStream(it).buffered()
+            zipStream.putNextEntry(ZipEntry(it.path.replace(protectedFilesDir.path, "unprotected")))
+            fileStream.copyTo(zipStream, 1024)
+            fileStream.close()
+            zipStream.closeEntry()
+            BackupRestoreJob.step()
+        }
+        val dbFile = ctx.getDatabasePath(Database.NAME)
+        if (dbFile.exists()) {
+            val fileStream = FileInputStream(dbFile).buffered()
+            zipStream.putNextEntry(ZipEntry(Database.NAME))
+            fileStream.copyTo(zipStream, 1024)
+            fileStream.close()
+            zipStream.closeEntry()
+        }
+        BackupRestoreJob.step()
+        zipStream.putNextEntry(ZipEntry(PREFS_FILE_NAME))
+        // every keyboard's set, not just the edited one: what is stored (the settings you picked, and the keyboards'
+        // "reset to default" marks), so a setting left at its default follows the defaults of the version it's
+        // restored on (0.3.008; from 2026-10-03 every default was written out, which froze them)
+        settingsToJsonStream(ctx.realPrefs().all.mapKeys { it.key as String? }, zipStream)
+        zipStream.closeEntry()
+        BackupRestoreJob.step()
+        zipStream.putNextEntry(ZipEntry(PROTECTED_PREFS_FILE_NAME))
+        settingsToJsonStream(ctx.protectedPrefs().all, zipStream)
+        zipStream.closeEntry()
+        BackupRestoreJob.step()
+        // fork: include the system personal dictionary (words added via "edit personal dictionary")
+        zipStream.putNextEntry(ZipEntry(PERSONAL_DICT_FILE_NAME))
+        zipStream.write(Json.encodeToString(readPersonalDictionary(ctx)).toByteArray())
+        zipStream.closeEntry()
+        BackupRestoreJob.step()
+        zipStream.close()
+    }
+}
+
+/**
+ * The backup or restore running, one at a time app-wide, and how far it got (review 2026-10-08 M2, 2026-10-10). The
+ * job runs on the keyboard executor, which outlives the screen; the progress dialog reads [progress], which is only
+ * changed on the main thread. A step is a file written or restored, then the learned words, then the settings.
+ */
+internal object BackupRestoreJob {
+    class Progress(val title: Int, val done: Int, val total: Int)
+
+    var progress: Progress? by mutableStateOf(null)
+        private set
+    /** Called on the main thread with every progress shown (tests). */
+    internal var onProgress: ((Progress) -> Unit)? = null
+
+    private val running = AtomicBoolean(false)
+    private val done = AtomicInteger(0)
+    @Volatile private var total = 1
+    @Volatile private var title = 0
+    private val updatePosted = AtomicBoolean(false)
+    private val main by lazy { Handler(Looper.getMainLooper()) }
+
+    val isRunning get() = running.get()
+
+    /** Claims the job (false when one is running) and shows the dialog; called on the main thread. */
+    fun start(title: Int, total: Int): Boolean {
+        if (!running.compareAndSet(false, true)) return false
+        this.title = title
+        this.total = total.coerceAtLeast(1)
+        done.set(0)
+        publish()
+        return true
+    }
+
+    /** The number of steps, once the worker knows it. */
+    fun setTotal(total: Int) {
+        if (!running.get()) return
+        this.total = total.coerceAtLeast(1)
+        update()
+    }
+
+    /** One step done (nothing when no job runs: the restore functions are called directly by tests too). */
+    fun step() {
+        if (!running.get()) return
+        done.incrementAndGet()
+        update()
+    }
+
+    // one update waiting on the main thread at a time: it shows the latest count when it runs
+    private fun update() {
+        if (updatePosted.compareAndSet(false, true)) main.post { updatePosted.set(false); if (running.get()) publish() }
+    }
+
+    private fun publish() {
+        val p = Progress(title, done.get(), total)
+        progress = p
+        onProgress?.invoke(p)
+    }
+
+    fun post(action: () -> Unit) { main.post(action) }
+
+    /** The job ended: the dialog closes and another job may start; called on the main thread. */
+    fun finish() {
+        progress = null
+        running.set(false)
+    }
+}
+
+/** Non-cancellable while the job runs: it closes itself when the job ends. */
+@Composable
+private fun ProgressDialog(progress: BackupRestoreJob.Progress) {
+    Dialog(onDismissRequest = { }, properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)) {
+        Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.widthIn(min = 280.dp, max = 560.dp)) {
+            Column(Modifier.padding(16.dp)) {
+                Text(stringResource(progress.title), style = MaterialTheme.typography.titleMedium)
+                LinearProgressIndicator(
+                    progress = { (progress.done.toFloat() / progress.total).coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp),
+                )
+            }
+        }
     }
 }
 
@@ -238,6 +355,7 @@ private class RestoreChoice(
 private fun restoreLauncher(onError: (String) -> Unit, onChoose: (PendingRestore) -> Unit): ManagedActivityResultLauncher<Intent, ActivityResult> {
     val ctx = LocalContext.current
     return filePicker { uri ->
+        if (BackupRestoreJob.isRunning) return@filePicker // (its file is the one being restored)
         val file = File(ctx.cacheDir, "restore.zip")
         val pending = try {
             ctx.getActivity()?.contentResolver?.openInputStream(uri)?.use { input -> FileOutputStream(file).use { input.copyTo(it) } }
@@ -250,8 +368,10 @@ private fun restoreLauncher(onError: (String) -> Unit, onChoose: (PendingRestore
         }
         // a backup without keyboards (older format) has nothing to choose from
         if (pending.keyboards.isEmpty()) {
-            runRestore(ctx, onError, R.string.backup_restored) { restoreEverything(ctx, file) }
-            file.delete()
+            // (the file goes when the job is done with it)
+            if (!runRestore(ctx, onError, R.string.backup_restored, restoreSteps(pending)) {
+                try { restoreEverything(ctx, file) } finally { file.delete() }
+            }) file.delete()
         } else onChoose(pending)
     }
 }
@@ -266,8 +386,10 @@ private fun RestoreChoiceDialog(pending: PendingRestore, onDismiss: () -> Unit, 
     var customWords by rememberSaveable { mutableStateOf(true) }
     var clipboard by rememberSaveable { mutableStateOf(false) }
     val withKeyboards = selected.isNotEmpty() // the "bring with them" rows mean nothing without a keyboard
+    // once the restore started, the job deletes the file when done with it (2026-10-10: it runs after the dialog closed)
+    var started by remember { mutableStateOf(false) }
     ThreeButtonAlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!started) pending.file.delete(); onDismiss() },
         title = { Text(stringResource(R.string.button_restore)) },
         content = {
             Column {
@@ -305,31 +427,59 @@ private fun RestoreChoiceDialog(pending: PendingRestore, onDismiss: () -> Unit, 
         onConfirmed = {
             val choice = RestoreChoice(selected.toList(), settings, learnedWords && pending.hasLearnedWords,
                 dictionaries && pending.hasDictionaries, customWords && pending.hasCustomWords, clipboard && pending.hasClipboard)
-            runRestore(ctx, onError, R.string.backup_restored) { restoreChosen(ctx, pending, choice) }
-            onDismiss()
+            started = runRestore(ctx, onError, R.string.backup_restored, restoreSteps(pending)) {
+                try { restoreChosen(ctx, pending, choice) } finally { pending.file.delete() }
+            }
         },
     )
 }
 
-/** Runs [work] on the keyboard executor, waits for it, then refreshes everything that may have changed. */
-internal fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: Int, work: () -> Unit) {
-    val wait = CountDownLatch(1)
+/** The steps of restoring [pending]'s job: each of its entries, then the learned words (the settings: see runRestore). */
+private fun restoreSteps(pending: PendingRestore) = pending.entries.size + 1
+
+/**
+ * Runs [work] (counting [steps] steps) and what follows a restore on the keyboard executor, with the progress dialog
+ * up, then refreshes on the main thread what must be refreshed there, and closes the dialog (review 2026-10-08 M2,
+ * 2026-10-10: the screen thread waited for the whole job, and a touch meanwhile was an ANR that could leave half a
+ * restore). False when a backup or restore is running already. [onError] is called on the main thread.
+ */
+internal fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: Int, steps: Int = 0, work: () -> Unit): Boolean {
+    if (!BackupRestoreJob.start(R.string.restore_running, steps + 1)) return false
+    val app = ctx.applicationContext
     ExecutorUtils.getBackgroundExecutor(ExecutorUtils.KEYBOARD).execute {
+        var failure: String? = null
         try {
             work()
-            if (Looper.myLooper() == null) Looper.prepare()
-            Toast.makeText(ctx, ctx.getString(doneMessage), Toast.LENGTH_LONG).show()
         } catch (t: Throwable) {
-            onError("r" + t.message)
+            failure = "r" + t.message
             Log.w("AdvancedScreen", "error during restore", t)
-        } finally {
-            wait.countDown()
+        }
+        // (after a failure too, as before: what was restored by then is followed up)
+        try {
+            helium314.keyboard.latin.gesture.GestureStats.reload() // (its cached rows would come back over the restored ones)
+            restoreFollowUp(ctx)
+            transferOldPinnedClips(ctx)
+        } catch (t: Throwable) {
+            Log.w("AdvancedScreen", "error after restore", t)
+        }
+        BackupRestoreJob.step() // (the settings)
+        BackupRestoreJob.post {
+            try {
+                restoreRefresh(ctx)
+            } catch (t: Throwable) {
+                Log.w("AdvancedScreen", "error refreshing after restore", t)
+            } finally {
+                BackupRestoreJob.finish()
+            }
+            if (failure != null) onError(failure)
+            else Toast.makeText(app, app.getString(doneMessage), Toast.LENGTH_LONG).show()
         }
     }
-    wait.await()
-    helium314.keyboard.latin.gesture.GestureStats.reload() // (its cached rows would come back over the restored ones)
-    restoreFollowUp(ctx)
-    transferOldPinnedClips(ctx)
+    return true
+}
+
+/** What a restore changes, refreshed on the main thread: the keyboard's view of the settings and the open screens. */
+private fun restoreRefresh(ctx: Context) {
     LearnedStores.refresh(ctx.realPrefs()) // (the keyboard's learned words, as restored)
     Settings.getInstance().startListener()
     SubtypeSettings.reloadEnabledSubtypes(ctx)
@@ -391,6 +541,7 @@ private fun replaceEverything(ctx: Context, file: File) {
                 }
             }
             zip.closeEntry()
+            BackupRestoreJob.step()
             entry = zip.nextEntry
         }
     }
@@ -399,6 +550,7 @@ private fun replaceEverything(ctx: Context, file: File) {
     // per-language files, merged per script now as at app start
     PersonalizationHelper.reloadAllFromFiles()
     LearnedStoreMigration.runNow(ctx)
+    BackupRestoreJob.step() // (the learned words)
 }
 
 /**
@@ -486,6 +638,7 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, choice: R
                 allSettings && isSettingsFile(path) -> FileUtils.copyStreamToNewFile(zip, target)
             }
             zip.closeEntry()
+            BackupRestoreJob.step()
             entry = zip.nextEntry
         }
     }
@@ -494,6 +647,7 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, choice: R
         restoreLearnedWords(ctx, pending.prefs, choice.keyboards, learnedDir, io)
         learnedDir.deleteRecursively()
     }
+    BackupRestoreJob.step() // (the learned words)
     if (allSettings) {
         // a backup from before the pictures were per keyboard (or the picture list existed): what app start does once
         val real = ctx.realPrefs()

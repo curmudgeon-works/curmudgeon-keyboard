@@ -289,6 +289,10 @@
     <string name="button_restore">Restore</string>
     <!-- Message when backup is restored successfully -->
     <string name="backup_restored">Backup restored</string>
+    <!-- Above the progress bar while a backup is written -->
+    <string name="backup_running">Backing up…</string>
+    <!-- Above the progress bar while a backup is restored -->
+    <string name="restore_running">Restoring…</string>
     <!-- Restore dialog: one checklist, mirroring the factory reset one -->
     <string name="restore_choice_message">Choose what to bring from the backup.</string>
     <string name="restore_keyboards">Keyboards</string>
