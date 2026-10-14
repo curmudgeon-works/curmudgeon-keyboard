@@ -64,7 +64,7 @@ class Review1010ThemesTest {
         helium314.keyboard.settings.Palettes.delete(real, set(1), "My theme", onlyHere = false) // (separate off: the main set)
         assertFalse(real.contains("${Settings.PREF_USER_COLORS_PREFIX}My theme"))
         for (id in 1..3) assertEquals(null, real.getString("p$id/$colors", null))
-        assertTrue(real.getBoolean("p1/~$colors", false)) // (at its default: marked)
+        assertFalse(real.contains("p1/~$colors")) // (owner 2026-10-11: no default marks; nothing stored = the default)
         assertEquals(null, real.getString("p1/$night", null))
         // a new palette that takes the free name later is not picked up by keyboard 1 when separate settings come back
         real.edit().putString("${Settings.PREF_USER_COLORS_PREFIX}My theme", "[]").putBoolean("separate_settings_per_keyboard", true).commit()

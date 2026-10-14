@@ -64,7 +64,8 @@ class PickedOnlyUpgradeTest {
         assertEquals("emoji", picked.getString(symbolAction, null))
     }
 
-    @Test fun `every keyboard's own set, in use or not, gets a reset mark instead`() {
+    // (owner 2026-10-11: no default marks; nothing stored = the default)
+    @Test fun `every keyboard's own set, in use or not, is unset too - no mark`() {
         prefs.edit {
             putString("keyboard_profile_ids", """{"en_US:":1,"hi_ZZ:":2}""")
             putBoolean("separate_settings_per_keyboard", false) // the sets are kept in the background
@@ -72,16 +73,14 @@ class PickedOnlyUpgradeTest {
             putString(own(1, popups), "all") // keyboard 1: at the old default
             putString(own(2, popups), Defaults.PREF_MORE_POPUP_KEYS) // keyboard 2: at the default now ("all" since 2026-10-07; "main" is a pick again)
             putString(own(2, map), "q~") // a pick
-            putBoolean(mark(2, color), true) // already reads the default
         }
         pickedOnlyUpgrade(prefs, freshInstall = false)
         assertEquals("more", prefs.getString(popups, null))
         assertFalse(prefs.contains(own(1, popups)))
-        assertTrue(prefs.getBoolean(mark(1, popups), false))
+        assertFalse(prefs.contains(mark(1, popups)))
         assertFalse(prefs.contains(own(2, popups)))
-        assertTrue(prefs.getBoolean(mark(2, popups), false))
+        assertFalse(prefs.contains(mark(2, popups)))
         assertEquals("q~", prefs.getString(own(2, map), null))
-        assertTrue(prefs.getBoolean(mark(2, color), false))
     }
 
     @Test fun `long-press ?123 stays where the old numpad switch is on`() {
@@ -146,9 +145,9 @@ class PickedOnlyUpgradeTest {
                 Settings.PREF_VIBRATE_ON, AppearanceLooks.PREF_SELECTED)) assertFalse(prefs.contains(key), key)
         assertEquals(false, prefs.getBoolean(Settings.PREF_SOUND_ON, true))
         assertFalse(prefs.contains(own(1, Settings.PREF_THEME_COLORS)))
-        assertTrue(prefs.getBoolean(mark(1, Settings.PREF_THEME_COLORS), false))
+        assertFalse(prefs.contains(mark(1, Settings.PREF_THEME_COLORS))) // (owner 2026-10-11: no default marks; nothing stored = the default)
         assertFalse(prefs.contains(own(1, AppearanceLooks.PREF_SELECTED)))
-        assertTrue(prefs.getBoolean(mark(1, AppearanceLooks.PREF_SELECTED), false))
+        assertFalse(prefs.contains(mark(1, AppearanceLooks.PREF_SELECTED)))
         assertEquals(black, AppearanceLooks.load(prefs).single().values[Settings.PREF_THEME_COLORS])
         assertEquals(true, LayoutPresets.load(prefs).single().values[Settings.PREF_VIBRATE_ON])
     }
@@ -183,7 +182,7 @@ class PickedOnlyUpgradeTest {
                 assertFalse(real.contains(own(2, key)), "p2/$key")
             }
             for (key in listOf(Settings.PREF_KEY_LONGPRESS_TIMEOUT, Settings.PREF_BACKSPACE_SPEED_UP, padding(0), padding(2)))
-                assertTrue(real.getBoolean(mark(2, key), false), "p2/~$key")
+                assertFalse(real.contains(mark(2, key)), "p2/~$key") // (owner 2026-10-11: no default marks; nothing stored = the default)
 
             // a phone that went through 0.3.008: 300 since then is a pick, and stays
             real.edit().clear().commit()
@@ -217,7 +216,7 @@ class PickedOnlyUpgradeTest {
         curmudgeonUpgrades(prefs, freshInstall = false)
         pickedOnlyUpgrade(prefs, freshInstall = false)
         assertFalse(prefs.contains(gap)); assertFalse(prefs.contains(vGap)); assertFalse(prefs.contains(own(1, gap)))
-        assertTrue(prefs.contains(mark(1, gap)))
+        assertFalse(prefs.contains(mark(1, gap))) // (owner 2026-10-11: no default marks; nothing stored = the default)
         assertEquals(0.5f, AppearanceLooks.load(prefs).single().values[gap])
         // from 0.3.006 on (its flag), 0.5 is a pick
         val later = ctx.getSharedPreferences("picked_only_test_gaps_${System.nanoTime()}", Context.MODE_PRIVATE)

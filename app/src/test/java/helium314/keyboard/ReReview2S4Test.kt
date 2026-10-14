@@ -84,9 +84,11 @@ class ReReview2S4Test {
         assertEquals(200, view(1).getInt(longPress, Defaults.PREF_KEY_LONGPRESS_TIMEOUT))
     }
 
-    @Test fun `off then on - the shared set holds a value - the own set gets its mark back and reads the default`() {
+    // (owner 2026-10-11: no default marks; nothing stored = the default: a set at its default stores nothing, no mark)
+    @Test fun `off then on - a set at its default - holds nothing again and reads the default`() {
         separateWithWorkAndSunset()
-        real.edit().putBoolean(mark(1, longPress), true).commit() // (it read the default)
+        view(1).edit().remove(longPress).commit() // ("Default")
+        assertFalse(real.contains(mark(1, longPress)))
         choose()
         flip(false)
         assertEquals(300, real.getInt(own(1, longPress), 0))

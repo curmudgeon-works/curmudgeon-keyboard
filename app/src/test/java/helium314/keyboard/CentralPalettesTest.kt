@@ -137,7 +137,7 @@ class CentralPalettesTest {
         everyoneOnWarm()
         Palettes.afterEdit(real, "Warm", old, mapOf(b to Choice.DEFAULT), emptyMap())
         assertNull(real.getString(own(2, day), null)); assertNull(real.getString(own(2, night), null))
-        assertTrue(real.getBoolean(mark(2, day), false)); assertTrue(real.getBoolean(mark(2, night), false))
+        assertFalse(real.contains(mark(2, day))); assertFalse(real.contains(mark(2, night))) // (owner 2026-10-11: no default marks; nothing stored = the default)
         assertEquals("Warm", real.getString(own(1, day), null)) // (the edited one: the new colours)
         assertEquals(listOf(warm), paletteKeys())
     }
@@ -195,7 +195,7 @@ class CentralPalettesTest {
         everyoneOnWarm()
         Palettes.delete(real, view(1), "Warm", onlyHere = false)
         assertEquals(emptyList(), paletteKeys())
-        for (id in 1..3) { assertNull(real.getString(own(id, day), null)); assertTrue(real.getBoolean(mark(id, day), false)) }
+        for (id in 1..3) { assertNull(real.getString(own(id, day), null)); assertFalse(real.contains(mark(id, day))) } // (owner 2026-10-11: no default marks; nothing stored = the default)
         assertNull(real.getString(own(2, night), null))
         assertNull(sunset().values[day])
     }
@@ -257,7 +257,7 @@ class CentralPalettesTest {
             putString(own(3, warm), y); putString(own(3, day), "Warm") // other colours: numbered
             putInt(own(3, Settings.PREF_USER_MORE_COLORS_PREFIX + "Warm"), 0) // ("main colours", the default: the same)
             putString(own(2, Settings.PREF_USER_COLORS_PREFIX + "~custom:1"), k); putString(own(2, night), "~custom:1") // a kept copy
-            putBoolean(own(1, KeyboardProfiles.TOMBSTONE + Settings.PREF_USER_COLORS_PREFIX + "Gone"), true) // (a mark of one)
+            putBoolean(own(1, KeyboardProfiles.TOMBSTONE + Settings.PREF_USER_COLORS_PREFIX + "Gone"), true) // (an old mark of one)
         }
         val sunsetJson = org.json.JSONArray().put(org.json.JSONObject().put("name", "Sunset").put("values", org.json.JSONObject()
             .put(day, org.json.JSONObject().put("s", "Warm")).put(warm, org.json.JSONObject().put("s", y))
@@ -270,7 +270,11 @@ class CentralPalettesTest {
         assertEquals("Palette 1", real.getString(own(2, night), null))
         assertEquals("Warm 2", sunset().values[day]) // (its copy had Warm 2's colours)
         assertTrue(sunset().values.keys.none { Palettes.isKey(it) })
-        assertTrue(real.all.keys.none { k2 -> KeyboardProfiles.splitOwnKey(k2)?.second?.removePrefix(KeyboardProfiles.TOMBSTONE)?.let { Palettes.isKey(it) } == true })
+        assertTrue(real.all.keys.none { k2 -> KeyboardProfiles.splitOwnKey(k2)?.second?.let { Palettes.isKey(it) } == true })
+        // (the old mark: not the move's, the marks' cleanup after it takes it; (owner 2026-10-11: no default marks; nothing stored = the default))
+        assertTrue(real.contains(own(1, KeyboardProfiles.TOMBSTONE + Settings.PREF_USER_COLORS_PREFIX + "Gone")))
+        KeyboardProfiles.removeDefaultMarks(real)
+        assertFalse(real.contains(own(1, KeyboardProfiles.TOMBSTONE + Settings.PREF_USER_COLORS_PREFIX + "Gone")))
         assertTrue(real.getBoolean(Palettes.CENTRAL_DONE, false))
         // once only
         val after = real.all

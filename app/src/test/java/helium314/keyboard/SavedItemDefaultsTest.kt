@@ -244,7 +244,7 @@ class SavedItemDefaultsTest {
         real.edit().putString(own(4, LayoutPresets.PREF_SELECTED), "Work").commit()
         choose(keyboard); choose(fr); choose(de)
         view(3).edit().putInt(longPress, 400).commit()
-        assertFalse(real.contains(own(1, longPress))) // (on: nothing stored, at the default: marked)
+        assertFalse(real.contains(own(1, longPress))) // (on: nothing stored, at the default)
         flip(false)
         for (id in listOf(1, 2)) {
             assertEquals(300, real.getInt(own(id, longPress), 0), "set $id doesn't hold Work's long press: a new default reaches it")

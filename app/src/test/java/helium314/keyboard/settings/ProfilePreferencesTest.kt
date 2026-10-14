@@ -161,7 +161,7 @@ class ProfilePreferencesTest {
         assertFalse(own.all.containsKey("x")) // another set's value is no fallback (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones)
         own.edit().remove("y").commit()
         assertFalse(own.all.containsKey("y"))
-        // a value written straight into the file (Layout & Typing's Discard does) next to a mark left behind
+        // a value written straight into the file (Layout & Typing's Discard does; no mark left behind since 2026-10-11)
         real.edit().putInt("p2/y", 6).commit()
         assertEquals(6, own.getInt("y", 0))
         assertEquals(6, own.all["y"])
@@ -209,7 +209,8 @@ class ProfilePreferencesTest {
     }
 
     @Test fun theChosenKeyboardAtItsDefaultLeavesTheSharedValueAtItsDefault() {
-        real.edit().putBoolean("p2/$autoCap", false).putBoolean("p1/~$autoCap", true).commit() // keyboard 1: "Default"
+        // keyboard 1: "Default", nothing stored (owner 2026-10-11: no default marks; nothing stored = the default)
+        real.edit().putBoolean("p2/$autoCap", false).commit()
         KeyboardProfiles.setGroupShared(real, correction, true)
         assertTrue(set(2).getBoolean(autoCap, true)) // the main keyboard's: the default
         assertTrue(real.contains("p2/$autoCap")) // (owner 2026-10-11: sharing a menu keeps each keyboard's own)

@@ -54,12 +54,15 @@ class ReReviewMedium2Test {
     // 1
     @Test fun `a restore runs the settings moves right away`() {
         val turn = Settings.PREF_GESTURE_TURN_WEIGHT
-        real.edit().putFloat("p3/$turn", 1.2f).putBoolean("moved_markers_removed", false).commit()
+        real.edit().putFloat("p3/$turn", 1.2f).putBoolean("p3/~$turn", true).commit()
         restoreFollowUp(ctx)
         assertFalse(real.contains("p3/$turn"), "a keyboard's own copy of a moved setting is gone")
         assertTrue(real.getBoolean("learning_swiping_global", false))
         assertTrue(real.getBoolean("suggestions_refine_moved", false))
-        assertTrue(real.getBoolean("moved_markers_removed", false))
+        // (owner 2026-10-11: no default marks; nothing stored = the default: the moved-markers step is gone, every old
+        // mark goes with the marks' cleanup)
+        assertFalse(real.contains("p3/~$turn"))
+        assertTrue(real.getBoolean(KeyboardProfiles.NO_DEFAULT_MARKS_DONE, false))
     }
 
     // 2

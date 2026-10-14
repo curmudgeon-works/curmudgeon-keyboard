@@ -88,9 +88,10 @@ class DeleteWarningTest {
         assertEquals(listOf(b), using(listOf(a, b), KeyPopupOverrides.PREF_SELECTED_SET, "T"))
     }
 
-    @Test fun `a mark at the default - the keyboard reads nothing chosen, not the shared one`() {
+    // (owner 2026-10-11: no default marks; nothing stored = the default)
+    @Test fun `nothing stored - the keyboard reads nothing chosen, not the shared one`() {
         val key = AppearanceLooks.PREF_SELECTED
-        real.edit { putString("p1/$key", "X"); putBoolean("p2/~$key", true) }
+        real.edit { putString("p1/$key", "X") }
         assertEquals(listOf(a), using(listOf(a, b), key, "X"))
         real.edit { putBoolean("separate_settings_per_keyboard", false) } // the mark hidden: B reads A's
         assertEquals(listOf(a, b), using(listOf(a, b), key, "X"))

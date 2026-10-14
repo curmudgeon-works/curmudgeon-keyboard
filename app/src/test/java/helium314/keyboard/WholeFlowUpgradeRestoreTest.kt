@@ -182,13 +182,15 @@ class WholeFlowUpgradeRestoreTest {
         // goes; US and French, each with a set of its own, keep their sets as they are: not filled up from the common set
         // (owner 2026-10-11, the upgrade decided: no gap-filling; only a keyboard without a set gets a copy of it; owner
         // 2026-10-11: the common set's palettes are deleted at the upgrade, no copies; this phone's common set has none)
-        // (owner 2026-10-11: palettes are one app-wide list: the one-time move's flag too; this phone has no palette)
+        // (owner 2026-10-11: no default marks; nothing stored = the default: French's mark goes, once; the palettes' move
+        // sets its flag too)
         assertEquals(sortedSetOf(LayoutPresets.PREF, AppearanceLooks.PREF, SavedItemDefaults.REMEMBERED_DONE, KeyboardProfiles.NO_COMMON_SET_DONE,
-            helium314.keyboard.settings.Palettes.CENTRAL_DONE) + commonOf3afbeeebc, changedKeys(before, first), "the first upgrade changed more than the saved Layouts and themes")
+            helium314.keyboard.settings.Palettes.CENTRAL_DONE, KeyboardProfiles.NO_DEFAULT_MARKS_DONE, mark(2, gap))
+            + commonOf3afbeeebc, changedKeys(before, first), "the first upgrade changed more than the saved Layouts and themes")
         assertEquals(true, first[SavedItemDefaults.REMEMBERED_DONE])
         assertFalse(first.containsKey(SavedItemDefaults.PREF), "the switch was written down")
         // no other keyboard's setting changed, and nothing written as a default
-        assertEquals(live(before) - commonOf3afbeeebc, live(first))
+        assertEquals(live(before) - commonOf3afbeeebc - mark(2, gap), live(first))
         // the saved items: picked values as they were, unpicked ones remember today's default
         val layouts = LayoutPresets.load(real)
         assertEquals(oldLayouts.map { it.name to it.values }, layouts.map { it.name to it.values })
@@ -246,7 +248,8 @@ class WholeFlowUpgradeRestoreTest {
         assertEquals(old[KeyPopupOverrides.PREF_SETS], real.all[KeyPopupOverrides.PREF_SETS])
         // every keyboard's settings as in the backup: nothing of the phone's left, nothing written down with the switch off
         // (the backup's common set dropped: owner 2026-10-11, "fine to trash common set with upgrade and restore")
-        assertEquals(live(old) - commonOf3afbeeebc, live(real.all), "live settings differ from the backup's")
+        // (owner 2026-10-11: no default marks; nothing stored = the default: French's mark goes)
+        assertEquals(live(old) - commonOf3afbeeebc - mark(2, gap), live(real.all), "live settings differ from the backup's")
         assertEquals(old["keyboard_profile_ids"], real.all["keyboard_profile_ids"])
         assertEquals(old[Settings.PREF_ENABLED_SUBTYPES], real.all[Settings.PREF_ENABLED_SUBTYPES])
 

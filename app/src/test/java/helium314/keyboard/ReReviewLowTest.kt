@@ -109,17 +109,14 @@ class ReReviewLowTest {
         assertTrue(real.getBoolean("trail_thickness_migrated", false))
     }
 
-    // T4
-    @Test fun `the moved-markers cleanup waits while Refine is per keyboard`() {
+    // T4 (owner 2026-10-11: no default marks; nothing stored = the default: the moved-markers cleanup is gone, every
+    // mark goes once, Refine per keyboard or not)
+    @Test fun `the default marks cleanup removes a mark also while Refine is per keyboard`() {
         val mark = "p3/~" + Settings.PREF_GESTURE_TURN_WEIGHT
         real.edit().putBoolean(mark, true).putBoolean(KeyboardProfiles.Group.REFINE.prefKey, false).commit()
-        KeyboardProfiles.removeMovedMarkers(real)
-        assertTrue(real.contains(mark)) // a genuine reset: kept
-        assertFalse(real.getBoolean("moved_markers_removed", false))
-        real.edit().putBoolean(KeyboardProfiles.Group.REFINE.prefKey, true).commit()
-        KeyboardProfiles.removeMovedMarkers(real)
+        KeyboardProfiles.removeDefaultMarks(real)
         assertFalse(real.contains(mark))
-        assertTrue(real.getBoolean("moved_markers_removed", false))
+        assertTrue(real.getBoolean(KeyboardProfiles.NO_DEFAULT_MARKS_DONE, false))
     }
 
     // T5

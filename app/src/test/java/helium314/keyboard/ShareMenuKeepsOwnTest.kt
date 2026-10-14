@@ -117,16 +117,18 @@ class ShareMenuKeepsOwnTest {
         assertFalse(pic(3).exists()) // (3 had nothing of its own: nothing copied)
     }
 
-    @Test fun `the winner's default mark makes the shared value default, other marks stay`() {
+    // (owner 2026-10-11: no default marks; nothing stored = the default)
+    @Test fun `a Default leaves nothing stored, shared or not`() {
         view(1).edit().remove(gap).commit() // 1: "Default"
         view(2).edit().remove(gap).commit()
         share(1)
         assertEquals(0f, view(3).getFloat(gap, 0f))
-        assertTrue(real.contains(own(2, KeyboardProfiles.TOMBSTONE + gap)))
+        assertFalse(real.contains(own(2, gap)))
+        assertFalse(real.contains(own(2, KeyboardProfiles.TOMBSTONE + gap)))
         view(3).edit().putFloat(gap, 6f).commit() // (US's set)
-        assertEquals(6f, view(2).getFloat(gap, 0f)) // (the mark is not read while shared)
+        assertEquals(6f, view(2).getFloat(gap, 0f))
         unshare()
-        assertEquals(0f, view(2).getFloat(gap, 0f)) // its own "Default" again
+        assertEquals(0f, view(2).getFloat(gap, 0f)) // its own "Default" again: nothing stored
     }
 
 

@@ -70,7 +70,7 @@ class NamesEverywhereTest {
         LayoutPresets.delete(real, "X") // from A's Layouts list
         assertEquals(listOf("Y"), LayoutPresets.load(real).map { it.name })
         assertFalse(real.contains("p2/$key"))
-        assertTrue(real.getBoolean(mark(2, key), false))
+        assertFalse(real.contains(mark(2, key))) // (owner 2026-10-11: no default marks; nothing stored = the default)
         assertNull(set(2).getString(key, null), "B reads the shared Layout instead of none")
         assertEquals("Y", set(3).getString(key, null)) // C's, the common one, untouched
         LayoutPresets.save(real, LayoutPresets.load(real) + LayoutPresets.Preset("X", mapOf("a" to 3))) // a new "X" later
@@ -108,7 +108,7 @@ class NamesEverywhereTest {
         assertEquals(popups, set(2).getString(KeyPopupOverrides.PREF, null))
         assertNull(set(1).getString(key, null))
         assertFalse(real.contains("p2/$key"))
-        assertTrue(real.getBoolean(mark(2, key), false))
+        assertFalse(real.contains(mark(2, key))) // (owner 2026-10-11: no default marks; nothing stored = the default)
         assertNull(set(2).getString(key, null), "B reads the shared set instead of none")
         assertEquals("T", set(3).getString(key, null))
         assertNull(row(set(1)), "A's row names ${row(set(1))?.name}, not Custom")
@@ -189,7 +189,7 @@ class NamesEverywhereTest {
         val key = AppearanceLooks.PREF_SELECTED
         real.edit().putString("p3/$key", "Other").putString("p2/$key", "Mine").commit()
 
-        KeyboardProfiles.forgetValueEverywhere(real, key, "Mine")
+        KeyboardProfiles.replaceValueEverywhere(real, key, "Mine", null)
         assertNull(set(2).getString(key, null))
         assertEquals("Other", set(3).getString(key, null))
     }
@@ -222,7 +222,7 @@ class NamesEverywhereTest {
         LayoutUtilsCustom.removeMissingLayouts(ctx) // (A, set 1, reads the shared x)
         assertFalse(real.contains(numberRow))
         assertFalse(real.contains("p2/$numberRow"))
-        assertTrue(real.getBoolean(mark(2, numberRow), false))
+        assertFalse(real.contains(mark(2, numberRow))) // (owner 2026-10-11: no default marks; nothing stored = the default)
         val builtIn = Settings.readDefaultLayoutName(LayoutType.NUMBER_ROW, ProfilePreferences(real) { 9 })
         assertEquals(builtIn, Settings.readDefaultLayoutName(LayoutType.NUMBER_ROW, set(2)))
         assertEquals(builtIn, Settings.readDefaultLayoutName(LayoutType.NUMBER_ROW, set(1)))
@@ -236,6 +236,6 @@ class NamesEverywhereTest {
         real.edit().putString("p2/$numberRow", x).commit()
         LayoutUtilsCustom.removeMissingLayouts(ctx) // A (set 1) names none: before, only A's own was checked
         assertFalse(real.contains("p2/$numberRow"), "B still names a layout without a file")
-        assertTrue(real.getBoolean(mark(2, numberRow), false))
+        assertFalse(real.contains(mark(2, numberRow))) // (owner 2026-10-11: no default marks; nothing stored = the default)
     }
 }

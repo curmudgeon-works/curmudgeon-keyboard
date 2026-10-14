@@ -285,7 +285,7 @@ class SubScreenSaveRealPathTest {
         option(R.string.palette_take_old, 1, "Warm 2")
         click(ctx.getString(R.string.save))
         assertEquals(null, real.getString(own(2, Settings.PREF_THEME_COLORS), null)) // the default colours
-        assertTrue(real.getBoolean(own(2, KeyboardProfiles.TOMBSTONE + Settings.PREF_THEME_COLORS), false))
+        assertFalse(real.contains(own(2, KeyboardProfiles.TOMBSTONE + Settings.PREF_THEME_COLORS))) // (owner 2026-10-11: no default marks; nothing stored = the default)
         assertEquals("Warm 2", AppearanceLooks.load(real).single().values[Settings.PREF_THEME_COLORS])
         assertEquals(before, real.getString(Settings.PREF_USER_COLORS_PREFIX + "Warm 2", null)) // the old colours, on the list
         assertEquals("Warm", real.getString(own(1, Settings.PREF_THEME_COLORS), null)) // the edited one: the new
