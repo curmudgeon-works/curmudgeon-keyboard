@@ -394,7 +394,7 @@ fun SubtypeScreen(
                         currentSubtype.getExtraValueOf(ExtraValue.LOCALIZED_NUMBER_ROW) != openedSubtype.getExtraValueOf(ExtraValue.LOCALIZED_NUMBER_ROW)) {
                         val checked = currentSubtype.getExtraValueOf(ExtraValue.LOCALIZED_NUMBER_ROW)?.toBoolean()
                         SwitchRow(stringResource(R.string.localized_number_row),
-                            checked ?: prefs.getBoolean(Settings.PREF_LOCALIZED_NUMBER_ROW, Defaults.PREF_LOCALIZED_NUMBER_ROW),
+                            checked ?: Defaults.PREF_LOCALIZED_NUMBER_ROW, // (Default: on, no app-wide row any more)
                             extra = { DefaultButton(checked == null) { setCurrentSubtype(currentSubtype.without(ExtraValue.LOCALIZED_NUMBER_ROW)) } },
                         ) { setCurrentSubtype(currentSubtype.with(ExtraValue.LOCALIZED_NUMBER_ROW, it.toString())) }
                     } }

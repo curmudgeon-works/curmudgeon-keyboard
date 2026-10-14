@@ -68,9 +68,11 @@ fun getResourceSubtypes(resources: Resources): List<InputMethodSubtype> {
     return subtypes
 }
 
+/** The keyboard's own choice, else (its "Default") [Defaults.PREF_LOCALIZED_NUMBER_ROW]: there is no app-wide row any more
+ *  (owner 2026-10-14: "yes A, start with default on going forward"), so a value stored by an older version isn't read. */
+@Suppress("UNUSED_PARAMETER")
 fun getHasLocalizedNumberRow(subtype: InputMethodSubtype, prefs: SharedPreferences): Boolean =
-    subtype.getExtraValueOf(ExtraValue.LOCALIZED_NUMBER_ROW)?.toBoolean()
-        ?: prefs.getBoolean(Settings.PREF_LOCALIZED_NUMBER_ROW, Defaults.PREF_LOCALIZED_NUMBER_ROW)
+    subtype.getExtraValueOf(ExtraValue.LOCALIZED_NUMBER_ROW)?.toBoolean() ?: Defaults.PREF_LOCALIZED_NUMBER_ROW
 
 fun getPopupKeyTypes(subtype: InputMethodSubtype, prefs: SharedPreferences): List<String> {
     val string = subtype.getExtraValueOf(ExtraValue.POPUP_ORDER)

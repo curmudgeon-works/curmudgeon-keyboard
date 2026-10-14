@@ -82,8 +82,7 @@ fun PreferencesScreen(
     )
 }
 
-/** The input group, shown at the top of the Layout screen (the Preferences screen stays reachable through search);
- *  hints, the symbol map, the per-key popups (which replaced the popup order) and the TLD popups
+/** The input group, shown at the top of the Layout screen (no entry opens the Preferences screen any more); hints, the symbol map, the per-key popups (which replaced the popup order) and the TLD popups
  *  are on the Layout screen. */
 fun preferencesInputItems(prefs: SharedPreferences, ctx: Context): List<Any?> {
     // key sound and volume only while sound can actually play (see SystemFeedback)

@@ -5,7 +5,11 @@ import android.content.Context
 import android.os.Looper
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasParent
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.core.app.ActivityScenario
@@ -17,6 +21,7 @@ import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.utils.ExecutorUtils
 import helium314.keyboard.latin.utils.SubtypeSettings
+import helium314.keyboard.latin.utils.getHasLocalizedNumberRow
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.LayoutDraft
 import helium314.keyboard.settings.LocalSettingsMenu
@@ -94,5 +99,14 @@ class LocalizedNumberRowPlaceTest {
         open(advanced = false)
         compose.onNodeWithText(ctx.getString(R.string.show_numbers_row)).assertExists()
         compose.onNodeWithText(ctx.getString(R.string.localized_number_row)).assertDoesNotExist()
+    }
+
+    // owner 2026-10-14: "yes A, start with default on going forward": a keyboard on Default has the localized row, an
+    // app-wide value (stored by an older version) is not read. Fail before: Default followed the app-wide false
+    @Test fun `a keyboard on Default has the localized row, whatever an app-wide value says`() {
+        real.edit().putBoolean(Settings.PREF_LOCALIZED_NUMBER_ROW, false).commit()
+        assertTrue(getHasLocalizedNumberRow(bengali.toAdditionalSubtype(), real))
+        open(advanced = true)
+        compose.onNode(isToggleable() and hasParent(hasText(ctx.getString(R.string.localized_number_row)))).assertIsOn()
     }
 }
