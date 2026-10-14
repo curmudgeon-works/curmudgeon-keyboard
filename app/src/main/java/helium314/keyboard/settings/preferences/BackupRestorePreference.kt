@@ -952,7 +952,10 @@ private fun RestoreChooseDialog(flow: RestoreFlow, question: MergeQuestion, choi
                     // an unsaved key layout the row leaves unused: the name its keys are saved as, only while ticked
                     // (owner 2026-10-12: "Unsaved number row on the device will be saved as "temp_MMDD" to prevent loss
                     // of unsaved data"; any unsaved one, A1b); the run saves them under that same name
-                    val warning = if (ticked) RestoreMatch.unsavedWarning(ctx, difference, question.plan.unsavedSaves(choice.target)) else null
+                    // (a menu row: those of the device keyboard's defaults it replaces, owner 2026-10-13, 20261013_M1)
+                    val warning = if (!ticked) null else RestoreMatch.unsavedWarning(ctx, difference, question.plan.unsavedSaves(choice.target))
+                        ?: (difference as? RestoreMatch.Difference.Menu)?.let {
+                            RestoreMatch.unsavedDefaultsWarning(ctx, it, question.plan.unsavedDefaultSaves(choice.target, question.keyboard)) }
                     CheckRow(RestoreMatch.rowText(ctx, difference, question.keyboard, keyLayouts::deviceRename),
                         ticked, subtext = warning, warning = true) {
                         if (it) choice.ticked.add(difference) else choice.ticked.remove(difference)
@@ -1743,6 +1746,13 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, plan: Re
             val backupName = keyboard.layoutName(type)
             plan.unsavedSave(merge.phone, type, name, backupName)?.let { unsavedSaves[type to name] = backupName to it }
         }
+        // one it reaches through its own set's default, when the merge takes that setting (owner 2026-10-13,
+        // 20261013_M1: exactly like an own pick; before, the backup's settings replaced the default and the cleanup
+        // deleted the file)
+        if (keyboard in backupSettings) for (save in plan.unsavedDefaultSaves(merge.phone, keyboard)) {
+            if (!takesSetting(keyboard, Settings.PREF_LAYOUT_PREFIX + save.type.name)) continue
+            unsavedSaves.getOrPut(save.type to save.name) { save.backup to save.saved }
+        }
     }
 
     // ---- the device side first (owner 2026-10-12: answers are recorded against the device's keyboards and items as they
@@ -2111,8 +2121,32 @@ private fun planItems(ctx: Context, pending: PendingRestore): SavedItemsMerge.Pl
         if ((type to name) in saves || pending.keyboards.none { it.layoutName(type) != name }) continue
         save(type, name)
     }
+    // and those they reach through their own sets' defaults a backup keyboard has another default for (owner 2026-10-13,
+    // 20261013_M1: like an own pick), after them
+    val all = real.all
+    val backupDefaults by lazy { pending.keyboards.map { kb -> try { restoredSettings(ctx, pending.prefs, kb) } catch (e: Exception) { emptyMap<String, Any?>() } } }
+    for (keyboard in on + off) for (type in LayoutType.entries) {
+        val name = ownUnsavedDefault(all, keyboard, type) ?: continue
+        if ((type to name) in saves || backupDefaults.none { it[Settings.PREF_LAYOUT_PREFIX + type.name] != name }) continue
+        save(type, name)
+    }
     return SavedItemsMerge.Plan(items.palettes, items.popupSets, items.layouts, items.themes, items.fonts, items.pictures,
         SavedItemsMerge.KeyLayouts(contents, renames, saves), items.deviceFonts, items.devicePictures)
+}
+
+/** The [type] default the device's [keyboard]'s own set stores (shown or hidden) when it names an unsaved key layout,
+ *  else null; [all]: the stored preferences (owner 2026-10-13, 20261013_M1). */
+private fun ownUnsavedDefault(all: Map<String, *>, keyboard: SettingsSubtype, type: LayoutType): String? =
+    keyboard.keyboardId?.let { all[KeyboardProfiles.ownKey(it, Settings.PREF_LAYOUT_PREFIX + type.name)] as? String }
+        ?.takeIf { LayoutUtilsCustom.isPrivateLayout(it) }
+
+/** Whether a device keyboard other than [target] names the [type] key layout [name] itself: its own pick, or a default
+ *  its own set stores ([all]), as the cleanup counts them ([LayoutUtilsCustom.removeUnusedPrivateLayouts]) (owner
+ *  2026-10-13, 20261013_M1). */
+private fun namedByOthers(ctx: Context, all: Map<String, *>, type: LayoutType, name: String, target: SettingsSubtype): Boolean {
+    val (on, off) = phoneKeyboards(ctx.realPrefs())
+    return (on + off).any { kb -> !kb.sameKeyboard(target) &&
+        (kb.layoutName(type) == name || kb.keyboardId?.let { all[KeyboardProfiles.ownKey(it, Settings.PREF_LAYOUT_PREFIX + type.name)] } == name) }
 }
 
 /**
@@ -2151,6 +2185,25 @@ private fun restorePlan(ctx: Context, pending: PendingRestore): RestorePlan {
                 && backup?.let { keyLayouts.contents[type to it] ?: deviceKeys(type, it) }?.let { keys -> deviceKeys(type, phone)?.contentEquals(keys) } != true
         }
     }
+    // the same for an unsaved one the device's [target] reaches through its own set's default, the backup keyboard's
+    // default there taking its place (owner 2026-10-13, 20261013_M1: "exactly like an own pick", the same warning and
+    // temp_MMDD save; before, the cleanup deleted it). Not one its own pick names too: that row's ([unsavedSave]).
+    // Another user is a keyboard naming it itself, by its pick or a default its own set stores (one reading [target]'s
+    // set through the common settings reads what the merge replaces)
+    val unsavedDefaultSaves = { target: SettingsSubtype, keyboard: SettingsSubtype ->
+        val all = real.all
+        val backupValues = try { restoredSettings(ctx, pending.prefs, keyboard) } catch (e: Exception) { emptyMap<String, Any?>() }
+        LayoutType.entries.mapNotNull { type ->
+            val phone = ownUnsavedDefault(all, target, type) ?: return@mapNotNull null
+            if (target.layoutName(type) == phone) return@mapNotNull null
+            val backup = backupValues[Settings.PREF_LAYOUT_PREFIX + type.name] as? String
+            keyLayouts.deviceSave(type, phone)?.takeIf {
+                if (phone == backup) keyLayouts.deviceRename(type, phone) != null
+                else !namedByOthers(ctx, all, type, phone, target)
+                    && backup?.let { keyLayouts.contents[type to it] ?: deviceKeys(type, it) }?.let { keys -> deviceKeys(type, phone)?.contentEquals(keys) } != true
+            }?.let { RestorePlan.DefaultSave(type, phone, backup, it) }
+        }
+    }
     val cache = HashMap<SavedItemsMerge.Choices, SavedItemsMerge.Renames?>()
     // (one at a time: "What to merge" works it out off the main thread, R5)
     fun renames(choices: SavedItemsMerge.Choices) = synchronized(cache) { cache.getOrPut(choices) {
@@ -2178,7 +2231,8 @@ private fun restorePlan(ctx: Context, pending: PendingRestore): RestorePlan {
         clashes = items.clashes,
         dictionaryClashes = RestoreDictionaries.clashTags(dictionarySteps),
         dictionarySteps = dictionarySteps,
-        items = items, usedBy = usedBy, usedByItems = usedByItems, deviceUsers = deviceUsers, unsavedSave = unsavedSave)
+        items = items, usedBy = usedBy, usedByItems = usedByItems, deviceUsers = deviceUsers, unsavedSave = unsavedSave,
+        unsavedDefaultSaves = unsavedDefaultSaves)
 }
 
 /** The restore dialog's questions for the backup [file]'s keyboards (tests). */
@@ -2189,7 +2243,9 @@ internal fun restorePlanFrom(ctx: Context, file: File): RestorePlan = restorePla
 private fun restoreDifferences(ctx: Context, plan: RestorePlan, keyboard: SettingsSubtype, phone: SettingsSubtype,
                                withSettings: Boolean, names: SavedItemsMerge.Choices): List<RestoreMatch.Difference> =
     RestoreMatch.differences(phone, plan.incoming.getValue(keyboard), withSettings,
-        { plan.phoneSettings(RestoreMatch.phoneSettings(ctx.realPrefs(), phone), names) }, { plan.backupSettings(keyboard, names) }, plan.sameLayout)
+        { plan.phoneSettings(RestoreMatch.phoneSettings(ctx.realPrefs(), phone), names) }, { plan.backupSettings(keyboard, names) }, plan.sameLayout,
+        // (an unsaved default of one name with other keys: asked, owner 2026-10-13, 20261013_M1)
+        sameDefault = { type, name -> !LayoutUtilsCustom.isPrivateLayout(name) || plan.items.keyLayouts.deviceRename(type, name) == null })
 
 /** [restoreDifferences] for the backup [file] (tests). */
 internal fun restoreDifferencesFrom(ctx: Context, file: File, keyboard: SettingsSubtype, phone: SettingsSubtype,

@@ -96,9 +96,11 @@ internal object RestoreMatch {
         return menus
     }
 
-    /** The menus whose settings differ between [phone] and [backup] (plain keys; not stored = the default). */
-    fun menuDifferences(phone: Map<String, Any?>, backup: Map<String, Any?>): List<Difference.Menu> {
+    /** The menus whose settings differ between [phone] and [backup] (plain keys; not stored = the default), and the
+     *  menus of [alsoDiffering] (one name with other keys behind it: owner 2026-10-13, 20261013_M1). */
+    fun menuDifferences(phone: Map<String, Any?>, backup: Map<String, Any?>, alsoDiffering: Set<String> = emptySet()): List<Difference.Menu> {
         val differing = HashSet<KeyboardProfiles.Group>()
+        for (key in alsoDiffering) differing.addAll(menusOf(key))
         for (key in phone.keys + backup.keys) {
             val menus = menusOf(key)
             if (menus.isEmpty() || differing.containsAll(menus)) continue
@@ -112,11 +114,21 @@ internal object RestoreMatch {
         KeyboardProfiles.effectiveSettingsIn(real.all, keyboard)
 
     /** Everything that differs: the definitions, and with [withSettings] the menus' settings ([phoneSettings] and
-     *  [backupSettings]). Empty: nothing to ask. */
+     *  [backupSettings]; [sameDefault], whether a key layout default named alike on both is the same keys: owner
+     *  2026-10-13, 20261013_M1). Empty: nothing to ask. */
     fun differences(phone: SettingsSubtype, backup: SettingsSubtype, withSettings: Boolean,
                     phoneSettings: () -> Map<String, Any?>, backupSettings: () -> Map<String, Any?>,
-                    sameLayout: (LayoutType, String, String) -> Boolean = { _, a, b -> a == b }): List<Difference> =
-        definitionDifferences(phone, backup, sameLayout) + if (withSettings) menuDifferences(phoneSettings(), backupSettings()) else emptyList()
+                    sameLayout: (LayoutType, String, String) -> Boolean = { _, a, b -> a == b },
+                    sameDefault: (LayoutType, String) -> Boolean = { _, _ -> true }): List<Difference> =
+        definitionDifferences(phone, backup, sameLayout) + if (!withSettings) emptyList() else {
+            val p = phoneSettings(); val b = backupSettings()
+            // (one name on both with other keys behind it: the backup's keys come in, so the menu is asked, as a
+            // definition's layout of one name is)
+            val alsoDiffering = LayoutType.entries.map { Settings.PREF_LAYOUT_PREFIX + it.name to it }
+                .filter { (key, type) -> (p[key] as? String)?.let { name -> name == b[key] && !sameDefault(type, name) } == true }
+                .mapTo(HashSet()) { it.first }
+            menuDifferences(p, b, alsoDiffering)
+        }
 
     /** The definition the replaced keyboard gets: the backup's whole, or the phone's with the ticked parts the backup's. */
     fun definition(replace: Replace, backup: SettingsSubtype): SettingsSubtype {
@@ -175,6 +187,17 @@ internal object RestoreMatch {
         val saved = deviceSave(part.type, name, definition.backup) ?: return null
         return ctx.getString(R.string.restore_unsaved_warning, label(ctx, part).lowercase(java.util.Locale.getDefault()),
             LayoutUtilsCustom.getDisplayName(saved))
+    }
+
+    /** The warning under a ticked menu row that replaces a default of the device keyboard naming an unsaved key
+     *  layout ([saves]: [RestorePlan.unsavedDefaultSaves]), one line per layout, or null (owner 2026-10-13,
+     *  20261013_M1: a layout reached through the default is treated exactly like an own pick, the same warning). */
+    fun unsavedDefaultsWarning(ctx: Context, difference: Difference, saves: List<RestorePlan.DefaultSave>): String? {
+        val menu = difference as? Difference.Menu ?: return null
+        return saves.filter { menu.group in menusOf(Settings.PREF_LAYOUT_PREFIX + it.type.name) }
+            .map { ctx.getString(R.string.restore_unsaved_warning, label(ctx, Part.Layout(it.type)).lowercase(java.util.Locale.getDefault()),
+                LayoutUtilsCustom.getDisplayName(it.saved)) }
+            .takeIf { it.isNotEmpty() }?.joinToString("\n")
     }
 
     // what a row is ("Keys", "Number row", "Accents", …)
