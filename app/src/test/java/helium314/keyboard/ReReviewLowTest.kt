@@ -29,8 +29,11 @@ class ReReviewLowTest {
     private val ctx: Context = ApplicationProvider.getApplicationContext()
     private val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
 
+    // (the swipe statistics' store as the app has it: two tests point it at these preferences; put back after each)
+    private val statsPrefs = GestureStats.prefsProvider
+
     @Before fun setUp() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
-    @After fun tearDown() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
+    @After fun tearDown() { GestureStats.prefsProvider = statsPrefs; real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
 
     // language priority is the keyboard's (decision 2026-10-07)
     @Test fun `a keyboard's own set holds its own language priorities`() {

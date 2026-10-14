@@ -15,6 +15,7 @@ import helium314.keyboard.latin.personalization.putStoreForTest
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
+import helium314.keyboard.latin.utils.ExecutorUtils
 import helium314.keyboard.latin.utils.RemovedWords
 import helium314.keyboard.latin.utils.protectedPrefs
 import helium314.keyboard.latin.utils.realPrefs
@@ -49,8 +50,15 @@ class FullRestoreRaceTest {
     private val real = ctx.realPrefs()
     private val zip = File(ctx.cacheDir, "full-restore-race.zip")
     private lateinit var store: LoadCountingHistory
+    // (the swipe statistics' store as the app has it: a test below points it at these preferences)
+    private val statsPrefs = GestureStats.prefsProvider
 
     @Before fun setUp() {
+        // (another class's work still running on the keyboard executor, or posted to the main thread, would run into this
+        // test's restore: waited for, as the other restore tests' tearDown wait for their job)
+        idleUntil { !BackupRestoreJob.isRunning }
+        ExecutorUtils.getBackgroundExecutor(ExecutorUtils.KEYBOARD).submit { }.get()
+        shadowOf(Looper.getMainLooper()).idle()
         real.edit().clear().commit()
         ctx.protectedPrefs().edit().clear().commit()
         real.edit().putInt(Settings.PREF_KEY_LONGPRESS_TIMEOUT, 444).commit()
@@ -65,6 +73,7 @@ class FullRestoreRaceTest {
         idleUntil { !BackupRestoreJob.isRunning }
         putStoreForTest("Latn", LearnedStores.SHARED, null)
         RestoreGate.setForTest(null)
+        GestureStats.prefsProvider = statsPrefs
         real.edit().clear().commit()
         ctx.protectedPrefs().edit().clear().commit()
         KeyboardProfiles.loadGroups(real)
@@ -139,7 +148,12 @@ class FullRestoreRaceTest {
     @Test fun `the keyboard's dictionaries are told to reload with no settings screen open`() {
         backup()
         val app = ctx as Application
-        fun told() = shadowOf(app).broadcastIntents.count { it.action == DictionaryPackConstants.NEW_DICTIONARY_INTENT_ACTION }
+        // (Robolectric's list of sent broadcasts is a synchronized list handed out as it is: gone through under its lock,
+        // a broadcast sent meanwhile on another thread made it a ConcurrentModificationException)
+        fun told(): Int {
+            val sent = shadowOf(app).broadcastIntents
+            return synchronized(sent) { sent.count { it.action == DictionaryPackConstants.NEW_DICTIONARY_INTENT_ACTION } }
+        }
         val before = told()
         assertEquals(null, fullRestoreJob())
         assertEquals(before + 1, told(), "no new-dictionary broadcast without an activity: the keyboard kept its old dictionaries")
