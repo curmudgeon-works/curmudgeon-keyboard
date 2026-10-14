@@ -10,6 +10,8 @@ import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.KeyPopupOverrides
+import helium314.keyboard.latin.utils.LayoutType
+import helium314.keyboard.latin.utils.LayoutUtilsCustom
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.settings.screens.customizePopupsSaved
 import helium314.keyboard.settings.screens.deletePopupSet
@@ -197,5 +199,63 @@ class SubScreenOwnChangeTest {
         customizePopupsSaved()
         LayoutDraft.rejectOpen(ctx)
         assertEquals(m1 + ("o" to listOf("ö", "ó")), KeyPopupOverrides.load(real))
+    }
+
+    // review M2: a keyboard the sub-screen kept is recorded by the fields its save changed, not as the whole entry
+
+    /** Keyboard 1 gets letters "azerty" on Layout and Typing (unsaved), then Customize popups saves accents "all". */
+    private fun accentsScenario(): SettingsSubtype {
+        val one = SettingsSubtype(Locale.US, "").withId(1)
+        storeKeyboards(ctx, real, listOf(one))
+        LayoutDraft.of(ctx, one.toPref()) // Layout & Typing opens
+        val azerty = one.withLayout(LayoutType.MAIN, "azerty")
+        storeKeyboards(ctx, real, listOf(azerty), selected = null)
+        LayoutDraft.subScreenOpenedOpen(ctx) // Customize popups opens
+        storeKeyboards(ctx, real, listOf(azerty.with(ExtraValue.MORE_POPUPS, "all")), selected = null)
+        customizePopupsSaved()
+        return one
+    }
+
+    private fun assertAccentsOnly(one: SettingsSubtype) {
+        val expected = one.with(ExtraValue.MORE_POPUPS, "all").toPref() // the saved accents, the snapshot's letters
+        assertEquals(listOf(expected), storedEnabled(real).map { it.toPref() })
+        assertEquals(listOf(expected),
+            SubtypeSettings.createSettingsSubtypes(real.getString(Settings.PREF_ADDITIONAL_SUBTYPES, "")!!).map { it.toPref() })
+    }
+
+    @Test fun `keyboard fields - letters changed on Layout and Typing, accents saved in Customize popups, leaving the app keeps only the accents`() {
+        val one = accentsScenario()
+        LayoutDraft.rejectOpen(ctx) // the app left
+        assertAccentsOnly(one)
+    }
+
+    @Test fun `keyboard fields - the same after a crash, the fields kept on disk`() {
+        val one = accentsScenario()
+        LayoutDraft.forgetActiveForTest() // the process died
+        LayoutDraft.recoverAfterCrash(ctx) // the next app start
+        assertAccentsOnly(one)
+    }
+
+    @Test fun `keyboard fields - a layout file deleted on the layout files screen changes only that layout of the keyboard`() {
+        SubtypeSettings.init(ctx)
+        val type = LayoutType.NUMBER_ROW
+        val x = LayoutUtilsCustom.getLayoutName("x", type)
+        LayoutUtilsCustom.getLayoutFile(x, type, ctx).writeText("1 2 3")
+        LayoutUtilsCustom.onLayoutFileChanged()
+        val one = SettingsSubtype(Locale.US, "").withLayout(type, x).withId(1)
+        storeKeyboards(ctx, real, listOf(one))
+        LayoutDraft.of(ctx, one.toPref()) // Layout & Typing opens
+        storeKeyboards(ctx, real, listOf(one.with(ExtraValue.MORE_POPUPS, "none")), selected = null) // (unsaved)
+        LayoutDraft.subScreenOpenedOpen(ctx) // the layout files screen: x deleted, then Save
+        LayoutUtilsCustom.deleteLayout(x, type, ctx)
+        layoutFilesSaved()
+        LayoutDraft.rejectOpen(ctx) // the app left
+
+        val after = storedEnabled(real).single()
+        val copy = after.layoutName(type)!!
+        assertTrue(LayoutUtilsCustom.isPrivateLayout(copy)) // the delete's change: the keyboard's own unnamed copy
+        assertEquals(one.withLayout(type, copy).toPref(), after.toPref()) // the rest as the snapshot had it (no "none")
+        assertEquals("1 2 3", LayoutUtilsCustom.getLayoutFile(copy, type, ctx).readText())
+        assertTrue(!LayoutUtilsCustom.getLayoutFile(x, type, ctx).exists())
     }
 }
