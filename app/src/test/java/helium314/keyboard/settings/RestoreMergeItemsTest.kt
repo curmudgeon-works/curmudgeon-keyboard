@@ -336,15 +336,16 @@ class RestoreMergeItemsTest {
         assertEquals(copy.keyboardId, inUse().keyboardId)
     }
 
-    // fail before: the device's English stayed in use
-    @Test fun `Keep both with no copy of the keyboard being typed on - the first restored keyboard in the list is in use`() {
+    // fail before (Q1b): the first restored keyboard in the list (French) was put in use
+    @Test fun `Keep both with no copy of the keyboard being typed on - the keyboard in use stays`() {
         val de = available("de-DE").withId(2)
         useKeyboards(ctx, real, en, de) // (English in use)
         val deB = available("de-DE").withId(8)
-        backup(listOf(frB, deB))
-        val restored = restoreChosenFrom(ctx, zip, listOf(frB, deB), settings = false, learnedWords = false, io = io,
-            decisions = mapOf(deB to RestoreDecision.Separate()))
-        assertEquals(restored.onDevice.getValue(frB).keyboardId, inUse().keyboardId) // (added first: first in the list)
+        val enOther = available("en-US").withId(9) // (another English: same language, not a copy of the one typed on)
+        backup(listOf(frB, deB, enOther))
+        restoreChosenFrom(ctx, zip, listOf(frB, deB, enOther), settings = false, learnedWords = false, io = io,
+            decisions = mapOf(deB to RestoreDecision.Separate(), enOther to RestoreDecision.Separate()))
+        assertEquals(en.keyboardId, inUse().keyboardId)
     }
 
     // (passes before too: no keyboard kept apart, the keyboard in use stays)

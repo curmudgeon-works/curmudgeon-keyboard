@@ -1472,19 +1472,14 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, plan: Res
 /**
  * After a restore that kept a backup keyboard apart ("Keep both"), the keyboard in use becomes the restored copy of the
  * one being typed on before ([typing]): the kept-apart backup keyboard with its id (as "Suggested: same keyboard as in
- * the backup"), else one of its language; with no such copy, the first restored keyboard in the list's order (owner
- * 2026-10-13, Q1: "User's choice to restore should take precedence", "restored copy of what I was typing"). Other
- * restores leave the keyboard in use as it is. [onDevice]: each restored backup keyboard as it is on the device now.
+ * the backup") (owner 2026-10-13, Q1: "User's choice to restore should take precedence", "restored copy of what I was
+ * typing"). With no such copy the keyboard in use stays (Q1b: no fallback to another keyboard), and so do other
+ * restores. [onDevice]: each restored backup keyboard as it is on the device now.
  */
 private fun switchToKeptCopy(ctx: Context, choice: RestoreChoice, onDevice: Map<SettingsSubtype, SettingsSubtype>, typing: SettingsSubtype?) {
-    val kept = onDevice.filterKeys { choice.decisions[it] is RestoreDecision.Separate }
-    if (kept.isEmpty()) return
-    val ofTyping = typing?.let { t ->
-        kept.entries.firstOrNull { t.keyboardId != null && it.key.keyboardId == t.keyboardId }?.value
-            ?: kept.entries.firstOrNull { it.key.locale.toLanguageTag() == t.locale.toLanguageTag() }?.value
-    }
-    val target = ofTyping ?: SubtypeSettings.getEnabledSubtypes().map { it.toSettingsSubtype() }
-        .firstOrNull { e -> onDevice.values.any { it.sameKeyboard(e) } } ?: return
+    val id = typing?.keyboardId ?: return
+    val target = onDevice.entries.firstOrNull { (backup, _) -> choice.decisions[backup] is RestoreDecision.Separate && backup.keyboardId == id }
+        ?.value ?: return
     val real = ctx.realPrefs()
     SubtypeSettings.setSelectedSubtype(real, target.toAdditionalSubtype())
     KeyboardProfiles.refreshImeId(real) // (its own settings; the keyboard takes it with the restore's refresh)
