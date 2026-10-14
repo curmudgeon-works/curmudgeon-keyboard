@@ -3,9 +3,12 @@ package helium314.keyboard.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import helium314.keyboard.latin.common.Constants
+import helium314.keyboard.latin.common.LocaleUtils.constructLocale
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
+import helium314.keyboard.latin.utils.LayoutType
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -19,9 +22,11 @@ import java.io.File
  * disk in [dir] with the snapshot, so the undo after a crash keeps them as well.
  * Only the sub-screen's own change (owner 2026-10-11, review E4: "On app exit you should only honour the sub-screen's
  * save and discard all else"): a key holding a whole list ([ListElements]: the saved themes, Layouts and popup sets, the
- * keyboard lists, the learned words' pools) is recorded by the elements the sub-screen changed, and leaving the app puts
- * only those onto the list as the snapshot had it. Before, the whole list was taken, with the editing screen's own
- * unsaved changes in it (a theme deleted on Appearance stayed deleted). The palettes are a key each: one palette.
+ * keyboard lists, the learned words' pools, the popup keys) is recorded by the elements the sub-screen changed, and
+ * leaving the app puts only those onto the list as the snapshot had it. Before, the whole list was taken, with the
+ * editing screen's own unsaved changes in it (a theme deleted on Appearance stayed deleted). The palettes are a key
+ * each: one palette. A keyboard kept by the save is recorded by its fields the save changed (review M2): before, an
+ * unsaved letters layout of the same keyboard stayed with the accents Customize popups saved.
  */
 internal class SubScreenWrites(private val dir: File, private val liveDir: File?, private val inScope: (String) -> Boolean) {
     private var ctx: Context? = null
@@ -55,8 +60,13 @@ internal class SubScreenWrites(private val dir: File, private val liveDir: File?
             val isNow = ListElements.split(key, now[key])
             if (was == null || isNow == null) { prefs[key] = now[key]; continue } // (no list, or one that can't be read: the value)
             val changed = lists.getOrPut(key) { LinkedHashMap() }
-            for (id in was.keys + isNow.keys) if (was[id] != isNow[id])
-                changed[id] = ListElements.Change(isNow[id], added = id !in was || changed[id]?.added == true)
+            for (id in was.keys + isNow.keys) if (was[id] != isNow[id]) {
+                val prior = changed[id]
+                // (a keyboard there before and after, not taken whole by an earlier save: the fields the save changed, review M2)
+                val fields = if (prior != null && prior.fields == null) null
+                    else ListElements.fieldsChanged(key, was[id], isNow[id])?.let { (prior?.fields ?: emptyMap()) + it }
+                changed[id] = ListElements.Change(isNow[id], added = id !in was || prior?.added == true, fields)
+            }
         }
         val nowFiles = listing(liveDir)
         for (path in nowFiles.keys + baselineFiles.keys) if (nowFiles[path] != baselineFiles[path]) {
@@ -106,10 +116,13 @@ internal class SubScreenWrites(private val dir: File, private val liveDir: File?
         json.put("prefs", JSONObject().also { o -> prefs.forEach { (k, v) -> v?.let { AppearanceLooks.toJson(it) }?.let { o.put(k, it) } } })
         json.put("removed", JSONArray(prefs.filterValues { it == null }.keys.toList()))
         json.put("files", JSONObject().also { o -> files.forEach { (k, v) -> o.put(k, v) } })
-        // (each element as [id, element or null, added], in order: new ones are added in this order)
+        // (each element as [id, element or null, added], in order: new ones are added in this order; a keyboard changed
+        // field by field with a fourth, its fields: field -> value or null)
         json.put("lists", JSONObject().also { o -> lists.forEach { (k, changed) ->
             o.put(k, JSONArray().also { a -> changed.forEach { (id, c) ->
-                a.put(JSONArray().put(id).put(c.element ?: JSONObject.NULL).put(c.added)) } })
+                val e = JSONArray().put(id).put(c.element ?: JSONObject.NULL).put(c.added)
+                c.fields?.let { f -> e.put(JSONObject().also { fo -> f.forEach { (n, v) -> fo.put(n, v ?: JSONObject.NULL) } }) }
+                a.put(e) } })
         } })
         helium314.keyboard.latin.utils.AtomicFiles.write(File(dir, FILE), json.toString()) // (crash-safe, B4w.2)
     }
@@ -134,8 +147,10 @@ internal class SubScreenWrites(private val dir: File, private val liveDir: File?
             val l = json.optJSONObject("lists")
             l?.keys()?.forEach { k ->
                 val a = l.getJSONArray(k)
+                // (a record without the fourth, written before review M2: the whole element, as then)
                 lists[k] = LinkedHashMap<String, ListElements.Change>().also { m -> for (i in 0 until a.length()) a.getJSONArray(i).let { e ->
-                    m[e.getString(0)] = ListElements.Change(if (e.isNull(1)) null else e.getString(1), e.optBoolean(2)) } }
+                    val fields = e.optJSONObject(3)?.let { f -> f.keys().asSequence().associateWith { n -> if (f.isNull(n)) null else f.getString(n) } }
+                    m[e.getString(0)] = ListElements.Change(if (e.isNull(1)) null else e.getString(1), e.optBoolean(2), fields) } }
             }
         }
     }
@@ -144,18 +159,23 @@ internal class SubScreenWrites(private val dir: File, private val liveDir: File?
 /**
  * The stored keys holding a whole list, as their elements (review E4): what a sub-screen's save changed of them is
  * recorded element by element ([SubScreenWrites]). The saved themes, Layouts and popup sets (a JSON list, an element by
- * its "name"), the keyboard list and the added keyboards (an element by its keyboard id), the learned words' pools
- * (keyboard id -> pool). Any other key is one value.
+ * its "name"), the keyboard list and the added keyboards (an element by its keyboard id; a keyboard there before and
+ * after by its fields, review M2), the learned words' pools (keyboard id -> pool), the popup keys (key -> its popups,
+ * review M2). Any other key is one value.
  */
 internal object ListElements {
     /** An element a sub-screen's save changed: [element] as saved (null: removed); [added]: none of that id was there
-     *  when the sub-screen opened (it made it). */
-    class Change(val element: String?, val added: Boolean)
+     *  when the sub-screen opened (it made it); [fields] (a keyboard kept by the save): only these of it changed, field
+     *  -> value as saved (null: removed), as [fieldsChanged] tells them. */
+    class Change(val element: String?, val added: Boolean, val fields: Map<String, String?>? = null)
 
     private val named = setOf(AppearanceLooks.PREF, LayoutPresets.PREF, helium314.keyboard.latin.utils.KeyPopupOverrides.PREF_SETS)
     private val keyboards = setOf(helium314.keyboard.latin.settings.Settings.PREF_ENABLED_SUBTYPES,
         helium314.keyboard.latin.settings.Settings.PREF_ADDITIONAL_SUBTYPES)
     private val maps = setOf(helium314.keyboard.latin.personalization.LearnedKeyboards.PREF_POOLS)
+    // (key -> a JSON list; a key the sub-screen changed is put even where the snapshot had none: the popups as generated
+    // are no element the editing screen made)
+    private val popups = setOf(helium314.keyboard.latin.utils.KeyPopupOverrides.PREF)
     private val sep = helium314.keyboard.latin.common.Constants.Separators.SETS
 
     private fun plain(key: String) = LayoutDraft.plain(key)
@@ -164,7 +184,7 @@ internal object ListElements {
      *  can't be read as one. */
     fun split(key: String, value: Any?): LinkedHashMap<String, String>? {
         val p = plain(key)
-        if (p !in named && p !in keyboards && p !in maps) return null
+        if (p !in named && p !in keyboards && p !in maps && p !in popups) return null
         val out = LinkedHashMap<String, String>()
         if (value == null) return out
         if (value !is String) return null
@@ -183,20 +203,64 @@ internal object ListElements {
     private fun join(key: String, elements: Collection<Pair<String, String>>): String = when (plain(key)) {
         in named -> JSONArray().also { a -> elements.forEach { a.put(JSONObject(it.second)) } }.toString()
         in keyboards -> elements.joinToString(sep) { it.second }
+        in popups -> JSONObject().also { o -> elements.forEach { (id, e) -> o.put(id, runCatching { JSONArray(e) }.getOrDefault(e)) } }.toString()
         else -> JSONObject().also { o -> elements.forEach { (id, e) -> o.put(id, e.toIntOrNull() ?: e) } }.toString()
     }
 
     /** [changed] onto [value], [key]'s list as it is: a changed element in its place, one the sub-screen made at the end,
      *  a removed one gone; the rest as there. A changed element not in [value] stays out: the editing screen made it
-     *  (a theme it renamed, a keyboard it added), and its changes are undone. Null: nothing stored (no element, none
+     *  (a theme it renamed, a keyboard it added), and its changes are undone; a popup key is put all the same. A keyboard
+     *  changed by its fields: those fields set on the keyboard as [value] has it. Null: nothing stored (no element, none
      *  before). A value that can't be read as the list stays as it is. */
     fun applied(key: String, value: Any?, changed: Map<String, Change>): Any? {
         val elements = split(key, value) ?: return value
         for ((id, c) in changed) when {
             c.element == null -> elements.remove(id)
-            id in elements || c.added -> elements[id] = c.element
+            c.fields != null -> elements[id]?.let { elements[id] = patched(it, c.fields) }
+            id in elements || c.added || plain(key) in popups -> elements[id] = c.element
         }
         if (value == null && elements.isEmpty()) return null
         return join(key, elements.map { it.key to it.value })
     }
+
+    private const val LOCALE = "locale"
+    private val LAYOUT = Constants.Subtype.ExtraValue.KEYBOARD_LAYOUT_SET + "."
+
+    /** A keyboard entry's fields (review M2): [LOCALE], each extra value by its key (as stored, "key=value" or the bare
+     *  key), the layouts each by its type ("KeyboardLayoutSet.MAIN" -> the layout's name). */
+    private fun fields(entry: String): Map<String, String> {
+        val s = entry.toSettingsSubtype()
+        val out = LinkedHashMap<String, String>()
+        out[LOCALE] = entry.substringBefore(Constants.Separators.SET)
+        for (v in s.extraValues.split(",")) {
+            if (v.isBlank()) continue
+            val k = v.substringBefore("=")
+            if (k == Constants.Subtype.ExtraValue.KEYBOARD_LAYOUT_SET)
+                LayoutType.getLayoutMap(v.substringAfter("=")).forEach { (type, name) -> out[LAYOUT + type.name] = name }
+            else out[k] = v
+        }
+        return out
+    }
+
+    /** What a keyboard list's element [was] -> [now] changed, field -> value now (null: removed); null: no keyboard list,
+     *  an element made or removed, or one that can't be read. */
+    fun fieldsChanged(key: String, was: String?, now: String?): Map<String, String?>? {
+        if (plain(key) !in keyboards || was == null || now == null) return null
+        return runCatching {
+            val a = fields(was); val b = fields(now)
+            (a.keys + b.keys).filter { a[it] != b[it] }.associateWith { b[it] }
+        }.getOrNull()
+    }
+
+    /** [entry] with [fields] set (null: removed), the rest as it is. */
+    private fun patched(entry: String, fields: Map<String, String?>): String = if (fields.isEmpty()) entry else runCatching {
+        var s = entry.toSettingsSubtype()
+        for ((f, v) in fields) s = when {
+            f == LOCALE -> if (v == null) s else s.copy(locale = v.constructLocale())
+            f.startsWith(LAYOUT) -> LayoutType.valueOf(f.removePrefix(LAYOUT)).let { if (v == null) s.withoutLayout(it) else s.withLayout(it, v) }
+            v == null -> s.without(f)
+            else -> s.with(f, if ("=" in v) v.substringAfter("=") else null)
+        }
+        s.toPref()
+    }.getOrDefault(entry)
 }
