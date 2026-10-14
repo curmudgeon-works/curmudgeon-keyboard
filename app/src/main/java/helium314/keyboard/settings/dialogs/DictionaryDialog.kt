@@ -228,11 +228,15 @@ internal fun dictionaryInUse(context: android.content.Context, locale: Locale, d
     val usedBy = context.getString(R.string.dictionary_in_use_users, dictionaryUserNames(context, blockers).joinToString(", "))
     // (the asking keyboard the only one using it: replaced when there is another, main or second language alike)
     val sole = keyboard != null && blockers.size == 1 && blockers.single().sameKeyboard(keyboard)
-    val next = if (sole) nextDictionary(context, locale, dict) else null
+    // whether there is another version, worked out in every case for the text only: several keyboards with none get the
+    // "only one" text too, not "select another version" (round-6 review 20261013_L2_2); Replace only for the sole
+    // keyboard (owner 2026-10-13: "don't offer to delete/replace for multiple keyboards")
+    val other = nextDictionary(context, locale, dict)
+    val next = if (sole) other else null
     val case = when {
         next != null -> context.getString(R.string.dictionary_in_use_select_first)
         // (another kind than main: the sentence names it, "the only emoji dictionary", 20261013_F4)
-        sole -> DictionarySelection.typeOf(dict).let { kind ->
+        other == null -> DictionarySelection.typeOf(dict).let { kind ->
             if (kind == Dictionary.TYPE_MAIN) context.getString(R.string.dictionary_in_use_only_one)
             else context.getString(R.string.dictionary_in_use_only_one_kind, dictionaryKindName(context, kind).lowercase())
         }

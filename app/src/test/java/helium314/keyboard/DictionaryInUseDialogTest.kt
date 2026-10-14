@@ -139,6 +139,24 @@ class DictionaryInUseDialogTest {
         assertNull(d.replaceButton)
     }
 
+    // round-6 review 20261013_L2_2 (owner 2026-10-13: "don't offer to delete/replace for multiple keyboards"): several
+    // keyboards and no other version: the "only one" text, no Replace. Fail before: "select another version for those
+    // keyboards first", though there is none
+    @Test fun `case 3 - other keyboards use it too, no other version - the only one, OK only`() {
+        val da2 = available("da").withId(4)
+        useKeyboards(ctx, real, da, da2)
+        val main = File(dir(danish), "main_user.dict").apply { writeText("x") }
+        val d = dialog(danish, main, da)
+        assertEquals("Used by: ${name(da)}, ${name(da2)}. It is the only dictionary for this language, so it can't be deleted while a keyboard uses the language.", d.message)
+        assertNull(d.replaceButton)
+        assertNull(d.replaceWith)
+        // another version there: "select another version for those keyboards", still no Replace
+        File(dir(danish), "main_prev_user.dict").writeText("y")
+        val again = dialog(danish, main, da)
+        assertEquals("Used by: ${name(da)}, ${name(da2)}. To delete it, select another version for those keyboards first.", again.message)
+        assertNull(again.replaceButton)
+    }
+
     @Test fun `case 4 - from the Dictionaries screen - that keyboard or those keyboards, OK only`() {
         useKeyboards(ctx, real, en)
         val main = File(dir(Locale.US), "main_user.dict").apply { writeText("x") }
