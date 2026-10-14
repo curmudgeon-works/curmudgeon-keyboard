@@ -207,17 +207,48 @@ class RestoreMergeItemsTest {
         assertEquals(null, selected("fr"))
     }
 
-    // ---- 3. other backup items come in silently ----
+    // ---- 3. other dictionaries: the "Also restore" row (owner 2026-10-13, R-DICT; were silent, new ones only) ----
 
-    // fail before: only the restored keyboards' languages' dictionaries came (with the row ticked)
-    @Test fun `dictionaries of languages no restored keyboard has come in silently when new, a clash keeps the device's`() {
+    private fun restoreOthers(others: Boolean) =
+        restoreChosenFrom(ctx, zip, listOf(frB), settings = false, learnedWords = false, io = io, dictionaries = true, otherDictionaries = others)
+
+    // fail before: a clash with a language no backup keyboard has kept the device's
+    @Test fun `Other dictionaries ticked - new ones come in and the backup's takes over, the device's at prev`() {
         dictDir("ko").mkdirs(); dict("ko", "main_user.dict").writeText("device ko")
         backup(listOf(frB), entries = mapOf("dicts/ur/main_user.dict" to "urdu".toByteArray(), "dicts/ko/main_user.dict" to "backup ko".toByteArray()))
-        restoreDictionaries(ticked = false)
+        restoreOthers(true)
         assertEquals("urdu", dict("ur", "main_user.dict").readText())
+        assertEquals("backup ko", dict("ko", "main_user.dict").readText())
+        assertEquals("device ko", dict("ko", "main_prev_user.dict").readText())
+        assertEquals("main_user.dict", selected("ko"))
+    }
+
+    // fail before: a new one came in unselected, the built-in one the device had selected stayed in use
+    @Test fun `Other dictionaries ticked - one over a built-in is selected, the built-in still selectable`() {
+        real.edit().putString("dict_selected_ur_main", "internal").commit()
+        backup(listOf(frB), entries = mapOf("dicts/ur/main_user.dict" to "urdu".toByteArray()))
+        restoreOthers(true)
+        assertEquals("urdu", dict("ur", "main_user.dict").readText())
+        assertEquals("main_user.dict", selected("ur"))
+    }
+
+    // fail before: they came in silently
+    @Test fun `Other dictionaries unticked - none of them come`() {
+        dictDir("ko").mkdirs(); dict("ko", "main_user.dict").writeText("device ko")
+        backup(listOf(frB), entries = mapOf("dicts/ur/main_user.dict" to "urdu".toByteArray(), "dicts/ko/main_user.dict" to "backup ko".toByteArray()))
+        restoreOthers(false)
+        assertFalse(dict("ur", "main_user.dict").exists())
         assertEquals(setOf("main_user.dict"), dictDir("ko").list()!!.toSet())
         assertEquals("device ko", dict("ko", "main_user.dict").readText())
-        assertEquals(null, selected("ko"))
+    }
+
+    // fail before: a backup keyboard's language came in silently when new, though its keyboard wasn't restored
+    @Test fun `an unticked backup keyboard's language brings no dictionary, a restored one's does`() {
+        val deB = available("de-DE").withId(7)
+        backup(listOf(frB, deB), entries = mapOf("dicts/de-DE/main_user.dict" to "de".toByteArray(), "dicts/fr/main_user.dict" to "fr".toByteArray()))
+        restoreOthers(true) // (French restored; German unticked: not an "other" dictionary either)
+        assertFalse(dict("de-DE", "main_user.dict").exists())
+        assertEquals("fr", dict("fr", "main_user.dict").readText())
     }
 
     // (owner 2026-10-12: no Dictionaries row any more, dictionaries always come; the "Backup restored" dialog says so)

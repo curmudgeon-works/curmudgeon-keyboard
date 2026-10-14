@@ -36,6 +36,9 @@ internal object RestoreDictionaries {
 
     fun kindOf(name: String) = name.substringBefore("_")
 
+    /** A dictionary file's name as the dialogs show it: "main_prev" of "main_prev_user.dict". */
+    fun shownName(name: String) = name.removeSuffix(suffix)
+
     /** The name the engine uses when nothing is selected: "main_user.dict". */
     fun defaultName(kind: String) = kind + suffix
 
@@ -69,9 +72,11 @@ internal object RestoreDictionaries {
 
     /** What the restore does with the backup's [backupName] of [tag] and its kind: [target], its name on the device;
      *  [renames], the device files renamed first, in order (from -> to; SAME: the device's matching copy last, to
-     *  [target]); [select], whether [target] is selected after. */
+     *  [target]); [select], whether [target] is selected after; [kept], the device's dictionary of that kind the
+     *  backup's takes over from, by its name after (a clash: the one moved to "…_prev", else the one already under
+     *  another name; a match: the one moved aside for it), null when none (R-DICT: the restore dialog and summary say it). */
     data class Step(val tag: String, val kind: String, val backupName: String, val action: Action, val target: String,
-                    val renames: List<Pair<String, String>> = emptyList()) {
+                    val renames: List<Pair<String, String>> = emptyList(), val kept: String? = null) {
         val select get() = action == Action.CLASH || action == Action.SAME
     }
 
@@ -100,13 +105,13 @@ internal object RestoreDictionaries {
                 val aside = backupName + MOVING
                 listOf(match to aside, backupName to nextPrev(kind, device.keys - match), aside to backupName)
             } else listOf(match to backupName)
-            return Step(tag, kind, backupName, Action.SAME, backupName, renames)
+            return Step(tag, kind, backupName, Action.SAME, backupName, renames, kept = renames.firstOrNull { it.first == backupName }?.second)
         }
         if (sameKind.isEmpty()) return Step(tag, kind, backupName, Action.NEW, target)
         // (the device's of the default name, the one in use unless another was selected, moved aside; one already
         // under another name stays as it is, selectable)
         val renames = if (target in device) listOf(target to nextPrev(kind, device.keys)) else emptyList()
-        return Step(tag, kind, backupName, Action.CLASH, target, renames)
+        return Step(tag, kind, backupName, Action.CLASH, target, renames, kept = renames.firstOrNull()?.second ?: sameKind.keys.sorted().first())
     }
 
     /** The steps for the backup's dictionaries of each language: [backup], each file's digest by entry; the backup's
@@ -130,7 +135,7 @@ internal object RestoreDictionaries {
 
     /** Carries out [step] in the language's folder [dir], the backup's file read from [source] (SAME: not read, the
      *  device's copy is renamed); with [real], selects it on a clash or a match. Returns whether it was carried out. */
-    fun apply(step: Step, dir: File, source: File, real: SharedPreferences): Boolean {
+    fun apply(step: Step, dir: File, source: File, real: SharedPreferences, selectNew: Boolean = false): Boolean {
         val target = File(dir, step.target)
         // (never outside the folder, whatever the zip says)
         fun inside(f: File) = f.canonicalPath.startsWith(dir.canonicalPath + File.separator)
@@ -162,7 +167,8 @@ internal object RestoreDictionaries {
                 try { helium314.keyboard.latin.utils.AtomicFiles.copy(incoming, target) } finally { incoming.delete() } // (B4w.3)
             }
         }
-        if (step.select) real.edit(commit = true) { putString(selectedKey(step.tag, step.kind), step.target) }
+        // ([selectNew]: a new one selected too, over a built-in one the device selected; R-DICT, the other dictionaries)
+        if (step.select || (selectNew && step.action == Action.NEW)) real.edit(commit = true) { putString(selectedKey(step.tag, step.kind), step.target) }
         return true
     }
 
