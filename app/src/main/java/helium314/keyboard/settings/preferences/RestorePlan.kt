@@ -88,8 +88,9 @@ internal sealed class RestoreDecision {
  * backup keyboards using each (by kind and key; directly, or through a Layout or theme): "Required for"; [usedByItems],
  * the backup's Layouts and themes using each; [deviceUsers], the device keyboards using each device item (by kind and
  * name), which take the backup's when it is replaced. [unsavedSave]: the name a device keyboard's unsaved key layout is
- * saved as when a ticked row leaves it unused, or null (A1b); [unsavedDefaultSaves], the same for one it reaches
- * through its own set's default (owner 2026-10-13, 20261013_M1).
+ * saved as when a ticked row leaves it unused, or null (A1b); [unsavedDefaultSavesAfter], the same for one it reaches
+ * through its own set's default (owner 2026-10-13, 20261013_M1). Both count the device keyboards that still name the
+ * layout after the restore, by the other backup keyboards' answers (owner 2026-10-13, 20261013_L6).
  */
 internal class RestorePlan(
     val incoming: Map<SettingsSubtype, SettingsSubtype>,
@@ -107,20 +108,32 @@ internal class RestorePlan(
     val usedBy: Map<Pair<SavedItemsMerge.Kind, String>, List<SettingsSubtype>> = emptyMap(),
     val usedByItems: Map<Pair<SavedItemsMerge.Kind, String>, Set<Pair<SavedItemsMerge.Kind, String>>> = emptyMap(),
     val deviceUsers: Map<Pair<SavedItemsMerge.Kind, String>, List<SettingsSubtype>> = emptyMap(),
-    val unsavedSave: (SettingsSubtype, helium314.keyboard.latin.utils.LayoutType, String, String?) -> String? = { _, _, _, _ -> null },
+    // (both by the other backup keyboards' answers and whether settings come: another device keyboard counts as a user
+    // only when it still names the layout after the restore, owner 2026-10-13, 20261013_L6)
+    val unsavedSave: (SettingsSubtype, helium314.keyboard.latin.utils.LayoutType, String, String?, Map<SettingsSubtype, RestoreDecision>, Boolean) -> String? =
+        { _, _, _, _, _, _ -> null },
     // the device keyboard's unsaved key layouts it reaches through its own set's defaults, saved as an own pick's are
     // when the merge of the backup keyboard takes that setting (owner 2026-10-13, 20261013_M1): by the device keyboard
     // and the backup's
-    val unsavedDefaultSaves: (SettingsSubtype, SettingsSubtype) -> List<DefaultSave> = { _, _ -> emptyList() },
+    val unsavedDefaultSavesAfter: (SettingsSubtype, SettingsSubtype, Map<SettingsSubtype, RestoreDecision>, Boolean) -> List<DefaultSave> =
+        { _, _, _, _ -> emptyList() },
 ) {
     /** An unsaved key layout [name] the device keyboard has as its own set's [type] default, the backup keyboard's
      *  default there ([backup], null: none), and the name its keys are saved as ([saved]) when a merge replaces that
      *  default (owner 2026-10-13, 20261013_M1: "exactly like an own pick", the same warning and temp_MMDD save). */
     data class DefaultSave(val type: helium314.keyboard.latin.utils.LayoutType, val name: String, val backup: String?, val saved: String)
 
-    /** [unsavedSave] for the device's [target] ("What to merge"'s warnings). */
-    fun unsavedSaves(target: SettingsSubtype): (helium314.keyboard.latin.utils.LayoutType, String, String?) -> String? =
-        { type, phone, backup -> unsavedSave(target, type, phone, backup) }
+    /** [unsavedSave] for the device's [target] ("What to merge"'s warnings), the other backup keyboards answered as
+     *  [decisions] (the restore dialog's: settings come, [withSettings]; owner 2026-10-13, 20261013_L6: a keyboard
+     *  another answer switches away from the layout is no user of it). */
+    fun unsavedSaves(target: SettingsSubtype, decisions: Map<SettingsSubtype, RestoreDecision> = emptyMap(),
+                     withSettings: Boolean = true): (helium314.keyboard.latin.utils.LayoutType, String, String?) -> String? =
+        { type, phone, backup -> unsavedSave(target, type, phone, backup, decisions, withSettings) }
+
+    /** [unsavedDefaultSavesAfter] of the device's [target] merged with the backup's [keyboard], the other backup
+     *  keyboards answered as [decisions] (20261013_L6). */
+    fun unsavedDefaultSaves(target: SettingsSubtype, keyboard: SettingsSubtype, decisions: Map<SettingsSubtype, RestoreDecision> = emptyMap(),
+                            withSettings: Boolean = true): List<DefaultSave> = unsavedDefaultSavesAfter(target, keyboard, decisions, withSettings)
 
     val phone = (enabled + switchedOff).distinct()
 
