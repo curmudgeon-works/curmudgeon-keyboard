@@ -52,11 +52,11 @@ object SettingsSearch {
     // per Setting object: they are recreated when the app language changes, and with them the titles
     private val wordsOfSetting = java.util.WeakHashMap<Setting, Words>()
 
-    /** @return [settings] that match [query], best match first */
+    /** @return [settings] that match [query], best match first; titles starting with the typed text above the rest */
     fun search(query: String, settings: List<Setting>): List<Setting> {
         val queryWords = splitWords(query).filterNot { it in fillerWords }.ifEmpty { splitWords(query) }
         if (queryWords.isEmpty()) return emptyList()
-        return settings.mapNotNull { setting ->
+        val scored = settings.mapNotNull { setting ->
             val words = wordsOfSetting.getOrPut(setting) {
                 Words(splitWords(setting.title), splitWords(setting.description ?: ""), splitWords(setting.key))
             }
@@ -66,6 +66,11 @@ object SettingsSearch {
             if (matched == 0 || matched < queryWords.size - queryWords.size / 3) null
             else setting to scores.sum()
         }.sortedByDescending { it.second }.map { it.first }
+        // owner 2026-10-14: "You should retain the order of how well they match then, just move to the top any items
+        // that start with the search term, preserving their internal order too."
+        val typed = query.trim().lowercase()
+        val (starting, others) = scored.partition { it.title.lowercase().startsWith(typed) }
+        return starting + others
     }
 
     private fun score(queryWord: String, words: Words): Float {
