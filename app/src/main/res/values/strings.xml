@@ -174,7 +174,9 @@
     <string name="learned_words_removed_times">Removed %d times</string>
     <string name="learned_words_action_unblacklist">Un-blacklist</string>
     <string name="learned_words_remove_message">As long-press Remove: forgets how often you typed it, takes it out of the personal dictionary, and it isn\'t suggested until you type it again (the more often removed, the more it takes).</string>
-    <string name="learned_words_unblacklist_message">Suggested again, and how often it was removed starts over.</string>
+    <string name="learned_words_unblacklist_message">Off the list as if it was never removed: suggested again, and how often it was removed starts over.</string>
+    <!-- Learned words list, Delete dialog: the word goes as if never typed; it is not blacklisted -->
+    <string name="learned_words_delete_message">Off the list as if you never typed it: forgets how often you typed it and takes it out of the personal dictionary. It isn\'t blacklisted (long-press Remove in the suggestions does that).</string>
     <!-- Name of the main dictionary, as opposed to auxiliary dictionaries (medical/entertainment/sports...) -->
     <string name="main_dictionary">Main dictionary</string>
     <!-- Option to enable showing suggestions -->

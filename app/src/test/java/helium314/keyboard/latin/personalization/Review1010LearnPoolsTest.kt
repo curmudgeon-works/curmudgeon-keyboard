@@ -149,4 +149,21 @@ class Review1010LearnPoolsTest {
             assertTrue(cache.get(Locale.US).isValidSpellingWord("zorblat"), "A in use: the spell checker still read B's words")
         } finally { cache.closeDictionaries() }
     }
+
+    // 2026-10-11 (owner: "longpress delete should just knock that word out of that list entirely as if it never existed")
+    @Test fun `Delete on the Learned words list forgets the word without blacklisting it - Remove still blacklists`() {
+        storeA.counts["wfddsg"] = 3
+        storeA.counts["teh"] = 2
+        val f = facilitatorOfA()
+        try {
+            DictionaryFacilitatorImpl.removeWords(ctx, "Latn", poolA, listOf(Locale.US), listOf("wfddsg"), blacklist = false)
+            assertTrue(!storeA.counts.containsKey("wfddsg"), "still learned")
+            assertTrue(helium314.keyboard.latin.utils.RemovedWords.blacklist(ctx, "Latn", poolA).entries().keys.none { it.equals("wfddsg", true) },
+                "Delete blacklisted it")
+            DictionaryFacilitatorImpl.removeWords(ctx, "Latn", poolA, listOf(Locale.US), listOf("teh")) // long-press Remove
+            assertTrue(!storeA.counts.containsKey("teh"), "still learned")
+            assertTrue(helium314.keyboard.latin.utils.RemovedWords.blacklist(ctx, "Latn", poolA).entries().keys.any { it.equals("teh", true) },
+                "Remove no longer blacklists")
+        } finally { f.closeDictionaries() }
+    }
 }

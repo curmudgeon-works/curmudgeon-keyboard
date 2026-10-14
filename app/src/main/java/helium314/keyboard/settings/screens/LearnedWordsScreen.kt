@@ -54,10 +54,11 @@ import java.util.Locale
  * with its buttons "Use lists from other keyboards". Per script:
  * - Your words: the script's learned words, merged with the Android personal dictionary's words of the script (from
  *   their letters; the personal dictionary stays per language, Android's), each word once (case-insensitive, shown in
- *   its most typed spelling). Remove: the same as long-press Remove (DictionaryFacilitatorImpl.removeWords), plus its
- *   rows in the Android personal dictionary
+ *   its most typed spelling). Delete: gone as if never typed (owner 2026-10-10: "Just as if the word never existed on
+ *   the list"): out of the learned words and the Android personal dictionary, its recent uses forgotten, NOT blacklisted
+ *   (long-press Remove in the strip is what blacklists)
  * - Blacklisted words: the script's long-press Remove list (see RemovedWords), with how often each was removed (its
- *   strikes, which say how it comes back). Un-blacklist: the word and its strikes.
+ *   strikes, which say how it comes back). Delete: the word and its strikes, as if never removed.
  * A further section (another list of the kind) is one more Kind with its action and one more section() in rows().
  * The personal dictionary's own screens (shortcuts, weights, "for all languages", editing) stay reachable from the
  * first screen, and Add a word here is its add dialog.
@@ -172,9 +173,9 @@ fun LearnedWordsScreen(onClickBack: () -> Unit, script: String, blacklisted: Boo
             onDismissRequest = { selected = null },
             onConfirmed = { run(item) },
             title = { Text(item.entry.word) },
-            content = { Text(stringResource(if (item.kind == Kind.YOURS) R.string.learned_words_remove_message
+            content = { Text(stringResource(if (item.kind == Kind.YOURS) R.string.learned_words_delete_message
                 else R.string.learned_words_unblacklist_message)) },
-            confirmButtonText = stringResource(if (item.kind == Kind.YOURS) R.string.remove else R.string.learned_words_action_unblacklist),
+            confirmButtonText = stringResource(R.string.delete),
         )
     }
     if (adding) // the personal dictionary's own add dialog
@@ -333,8 +334,8 @@ private fun apply(context: Context, script: String, pool: Int, scriptLocales: Li
     val entry = item.entry
     when (item.kind) {
         Kind.YOURS -> {
-            // as long-press Remove (every capitalization of each spelling): out of the script's learned words, one strike
-            // on its blacklist; the languages of the script (and those whose personal dictionary has it) say how it's listed
+            // every capitalization of each spelling out of the script's learned words, no strike (a plain delete); the
+            // languages of the script (and those whose personal dictionary has it) say how it's listed
             val locales = (scriptLocales + entry.personal.mapNotNull { it.locale }).distinct()
             try {
                 if (LearningEventLog.isEnabled()) {
@@ -343,7 +344,7 @@ private fun apply(context: Context, script: String, pool: Int, scriptLocales: Li
                         LearningEventLog.log(LearningEventLog.REMOVED, LearningEventLog.SETTINGS, word, "",
                             LearnedStores.label(script, pool), counts)
                 }
-                DictionaryFacilitatorImpl.removeWords(context, script, pool, locales, entry.spellings)
+                DictionaryFacilitatorImpl.removeWords(context, script, pool, locales, entry.spellings, blacklist = false)
             } catch (e: Exception) {
                 Log.w("LearnedWordsScreen", "could not remove a word of $script", e)
             }

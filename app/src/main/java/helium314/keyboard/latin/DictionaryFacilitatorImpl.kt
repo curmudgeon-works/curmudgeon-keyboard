@@ -899,7 +899,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
      * apps) and gives each one more strike on its script's blacklist. Spellings of one word ("The", "the") are one
      * Remove: one strike; and one per word, not one per language (the languages of a script share the list).
      */
-    private fun removeWords(words: Collection<String>) {
+    private fun removeWords(words: Collection<String>, blacklist: Boolean = true) {
         val struck = LinkedHashSet<String>()
         // (the swipe lists are the keyboard in use's: not touched for the words of another keyboard, e.g. through the
         // spell checker's facilitator still set up for it)
@@ -909,6 +909,10 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
             // each language's dictionaries say how the word is listed: as written if one of them has it so, else lowercase
             val spellings = dictionaryGroups.map { it.removeEverywhere(word, history, swipe, learnedPool) }
             struck.add(if (word in spellings) word else spellings.firstOrNull() ?: word.lowercase())
+        }
+        if (!blacklist) { // (a plain delete: a dictionary word's copy is swiped again, as if never learned)
+            if (swipe) for (group in dictionaryGroups) GestureDecoderVocabulary.onWordUnblacklisted(group.locale, struck.firstOrNull() ?: return)
+            return
         }
         for (spelling in struck) {
             blacklistFor(spelling)?.own?.strike(spelling) ?: continue
@@ -952,6 +956,8 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         private val liveFacilitators = java.util.Collections.newSetFromMap(java.util.WeakHashMap<DictionaryFacilitatorImpl, Boolean>())
 
         /**
+         * ([blacklist] false: a plain delete from the Learned words list, no strike; owner 2026-10-10: "Just as if the word
+         * never existed on the list")
          * Long-press Remove of [words] of [script] in learned-words [pool], from outside the keyboard (the settings screen
          * "Learned & blacklisted words"; [locales]: the languages of that script): through a running keyboard that has
          * those dictionaries and that pool loaded, else through the languages' main dictionaries loaded for this (they say
@@ -959,10 +965,11 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
          * shared RemovedWords list, so the running keyboard has it at once. Call off the main thread.
          */
         @JvmStatic
-        fun removeWords(context: Context, script: String, pool: Int, locales: Collection<Locale>, words: Collection<String>) {
+        fun removeWords(context: Context, script: String, pool: Int, locales: Collection<Locale>, words: Collection<String>,
+                        blacklist: Boolean = true) {
             val live = synchronized(liveFacilitators) { liveFacilitators.toList() }.firstOrNull { f ->
                 f.learnedPool == pool && f.dictionaryGroups.any { it.locale in locales && it.hasDict(Dictionary.TYPE_MAIN) } }
-            if (live != null) return live.removeWords(words)
+            if (live != null) return live.removeWords(words, blacklist)
             val history = PersonalizationHelper.getUserHistoryDictionary(context, script, pool)
             val groups = locales.map { DictionaryGroup(it, DictionaryFactory.createMainDictionaryCollection(context, it, false)) }
             val swipe = inUseReads(pool)
@@ -971,6 +978,11 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
                 for (word in words) {
                     val spellings = groups.map { it.removeEverywhere(word, history, swipe, pool) }
                     struck.add(if (word in spellings || spellings.isEmpty()) word else spellings.first())
+                }
+                if (!blacklist) { // (a plain delete from the Learned words list: no strike)
+                    if (swipe) for (locale in locales) GestureDecoderVocabulary.onWordUnblacklisted(locale, struck.firstOrNull() ?: break)
+                    history.onFinishInput()
+                    return
                 }
                 val list = RemovedWords.blacklist(context, script, pool)
                 for (spelling in struck) {
