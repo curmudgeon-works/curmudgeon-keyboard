@@ -18,14 +18,14 @@ import java.io.File
  * (SettingsActivity.onStop) and, after a crash, when the app starts again ([recoverAfterCrash]).
  */
 class AppearanceDraft private constructor(
-    private var prefs: Map<String, Any?>,
+    private val prefs: Map<String, Any?>,
     private var files: Map<File, Saved?>, // the live file -> its saved copy, null when it didn't exist
     private val dir: File,
     private val setId: Int = KeyboardProfiles.SHARED, // the set the screen edited (see PrefsDraft)
     // what the screen's saved items reach beyond the edited set, as stored (every keyboard's own set too): the saved
     // themes, each set's theme choice and palettes, so Discard undoes a rename or delete everywhere it reached (owner
     // 2026-10-11: "Every action on an editing screen ... is held until Save; Discard undoes it everywhere it reached")
-    private var reached: Map<String, Any?> = emptyMap(),
+    private val reached: Map<String, Any?> = emptyMap(),
 ) {
     /** A copy of a custom file, with the size and time the live one had (enough to tell a change, no reading). */
     class Saved(val copy: File, val length: Long, val modified: Long)
@@ -110,18 +110,8 @@ class AppearanceDraft private constructor(
         discard()
     }
 
-    /** [keys] are kept as they are now ("Save and exit" on a screen opened from Appearance, the palette editor): the
-     *  snapshot takes their values, so neither the cross nor leaving the app undoes them. */
-    fun rebase(ctx: Context, keys: Set<String>) {
-        val now = AppearanceLooks.screenValues(
-            ProfilePreferences(helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)) { setId })
-        prefs = prefs.filterKeys { it !in keys } + now.filterKeys { it in keys }
-        // (the palette editor's "Save and exit" keeps a palette's rename too, wherever it reached)
-        if (keys.any { reachesBeyond(it) }) reached = reachedNow(ctx)
-        writeSnapshot(dir, setId, prefs, files, reached)
-        version.intValue++
-        helium314.keyboard.latin.utils.SettingsEventLog.log("Appearance snapshot rebased: $keys")
-    }
+    // (no rebase: the palette editor's "Save and exit" leaves this snapshot as it is, so Appearance's Save or Discard
+    // decides the editor's changes too; owner 2026-10-11, option 1, review B1)
 
     /** Keeps what is on the phone now; only the snapshot goes. Deletes made on the screen are done for good now: every
      *  keyboard and saved theme lets go of a deleted font, the other keyboards of a deleted palette. */
@@ -182,9 +172,6 @@ class AppearanceDraft private constructor(
 
         /** [AppearanceDraft.holdFiles] of the running draft, if there is one. */
         fun holdFilesOpen(files: List<File>) { active?.holdFiles(files) }
-
-        /** [AppearanceDraft.rebase] of the running draft, if there is one. */
-        fun rebaseOpen(ctx: Context, keys: Set<String>) { active?.rebase(ctx, keys) }
 
 
         /** The app is left (or the screen goes to the background) with the screen open: changes not accepted are undone. */

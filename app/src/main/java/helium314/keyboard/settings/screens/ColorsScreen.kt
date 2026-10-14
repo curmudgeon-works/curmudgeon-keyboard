@@ -68,6 +68,15 @@ import helium314.keyboard.latin.utils.previewDark
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
+/** The palette editor's "Save and exit" ([opened] the palette's name when the editor opened, [now] its name now): the
+ *  change stays and the editor goes back to Appearance, which still holds it; Appearance's own Save or Discard decides
+ *  it, with everything else done there (owner 2026-10-11, option 1: "every action is held until the screen's Save;
+ *  Discard undoes it everywhere it reached"). Until then this rebased Appearance's snapshot, which took all it reaches:
+ *  a theme deleted on Appearance stayed deleted after its Discard (review B1). */
+internal fun paletteEditorSaved(opened: String, now: String) {
+    helium314.keyboard.latin.utils.SettingsEventLog.log("Palette editor saved ($opened -> $now): held until Appearance's Save")
+}
+
 @Composable
 fun ColorsScreen(
     isNight: Boolean,
@@ -124,10 +133,9 @@ fun ColorsScreen(
     var askLeave by rememberSaveable { mutableStateOf(false) }
     fun leave() { if (changed) askLeave = true else onClickBack() }
     var askUpdate by rememberSaveable { mutableStateOf(false) }
-    /** Kept for good (the Appearance screen under it doesn't ask again about it), and back. */
+    /** Kept, and back to Appearance, whose Save or Discard decides it ([paletteEditorSaved]). */
     fun saveAndBack() {
-        helium314.keyboard.settings.AppearanceDraft.rebaseOpen(ctx,
-            (paletteKeys(openedName) + paletteKeys(newThemeName.text) + Settings.PREF_THEME_COLORS + Settings.PREF_THEME_COLORS_NIGHT).toSet())
+        paletteEditorSaved(openedName, newThemeName.text)
         onClickBack()
     }
     /** The other keyboards (with their set ids) and the saved themes that use this palette: none with one set of
@@ -308,7 +316,7 @@ fun ColorsScreen(
     if (askLeave) helium314.keyboard.settings.dialogs.UnsavedChangesDialog(
         onKeepWorking = { askLeave = false },
         onDiscardAndExit = { askLeave = false; putBack(); onClickBack() },
-        // saved for good, as on the popups screen: the Appearance screen under it doesn't ask again about it
+        // kept and back: Appearance's Save or Discard decides it (owner 2026-10-11, see paletteEditorSaved)
         onSaveAndExit = {
             askLeave = false
             // other keyboards or saved themes using it: which get the new colours (2026-10-11), else saved at once
