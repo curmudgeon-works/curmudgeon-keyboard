@@ -25,6 +25,7 @@ import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSub
 import helium314.keyboard.latin.utils.RemovedWords
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.realPrefs
+import helium314.keyboard.settings.preferences.RestoreDecision
 import helium314.keyboard.settings.preferences.restoreChosenFrom
 import helium314.keyboard.settings.preferences.restoreEverythingFrom
 import helium314.keyboard.settings.preferences.settingsToJsonStream
@@ -169,7 +170,9 @@ class LearnedKeyboardsResetRestoreTest {
             "keyboard_profile_ids" to JSONObject(mapOf(c.toPref() to 7, d.toPref() to 8)).toString(), "keyboard_profile_next_id" to 9),
             stores = mapOf(1 to "backc", 2 to "backd"))
 
-        restoreChosenFrom(ctx, zip, listOf(c, d), settings = true, learnedWords = true, io = io)
+        // (both on the phone: answered "merge into" each, as the dialog asks; (owner 2026-10-11: a keyboard restore never wipes; only the full restore does))
+        restoreChosenFrom(ctx, zip, listOf(c, d), settings = true, learnedWords = true, io = io,
+            decisions = mapOf(c to RestoreDecision.Merge(c), d to RestoreDecision.Merge(d)))
 
         assertEquals(mapOf(c.toPref() to 3, d.toPref() to 4), storedPools(real), "the phone's pools")
         assertEquals(5, real.getInt(LearnedKeyboards.PREF_POOL_NEXT, 0))
@@ -188,7 +191,9 @@ class LearnedKeyboardsResetRestoreTest {
         backup(mapOf(Settings.PREF_ENABLED_SUBTYPES to SubtypeSettings.createPrefSubtypes(listOf(c, d)),
             Settings.PREF_SELECTED_SUBTYPE to c.toPref()), stores = mapOf(0 to "shared"), lists = mapOf(0 to "teh"))
 
-        restoreChosenFrom(ctx, zip, listOf(c, d), settings = true, learnedWords = true, io = io)
+        // (c on the phone: answered "merge into" it, as the dialog asks; (owner 2026-10-11: a keyboard restore never wipes; only the full restore does))
+        restoreChosenFrom(ctx, zip, listOf(c, d), settings = true, learnedWords = true, io = io,
+            decisions = mapOf(c to RestoreDecision.Merge(c)))
 
         val pools = storedPools(real)
         assertEquals(3, pools[c.toPref()])

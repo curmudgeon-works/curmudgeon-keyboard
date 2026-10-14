@@ -316,6 +316,8 @@
     <string name="restore_running">Restoring…</string>
     <!-- Restore dialog: one checklist, mirroring the factory reset one -->
     <string name="restore_choice_message">Choose what to bring from the backup.</string>
+    <!-- the restore dialog's own choice of the full restore, which wipes (owner 2026-10-11); its message: saving_full_everything -->
+    <string name="restore_everything">Restore everything</string>
     <string name="restore_keyboards">Keyboards</string>
     <string name="restore_with_keyboards">Bring with them</string>
     <string name="restore_settings">Settings</string>

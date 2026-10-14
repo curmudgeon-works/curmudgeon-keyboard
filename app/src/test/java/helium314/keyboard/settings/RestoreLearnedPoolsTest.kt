@@ -98,7 +98,9 @@ class RestoreLearnedPoolsTest {
         finally { LearnedKeyboards.storeIo = LearnedStoreIo.Native }
 
         val ids = JSONObject(real.getString("keyboard_profile_ids", "{}")!!)
-        assertEquals(setOf(c.toPref(), d.toPref()), ids.keys().asSequence().toSet(), "the phone's old keyboards got ids")
+        // (the phone's keyboards stay, with their ids; (owner 2026-10-11: a keyboard restore never wipes; only the full restore does))
+        assertEquals(mapOf(a.toPref() to 5, b.toPref() to 6), ids.keys().asSequence().filter { it == a.toPref() || it == b.toPref() }.associateWith { ids.getInt(it) })
+        assertEquals(setOf(a.toPref(), b.toPref(), c.toPref(), d.toPref()), ids.keys().asSequence().toSet())
         // the phone's keyboards kept their pools (sharing was off there), the backup's got their own
         val pools = JSONObject(real.getString(LearnedKeyboards.PREF_POOLS, "{}")!!)
         assertEquals(5, pools.getInt(a.toPref()))

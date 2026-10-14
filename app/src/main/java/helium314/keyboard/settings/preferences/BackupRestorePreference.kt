@@ -425,6 +425,24 @@ private fun RestoreChoiceDialog(pending: PendingRestore, onDismiss: () -> Unit, 
         asking = rest
         if (rest.isEmpty()) { start(); close() }
     }
+    // the full restore, its own choice (owner 2026-10-11: "User should be given the option to do a full restore which
+    // wipes, or partial keyboard by keyboard"): asked once, no questions per keyboard
+    var everything by remember { mutableStateOf(false) }
+    if (everything) {
+        ConfirmationDialog(
+            onDismissRequest = { everything = false }, // (back to the restore dialog)
+            title = { Text(stringResource(R.string.restore_everything)) },
+            content = { Text(stringResource(R.string.saving_full_everything)) },
+            confirmButtonText = stringResource(R.string.restore_everything),
+            onConfirmed = {
+                started = runRestore(ctx, onError, R.string.backup_restored, restoreSteps(pending)) {
+                    try { restoreEverything(ctx, pending.file) } finally { pending.file.delete() }
+                }
+                close()
+            },
+        )
+        return
+    }
     val asked = asking?.firstOrNull()
     if (asked != null) {
         // (each keyboard's questions their own state; "what to merge" goes back to its first question)
@@ -459,8 +477,8 @@ private fun RestoreChoiceDialog(pending: PendingRestore, onDismiss: () -> Unit, 
                 }
                 Heading(R.string.restore_with_keyboards)
                 CheckRow(stringResource(R.string.restore_settings), settings, withKeyboards) { settings = it }
-                // (only when some keyboards come back: all of them with their settings replace everything)
-                if (settings && withKeyboards && selected.toSet() != pending.keyboards.toSet())
+                // (every keyboard too: a keyboard restore never wipes, owner 2026-10-11)
+                if (settings && withKeyboards)
                     CheckRow(stringResource(R.string.restore_saved_items_as_copies), asCopies) { asCopies = it }
                 if (pending.hasLearnedWords)
                     CheckRow(stringResource(R.string.restore_learned_words), learnedWords, withKeyboards) { learnedWords = it }
@@ -477,6 +495,8 @@ private fun RestoreChoiceDialog(pending: PendingRestore, onDismiss: () -> Unit, 
         },
         scrollContent = true,
         confirmFirst = true,
+        neutralButtonText = stringResource(R.string.restore_everything),
+        onNeutral = { everything = true },
         checkOk = { withKeyboards || (customWords && pending.hasCustomWords) || (clipboard && pending.hasClipboard) },
         onConfirmed = {
             // the chosen keyboards whose language the phone has are asked about first, one by one
@@ -763,9 +783,8 @@ internal fun restoreChosenFrom(ctx: Context, file: File, keyboards: List<Setting
     restoreChosen(ctx, readBackup(file), RestoreChoice(keyboards, settings, learnedWords, false, false, false, decisions = decisions), io)
 
 /**
- * Brings what [choice] asks for out of the backup and leaves the rest of the phone as it is. With every keyboard
- * of the backup chosen together with the settings, the backup's whole preference set (shared or separate, as it
- * was) replaces the phone's; a subset is restored keyboard by keyboard, see [restoreKeyboards]. Learned words and
+ * Brings what [choice] asks for out of the backup and leaves the rest of the phone as it is: the keyboards keyboard by
+ * keyboard, all of them too ([restoreKeyboards]; only the full restore wipes, [restoreEverything]). Learned words and
  * added dictionaries follow the chosen keyboards' languages.
  */
 private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: RestoreChoice, io: LearnedStoreIo = LearnedStoreIo.Native): List<SettingsSubtype> =
@@ -777,24 +796,16 @@ private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: Restore
 
 /** The result: the restored keyboards whose settings wait behind the common ones (separate settings off, R7). */
 private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, choice: RestoreChoice, io: LearnedStoreIo): List<SettingsSubtype> {
-    val everyKeyboard = choice.keyboards.toSet() == pending.keyboards.toSet()
     // (one answered "Don't restore" brings nothing: not its learned words or dictionaries either)
     val restoring = choice.keyboards.filter { choice.decisions[it] != RestoreDecision.Skip }
-    // the backup's whole set replaces the phone's only with every keyboard of the backup, each one asked about merged
-    // whole into a phone keyboard and named as in the backup: else keyboard by keyboard (a keyboard kept separate, or of
-    // which only some parts come back: the whole set would replace the phone's)
-    val allSettings = choice.settings && choice.keyboards.isNotEmpty() && everyKeyboard && (choice.decisions.isEmpty() ||
-        incomingKeyboards(ctx, pending).let { incoming -> choice.decisions.all { (keyboard, decision) ->
-            decision is RestoreDecision.Merge && decision.whole &&
-                RestoreDecision.result(decision, incoming.getValue(keyboard)) { keyboardName(it, ctx) } == incoming.getValue(keyboard) } })
-    // each restored keyboard as it is on the phone now (its custom key layouts can come in under other names; merged:
-    // the phone keyboard it went into, its definition the phone's in parts)
-    var onPhone: Map<SettingsSubtype, SettingsSubtype> = choice.keyboards.associateWith { it }
+    // keyboard by keyboard, every keyboard of the backup too (owner 2026-10-11: a keyboard restore never wipes; only the
+    // full restore does: "partial keyboard by keyboard where all keyboards are just another case"). Each restored
+    // keyboard as it is on the phone now (its custom key layouts can come in under other names; merged: the phone
+    // keyboard it went into, its definition the phone's in parts)
+    var onPhone: Map<SettingsSubtype, SettingsSubtype> = emptyMap()
     var hidden: List<SettingsSubtype> = emptyList()
-    if (choice.keyboards.isNotEmpty()) {
-        if (allSettings) restoreAllSettings(ctx, pending)
-        else restoreKeyboards(ctx, pending, restoring, choice.settings, choice.asCopies, choice.decisions).let { onPhone = it.first; hidden = it.second }
-    }
+    if (choice.keyboards.isNotEmpty())
+        restoreKeyboards(ctx, pending, restoring, choice.settings, choice.asCopies, choice.decisions).let { onPhone = it.first; hidden = it.second }
     val tags = restoring.flatMap { listOf(it.locale) + getSecondaryLocales(it.extraValues) }.map { it.toLanguageTag() }.toSet()
     val filesDir = ctx.filesDir ?: return hidden
     val deviceProtectedFilesDir = DeviceProtectedUtils.getFilesDir(ctx)
@@ -824,8 +835,6 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, choice: R
             when {
                 !backupFilePatterns.any { path.matches(it) } -> when {
                     name == Database.NAME && choice.clipboard -> FileUtils.copyStreamToNewFile(zip, restoredDb)
-                    name == PROTECTED_PREFS_FILE_NAME && allSettings ->
-                        restoreProtectedPrefs(ctx, String(zip.readBytes()).split("\n"))
                     name == PERSONAL_DICT_FILE_NAME && choice.customWords -> try {
                         restorePersonalDictionary(ctx, String(zip.readBytes())) // never fail the whole restore over it
                     } catch (t: Throwable) {
@@ -837,7 +846,6 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, choice: R
                     if (aside.canonicalPath.startsWith(learnedDir.canonicalPath + File.separator)) FileUtils.copyStreamToNewFile(zip, aside)
                 }
                 choice.dictionaries && isDictionary(path) -> FileUtils.copyStreamToNewFile(zip, target)
-                allSettings && isSettingsFile(path) -> FileUtils.copyStreamToNewFile(zip, target)
             }
             zip.closeEntry()
             BackupRestoreJob.step()
@@ -852,14 +860,6 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, choice: R
         learnedDir.deleteRecursively()
     }
     BackupRestoreJob.step() // (the learned words)
-    if (allSettings) {
-        // a backup from before the pictures were per keyboard (or the picture list existed): what app start does once
-        val real = ctx.realPrefs()
-        KeyboardProfiles.migrateFiles(real)
-        helium314.keyboard.latin.common.PictureLibrary.migrate(ctx, real.getBoolean("picture_library_migrated", false)) {
-            real.edit().putBoolean("picture_library_migrated", true).apply() }
-        Settings.clearCachedBackgroundImages()
-    }
     LayoutUtilsCustom.onLayoutFileChanged()
     return hidden
 }
@@ -874,25 +874,6 @@ private fun keepingPhoneChoices(ctx: Context, restore: () -> Unit) {
     try { restore() } finally {
         ctx.realPrefs().edit(commit = true) { if (phone == null) remove(key) else putBoolean(key, phone) }
     }
-}
-
-/** The backup's preferences replace the phone's, every keyboard's set included. */
-private fun restoreAllSettings(ctx: Context, pending: PendingRestore) = keepingPhoneChoices(ctx) {
-    // which pool each keyboard's learned words are in names the phone's files: the phone's stays (the backup's words are
-    // added keyboard by keyboard, restoreLearnedWords)
-    val phone = LearnedKeyboards.phoneState(ctx.realPrefs())
-    Settings.getInstance().stopListener()
-    // the backup's set ids replace the phone's: pictures of the phone's sets would turn up on the backup's keyboards
-    KeyboardProfiles.deleteAllFiles()
-    Settings.clearCachedBackgroundImages()
-    ctx.realPrefs().edit {
-        clear()
-        for ((key, value) in pending.prefs) KeyboardProfiles.put(this, key, value)
-    }
-    val real = ctx.realPrefs()
-    // and the buttons of the backup's keyboards (review 2026-10-07: not the phone's list, which isn't reloaded yet)
-    LearnedKeyboards.afterFullRestore(real, phone, pending.prefs, pending.keyboards)
-    LearnedStores.refresh(real)
 }
 
 /** What [keyboard] gets when restored on its own from [backup]: what it read there, left at the defaults where the

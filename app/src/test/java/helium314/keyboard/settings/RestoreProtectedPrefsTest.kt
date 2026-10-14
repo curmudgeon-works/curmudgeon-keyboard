@@ -15,7 +15,6 @@ import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.protectedPrefs
 import helium314.keyboard.latin.utils.realPrefs
-import helium314.keyboard.settings.preferences.restoreChosenFrom
 import helium314.keyboard.settings.preferences.restoreEverythingFrom
 import helium314.keyboard.settings.preferences.settingsToJsonStream
 import helium314.keyboard.latin.personalization.LearnedStoreIo
@@ -130,10 +129,10 @@ class RestoreProtectedPrefsTest {
     }
 
     @Config(sdk = [23])
-    @Test fun `Android 6, all keyboards and settings from a 7+ backup keep the settings`() {
+    @Test fun `Android 6, Everything from a 7+ backup keeps the settings`() {
         assertOnePhoneFile()
         writeBackup(currentSettings(), protectedEntry(mapOf("lib_checksum" to "abc")))
-        restoreChosenFrom(ctx, zip, keyboards, settings = true, learnedWords = false, io = LearnedStoreIo.Native)
+        restoreEverythingFrom(ctx, zip) // (was every keyboard with settings: owner 2026-10-11: a keyboard restore never wipes; only the full restore does)
         assertCurrentSettingsKept()
     }
 
@@ -155,7 +154,7 @@ class RestoreProtectedPrefsTest {
     @Test fun `Android 6, an unreadable protected entry leaves the restored settings`() {
         assertOnePhoneFile()
         writeBackup(currentSettings(), "boolean settings\n{not json")
-        restoreChosenFrom(ctx, zip, keyboards, settings = true, learnedWords = false, io = LearnedStoreIo.Native)
+        restoreEverythingFrom(ctx, zip) // (was every keyboard with settings: owner 2026-10-11: a keyboard restore never wipes; only the full restore does)
         assertCurrentSettingsKept()
         real.edit().clear().commit()
         writeBackup(upstreamSettings(), "boolean settings\n{not json")
@@ -170,7 +169,7 @@ class RestoreProtectedPrefsTest {
         assertNotEquals(ctx.filesDir, DeviceProtectedUtils.getFilesDir(ctx))
         ctx.protectedPrefs().edit().putString("stale", "x").commit()
         writeBackup(currentSettings(), protectedEntry(mapOf("lib_checksum" to "abc")))
-        restoreChosenFrom(ctx, zip, keyboards, settings = true, learnedWords = false, io = LearnedStoreIo.Native)
+        restoreEverythingFrom(ctx, zip) // (was every keyboard with settings: owner 2026-10-11: a keyboard restore never wipes; only the full restore does)
         assertCurrentSettingsKept()
         assertNull(real.all["lib_checksum"])
         assertEquals(mapOf<String, Any?>("lib_checksum" to "abc"), ctx.protectedPrefs().all, "the protected file is replaced")
