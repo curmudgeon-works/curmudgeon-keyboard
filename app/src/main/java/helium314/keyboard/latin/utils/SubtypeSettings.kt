@@ -24,15 +24,18 @@ import helium314.keyboard.latin.utils.ScriptUtils.script
 import java.util.Locale
 
 object SubtypeSettings {
-    /** @return enabled subtypes. If no subtypes are enabled, but a contextForFallback is provided,
-     *  subtypes for system locales will be returned, or en-US if none found. */
+    /** @return enabled subtypes. If none are enabled and [fallback]: the default keyboard ([getDefaultEnabledSubtypes]),
+     *  only before [init] stored it (2026-10-11: the list is never left empty, see [loadEnabledSubtypes]). */
     fun getEnabledSubtypes(fallback: Boolean = false): List<InputMethodSubtype> {
         if (fallback && enabledSubtypes.isEmpty())
             return getDefaultEnabledSubtypes()
         return enabledSubtypes
     }
 
-    fun isEnabled(subtype: InputMethodSubtype?): Boolean = subtype in enabledSubtypes || subtype in getDefaultEnabledSubtypes()
+    // (the default counts only while nothing is listed: a default keyboard taken out of the list is not enabled; before
+    // 2026-10-11 it stayed "enabled" and switching could go back to it)
+    fun isEnabled(subtype: InputMethodSubtype?): Boolean =
+        subtype in enabledSubtypes || (enabledSubtypes.isEmpty() && subtype in getDefaultEnabledSubtypes())
 
     fun getAllAvailableSubtypes(): List<InputMethodSubtype> =
         resourceSubtypesByLocale.values.flatten() + additionalSubtypes
@@ -56,21 +59,20 @@ object SubtypeSettings {
     fun addEnabledSubtype(prefs: SharedPreferences, newSubtype: InputMethodSubtype) {
         helium314.keyboard.latin.utils.SettingsEventLog.log("keyboard added: ${newSubtype.toSettingsSubtype().toPref()}")
         val subtype = newSubtype.toSettingsSubtype()
-        // no list stored yet (a fresh install): the keyboards it shows stay in it, the first one's set being the common
-        // settings (owner 2026-10-11: no separate common set; before, the added one replaced them, and the settings
-        // made so far stayed with a keyboard no longer listed)
+        // (the list is stored from the first start on, see [loadEnabledSubtypes]; found empty all the same: the default
+        // keyboard is stored first, as at a first start, so the settings made on it stay with a listed keyboard)
         val stored = createSettingsSubtypes(prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!)
-        val subtypes = stored.ifEmpty { getEnabledSubtypes(true).map { it.toSettingsSubtype() } } + subtype
+        val defaultFirst = stored.isEmpty() && enabledSubtypes.isEmpty()
+        val subtypes = (if (defaultFirst) listOf(getDefaultEnabledSubtypes().first().toSettingsSubtype()) else stored) + subtype
         val newString = createPrefSubtypes(subtypes)
         prefs.edit { putString(Settings.PREF_ENABLED_SUBTYPES, newString) }
 
-        val shownKept = stored.isEmpty() && enabledSubtypes.isEmpty()
-        if (shownKept) enabledSubtypes.addAll(getDefaultEnabledSubtypes())
+        if (defaultFirst) enabledSubtypes.add(getDefaultEnabledSubtypes().first())
         if (newSubtype !in enabledSubtypes) {
             enabledSubtypes.add(newSubtype)
             // order = the order keyboards were added (also the switching order); the pref string keeps it across restarts
             RichInputMethodManager.getInstance().refreshSubtypeCaches()
-        } else if (shownKept) RichInputMethodManager.getInstance().refreshSubtypeCaches()
+        } else if (defaultFirst) RichInputMethodManager.getInstance().refreshSubtypeCaches()
     }
 
     /** @return whether subtype was actually removed */
@@ -231,26 +233,30 @@ object SubtypeSettings {
         reloadSystemLocales(context)
 
         loadResourceSubtypes(context.resources)
+        builtInDictLocales.clear()
+        DictionaryInfoUtils.getAssetsDictionaryList(context).orEmpty().filter { it.startsWith(DictionaryInfoUtils.MAIN_DICT_PREFIX) }
+            .mapNotNullTo(builtInDictLocales) { runCatching { DictionaryInfoUtils.extractLocaleFromAssetsDictionaryFile(it) }.getOrNull() }
+        systemSubtypes.clear()
         loadAdditionalSubtypes(context.prefs())
         enabledSubtypes.clear() // loading twice must not list a keyboard twice
         loadEnabledSubtypes(context)
     }
 
-    @Suppress("SameReturnValue")
+    /**
+     * The default keyboard, one (owner 2026-10-11: at the first start one real keyboard is stored, no "list empty, a
+     * default is shown" any more): the first of the phone's languages (its language list, in order) the app has a
+     * built-in dictionary for, as the "No dictionary" check matches them (a language-level one counts, see
+     * getUserAndInternalDictionaries), its first built-in keyboard; else English (US).
+     */
     private fun getDefaultEnabledSubtypes(): List<InputMethodSubtype> {
         if (systemSubtypes.isNotEmpty()) return systemSubtypes
-        val subtypes = systemLocales.mapNotNull { locale ->
-            val subtypesOfLocale = resourceSubtypesByLocale[locale]
-            // get best match
-                ?: LocaleUtils.getBestMatch(locale, resourceSubtypesByLocale.keys) {it}?.let { resourceSubtypesByLocale[it] }
-            subtypesOfLocale?.firstOrNull()
-        }
-        if (subtypes.isEmpty()) {
-            // hardcoded fallback to en-US for weird cases
-            systemSubtypes.add(resourceSubtypesByLocale[Locale.US]!!.first())
-        } else {
-            systemSubtypes.addAll(subtypes)
-        }
+        val subtype = systemLocales.firstNotNullOfOrNull { locale ->
+            if (LocaleUtils.getBestMatch(locale, builtInDictLocales) { it } == null) return@firstNotNullOfOrNull null
+            (resourceSubtypesByLocale[locale]
+                ?: LocaleUtils.getBestMatch(locale, resourceSubtypesByLocale.keys) { it }?.let { resourceSubtypesByLocale[it] })
+                ?.firstOrNull()
+        } ?: resourceSubtypesByLocale[Locale.US]!!.first()
+        systemSubtypes.add(subtype)
         return systemSubtypes
     }
 
@@ -300,6 +306,18 @@ object SubtypeSettings {
 
             enabledSubtypes.add(subtype)
         }
+        // nothing listed (the first start, or the list found empty): the default keyboard is stored, an ordinary keyboard
+        // whose own settings are the main ones (owner 2026-10-11); before, the list stayed empty and a default was shown.
+        // (a list whose keyboards only failed to load in debug mode stays as it is)
+        if (enabledSubtypes.isEmpty() && createSettingsSubtypes(prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!).isEmpty()) {
+            val default = getDefaultEnabledSubtypes().first()
+            Log.i(TAG, "no keyboard in the list: storing the default ${default.toSettingsSubtype().toPref()}")
+            prefs.edit {
+                putString(Settings.PREF_ENABLED_SUBTYPES, createPrefSubtypes(listOf(default.toSettingsSubtype())))
+                if (!prefs.contains(Settings.PREF_SELECTED_SUBTYPE)) putString(Settings.PREF_SELECTED_SUBTYPE, default.toSettingsSubtype().toPref())
+            }
+            enabledSubtypes.add(default)
+        }
     }
 
     /** @return whether pref was changed */
@@ -332,6 +350,7 @@ object SubtypeSettings {
     private val resourceSubtypesByLocale = LinkedHashMap<Locale, MutableList<InputMethodSubtype>>(100)
     private val additionalSubtypes = mutableListOf<InputMethodSubtype>()
     private val systemLocales = mutableListOf<Locale>()
-    private val systemSubtypes = mutableListOf<InputMethodSubtype>()
+    private val systemSubtypes = mutableListOf<InputMethodSubtype>() // (the default keyboard, once worked out)
+    private val builtInDictLocales = mutableListOf<Locale>() // the languages of the built-in (asset) main dictionaries
     private val TAG = SubtypeSettings::class.simpleName
 }
