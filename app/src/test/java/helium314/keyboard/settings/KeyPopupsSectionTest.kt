@@ -47,6 +47,9 @@ class KeyPopupsSectionTest {
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
     }
 
+    private val customFromS get() = ctx.getString(helium314.keyboard.latin.R.string.custom_from,
+        ctx.getString(helium314.keyboard.latin.R.string.custom_label), "S")
+
     private fun open(): ActivityScenario<SettingsActivity> = ActivityScenario.launch(SettingsActivity::class.java).onActivity {
         it.setContent { KeyPopupsSection(keyboard) { } }
     }
@@ -63,7 +66,8 @@ class KeyPopupsSectionTest {
         ctx.prefs().edit().putString(KeyPopupOverrides.PREF, p1).putString(KeyPopupOverrides.PREF_SELECTED_SET, "S").commit()
         deletePopupSet(ctx, "S")
         open().use {
-            compose.onNodeWithText("Custom 1").assertExists() // the keyboard keeps its popups
+            // (owner 2026-10-11: labels are just "Custom", no number; the deleted set's name stays with it: "Custom · from S")
+            compose.onNodeWithText(customFromS).assertExists() // the keyboard keeps its popups
             applyLayout(LayoutPresets.builtIn(ctx).first()) // the Curmudgeon Layout: no popups of its own
             compose.waitForIdle()
             compose.onNodeWithText(ctx.getString(helium314.keyboard.latin.R.string.key_popups_preset_heliboard_packed)).assertExists() // the default popups
@@ -78,7 +82,7 @@ class KeyPopupsSectionTest {
         deletePopupSet(ctx, "S")
         ctx.prefs().edit().putString(KeyPopupOverrides.PREF, p1).commit()
         open().use {
-            compose.onNodeWithText("Custom 1").assertExists()
+            compose.onNodeWithText(customFromS).assertExists() // (owner 2026-10-11: labels are just "Custom", no number)
             applyLayout(layout) // p2 on the keyboard, S back in the list
             compose.waitForIdle()
             compose.onNodeWithText("S").assertExists() // the set the Layout brought back
