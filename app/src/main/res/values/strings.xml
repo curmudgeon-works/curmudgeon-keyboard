@@ -603,6 +603,28 @@
     <!-- the restore dialog: a keyboard not on this phone; and what to do with saved items whose names are taken -->
     <string name="restore_keyboard_new">%s (new)</string>
     <string name="restore_saved_items_as_copies">Saved items whose names you already use: bring them in as copies</string>
+    <!-- the restore: a chosen keyboard is on this phone already (same language, name and copy number) but differs.
+         The app can't tell which one is newer: never say newer or older. %s: the keyboard's name -->
+    <string name="restore_differs_title">%s is already on this phone, and differs from the backup\'s.</string>
+    <string name="restore_differs_choose">Choose what to replace</string>
+    <string name="restore_differs_replace">Replace with the backup\'s</string>
+    <string name="restore_differs_choose_message">A ticked item takes the backup\'s. An unticked item keeps this phone\'s.</string>
+    <!-- a row of "Choose what to replace": %1$s what it is, %2$s this phone's value, %3$s the backup's -->
+    <string name="restore_differs_row">%1$s: this phone %2$s, backup %3$s</string>
+    <!-- a row whose two values can't be shown apart in words -->
+    <string name="restore_differs_plain">%s: this phone and the backup differ</string>
+    <!-- a row for a menu whose settings differ: %s the menu -->
+    <string name="restore_differs_menu">%s settings</string>
+    <string name="restore_part_keys">Keys</string>
+    <string name="restore_part_languages">Languages</string>
+    <string name="restore_part_accents">Accents</string>
+    <string name="restore_part_popup_order">Popup order</string>
+    <string name="restore_part_hint_order">Hint order</string>
+    <string name="restore_value_general">as the general setting</string>
+    <string name="restore_value_default">default</string>
+    <string name="restore_value_own">its own</string>
+    <string name="restore_value_on">on</string>
+    <string name="restore_value_off">off</string>
     <string name="key_popups_save_as_new">Save current popup layout</string>
     <string name="key_popups_save_change_title">Save this change to a set of your own</string>
     <string name="key_popups_my_set">My popups</string>

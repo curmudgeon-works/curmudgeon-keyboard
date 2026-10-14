@@ -428,7 +428,7 @@ private fun Preview() {
 
 /** A character or a whole word per press (undo / redo): two buttons in the row, like a language's L / M / H. */
 /** The menu a Per keyboard row is for, named as on the main screen. */
-private fun groupTitle(group: helium314.keyboard.latin.settings.KeyboardProfiles.Group) = when (group) {
+internal fun groupTitle(group: helium314.keyboard.latin.settings.KeyboardProfiles.Group) = when (group) {
     helium314.keyboard.latin.settings.KeyboardProfiles.Group.LAYOUT -> R.string.settings_screen_preferences
     helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE -> R.string.settings_screen_appearance
     helium314.keyboard.latin.settings.KeyboardProfiles.Group.SWIPE -> R.string.swipe_screen
