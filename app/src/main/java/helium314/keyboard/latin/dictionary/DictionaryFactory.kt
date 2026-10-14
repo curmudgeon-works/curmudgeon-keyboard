@@ -40,16 +40,16 @@ object DictionaryFactory {
     /**
      * The language's dictionary files as [createMainDictionaryCollection] tries them (the first loading one of each kind
      * is used), with the bundled ones not extracted yet: added ones first, so they have priority over internal ones of
-     * the same kind; of the added main dictionaries only the one in use ([DictionarySelection]: the selected one, none
-     * when the internal one is; with no selection "main_user.dict"). (Before 2026-10-12 every added main file was
-     * tried, the first in the folder listing's order winning, e.g. a restore's "_prev" one.)
+     * the same kind; of the added dictionaries of each kind only the one in use ([DictionarySelection]: the selected
+     * one, none when the internal one is; with no selection "main_user.dict", "emoji_user.dict"). (Before 2026-10-12
+     * every added main file was tried, the first in the folder listing's order winning, e.g. a restore's "_prev" one;
+     * emoji files so until review M3.)
      */
     internal fun dictionaryFilesInOrder(context: Context, locale: Locale, useEmojiDict: Boolean): Pair<List<File>, List<String>> {
         val (extracted, nonExtracted) = getAvailableDictsForLocale(locale, context, useEmojiDict)
-        val hasInternal = extracted.any { !DictionarySelection.isAdded(it) && DictionarySelection.typeOf(it) == Dictionary.TYPE_MAIN }
-            || nonExtracted.any { it.substringBefore("_") == Dictionary.TYPE_MAIN }
-        val main = DictionarySelection.mainAdded(extracted.toList(), DictionarySelection.selected(context, locale), hasInternal)
-        return DictionarySelection.withoutUnused(extracted.toList(), main)
+        val hasInternal = { type: String -> extracted.any { !DictionarySelection.isAdded(it) && DictionarySelection.typeOf(it) == type }
+            || nonExtracted.any { it.substringBefore("_") == type } }
+        return DictionarySelection.withoutUnused(extracted.toList(), { DictionarySelection.selected(context, locale, it) }, hasInternal)
             .sortedBy { !DictionarySelection.isAdded(it) } to nonExtracted
     }
 
