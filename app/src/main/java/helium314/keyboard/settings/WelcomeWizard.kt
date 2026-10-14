@@ -191,7 +191,8 @@ private fun WelcomeWizardSteps(
                 painterResource(R.drawable.sym_keyboard_language_switch), close)
             if (step >= 3) DictionaryDownloads(stepBackgroundColor, textColor)
             // on every screen, faint until the keyboard is in use
-            row(SetupRow.FINISH, stringResource(R.string.setup_finish_action), painterResource(R.drawable.ic_setup_check), finish)
+            // (a checkered flag, not the check of the steps done: owner 2026-10-14)
+            row(SetupRow.FINISH, stringResource(R.string.setup_finish_action), painterResource(R.drawable.ic_setup_finish), finish)
         }
     }
     Surface {
