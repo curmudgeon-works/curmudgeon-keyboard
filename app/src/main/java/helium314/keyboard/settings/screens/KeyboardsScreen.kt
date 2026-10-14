@@ -117,6 +117,7 @@ fun KeyboardsScreen(
         onClickBack = onClickBack,
         title = stringResource(R.string.ime_settings),
         settings = emptyList(),
+        searchAll = true, // the app's first screen: its search finds every setting (owner 2026-10-13, SEARCH-SCOPE)
     ) {
         // (the separate-settings switch was a bar at the bottom here: now on App settings > Per keyboard)
         Scaffold(contentWindowInsets = WindowInsets(0)) { innerPadding ->

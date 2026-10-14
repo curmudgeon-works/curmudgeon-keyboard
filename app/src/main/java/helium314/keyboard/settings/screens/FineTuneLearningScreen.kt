@@ -54,6 +54,8 @@ fun FineTuneLearningScreen(onClickBack: () -> Unit) {
         title = stringResource(R.string.fine_tune_learning_screen),
         topActions = draft.topActions,
         settings = emptyList(),
+        // its search: the settings it shows (owner 2026-10-13, SEARCH-SCOPE)
+        searchKeys = listOf(Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, Settings.PREF_LEARNING_LOG),
     ) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
           androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.preferences.LocalRowStart provides 22.dp) {

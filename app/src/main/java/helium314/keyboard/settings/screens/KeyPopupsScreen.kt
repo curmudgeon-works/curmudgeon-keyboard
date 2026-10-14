@@ -639,13 +639,32 @@ fun CustomizePopupsScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
         onDiscardAndExit = { askLeave = false; putBack(); onClickBack() },
         onSaveAndExit = { askLeave = false; save(); onClickBack() },
     )
+    // its search: the keys of every tab by their names, as the colors list filters its colors (owner 2026-10-13,
+    // SEARCH-SCOPE: "Every screen should have a search bar"; before, none). Back closes it first
+    var showSearch by remember { mutableStateOf(false) }
+    var searchText by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue()) }
+    fun closeSearch() { showSearch = false; searchText = androidx.compose.ui.text.input.TextFieldValue() }
+    androidx.activity.compose.BackHandler(enabled = showSearch) { closeSearch() }
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.key_popups_full)) }, navigationIcon = { BackButton(::leave) },
-            actions = { if (changed) {
-                IconButton({ askReject = true }) { Icon(painterResource(R.drawable.ic_close), stringResource(R.string.appearance_reject)) }
-                IconButton({ askAccept = true }) { Icon(painterResource(R.drawable.ic_check), stringResource(R.string.appearance_accept)) }
-            } }) },
+        topBar = { Column {
+            TopAppBar(title = { Text(stringResource(R.string.key_popups_full)) },
+                navigationIcon = { BackButton { if (showSearch) closeSearch() else leave() } },
+                actions = {
+                    if (changed) {
+                        IconButton({ askReject = true }) { Icon(painterResource(R.drawable.ic_close), stringResource(R.string.appearance_reject)) }
+                        IconButton({ askAccept = true }) { Icon(painterResource(R.drawable.ic_check), stringResource(R.string.appearance_accept)) }
+                    }
+                    IconButton({ if (showSearch) closeSearch() else showSearch = true }) { helium314.keyboard.latin.utils.SearchIcon() }
+                })
+            helium314.keyboard.settings.ExpandableSearchField(
+                expanded = showSearch,
+                onDismiss = ::closeSearch,
+                search = searchText,
+                onSearchChange = { searchText = it },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        } },
         bottomBar = { TryItBar(keyboard, tryIt) },
     ) { innerPadding ->
         Column(Modifier.fillMaxSize().padding(innerPadding)) {
@@ -655,9 +674,10 @@ fun CustomizePopupsScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
                     Tab(selected = i == tab, onClick = { tab = i }, text = { Text(stringResource(titleId) + if (changed) " •" else "") })
                 }
             }
-            val (groupTitle, keys) = groups[tab.coerceAtMost(groups.lastIndex)]
+            // the tab's keys; searching, the keys of every tab whose name matches
+            val rows = popupSearchRows(groups, tab, searchText.text) { it.title }
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
-                for (keyInfo in keys) key(groupTitle, keyInfo.overrideKey) {
+                for ((groupTitle, keyInfo) in rows) key(groupTitle, keyInfo.overrideKey) {
                     val id = "$groupTitle:${keyInfo.overrideKey}"
                     val override = overrides[keyInfo.overrideKey]
                     val summary = (override ?: keyInfo.popups).joinToString(" ")
@@ -680,6 +700,16 @@ fun CustomizePopupsScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
             }
         }
     }
+}
+
+/** The rows Customize popups lists: with no [search], those of tab [tab] of [groups] (title id to its keys); else the
+ *  keys of every tab whose name ([title]) has a word starting with it, as the colors list matches (owner 2026-10-13,
+ *  SEARCH-SCOPE). Each with its tab's title. */
+internal fun <K> popupSearchRows(groups: List<Pair<Int, List<K>>>, tab: Int, search: String, title: (K) -> String): List<Pair<Int, K>> {
+    val term = search.trim()
+    if (term.isEmpty()) return groups[tab.coerceAtMost(groups.lastIndex)].let { (t, keys) -> keys.map { t to it } }
+    return groups.flatMap { (t, keys) -> keys.map { t to it } }
+        .filter { (_, k) -> title(k).split(" ", "_").any { it.startsWith(term, true) } }
 }
 
 /** A text field to try the keyboard being edited: focusing it opens that keyboard, changes rebuild it live. */

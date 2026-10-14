@@ -159,6 +159,7 @@ fun SubtypeScreen(
     if (helium314.keyboard.settings.WaitingForRestore(stringResource(R.string.settings_screen_preferences), onClickBack)) return
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
+    val menuOfScreen = helium314.keyboard.settings.LocalSettingsMenu.current // (its search leaves out what another menu keeps)
     val b = (LocalContext.current.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
     if ((b?.value ?: 0) < 0)
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
@@ -322,14 +323,21 @@ fun SubtypeScreen(
                 IconButton({ askAccept = true }) { Icon(painterResource(R.drawable.ic_check), stringResource(R.string.appearance_accept)) }
             }
         },
-        // asks first, as the keyboard list does (2026-10-10: its learned and blacklisted words go with it now)
-        icon = { if (SubtypeSettings.getEnabledSubtypes(true).size > 1 && SubtypeSettings.isEnabled(currentSubtype.toAdditionalSubtype())) DeleteButton {
+        // asks first, as the keyboard list does (2026-10-10: its learned and blacklisted words go with it now); right of
+        // the search button
+        trailingActions = { if (SubtypeSettings.getEnabledSubtypes(true).size > 1 && SubtypeSettings.isEnabled(currentSubtype.toAdditionalSubtype())) DeleteButton {
             askDelete = true
         } },
         // the screen's name (the keyboard's name goes under it when settings are separate per keyboard)
         title = { Text(stringResource(R.string.settings_screen_preferences)) },
-        itemContent = { },
-        filteredItems = { emptyList<String>() }
+        // its search: the settings of the app's list it shows, the advanced ones on the advanced tint (owner 2026-10-13,
+        // SEARCH-SCOPE: "Every screen should have a search bar"; before, none)
+        itemContent = { setting -> androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.LocalSettingsMenu provides null) {
+            if (setting.key in layoutScreenAdvancedKeys(prefs)) helium314.keyboard.settings.AdvancedTint { setting.Preference() }
+            else setting.Preference()
+        } },
+        filteredItems = { term -> helium314.keyboard.settings.screenSearch(term, helium314.keyboard.settings.screenSettings(
+            layoutScreenKeys(prefs, ctx), ctx.realPrefs(), menuOfScreen)) }
     ) {
         Scaffold(
             contentWindowInsets = WindowInsets(0),
@@ -774,6 +782,23 @@ private val previewedSwitches = listOf(
 )
 
 private val advancedInputItems = listOf(Settings.PREF_LONG_PRESS_SYMBOL_ACTION, SettingsWithoutKey.ABC_AFTER) // (emoji descriptions: Appearance, Emoji group)
+
+/** The settings of the app's list Layout & Typing shows, as its search finds them (owner 2026-10-13, SEARCH-SCOPE): the
+ *  rows drawn from the list, simple and advanced ([layoutScreenAdvancedKeys]). */
+internal fun layoutScreenKeys(prefs: android.content.SharedPreferences, ctx: Context): List<String> = listOf(
+    Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, Settings.PREF_SHOW_NUMBER_ROW, Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS,
+    Settings.PREF_SHOW_EMOJI_KEY, Settings.PREF_SHOW_VOICE_KEY, Settings.PREF_ENABLE_SPLIT_KEYBOARD, Settings.PREF_SPLIT_SPACER_SCALE_PREFIX,
+    Settings.PREF_TOOLBAR_VISIBILITY, Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS, Settings.PREF_BACKSPACE_SPEED_UP,
+) + preferencesInputItems(prefs, ctx).filterIsInstance<String>() + layoutScreenAdvancedKeys(prefs)
+
+/** The settings Layout & Typing shows only in advanced mode (in its advanced blocks). */
+internal fun layoutScreenAdvancedKeys(prefs: android.content.SharedPreferences): List<String> = listOf(
+    Settings.PREF_SPACE_TO_CHANGE_LANG, Settings.PREF_BOTTOM_ROW_SCALE_PREFIX, Settings.PREF_SIDE_PADDING_SCALE_PREFIX,
+    Settings.PREF_BACKSPACE_LONGPRESS_DELAY, Settings.PREF_DELETE_SWIPE, Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT,
+    Settings.PREF_SHOW_TLD_POPUP_KEYS, Settings.PREF_REMOVE_REDUNDANT_POPUPS,
+    Settings.PREF_UNDO_HISTORY_LENGTH, Settings.PREF_UNDO_UNIT, Settings.PREF_REDO_UNIT,
+) + toolbarItems(prefs).filterNotNull().filter { it != Settings.PREF_TOOLBAR_VISIBILITY } + advancedInputItems +
+    clipboardHistoryItems(prefs).filterIsInstance<String>()
 
 /** Advanced items on a slightly different background, so toggling the mode shows what it adds (last in the Input
  *  group, in place elsewhere). */

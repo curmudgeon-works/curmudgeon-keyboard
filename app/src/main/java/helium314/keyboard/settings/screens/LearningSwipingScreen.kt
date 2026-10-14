@@ -100,6 +100,8 @@ fun LearningSwipingScreen(onClickBack: () -> Unit) {
         title = stringResource(R.string.learning_swiping_screen),
         topActions = draft.topActions,
         settings = emptyList(),
+        // its search: the settings it shows (owner 2026-10-13, SEARCH-SCOPE)
+        searchKeys = swipeTuningKeys + listOf(Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_SWIPE_METRICS),
     ) {
         androidx.compose.material3.Scaffold(contentWindowInsets = WindowInsets(0), bottomBar = {
             androidx.compose.foundation.layout.Box(Modifier.onGloballyPositioned {

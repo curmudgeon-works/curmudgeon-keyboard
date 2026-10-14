@@ -57,7 +57,9 @@ fun DebugScreen(
             onClickBack()
         },
         title = stringResource(R.string.debug_settings_title),
-        settings = emptyList()
+        settings = emptyList(),
+        // its search: its own settings, not in the app's list (owner 2026-10-13, SEARCH-SCOPE)
+        searchSettings = settings.filter { it.key in items },
     ) {
         // the preferences are not in SettingsContainer, so set content instead
         LazyColumn {

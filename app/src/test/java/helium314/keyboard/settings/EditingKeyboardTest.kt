@@ -180,7 +180,7 @@ class EditingKeyboardTest {
         assertFalse(real.contains(own(idA)), "B's Text correction wrote A's set")
     }
 
-    @Test fun `Back during the slide, then App settings and a setting found there edit the keyboard in use`() = launch { _, activity ->
+    @Test fun `Back during the slide, then App settings neither names B nor finds a setting of another screen`() = launch { _, activity ->
         openCorrectionOfB()
         frames(1000)
         activity.runOnUiThread { activity.onBackPressedDispatcher.onBackPressed() }
@@ -190,13 +190,15 @@ class EditingKeyboardTest {
         frames(1000)
         assertEquals(0, shown(mainTitle), "App settings didn't open")
         assertEquals(0, shown(keyboardName(b, ctx)), "App settings names B")
+        // (App settings' search finds only its own settings since 2026-10-13, owner: "Every screen should have a search
+        // bar. That should only let you search within that screen": a keyboard's setting isn't found there any more)
         compose.onAllNodesWithContentDescription(ctx.getString(R.string.label_search_key))[0].performSemanticsAction(SemanticsActions.OnClick)
         frames(500)
         compose.onAllNodes(hasSetTextAction())[0].performTextInput(autoCap)
         frames(500)
-        toggleAutoCap()
-        assertTrue(real.contains(own(idA)), "the setting didn't land in the keyboard in use's set: ${real.all.keys}")
-        assertFalse(real.contains(own(idB)), "the setting landed in B's set")
+        assertEquals(0, compose.onAllNodes(hasText(autoCap) and !hasSetTextAction()).fetchSemanticsNodes().size,
+            "App settings' search found another screen's setting")
+        assertFalse(real.contains(own(idB)), "a setting landed in B's set")
     }
 
     // ---- 3: the main screen idle ----

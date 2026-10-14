@@ -62,6 +62,7 @@ fun MainSettingsScreen(
         title = keyboardName(keyboard, ctx),
         settings = emptyList(),
         showKeyboardName = false, // (the title is its name)
+        searchAll = true, // a keyboard's main screen, every menu under it: its search finds every setting (owner 2026-10-13, SEARCH-SCOPE)
     ) {
         Scaffold(contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)) { innerPadding ->
             Column(

@@ -116,9 +116,18 @@ fun SearchSettingsScreen(
     revealer: TapRevealer? = null, // a screen with a preview keyboard: moves the tapped row above where the keyboard will end
     isPending: ((String) -> Boolean)? = null, // rows with a change not yet accepted, drawn with an italic title
     showKeyboardName: Boolean = true, // false where the title already is the keyboard's name (its own screen)
+    // the search: this screen's own settings ([settings], and [searchKeys] of a screen drawing its own [content]; or
+    // [searchSettings], settings the app's list doesn't have), not another screen's; every setting with [searchAll]
+    // (the main screens). Owner 2026-10-13: "Every screen should have a search bar. That should only let you search
+    // within that screen (including any items that may be duplicated between screens)"; "main screen's search bar can
+    // search anything tho"
+    searchAll: Boolean = false,
+    searchKeys: List<String> = emptyList(),
+    searchSettings: List<Setting>? = null,
     content: @Composable (ColumnScope.() -> Unit)? = null, // overrides settings if not null; LAST: callers pass it as the trailing lambda
 ) {
     val ctx = LocalContext.current
+    val menu = LocalSettingsMenu.current
     val advanced by SettingsMode.state(ctx)
     val shownSettings = SettingsMode.filter(settings, simpleModeKeys, advanced)
     // the setting last tapped is kept out from under a preview keyboard: moved above where the keyboard will end
@@ -163,8 +172,7 @@ fun SearchSettingsScreen(
                         // advanced-only items (and headings whose items all are) on the advanced tint; not on screens
                         // that are advanced as a whole (empty simple set), whose entry carries the tint instead
                         // (the tint stays while an item folds away, so not tied to the mode itself)
-                        val tinting = !simpleModeKeys.isNullOrEmpty()
-                        fun isAdvanced(item: Any?) = tinting && item is String && item !in simpleModeKeys!!
+                        fun isAdvanced(item: Any?) = item is String && advancedOnly(item, simpleModeKeys)
                         // every item is composed, the ones the mode hides folded away: the advanced switch unfolds and
                         // folds them (AdvancedReveal) instead of the list jumping
                         val shown = shownSettings.toSet()
@@ -230,11 +238,34 @@ fun SearchSettingsScreen(
                 }
             }
         },
-        filteredItems = { SettingsActivity.settingsContainer.filter(it) },
+        filteredItems = { term ->
+            if (searchAll) SettingsActivity.settingsContainer.filter(term)
+            else screenSearch(term, searchSettings ?: screenSettings(settings + searchKeys,
+                helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx), menu))
+        },
         // (under no menu: a result hidden on the menu search was opened from is still a setting, review 2026-10-06)
-        itemContent = { CompositionLocalProvider(LocalSettingsMenu provides null) { it.Preference() } }
+        // a result shown only in advanced mode on this screen: found in simple mode too, on the advanced tint (owner
+        // 2026-10-13: "find them and show with advanced tint")
+        itemContent = { CompositionLocalProvider(LocalSettingsMenu provides null) {
+            if (!searchAll && advancedOnly(it.key, simpleModeKeys)) AdvancedTint { it.Preference() } else it.Preference()
+        } }
     )
 }
+
+/** The settings of [keys] (a screen's items: keys, headings, nulls) in the app's list, as a screen's own search finds
+ *  them (owner 2026-10-13, SEARCH-SCOPE): every one the screen lists, the ones simple mode hides too; not one no screen
+ *  shows ([hiddenFromSearch]), nor one the screen's [menu] leaves to another menu (with separate settings: not shown
+ *  on it either). */
+fun screenSettings(keys: List<Any?>, real: android.content.SharedPreferences, menu: helium314.keyboard.latin.settings.KeyboardProfiles.Group?): List<Setting> =
+    keys.filterIsInstance<String>().distinct().mapNotNull { SettingsActivity.settingsContainer[it] }
+        .filter { !hiddenFromSearch(it.key) && (menu == null || !helium314.keyboard.latin.settings.KeyboardProfiles.hiddenOn(real, menu, it.key)) }
+
+/** [settings] (a screen's own) matching [term], best first, as the main screen's search matches every setting. */
+fun screenSearch(term: String, settings: List<Setting>): List<Setting> = SettingsSearch.search(term, settings)
+
+/** A setting a screen shows only in advanced mode ([simpleModeKeys]: the ones it shows in simple mode); none on a
+ *  screen without simple mode, or one advanced as a whole (empty: its entry carries the tint instead). */
+fun advancedOnly(key: String, simpleModeKeys: Set<String>?): Boolean = !simpleModeKeys.isNullOrEmpty() && key !in simpleModeKeys
 
 /** The simple / advanced settings menu switch, shown in the top bar of every settings screen. */
 @Composable
@@ -262,6 +293,7 @@ fun <T: Any?> SearchScreen(
     showAdvancedSwitch: Boolean = true, // the simple / advanced settings switch, on every screen
     leadingActions: @Composable RowScope.() -> Unit = {}, // top bar buttons before the advanced switch
     showKeyboardName: Boolean = true, // the keyboard being edited under the title (separate settings)
+    trailingActions: @Composable RowScope.() -> Unit = {}, // top bar buttons after the search button (a screen's delete)
     content: @Composable (ColumnScope.() -> Unit)? = null,
 ) {
     val switchCtx = LocalContext.current
@@ -316,6 +348,7 @@ fun <T: Any?> SearchScreen(
                                 IconButton(onClick = { setShowSearch(!showSearch) }) { SearchIcon() }
                             else
                                 icon()
+                            trailingActions()
                             if (menu != null)
                                 Box {
                                     var showMenu by remember { mutableStateOf(false) }

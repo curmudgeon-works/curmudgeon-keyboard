@@ -114,6 +114,7 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
         title = stringResource(R.string.swipe_screen),
         topActions = draft.topActions,
         settings = emptyList(),
+        searchKeys = swipeSettingKeys, // its search: the settings it shows (owner 2026-10-13, SEARCH-SCOPE)
     ) {
         // (a screen with its own content draws its own try-it bar: SearchSettingsScreen's bottomBar is for its list)
         androidx.compose.material3.Scaffold(contentWindowInsets = WindowInsets(0), bottomBar = {
