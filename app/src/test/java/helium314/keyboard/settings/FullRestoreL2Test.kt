@@ -31,6 +31,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** Review 2026-10-12 L2, the full restore: its flag "didn't finish" and its failures before the wipe. */
@@ -52,6 +53,7 @@ class FullRestoreL2Test {
     @After fun tearDown() {
         helium314.keyboard.latin.personalization.LearnedKeyboards.storeIo = helium314.keyboard.latin.personalization.LearnedStoreIo.Native
         FullRestore.afterStep = null
+        FullRestore.afterCheck = null
         idleUntil { !BackupRestoreJob.isRunning }
         real.edit().clear().commit()
         ctx.protectedPrefs().edit().clear().commit()
@@ -97,5 +99,41 @@ class FullRestoreL2Test {
         assertEquals(emptyList(), seen.filter { !it.second }, "changes seen without the flag")
         assertEquals(222, real.all[idKey(1, Settings.PREF_KEY_LONGPRESS_TIMEOUT)])
         assertTrue(FullRestore.isUnfinished(real))
+    }
+
+    /** The full restore of [zip] as the restore dialog runs it, its follow-up too; @return its error, null for none. */
+    private fun fullRestoreJob(): String? {
+        var error: String? = null
+        assertTrue(runRestore(ctx, { error = it }, R.string.backup_restored, 1, fullRestore = true) { restoreEverythingFrom(ctx, zip) })
+        assertTrue(idleUntil { !BackupRestoreJob.isRunning }, "the job never ended")
+        return error
+    }
+
+    /** Nothing deleted or changed, no follow-up ran ([followedUp]), no flag. */
+    private fun assertUnchanged(followedUp: Boolean) {
+        assertTrue(File(ctx.filesDir, "custom_background_image").exists(), "wiped")
+        assertEquals(444, real.getInt(Settings.PREF_KEY_LONGPRESS_TIMEOUT, 0), "the settings changed")
+        assertFalse(followedUp, "the follow-up ran")
+        assertFalse(FullRestore.isUnfinished(real), "flagged as unfinished although nothing changed")
+    }
+
+    // L2 (2): the backup read after its check, before the wipe, fails: before, a file gone was a plain error ("r") and
+    // the follow-up ran; one that read as no entries was wiped over with nothing
+    @Test fun `the backup gone after its check - the unreadable error, nothing wiped, no follow-up`() {
+        backup()
+        var followedUp = false
+        FullRestore.afterStep = { if (it == FullRestore.FOLLOW_UP) followedUp = true }
+        FullRestore.afterCheck = { zip.delete() }
+        assertEquals("u", fullRestoreJob())
+        assertUnchanged(followedUp)
+    }
+
+    @Test fun `the backup no zip any more after its check - the unreadable error, nothing wiped, no follow-up`() {
+        backup()
+        var followedUp = false
+        FullRestore.afterStep = { if (it == FullRestore.FOLLOW_UP) followedUp = true }
+        FullRestore.afterCheck = { zip.writeText("not a zip any more") }
+        assertEquals("u", fullRestoreJob())
+        assertUnchanged(followedUp)
     }
 }

@@ -194,6 +194,9 @@ internal object FullRestore {
     /** Called right after the wipe (null) and after each entry restored (its name): a failure thrown here is one after
      *  the wipe (tests); with [FOLLOW_UP] at the end of runRestore's follow-up. */
     @Volatile internal var afterStep: ((String?) -> Unit)? = null
+
+    /** Called after the full restore's check passed, before it opens the backup for its copies (tests). */
+    @Volatile internal var afterCheck: (() -> Unit)? = null
 }
 
 /** The device's keys a backup never holds, and a restore never brings ([FullRestore]). */
@@ -1088,12 +1091,16 @@ private fun restoreRefresh(ctx: Context) {
 private fun restoreEverything(ctx: Context, file: File, promised: PendingRestore? = null) = LearnedKeyboards.withFiles {
     // [promised]: what the restore dialog showed of [file] (null: no dialog, tests), checked with the rest before the wipe
     checkFullBackup(file, promised) // (throws, nothing deleted)
-    underRestoreGate(ctx) {
-        replaceEverythingChecked(ctx, file)
-        // (a backup from before the keyboards had ids: ids first, so the learned words' update finds each keyboard by its own)
-        helium314.keyboard.latin.settings.KeyboardIdUpgrade.upgrade(ctx)
-        LearnedKeyboards.updateOnce(ctx)
-    }
+    FullRestore.afterCheck?.invoke()
+    val opened = openBackup(file) // (throws, nothing deleted: before the gate, which closes the open stores unsaved)
+    try {
+        underRestoreGate(ctx) {
+            replaceEverythingChecked(ctx, opened)
+            // (a backup from before the keyboards had ids: ids first, so the learned words' update finds each keyboard by its own)
+            helium314.keyboard.latin.settings.KeyboardIdUpgrade.upgrade(ctx)
+            LearnedKeyboards.updateOnce(ctx)
+        }
+    } finally { opened.zip.close() }
     // (the flag of a full restore that didn't finish stays: runRestore clears it once its follow-up finished too)
 }
 
@@ -1175,10 +1182,24 @@ internal class UnreadableBackupException(message: String, cause: Throwable? = nu
  *  stays, and [runRestore] says so (owner 2026-10-12, A3: no rollback; "Restore stopped partway; …"). */
 internal class RestoreStoppedPartway(cause: Throwable) : Exception(cause.message, cause)
 
-private fun replaceEverythingChecked(ctx: Context, file: File) = keepingPhoneChoices(ctx) {
+/** The backup opened for the full restore's copies, its first entry read ([openBackup]). */
+private class OpenedBackup(val zip: ZipInputStream, val first: ZipEntry)
+
+/** [file] opened and its first entry read, before the full restore deletes anything (review 2026-10-12 L2: a backup
+ *  that can't be read here, after its check, changes nothing, as one its check finds unreadable; before, a file that
+ *  had gone was a plain failure, whose follow-up then ran, and one that read as no entries was wiped over with
+ *  nothing). Throws [UnreadableBackupException]. */
+private fun openBackup(file: File): OpenedBackup {
+    val zip = try { ZipInputStream(FileInputStream(file)) } catch (t: Throwable) { throw UnreadableBackupException(t.toString(), t) }
+    val first = try { zip.nextEntry } catch (t: Throwable) { zip.close(); throw UnreadableBackupException(t.toString(), t) }
+    if (first == null) { zip.close(); throw UnreadableBackupException("no entries") }
+    return OpenedBackup(zip, first)
+}
+
+private fun replaceEverythingChecked(ctx: Context, opened: OpenedBackup) = keepingPhoneChoices(ctx) {
     val restoredDb = ctx.getDatabasePath(Database.NAME + "_restored")
-    ZipInputStream(FileInputStream(file)).use { zip ->
-        var entry: ZipEntry? = zip.nextEntry
+    opened.zip.use { zip ->
+        var entry: ZipEntry? = opened.first
         val filesDir = ctx.filesDir ?: return@keepingPhoneChoices
         val deviceProtectedFilesDir = DeviceProtectedUtils.getFilesDir(ctx)
         // until the full restore finished, the main screen says it didn't (owner 2026-10-12: "Yes add this"): set right
