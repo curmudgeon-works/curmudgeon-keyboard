@@ -839,6 +839,10 @@ private fun restoreKeyboards(ctx: Context, pending: PendingRestore, chosen: List
             // exactly that set: a setting the backup leaves at its default gets a default mark, so it doesn't read
             // the phone's shared value instead
             KeyboardProfiles.write(real, id, settings.getValue(keyboard), markDefaults = true)
+            // an item it chose that wasn't brought in (its name is the phone's for other content, copies off): it names
+            // none and shows "Custom 1" (owner 2026-10-11, option 2)
+            renames?.customKinds(backupSettings.getValue(keyboard))?.forEach {
+                helium314.keyboard.settings.CustomLabels.number(real, helium314.keyboard.latin.settings.ProfilePreferences(real) { id }, it) }
             // its languages' priorities, into its own set (not the shared one, which every other keyboard reads: review
             // session 2026-10-07): the backup's own copy for this keyboard first, else the backup's shared value
             val backupId = KeyboardProfiles.idIn(backup, keyboard)

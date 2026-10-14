@@ -15,7 +15,10 @@ import helium314.keyboard.settings.LayoutPresets
  * existing and also add whatever was in the backup", "Items inside items must be renamed together", "Next free
  * number"): every popup set, Layout and theme of the backup comes in unless the phone has one with the same content
  * (any name; then the phone's is used). A name the phone uses already (its own items or a built-in) gets the next free
- * number, "Sunset 2", when [asCopies] (the restore dialog's tick, on by default); off, the phone's same-named one is used.
+ * number, "Sunset 2", when [asCopies] (the restore dialog's tick, on by default); off, it's not brought in and nothing
+ * names it: the keyboards that chose it keep its look and show "Custom 1", a Layout that held such a popup set keeps its
+ * popups (owner 2026-10-11 chose this "option 2": names never point at other content; before, they named the phone's
+ * same-named item, "Custom 1 · from Sunset" on a look that isn't Sunset).
  * Inner items first (popup sets), then the outer ones (Layouts) with their references rewritten, so a second restore
  * of the same backup adds nothing. The result maps each kind's backup names to the phone's. The custom key layouts that
  * came in under other names (restoreLayoutFiles) are named so in the Layouts, and in the keyboards' defaults for each type.
@@ -23,9 +26,13 @@ import helium314.keyboard.settings.LayoutPresets
 internal object SavedItemsMerge {
     class Renames(val popupSets: Map<String, String>, val layouts: Map<String, String>, val themes: Map<String, String>,
                   val fonts: Map<String, String> = emptyMap(), val keyLayouts: Map<LayoutType, Map<String, String>> = emptyMap(),
-                  val palettes: Map<String, String> = emptyMap()) {
-        /** A restored keyboard's settings ([values], plain keys) naming its items as they are called on the phone now. */
-        fun apply(values: Map<String, Any?>): Map<String, Any?> = RestoredCustomCopies.renamePalettes(values, palettes).mapValues { (key, value) ->
+                  val palettes: Map<String, String> = emptyMap(),
+                  /** backup names not brought in (taken by other content, copies off), by the selected-name key */
+                  val notBrought: Map<String, Set<String>> = emptyMap()) {
+        /** A restored keyboard's settings ([values], plain keys) naming its items as they are called on the phone now
+         *  (a choice of one not brought in left out: it names none). */
+        fun apply(values: Map<String, Any?>): Map<String, Any?> = RestoredCustomCopies.renamePalettes(values, palettes)
+            .filter { (key, value) -> !names(key, value) }.mapValues { (key, value) ->
             val map = when (key) {
                 KeyPopupOverrides.PREF_SELECTED_SET -> popupSets
                 LayoutPresets.PREF_SELECTED -> layouts
@@ -35,6 +42,14 @@ internal object SavedItemsMerge {
             if (key in helium314.keyboard.keyboard.FontLibrary.fontPrefs) return@mapValues renamedFont(value, fonts)
             (value as? String)?.let { map?.get(it) } ?: value
         }
+
+        private fun names(key: String, value: Any?) = value is String && value in notBrought[key].orEmpty()
+
+        /** The kinds whose item the keyboard ([values], before [apply]) chose wasn't brought in: it gets its Custom number. */
+        fun customKinds(values: Map<String, Any?>): List<helium314.keyboard.settings.CustomLabels.Kind> = listOfNotNull(
+            helium314.keyboard.settings.CustomLabels.Kind.POPUPS.takeIf { names(KeyPopupOverrides.PREF_SELECTED_SET, values[KeyPopupOverrides.PREF_SELECTED_SET]) },
+            helium314.keyboard.settings.CustomLabels.Kind.LAYOUT.takeIf { names(LayoutPresets.PREF_SELECTED, values[LayoutPresets.PREF_SELECTED]) },
+            helium314.keyboard.settings.CustomLabels.Kind.THEME.takeIf { names(AppearanceLooks.PREF_SELECTED, values[AppearanceLooks.PREF_SELECTED]) })
     }
 
     /** The layout type whose default [key] is (Settings.PREF_LAYOUT_PREFIX + type), or null. */
@@ -92,10 +107,11 @@ internal object SavedItemsMerge {
             fun content(s: KeyPopupOverrides.UserSet) = listOf(s.morePopups, s.symbolsLayout, s.overrides, s.symbolMap, s.popupOrder, s.atDefault)
             val phoneSets = KeyPopupOverrides.loadSets(real).toMutableList()
             val setNames = HashMap<String, String>()
+            val setsNotBrought = HashSet<String>()
             for (set in KeyPopupOverrides.loadSets(scratch)) {
                 phoneSets.firstOrNull { content(it) == content(set) }?.let { setNames[set.name] = it.name; continue }
                 val taken = phoneSets.map { it.name }.toSet()
-                if (set.name in taken && !asCopies) { setNames[set.name] = set.name; continue } // (the phone's is used)
+                if (set.name in taken && !asCopies) { setsNotBrought += set.name; continue }
                 val name = freeName(set.name, taken)
                 phoneSets += KeyPopupOverrides.UserSet(name, set.morePopups, set.symbolsLayout, set.overrides, set.symbolMap, set.popupOrder, set.atDefault)
                 setNames[set.name] = name
@@ -106,12 +122,15 @@ internal object SavedItemsMerge {
             val builtInLayouts = LayoutPresets.builtIn(ctx).map { it.name }.toSet()
             val phoneLayouts = LayoutPresets.load(real).toMutableList()
             val layoutNames = HashMap<String, String>()
+            val layoutsNotBrought = HashSet<String>()
             for (preset in LayoutPresets.load(scratch)) {
-                val values = renamedKeyLayouts(preset.values, keyLayouts).mapValues { (key, value) ->
+                // (a popup set not brought in: no name, its popups kept)
+                val values = renamedKeyLayouts(preset.values, keyLayouts)
+                    .filter { (key, value) -> key != KeyPopupOverrides.PREF_SELECTED_SET || value !in setsNotBrought }.mapValues { (key, value) ->
                     if (key == KeyPopupOverrides.PREF_SELECTED_SET) (value as? String)?.let { setNames[it] ?: it } else value }
                 phoneLayouts.firstOrNull { it.values == values }?.let { layoutNames[preset.name] = it.name; continue }
                 val taken = phoneLayouts.map { it.name }.toSet() + builtInLayouts
-                if (preset.name in taken && !asCopies) { layoutNames[preset.name] = preset.name; continue }
+                if (preset.name in taken && !asCopies) { layoutsNotBrought += preset.name; continue }
                 val name = freeName(preset.name, taken)
                 phoneLayouts += LayoutPresets.Preset(name, values, remembered = preset.remembered)
                 layoutNames[preset.name] = name
@@ -122,6 +141,7 @@ internal object SavedItemsMerge {
             val builtInThemes = AppearanceLooks.builtIn(ctx).map { it.name }.toSet()
             val phoneThemes = AppearanceLooks.load(real).toMutableList()
             val themeNames = HashMap<String, String>()
+            val themesNotBrought = HashSet<String>()
             // kept palette copies ("~custom:N") the phone uses for other colours: the next free number, in the keyboards
             // and the themes together (review C4)
             val backupLooks = AppearanceLooks.load(scratch)
@@ -132,13 +152,14 @@ internal object SavedItemsMerge {
                     RestoredCustomCopies.renamePalettes(renamedFiles(backupLook.values, fonts, pictures), palettes), backupLook.remembered)
                 phoneThemes.firstOrNull { it.values == look.values }?.let { themeNames[look.name] = it.name; continue }
                 val taken = phoneThemes.map { it.name }.toSet() + builtInThemes
-                if (look.name in taken && !asCopies) { themeNames[look.name] = look.name; continue }
+                if (look.name in taken && !asCopies) { themesNotBrought += look.name; continue }
                 val name = freeName(look.name, taken)
                 phoneThemes += AppearanceLooks.Look(name, look.values, look.remembered)
                 themeNames[look.name] = name
             }
             AppearanceLooks.save(real, phoneThemes, now = true)
-            return Renames(setNames, layoutNames, themeNames, fonts, keyLayouts, palettes)
+            return Renames(setNames, layoutNames, themeNames, fonts, keyLayouts, palettes, mapOf(KeyPopupOverrides.PREF_SELECTED_SET to setsNotBrought,
+                LayoutPresets.PREF_SELECTED to layoutsNotBrought, AppearanceLooks.PREF_SELECTED to themesNotBrought))
         } finally {
             scratch.edit(commit = true) { clear() }
         }

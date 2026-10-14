@@ -4,11 +4,13 @@ package helium314.keyboard
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.latin.settings.ProfilePreferences
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.KeyPopupOverrides
 import helium314.keyboard.settings.AppearanceLooks
+import helium314.keyboard.settings.CustomLabels
 import helium314.keyboard.settings.LayoutPresets
 import helium314.keyboard.settings.preferences.SavedItemsMerge
 import helium314.keyboard.settings.preferences.restoreKeyboardsFrom
@@ -25,6 +27,9 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * Owner 2026-10-11, restoring some keyboards: "keep everything existing and also add whatever was in the backup", by
@@ -44,7 +49,7 @@ class PartialRestoreItemsTest {
     private fun set(name: String, a: String) = JSONObject().put("name", name).put("morePopups", "all").put("symbolsLayout", "")
         .put("overrides", JSONObject().put("a", JSONArray(listOf(a))))
 
-    /** The backup: popup set "Mine" (á), Layout "Work" naming it, theme "Sunset", the keyboard on all three. */
+    /** The backup: popup set "Mine" (á), Layout "Work" naming it, theme "Sunset" (gap 3), the keyboard on all three. */
     private fun backup() {
         val work = JSONObject().put("name", "Work").put("values", JSONObject()
             .put(KeyPopupOverrides.PREF_SELECTED_SET, JSONObject().put("s", "Mine"))
@@ -57,12 +62,13 @@ class PartialRestoreItemsTest {
                 LayoutPresets.PREF to JSONArray(listOf(work)).toString(),
                 AppearanceLooks.PREF to JSONArray(listOf(sunset)).toString(),
                 KeyPopupOverrides.PREF_SELECTED_SET to "Mine", LayoutPresets.PREF_SELECTED to "Work",
-                AppearanceLooks.PREF_SELECTED to "Sunset",
+                AppearanceLooks.PREF_SELECTED to "Sunset", Settings.PREF_KEY_HORIZONTAL_GAP to 3f, // (the keyboard on Sunset's look)
                 helium314.keyboard.latin.PICKED_ONLY_DONE to true, helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true,
                 helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE to true), z)
             z.closeEntry()
         }
     }
+    private fun own() = ProfilePreferences(real) { KeyboardProfiles.idFor(real, keyboard) }
     private fun ownChoice(key: String) = real.getString(KeyboardProfiles.prefixedKey(KeyboardProfiles.idFor(real, keyboard), key), null)
 
     @Test fun `new items come in under their names, and a second restore adds nothing`() {
@@ -97,6 +103,29 @@ class PartialRestoreItemsTest {
         assertEquals("Ours", ownChoice(KeyPopupOverrides.PREF_SELECTED_SET))
         assertEquals(listOf("Sunset"), AppearanceLooks.load(real).map { it.name }) // (the phone's Sunset)
         assertEquals(1f, AppearanceLooks.load(real).single().values[Settings.PREF_KEY_HORIZONTAL_GAP])
+        // the taken name with other content: the keyboard keeps the backup's look but names no theme, so it shows a
+        // plain "Custom N", not "Custom N · from Sunset" (owner 2026-10-11 chose option 2: names never point at other
+        // content; before, it named the phone's Sunset)
+        assertEquals(3f, own().getFloat(Settings.PREF_KEY_HORIZONTAL_GAP, 0f))
+        assertNull(own().getString(AppearanceLooks.PREF_SELECTED, null))
+        assertTrue(CustomLabels.has(own(), CustomLabels.Kind.THEME))
+    }
+
+    @Test fun `with copies off a popup set whose name the phone uses for other content is not brought in, and nothing names it`() {
+        KeyPopupOverrides.saveSets(real, listOf(KeyPopupOverrides.UserSet("Mine", "all", null, mapOf("a" to listOf("à")))))
+        backup()
+        restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true, asCopies = false)
+        assertEquals(listOf("Mine"), KeyPopupOverrides.loadSets(real).map { it.name }) // (the phone's Mine, unchanged)
+        assertEquals(listOf("à"), KeyPopupOverrides.loadSets(real).single().overrides["a"])
+        // (owner 2026-10-11, option 2: the keyboard names no set and shows "Custom N"; the Layout brought in keeps its
+        // popups but names no set either)
+        assertNull(own().getString(KeyPopupOverrides.PREF_SELECTED_SET, null))
+        assertTrue(CustomLabels.has(own(), CustomLabels.Kind.POPUPS))
+        val work = LayoutPresets.load(real).single()
+        assertEquals("Work", work.name)
+        assertFalse(work.values.containsKey(KeyPopupOverrides.PREF_SELECTED_SET))
+        assertEquals("Work", ownChoice(LayoutPresets.PREF_SELECTED))
+        assertFalse(CustomLabels.has(own(), CustomLabels.Kind.LAYOUT))
     }
 
     @Test fun `a built-in name is taken too`() {
