@@ -689,7 +689,9 @@ private fun CheckRow(text: String, checked: Boolean, enabled: Boolean = true, su
                      onChange: (Boolean) -> Unit) =
     Row(verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().clickable(enabled = enabled) { onChange(!checked) }.padding(vertical = 2.dp)) {
-        Checkbox(checked = checked, onCheckedChange = if (enabled) onChange else null, enabled = enabled)
+        // always onChange; not enabled ignores taps (review 2026-10-12 T2: with no onCheckedChange a greyed row lost its
+        // checked state for TalkBack)
+        Checkbox(checked = checked, onCheckedChange = onChange, enabled = enabled)
         if (subtext == null) Text(text)
         else Column {
             Text(text)
