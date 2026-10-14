@@ -391,6 +391,12 @@ internal class RestoreFlow(val plan: RestorePlan, val keyboards: List<SettingsSu
         SavedItemsMerge.applyOrder.flatMap { plan.items.of(it) }.filter { it.mergeRequired && ticked(it.kind to it.key) }
             .map { Question.Item(it.kind, it.key) } + restoring().filter { plan.asks(it) }.map { Question.Keyboard(it) }
 
+    /** Screen 1's Restore / Next can be tapped: the full restore ticked, or a keyboard or item row ticked (owner 2026-10-12
+     *  A6: with every row unticked, Restore ran anyway and merged the clipboard, Android's personal dictionary and new
+     *  dictionaries without asking; overrides "Restore enabled with nothing ticked"). */
+    val anythingTicked get() = top.wipe || restoring().isNotEmpty() ||
+        sections.any { section -> items(section).any { ticked(it.kind to it.key) } }
+
     /** "Tricky merging ahead!": the full restore unticked and a ticked row that needs merging (owner 2026-10-12). */
     val trickyAhead get() = !top.wipe && questions.isNotEmpty()
 

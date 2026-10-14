@@ -6,6 +6,7 @@ import android.os.Looper
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -150,6 +151,24 @@ class RestoreDialogGroupsUiTest {
         compose.onNodeWithText("Next").performClick()
         compose.onNodeWithText("2 of 2").assertExists()
         compose.onNodeWithText("Suggested: same keyboard as in the backup").assertExists()
+    }
+
+    // owner 2026-10-12 A6: with every row unticked, Restore is greyed out (fail before: it stayed enabled and the restore
+    // merged the clipboard, Android's personal dictionary and the new dictionaries anyway); the full restore box counts
+    @Test fun `Restore is greyed out while nothing is ticked`() {
+        show()
+        fun button(text: String) = compose.onNode(androidx.compose.ui.test.hasText(text) and androidx.compose.ui.test.hasClickAction())
+        button(ctx.getString(android.R.string.ok)).assertIsEnabled() // (the full restore box ticked)
+        compose.onNodeWithText(top).performClick()
+        button("Restore").assertIsEnabled() // (French ticked)
+        compose.onNodeWithText("French").performClick()
+        box("French").assertIsOff()
+        button("Restore").assertIsNotEnabled()
+        compose.onNodeWithText("French").performClick()
+        button("Restore").assertIsEnabled()
+        compose.onNodeWithText("French").performClick()
+        compose.onNodeWithText(top).performClick()
+        button(ctx.getString(android.R.string.ok)).assertIsEnabled()
     }
 
     // owner 2026-10-12: a full restore has nothing to choose, nothing shows below the box

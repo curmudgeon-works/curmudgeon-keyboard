@@ -677,6 +677,8 @@ private fun RestoreChoiceDialog(pending: PendingRestore, plan: RestorePlan, onDi
         },
         scrollContent = true,
         confirmFirst = true,
+        // (greyed out with nothing ticked, owner 2026-10-12 A6)
+        checkOk = { flow.anythingTicked },
         confirmButtonText = stringResource(when {
             top.wipe -> android.R.string.ok
             flow.questions.isEmpty() -> R.string.button_restore
