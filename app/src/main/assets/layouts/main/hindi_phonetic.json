@@ -107,7 +107,7 @@
     {
       "$": "shift_state_selector",
       "manualOrLocked": {
-        "label": "य़"
+        "label": "य़"
       },
       "default": {
         "label": "य",
@@ -229,7 +229,7 @@
     {
       "$": "shift_state_selector",
       "manualOrLocked": {
-        "label": "फ़"
+        "label": "फ़"
       },
       "default": {
         "label": "प"
@@ -330,7 +330,7 @@
         "label": "ग",
         "popup": {
           "main": {
-            "label": "ग़"
+            "label": "ग़"
           },
           "relevant": [
             {
@@ -380,11 +380,11 @@
         "label": "क",
         "popup": {
           "main": {
-            "label": "क़"
+            "label": "क़"
           },
           "relevant": [
             {
-              "label": "ख़"
+              "label": "ख़"
             }
           ]
         }

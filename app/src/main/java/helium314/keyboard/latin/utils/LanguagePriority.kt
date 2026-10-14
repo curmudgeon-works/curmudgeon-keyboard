@@ -51,6 +51,10 @@ object LanguagePriority {
 
     fun factor(prefs: SharedPreferences, locale: Locale): Float = factor(get(prefs, locale))
 
+    /** [locales] as a keyboard's language list shows them: highest priority first, then in the order they were added. */
+    fun inListOrder(prefs: SharedPreferences, locales: List<Locale>): List<Locale> =
+        locales.sortedWith(compareByDescending<Locale> { get(prefs, it) }.thenBy { added(prefs, it) })
+
     /** When the language was last added to a keyboard (0 for languages added before this was recorded). */
     fun added(prefs: SharedPreferences, locale: Locale): Long =
         prefs.getLong(PREF_ADDED_PREFIX + locale.toLanguageTag(), 0L)

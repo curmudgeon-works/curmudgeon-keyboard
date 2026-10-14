@@ -180,7 +180,7 @@ private fun languagesFor(ctx: android.content.Context, keyboard: SettingsSubtype
         return hasInternal || dicts.isNotEmpty()
     }
     // (sorting is stable: languages added before the adding time was recorded keep the keyboard's own order)
-    return own.sortedWith(compareByDescending<Locale> { LanguagePriority.get(prefs, it) }.thenBy { LanguagePriority.added(prefs, it) }) to
+    return LanguagePriority.inListOrder(prefs, own) to
         others.sortedWith(compareBy({ it.script() != keyboard.locale.script() }, { !hasDictionary(it) },
             { it.localizedDisplayName(ctx.resources) }))
 }

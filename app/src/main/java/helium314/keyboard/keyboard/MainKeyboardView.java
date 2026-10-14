@@ -56,8 +56,10 @@ import helium314.keyboard.latin.settings.DebugSettings;
 import helium314.keyboard.latin.settings.Defaults;
 import helium314.keyboard.latin.settings.Settings;
 import helium314.keyboard.latin.utils.KtxKt;
+import helium314.keyboard.latin.utils.LanguagePriority;
 import helium314.keyboard.latin.utils.LanguageOnSpacebarUtils;
 import helium314.keyboard.latin.utils.Log;
+import helium314.keyboard.latin.utils.SubtypeLocaleUtils;
 import helium314.keyboard.latin.utils.TypefaceUtils;
 
 import java.util.ArrayList;
@@ -744,25 +746,27 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
             final RichInputMethodSubtype subtype, final int width) {
         // Choose appropriate language name to fit into the width.
 
-        final List<Locale> secondaryLocales = Settings.getValues().mSecondaryLocales;
+        // in the order of the keyboard's language list: priority, then the order they were added (2026-10-10)
+        final List<Locale> secondaryLocales = LanguagePriority.INSTANCE.inListOrder(KtxKt.prefs(getContext()), Settings.getValues().mSecondaryLocales);
         // avoid showing same language twice
-        final List<Locale> secondaryLocalesToUse = withoutDuplicateLanguages(secondaryLocales, subtype.getLocale().getLanguage());
+        final List<Locale> secondaryLocalesToUse = withoutDuplicateLanguages(secondaryLocales, subtype.getMiddleDisplayName());
         if (!secondaryLocalesToUse.isEmpty()) {
             StringBuilder sb = new StringBuilder(subtype.getMiddleDisplayName());
             final Locale displayLocale = ConfigurationCompatKt.locale(getResources().getConfiguration());
-            for (Locale locale : secondaryLocales) {
+            // the same names as the main language: Locale.getDisplayLanguage called Hinglish (hi-Latn) "Hindi"
+            for (Locale locale : secondaryLocalesToUse) {
                 sb.append(" - ");
-                sb.append(locale.getDisplayLanguage(displayLocale));
+                sb.append(SubtypeLocaleUtils.INSTANCE.getSubtypeLanguageDisplayName(locale));
             }
             final String full = sb.toString();
             if (fitsTextIntoWidth(width, full, paint)) {
                 return full;
             }
             sb.setLength(0);
-            sb.append(subtype.getLocale().getLanguage().toUpperCase(displayLocale));
-            for (Locale locale : secondaryLocales) {
+            sb.append(shortLanguageName(subtype.getLocale(), displayLocale));
+            for (Locale locale : secondaryLocalesToUse) {
                 sb.append(" - ");
-                sb.append(locale.getLanguage().toUpperCase(displayLocale));
+                sb.append(shortLanguageName(locale, displayLocale));
             }
             final String middle = sb.toString();
             if (fitsTextIntoWidth(width, middle, paint)) {
@@ -785,18 +789,25 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
         return "";
     }
 
-    private List<Locale> withoutDuplicateLanguages(List<Locale> locales, String mainLanguage) {
-        ArrayList<String> languages = new ArrayList<String>() {{ add(mainLanguage); }};
+    /** The language code ("EN"), or for a language told apart by its script (Hinglish = hi-Latn, Serbian in Latin
+     *  letters) its name: the code alone said "HI" for Hinglish (2026-10-10). */
+    @androidx.annotation.VisibleForTesting
+    static String shortLanguageName(Locale locale, Locale displayLocale) {
+        if (!locale.getScript().isEmpty()) return SubtypeLocaleUtils.INSTANCE.getSubtypeLanguageDisplayName(locale);
+        return locale.getLanguage().toUpperCase(displayLocale);
+    }
+
+    /** [locales] without the ones named like [mainName] or like an earlier one (en-US + en-GB = "English" once;
+     *  Hindi and Hinglish have different names, so both stay). */
+    @androidx.annotation.VisibleForTesting
+    static List<Locale> withoutDuplicateLanguages(List<Locale> locales, String mainName) {
+        ArrayList<String> names = new ArrayList<String>() {{ add(mainName); }};
         ArrayList<Locale> newLocales = new ArrayList<>();
         for (Locale locale : locales) {
-            boolean keep = true;
-            for (String language : languages) {
-                if (locale.getLanguage().equals(language))
-                    keep = false;
-            }
-            if (!keep)
+            final String name = SubtypeLocaleUtils.INSTANCE.getSubtypeLanguageDisplayName(locale);
+            if (names.contains(name))
                 continue;
-            languages.add(locale.getLanguage());
+            names.add(name);
             newLocales.add(locale);
         }
         return newLocales;
