@@ -356,6 +356,9 @@ internal object BackupRestoreJob {
     var afterTitle: String? by mutableStateOf(null)
     /** Called on the main thread with every progress shown (tests). */
     internal var onProgress: ((Progress) -> Unit)? = null
+    /** The running restore skipped the backup's clipboard ([Database.copyFromDb]): its done message says so (review
+     *  2026-10-12 M8; reset by [start]). */
+    @Volatile var clipboardSkipped = false
 
     private val running = AtomicBoolean(false)
     private val done = AtomicInteger(0)
@@ -388,6 +391,7 @@ internal object BackupRestoreJob {
         this.title = title
         this.total = total.coerceAtLeast(1)
         done.set(0)
+        clipboardSkipped = false
         publish()
         return true
     }
@@ -1128,10 +1132,15 @@ internal fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: In
             // (what the restore has to say, once, in a dialog with OK, owner 2026-10-12: "ahh. Let's do dialog"; else
             // the done message)
             else {
+                // (the backup's clipboard skipped, the rest restored: said too, owner 2026-10-12 "makes senes to do B")
+                val skipped = if (BackupRestoreJob.clipboardSkipped) app.getString(R.string.restore_clipboard_skipped) else null
                 val said = note()
                 // ([noteTitle]: the keyboard by keyboard restore's summary, "Backup restored", owner 2026-10-12)
-                if (said != null) { BackupRestoreJob.afterTitle = noteTitle?.let { app.getString(it) }; BackupRestoreJob.afterNote = said }
-                else Toast.makeText(app, app.getString(doneMessage), Toast.LENGTH_LONG).show()
+                if (said != null) {
+                    BackupRestoreJob.afterTitle = noteTitle?.let { app.getString(it) }
+                    BackupRestoreJob.afterNote = listOfNotNull(said, skipped).joinToString("\n\n")
+                }
+                else Toast.makeText(app, listOfNotNull(app.getString(doneMessage), skipped).joinToString("\n"), Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -1370,7 +1379,8 @@ private fun replaceEverythingChecked(ctx: Context, opened: OpenedBackup) = keepi
             entry = zip.nextEntry
         }
     }
-    Database.copyFromDb(restoredDb, ctx)
+    // (never fails the restore: a clipboard it can't read is skipped, the device's kept, review 2026-10-12 M8)
+    if (!Database.copyFromDb(restoredDb, ctx)) BackupRestoreJob.clipboardSkipped = true
     // the learned words open in the keyboard read the restored files; a backup from before they were per script has
     // per-language files, merged per script now as at app start
     PersonalizationHelper.reloadAllFromFiles()
@@ -1516,9 +1526,12 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, plan: Res
             learnedDir.deleteRecursively()
         }
         // merged into the device's clips (owner 2026-10-12: "yes, merge clipboard"; the full restore still replaces them)
-        val clipboard = choice.clipboard && restoredDb.exists()
-        if (choice.clipboard) Database.copyFromDb(restoredDb, ctx,
+        // (never fails the restore: a clipboard it can't read is skipped, the device's kept, review 2026-10-12 M8)
+        // (copyFromDb deletes the file: whether the backup had clips is asked first)
+        val hadClips = choice.clipboard && restoredDb.exists()
+        val clipboard = hadClips && Database.copyFromDb(restoredDb, ctx,
             mergeKeeping = ctx.prefs().getInt(Settings.PREF_CLIPBOARD_HISTORY_SIZE, Defaults.PREF_CLIPBOARD_HISTORY_SIZE))
+        if (hadClips && !clipboard) BackupRestoreJob.clipboardSkipped = true
         // Android's personal dictionary words: a word missing for its locale is added (never fail the whole restore over it)
         personalWords?.let { words ->
             try { restorePersonalDictionary(ctx, words) } catch (t: Throwable) { Log.w("AdvancedScreen", "error restoring personal dictionary", t) }

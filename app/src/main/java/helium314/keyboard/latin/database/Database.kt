@@ -2,6 +2,7 @@
 package helium314.keyboard.latin.database
 
 import android.content.Context
+import android.database.DatabaseErrorHandler
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import androidx.core.database.sqlite.transaction
@@ -38,34 +39,58 @@ class Database private constructor(context: Context, name: String = NAME) : SQLi
             getInstance(context).writableDatabase.rawQuery("PRAGMA wal_checkpoint(FULL)", null).use { it.moveToFirst() }
         }
 
-        // needs to be in sync with db version
         /** The clips of the database [file] replace the phone's (a full restore), or with [mergeKeeping] (the history
          *  size) are merged into them (a partial restore, owner 2026-10-12: backup's clips added, exact duplicates
-         *  once, both sides' pins kept, newest first, the oldest unpinned beyond the size dropped). */
-        fun copyFromDb(file: File, context: Context, mergeKeeping: Int? = null) {
+         *  once, both sides' pins kept, newest first, the oldest unpinned beyond the size dropped).
+         *  The backup's database is read as it is, its version ignored and never upgraded (review 2026-10-12 M8: one
+         *  from a newer build, or a damaged one, threw here after the full restore's wipe and stopped it): any problem
+         *  with it skips the clipboard and keeps the device's as it is (owner 2026-10-12 "makes senes to do B": no
+         *  clipboard problem may break a restore). [file] is deleted either way.
+         *  @return false when the backup's clips were skipped, true when restored (or there were none). Never throws. */
+        fun copyFromDb(file: File, context: Context, mergeKeeping: Int? = null): Boolean {
             if (!file.exists())
-                return
-            val otherDb = Database(context, file.name) // this upgrades the DB if necessary
-            val clipDao = ClipboardDao.getInstance(context) // insert to dao because of cache
-            if (clipDao == null) {
-                Log.e(TAG, "can't transfer clipboard data because ClipboardDao is null")
-            } else {
-                val clips = ArrayList<Triple<Long, Boolean, String>>()
-                otherDb.readableDatabase.rawQuery("SELECT TIMESTAMP, PINNED, TEXT FROM CLIPBOARD", null)
-                    .use {
-                        while (it.moveToNext()) {
-                            val text = it.getString(2) ?: continue
-                            clips += Triple(it.getLong(0), it.getInt(1) != 0, text)
-                        }
-                    }
+                return true
+            try {
+                // all of the backup's clips read first: the device's are cleared only once they're in hand
+                val clips = readClips(file) ?: return false
+                val clipDao = ClipboardDao.getInstance(context) // insert to dao because of cache
+                if (clipDao == null) {
+                    Log.e(TAG, "can't transfer clipboard data because ClipboardDao is null")
+                    return false
+                }
                 if (mergeKeeping == null) {
                     clipDao.clear()
-                    for ((timestamp, pinned, text) in clips) clipDao.addClip(timestamp, pinned, text)
+                    clips.forEach { clipDao.addClip(it.first, it.second, it.third) }
                 } else clipDao.mergeClips(clips, mergeKeeping) // (one transaction, the size applied after, L3.6)
+                // (upstream also copied its gesture-data table here: not in this app, and fresh installs don't have it)
+                return true
+            } catch (t: Throwable) {
+                Log.w(TAG, "clipboard not restored", t)
+                return false
+            } finally {
+                file.delete()
             }
-            // (upstream also copied its gesture-data table here: not in this app, and fresh installs don't have it)
-            otherDb.close()
-            file.delete()
+        }
+
+        /** The clips (time, pinned, text) of the database [file], read-only and whatever its version (the columns every
+         *  version so far has); null when it can't be read (damaged, not a database, no clipboard table). */
+        private fun readClips(file: File): List<Triple<Long, Boolean, String>>? = try {
+            // (an error handler that does nothing: Android's default one deletes a damaged file; no localized
+            // collators: nothing may be written to the backup's database)
+            SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY or SQLiteDatabase.NO_LOCALIZED_COLLATORS,
+                DatabaseErrorHandler { }).use { db ->
+                db.rawQuery("SELECT TIMESTAMP, PINNED, TEXT FROM CLIPBOARD", null).use {
+                    val clips = ArrayList<Triple<Long, Boolean, String>>()
+                    while (it.moveToNext()) {
+                        val text = it.getString(2) ?: continue
+                        clips.add(Triple(it.getLong(0), it.getInt(1) != 0, text))
+                    }
+                    clips
+                }
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "can't read the backup's clipboard database", t)
+            null
         }
     }
 }
