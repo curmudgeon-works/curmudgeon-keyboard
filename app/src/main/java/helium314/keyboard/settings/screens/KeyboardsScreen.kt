@@ -360,14 +360,10 @@ fun KeyboardsScreen(
 /** An Add keyboard entry: a copy of an existing keyboard. */
 private class CopyOf(val keyboard: SettingsSubtype)
 
-/** The switched-off keyboards: an own set (id map) or a learned-words pool, not in the list. */
-internal fun switchedOffKeyboards(ctx: Context): Set<SettingsSubtype> {
-    val real = ctx.realPrefs()
-    val enabled = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.toSet()
-    val withSet = KeyboardProfiles.idEntries(real).filterValues { it != KeyboardProfiles.SHARED }.keys
-    return (withSet + helium314.keyboard.latin.personalization.LearnedKeyboards.poolKeys(real))
-        .map { it.toSettingsSubtype() }.filterTo(LinkedHashSet()) { it !in enabled }
-}
+/** The switched-off keyboards: an own set (id map) or a learned-words pool, not in the list ([SwitchedOffKeyboards.list],
+ *  the one helper for them; 2026-10-11). */
+internal fun switchedOffKeyboards(ctx: Context): Set<SettingsSubtype> =
+    SwitchedOffKeyboards.list(ctx.realPrefs()).toCollection(LinkedHashSet())
 
 /** The definitions taken by a keyboard, enabled or switched off (owner 2026-10-11: switched-off keyboards count like
  *  switched-on ones; a new or changed keyboard never lands on one's settings and words). */

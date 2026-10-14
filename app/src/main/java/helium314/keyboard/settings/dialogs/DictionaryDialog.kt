@@ -183,7 +183,7 @@ internal fun dictionaryUsers(context: android.content.Context, locale: Locale,
 internal fun allDictionaryUsers(context: android.content.Context, locale: Locale): List<helium314.keyboard.latin.settings.SettingsSubtype> =
     (helium314.keyboard.latin.utils.SubtypeSettings.getEnabledSubtypes(true)
         .map { with(helium314.keyboard.latin.settings.SettingsSubtype) { it.toSettingsSubtype() } } +
-        helium314.keyboard.latin.settings.KeyboardProfiles.switchedOffKeyboards(
+        helium314.keyboard.latin.settings.SwitchedOffKeyboards.list(
             helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(context)))
         .distinct()
         .filter { kb -> kb.locale == locale || locale in helium314.keyboard.latin.utils.getSecondaryLocales(kb.extraValues) }

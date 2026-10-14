@@ -128,11 +128,12 @@ fun switchedOffUsing(ctx: Context, keys: Collection<String>, edited: SettingsSub
                      matches: (key: String, value: String?) -> Boolean): List<SettingsSubtype> {
     val real = ctx.realPrefs()
     val editingId = helium314.keyboard.latin.settings.KeyboardProfiles.editingId(ctx)
-    val enabled = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.toSet()
+    // (which keyboards are switched off: the one helper, [SwitchedOffKeyboards.list]; 2026-10-11)
+    val off = helium314.keyboard.latin.settings.SwitchedOffKeyboards.list(real).toHashSet()
     return helium314.keyboard.latin.settings.KeyboardProfiles.idEntries(real).mapNotNull { (pref, id) ->
         if (id == helium314.keyboard.latin.settings.KeyboardProfiles.SHARED || id == editingId) return@mapNotNull null
-        val keyboard = pref.toSettingsSubtype()
-        if (keyboard in enabled || keyboard == edited) return@mapNotNull null
+        val keyboard = runCatching { pref.toSettingsSubtype() }.getOrNull() ?: return@mapNotNull null
+        if (keyboard !in off || keyboard == edited) return@mapNotNull null
         keyboard.takeIf { keys.any { key -> val own = helium314.keyboard.latin.settings.KeyboardProfiles.ownKey(id, key)
             real.contains(own) && matches(key, real.getString(own, null)) } }
     }.distinct()
