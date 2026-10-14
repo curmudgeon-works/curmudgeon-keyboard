@@ -179,15 +179,14 @@ class WholeFlowUpgradeRestoreTest {
         appStart()
         val first = HashMap(real.all)
         // (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones) the common set
-        // goes; French, with a set of its own, keeps what it read from it where its own held nothing (to be confirmed),
-        // US, the first keyboard, keeps its own set as it is
-        val filled = commonOf3afbeeebc.filter { !before.containsKey(own(2, it)) && !before.containsKey(mark(2, it)) }.associate { own(2, it) to before[it] }
+        // goes; US and French, each with a set of its own, keep their sets as they are: not filled up from the common set
+        // (owner 2026-10-11, the upgrade decided: no gap-filling; only a keyboard without a set gets a copy of it)
         assertEquals(sortedSetOf(LayoutPresets.PREF, AppearanceLooks.PREF, SavedItemDefaults.REMEMBERED_DONE, KeyboardProfiles.NO_COMMON_SET_DONE)
-            + commonOf3afbeeebc + filled.keys, changedKeys(before, first), "the first upgrade changed more than the saved Layouts and themes")
+            + commonOf3afbeeebc, changedKeys(before, first), "the first upgrade changed more than the saved Layouts and themes")
         assertEquals(true, first[SavedItemDefaults.REMEMBERED_DONE])
         assertFalse(first.containsKey(SavedItemDefaults.PREF), "the switch was written down")
         // no other keyboard's setting changed, and nothing written as a default
-        assertEquals(live(before) - commonOf3afbeeebc + filled, live(first))
+        assertEquals(live(before) - commonOf3afbeeebc, live(first))
         // the saved items: picked values as they were, unpicked ones remember today's default
         val layouts = LayoutPresets.load(real)
         assertEquals(oldLayouts.map { it.name to it.values }, layouts.map { it.name to it.values })
