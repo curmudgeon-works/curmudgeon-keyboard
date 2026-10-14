@@ -125,6 +125,20 @@ class HowSavingWorksTest {
             assertEquals(listOf(R.string.saving_separate_items), savingCell(kind, action("Separate settings on/off")), ctx.getString(kind))
     }
 
+    // owner 2026-10-14 ("A. change sentence"): a factory reset keeps "Saved items take new defaults" only with the saved
+    // items' box ticked (keptOnReset). Fail before: the sentence said it stays as it is
+    @Test fun `factory reset - the saved items switch is kept only with the saved items box ticked`() {
+        val text = ctx.getString(R.string.saving_reset_items)
+        assertTrue("\"Saved items take new defaults\" stays as it is" !in text, text)
+        assertTrue("\"Saved items take new defaults\" is kept only when that box is ticked; otherwise it goes back on" in text, text)
+        val key = SavedItemDefaults.PREF
+        assertTrue(helium314.keyboard.settings.preferences.keptOnReset(key, helium314.keyboard.settings.preferences.ResetKeep(
+            keyboards = false, words = false, clipboard = false, own = true)))
+        assertTrue(!helium314.keyboard.settings.preferences.keptOnReset(key, helium314.keyboard.settings.preferences.ResetKeep(
+            keyboards = true, words = true, clipboard = true, own = false)))
+        assertTrue(SavedItemDefaults.DEFAULT) // ("goes back on")
+    }
+
     // owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones
     @Test fun `separate settings rows - the first keyboard's settings, nothing copied, delete and reorder`() {
         val separate = savingGuide.last().rows.map { it.text }
