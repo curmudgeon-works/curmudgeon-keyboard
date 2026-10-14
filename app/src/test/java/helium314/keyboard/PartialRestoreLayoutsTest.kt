@@ -135,7 +135,9 @@ class PartialRestoreLayoutsTest {
         file(numrow).writeText("A")
         phoneKeyboards(backupKeyboard, phoneKeyboard)
         backup("B")
-        restoreKeyboardsFrom(ctx, zip, listOf(backupKeyboard), withSettings = true)
+        // (owner 2026-10-11: restore matches by language and asks: answered "merge into the phone's", all ticked)
+        restoreKeyboardsFrom(ctx, zip, listOf(backupKeyboard), withSettings = true,
+            decisions = mapOf(backupKeyboard to helium314.keyboard.settings.preferences.RestoreDecision.Merge(backupKeyboard)))
         assertEquals("A", file(numrow).readText())
         assertEquals("B", file(numrow2).readText())
         assertEquals(listOf(backupKeyboard.withLayout(type, numrow2), phoneKeyboard), enabled())

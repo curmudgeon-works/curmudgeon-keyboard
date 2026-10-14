@@ -20,11 +20,9 @@ import helium314.keyboard.settings.KnownDefaults
 import helium314.keyboard.settings.REFINE_MENU_SHOWN
 
 /**
- * A backup's keyboard and this phone's in a restore of some keyboards (review item C1, owner 2026-10-11). The same
- * keyboard is the one of the same language, custom name and copy number, whatever its keys, languages or accents now:
- * restoring it replaces the phone's (before, a keyboard changed since the backup counted as new, and came in as a second
- * one). When the two differ, the restore asks; "Choose what to replace" lists only what differs: each part of the
- * keyboard's definition, and each menu whose settings differ. A ticked item takes the backup's, an unticked one keeps
+ * A backup's keyboard and the phone keyboard it is merged into in a restore of some keyboards (review item C1; owner
+ * 2026-10-11: restore matches by language and asks, [RestorePlan]). "What to merge" lists only what differs: each part of
+ * the keyboard's definition, and each menu whose settings differ. A ticked item takes the backup's, an unticked one keeps
  * the phone's. No Compose here: the restore dialog only shows what these give.
  */
 internal object RestoreMatch {
@@ -44,41 +42,13 @@ internal object RestoreMatch {
     }
 
     /**
-     * How a backup keyboard already on the phone ([phone]) is restored: [parts] and [menus] null = the backup's whole
-     * keyboard ("Replace with the backup's"); else the phone's keyboard with only the ticked parts and menus the backup's.
+     * How a backup keyboard merged into the phone's [phone] is restored: [parts] and [menus] null = the backup's whole
+     * keyboard (everything ticked); else the phone's keyboard with only the ticked parts and menus the backup's.
      */
     class Replace(val phone: SettingsSubtype, val parts: Set<Part>? = null, val menus: Set<KeyboardProfiles.Group>? = null) {
         val whole get() = parts == null && menus == null
         fun takes(part: Part) = parts == null || part in parts
         fun takes(menu: KeyboardProfiles.Group) = menus == null || menu in menus
-    }
-
-    /** The same keyboard: same language, same custom name (none = none), same copy number (none = none). */
-    fun sameKeyboard(a: SettingsSubtype, b: SettingsSubtype): Boolean =
-        a.locale.toLanguageTag() == b.locale.toLanguageTag()
-            && a.getExtraValueOf(ExtraValue.KEYBOARD_NAME) == b.getExtraValueOf(ExtraValue.KEYBOARD_NAME)
-            && a.getExtraValueOf(ExtraValue.KEYBOARD_COPY) == b.getExtraValueOf(ExtraValue.KEYBOARD_COPY)
-
-    /**
-     * Each of the [backup]'s keyboards that is on the phone ([phone]), with the phone's: an identical one first, then a
-     * same keyboard with the same keys, then any same keyboard; a phone keyboard is matched once at most (two English
-     * keyboards without names on both sides pair up by their keys). The others are new.
-     */
-    fun match(backup: List<SettingsSubtype>, phone: List<SettingsSubtype>): Map<SettingsSubtype, SettingsSubtype> {
-        val result = LinkedHashMap<SettingsSubtype, SettingsSubtype>()
-        val free = phone.toMutableList()
-        val passes = listOf<(SettingsSubtype, SettingsSubtype) -> Boolean>(
-            { a, b -> a == b },
-            { a, b -> sameKeyboard(a, b) && a.layoutName(LayoutType.MAIN) == b.layoutName(LayoutType.MAIN) },
-            ::sameKeyboard,
-        )
-        for (pass in passes) for (keyboard in backup) {
-            if (keyboard in result) continue
-            val onPhone = free.firstOrNull { pass(keyboard, it) } ?: continue
-            result[keyboard] = onPhone
-            free.remove(onPhone)
-        }
-        return result
     }
 
     // the extra values by key, as written ("Key=value", or "Key" for a flag)
@@ -167,7 +137,7 @@ internal object RestoreMatch {
 
     // ---- what the dialogs say ----
 
-    /** A row of "Choose what to replace": what it is, with the phone's and the backup's value. */
+    /** A row of "What to merge": what it is, with the phone's and the backup's value. */
     fun rowText(ctx: Context, difference: Difference, backup: SettingsSubtype): String = when (difference) {
         is Difference.Menu -> ctx.getString(R.string.restore_differs_menu, ctx.getString(helium314.keyboard.settings.screens.groupTitle(difference.group)))
         is Difference.Definition -> {

@@ -14,7 +14,6 @@ import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.settings.AppearanceLooks
 import helium314.keyboard.settings.CustomLabels
-import helium314.keyboard.settings.preferences.RestoreMatch
 import helium314.keyboard.settings.preferences.restoreKeyboardsFrom
 import helium314.keyboard.settings.preferences.settingsToJsonStream
 import org.json.JSONArray
@@ -83,12 +82,15 @@ class RestoreOnlyThatKeyboardTest {
     private fun outsideHindi() = real.all.filterKeys { stored ->
         KeyboardProfiles.splitOwnKey(stored)?.let { it.first != 2 } ?: !KeyboardProfiles.isAppWide(stored) }
 
+    // (owner 2026-10-11: restore matches by language and asks: Hindi answered "merge into the phone's Hindi", all ticked)
+    private val whole get() = mapOf(hi to helium314.keyboard.settings.preferences.RestoreDecision.Merge(hi))
+
     private fun unshare() = KeyboardProfiles.setGroupShared(real, appearance, false, KeyboardProfiles.SHARED)
 
     @Test fun `a shared menu's values go to the keyboard's own hidden set, not the shared one`() {
         backup()
         val before = outsideHindi()
-        restoreKeyboardsFrom(ctx, zip, listOf(hi), withSettings = true)
+        restoreKeyboardsFrom(ctx, zip, listOf(hi), withSettings = true, decisions = whole)
         assertEquals(before, outsideHindi())
         assertEquals(2f, real.getFloat(gap, 0f), "the shared gap changed")
         assertEquals(2f, view(1).getFloat(gap, 0f)); assertEquals(2f, view(2).getFloat(gap, 0f)) // (shared, for all)
@@ -103,7 +105,7 @@ class RestoreOnlyThatKeyboardTest {
         real.edit().putFloat(vgap, 7f).putFloat(own(2, vgap), 8f).putFloat(own(1, vgap), 6f).commit()
         backup()
         val before = outsideHindi()
-        restoreKeyboardsFrom(ctx, zip, listOf(hi), withSettings = true)
+        restoreKeyboardsFrom(ctx, zip, listOf(hi), withSettings = true, decisions = whole)
         assertEquals(before, outsideHindi())
         assertFalse(real.contains(own(2, vgap))) // (the backup's Hindi read the default there: a mark)
         assertTrue(real.contains(own(2, KeyboardProfiles.TOMBSTONE + vgap)))
@@ -116,8 +118,8 @@ class RestoreOnlyThatKeyboardTest {
     @Test fun `choosing a shared menu replaces only the keyboard's own values there`() {
         backup()
         val before = outsideHindi()
-        restoreKeyboardsFrom(ctx, zip, listOf(hi), withSettings = true, replaces = mapOf(hi to
-            RestoreMatch.Replace(hi, parts = emptySet(), menus = setOf(appearance))))
+        restoreKeyboardsFrom(ctx, zip, listOf(hi), withSettings = true, decisions = mapOf(hi to
+            helium314.keyboard.settings.preferences.RestoreDecision.Merge(hi, parts = emptySet(), menus = setOf(appearance))))
         assertEquals(before, outsideHindi())
         assertEquals(5f, real.getFloat(own(2, gap), 0f))
         assertFalse(view(2).getBoolean(autoCap, true)) // (Text correction not ticked: the phone's)
@@ -126,8 +128,8 @@ class RestoreOnlyThatKeyboardTest {
     @Test fun `choosing another menu keeps the keyboard's hidden own values of a shared menu`() {
         backup()
         val before = outsideHindi()
-        restoreKeyboardsFrom(ctx, zip, listOf(hi), withSettings = true, replaces = mapOf(hi to
-            RestoreMatch.Replace(hi, parts = emptySet(), menus = setOf(KeyboardProfiles.Group.TEXT_CORRECTION))))
+        restoreKeyboardsFrom(ctx, zip, listOf(hi), withSettings = true, decisions = mapOf(hi to
+            helium314.keyboard.settings.preferences.RestoreDecision.Merge(hi, parts = emptySet(), menus = setOf(KeyboardProfiles.Group.TEXT_CORRECTION))))
         assertEquals(before, outsideHindi())
         assertTrue(view(2).getBoolean(autoCap, false))
         assertEquals(4f, real.getFloat(own(2, gap), 0f), "Hindi's hidden gap went")
@@ -139,12 +141,12 @@ class RestoreOnlyThatKeyboardTest {
         real.edit().putBoolean("separate_settings_per_keyboard", false).remove(own(2, gap)).remove(own(2, autoCap)).commit()
         backup()
         val before = outsideHindi()
-        restoreKeyboardsFrom(ctx, zip, listOf(hi), withSettings = true)
+        restoreKeyboardsFrom(ctx, zip, listOf(hi), withSettings = true, decisions = whole)
         assertEquals(before, outsideHindi())
-        // (it turns separate settings on, the pending review item R7: unchanged here)
-        assertTrue(KeyboardProfiles.isSeparate(real))
+        // (owner 2026-10-11: R7, a restore never turns separate settings on)
+        assertFalse(KeyboardProfiles.isSeparate(real))
         assertEquals(5f, real.getFloat(own(2, gap), 0f))
-        assertTrue(view(2).getBoolean(autoCap, false))
+        assertTrue(real.getBoolean(own(2, autoCap), false)) // (its own set, read once separate settings are on)
     }
 
     @Test fun `the restored keyboard's Custom label of a shared menu lands in its own set`() {
@@ -152,7 +154,7 @@ class RestoreOnlyThatKeyboardTest {
         val sunset = JSONObject().put("name", "Sunset").put("values", JSONObject().put(gap, JSONObject().put("f", 5.0)))
         backup(mapOf(AppearanceLooks.PREF to JSONArray(listOf(sunset)).toString(), own(7, AppearanceLooks.PREF_SELECTED) to "Sunset"))
         val before = outsideHindi()
-        restoreKeyboardsFrom(ctx, zip, listOf(hi), withSettings = true, asCopies = false)
+        restoreKeyboardsFrom(ctx, zip, listOf(hi), withSettings = true, asCopies = false, decisions = whole)
         assertEquals(before, outsideHindi())
         assertFalse(real.contains(label), "the shared set got Hindi's label")
         assertTrue(real.getInt(own(2, label), 0) > 0)

@@ -11,7 +11,7 @@ import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.LayoutType
 import helium314.keyboard.latin.utils.LayoutUtilsCustom
 import helium314.keyboard.latin.utils.SubtypeSettings
-import helium314.keyboard.settings.preferences.restoreDialogMatchFrom
+import helium314.keyboard.settings.preferences.restorePlanFrom
 import helium314.keyboard.settings.preferences.restoreKeyboardsFrom
 import helium314.keyboard.settings.preferences.settingsToJsonStream
 import org.junit.After
@@ -80,7 +80,7 @@ class ReReview2R6Test {
     @Test fun `the dry run numbers the backup's layouts as the restore does, and writes nothing`() {
         file(numrow).writeText("A")
         backup()
-        val dry = restoreDialogMatchFrom(ctx, zip).first.mapValues { it.value.layoutName(type) }
+        val dry = restorePlanFrom(ctx, zip).incoming.mapValues { it.value.layoutName(type) }
         assertEquals(setOf(numrow), folder.list()!!.toSet()) // (the dry run wrote nothing)
 
         restoreKeyboardsFrom(ctx, zip, listOf(first, second), withSettings = false)

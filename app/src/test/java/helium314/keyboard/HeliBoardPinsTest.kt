@@ -143,6 +143,9 @@ class HeliBoardPinsTest {
         helium314.keyboard.settings.preferences.restoreKeyboardsFrom(ctx, zip, listOf(keyboard), withSettings = true)
         val id = KeyboardProfiles.idFor(real, keyboard)
         assertEquals(300, real.all[KeyboardProfiles.prefixedKey(id, Settings.PREF_KEY_LONGPRESS_TIMEOUT)], "${real.all}")
+        // (owner 2026-10-11: R7, a restore never turns separate settings on: its own set shows once they're on)
+        assertFalse(KeyboardProfiles.isSeparate(real))
+        KeyboardProfiles.enable(real, listOf(keyboard), keepExisting = true)
         // (outside an activity the view reads the keyboard in use: this one)
         real.edit { putString(Settings.PREF_SELECTED_SUBTYPE, keyboard.toPref()) }
         KeyboardProfiles.refreshImeId(real)

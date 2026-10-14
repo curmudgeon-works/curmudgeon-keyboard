@@ -43,7 +43,9 @@ class PartialRestoreItemsTest {
     private val keyboard = SettingsSubtype(Locale.US, "")
     private val zip by lazy { File(ctx.cacheDir, "partial-items-${System.nanoTime()}.zip") }
 
-    @Before fun setUp() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
+    // (separate settings on: the keyboard's own set is read; owner 2026-10-11: R7, a restore never turns separate settings
+    // on, and with one set for all its own set waits behind the common one)
+    @Before fun setUp() { real.edit().clear().putBoolean("separate_settings_per_keyboard", true).commit(); KeyboardProfiles.loadGroups(real) }
     @After fun tearDown() { zip.delete(); real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
 
     private fun set(name: String, a: String) = JSONObject().put("name", name).put("morePopups", "all").put("symbolsLayout", "")

@@ -450,6 +450,12 @@ object KeyboardProfiles {
         editor.apply()
     }
 
+    /** Set [id] was restored while one set is for all (owner 2026-10-11, R7: separate settings stay off): if the common
+     *  settings came from its keyboard, they no longer do, so turning separate settings on ([enable]) keeps the
+     *  restored set rather than giving it the common one. */
+    @Synchronized
+    fun restoredBehindShared(real: SharedPreferences, id: Int) = setSharedFrom(real, null, null, dropId = id)
+
     fun put(editor: SharedPreferences.Editor, key: String, value: Any?) {
         @Suppress("UNCHECKED_CAST")
         when (value) {

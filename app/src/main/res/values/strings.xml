@@ -605,13 +605,30 @@
     <!-- the restore dialog: a keyboard not on this phone; and what to do with saved items whose names are taken -->
     <string name="restore_keyboard_new">%s (new)</string>
     <string name="restore_saved_items_as_copies">Saved items whose names you already use: bring them in as copies</string>
-    <!-- the restore: a chosen keyboard is on this phone already (same language, name and copy number) but differs.
-         The app can't tell which one is newer: never say newer or older. %s: the keyboard's name -->
-    <string name="restore_differs_title">%s is already on this phone, and differs from the backup\'s.</string>
-    <string name="restore_differs_choose">Choose what to replace</string>
-    <string name="restore_differs_replace">Replace with the backup\'s</string>
+    <!-- the restore: the phone has keyboards of a chosen backup keyboard's language (owner 2026-10-11: restore matches by
+         language and asks). The app can't tell which one is newer: never say newer or older. %s: the backup keyboard's name -->
+    <string name="restore_merge_title">Restoring %s</string>
+    <string name="restore_merge_message">This phone has a keyboard of the same language. Merge the backup\'s keyboard into one of them, or keep it as a separate keyboard?</string>
+    <string name="restore_keep_separate">Keep as a separate keyboard</string>
+    <string name="restore_next">Next</string>
+    <!-- the name box of a merged or separate keyboard -->
+    <string name="restore_name">Name</string>
+    <!-- %s: the other keyboard's name -->
+    <string name="restore_same_as">This would be the same as your other %s keyboard: change the name or what you merge</string>
+    <!-- what to merge: %s the phone keyboard's name -->
+    <string name="restore_differs_choose">What to merge into %s</string>
+    <string name="restore_learned_row">Learned words (added to this phone\'s)</string>
+    <!-- %s: the phone keyboard's name -->
+    <string name="restore_nothing_differs">Nothing differs: %s on this phone is the same as the backup\'s.</string>
+    <!-- nothing ticked; %s: the backup keyboard's name -->
+    <string name="restore_nothing_ticked">Nothing to restore: %s will not be restored from the backup.</string>
+    <string name="restore_dont_restore">Don\'t restore</string>
+    <string name="restore_done">Done</string>
+    <!-- after a restore with one set of settings for all (separate settings off), which the restore leaves off: %s the keyboard(s) -->
+    <string name="restore_settings_hidden_one">%s\'s settings were restored. You\'ll see them once you turn on Use separate settings in App settings.</string>
+    <string name="restore_settings_hidden_many">The settings of %s were restored. You\'ll see them once you turn on Use separate settings in App settings.</string>
     <string name="restore_differs_choose_message">A ticked item takes the backup\'s. An unticked item keeps this phone\'s.</string>
-    <!-- a row of "Choose what to replace": %1$s what it is, %2$s this phone's value, %3$s the backup's -->
+    <!-- a row of "What to merge": %1$s what it is, %2$s this phone's value, %3$s the backup's -->
     <string name="restore_differs_row">%1$s: this phone %2$s, backup %3$s</string>
     <!-- a row whose two values can't be shown apart in words -->
     <string name="restore_differs_plain">%s: this phone and the backup differ</string>
