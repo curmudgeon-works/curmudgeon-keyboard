@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import helium314.keyboard.keyboard.FontLibrary
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import android.graphics.Typeface
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -518,17 +519,30 @@ fun SuggestionColorRow(reload: () -> Unit) {
 }
 
 /** Who goes back to the default font when font [name] is deleted: the enabled keyboards choosing it (the one being
- *  edited too), by name, then the saved themes, "theme <name>"; one line each. */
+ *  edited too), by name, then the switched-off keyboards whose own set chose it, "<name> (switched off)", then the
+ *  saved themes, "theme <name>"; one line each. */
 internal fun fontUsers(ctx: Context, name: String): List<String> {
     val value = FontLibrary.PREFIX + name
     val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
     val edited = helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(real, helium314.keyboard.settings.PrefsDraft.currentSetId(ctx))
     val keyboards = helium314.keyboard.settings.screens.keyboardsUsing(ctx, FontLibrary.fontPrefs, edited) { _, v -> v == value }
         .map { helium314.keyboard.settings.screens.keyboardName(it, ctx) }
+    // (review 2026-10-11 S6: a keyboard switched off on the Languages screen keeps its id and own set, and the delete
+    // resets that set too; named whether or not separate settings is on, as enabled keyboards' hidden sets are. A set
+    // no keyboard maps to: nothing to name)
+    val enabled = helium314.keyboard.latin.utils.SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.toSet()
+    val switchedOff = helium314.keyboard.latin.settings.KeyboardProfiles.idEntries(real).mapNotNull { (pref, id) ->
+        if (id == helium314.keyboard.latin.settings.KeyboardProfiles.SHARED) return@mapNotNull null
+        val keyboard = pref.toSettingsSubtype()
+        if (keyboard in enabled) return@mapNotNull null
+        if (FontLibrary.fontPrefs.none { real.getString(helium314.keyboard.latin.settings.KeyboardProfiles.ownKey(id, it), null) == value })
+            return@mapNotNull null
+        ctx.getString(R.string.font_delete_switched_off, helium314.keyboard.settings.screens.keyboardName(keyboard, ctx))
+    }.distinct()
     val themes = helium314.keyboard.settings.AppearanceLooks.load(real)
         .filter { look -> FontLibrary.fontPrefs.any { look.values[it] == value } }
         .map { ctx.getString(R.string.font_delete_theme, it.name) }
-    return keyboards + themes
+    return keyboards + switchedOff + themes
 }
 
 /**
