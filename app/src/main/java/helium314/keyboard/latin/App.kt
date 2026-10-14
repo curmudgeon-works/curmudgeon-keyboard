@@ -62,7 +62,10 @@ class App : Application() {
         scope.launch { // do some uncritical work in background for faster startup
             SupportedEmojis.load(this@App)
             LayoutUtilsCustom.removeMissingLayouts(this@App)
-            val packageInfo = packageManager.getPackageInfo(packageName, 0)
+            // (can't fail for the app itself on a phone; in unit tests this job outlives its test, and the next test's
+            // package manager doesn't know the package: the exception landed in that test as a flaky failure)
+            val packageInfo = try { packageManager.getPackageInfo(packageName, 0) }
+                catch (_: android.content.pm.PackageManager.NameNotFoundException) { return@launch }
             @Suppress("DEPRECATION")
             Log.i(
                 "startup", "Starting ${applicationInfo.processName} version ${packageInfo.versionName} (${
