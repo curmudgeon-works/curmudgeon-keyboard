@@ -169,18 +169,31 @@ object LearnedKeyboards {
      * then its learned words and blacklists deleted in the background, under [files]. The pool is read before the entry
      * goes; pool 0 (the shared words of before) is never touched.
      */
-    fun deleteKeyboard(context: Context, keyboard: SettingsSubtype) {
+    fun deleteKeyboard(context: Context, keyboard: SettingsSubtype, mergeInto: SettingsSubtype? = null) {
         val real = DeviceProtectedUtils.getRealSharedPreferences(context)
         val pool = if (!isDone(real)) null else synchronized(this) {
             pools(real).let { map -> keyboard.toPref().takeIf { map.has(it) }?.let { map.getInt(it) } }
         }
+        // [mergeInto] (picked in the delete dialog, 2026-10-11: "Merge these lists into one of those keyboards and refer
+        // from others"): it takes the lists, merged into its own, before they're deleted, in the same task
+        val target = mergeInto?.let { poolFor(real, it) }?.takeIf { it != pool && it != LearnedStores.SHARED }
         KeyboardProfiles.onKeyboardDeleted(real, keyboard)
         if (pool == null || pool == LearnedStores.SHARED) return
         val app = context.applicationContext ?: context
         ExecutorUtils.getBackgroundExecutor(ExecutorUtils.KEYBOARD).execute {
+            if (target != null) try {
+                if (LearnedImport.importNow(app, target, listOf(pool), listOf(pool)) != null)
+                    android.os.Handler(android.os.Looper.getMainLooper()).post { LearnedStores.notifyPoolChanged(target) }
+            } catch (e: Exception) { Log.e(TAG, "could not merge a deleted keyboard's words", e) }
             try { deleteWordsOf(app, pool) } catch (e: Exception) { Log.e(TAG, "could not delete a deleted keyboard's words", e) }
         }
     }
+
+    /** The other enabled keyboards that read [keyboard]'s lists ("Use lists from other keyboards" on): the delete
+     *  dialog names them and offers to merge the lists into one. */
+    fun listReaders(real: SharedPreferences, keyboard: SettingsSubtype): List<SettingsSubtype> =
+        SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.distinct()
+            .filter { it != keyboard && buttonPrefs.any { pref -> usesOthers(real, pref, it) } }
 
     /** [pool]'s stores and lists deleted, unless a keyboard has it (again). Background only. */
     internal fun deleteWordsOf(context: Context, pool: Int) = withFiles {

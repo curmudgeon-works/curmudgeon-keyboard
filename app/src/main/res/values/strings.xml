@@ -586,6 +586,15 @@
     <!-- the trash on a font nothing uses any more -->
     <string name="font_delete_file_title">Also delete the font file “%s” for good?</string>
     <string name="font_keep_file">Keep the file</string>
+    <!-- deleting an added dictionary other keyboards use: not allowed -->
+    <string name="dictionary_in_use_title">“%s” is in use</string>
+    <string name="dictionary_in_use_message">These keyboards use it too, so it stays:\n%s</string>
+    <string name="dictionary_turn_off_here">Turn the language off here</string>
+    <string name="dictionary_used_by_none">No keyboard uses it.</string>
+    <string name="dictionary_used_by_one">%s uses it and loses this dictionary.</string>
+    <!-- deleting a keyboard whose word lists other keyboards read -->
+    <string name="delete_keyboard_readers">These keyboards use its learned and blacklisted words (Use lists from other keyboards). Pick one to keep them, merged into its own; the others then read them from there:</string>
+    <string name="delete_keyboard_merge_none">None: the lists go</string>
     <string name="key_popups_save_as_new">Save current popup layout</string>
     <string name="key_popups_save_change_title">Save this change to a set of your own</string>
     <string name="key_popups_my_set">My popups</string>

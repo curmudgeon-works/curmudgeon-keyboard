@@ -293,20 +293,14 @@ fun SubtypeScreen(
     }
     if (askReject) DiscardChangesDialog({ askReject = false }) { discardChanges(); draft = LayoutDraft.of(ctx, currentSubtypeString) }
     if (askAccept) SaveChangesDialog({ askAccept = false }) { draft.accept(); draft = LayoutDraft.of(ctx, currentSubtypeString) }
-    if (askDelete) ConfirmationDialog(
-        onDismissRequest = { askDelete = false },
-        onConfirmed = {
-            askDelete = false
-            LayoutDraft.close() // deleting keeps the changes so far: a Discard mustn't bring the keyboard back
-            if (currentSubtype.isAdditionalSubtype(prefs)) SubtypeUtilsAdditional.removeAdditionalSubtype(ctx, currentSubtype.toAdditionalSubtype())
-            SubtypeSettings.removeEnabledSubtype(ctx, currentSubtype.toAdditionalSubtype())
-            helium314.keyboard.latin.personalization.LearnedKeyboards.deleteKeyboard(ctx, currentSubtype) // (its words too)
-            onClickBack()
-        },
-        title = { Text(stringResource(R.string.delete_keyboard_title)) },
-        content = { Text(stringResource(R.string.delete_keyboard_message, keyboardName(currentSubtype, ctx))) },
-        confirmButtonText = stringResource(R.string.delete),
-    )
+    if (askDelete) DeleteKeyboardDialog(currentSubtype, onDismissRequest = { askDelete = false }) { mergeInto ->
+        askDelete = false
+        LayoutDraft.close() // deleting keeps the changes so far: a Discard mustn't bring the keyboard back
+        if (currentSubtype.isAdditionalSubtype(prefs)) SubtypeUtilsAdditional.removeAdditionalSubtype(ctx, currentSubtype.toAdditionalSubtype())
+        SubtypeSettings.removeEnabledSubtype(ctx, currentSubtype.toAdditionalSubtype())
+        helium314.keyboard.latin.personalization.LearnedKeyboards.deleteKeyboard(ctx, currentSubtype, mergeInto) // (its words too)
+        onClickBack()
+    }
     if (askOnLeave) UnsavedChangesDialog(
         onKeepWorking = { askOnLeave = false },
         onDiscardAndExit = { discardChanges(); askOnLeave = false; onClickBack() },

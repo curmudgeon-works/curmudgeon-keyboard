@@ -48,6 +48,9 @@ import helium314.keyboard.dictionarypack.DictionaryPackConstants
 fun DictionaryDialog(
     onDismissRequest: () -> Unit,
     locale: Locale,
+    /** The keyboard whose language row opened it, with how to turn the language off there; null from the Dictionaries screen. */
+    keyboard: helium314.keyboard.latin.settings.SettingsSubtype? = null,
+    onTurnOff: (() -> Unit)? = null,
 ) {
     val ctx = LocalContext.current
     val (dictionaries, hasInternal) = getUserAndInternalDictionaries(ctx, locale)
@@ -75,14 +78,14 @@ fun DictionaryDialog(
                     )
                 }
                 if (mainDict != null)
-                    DictionaryDetails(mainDict)
+                    DictionaryDetails(mainDict, locale, keyboard, onTurnOff)
                 if (addonDicts.isNotEmpty()) {
                     HorizontalDivider()
                     Text(stringResource(R.string.dictionary_category_title),
                         modifier = Modifier.padding(vertical = 12.dp),
                         style = MaterialTheme.typography.titleSmall
                     )
-                    addonDicts.forEach { DictionaryDetails(it) }
+                    addonDicts.forEach { DictionaryDetails(it, locale, keyboard, onTurnOff) }
                 }
                 val dictString = createDictionaryTextAnnotated(locale)
                 if (dictString.isNotEmpty()) {
@@ -105,7 +108,8 @@ fun DictionaryDialog(
 }
 
 @Composable
-private fun DictionaryDetails(dict: File) {
+private fun DictionaryDetails(dict: File, locale: Locale, keyboard: helium314.keyboard.latin.settings.SettingsSubtype?,
+                              onTurnOff: (() -> Unit)?) {
     val header = DictionaryInfoUtils.getDictionaryFileHeaderOrNull(dict) ?: return
     val type = header.mIdString.substringBefore(":")
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -129,8 +133,22 @@ private fun DictionaryDetails(dict: File) {
             modifier = Modifier.padding(start = 10.dp, top = 0.dp, end = 10.dp, bottom = 12.dp)
         )
     }
-    if (showDeleteDialog) {
-        val context = LocalContext.current
+    // used by other keyboards: no delete (owner 2026-10-11: "No delete allowed if other keyboards using dict"); the dialog
+    // names them and, opened from a keyboard with it as a second language, offers to turn it off there instead
+    val context = LocalContext.current
+    val others = if (!showDeleteDialog) emptyList() else remember(showDeleteDialog) { dictionaryUsers(context, locale, keyboard) }
+    if (showDeleteDialog && others.isNotEmpty()) {
+        val canTurnOff = keyboard != null && onTurnOff != null && keyboard.locale != locale
+        ThreeButtonAlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            onConfirmed = { onTurnOff?.invoke() },
+            confirmButtonText = if (canTurnOff) stringResource(R.string.dictionary_turn_off_here) else null,
+            cancelButtonText = stringResource(if (canTurnOff) android.R.string.cancel else android.R.string.ok),
+            title = { Text(stringResource(R.string.dictionary_in_use_title, type)) },
+            content = { Text(stringResource(R.string.dictionary_in_use_message,
+                others.joinToString("\n") { helium314.keyboard.settings.screens.keyboardName(it, context) })) },
+        )
+    } else if (showDeleteDialog) {
         ConfirmationDialog(
             onDismissRequest = { showDeleteDialog = false },
             confirmButtonText = stringResource(R.string.remove),
@@ -138,10 +156,32 @@ private fun DictionaryDetails(dict: File) {
                 dict.delete()
                 context.sendBroadcast(Intent(DictionaryPackConstants.NEW_DICTIONARY_INTENT_ACTION))
             },
-            content = { Text(stringResource(R.string.remove_dictionary_message, type)) }
+            content = {
+                // (the old Dictionaries screen, no keyboard asking: who uses it, none or the one, owner 2026-10-11)
+                val users = if (keyboard != null) null else remember { allDictionaryUsers(context, locale) }
+                Text(stringResource(R.string.remove_dictionary_message, type) + when {
+                    users == null -> ""
+                    users.isEmpty() -> "\n\n" + stringResource(R.string.dictionary_used_by_none)
+                    else -> "\n\n" + stringResource(R.string.dictionary_used_by_one, helium314.keyboard.settings.screens.keyboardName(users.first(), context))
+                })
+            }
         )
     }
 }
+
+/** The enabled keyboards with [locale] as a language, but [keyboard] (the one asking: a language row). (No keyboard
+ *  asking: the old Dictionaries screen, which nothing opens; there all but one, so a dictionary one keyboard uses can go.) */
+internal fun dictionaryUsers(context: android.content.Context, locale: Locale,
+                             keyboard: helium314.keyboard.latin.settings.SettingsSubtype?): List<helium314.keyboard.latin.settings.SettingsSubtype> {
+    val users = allDictionaryUsers(context, locale)
+    return if (keyboard != null) users.filter { it != keyboard } else if (users.size < 2) emptyList() else users
+}
+
+/** Every enabled keyboard with [locale] as its language or a second one. */
+internal fun allDictionaryUsers(context: android.content.Context, locale: Locale): List<helium314.keyboard.latin.settings.SettingsSubtype> =
+    helium314.keyboard.latin.utils.SubtypeSettings.getEnabledSubtypes(true)
+        .map { with(helium314.keyboard.latin.settings.SettingsSubtype) { it.toSettingsSubtype() } }.distinct()
+        .filter { kb -> kb.locale == locale || locale in helium314.keyboard.latin.utils.getSecondaryLocales(kb.extraValues) }
 
 @Preview
 @Composable

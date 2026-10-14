@@ -33,6 +33,9 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import helium314.keyboard.latin.R
@@ -266,19 +269,13 @@ fun KeyboardsScreen(
             )
         }
         keyboardToDelete?.let { keyboard ->
-            ConfirmationDialog(
-                onDismissRequest = { keyboardToDelete = null },
-                onConfirmed = {
-                    if (keyboard.isAdditionalSubtype(ctx.prefs())) SubtypeUtilsAdditional.removeAdditionalSubtype(ctx, keyboard.toAdditionalSubtype())
-                    SubtypeSettings.removeEnabledSubtype(ctx, keyboard.toAdditionalSubtype())
-                    helium314.keyboard.latin.personalization.LearnedKeyboards.deleteKeyboard(ctx, keyboard) // (its words too)
-                    keyboardToDelete = null
-                    generation++
-                },
-                title = { Text(stringResource(R.string.delete_keyboard_title)) },
-                content = { Text(stringResource(R.string.delete_keyboard_message, keyboardName(keyboard, ctx))) },
-                confirmButtonText = stringResource(R.string.delete),
-            )
+            DeleteKeyboardDialog(keyboard, onDismissRequest = { keyboardToDelete = null }) { mergeInto ->
+                if (keyboard.isAdditionalSubtype(ctx.prefs())) SubtypeUtilsAdditional.removeAdditionalSubtype(ctx, keyboard.toAdditionalSubtype())
+                SubtypeSettings.removeEnabledSubtype(ctx, keyboard.toAdditionalSubtype())
+                helium314.keyboard.latin.personalization.LearnedKeyboards.deleteKeyboard(ctx, keyboard, mergeInto) // (its words too)
+                keyboardToDelete = null
+                generation++
+            }
         }
         if (showAddKeyboard)
             ListPickerDialog<Any>(
@@ -373,4 +370,39 @@ private fun startWords(ctx: Context, keyboard: SettingsSubtype, learned: List<Se
             else app.getString(R.string.import_words_done, result.learned, result.blacklisted)
         android.widget.Toast.makeText(app, text, android.widget.Toast.LENGTH_LONG).show()
     }
+}
+
+/**
+ * Delete [keyboard]? Its learned and blacklisted words go too; the keyboards reading them ("Use lists from other
+ * keyboards") are named, with one pick, none by default (owner 2026-10-11: "list of keyboards where user can select one
+ * keyboard or none (none selected by default) Ok/cancel"): the picked one takes the lists merged into its own, and the
+ * others read them from there. [onConfirmed] gets the pick.
+ */
+@Composable
+internal fun DeleteKeyboardDialog(keyboard: SettingsSubtype, onDismissRequest: () -> Unit, onConfirmed: (SettingsSubtype?) -> Unit) {
+    val ctx = LocalContext.current
+    val readers = remember(keyboard) { helium314.keyboard.latin.personalization.LearnedKeyboards.listReaders(ctx.realPrefs(), keyboard) }
+    var pick: SettingsSubtype? by remember { mutableStateOf(null) }
+    helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog(
+        onDismissRequest = onDismissRequest,
+        onConfirmed = { onConfirmed(pick) },
+        confirmButtonText = stringResource(R.string.delete),
+        title = { Text(stringResource(R.string.delete_keyboard_title)) },
+        scrollContent = true,
+        content = {
+            androidx.compose.foundation.layout.Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.delete_keyboard_message, keyboardName(keyboard, ctx)))
+                if (readers.isNotEmpty()) {
+                    Text(stringResource(R.string.delete_keyboard_readers))
+                    (listOf<SettingsSubtype?>(null) + readers).forEach { kb ->
+                        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().clickable { pick = kb }.heightIn(min = 44.dp)) {
+                            androidx.compose.material3.RadioButton(selected = pick == kb, onClick = { pick = kb })
+                            Text(if (kb == null) stringResource(R.string.delete_keyboard_merge_none) else keyboardName(kb, ctx))
+                        }
+                    }
+                }
+            }
+        },
+    )
 }
