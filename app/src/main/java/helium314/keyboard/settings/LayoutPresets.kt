@@ -35,11 +35,11 @@ object LayoutPresets {
     const val PREF_SELECTED = "layout_preset_selected"
     private const val LAYOUT = "layout:" // + type: the keys' layout name (no entry: the default)
     private const val LAYOUT_TEXT = "layoutText:" // + type: a custom layout's content
-    internal const val SCRIPT = "script" // the script of the keyboard it was saved from (popups only go to that script)
+    private const val SCRIPT = "script" // the script of the keyboard it was saved from (popups only go to that script)
     private const val MORE_POPUPS = "morePopups" // the keyboard's own accents level (no entry / null: the general one)
 
     /** The popup settings (also in Layouts since 2026-10-03). */
-    internal val popupKeys = setOf(Settings.PREF_SHOW_TLD_POPUP_KEYS, Settings.PREF_REMOVE_REDUNDANT_POPUPS,
+    private val popupKeys = setOf(Settings.PREF_SHOW_TLD_POPUP_KEYS, Settings.PREF_REMOVE_REDUNDANT_POPUPS,
         Settings.PREF_SYMBOL_POPUP_MAP, KeyPopupOverrides.PREF, KeyPopupOverrides.PREF_SELECTED_SET)
 
     /** Equal by content, not name: the list's tapped one is still found after a rename (or a reload of the list).
