@@ -111,7 +111,6 @@
     <!-- Keyboards: press and hold a keyboard > Rename (empty: its languages' name again) -->
     <string name="rename_keyboard">Rename</string>
     <!-- Keyboards > Add keyboard (separate settings): where the new keyboard's settings come from -->
-    <string name="new_keyboard_copy_settings">Settings for %s: copy from</string>
     <string name="new_keyboard_default_settings">Default settings</string>
     <!-- Settings: a bar on top while another keyboard is selected in Android -->
     <string name="not_current_keyboard">Curmudgeon isn\'t your current keyboard</string>
@@ -768,8 +767,6 @@
     <string name="add_keyboard">Add keyboard</string>
     <!-- %s: a keyboard's name -->
     <string name="copy_of_keyboard">Copy of %s</string>
-    <string name="copy_keyboard_message">The copy has the same languages and layout. Which settings should it start with?</string>
-    <string name="copy_keyboard_with_settings">Ok: All its settings</string>
     <string name="copy_keyboard_common_settings">The common settings</string>
     <string name="delete_keyboard_title">Delete this keyboard?</string>
     <!-- the first keyboard can't be deleted while its settings are the common ones: %s the keyboard -->

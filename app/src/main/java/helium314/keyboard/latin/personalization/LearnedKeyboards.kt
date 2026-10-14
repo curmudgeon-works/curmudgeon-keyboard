@@ -128,9 +128,6 @@ object LearnedKeyboards {
     private fun pools(json: String?): JSONObject =
         try { JSONObject(json ?: "{}") } catch (e: Exception) { JSONObject() }
 
-    /** The keyboard ids with a pool, switched-off ones too. */
-    fun poolKeys(real: SharedPreferences): Set<String> = pools(real).keys().asSequence().toSet()
-
     /** Whether [keyboard] uses the other keyboards' lists of button [pref] (one of [buttonPrefs]): its id is in it. */
     fun usesOthers(real: SharedPreferences, pref: String, keyboard: SettingsSubtype) =
         keyboard.keyboardId?.let { it in ids(real.getString(pref, null)) } == true
@@ -499,20 +496,6 @@ object LearnedKeyboards {
     private fun blacklist(filesDir: File, script: String, pool: Int) = RemovedWords.forFile(LearnedStores.blacklistFile(filesDir, script, pool))
 
     // ---------------- restore ----------------
-
-    /** The phone's bookkeeping, read before a full restore replaces the preferences ([afterFullRestore] puts it back). */
-    fun phoneState(real: SharedPreferences): Map<String, Any?> = real.all.filterKeys { it in phoneKeys }
-
-    /** After a full restore: the phone's bookkeeping back over the backup's (the phone's files are the phone's; the
-     *  backup's words are added to them by keyboard), and the buttons of the backup's [keyboards] (see [restoreButtons]). */
-    fun afterFullRestore(real: SharedPreferences, phone: Map<String, Any?>, backup: Map<String, Any?>, keyboards: List<SettingsSubtype>) {
-        synchronized(this) {
-            val editor = real.edit()
-            for (key in phoneKeys) phone[key]?.let { KeyboardProfiles.put(editor, key, it) } ?: editor.remove(key)
-            editor.commit()
-        }
-        restoreButtons(real, backup, keyboards)
-    }
 
     /** [keyboards]' buttons as in the [backup] (its preferences); a backup from before them: on if it shared its words,
      *  as the update does. [onPhone]: a keyboard as it is called on the phone now, if not as in the backup. */

@@ -1246,16 +1246,8 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, asked: L
     // one mapping, backup keyboard -> the phone keyboard it becomes: its key layouts as they came in (B4), merged or
     // added as answered, named as answered
     val onPhone = chosen.associateWith { keyboard -> RestoreDecision.result(decisions[keyboard], renamedLayouts(keyboard, keyLayouts), nameOf)!! }
-    // (the phone's settings for the merge; owner 2026-10-11, palettes are one app-wide list: its plain palettes are the
-    // phone's list, Palettes.merge; the sets kept apart here held palette copies before that)
-    val replacing = (onPhone.values + replaces.values.map { it.phone }).mapNotNullTo(HashSet()) { it.keyboardId }
-    val phone = real.all.filterKeys { KeyboardProfiles.splitOwnKey(it)?.first !in replacing }
-    // (a merge target whose Appearance stays the phone's: counted as the phone's, owner 2026-10-11, R2: "make sure nothing
-    // gets trashed")
-    val keepsLook = replaces.values.filter { !it.takes(KeyboardProfiles.Group.APPEARANCE) }.mapNotNullTo(HashSet()) { it.phone.keyboardId }
-    val phonePalettes = real.all.filterKeys { key -> KeyboardProfiles.splitOwnKey(key)?.first.let { it !in replacing || it in keepsLook } }
     val renames = if (withSettings) SavedItemsMerge.merge(ctx, real, backup, names, files?.first.orEmpty(), files?.second.orEmpty(), keyLayouts,
-        wanted, phonePalettes) else null
+        wanted) else null
     val settings = backupSettings.mapValues { (_, values) -> renames?.apply(values) ?: values }
     val wasSeparate = KeyboardProfiles.isSeparate(real)
 
