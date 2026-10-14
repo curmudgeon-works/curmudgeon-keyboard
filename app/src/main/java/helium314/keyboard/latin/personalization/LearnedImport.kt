@@ -85,8 +85,10 @@ object LearnedImport {
                 val file = LearnedStores.blacklistFile(filesDir, script, from)
                 val entries = (RemovedWords.cached(file) ?: file.takeIf { it.isFile }?.let { RemovedWords.forFile(it) })
                     ?.apply { reload() }?.entries()
-                // (a list with something in its file that came out empty: its read failed)
-                if (entries.isNullOrEmpty() && file.isFile && file.length() > 0) {
+                // (a list with words in its file that came out empty, or a file that can't be read: its read failed;
+                // a file with no words is an empty list, review 2026-10-11 S9: "empty doesn't register as error")
+                if (entries.isNullOrEmpty() && file.isFile && file.length() > 0
+                    && (try { file.readLines().any { RemovedWords.parse(it) != null } } catch (e: Exception) { true })) {
                     Log.w(TAG, "$script: a blacklist could not be read"); complete = false
                 }
                 entries?.takeIf { it.isNotEmpty() }
