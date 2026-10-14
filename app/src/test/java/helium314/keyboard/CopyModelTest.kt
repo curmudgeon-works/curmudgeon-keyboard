@@ -53,7 +53,7 @@ class CopyModelTest {
             .commit()
         KeyboardProfiles.loadGroups(real)
     }
-    @After fun tearDown() { AppearanceDraft.close(); real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
+    @After fun tearDown() { AppearanceDraft.close(); helium314.keyboard.settings.LayoutDraft.close(); real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
 
     @Test fun `Custom labels number per kind across keyboards, and go when an item is chosen`() {
         assertEquals(1, CustomLabels.number(real, view(1), CustomLabels.Kind.THEME))
@@ -198,5 +198,47 @@ class CopyModelTest {
         assertTrue(helium314.keyboard.keyboard.KeyboardTheme.isHiddenPalette(hidden))
         assertEquals("old", real.getString(Settings.PREF_USER_COLORS_PREFIX + hidden, null))
         assertEquals("Warm", real.getString(Settings.PREF_THEME_COLORS, null)) // (the shared set: still the palette)
+    }
+
+    // review 2026-10-11 D1: owner "yes, one copy one number". A menu shared by all keyboards shows them one copy, so one
+    // Custom number, stored in the shared set; per keyboard each its own. A label, never a saved theme or Layout.
+    @Test fun `a menu shared by all keyboards has one Custom number for its one copy`() {
+        real.edit().putBoolean(KeyboardProfiles.Group.APPEARANCE.prefKey, true).putBoolean(KeyboardProfiles.Group.LAYOUT.prefKey, true).commit()
+        KeyboardProfiles.loadGroups(real)
+        val appearance = AppearanceDraft.of(ctx)
+        val layout = helium314.keyboard.settings.LayoutDraft.of(ctx, us.toPref())
+        for (kind in CustomLabels.Kind.entries) {
+            val first = CustomLabels.number(real, view(1), kind)
+            assertEquals(first, CustomLabels.number(real, view(2), kind), kind.name)
+            assertEquals(first, real.getInt(kind.key, 0), kind.name) // (in the shared set)
+            assertFalse(real.contains(own(1, kind.key)) || real.contains(own(2, kind.key)), kind.name)
+        }
+        assertTrue(AppearanceLooks.load(real).isEmpty())
+        assertTrue(LayoutPresets.load(real).isEmpty())
+        assertFalse(appearance.hasChanges(ctx))
+        assertFalse(layout.hasChanges(ctx))
+    }
+
+    @Test fun `a menu per keyboard numbers each keyboard's copy`() {
+        val appearance = AppearanceDraft.of(ctx)
+        val layout = helium314.keyboard.settings.LayoutDraft.of(ctx, us.toPref())
+        for (kind in CustomLabels.Kind.entries) {
+            assertEquals(1, CustomLabels.number(real, view(1), kind), kind.name)
+            assertEquals(2, CustomLabels.number(real, view(2), kind), kind.name)
+            assertEquals(1, real.getInt(own(1, kind.key), 0)); assertEquals(2, real.getInt(own(2, kind.key), 0))
+            assertFalse(real.contains(kind.key), kind.name)
+        }
+        assertTrue(AppearanceLooks.load(real).isEmpty())
+        assertTrue(LayoutPresets.load(real).isEmpty())
+        assertFalse(appearance.hasChanges(ctx))
+        assertFalse(layout.hasChanges(ctx))
+    }
+
+    @Test fun `a Custom number moves with its menu when the menu becomes shared`() {
+        assertEquals(1, CustomLabels.number(real, view(1), CustomLabels.Kind.THEME))
+        assertEquals(2, CustomLabels.number(real, view(2), CustomLabels.Kind.THEME))
+        KeyboardProfiles.setGroupShared(real, KeyboardProfiles.Group.APPEARANCE, true, 2)
+        assertEquals(2, CustomLabels.number(real, view(1), CustomLabels.Kind.THEME)) // (keyboard 2's copy won: its number)
+        assertFalse(real.contains(own(1, CustomLabels.Kind.THEME.key)) || real.contains(own(2, CustomLabels.Kind.THEME.key)))
     }
 }

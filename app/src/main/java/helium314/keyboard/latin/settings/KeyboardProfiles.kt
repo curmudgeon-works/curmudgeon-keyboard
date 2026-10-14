@@ -58,15 +58,19 @@ object KeyboardProfiles {
         REFINE("share_group_refine", true), // "Fine-tune suggestions": your hand, so one set by default
         LEARNING("share_group_learning", true); // "Fine-tune learning" (split from Refine 2026-10-10): your words, the same
 
+        // (a "Custom N" label follows its menu: one shared copy, one number; review 2026-10-11 D1. Here, not in the
+        // screens' scopes: a label is no setting of a saved Layout or theme, and no change of the screen's draft)
         fun contains(key: String): Boolean = when (this) {
-            LAYOUT -> helium314.keyboard.settings.LayoutDraft.inScope(key)
-            APPEARANCE -> helium314.keyboard.settings.AppearanceLooks.onScreen(key)
+            LAYOUT -> helium314.keyboard.settings.LayoutDraft.inScope(key) || key in layoutLabelKeys
+            APPEARANCE -> helium314.keyboard.settings.AppearanceLooks.onScreen(key) || key == helium314.keyboard.settings.CustomLabels.Kind.THEME.key
             SWIPE -> key in helium314.keyboard.settings.screens.swipeSettingKeys
             TEXT_CORRECTION -> key in helium314.keyboard.settings.screens.correctionKeys
             REFINE -> key in refineKeys
             LEARNING -> key in learningKeys
         }
     }
+
+    private val layoutLabelKeys get() = setOf(helium314.keyboard.settings.CustomLabels.Kind.LAYOUT.key, helium314.keyboard.settings.CustomLabels.Kind.POPUPS.key)
 
     /** The groups shared by all keyboards, read once ([loadGroups]) since every preference read asks. */
     @Volatile private var sharedGroups: Set<Group> = Group.entries.filterTo(HashSet()) { it.sharedByDefault }
