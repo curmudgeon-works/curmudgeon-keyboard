@@ -13,6 +13,7 @@ import helium314.keyboard.keyboard.internal.KeyboardIconsSet
 import helium314.keyboard.latin.common.PictureFraming
 import helium314.keyboard.latin.common.PictureLibrary
 import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.getActivity
 import helium314.keyboard.latin.utils.prefs
@@ -303,6 +304,22 @@ object AppearanceLooks {
 
     /** The pictures as they are now, as a look of their own (for putting them back on Cancel). */
     fun currentPictures(ctx: Context): Look = Look("", mapOf(PICTURES to savePictures(ctx)))
+
+    /** The theme a keyboard that never chose one is named for: Dynamic (Android 12 and up); older, Midnight, whose black
+     *  Dynamic shows there ([KeyboardTheme.dynamicFallback]; review L5.1: the Themes row was blank). */
+    fun defaultName(ctx: Context): String = ctx.getString(
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) R.string.theme_preset_dynamic else R.string.theme_preset_midnight)
+
+    /** [defaultName]'s theme among [builtIn] as a keyboard that never chose one has it (what "tweaked" compares with):
+     *  older than Android 12, Midnight with the default colors (Dynamic, drawn as Midnight's black), so the defaults
+     *  themselves aren't a change. */
+    fun defaultLook(ctx: Context, builtIn: List<Look>): Look? {
+        val look = builtIn.firstOrNull { it.name == defaultName(ctx) } ?: return null
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) return look
+        return Look(look.name, look.values + mapOf(Settings.PREF_THEME_COLORS to Defaults.PREF_THEME_COLORS,
+            Settings.PREF_THEME_COLORS_NIGHT to Defaults.PREF_THEME_COLORS_NIGHT, Settings.PREF_THEME_DAY_NIGHT to Defaults.PREF_THEME_DAY_NIGHT),
+            look.remembered)
+    }
 
     /** The themes that ship with the app, each setting the whole Theme and Emoji groups ([complete]): Dynamic (the
      *  default, Android 12+) first; Midnight and Daylight one color set each; the others a light and a dark one

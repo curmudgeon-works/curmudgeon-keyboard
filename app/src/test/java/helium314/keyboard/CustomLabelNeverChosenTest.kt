@@ -25,6 +25,7 @@ import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.util.Locale
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -73,6 +74,16 @@ class CustomLabelNeverChosenTest {
         assertEquals("Dynamic", themeText()) // (was "Custom" for good)
         prefs.edit { putBoolean(Settings.PREF_THEME_KEY_BORDERS, false) }
         assertEquals("Custom · from Dynamic", themeText()) // (was "Custom")
+    }
+
+    // fail before (L5.1): older than Android 12 there is no Dynamic theme, and the row was blank
+    @Config(sdk = [23]) // (older than Android 12; the SDK jar the other tests use too)
+    @Test fun `Android 11 and older - theme never chosen shows Midnight, the default look there, and Custom from Midnight once it differs`() {
+        assertEquals(ctx.getString(R.string.theme_preset_midnight), themeText())
+        prefs.edit { putBoolean(Settings.PREF_THEME_KEY_BORDERS, false) }
+        assertEquals("Custom · from " + ctx.getString(R.string.theme_preset_midnight), themeText())
+        prefs.edit { remove(Settings.PREF_THEME_KEY_BORDERS) }
+        assertEquals(ctx.getString(R.string.theme_preset_midnight), themeText())
     }
 
     @Test fun `theme chosen saved Sunset - Custom from Sunset while it differs, Sunset once it matches`() {

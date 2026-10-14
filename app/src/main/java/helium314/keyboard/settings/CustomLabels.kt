@@ -149,11 +149,11 @@ object CustomLabels {
     }
 
     /** The Themes row for the keyboard ([prefs]: its settings view; [ctx]: the screen editing it), [builtIn] and [looks]
-     *  the built-in and saved themes: its chosen theme, none chosen the default look, Dynamic (on Android 12 and up). */
+     *  the built-in and saved themes: its chosen theme, none chosen the default look ([AppearanceLooks.defaultLook]:
+     *  Dynamic, older than Android 12 Midnight). */
     fun themeRow(ctx: Context, prefs: SharedPreferences, builtIn: List<AppearanceLooks.Look>, looks: List<AppearanceLooks.Look>): Row {
-        val chosenName = prefs.getString(AppearanceLooks.PREF_SELECTED, null)
-            ?: ctx.getString(R.string.theme_preset_dynamic).takeIf { android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S }
-        val chosen = chosenName?.let { name -> (builtIn + looks).firstOrNull { it.name == name } }
+        val chosen = prefs.getString(AppearanceLooks.PREF_SELECTED, null)?.let { name -> (builtIn + looks).firstOrNull { it.name == name } }
+            ?: AppearanceLooks.defaultLook(ctx, builtIn).takeIf { !prefs.contains(AppearanceLooks.PREF_SELECTED) }
         return row(ctx, prefs, Kind.THEME, AppearanceLooks.PREF_SELECTED, chosen?.name) { AppearanceLooks.isTweaked(ctx, chosen!!) }
     }
 
