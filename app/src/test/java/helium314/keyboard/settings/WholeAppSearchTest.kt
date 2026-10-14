@@ -131,8 +131,14 @@ class WholeAppSearchTest {
     // while those are hidden, so the main screen's search still finds them. Fail before: found from no screen
     @Test fun `the logs of the hidden Fine-tune screens are on App settings and found`() {
         KeyboardProfiles.disable(real)
-        if (REFINE_MENU_SHOWN) return
         val appSettings = appSettingsItems(ctx.prefs(), real)
+        // (the private build, its Fine-tune screens shown: they keep the logs, App settings leaves them out, so nothing
+        // is shown twice; round-7c review 20261014_L11_2: this branch was untested)
+        if (REFINE_MENU_SHOWN) {
+            for (key in listOf(Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_SWIPE_METRICS, Settings.PREF_LEARNING_LOG))
+                assertFalse(key in appSettings, key)
+            return
+        }
         for (key in listOf(Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_SWIPE_METRICS, Settings.PREF_LEARNING_LOG)) {
             assertTrue(key in appSettings, key)
             assertTrue(key in helium314.keyboard.settings.screens.advancedOnlyAppSettings, key)

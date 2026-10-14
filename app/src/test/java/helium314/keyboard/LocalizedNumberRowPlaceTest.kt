@@ -5,7 +5,9 @@ import android.content.Context
 import android.os.Looper
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasParent
 import androidx.compose.ui.test.hasText
@@ -22,7 +24,14 @@ import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.utils.ExecutorUtils
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.getHasLocalizedNumberRow
+import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.realPrefs
+import helium314.keyboard.latin.common.Constants.Subtype.ExtraValue
+import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
+import helium314.keyboard.settings.SettingsContainer
+import helium314.keyboard.settings.screenSearch
+import helium314.keyboard.settings.screenSettings
+import helium314.keyboard.settings.screens.layoutScreenKeys
 import helium314.keyboard.settings.LayoutDraft
 import helium314.keyboard.settings.LocalSettingsMenu
 import helium314.keyboard.settings.SettingsActivity
@@ -38,6 +47,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.util.Locale
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -77,13 +88,18 @@ class LocalizedNumberRowPlaceTest {
         SubtypeSettings.reloadEnabledSubtypes(ctx)
     }
 
-    private fun open(advanced: Boolean) {
+    private fun open(advanced: Boolean, keyboard: SettingsSubtype = bengali) {
         SettingsMode.set(ctx, advanced)
         scenario = ActivityScenario.launch(SettingsActivity::class.java).onActivity { it.setContent {
             CompositionLocalProvider(LocalSettingsMenu provides KeyboardProfiles.Group.LAYOUT) {
-                SubtypeScreen(initialSubtype = bengali, onClickBack = { }) }
+                SubtypeScreen(initialSubtype = keyboard, onClickBack = { }) }
         } }
         compose.waitForIdle()
+    }
+    private val title get() = ctx.getString(R.string.localized_number_row)
+    private fun mainSearch(): List<String> {
+        SettingsActivity.settingsContainer = SettingsContainer(ctx)
+        return SettingsActivity.settingsContainer.filter(title, ctx).map { it.key }
     }
     private fun top(text: Int) = compose.onNodeWithText(ctx.getString(text)).getUnclippedBoundsInRoot().top
 
@@ -108,5 +124,37 @@ class LocalizedNumberRowPlaceTest {
         assertTrue(getHasLocalizedNumberRow(bengali.toAdditionalSubtype(), real))
         open(advanced = true)
         compose.onNode(isToggleable() and hasParent(hasText(ctx.getString(R.string.localized_number_row)))).assertIsOn()
+    }
+
+    // round-7c review 20261014_L11_2 (owner: "add them"): a keyboard whose language has no digits of its own has no row,
+    // on the screen or in either search
+    @Test fun `a language without its own digits - no row, not found`() {
+        val english = SettingsSubtype(Locale.US, "").withId(1)
+        real.edit().putString(Settings.PREF_SELECTED_SUBTYPE, english.toPref()).putString(Settings.PREF_ENABLED_SUBTYPES, english.toPref())
+            .putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(english))).commit()
+        SubtypeSettings.reloadEnabledSubtypes(ctx)
+        open(advanced = true, keyboard = english)
+        compose.onNodeWithText(ctx.getString(R.string.show_numbers_row)).assertExists()
+        compose.onNodeWithText(title).assertDoesNotExist()
+        assertFalse(Settings.PREF_LOCALIZED_NUMBER_ROW in layoutScreenKeys(ctx.prefs(), ctx, english))
+        assertFalse(Settings.PREF_LOCALIZED_NUMBER_ROW in mainSearch())
+    }
+
+    // (L11_2, M1_2 "yes A"): a row of the app's list now, so the main screen's search finds it for the keyboard in use
+    // and Layout & Typing's own search for its keyboard; the main search's row edits the keyboard in use. Fail before:
+    // found by neither (and the main search's row was the app-wide value)
+    @Test fun `found by both searches, and the main search's row edits the keyboard in use`() {
+        assertTrue(Settings.PREF_LOCALIZED_NUMBER_ROW in screenSearch(title, screenSettings(
+            layoutScreenKeys(ctx.prefs(), ctx, bengali), real, KeyboardProfiles.Group.LAYOUT)).map { it.key })
+        assertTrue(Settings.PREF_LOCALIZED_NUMBER_ROW in mainSearch())
+        val row = SettingsActivity.settingsContainer.filter(title, ctx).first { it.key == Settings.PREF_LOCALIZED_NUMBER_ROW }
+        scenario = ActivityScenario.launch(SettingsActivity::class.java).onActivity { it.setContent { row.Preference() } }
+        compose.waitForIdle()
+        compose.onNode(isToggleable() and hasParent(hasText(title))).assertIsOn().performClick()
+        compose.waitForIdle()
+        val inUse = real.getString(Settings.PREF_SELECTED_SUBTYPE, "")!!.toSettingsSubtype()
+        assertEquals("false", inUse.getExtraValueOf(ExtraValue.LOCALIZED_NUMBER_ROW))
+        assertTrue(inUse.sameKeyboard(bengali))
+        compose.onNode(isToggleable() and hasParent(hasText(title))).assertIsOff()
     }
 }
