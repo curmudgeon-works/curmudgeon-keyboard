@@ -8,6 +8,27 @@ import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.Role
+import helium314.keyboard.keyboard.KeyboardTheme
+import helium314.keyboard.latin.common.ColorType
+import helium314.keyboard.latin.common.Colors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -184,8 +205,14 @@ private fun WelcomeWizardSteps(
             row(SetupRow.SWITCH, stringResource(R.string.setup_step2_action), painterResource(R.drawable.ic_setup_select),
                 imm::showInputMethodPicker)
             // (no Dynamic colors before Android 12: nothing to pick there, the keyboard is Curmudgeon's)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
-                row(SetupRow.THEME, stringResource(R.string.setup_theme_title), painterResource(R.drawable.ic_settings_appearance)) { }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // a faint row until the keyboard is in use, then the two themes to pick from
+                if (setupRowState(SetupRow.THEME, step).look == SetupRowLook.OPEN) {
+                    Spacer(Modifier.height(4.dp))
+                    ThemePick(stepBackgroundColor)
+                } else
+                    row(SetupRow.THEME, stringResource(R.string.setup_theme_title), painterResource(R.drawable.ic_settings_appearance)) { }
+            }
             // (no "(optional)": owner 2026-10-14)
             row(SetupRow.CONFIGURE, stringResource(R.string.setup_step3_action),
                 painterResource(R.drawable.sym_keyboard_language_switch), close)
@@ -243,6 +270,98 @@ private fun WidePreview() {
         Surface {
             WelcomeWizard({}) {  }
         }
+    }
+}
+
+/**
+ * The last screen's "Pick a theme": Dynamic (the default, picked at first) or Curmudgeon, each a picture of the keyboard
+ * in its real colors; the whole choice is tapped, the picked one's picture ringed in orange (owner 2026-10-14: "can you
+ * remove the radio button, and let user tap the thumbnail which can be, sort of, encircled?"). See [SetupTheme].
+ */
+@Composable
+private fun ThemePick(background: androidx.compose.ui.graphics.Color) {
+    val ctx = LocalContext.current
+    var curmudgeon by rememberSaveable { mutableStateOf(SetupTheme.isCurmudgeon(ctx)) }
+    // the keyboards' Appearance settings before the first pick here (null: none yet)
+    var before by rememberSaveable { mutableStateOf<String?>(null) }
+    val dynamicColors = remember { SetupTheme.colors(ctx, KeyboardTheme.THEME_DYNAMIC) }
+    val curmudgeonColors = remember { SetupTheme.colors(ctx, KeyboardTheme.THEME_CURMUDGEON) }
+    Column(Modifier.fillMaxWidth().background(color = background).padding(16.dp)) {
+        Text(stringResource(R.string.setup_theme_title))
+        Row(Modifier.padding(top = 8.dp).fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ThemeChoice(dynamicColors, stringResource(R.string.theme_preset_dynamic), stringResource(R.string.setup_theme_dynamic_hint),
+                selected = !curmudgeon) {
+                if (curmudgeon) { SetupTheme.pickDynamic(ctx, before); curmudgeon = false }
+            }
+            ThemeChoice(curmudgeonColors, stringResource(R.string.theme_preset_curmudgeon), stringResource(R.string.setup_theme_curmudgeon_hint),
+                selected = curmudgeon) {
+                if (!curmudgeon) {
+                    // (only the first time: a keyboard that came with Curmudgeon has nothing to go back to, see pickDynamic)
+                    if (before == null && !SetupTheme.isCurmudgeon(ctx)) before = SetupTheme.before(ctx)
+                    SetupTheme.pickCurmudgeon(ctx)
+                    curmudgeon = true
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RowScope.ThemeChoice(colors: Colors, name: String, hint: String, selected: Boolean, onClick: () -> Unit) {
+    Column(
+        Modifier.weight(1f).selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(Modifier
+            .border(2.5.dp, if (selected) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent,
+                RoundedCornerShape(8.dp))
+            .padding(5.dp)
+        ) {
+            KeyboardThumbnail(colors, Modifier.fillMaxWidth().aspectRatio(2f).clip(RoundedCornerShape(4.dp)))
+        }
+        Text(name, Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), textAlign = TextAlign.Center)
+        Text(hint, style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), textAlign = TextAlign.Center)
+    }
+}
+
+/** A small keyboard in [colors]: its background, four rows of keys (the space bar between two function keys) and a
+ *  swipe trail across the letters. */
+@Composable
+private fun KeyboardThumbnail(colors: Colors, modifier: Modifier) {
+    val background = androidx.compose.ui.graphics.Color(colors.get(ColorType.MAIN_BACKGROUND))
+    val key = androidx.compose.ui.graphics.Color(colors.get(ColorType.KEY_BACKGROUND))
+    val functional = androidx.compose.ui.graphics.Color(colors.get(ColorType.FUNCTIONAL_KEY_BACKGROUND))
+    val space = androidx.compose.ui.graphics.Color(colors.get(ColorType.SPACE_BAR_BACKGROUND))
+    val trail = androidx.compose.ui.graphics.Color(colors.get(ColorType.GESTURE_TRAIL))
+    Canvas(modifier) {
+        drawRect(background)
+        val pad = size.height * 0.06f
+        val gap = size.height * 0.04f
+        val rowHeight = (size.height - 2 * pad - 3 * gap) / 4
+        val corner = CornerRadius(rowHeight * 0.15f)
+        // (columns of keys in each row, by width: ten, nine, seven; the bottom row's space bar five wide)
+        fun keyRow(row: Int, widths: List<Float>, fill: (Int) -> androidx.compose.ui.graphics.Color) {
+            val total = widths.sum()
+            val unit = (size.width - 2 * pad - gap * (widths.size - 1)) / total
+            var x = pad
+            val y = pad + row * (rowHeight + gap)
+            widths.forEachIndexed { i, w ->
+                drawRoundRect(fill(i), Offset(x, y), Size(w * unit, rowHeight), corner)
+                x += w * unit + gap
+            }
+        }
+        keyRow(0, List(10) { 1f }) { key }
+        keyRow(1, List(9) { 1f }) { key }
+        keyRow(2, listOf(1.5f) + List(7) { 1f } + 1.5f) { if (it == 0 || it == 8) functional else key }
+        keyRow(3, listOf(1.5f, 1f, 5f, 1f, 1.5f)) { if (it == 2) space else functional }
+        val path = Path().apply {
+            moveTo(size.width * 0.18f, size.height * 0.62f)
+            cubicTo(size.width * 0.3f, size.height * 0.15f, size.width * 0.55f, size.height * 0.2f, size.width * 0.62f, size.height * 0.45f)
+            cubicTo(size.width * 0.66f, size.height * 0.58f, size.width * 0.72f, size.height * 0.62f, size.width * 0.8f, size.height * 0.3f)
+        }
+        drawPath(path, trail, style = Stroke(width = size.height * 0.05f, cap = StrokeCap.Round, join = StrokeJoin.Round))
     }
 }
 
