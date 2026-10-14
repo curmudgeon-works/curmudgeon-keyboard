@@ -155,7 +155,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
         val custom = current == null || differs
         val rowLabel = if (!custom) presetName(current!!) else remember(custom, chosenSet?.name, generation) {
             helium314.keyboard.settings.CustomLabels.mark(prefs, helium314.keyboard.settings.CustomLabels.Kind.POPUPS)
-            helium314.keyboard.settings.CustomLabels.text(ctx, chosenSet?.name)
+            helium314.keyboard.settings.CustomLabels.text(ctx, prefs, helium314.keyboard.settings.CustomLabels.Kind.POPUPS, chosenSet?.name)
         }
         // every arrangement belongs to a set of the user's own: into the selected one, or into a new one to be named
         fun storeInSet(name: String, all: Map<String, List<String>>) {
@@ -241,12 +241,20 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
         val opened = remember(showAccentsDialog) { keyboard to listOf(prefs.getString(KeyPopupOverrides.PREF, null),
             prefs.getString(KeyPopupOverrides.PREF_SELECTED_SET, null), prefs.getString(Settings.PREF_SYMBOL_POPUP_MAP, null),
             prefs.getString(Settings.PREF_POPUP_KEYS_ORDER, null)) }
+        // (a tap clears the label and a deleted origin's name: Cancel puts them back too, 2026-10-11)
+        val openedLabel = remember(showAccentsDialog) { with(helium314.keyboard.settings.CustomLabels.Kind.POPUPS) {
+            prefs.getInt(key, 0) to prefs.getString(fromKey, null) } }
         var confirmed by remember(showAccentsDialog) { mutableStateOf(false) }
         fun putBack() {
             val (kb, values) = opened
             prefs.edit().apply {
                 listOf(KeyPopupOverrides.PREF, KeyPopupOverrides.PREF_SELECTED_SET, Settings.PREF_SYMBOL_POPUP_MAP, Settings.PREF_POPUP_KEYS_ORDER).zip(values)
                     .forEach { (key, value) -> if (value == null) remove(key) else putString(key, value) }
+                with(helium314.keyboard.settings.CustomLabels.Kind.POPUPS) {
+                    if (prefs.getInt(key, 0) != openedLabel.first) { if (openedLabel.first > 0) putInt(key, openedLabel.first) else remove(key) }
+                    if (prefs.getString(fromKey, null) != openedLabel.second) {
+                        if (openedLabel.second != null) putString(fromKey, openedLabel.second) else remove(fromKey) }
+                }
             }.apply()
             if (keyboard != kb) onKeyboardChanged(kb)
             generation++

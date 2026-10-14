@@ -666,7 +666,7 @@ private fun SavedLooksPreference(setting: Setting) {
     // differs from the chosen theme: the keyboard's own copy, "Custom · from Sunset" (2026-10-11, no number since; was "Sunset (tweaked)")
     val shown = if (!tweaked) chosen?.name else if (!detached && chosen == null) null else remember(chosen?.name, tweaked, detached) {
         helium314.keyboard.settings.CustomLabels.mark(prefs, helium314.keyboard.settings.CustomLabels.Kind.THEME)
-        helium314.keyboard.settings.CustomLabels.text(ctx, chosen?.name?.takeIf { !detached }) }
+        helium314.keyboard.settings.CustomLabels.text(ctx, prefs, helium314.keyboard.settings.CustomLabels.Kind.THEME, chosen?.name?.takeIf { !detached }) }
     val summary = shown?.let { if (unsaved) it + " (" + stringResource(R.string.theme_unsaved) + ")" else it }
     // which of the user's themes differ from the keyboard as it was when the list opened: those get the save icon
     val differs = remember(showList, generation) { looks.associateWith { AppearanceLooks.isTweaked(ctx, it) } }
@@ -737,7 +737,10 @@ private fun SavedLooksPreference(setting: Setting) {
                 // (a setting still at what the theme on it, a previewed one included, keeps for its default stays at its default)
                 store(looks + AppearanceLooks.saved(ctx, name, previewed ?: chosen))
                 // what's on the keyboard now (a previewed theme included) is this theme; from the list: only once it's OK'd
-                if (!showList) prefs.edit { putString(AppearanceLooks.PREF_SELECTED, name) }
+                if (!showList) {
+                    prefs.edit { putString(AppearanceLooks.PREF_SELECTED, name) }
+                    helium314.keyboard.settings.CustomLabels.clear(prefs, helium314.keyboard.settings.CustomLabels.Kind.THEME) // (the copy is that theme now)
+                }
             },
         )
     toRename?.let { look ->

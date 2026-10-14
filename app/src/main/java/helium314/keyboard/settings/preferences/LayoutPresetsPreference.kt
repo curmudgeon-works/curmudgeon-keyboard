@@ -76,7 +76,7 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
     // differs from it: the keyboard's own copy, "Custom · from Work" (2026-10-11, no number since; was "unsaved")
     val customText = if (!tweaked) null else remember(tweaked, chosen.name, generation) {
         helium314.keyboard.settings.CustomLabels.mark(prefs, helium314.keyboard.settings.CustomLabels.Kind.LAYOUT)
-        helium314.keyboard.settings.CustomLabels.text(ctx, chosen.name.takeIf { !detached })
+        helium314.keyboard.settings.CustomLabels.text(ctx, prefs, helium314.keyboard.settings.CustomLabels.Kind.LAYOUT, chosen.name.takeIf { !detached })
     }
     Preference(name = stringResource(R.string.layout_presets),
         description = customText ?: chosen.name, descriptionItalic = tweaked,
@@ -167,7 +167,10 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
                 // (a setting still at what the Layout on it, a previewed one included, keeps for its default stays at its default)
                 store(presets + LayoutPresets.saved(ctx, keyboard, name, previewed ?: chosen))
                 // what this keyboard has now is this Layout (from the list: only once it's OK'd)
-                if (!showList) prefs.edit { putString(LayoutPresets.PREF_SELECTED, name) }
+                if (!showList) {
+                    prefs.edit { putString(LayoutPresets.PREF_SELECTED, name) }
+                    helium314.keyboard.settings.CustomLabels.clear(prefs, helium314.keyboard.settings.CustomLabels.Kind.LAYOUT) // (the copy is that Layout now)
+                }
             },
         )
     toRename?.let { preset ->

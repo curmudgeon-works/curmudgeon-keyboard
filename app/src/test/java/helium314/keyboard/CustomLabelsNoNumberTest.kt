@@ -58,9 +58,9 @@ class CustomLabelsNoNumberTest {
         AppearanceLooks.choiceRenamed(ctx, "Work", null)
         assertEquals(listOf(1, 1, 1), (1..3).map { real.getInt(own(it, theme), 0) })
         assertTrue((1..3).all { CustomLabels.has(view(it), CustomLabels.Kind.THEME) })
-        // (Work is gone: "Custom" alone, as the row shows a deleted item's copy; "from X" only while X exists)
+        // (owner 2026-10-11: after the item is deleted the label keeps "from <its name>"; was plain "Custom")
+        assertTrue((1..3).all { CustomLabels.text(ctx, view(it), CustomLabels.Kind.THEME, null) == "Custom · from Work" })
         assertEquals("Custom", CustomLabels.text(ctx, null))
-        assertEquals("Custom · from Work", CustomLabels.text(ctx, "Work"))
     }
 
     @Test fun `an older numbered label still reads as a label, a new one is written as 1`() {

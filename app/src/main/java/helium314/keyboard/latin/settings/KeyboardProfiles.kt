@@ -61,7 +61,7 @@ object KeyboardProfiles {
         // screens' scopes: a label is no setting of a saved Layout or theme, and no change of the screen's draft)
         fun contains(key: String): Boolean = when (this) {
             LAYOUT -> helium314.keyboard.settings.LayoutDraft.inScope(key) || key in layoutLabelKeys
-            APPEARANCE -> helium314.keyboard.settings.AppearanceLooks.onScreen(key) || key == helium314.keyboard.settings.CustomLabels.Kind.THEME.key
+            APPEARANCE -> helium314.keyboard.settings.AppearanceLooks.onScreen(key) || key in themeLabelKeys
             SWIPE -> key in helium314.keyboard.settings.screens.swipeSettingKeys
             TEXT_CORRECTION -> key in helium314.keyboard.settings.screens.correctionKeys
             REFINE -> key in refineKeys
@@ -69,7 +69,10 @@ object KeyboardProfiles {
         }
     }
 
-    private val layoutLabelKeys get() = setOf(helium314.keyboard.settings.CustomLabels.Kind.LAYOUT.key, helium314.keyboard.settings.CustomLabels.Kind.POPUPS.key)
+    // (a deleted origin's name goes with its label, 2026-10-11)
+    private val layoutLabelKeys get() = with(helium314.keyboard.settings.CustomLabels.Kind.LAYOUT) { setOf(key, fromKey) } +
+        with(helium314.keyboard.settings.CustomLabels.Kind.POPUPS) { setOf(key, fromKey) }
+    private val themeLabelKeys get() = with(helium314.keyboard.settings.CustomLabels.Kind.THEME) { setOf(key, fromKey) }
 
     /** The groups shared by all keyboards, read once ([loadGroups]) since every preference read asks. */
     @Volatile private var sharedGroups: Set<Group> = Group.entries.filterTo(HashSet()) { it.sharedByDefault }
