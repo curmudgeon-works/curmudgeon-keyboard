@@ -49,6 +49,23 @@ class AllowedHereTest {
     private fun typedEnoughOnB(word: String, learnedCount: Int): Boolean =
         !RemovedWords.isRemoved(lists.entryFor(word), learnedCount) && lists.allowHere(word)
 
+    // fail before (L4.1): allow() on a list not read yet wrote the new row alone, the file's other rows were lost
+    @Test fun `an allowed row on a list not read yet keeps the file's other rows`() {
+        val file = java.io.File(ctx.filesDir, "blacklists${java.io.File.separator}allow-unread-${System.nanoTime()}.txt")
+        file.parentFile!!.mkdirs()
+        file.writeText("keep\t2\nother\n")
+        val list = RemovedWords.forFile(file) // (a list object nothing read yet)
+        try {
+            assertTrue(list.allow("zorp", 1))
+            list.reload()
+            assertEquals(mapOf("keep" to Entry(2), "other" to Entry(1)), list.entries())
+            assertEquals(mapOf("zorp" to 1), list.allowedEntries())
+            assertEquals(setOf("keep\t2", "other", "zorp\tallowed\t1"), file.readLines().toSet())
+        } finally {
+            file.delete()
+        }
+    }
+
     @Test fun `a borrowed block typed enough on B becomes an allowed row on B and the source stays untouched`() {
         a.strike("zorp")
         a.reload()

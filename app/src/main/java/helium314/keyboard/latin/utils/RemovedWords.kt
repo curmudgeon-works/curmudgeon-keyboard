@@ -424,12 +424,17 @@ object RemovedWords {
         }
 
         /** [word] allowed on this keyboard over borrowed strikes up to [level] (its blocked row, if any, replaced: one row
-         *  per word). No wait for a read (kept pending, as a strike). @return false if it was allowed so already */
-        fun allow(word: String, level: Int): Boolean = synchronized(lock) {
-            if (allowedByWord[word] == level && !byWord.containsKey(word)) return false
-            setAllowed(word, level)
-            recordGated(GatedAllow(word, level))
-            true
+         *  per word). The file is read first, as for a strike (review L4.1: an unread list's write was the new row only,
+         *  the file's other rows lost); while the one-time migration runs, kept pending and the read catches up first.
+         *  @return false if it was allowed so already */
+        fun allow(word: String, level: Int): Boolean {
+            if (!loaded) { if (LearnedStoreMigration.isRunning) reloadAsync() else read() }
+            synchronized(lock) {
+                if (allowedByWord[word] == level && !byWord.containsKey(word)) return false
+                setAllowed(word, level)
+                recordGated(GatedAllow(word, level))
+                return true
+            }
         }
 
         /**
