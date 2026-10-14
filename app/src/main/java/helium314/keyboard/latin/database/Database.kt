@@ -58,10 +58,10 @@ class Database private constructor(context: Context, name: String = NAME) : SQLi
                     Log.e(TAG, "can't transfer clipboard data because ClipboardDao is null")
                     return false
                 }
-                if (mergeKeeping == null) {
-                    clipDao.clear()
-                    clips.forEach { clipDao.addClip(it.first, it.second, it.third) }
-                } else clipDao.mergeClips(clips, mergeKeeping) // (one transaction, the size applied after, L3.6)
+                // (each one transaction, rolled back as a whole on a failure: the device's clips kept, as the message
+                // says; the full one owner 2026-10-13, 20261013_L1, the merge L3.6 with the size applied after)
+                if (mergeKeeping == null) clipDao.replaceClips(clips)
+                else clipDao.mergeClips(clips, mergeKeeping)
                 // (upstream also copied its gesture-data table here: not in this app, and fresh installs don't have it)
                 return true
             } catch (t: Throwable) {

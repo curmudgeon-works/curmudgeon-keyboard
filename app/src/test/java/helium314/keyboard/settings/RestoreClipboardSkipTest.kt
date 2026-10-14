@@ -169,4 +169,29 @@ class RestoreClipboardSkipTest {
             assertFalse(restoredDb.exists(), "not deleted (merge: $merge)")
         }
     }
+
+    /** The texts in the device's clipboard table itself. */
+    private fun tableTexts() = Database.getInstance(ctx).readableDatabase.rawQuery("SELECT TEXT FROM CLIPBOARD", null).use {
+        val out = HashSet<String>(); while (it.moveToNext()) out += it.getString(0); out
+    }
+
+    // fail before (owner 2026-10-13, 20261013_L1): the full path cleared the device's clips, then added the backup's one by
+    // one outside a transaction; an add that failed went unnoticed ("restored"), the device's clips gone
+    @Test fun `copyFromDb full - an add that fails rolls it all back, the device's clips kept, not restored`() {
+        val dao = deviceClips()
+        restoredDb.parentFile?.mkdirs()
+        restoredDb.writeBytes(clipboardDb(version = 2))
+        // (the device's table refuses the backup's "y", as a full disk would)
+        val w = Database.getInstance(ctx).writableDatabase
+        w.execSQL("CREATE TRIGGER refuse_y BEFORE INSERT ON CLIPBOARD WHEN NEW.TEXT = 'y' BEGIN SELECT RAISE(ABORT, 'refused'); END")
+        try {
+            assertFalse(Database.copyFromDb(restoredDb, ctx), "said restored")
+            assertEquals(setOf("a", "b"), texts(dao), "the device's clips weren't kept (cache)")
+            assertEquals(setOf("a", "b"), tableTexts(), "the device's clips weren't kept (table)")
+            assertTrue(dao.isPinned((0 until dao.count()).first { dao.getAt(it).text == "b" }), "a pin was lost")
+            assertFalse(restoredDb.exists(), "not deleted")
+        } finally {
+            w.execSQL("DROP TRIGGER IF EXISTS refuse_y")
+        }
+    }
 }

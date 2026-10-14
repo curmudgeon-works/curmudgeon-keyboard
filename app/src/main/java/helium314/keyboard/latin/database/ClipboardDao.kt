@@ -52,7 +52,10 @@ class ClipboardDao private constructor(private val db: Database) {
         sort()
     }
 
-    fun addClip(timestamp: Long, pinned: Boolean, text: String) {
+    fun addClip(timestamp: Long, pinned: Boolean, text: String) = addClip(timestamp, pinned, text, strict = false)
+
+    // [strict]: a failed insert throws (a restore's refill, rolled back as a whole) instead of going unnoticed
+    private fun addClip(timestamp: Long, pinned: Boolean, text: String, strict: Boolean) {
         val existingIndex = cache.indexOfFirst { it.text == text }
         if (existingIndex >= 0 && cache[existingIndex].timeStamp == timestamp)
             return // nothing to do
@@ -60,7 +63,27 @@ class ClipboardDao private constructor(private val db: Database) {
             updateTimestampAt(existingIndex, timestamp)
             return
         }
-        insertNewEntry(timestamp, pinned, text)
+        insertNewEntry(timestamp, pinned, text, trim = !strict, strict = strict)
+    }
+
+    /**
+     * The device's clips replaced by a backup's [clips] (time, pinned, text; a full restore), the clear and every add in
+     * one transaction, as [mergeClips] (owner 2026-10-13, 20261013_L1): an add that fails rolls it all back, the cache
+     * is read again, and the device's clips are really kept (before, they were cleared first and gone).
+     */
+    fun replaceClips(clips: List<Triple<Long, Boolean, String>>) {
+        val w = db.writableDatabase
+        w.beginTransaction()
+        var done = false
+        try {
+            clear()
+            for ((timestamp, pinned, text) in clips) addClip(timestamp, pinned, text, strict = true)
+            w.setTransactionSuccessful()
+            done = true
+        } finally {
+            w.endTransaction()
+            if (!done) reloadCache()
+        }
     }
 
     /**
@@ -122,7 +145,7 @@ class ClipboardDao private constructor(private val db: Database) {
         db.writableDatabase.delete(TABLE, "$COLUMN_ID IN (${old.joinToString { it.id.toString() }})", null)
     }
 
-    /** The cache read again from the table (after a failed merge). */
+    /** The cache read again from the table (after a failed merge or refill). */
     private fun reloadCache() {
         cache.clear()
         cache.addAll(readTable())
@@ -136,12 +159,12 @@ class ClipboardDao private constructor(private val db: Database) {
         sort()
     }
 
-    private fun insertNewEntry(timestamp: Long, pinned: Boolean, text: String, trim: Boolean = true) {
+    private fun insertNewEntry(timestamp: Long, pinned: Boolean, text: String, trim: Boolean = true, strict: Boolean = false) {
         val cv = ContentValues(3)
         cv.put(COLUMN_TIMESTAMP, timestamp)
         cv.put(COLUMN_PINNED, pinned)
         cv.put(COLUMN_TEXT, text)
-        val rowId = db.writableDatabase.insert(TABLE, null, cv)
+        val rowId = if (strict) db.writableDatabase.insertOrThrow(TABLE, null, cv) else db.writableDatabase.insert(TABLE, null, cv)
 
         val entry = ClipboardHistoryEntry(rowId, timestamp, pinned, text)
         cache.add(entry)
