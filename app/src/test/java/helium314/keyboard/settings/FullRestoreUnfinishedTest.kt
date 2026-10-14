@@ -5,8 +5,11 @@ import android.content.Context
 import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import helium314.keyboard.latin.R
+import helium314.keyboard.idKey
+import helium314.keyboard.latin.settings.KeyboardIdUpgrade
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.protectedPrefs
 import helium314.keyboard.latin.utils.realPrefs
@@ -16,6 +19,7 @@ import helium314.keyboard.settings.preferences.restoreEverythingFrom
 import helium314.keyboard.settings.preferences.runBackup
 import helium314.keyboard.settings.preferences.runRestore
 import helium314.keyboard.settings.preferences.settingsToJsonStream
+import helium314.keyboard.withId
 import org.junit.After
 import org.junit.Before
 import org.junit.runner.RunWith
@@ -23,6 +27,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
@@ -72,12 +77,22 @@ class FullRestoreUnfinishedTest {
         return done()
     }
 
-    /** A good backup: a learned-words file, then the settings ([extra] too), then the protected settings. */
+    /** The backup's keyboard, "k1": its settings are its own set's, "pk1/" (owner 2026-10-11: no common set; a backup's
+     *  plain per-keyboard keys are an old common set, which the restore's follow-up drops: dropCommonSet). */
+    private val keyboard = SettingsSubtype(Locale.US, "").withId(1)
+    /** The long-press delay as the backup's keyboard [keyboard] has it, 222 in the backup. */
+    private val restoredDelay get() = real.all[idKey(1, Settings.PREF_KEY_LONGPRESS_TIMEOUT)]
+
+    /** A good backup of this build: a learned-words file, then the settings ([keyboard] listed, 222 in its set; [extra]
+     *  too), then the protected settings. */
     private fun backup(extra: Map<String?, Any?> = emptyMap()) {
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("blacklists/en-US.txt")); z.write("backupwords".toByteArray()); z.closeEntry()
             z.putNextEntry(ZipEntry("preferences.json"))
-            settingsToJsonStream(mapOf<String?, Any?>(Settings.PREF_KEY_LONGPRESS_TIMEOUT to 222) + extra, z)
+            settingsToJsonStream(mapOf<String?, Any?>(Settings.PREF_ENABLED_SUBTYPES to keyboard.toPref(),
+                Settings.PREF_ADDITIONAL_SUBTYPES to keyboard.toPref(), Settings.PREF_SELECTED_SUBTYPE to keyboard.toPref(),
+                KeyboardIdUpgrade.DONE to true, Settings.PREF_VERSION_CODE to helium314.keyboard.latin.BuildConfig.MIGRATION_VERSION,
+                idKey(1, Settings.PREF_KEY_LONGPRESS_TIMEOUT) to 222) + extra, z)
             z.closeEntry()
             z.putNextEntry(ZipEntry("protected_preferences.json"))
             settingsToJsonStream(emptyMap<String?, Any?>(), z)
@@ -111,14 +126,14 @@ class FullRestoreUnfinishedTest {
         assertTrue(FullRestore.isUnfinished(real), "cleared before the follow-up")
         assertEquals(null, fullRestoreJob())
         assertFalse(real.contains(FullRestore.PREF_UNFINISHED), "the flag stayed after a full restore that finished")
-        assertEquals(222, real.all[Settings.PREF_KEY_LONGPRESS_TIMEOUT])
+        assertEquals(222, restoredDelay)
     }
 
     @Test fun `the settings' clear keeps the flag - a failure after the settings entry leaves it set`() {
         backup()
         failAt("preferences.json")
         assertFailsWith<IllegalStateException> { restoreEverythingFrom(ctx, zip) }
-        assertEquals(222, real.all[Settings.PREF_KEY_LONGPRESS_TIMEOUT], "the settings weren't restored before the failure")
+        assertEquals(222, restoredDelay, "the settings weren't restored before the failure")
         assertTrue(FullRestore.isUnfinished(real), "the settings' clear took the flag")
     }
 
@@ -137,7 +152,7 @@ class FullRestoreUnfinishedTest {
         failAt(FullRestore.FOLLOW_UP)
         // (a follow-up failure is only logged, as before: the restore itself finished)
         assertEquals(null, fullRestoreJob())
-        assertEquals(222, real.all[Settings.PREF_KEY_LONGPRESS_TIMEOUT], "not restored")
+        assertEquals(222, restoredDelay, "not restored")
         assertTrue(FullRestore.isUnfinished(real), "cleared although the follow-up failed")
         FullRestore.afterStep = null
         assertEquals(null, fullRestoreJob())
