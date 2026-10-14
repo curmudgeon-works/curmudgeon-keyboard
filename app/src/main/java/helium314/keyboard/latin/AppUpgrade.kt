@@ -375,7 +375,7 @@ internal fun curmudgeonUpgrades(prefs: SharedPreferences, freshInstall: Boolean)
             putBoolean("fonts_follow_migrated", true)
         }
     }
-    // 0.3.001: "Show swipe trail" off became trail thickness 0 (the thickness slider's Off); the switch stays on
+    // 0.3.001: "Show swipe trail" off became trail thickness 0 (the thickness slider's Off); the switch itself is gone (0.3.015)
     if (!prefs.getBoolean("trail_thickness_migrated", false)) {
         prefs.edit {
             if (!prefs.getBoolean(Settings.PREF_GESTURE_PREVIEW_TRAIL, true)) putInt(Settings.PREF_GESTURE_TRAIL_THICKNESS, 0)

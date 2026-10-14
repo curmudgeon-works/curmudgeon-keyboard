@@ -60,7 +60,7 @@ internal data class ResetKeep(
 /**
  * Factory reset: every setting back to its default, and whatever isn't ticked as kept: the keyboards and languages, the
  * learned and blacklisted words, the clipboard history, the user's own items and files (owner 2026-10-11: "Select items
- * you DON'T want to reset:" ... "All items should be unselected by default"). Backup (owner 2026-10-11) runs the backup
+ * you DON'T want to reset:"; all ticked at first since 2026-10-14: "should come with all checkboxes on"). Backup (owner 2026-10-11) runs the backup
  * of Backup and restore; once one is written it greys out while the dialog stays open.
  */
 @Composable
