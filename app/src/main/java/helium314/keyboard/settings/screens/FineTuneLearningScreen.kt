@@ -32,6 +32,9 @@ import helium314.keyboard.latin.utils.getActivity
 import helium314.keyboard.settings.SearchSettingsScreen
 import helium314.keyboard.settings.SettingsActivity
 
+/** The settings Fine-tune learning shows (always the same): what its search and the main screen's search find. */
+internal val fineTuneLearningKeys = listOf(Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, Settings.PREF_LEARNING_LOG)
+
 /**
  * "Fine-tune learning" (2026-10-10, split from Refine, now "Fine-tune suggestions"): how the keyboard learns your
  * words: when your own words win over corrections, the log of what corrections do to the learned words, and what a
@@ -55,7 +58,7 @@ fun FineTuneLearningScreen(onClickBack: () -> Unit) {
         topActions = draft.topActions,
         settings = emptyList(),
         // its search: the settings it shows (owner 2026-10-13, SEARCH-SCOPE)
-        searchKeys = listOf(Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, Settings.PREF_LEARNING_LOG),
+        searchKeys = fineTuneLearningKeys,
     ) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
           androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.preferences.LocalRowStart provides 22.dp) {

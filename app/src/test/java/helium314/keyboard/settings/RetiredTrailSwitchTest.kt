@@ -38,7 +38,7 @@ class RetiredTrailSwitchTest {
         val term = "full swipe trail"
         val swipe = screenSearch(term, screenSettings(swipeSettingKeys, real, null)).map { it.key }
         assertFalse(Settings.PREF_GESTURE_PREVIEW_TRAIL in swipe, "$swipe")
-        assertFalse(Settings.PREF_GESTURE_PREVIEW_TRAIL in SettingsActivity.settingsContainer.filter(term).map { it.key })
+        assertFalse(Settings.PREF_GESTURE_PREVIEW_TRAIL in SettingsActivity.settingsContainer.filter(term, ctx).map { it.key })
         assertTrue(SettingsActivity.settingsContainer[Settings.PREF_GESTURE_PREVIEW_TRAIL] == null)
     }
 }

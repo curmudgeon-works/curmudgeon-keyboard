@@ -15,6 +15,17 @@ import helium314.keyboard.settings.screens.createGestureTypingSettings
 import helium314.keyboard.settings.screens.createLayoutSettings
 import helium314.keyboard.settings.screens.createPreferencesSettings
 import helium314.keyboard.settings.screens.createToolbarSettings
+import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.settings.KeyboardProfiles.Group as Menu
+import helium314.keyboard.latin.utils.prefs
+import helium314.keyboard.settings.screens.aboutItems
+import helium314.keyboard.settings.screens.appSettingsItems
+import helium314.keyboard.settings.screens.appearanceItems
+import helium314.keyboard.settings.screens.correctionItems
+import helium314.keyboard.settings.screens.fineTuneLearningKeys
+import helium314.keyboard.settings.screens.fineTuneSuggestionsKeys
+import helium314.keyboard.settings.screens.layoutScreenKeys
+import helium314.keyboard.settings.screens.swipeScreenKeys
 
 class SettingsContainer(context: Context) {
     private val list = createSettings(context)
@@ -27,13 +38,57 @@ class SettingsContainer(context: Context) {
 
     operator fun get(key: Any): Setting? = map[key]
 
-    // always have all settings in search, because:
-    //  don't show disabled settings -> users confused
-    //  show as disabled (i.e. no interaction possible) -> users confused
-    //  show, but change will not do anything because another setting needs to be enabled first -> probably best
-    // (but not what no screen shows: hiddenFromSearch)
-    fun filter(searchTerm: String): List<Setting> = SettingsSearch.search(searchTerm, list.filter { !hiddenFromSearch(it.key) })
+    /** The main screen's search: every setting some screen shows now ([shown]), not every setting there is. Owner
+     *  2026-10-14: "in main home screen, searching for "Color" with the toggle off also shows "Colors (dark)" -- wrong
+     *  behavior"; "same thing happens with the separate settings toggle off". [ctx]: the main screen's, so the
+     *  conditions are read from the settings its results edit (KeyboardProfiles.mainEditingId). */
+    fun filter(searchTerm: String, ctx: Context): List<Setting> = SettingsSearch.search(searchTerm, shown(ctx))
+
+    /** Every setting on some screen's current list ([shownScreenLists]), as that screen's own search finds it
+     *  ([screenSettings]: not what no screen shows, [hiddenFromSearch], nor what the screen's menu leaves to another). */
+    fun shown(ctx: Context): List<Setting> {
+        val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
+        return shownScreenLists(ctx).flatMap { screenSettings(it.keys, real, it.menu) { key -> map[key] } }.distinctBy { it.key }
+    }
 }
+
+/** A screen's items as it shows them now (keys, headings, nulls), and the menu it is on (null: none). */
+class ScreenList(val keys: List<Any?>, val menu: Menu?)
+
+/**
+ * What each screen with settings shows now, read from [ctx]'s settings: the lists their own searches use (each screen
+ * draws from the same function), for the main screen's search ("draw each screen from its contents", owner 2026-10-14:
+ * "Agree with this recommendation"). A row's parts that are settings of their own count as on its screen ([partsOfRows]).
+ * Not the Debug screen's (its settings were never in the main screen's search: the user should know the context), nor
+ * Fine-tune suggestions / learning while their entries aren't shown ([REFINE_MENU_SHOWN]); the Preferences, Toolbar and
+ * Secondary layouts screens no entry opens any more.
+ */
+fun shownScreenLists(ctx: Context): List<ScreenList> {
+    val prefs = ctx.prefs()
+    val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx)
+    return listOfNotNull(
+        ScreenList(layoutScreenKeys(prefs, ctx), Menu.LAYOUT), // Layout & Typing
+        ScreenList(appearanceItems(ctx, prefs), Menu.APPEARANCE),
+        ScreenList(swipeScreenKeys(prefs), Menu.SWIPE),
+        ScreenList(correctionItems(prefs), Menu.TEXT_CORRECTION),
+        if (REFINE_MENU_SHOWN) ScreenList(fineTuneSuggestionsKeys(prefs), Menu.REFINE) else null,
+        if (REFINE_MENU_SHOWN) ScreenList(fineTuneLearningKeys, Menu.LEARNING) else null,
+        ScreenList(appSettingsItems(prefs, real), null),
+        ScreenList(aboutItems, null),
+        // a keyboard's Languages screen: its Learned words entry
+        ScreenList(listOf(SettingsWithoutKey.LEARNED_WORDS), null),
+    ).map { screen -> ScreenList(screen.keys + screen.keys.filterIsInstance<String>().flatMap { partsOfRows[it].orEmpty() }, screen.menu) }
+}
+
+/** Settings of their own that a row holds or opens, found by searching (they were in the main screen's search before
+ *  2026-10-14, each with its own row): the toolbar's three key lists (the toolbar keys row), the four "back to letters
+ *  after…" switches (its dialog), the personal dictionary (from Learned words). */
+private val partsOfRows: Map<String, List<String>> = mapOf(
+    SettingsWithoutKey.TOOLBAR_KEYS_ALL to listOf(Settings.PREF_TOOLBAR_KEYS, Settings.PREF_PINNED_TOOLBAR_KEYS, Settings.PREF_CLIPBOARD_TOOLBAR_KEYS),
+    SettingsWithoutKey.ABC_AFTER to listOf(Settings.PREF_ABC_AFTER_SYMBOL_SPACE, Settings.PREF_ABC_AFTER_NUMPAD_SPACE,
+        Settings.PREF_ABC_AFTER_EMOJI, Settings.PREF_ABC_AFTER_CLIP),
+    SettingsWithoutKey.LEARNED_WORDS to listOf(SettingsWithoutKey.EDIT_PERSONAL_DICTIONARY),
+)
 
 @Immutable
 class Setting(

@@ -147,52 +147,9 @@ fun AppearanceScreen(
     val b = (LocalContext.current.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
     if ((b?.value ?: 0) < 0)
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
-    val dayNightMode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && prefs.getBoolean(Settings.PREF_THEME_DAY_NIGHT, Defaults.PREF_THEME_DAY_NIGHT)
-    val items = listOf(
-        // ---- the theme first: the saved themes, then everything a theme sets
-        // (keyboard height, numbers row, split keyboard, bottom row and side padding are on Layout & Typing)
-        // the saved themes on top, on their own between two lines: a theme covers the whole screen (but the emoji
-        // version), not just the Theme group (2026-10-03)
-        SettingsWithoutKey.DIVIDER,
-        SettingsWithoutKey.APPEARANCE_LOOKS,
-        SettingsWithoutKey.DIVIDER,
-        R.string.appearance_group_theme,
-        // light / dark following the system first; when on, the light and the dark colors sit under it
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
-            Settings.PREF_THEME_DAY_NIGHT else null,
-        Settings.PREF_THEME_COLORS,
-        if (dayNightMode) Settings.PREF_THEME_COLORS_NIGHT else null,
-        // the keyboard's accent over the theme's: trail, suggestions, enter key (advanced, under the colors; 2026-10-07)
-        Settings.PREF_GESTURE_TRAIL_COLOR,
-        Settings.PREF_SUGGESTION_WORD_PADDING, // spacing between suggestions (advanced; saved with a theme)
-        SettingsWithoutKey.FONTS, // keys, symbols, suggestions: one dialog
-        Settings.PREF_THEME_STYLE,
-        Settings.PREF_ICON_STYLE,
-        Settings.PREF_CUSTOM_ICON_NAMES,
-        // (part of themes too since 2026-10-02; the per-area symbol rows are on Others)
-        SettingsWithoutKey.HIDE_ALL_SYMBOLS,
-        Settings.PREF_THEME_KEY_BORDERS,
-        Settings.PREF_KEY_HORIZONTAL_GAP,
-        Settings.PREF_KEY_VERTICAL_GAP,
-        Settings.PREF_SPACE_BAR_TEXT,
-        // the background picture last
-        SettingsWithoutKey.BACKGROUND_IMAGE,
-        SettingsWithoutKey.BACKGROUND_IMAGE_LANDSCAPE,
-        // only with a picture set: keys painted or clear on it
-        if (listOf(false, true).any { night -> listOf(false, true).any { land -> Settings.getCustomBackgroundFile(ctx, night, land).exists() } })
-            Settings.PREF_BACKGROUND_WHOLE_PICTURE else null,
-        // ---- then the emoji preferences (in themes, but the version, last here)
-        R.string.appearance_group_emoji,
-        Settings.PREF_EMOJI_FONT_SCALE,
-        if (prefs.getFloat(Settings.PREF_EMOJI_FONT_SCALE, Defaults.PREF_EMOJI_FONT_SCALE) != 1f)
-            Settings.PREF_EMOJI_KEY_FIT else null,
-        if (prefs.getInt(Settings.PREF_EMOJI_MAX_SDK, helium314.keyboard.keyboard.emoji.SupportedEmojis.DEFAULT) >= 24)
-            Settings.PREF_EMOJI_SKIN_TONE else null,
-        SettingsWithoutKey.CUSTOM_EMOJI_FONT,
-        Settings.PREF_SHOW_EMOJI_DESCRIPTIONS,
-        // which emojis show: what the emoji font can draw, overridable (e.g. for a newer font); advanced, not in themes
-        Settings.PREF_EMOJI_MAX_SDK,
-    )
+    // the rows as they are now; the main screen's search asks the same function (owner 2026-10-14: "in main home screen,
+    // searching for "Color" with the toggle off also shows "Colors (dark)" -- wrong behavior")
+    val items = appearanceItems(ctx, prefs)
     // every change shows on the live keyboard at once; the draft remembers how things were when the screen opened
     // after Accept or Reject the current state is the new starting point: a fresh snapshot
     var draft by remember { mutableStateOf(AppearanceDraft.of(ctx)) }
@@ -291,6 +248,57 @@ fun AppearanceScreen(
         onDiscardAndExit = { draft.reject(ctx); askOnLeave = false; onClickBack() },
         onSaveAndExit = { draft.accept(ctx); askOnLeave = false; onClickBack() },
         alsoUndoes = appearanceAlsoUndoes(ctx, draft),
+    )
+}
+
+/** The Appearance screen's rows as they are now (with [prefs] of the keyboard it edits): what it shows, what its search
+ *  and the main screen's search find. */
+internal fun appearanceItems(ctx: Context, prefs: android.content.SharedPreferences): List<Any?> {
+    val dayNightMode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && prefs.getBoolean(Settings.PREF_THEME_DAY_NIGHT, Defaults.PREF_THEME_DAY_NIGHT)
+    return listOf(
+        // ---- the theme first: the saved themes, then everything a theme sets
+        // (keyboard height, numbers row, split keyboard, bottom row and side padding are on Layout & Typing)
+        // the saved themes on top, on their own between two lines: a theme covers the whole screen (but the emoji
+        // version), not just the Theme group (2026-10-03)
+        SettingsWithoutKey.DIVIDER,
+        SettingsWithoutKey.APPEARANCE_LOOKS,
+        SettingsWithoutKey.DIVIDER,
+        R.string.appearance_group_theme,
+        // light / dark following the system first; when on, the light and the dark colors sit under it
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
+            Settings.PREF_THEME_DAY_NIGHT else null,
+        Settings.PREF_THEME_COLORS,
+        if (dayNightMode) Settings.PREF_THEME_COLORS_NIGHT else null,
+        // the keyboard's accent over the theme's: trail, suggestions, enter key (advanced, under the colors; 2026-10-07)
+        Settings.PREF_GESTURE_TRAIL_COLOR,
+        Settings.PREF_SUGGESTION_WORD_PADDING, // spacing between suggestions (advanced; saved with a theme)
+        SettingsWithoutKey.FONTS, // keys, symbols, suggestions: one dialog
+        Settings.PREF_THEME_STYLE,
+        Settings.PREF_ICON_STYLE,
+        Settings.PREF_CUSTOM_ICON_NAMES,
+        // (part of themes too since 2026-10-02; the per-area symbol rows are on Others)
+        SettingsWithoutKey.HIDE_ALL_SYMBOLS,
+        Settings.PREF_THEME_KEY_BORDERS,
+        Settings.PREF_KEY_HORIZONTAL_GAP,
+        Settings.PREF_KEY_VERTICAL_GAP,
+        Settings.PREF_SPACE_BAR_TEXT,
+        // the background picture last
+        SettingsWithoutKey.BACKGROUND_IMAGE,
+        SettingsWithoutKey.BACKGROUND_IMAGE_LANDSCAPE,
+        // only with a picture set: keys painted or clear on it
+        if (listOf(false, true).any { night -> listOf(false, true).any { land -> Settings.getCustomBackgroundFile(ctx, night, land).exists() } })
+            Settings.PREF_BACKGROUND_WHOLE_PICTURE else null,
+        // ---- then the emoji preferences (in themes, but the version, last here)
+        R.string.appearance_group_emoji,
+        Settings.PREF_EMOJI_FONT_SCALE,
+        if (prefs.getFloat(Settings.PREF_EMOJI_FONT_SCALE, Defaults.PREF_EMOJI_FONT_SCALE) != 1f)
+            Settings.PREF_EMOJI_KEY_FIT else null,
+        if (prefs.getInt(Settings.PREF_EMOJI_MAX_SDK, helium314.keyboard.keyboard.emoji.SupportedEmojis.DEFAULT) >= 24)
+            Settings.PREF_EMOJI_SKIN_TONE else null,
+        SettingsWithoutKey.CUSTOM_EMOJI_FONT,
+        Settings.PREF_SHOW_EMOJI_DESCRIPTIONS,
+        // which emojis show: what the emoji font can draw, overridable (e.g. for a newer font); advanced, not in themes
+        Settings.PREF_EMOJI_MAX_SDK,
     )
 }
 

@@ -117,8 +117,8 @@ fun SearchSettingsScreen(
     isPending: ((String) -> Boolean)? = null, // rows with a change not yet accepted, drawn with an italic title
     showKeyboardName: Boolean = true, // false where the title already is the keyboard's name (its own screen)
     // the search: this screen's own settings ([settings], and [searchKeys] of a screen drawing its own [content]; or
-    // [searchSettings], settings the app's list doesn't have), not another screen's; every setting with [searchAll]
-    // (the main screens). Owner 2026-10-13: "Every screen should have a search bar. That should only let you search
+    // [searchSettings], settings the app's list doesn't have), not another screen's; with [searchAll] (the main screens)
+    // every setting some screen shows now ([SettingsContainer.filter]; owner 2026-10-14). Owner 2026-10-13: "Every screen should have a search bar. That should only let you search
     // within that screen (including any items that may be duplicated between screens)"; "main screen's search bar can
     // search anything tho"
     searchAll: Boolean = false,
@@ -239,7 +239,7 @@ fun SearchSettingsScreen(
             }
         },
         filteredItems = { term ->
-            if (searchAll) SettingsActivity.settingsContainer.filter(term)
+            if (searchAll) SettingsActivity.settingsContainer.filter(term, ctx)
             else screenSearch(term, searchSettings ?: screenSettings(settings + searchKeys,
                 helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx), menu))
         },
@@ -255,9 +255,10 @@ fun SearchSettingsScreen(
 /** The settings of [keys] (a screen's items: keys, headings, nulls) in the app's list, as a screen's own search finds
  *  them (owner 2026-10-13, SEARCH-SCOPE): every one the screen lists, the ones simple mode hides too; not one no screen
  *  shows ([hiddenFromSearch]), nor one the screen's [menu] leaves to another menu (with separate settings: not shown
- *  on it either). */
-fun screenSettings(keys: List<Any?>, real: android.content.SharedPreferences, menu: helium314.keyboard.latin.settings.KeyboardProfiles.Group?): List<Setting> =
-    keys.filterIsInstance<String>().distinct().mapNotNull { SettingsActivity.settingsContainer[it] }
+ *  on it either). [settingOf]: the app's list (a container of its own: [SettingsContainer.filter]). */
+fun screenSettings(keys: List<Any?>, real: android.content.SharedPreferences, menu: helium314.keyboard.latin.settings.KeyboardProfiles.Group?,
+                   settingOf: (String) -> Setting? = { SettingsActivity.settingsContainer[it] }): List<Setting> =
+    keys.filterIsInstance<String>().distinct().mapNotNull { settingOf(it) }
         .filter { !hiddenFromSearch(it.key) && (menu == null || !helium314.keyboard.latin.settings.KeyboardProfiles.hiddenOn(real, menu, it.key)) }
 
 /** [settings] (a screen's own) matching [term], best first, as the main screen's search matches every setting. */

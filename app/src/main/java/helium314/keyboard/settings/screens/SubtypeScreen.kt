@@ -383,7 +383,8 @@ fun SubtypeScreen(
                             SettingsActivity.settingsContainer[Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX]?.Preference() }
                         Pending(keyChanged(Settings.PREF_SHOW_NUMBER_ROW)) {
                             SettingsActivity.settingsContainer[Settings.PREF_SHOW_NUMBER_ROW]?.Preference() }
-                        if (!prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW))
+                        // (shown when its search's list has it, [layoutScreenKeys]: the same condition)
+                        if (Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS in layoutScreenKeys(prefs, ctx))
                             Pending(keyChanged(Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS)) { Box(Modifier.padding(start = 16.dp)) {
                                 SettingsActivity.settingsContainer[Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS]?.Preference() } }
                     }
@@ -406,9 +407,7 @@ fun SubtypeScreen(
                         Pending(keyChanged(Settings.PREF_ENABLE_SPLIT_KEYBOARD, Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE,
                             Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE)) {
                             SettingsActivity.settingsContainer[Settings.PREF_ENABLE_SPLIT_KEYBOARD]?.Preference() }
-                        if (listOf(Settings.PREF_ENABLE_SPLIT_KEYBOARD, Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE,
-                                Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE)
-                                .any { prefs.getBoolean(it, Defaults.PREF_ENABLE_SPLIT_KEYBOARD) })
+                        if (Settings.PREF_SPLIT_SPACER_SCALE_PREFIX in layoutScreenKeys(prefs, ctx))
                             Pending(prefixChanged(Settings.PREF_SPLIT_SPACER_SCALE_PREFIX)) { Box(Modifier.padding(start = 16.dp)) {
                                 SettingsActivity.settingsContainer[Settings.PREF_SPLIT_SPACER_SCALE_PREFIX]?.Preference() } }
                     }
@@ -527,7 +526,7 @@ fun SubtypeScreen(
                             // backspace, advanced: swiping left, undoing an autocorrection (a tap after a swipe: on Swiping)
                             Pending(keyChanged(Settings.PREF_DELETE_SWIPE, Settings.PREF_DELETE_SWIPE_SPEED)) {
                                 SettingsActivity.settingsContainer[Settings.PREF_DELETE_SWIPE]?.Preference() }
-                            if (prefs.getBoolean(Settings.PREF_AUTO_CORRECTION, Defaults.PREF_AUTO_CORRECTION))
+                            if (Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT in layoutScreenKeys(prefs, ctx))
                                 Pending(keyChanged(Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT)) {
                                     SettingsActivity.settingsContainer[Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT]?.Preference() }
                             advancedInputItems.forEach {
@@ -790,18 +789,27 @@ private val previewedSwitches = listOf(
 
 private val advancedInputItems = listOf(Settings.PREF_LONG_PRESS_SYMBOL_ACTION, SettingsWithoutKey.ABC_AFTER) // (emoji descriptions: Appearance, Emoji group)
 
-/** The settings of the app's list Layout & Typing shows, as its search finds them (owner 2026-10-13, SEARCH-SCOPE): the
- *  rows drawn from the list, simple and advanced ([layoutScreenAdvancedKeys]). */
-internal fun layoutScreenKeys(prefs: android.content.SharedPreferences, ctx: Context): List<String> = listOf(
-    Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, Settings.PREF_SHOW_NUMBER_ROW, Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS,
-    Settings.PREF_SHOW_EMOJI_KEY, Settings.PREF_SHOW_VOICE_KEY, Settings.PREF_ENABLE_SPLIT_KEYBOARD, Settings.PREF_SPLIT_SPACER_SCALE_PREFIX,
+/** The settings of the app's list Layout & Typing shows now, as its search finds them (owner 2026-10-13, SEARCH-SCOPE): the
+ *  rows drawn from the list, simple and advanced ([layoutScreenAdvancedKeys]); a row shown only under a switch, while it
+ *  is (the screen asks here too). The main screen's search finds these (owner 2026-10-14). */
+internal fun layoutScreenKeys(prefs: android.content.SharedPreferences, ctx: Context): List<String> = listOfNotNull(
+    Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, Settings.PREF_SHOW_NUMBER_ROW,
+    // the symbols page's number row: only while the number row is off
+    if (!prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW)) Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS else null,
+    Settings.PREF_SHOW_EMOJI_KEY, Settings.PREF_SHOW_VOICE_KEY, Settings.PREF_ENABLE_SPLIT_KEYBOARD,
+    // the split's gap: only while the keyboard is split somewhere
+    if (listOf(Settings.PREF_ENABLE_SPLIT_KEYBOARD, Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE,
+            Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE)
+            .any { prefs.getBoolean(it, Defaults.PREF_ENABLE_SPLIT_KEYBOARD) }) Settings.PREF_SPLIT_SPACER_SCALE_PREFIX else null,
     Settings.PREF_TOOLBAR_VISIBILITY, Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS, Settings.PREF_BACKSPACE_SPEED_UP,
 ) + preferencesInputItems(prefs, ctx).filterIsInstance<String>() + layoutScreenAdvancedKeys(prefs)
 
-/** The settings Layout & Typing shows only in advanced mode (in its advanced blocks). */
-internal fun layoutScreenAdvancedKeys(prefs: android.content.SharedPreferences): List<String> = listOf(
+/** The settings Layout & Typing shows only in advanced mode (in its advanced blocks), the ones under a switch while it is on. */
+internal fun layoutScreenAdvancedKeys(prefs: android.content.SharedPreferences): List<String> = listOfNotNull(
     Settings.PREF_SPACE_TO_CHANGE_LANG, Settings.PREF_BOTTOM_ROW_SCALE_PREFIX, Settings.PREF_SIDE_PADDING_SCALE_PREFIX,
-    Settings.PREF_BACKSPACE_LONGPRESS_DELAY, Settings.PREF_DELETE_SWIPE, Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT,
+    Settings.PREF_BACKSPACE_LONGPRESS_DELAY, Settings.PREF_DELETE_SWIPE,
+    // undoing an autocorrection: only while autocorrect is on
+    if (prefs.getBoolean(Settings.PREF_AUTO_CORRECTION, Defaults.PREF_AUTO_CORRECTION)) Settings.PREF_BACKSPACE_REVERTS_AUTOCORRECT else null,
     Settings.PREF_SHOW_TLD_POPUP_KEYS, Settings.PREF_REMOVE_REDUNDANT_POPUPS,
     Settings.PREF_UNDO_HISTORY_LENGTH, Settings.PREF_UNDO_UNIT, Settings.PREF_REDO_UNIT,
 ) + toolbarItems(prefs).filterNotNull().filter { it != Settings.PREF_TOOLBAR_VISIBILITY } + advancedInputItems +

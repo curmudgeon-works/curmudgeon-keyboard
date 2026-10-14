@@ -69,57 +69,7 @@ fun TextCorrectionScreen(
     val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
     if ((b?.value ?: 0) < 0)
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
-    val autocorrectEnabled = prefs.getBoolean(Settings.PREF_AUTO_CORRECTION, Defaults.PREF_AUTO_CORRECTION)
-    // Show suggestions is the one switch for suggestions (the toolbar's visibility no longer hides this row)
-    val suggestionsVisible = true
-    val suggestionsEnabled = suggestionsVisible && prefs.getBoolean(Settings.PREF_SHOW_SUGGESTIONS, Defaults.PREF_SHOW_SUGGESTIONS)
-    val gestureEnabled = prefs.getBoolean(Settings.PREF_GESTURE_INPUT, Defaults.PREF_GESTURE_INPUT)
-    val items = listOf(
-        // (Learned & blacklisted words: on each keyboard's screen since 2026-10-10; still found by searching)
-        R.string.settings_category_correction,
-        Settings.PREF_AUTO_CORRECTION,
-        if (autocorrectEnabled) Settings.PREF_MORE_AUTO_CORRECTION else null,
-        if (autocorrectEnabled) Settings.PREF_AUTOCORRECT_SHORTCUTS else null,
-        if (autocorrectEnabled) Settings.PREF_AUTOCORRECT_WITH_DIGITS else null,
-        if (autocorrectEnabled) Settings.PREF_AUTO_CORRECT_THRESHOLD else null,
-        // (backspace reverts autocorrect: in the Backspace group of the Preferences screen)
-        Settings.PREF_AUTO_CAP,
-        Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE,
-        // (your own words winning over corrections, "Trust words you've typed": on Refine swipe and learning)
-        Settings.PREF_URL_DETECTION, // (from Advanced; advanced here too) web and email addresses as one word
-        R.string.settings_category_space,
-        Settings.PREF_AUTOSPACE_AFTER_SUGGESTION,
-        if (gestureEnabled) Settings.PREF_AUTOSPACE_AFTER_GESTURE_TYPING else null, // (also on the Swipe screen)
-        if (gestureEnabled) Settings.PREF_AUTOSPACE_BEFORE_GESTURE_TYPING else null,
-        Settings.PREF_AUTOSPACE_AFTER_PUNCTUATION,
-        Settings.PREF_SHIFT_REMOVES_AUTOSPACE,
-        Settings.PREF_KEY_USE_DOUBLE_SPACE_PERIOD,
-        R.string.settings_category_suggestions,
-        if (suggestionsVisible) Settings.PREF_SHOW_SUGGESTIONS else null,
-        if (suggestionsEnabled) Settings.PREF_ALWAYS_SHOW_SUGGESTIONS else null,
-        if (suggestionsEnabled && prefs.getBoolean(Settings.PREF_ALWAYS_SHOW_SUGGESTIONS, Defaults.PREF_ALWAYS_SHOW_SUGGESTIONS))
-            Settings.PREF_ALWAYS_SHOW_SUGGESTIONS_EXCEPT_WEB_TEXT else null,
-        // (right after Show suggestions and the rows indented under it)
-        Settings.PREF_BIGRAM_PREDICTIONS,
-        Settings.PREF_KEY_USE_PERSONALIZED_DICTS,
-        // right after it: what stops the learning (advanced, but not while suggesting learned words is off)
-        Settings.PREF_ALWAYS_INCOGNITO_MODE,
-        if (prefs.getBoolean(Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Defaults.PREF_KEY_USE_PERSONALIZED_DICTS))
-            Settings.PREF_ADD_TO_PERSONAL_DICTIONARY else null,
-        // the number of suggestions (its tile on Refine suggestions & learning while that menu isn't shown, 2026-10-06;
-        // the order of suggestions stays there, at its default)
-        if (!helium314.keyboard.settings.REFINE_MENU_SHOWN) Settings.PREF_SUGGESTION_COUNT else null,
-        // (PREF_CENTER_SUGGESTION_TEXT_TO_ENTER, "show the word space will type as the middle suggestion", is no longer
-        // shown: the strip has no middle and shows the typed word first anyway; its Setting stays, off, see SettingsValues)
-        if (suggestionsEnabled || autocorrectEnabled) Settings.PREF_SUGGEST_EMOJIS else null,
-        if (suggestionsEnabled || autocorrectEnabled) Settings.PREF_INLINE_EMOJI_SEARCH else null,
-        Settings.PREF_SUGGEST_PUNCTUATION,
-        if (prefs.getBoolean(Settings.PREF_SUGGEST_PUNCTUATION, Defaults.PREF_SUGGEST_PUNCTUATION))
-            Settings.PREF_PUNCTUATION_SUGGESTIONS else null,
-        Settings.PREF_SUGGEST_CLIPBOARD_CONTENT,
-        Settings.PREF_USE_CONTACTS,
-        Settings.PREF_USE_APPS,
-    )
+    val items = correctionItems(prefs) // (the main screen's search asks the same function, owner 2026-10-14)
     // every change applies at once and can be tried in the box at the bottom (the keyboard comes up for a moment, as on
     // Appearance); the top bar's tick keeps the changes since the screen opened, the cross undoes them
     // (the number of suggestions too while its tile is here, so the cross undoes it and it shows as changed; its
@@ -185,6 +135,62 @@ fun TextCorrectionScreen(
     )
     draft.dialogs()
     }
+}
+
+/** The Text correction screen's rows as they are now (with [prefs] of the keyboard it edits): what it shows, what its
+ *  search and the main screen's search find. */
+internal fun correctionItems(prefs: android.content.SharedPreferences): List<Any?> {
+    val autocorrectEnabled = prefs.getBoolean(Settings.PREF_AUTO_CORRECTION, Defaults.PREF_AUTO_CORRECTION)
+    // Show suggestions is the one switch for suggestions (the toolbar's visibility no longer hides this row)
+    val suggestionsVisible = true
+    val suggestionsEnabled = suggestionsVisible && prefs.getBoolean(Settings.PREF_SHOW_SUGGESTIONS, Defaults.PREF_SHOW_SUGGESTIONS)
+    val gestureEnabled = prefs.getBoolean(Settings.PREF_GESTURE_INPUT, Defaults.PREF_GESTURE_INPUT)
+    return listOf(
+        // (Learned & blacklisted words: on each keyboard's screen since 2026-10-10; still found by searching)
+        R.string.settings_category_correction,
+        Settings.PREF_AUTO_CORRECTION,
+        if (autocorrectEnabled) Settings.PREF_MORE_AUTO_CORRECTION else null,
+        if (autocorrectEnabled) Settings.PREF_AUTOCORRECT_SHORTCUTS else null,
+        if (autocorrectEnabled) Settings.PREF_AUTOCORRECT_WITH_DIGITS else null,
+        if (autocorrectEnabled) Settings.PREF_AUTO_CORRECT_THRESHOLD else null,
+        // (backspace reverts autocorrect: in the Backspace group of the Preferences screen)
+        Settings.PREF_AUTO_CAP,
+        Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE,
+        // (your own words winning over corrections, "Trust words you've typed": on Refine swipe and learning)
+        Settings.PREF_URL_DETECTION, // (from Advanced; advanced here too) web and email addresses as one word
+        R.string.settings_category_space,
+        Settings.PREF_AUTOSPACE_AFTER_SUGGESTION,
+        if (gestureEnabled) Settings.PREF_AUTOSPACE_AFTER_GESTURE_TYPING else null, // (also on the Swipe screen)
+        if (gestureEnabled) Settings.PREF_AUTOSPACE_BEFORE_GESTURE_TYPING else null,
+        Settings.PREF_AUTOSPACE_AFTER_PUNCTUATION,
+        Settings.PREF_SHIFT_REMOVES_AUTOSPACE,
+        Settings.PREF_KEY_USE_DOUBLE_SPACE_PERIOD,
+        R.string.settings_category_suggestions,
+        if (suggestionsVisible) Settings.PREF_SHOW_SUGGESTIONS else null,
+        if (suggestionsEnabled) Settings.PREF_ALWAYS_SHOW_SUGGESTIONS else null,
+        if (suggestionsEnabled && prefs.getBoolean(Settings.PREF_ALWAYS_SHOW_SUGGESTIONS, Defaults.PREF_ALWAYS_SHOW_SUGGESTIONS))
+            Settings.PREF_ALWAYS_SHOW_SUGGESTIONS_EXCEPT_WEB_TEXT else null,
+        // (right after Show suggestions and the rows indented under it)
+        Settings.PREF_BIGRAM_PREDICTIONS,
+        Settings.PREF_KEY_USE_PERSONALIZED_DICTS,
+        // right after it: what stops the learning (advanced, but not while suggesting learned words is off)
+        Settings.PREF_ALWAYS_INCOGNITO_MODE,
+        if (prefs.getBoolean(Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Defaults.PREF_KEY_USE_PERSONALIZED_DICTS))
+            Settings.PREF_ADD_TO_PERSONAL_DICTIONARY else null,
+        // the number of suggestions (its tile on Refine suggestions & learning while that menu isn't shown, 2026-10-06;
+        // the order of suggestions stays there, at its default)
+        if (!helium314.keyboard.settings.REFINE_MENU_SHOWN) Settings.PREF_SUGGESTION_COUNT else null,
+        // (PREF_CENTER_SUGGESTION_TEXT_TO_ENTER, "show the word space will type as the middle suggestion", is no longer
+        // shown: the strip has no middle and shows the typed word first anyway; its Setting stays, off, see SettingsValues)
+        if (suggestionsEnabled || autocorrectEnabled) Settings.PREF_SUGGEST_EMOJIS else null,
+        if (suggestionsEnabled || autocorrectEnabled) Settings.PREF_INLINE_EMOJI_SEARCH else null,
+        Settings.PREF_SUGGEST_PUNCTUATION,
+        if (prefs.getBoolean(Settings.PREF_SUGGEST_PUNCTUATION, Defaults.PREF_SUGGEST_PUNCTUATION))
+            Settings.PREF_PUNCTUATION_SUGGESTIONS else null,
+        Settings.PREF_SUGGEST_CLIPBOARD_CONTENT,
+        Settings.PREF_USE_CONTACTS,
+        Settings.PREF_USE_APPS,
+    )
 }
 
 /** Every preference on the Text correction screen (shown or not), for its tick / cross and its preview. */

@@ -51,25 +51,27 @@ import java.util.Locale
 fun AboutScreen(
     onClickBack: () -> Unit,
 ) {
-    val items = listOf(
-        SettingsWithoutKey.APP,
-        SettingsWithoutKey.VERSION,
-        SettingsWithoutKey.LICENSE,
-        SettingsWithoutKey.DICTIONARY_SOURCES,
-        SettingsWithoutKey.BASED_ON,
-        SettingsWithoutKey.HIDDEN_FEATURES,
-        SettingsWithoutKey.GITHUB_WIKI,
-        SettingsWithoutKey.GITHUB,
-        SettingsWithoutKey.RATE,
-        SettingsWithoutKey.SHARE,
-        SettingsWithoutKey.SAVE_LOG,
-    )
     SearchSettingsScreen(
         onClickBack = onClickBack,
         title = stringResource(R.string.settings_screen_about),
-        settings = items
+        settings = aboutItems,
     )
 }
+
+/** About's rows (always the same): what it shows, what its search and the main screen's search find. */
+internal val aboutItems = listOf(
+    SettingsWithoutKey.APP,
+    SettingsWithoutKey.VERSION,
+    SettingsWithoutKey.LICENSE,
+    SettingsWithoutKey.DICTIONARY_SOURCES,
+    SettingsWithoutKey.BASED_ON,
+    SettingsWithoutKey.HIDDEN_FEATURES,
+    SettingsWithoutKey.GITHUB_WIKI,
+    SettingsWithoutKey.GITHUB,
+    SettingsWithoutKey.RATE,
+    SettingsWithoutKey.SHARE,
+    SettingsWithoutKey.SAVE_LOG,
+)
 
 fun createAboutSettings(context: Context) = listOf(
     Setting(context, SettingsWithoutKey.APP, R.string.english_ime_name, R.string.app_slogan) {

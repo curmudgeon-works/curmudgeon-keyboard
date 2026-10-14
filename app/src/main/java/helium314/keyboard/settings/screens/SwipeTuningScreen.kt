@@ -71,6 +71,41 @@ internal val swipeSettingKeys = listOf(
     Settings.PREF_LANGUAGE_SWIPE_DISTANCE, Settings.PREF_TOUCHPAD_SENSITIVITY,
 )
 
+/** What the Swipe screen's rows depend on, read from [prefs]: the screen draws by it, and [swipeScreenKeys] lists by it. */
+internal class SwipeConditions(prefs: android.content.SharedPreferences) {
+    val gestureOn = prefs.getBoolean(Settings.PREF_GESTURE_INPUT, Defaults.PREF_GESTURE_INPUT)
+    val capsOn = prefs.getBoolean(Settings.PREF_GESTURE_CAPS_SWIPE, Defaults.PREF_GESTURE_CAPS_SWIPE)
+    val wholeTrail = prefs.getBoolean(Settings.PREF_GESTURE_TRAIL_WHOLE, Defaults.PREF_GESTURE_TRAIL_WHOLE)
+    val languageDistance = Settings.readHorizontalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.SWITCH_LANGUAGE
+        || Settings.readVerticalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.SWITCH_LANGUAGE
+    val touchpad = Settings.readVerticalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.TOUCHPAD_MODE
+}
+
+/** The settings the Swipe screen shows now, in its order (with [prefs] of the keyboard it edits): what its search and the
+ *  main screen's search find (owner 2026-10-14: the main screen's search finds what the screens show). The keys its
+ *  Keep / Discard covers stay [swipeSettingKeys]. */
+internal fun swipeScreenKeys(prefs: android.content.SharedPreferences): List<String> = with(SwipeConditions(prefs)) { listOfNotNull(
+    Settings.PREF_GESTURE_INPUT,
+    // the swipe settings group, while swiping is on (the fading or the lingering under the whole-trail switch)
+    if (gestureOn) Settings.PREF_GESTURE_TRAIL_THICKNESS else null,
+    if (gestureOn) Settings.PREF_GESTURE_TRAIL_WHOLE else null,
+    if (gestureOn && !wholeTrail) Settings.PREF_GESTURE_TRAIL_FADEOUT_DURATION else null,
+    if (gestureOn && wholeTrail) Settings.PREF_GESTURE_TRAIL_WHOLE_LINGER else null,
+    if (gestureOn) Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD else null,
+    if (gestureOn) Settings.PREF_AUTOSPACE_AFTER_GESTURE_TYPING else null,
+    Settings.PREF_DELETE_SWIPE,
+    // the advanced block: the swiped-word details while swiping is on, then the swipes that work when tapping too
+    if (gestureOn) Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD else null,
+    if (gestureOn) Settings.PREF_GESTURE_FAST_TYPING_COOLDOWN else null,
+    if (gestureOn) Settings.PREF_GESTURE_CAPS_SWIPE else null,
+    if (gestureOn && capsOn) Settings.PREF_GESTURE_CAPS_HEIGHT else null,
+    Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE,
+    Settings.PREF_SPACE_HORIZONTAL_SWIPE,
+    Settings.PREF_SPACE_VERTICAL_SWIPE,
+    if (languageDistance) Settings.PREF_LANGUAGE_SWIPE_DISTANCE else null,
+    if (touchpad) Settings.PREF_TOUCHPAD_SENSITIVITY else null,
+) }
+
 @Composable
 internal fun GroupTitle(titleId: Int) = Column {
     // the same heading as everywhere: a line above, flush at the edge, the rows indented under it
@@ -123,7 +158,7 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
         title = stringResource(R.string.swipe_screen),
         topActions = draft.topActions,
         settings = emptyList(),
-        searchKeys = swipeSettingKeys, // its search: the settings it shows (owner 2026-10-13, SEARCH-SCOPE)
+        searchKeys = swipeScreenKeys(prefs), // its search: the settings it shows now (owner 2026-10-13, SEARCH-SCOPE; 2026-10-14)
         simpleModeKeys = (swipeSettingKeys - swipeAdvancedKeys).toSet(), // (only for its search's tint: no [settings] list)
     ) {
         // (a screen with its own content draws its own try-it bar: SearchSettingsScreen's bottomBar is for its list)
@@ -138,8 +173,10 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
         Column(Modifier.padding(innerPadding).then(tapReveal.list).verticalScroll(listScroll)) {
           androidx.compose.runtime.CompositionLocalProvider(helium314.keyboard.settings.preferences.LocalRowStart provides 22.dp) {
             val advanced by SettingsMode.state(ctx)
-            val gestureOn = prefs.getBoolean(Settings.PREF_GESTURE_INPUT, Defaults.PREF_GESTURE_INPUT)
-            val capsOn = prefs.getBoolean(Settings.PREF_GESTURE_CAPS_SWIPE, Defaults.PREF_GESTURE_CAPS_SWIPE)
+            // (the same conditions as its search's list, [swipeScreenKeys])
+            val conditions = SwipeConditions(prefs)
+            val gestureOn = conditions.gestureOn
+            val capsOn = conditions.capsOn
             // a row in italics while it has a change not yet kept with the tick
             @Composable fun Pref(key: String) = androidx.compose.runtime.CompositionLocalProvider(
                 helium314.keyboard.settings.preferences.LocalPendingChange provides (key in draft.pending)) {
@@ -147,7 +184,7 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
             }
             // ---- the main switch: off folds away everything about swiped words (here and the tuning); the other
             // swipes (spacebar, backspace, suggestion strip) work when tapping too and stay, and the results stay as history
-            val wholeTrail = prefs.getBoolean(Settings.PREF_GESTURE_TRAIL_WHOLE, Defaults.PREF_GESTURE_TRAIL_WHOLE)
+            val wholeTrail = conditions.wholeTrail
             // the main switch as a heading of its own (a line above it, the headings' text), its switch at the right
             androidx.compose.material3.HorizontalDivider(Modifier.padding(top = 8.dp))
             val setGesture = { on: Boolean -> prefs.edit { putBoolean(Settings.PREF_GESTURE_INPUT, on) } }
@@ -206,11 +243,8 @@ fun SwipeTuningScreen(keyboard: SettingsSubtype, onClickBack: () -> Unit) {
                 } }
                 Pref(Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE)
                 listOfNotNull(Settings.PREF_SPACE_HORIZONTAL_SWIPE, Settings.PREF_SPACE_VERTICAL_SWIPE,
-                    if (Settings.readHorizontalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.SWITCH_LANGUAGE
-                        || Settings.readVerticalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.SWITCH_LANGUAGE)
-                        Settings.PREF_LANGUAGE_SWIPE_DISTANCE else null,
-                    if (Settings.readVerticalSpaceSwipe(prefs) == KeyboardActionListener.SwipeAction.TOUCHPAD_MODE)
-                        Settings.PREF_TOUCHPAD_SENSITIVITY else null,
+                    if (conditions.languageDistance) Settings.PREF_LANGUAGE_SWIPE_DISTANCE else null,
+                    if (conditions.touchpad) Settings.PREF_TOUCHPAD_SENSITIVITY else null,
                 ).forEach { Pref(it) }
             }
 

@@ -52,6 +52,14 @@ internal val swipeTuningKeys = listOf(
     Settings.PREF_SUGGESTION_COUNT, Settings.PREF_SUGGESTION_RULES,
 )
 
+/** The settings Fine-tune suggestions shows now (with [prefs] of the keyboard it edits): what its search and the main
+ *  screen's search find; the tuning and the swipe logs only while swiping is on, as the screen folds them away. */
+internal fun fineTuneSuggestionsKeys(prefs: android.content.SharedPreferences): List<String> =
+    listOf(Settings.PREF_SUGGESTION_COUNT, Settings.PREF_SUGGESTION_RULES) +
+        (if (prefs.getBoolean(Settings.PREF_GESTURE_INPUT, Defaults.PREF_GESTURE_INPUT))
+            swipeTuningKeys + listOf(Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_SWIPE_METRICS)
+        else emptyList())
+
 /**
  * "Refine swipe and learning" (2026-10-04): the swipe decoder's tuning with the statistics of every tuning
  * tried and the swipe logs (moved from the Swiping screen), and how the keyboard learns (trusting your words, moved
@@ -100,8 +108,8 @@ fun LearningSwipingScreen(onClickBack: () -> Unit) {
         title = stringResource(R.string.learning_swiping_screen),
         topActions = draft.topActions,
         settings = emptyList(),
-        // its search: the settings it shows (owner 2026-10-13, SEARCH-SCOPE)
-        searchKeys = swipeTuningKeys + listOf(Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_SWIPE_METRICS),
+        // its search: the settings it shows now (owner 2026-10-13, SEARCH-SCOPE; 2026-10-14)
+        searchKeys = fineTuneSuggestionsKeys(prefs),
     ) {
         androidx.compose.material3.Scaffold(contentWindowInsets = WindowInsets(0), bottomBar = {
             androidx.compose.foundation.layout.Box(Modifier.onGloballyPositioned {

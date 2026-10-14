@@ -47,7 +47,7 @@ class SearchScopeTest {
     @Test fun `a screen's search finds its own settings only, the main screen's every setting`() {
         val term = "clipboard history"
         // the main screens
-        assertTrue(Settings.PREF_ENABLE_CLIPBOARD_HISTORY in keys(SettingsActivity.settingsContainer.filter(term)))
+        assertTrue(Settings.PREF_ENABLE_CLIPBOARD_HISTORY in keys(SettingsActivity.settingsContainer.filter(term, ctx)))
         // a screen without it (the toolbar's settings): not found there
         val toolbar = screenSettings(toolbarItems(ctx.prefs()), real, null)
         assertFalse(Settings.PREF_ENABLE_CLIPBOARD_HISTORY in keys(screenSearch(term, toolbar)), "another screen's setting")
@@ -120,6 +120,6 @@ class SearchScopeTest {
             screenSearch(ctx.getString(helium314.keyboard.latin.R.string.settings_screen_appearance), entries).map { it.title })
         val autoCap = ctx.getString(helium314.keyboard.latin.R.string.auto_cap)
         assertTrue(screenSearch(autoCap, entries).isEmpty(), "a setting under a menu found on the keyboard's screen")
-        assertTrue(SettingsActivity.settingsContainer.filter(autoCap).isNotEmpty(), "the first screen's search lost it")
+        assertTrue(SettingsActivity.settingsContainer.filter(autoCap, ctx).isNotEmpty(), "the first screen's search lost it")
     }
 }

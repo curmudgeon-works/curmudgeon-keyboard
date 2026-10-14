@@ -81,9 +81,22 @@ fun AdvancedSettingsScreen(
     val b = (LocalContext.current.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
     if ((b?.value ?: 0) < 0)
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
-    val real = LocalContext.current.realPrefs()
+    val items = appSettingsItems(prefs, LocalContext.current.realPrefs()) // (the main screen's search asks it too, owner 2026-10-14)
+    SearchSettingsScreen(
+        onClickBack = onClickBack,
+        title = stringResource(R.string.settings_screen_advanced),
+        settings = items,
+        // everything in it shows, untinted (its entry on the main screen shows in simple mode too since 2026-10-06), but
+        // the switch for leaving a screen: advanced only (owner 2026-10-14)
+        simpleModeKeys = items.filterIsInstance<String>().toSet() - advancedOnlyAppSettings,
+    )
+}
+
+/** App settings' rows as they are now ([prefs]: the keyboard it edits; [real]: the app's own): what it shows, what its
+ *  search and the main screen's search find. */
+internal fun appSettingsItems(prefs: android.content.SharedPreferences, real: android.content.SharedPreferences): List<Any?> {
     val separate = helium314.keyboard.latin.settings.KeyboardProfiles.isSeparate(real)
-    val items = listOf(
+    return listOf(
         // App settings first (2026-10-06): the settings of the app as a whole
         R.string.settings_category_this_app,
         // (force incognito: on Text correction, next to learning from what you type)
@@ -122,14 +135,6 @@ fun AdvancedSettingsScreen(
         // (once under Experimental; the emoji version is on Appearance's Emoji group, next to the emoji font, URL
         //  detection on Text correction's Correction group)
         // (recording the swipe corpus and logging swipe results: on Fine-tune suggestions)
-    )
-    SearchSettingsScreen(
-        onClickBack = onClickBack,
-        title = stringResource(R.string.settings_screen_advanced),
-        settings = items,
-        // everything in it shows, untinted (its entry on the main screen shows in simple mode too since 2026-10-06), but
-        // the switch for leaving a screen: advanced only (owner 2026-10-14)
-        simpleModeKeys = items.filterIsInstance<String>().toSet() - advancedOnlyAppSettings,
     )
 }
 
