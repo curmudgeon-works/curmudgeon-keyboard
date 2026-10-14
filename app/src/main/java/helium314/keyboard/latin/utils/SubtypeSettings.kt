@@ -219,8 +219,10 @@ object SubtypeSettings {
     fun reloadEnabledSubtypes(context: Context) {
         enabledSubtypes.clear()
         loadAdditionalSubtypes(context.prefs())
-        loadEnabledSubtypes(context)
-        KeyboardProfiles.ensureListedRecords(context.realPrefs()) // (the net, owner 2026-10-11)
+        // the net (owner 2026-10-11), not for a default stored as the list was found empty: in a reload that is a moment
+        // of a list being rewritten (cleared, reset, restored), and records for it stayed behind as a switched-off
+        // keyboard once the list was written; a default that stays gets them at the next start, load or add
+        if (!loadEnabledSubtypes(context)) KeyboardProfiles.ensureListedRecords(context.realPrefs())
         if (RichInputMethodManager.isInitialized())
             RichInputMethodManager.getInstance().refreshSubtypeCaches()
     }
@@ -283,8 +285,8 @@ object SubtypeSettings {
         additionalSubtypes.addAll(subtypes)
     }
 
-    // requires loadResourceSubtypes to be called before
-    private fun loadEnabledSubtypes(context: Context) {
+    // requires loadResourceSubtypes to be called before. @return whether the list was found empty and the default stored
+    private fun loadEnabledSubtypes(context: Context): Boolean {
         val prefs = context.prefs()
         val settingsSubtypes = createSettingsSubtypes(prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!)
         for (settingsSubtype in settingsSubtypes) {
@@ -327,7 +329,9 @@ object SubtypeSettings {
                 if (!prefs.contains(Settings.PREF_SELECTED_SUBTYPE)) putString(Settings.PREF_SELECTED_SUBTYPE, default.toSettingsSubtype().toPref())
             }
             enabledSubtypes.add(default)
+            return true
         }
+        return false
     }
 
     /** @return whether pref was changed */

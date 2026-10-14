@@ -171,6 +171,21 @@ class GhostRecordsTest {
         assertRecords(mapOf(en to 1, de to 4, fr to 5))
     }
 
+    // (a full test run 2026-10-11: a reload found the list empty while a test rewrote it, stored the default, and the net
+    // gave it records that stayed as a switched-off keyboard; a restore later switched it on)
+    @Test fun `g - a default stored while the list is found empty gets no records, the list written after it does`() {
+        real.edit().clear().putBoolean(LearnedKeyboards.PREF_DONE, true).commit()
+        SubtypeSettings.reloadEnabledSubtypes(ctx) // (found empty: the default stored)
+        val default = storedEnabled().single()
+        assertTrue(default.toPref() !in KeyboardProfiles.idEntries(real) && default.toPref() !in storedPools(real))
+        if (default == de) return // (the default is German here: nothing left to tell apart)
+        real.edit().putString(Settings.PREF_ENABLED_SUBTYPES, de.toPref()).putString(Settings.PREF_SELECTED_SUBTYPE, de.toPref()).commit()
+        SubtypeSettings.reloadEnabledSubtypes(ctx)
+        assertEquals(emptyList(), SwitchedOffKeyboards.list(real))
+        assertEquals(setOf(de), ids().keys)
+        assertEquals(setOf(de), pools().keys)
+    }
+
     @Test fun `f - adding or copying a keyboard creates its records at once`() {
         keyboards(listOf(en))
         val added = createKeyboard(ctx, newKeyboardFor(ctx, Locale.GERMANY), null, StartSettings.Defaults)
