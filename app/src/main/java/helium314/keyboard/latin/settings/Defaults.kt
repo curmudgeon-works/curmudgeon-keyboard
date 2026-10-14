@@ -169,8 +169,7 @@ object Defaults {
     // the suggestion strip's words: not set = the theme's swipe trail color (0.3.008, see suggestionTextColor); the
     // orange only where no theme colors can be had
     const val PREF_SUGGESTION_TEXT_COLOR = CURMUDGEON_ORANGE
-    // the swipe trail: not set = the theme's (see gestureTrailColor); the orange where no theme colors can be had, and on
-    // the Dynamic colors (owner 2026-10-14: "should ship as our orange", see getColorsForCurrentTheme)
+    // the swipe trail: not set = the theme's (see gestureTrailColor); the orange only where no theme colors can be had
     const val PREF_GESTURE_TRAIL_COLOR = CURMUDGEON_ORANGE
     const val PREF_GESTURE_TRAIL_WHOLE = false
     const val PREF_GESTURE_TRAIL_WHOLE_LINGER = 1000

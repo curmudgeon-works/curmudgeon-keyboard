@@ -30,9 +30,7 @@ import helium314.keyboard.settings.dialogs.ColorPickerDialog
  * The keyboard's accent color (Appearance, advanced, under Colors; 2026-10-07): the swipe trail, the suggestion words
  * (unless theirs is picked) and the enter key, over the theme's. A row with the color in use as a swatch; the picker
  * shows each color on the preview keyboard as it's picked, Cancel puts back what was stored, Default = the theme's
- * (the key removed: not set means the theme's, so no fixed default). On the Dynamic colors the theme's is the orange
- * (owner 2026-10-14: "should ship as our orange"): the swatch and the picker's start read it from the keyboard's
- * colors, so they show the orange there too.
+ * (the key removed: not set means the theme's, so no fixed default).
  */
 @Composable
 fun AccentColorPreference(setting: Setting) {
