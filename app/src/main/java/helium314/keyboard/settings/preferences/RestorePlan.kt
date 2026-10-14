@@ -73,15 +73,21 @@ internal sealed class RestoreDecision {
 }
 
 /**
- * The restore dialog's questions for a backup's keyboards (no Compose screens here): [incoming], each backup keyboard as
- * it would come in (its custom key layouts named as the restore names them); the phone's keyboards, [enabled] and
- * [switchedOff] (owner 2026-10-11: switched-off keyboards are treated like switched-on ones); [nameOf], a keyboard's
- * name as the screens show it. For "What to merge" (review 2026-10-11 R3): [sameLayout], whether two key layouts of a
- * type are the same keys (an unsaved one compared by its keys); [backupSettings], a backup keyboard's settings with its
- * saved items named as the restore would name them, and [phoneSettings], a phone keyboard's, for the restore dialog's
- * ticks ([SavedItemsMerge.Choices]); [clashes], the backup's saved items the restore dialog asks about (owner
- * 2026-10-11: "backup wins the name if ticked"); [dictionaryClashes], the languages (tags) whose added dictionary in the
- * backup differs from the device's (owner 2026-10-12: the backup's is selected, the device's kept aside as "…_prev").
+ * The restore's plan of a backup (no Compose screens here), made once when the backup is read; the restore dialog, its
+ * questions and the restore run all read it, nothing is worked out again (owner 2026-10-12, the restore redesign: before,
+ * the dialog planned the key layouts' names over every backup keyboard and the run again over the ticked ones only, and
+ * the two could differ, M4). [incoming], each backup keyboard as it comes in (as in the backup: the backup's key layouts
+ * keep their names, owner 2026-10-12); the device's keyboards, [enabled] and [switchedOff] (owner 2026-10-11: switched-off
+ * keyboards are treated like switched-on ones); [nameOf], a keyboard's name as the screens show it. For "What to merge"
+ * (review 2026-10-11 R3): [sameLayout], whether two key layouts of a type are the same keys (one name whose device file
+ * the restore renames is not; an unsaved one compared by its keys); [backupSettings], a backup keyboard's settings with
+ * its saved items named as the restore names them, and [phoneSettings], a device keyboard's, for the dialog's rows and
+ * answers ([SavedItemsMerge.Choices]); [clashes], the saved items asked about; [dictionaryClashes], the languages (tags)
+ * whose added dictionary in the backup differs from the device's (owner 2026-10-12: the backup's is selected, the
+ * device's kept aside as "…_prev"). [items]: every saved item of the backup ([SavedItemsMerge.Plan]); [usedBy], the
+ * backup keyboards using each (by kind and key; directly, or through a Layout or theme): "Required for"; [usedByItems],
+ * the backup's Layouts and themes using each; [deviceUsers], the device keyboards using each device item (by kind and
+ * name), which take the backup's when it is replaced.
  */
 internal class RestorePlan(
     val incoming: Map<SettingsSubtype, SettingsSubtype>,
@@ -93,6 +99,10 @@ internal class RestorePlan(
     val phoneSettings: (Map<String, Any?>, SavedItemsMerge.Choices) -> Map<String, Any?> = { values, _ -> values },
     val clashes: List<SavedItemsMerge.Clash> = emptyList(),
     val dictionaryClashes: Set<String> = emptySet(),
+    val items: SavedItemsMerge.Plan = SavedItemsMerge.Plan(),
+    val usedBy: Map<Pair<SavedItemsMerge.Kind, String>, List<SettingsSubtype>> = emptyMap(),
+    val usedByItems: Map<Pair<SavedItemsMerge.Kind, String>, Set<Pair<SavedItemsMerge.Kind, String>>> = emptyMap(),
+    val deviceUsers: Map<Pair<SavedItemsMerge.Kind, String>, List<SettingsSubtype>> = emptyMap(),
 ) {
     val phone = (enabled + switchedOff).distinct()
 
@@ -103,8 +113,8 @@ internal class RestorePlan(
 
     fun isSwitchedOff(keyboard: SettingsSubtype) = enabled.none { it.sameKeyboard(keyboard) }
 
-    /** Whether the phone's [phone] is the backup's [keyboard] itself, the same id: a hint on the first question, nothing
-     *  picked by it (owner 2026-10-11). */
+    /** Whether the device's [phone] is the backup's [keyboard] itself, the same id: picked to start with on the first
+     *  question, "Suggested: same keyboard as in the backup" (owner 2026-10-12; was a hint only, owner 2026-10-11). */
     fun sameKeyboard(keyboard: SettingsSubtype, phone: SettingsSubtype) = keyboard.keyboardId != null && keyboard.keyboardId == phone.keyboardId
 
     private fun sameLanguage(a: SettingsSubtype, b: SettingsSubtype) = a.locale.toLanguageTag() == b.locale.toLanguageTag()
@@ -137,18 +147,16 @@ internal class RestorePlan(
     }
 
     /** The name box's first text. Merged: the device keyboard's current name, never a numbered one (owner 2026-10-12:
-     *  "yes, when merging the name should be current name"). Kept separate: the keyboard's name, or the next free one
-     *  when another keyboard after the restore has it ([nextFreeName], among the keyboards there are then, [others];
-     *  owner 2026-10-11: "same Name (or language in absence of name) makes it <name> 2"). */
+     *  "yes, when merging the name should be current name"). Kept both: the backup keyboard's own name, the device's of
+     *  that name becoming "… 2" in the restore (owner 2026-10-12: Keep both, "the backup's keeps its name"; this flips
+     *  owner 2026-10-11 "same Name (or language in absence of name) makes it <name> 2", which numbered the backup's).
+     *  ([chosen] and [decisions]: the other keyboards and their answers, not needed since the flip.) */
+    @Suppress("UNUSED_PARAMETER")
     fun prefillName(keyboard: SettingsSubtype, decision: RestoreDecision, chosen: Collection<SettingsSubtype>,
-                    decisions: Map<SettingsSubtype, RestoreDecision>): String {
-        val unnamed = when (decision) {
-            is RestoreDecision.Merge -> return nameOf(decision.phone)
-            is RestoreDecision.Separate -> RestoreDecision.Separate()
-            RestoreDecision.Skip -> return ""
-        }
-        val name = nameOf(result(keyboard, unnamed)!!)
-        return nextFreeName(name, others(keyboard, decision, chosen, decisions).map(nameOf).toSet())
+                    decisions: Map<SettingsSubtype, RestoreDecision>): String = when (decision) {
+        is RestoreDecision.Merge -> nameOf(decision.phone)
+        is RestoreDecision.Separate -> nameOf(result(keyboard, RestoreDecision.Separate())!!)
+        RestoreDecision.Skip -> ""
     }
 
     // (owner 2026-10-11, keyboards have unique ids: no "fully identical" block any more, a result set up like another
@@ -191,22 +199,24 @@ internal class RestorePlan(
     }
 }
 
-/** The first question for one backup keyboard: merge into which phone keyboard, or keep it apart; nothing picked to
- *  start with (owner 2026-10-11: "nothing preselected. Else we'll go into rabbit hole of what it means to be closest"). */
+/** The first question for one backup keyboard: merge into which device keyboard, or keep both. Picked to start with
+ *  (owner 2026-10-12: "the same-id candidate PRESELECTED", Next always enabled; overrides owner 2026-10-11 "nothing
+ *  preselected"): the device's with the backup keyboard's id, "Suggested: same keyboard as in the backup"; with none,
+ *  Keep both (it changes nothing of the device's keyboards but their names). */
 internal class MergeQuestion(val plan: RestorePlan, val keyboard: SettingsSubtype, val chosen: Collection<SettingsSubtype>,
                              val decisions: Map<SettingsSubtype, RestoreDecision>) {
-    /** The phone keyboards it can merge into (then "Keep as a separate keyboard"). */
+    /** The device keyboards it can merge into (then "Keep both"). */
     val options: List<SettingsSubtype> = plan.candidates(keyboard, decisions)
-    var picked: Pick? by mutableStateOf(null)
-    /** The name box of "Keep as a separate keyboard". */
+    var picked: Pick? by mutableStateOf(Pick(options.firstOrNull { plan.sameKeyboard(keyboard, it) }))
+    /** The name box of "Keep both". */
     var separateName: String by mutableStateOf(plan.prefillName(keyboard, RestoreDecision.Separate(), chosen, decisions))
 
-    /** Merge into [phone], or (null) keep it apart. */
+    /** Merge into [phone], or (null) keep both. */
     data class Pick(val phone: SettingsSubtype?)
 
     val separate get() = RestoreDecision.Separate(separateName)
     val canGoOn get() = picked != null
-    /** Whether the phone's [phone] is this backup keyboard itself (its id): "(same keyboard as in the backup)". */
+    /** Whether the device's [phone] is this backup keyboard itself (its id): "Suggested: same keyboard as in the backup". */
     fun isSameKeyboard(phone: SettingsSubtype) = plan.sameKeyboard(keyboard, phone)
 }
 
@@ -299,9 +309,175 @@ internal class RestoreDialogState(private val keyboards: List<SettingsSubtype>) 
 
     /** The keyboard rows, and the rows that only mean something keyboard by keyboard, can be changed. */
     val rowsEnabled get() = !wipe
-    /** "Prepare to do super-complex merging! Select what you want to bring in from the backup:" (owner 2026-10-12) */
+    /** The rows below the box show (owner 2026-10-12: "with the box ticked, hide every row below it"); "Tricky merging
+     *  ahead!" only with a ticked row that needs merging ([RestoreFlow.trickyAhead]). */
     val showsMergeLine get() = !wipe
     /** A keyboard row's tick: greyed out, every keyboard comes back. */
     fun ticked(keyboard: SettingsSubtype) = wipe || keyboard in selected
     fun ok() = if (wipe) Ok.ConfirmWipe else Ok.KeyboardByKeyboard
+}
+
+/**
+ * The restore dialog keyboard by keyboard (owner 2026-10-12, the restore redesign; no Compose screens here): screen 1's
+ * rows, the backup's keyboards ([top]) and its saved items by section ([sections], names as in the backup), and the
+ * questions after it ([questions]): one per ticked row that needs merging, in screen 1's order (keyboards, Layouts &
+ * popups, themes, palettes & images, fonts). Every row starts ticked; an item a ticked keyboard uses (or a ticked Layout
+ * or theme) is ticked and can't be unticked, "Required for …" ([requiredFor]), and is free again once nothing ticked uses
+ * it. The answers are kept through Back and through unticking: a row unticked drops its question, ticked again its
+ * earlier answer comes back. All of it reads [plan], made once when the backup was read.
+ */
+internal class RestoreFlow(val plan: RestorePlan, val keyboards: List<SettingsSubtype>) {
+    val top = RestoreDialogState(keyboards)
+    /** The items unticked on screen 1, by kind and backup key (a required one stays ticked whatever is here). */
+    val unticked = androidx.compose.runtime.mutableStateListOf<Pair<SavedItemsMerge.Kind, String>>()
+    /** The keyboard questions' answers, by backup keyboard. */
+    private val keyboardAnswers = HashMap<SettingsSubtype, KeyboardAnswer>()
+    /** The item questions' answers, by kind and backup key. */
+    private val itemAnswers = HashMap<Pair<SavedItemsMerge.Kind, String>, SavedItemsMerge.Answer>()
+    /** The question showing, by its place in [questions]; -1: screen 1. */
+    var index by mutableStateOf(-1)
+        private set
+    /** The keyboard question showing is on its "What to merge". */
+    var choosing by mutableStateOf(false)
+
+    /** Screen 1's sections of saved items, in order (owner 2026-10-12). */
+    class Section(val title: Int, val kinds: List<SavedItemsMerge.Kind>)
+    val sections = listOf(
+        Section(R.string.restore_section_layouts, listOf(SavedItemsMerge.Kind.LAYOUTS, SavedItemsMerge.Kind.POPUP_SETS)),
+        Section(R.string.restore_section_themes, listOf(SavedItemsMerge.Kind.THEMES)),
+        Section(R.string.restore_section_palettes, listOf(SavedItemsMerge.Kind.PALETTES, SavedItemsMerge.Kind.PICTURES)),
+        Section(R.string.restore_section_fonts, listOf(SavedItemsMerge.Kind.FONTS)),
+    )
+    fun items(section: Section): List<SavedItemsMerge.ItemPlan<*>> = section.kinds.flatMap { plan.items.of(it) }
+
+    /** The ticked keyboards, in the backup's order. */
+    fun restoring(): List<SettingsSubtype> = if (top.wipe) emptyList() else keyboards.filter { it in top.selected }
+
+    /** The ticked keyboards and Layouts or themes that use the item [key] (kind, backup key), by name: "Required for …"
+     *  (owner 2026-10-12); empty: it can be unticked. */
+    fun requiredFor(key: Pair<SavedItemsMerge.Kind, String>): List<String> {
+        if (top.wipe) return emptyList()
+        val byKeyboards = plan.usedBy[key].orEmpty().filter { it in top.selected }.map(plan.nameOf)
+        // (a Layout or theme is used by no other item: ticked by its row, or required by a keyboard)
+        val byItems = plan.usedByItems[key].orEmpty().filter { user -> user !in unticked || plan.usedBy[user].orEmpty().any { it in top.selected } }
+            .mapNotNull { plan.items.item(it.first, it.second)?.name }
+        return (byKeyboards + byItems).distinct()
+    }
+
+    /** Whether the item [key] comes in: required, or not unticked. */
+    fun ticked(key: Pair<SavedItemsMerge.Kind, String>) = key !in unticked || requiredFor(key).isNotEmpty()
+
+    fun tick(key: Pair<SavedItemsMerge.Kind, String>, on: Boolean) {
+        if (on) unticked.remove(key) else if (key !in unticked) unticked.add(key)
+    }
+
+    /** A question: a backup keyboard's, or a saved item's (kind, backup key). */
+    sealed class Question {
+        data class Keyboard(val keyboard: SettingsSubtype) : Question()
+        data class Item(val kind: SavedItemsMerge.Kind, val key: String) : Question()
+    }
+
+    /** One per ticked row that needs merging ("Merge required"), in screen 1's order. */
+    val questions: List<Question> get() = restoring().filter { plan.asks(it) }.map { Question.Keyboard(it) } +
+        sections.flatMap { items(it) }.filter { it.mergeRequired && ticked(it.kind to it.key) }.map { Question.Item(it.kind, it.key) }
+
+    /** "Tricky merging ahead!": the full restore unticked and a ticked row that needs merging (owner 2026-10-12). */
+    val trickyAhead get() = !top.wipe && questions.isNotEmpty()
+
+    val current: Question? get() = if (index < 0) null else questions.getOrNull(index)
+    val isLast get() = index >= 0 && index == questions.size - 1
+
+    /** Screen 1's Next: the first question; true when there is none (the restore runs). */
+    fun begin(): Boolean {
+        if (questions.isEmpty()) return true
+        index = 0; choosing = false
+        return false
+    }
+
+    /** A question's Next: the next one; true after the last one (its button is Restore: the restore runs). */
+    fun next(): Boolean {
+        if (index + 1 >= questions.size) return true
+        index++; choosing = false
+        return false
+    }
+
+    /** Back: from "What to merge" to its question, else to the question before (from the first: screen 1). Every answer
+     *  and every tick is kept. */
+    fun back() {
+        if (choosing) { choosing = false; return }
+        index = (index - 1).coerceAtLeast(-1)
+    }
+
+    // ---- the answers ----
+
+    private fun answer(keyboard: SettingsSubtype) = keyboardAnswers.getOrPut(keyboard) { KeyboardAnswer() }
+
+    /** The ticked keyboards' answers (one asked about and not answered yet has none). */
+    fun decisions(): Map<SettingsSubtype, RestoreDecision> =
+        restoring().filter { plan.asks(it) }.mapNotNull { kb -> keyboardAnswers[kb]?.decision?.let { kb to it } }.toMap()
+
+    /** The rows and answers of the items, as the restore takes them. */
+    fun choices(): SavedItemsMerge.Choices = SavedItemsMerge.Choices(unticked.filterTo(HashSet()) { !ticked(it) }, itemAnswers.toMap())
+
+    /** [keyboard]'s first question, as it was last answered (a device keyboard picked that another keyboard merges into
+     *  now: the start's pick again). */
+    fun mergeQuestion(keyboard: SettingsSubtype): MergeQuestion {
+        val question = MergeQuestion(plan, keyboard, restoring(), decisions() - keyboard)
+        keyboardAnswers[keyboard]?.let { a ->
+            a.pick?.takeIf { pick -> pick.phone == null || question.options.any { it.sameKeyboard(pick.phone) } }?.let { question.picked = it }
+            a.separateName?.let { question.separateName = it }
+        }
+        return question
+    }
+
+    /** [question]'s answer kept (Next and Back); Keep both is its decision, a merge's comes with "What to merge". */
+    fun keep(question: MergeQuestion) {
+        val a = answer(question.keyboard)
+        a.pick = question.picked
+        a.separateName = question.separateName
+        if (question.picked?.phone == null) a.decision = question.separate
+    }
+
+    /** "What to merge" of [question] into [target], with the ticks it had when last shown for the same differences. */
+    fun mergeChoice(question: MergeQuestion, target: SettingsSubtype, differences: List<RestoreMatch.Difference>, wordsRow: Boolean): MergeChoice {
+        val choice = MergeChoice(question, target, differences, wordsRow)
+        keyboardAnswers[question.keyboard]?.merges?.get(target)?.takeIf { it.differences == differences && it.wordsRow == wordsRow }?.let { t ->
+            choice.ticked.clear(); choice.ticked.addAll(t.ticked)
+            choice.wordsTicked = t.wordsTicked
+            choice.typed = t.typed
+        }
+        return choice
+    }
+
+    /** [choice]'s ticks kept (Next and Back); with [decide] (Next) its decision is the keyboard's. */
+    fun keep(choice: MergeChoice, decide: Boolean) {
+        val a = answer(choice.question.keyboard)
+        a.merges[choice.target] = MergeTicks(choice.differences, choice.ticked.toList(), choice.wordsRow, choice.wordsTicked, choice.typed)
+        if (decide) a.decision = choice.decision
+    }
+
+    /** The item question of [question], as it was last answered (none: the suggested answer). */
+    fun itemQuestion(question: Question.Item): ItemQuestion? =
+        plan.items.item(question.kind, question.key)?.let { ItemQuestion(it, itemAnswers[question.kind to question.key]) }
+
+    fun keep(question: ItemQuestion) { itemAnswers[question.item.kind to question.item.key] = question.picked }
+}
+
+/** A keyboard question's answer: its first question's pick and name box, its "What to merge" ticks by the device
+ *  keyboard merged into, and the decision (kept through Back, owner 2026-10-12). */
+internal class KeyboardAnswer {
+    var pick: MergeQuestion.Pick? = null
+    var separateName: String? = null
+    val merges = HashMap<SettingsSubtype, MergeTicks>()
+    var decision: RestoreDecision? = null
+}
+
+/** "What to merge"'s ticks, for the [differences] it showed. */
+internal class MergeTicks(val differences: List<RestoreMatch.Difference>, val ticked: List<RestoreMatch.Difference>,
+                          val wordsRow: Boolean, val wordsTicked: Boolean, val typed: String?)
+
+/** A saved item's question (owner 2026-10-12): Replace one of its candidates on the device, or Keep both; [answer]: as
+ *  answered before (none: the suggested one, the first candidate). */
+internal class ItemQuestion(val item: SavedItemsMerge.ItemPlan<*>, answer: SavedItemsMerge.Answer?) {
+    var picked: SavedItemsMerge.Answer by mutableStateOf(answer ?: item.suggested)
 }

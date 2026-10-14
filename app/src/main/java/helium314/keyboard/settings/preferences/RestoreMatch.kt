@@ -139,10 +139,14 @@ internal object RestoreMatch {
 
     // ---- what the dialogs say ----
 
-    /** A row of "What to merge": what it is, with the phone's and the backup's value. */
-    fun rowText(ctx: Context, difference: Difference, backup: SettingsSubtype): String = when (difference) {
+    /** A row of "What to merge": what it is, with the device's and the backup's value. A custom key layout of the backup
+     *  the device has under its name with other keys ([deviceRename]: the device's new name, or null) says so: "Keys:
+     *  Backup's My numrow; yours becomes My numrow 2" (owner 2026-10-12). */
+    fun rowText(ctx: Context, difference: Difference, backup: SettingsSubtype,
+                deviceRename: (LayoutType, String) -> String? = { _, _ -> null }): String = when (difference) {
         is Difference.Menu -> ctx.getString(R.string.restore_differs_menu, ctx.getString(helium314.keyboard.settings.screens.groupTitle(difference.group)))
         is Difference.Definition -> {
+            val clash = (difference.part as? Part.Layout)?.let { part -> difference.backup?.let { name -> deviceRename(part.type, name)?.let { name to it } } }
             val label = when (val part = difference.part) {
                 is Part.Layout -> if (part.type == LayoutType.MAIN) ctx.getString(R.string.restore_part_keys) else ctx.getString(part.type.displayNameId)
                 is Part.Extra -> when (part.key) {
@@ -156,7 +160,9 @@ internal object RestoreMatch {
             }
             val phone = valueText(ctx, difference.part, difference.phone, backup)
             val inBackup = valueText(ctx, difference.part, difference.backup, backup)
-            if (phone == inBackup) ctx.getString(R.string.restore_differs_plain, label)
+            if (clash != null) ctx.getString(R.string.restore_differs_key_layout, label,
+                LayoutUtilsCustom.getDisplayName(clash.first), LayoutUtilsCustom.getDisplayName(clash.second))
+            else if (phone == inBackup) ctx.getString(R.string.restore_differs_plain, label)
             else ctx.getString(R.string.restore_differs_row, label, phone, inBackup)
         }
     }

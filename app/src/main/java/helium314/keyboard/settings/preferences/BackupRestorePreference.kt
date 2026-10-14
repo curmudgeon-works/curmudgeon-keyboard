@@ -344,6 +344,8 @@ internal object BackupRestoreJob {
     /** What the restore just done has to say ([hiddenSettingsNote]): shown in a dialog with OK by [AfterRestoreNote],
      *  once (set on the main thread). */
     var afterNote: String? by mutableStateOf(null)
+    /** [afterNote]'s dialog's title, if it has one ("Backup restored", owner 2026-10-12). */
+    var afterTitle: String? by mutableStateOf(null)
     /** Called on the main thread with every progress shown (tests). */
     internal var onProgress: ((Progress) -> Unit)? = null
 
@@ -404,7 +406,19 @@ internal object BackupRestoreJob {
  *  top level (SettingsActivity): the restore goes back to the main screen meanwhile. */
 @Composable
 internal fun AfterRestoreNote() {
-    BackupRestoreJob.afterNote?.let { InfoDialog(it) { BackupRestoreJob.afterNote = null } }
+    val note = BackupRestoreJob.afterNote ?: return
+    val title = BackupRestoreJob.afterTitle
+    val dismiss = { BackupRestoreJob.afterNote = null; BackupRestoreJob.afterTitle = null }
+    if (title == null) InfoDialog(note, dismiss)
+    else ThreeButtonAlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text(title) },
+        content = { Text(note) },
+        scrollContent = true,
+        cancelButtonText = stringResource(android.R.string.ok),
+        onConfirmed = { },
+        confirmButtonText = null,
+    )
 }
 
 /** Non-cancellable while the job runs: it closes itself when the job ends. */
@@ -432,27 +446,41 @@ internal class PendingRestore(val file: File, val prefs: Map<String, Any?>, val 
     private val plain = entries.map { it.substringAfter("unprotected${File.separator}") }
     val hasLearnedWords = plain.any { it.startsWith(UserHistoryDictionary.NAME) || it.startsWith("blacklists${File.separator}") }
     val hasDictionaries = plain.any { it.startsWith("dicts${File.separator}") && it.endsWith(DictionaryInfoUtils.USER_DICTIONARY_SUFFIX) }
-    /** Android's personal dictionary words: brought by the Learned words row (owner 2026-10-12, the "Custom words" row
-     *  dropped: "Yes, learned words should bring both in the merge"). */
+    /** Android's personal dictionary words: brought by every keyboard by keyboard restore (owner 2026-10-12, no row). */
     val hasPersonalDictionary = PERSONAL_DICT_FILE_NAME in entries
     val hasClipboard = Database.NAME in entries
-    /** The Learned words row: learned or blacklisted words, or personal dictionary words. */
+    /** Learned or blacklisted words, or personal dictionary words. */
     val hasWords get() = hasLearnedWords || hasPersonalDictionary
 }
 
-/** What the restore dialog was told to bring: [keyboards] with or without their [settings], and the rest by data type
- *  ([personalDictionary]: Android's personal dictionary words, which the Learned words row brings too, owner 2026-10-12;
- *  [clipboard]: merged into the device's, owner 2026-10-12). */
+/** What the restore dialog was told to bring: [keyboards] with their [settings], their learned words, the
+ *  [dictionaries], Android's [personalDictionary] words and the [clipboard] (merged into the device's); the dialog always
+ *  brings all of these, no row (owner 2026-10-12; tests pick). */
 private class RestoreChoice(
     val keyboards: List<SettingsSubtype>, val settings: Boolean, val learnedWords: Boolean, val dictionaries: Boolean,
     val personalDictionary: Boolean, val clipboard: Boolean,
-    // restoring some keyboards: the clashing saved items as ticked (owner 2026-10-11: "backup wins the name if ticked";
-    // replaces "bring them in as copies")
+    // the backup's saved items: the rows unticked and the questions' answers (owner 2026-10-12: Replace or Keep both;
+    // replaces 2026-10-11's "backup wins the name if ticked")
     val names: SavedItemsMerge.Choices = SavedItemsMerge.Choices(),
-    // the chosen keyboards the dialog asked about, as answered: merged into a phone keyboard, kept separate or not
+    // the chosen keyboards the dialog asked about, as answered: merged into a device keyboard, kept both or not
     // restored (owner 2026-10-11: restore matches by language and asks); the others come in as new
     val decisions: Map<SettingsSubtype, RestoreDecision> = emptyMap(),
 )
+
+/** What a keyboard by keyboard restore did: each restored backup keyboard as it is on the device now ([onDevice]),
+ *  those whose settings wait behind the common ones ([hidden], R7), and by name what was merged into the device's
+ *  ([merged]: keyboards, and saved items replaced) and what was added ([added]). */
+internal class Restored(val onDevice: Map<SettingsSubtype, SettingsSubtype>, val hidden: List<SettingsSubtype>,
+                        val merged: List<String>, val added: List<String>)
+
+/** The "Backup restored" dialog's text after a keyboard by keyboard restore (owner 2026-10-12): "Merged: …", "Added: …",
+ *  the settings and dictionaries line, then the common settings' note when it applies ([hiddenSettingsNote]). */
+internal fun restoreSummary(ctx: Context, restored: Restored): String = listOfNotNull(
+    restored.merged.takeIf { it.isNotEmpty() }?.let { ctx.getString(R.string.restore_summary_merged, it.joinToString(", ")) },
+    restored.added.takeIf { it.isNotEmpty() }?.let { ctx.getString(R.string.restore_summary_added, it.joinToString(", ")) },
+    ctx.getString(R.string.restore_summary_settings),
+    hiddenSettingsNote(ctx, restored.hidden),
+).joinToString("\n")
 
 /** A backup picked for restore, and the cache file it's copied to: its own per pick, so a read cancelled and still
  *  running never meets the next pick's (review 2026-10-11 R5). */
@@ -525,50 +553,34 @@ private fun ReadingDialog(onCancel: () -> Unit) = ThreeButtonAlertDialog(
 )
 
 /**
- * [plan]: each backup keyboard as it would come in, its custom key layouts named as they would be (B4, R6), and the
- * questions: a keyboard whose language the phone has (switched-off keyboards too) is asked about, merged into one of
- * those or kept separate (owner 2026-10-11: "only check if language is same"); the others are new. Read off the main
- * thread ([readRestoreDialog], R5).
+ * The restore dialog of [pending] (owner 2026-10-12, the restore redesign): screen 1 has "Full restore (delete app data)"
+ * on top as before (ticked: the "Delete and restore" question, then the full restore). Unticked: one row per backup
+ * keyboard and saved item by section (Keyboards · Layouts & popups · Themes · Palettes & images · Fonts), names as in the
+ * backup, every row ticked to start with ([RestoreFlow]); then one question per ticked row that needs merging, Back /
+ * Next, the last one's button Restore. Settings and dictionaries, the clipboard history and Android's personal
+ * dictionary words come with every restore, no row (the "Restore their", "And merge" and "For other clashes" rows of
+ * before are gone). Everything reads [plan], made once when the backup was read off the main thread
+ * ([readRestoreDialog], R5).
  */
 @Composable
 private fun RestoreChoiceDialog(pending: PendingRestore, plan: RestorePlan, onDismiss: () -> Unit, onError: (String) -> Unit) {
     val ctx = LocalContext.current
-    // on top: "Delete app data and restore from backup", checked to start with (owner 2026-10-11); unchecked, every
-    // keyboard is ticked
-    val top = remember(pending) { RestoreDialogState(pending.keyboards) }
-    val selected = top.selected
-    // after OK: the chosen keyboards still to be asked about, the phone keyboard picked for the first, and the answers
-    var asking: List<SettingsSubtype>? by remember { mutableStateOf(null) }
-    var choosing: SettingsSubtype? by remember { mutableStateOf(null) }
-    val answers = remember { mutableMapOf<SettingsSubtype, RestoreDecision>() }
-    // the clashing saved items unticked (all ticked to start with: the user is restoring)
-    val unticked = remember(pending) { mutableStateListOf<Pair<SavedItemsMerge.Kind, String>>() }
-    val names = SavedItemsMerge.Choices(unticked.toSet())
-    var settings by rememberSaveable { mutableStateOf(true) }
-    var learnedWords by rememberSaveable { mutableStateOf(true) }
-    var dictionaries by rememberSaveable { mutableStateOf(true) }
-    var clipboard by rememberSaveable { mutableStateOf(false) }
-    val withKeyboards = selected.isNotEmpty() // the keyboards' rows mean nothing without a keyboard
+    val flow = remember(pending) { RestoreFlow(plan, pending.keyboards) }
+    val top = flow.top
     // once the restore started, the job deletes the file when done with it (2026-10-10: it runs after the dialog closed)
     var started by remember { mutableStateOf(false) }
     fun close() { if (!started) pending.file.delete(); onDismiss() }
     fun start() {
-        // (the Learned words row brings Android's personal dictionary words too, owner 2026-10-12)
-        val choice = RestoreChoice(selected.toList(), settings, learnedWords && pending.hasLearnedWords,
-            dictionaries && pending.hasDictionaries, learnedWords && pending.hasPersonalDictionary, clipboard && pending.hasClipboard, names,
-            answers.filterKeys { it in selected })
-        var hidden: List<SettingsSubtype> = emptyList()
-        started = runRestore(ctx, onError, R.string.backup_restored, restoreSteps(pending), note = { hiddenSettingsNote(ctx, hidden) }) {
-            try { hidden = restoreChosen(ctx, pending, choice) } finally { pending.file.delete() }
+        // (owner 2026-10-12: settings and dictionaries, the clipboard history and Android's personal dictionary words
+        // always, no row; the learned words come with each keyboard)
+        val choice = RestoreChoice(flow.restoring(), settings = true, learnedWords = pending.hasLearnedWords,
+            dictionaries = pending.hasDictionaries, personalDictionary = pending.hasPersonalDictionary, clipboard = pending.hasClipboard,
+            names = flow.choices(), decisions = flow.decisions())
+        var restored: Restored? = null
+        started = runRestore(ctx, onError, R.string.backup_restored, restoreSteps(pending), noteTitle = R.string.backup_restored,
+            note = { restored?.let { restoreSummary(ctx, it) } }) {
+            try { restored = restoreChosen(ctx, pending, plan, choice) } finally { pending.file.delete() }
         }
-    }
-    // the next keyboard to ask about, or the restore when all are answered
-    fun answered(keyboard: SettingsSubtype, decision: RestoreDecision) {
-        answers[keyboard] = decision
-        choosing = null
-        val rest = asking.orEmpty().drop(1)
-        asking = rest
-        if (rest.isEmpty()) { start(); close() }
     }
     // the full restore, the top checkbox checked (owner 2026-10-11: "User should be given the option to do a full restore
     // which wipes, or partial keyboard by keyboard"): asked once before it wipes, no questions per keyboard
@@ -589,96 +601,65 @@ private fun RestoreChoiceDialog(pending: PendingRestore, plan: RestorePlan, onDi
         )
         return
     }
-    val asked = asking?.firstOrNull()
-    if (asked != null) {
-        // (each keyboard's questions their own state; "what to merge" goes back to its first question)
-        androidx.compose.runtime.key(asked) {
-            val question = remember { MergeQuestion(plan, asked, selected.toList(), answers.toMap()) }
-            val target = choosing
-            if (target == null) RestoreMergeDialog(question,
-                onCancel = { asking = null; answers.clear() }, // back to the restore dialog, nothing restored (as before)
-                onNext = { pick -> if (pick.phone == null) answered(asked, question.separate) else choosing = pick.phone })
-            else androidx.compose.runtime.key(target) {
-                // worked out off the main thread, again when a tick it depends on changed (R5: it reads the backup's
-                // fonts and pictures); "Reading backup…" meanwhile, its Cancel back to the first question
-                val found by produceState<List<RestoreMatch.Difference>?>(null, settings, names) {
-                    val withSettings = settings; val ticks = names
-                    value = try {
-                        withContext(Dispatchers.IO) { restoreDifferences(ctx, plan, asked, target, withSettings, ticks) }
-                    } catch (e: CancellationException) { throw e } catch (t: Throwable) {
-                        Log.w("AdvancedScreen", "error reading backup", t)
-                        close(); onError("r" + t.message); null
-                    }
-                }
-                found?.let { differences ->
-                    RestoreChooseDialog(question, target, differences,
-                        wordsRow = learnedWords && pending.hasLearnedWords,
-                        onCancel = { choosing = null }, // back to the first question
-                        onConfirmed = { answered(asked, it) })
-                } ?: ReadingDialog(onCancel = { choosing = null })
+    when (val question = flow.current) {
+        is RestoreFlow.Question.Keyboard -> {
+            // (each question its own state; Back and Next keep the answers in [flow])
+            androidx.compose.runtime.key(question, flow.index) {
+                KeyboardQuestion(flow, question.keyboard, wordsRow = pending.hasLearnedWords, onRestore = { start(); close() },
+                    onError = { close(); onError(it) })
             }
+            return
         }
-        return
+        is RestoreFlow.Question.Item -> {
+            androidx.compose.runtime.key(question, flow.index) {
+                val asked = remember { flow.itemQuestion(question) }
+                if (asked != null) ItemQuestionDialog(flow, asked, onRestore = { start(); close() })
+            }
+            return
+        }
+        null -> { }
     }
     ThreeButtonAlertDialog(
-        // (OK closes the dialog after onConfirmed: not while the questions come)
-        // (nor while the wipe is asked about)
-        onDismissRequest = { if (asking == null && !everything) close() },
+        // (its button closes the dialog after onConfirmed: not while the questions come, nor while the wipe is asked about)
+        onDismissRequest = { if (flow.index < 0 && !everything) close() },
         title = { Text(stringResource(R.string.button_restore)) },
         content = {
             Column {
                 // (a backup without a keyboard list: checked, it can only be restored whole)
                 CheckRow(stringResource(R.string.restore_delete_app_data), top.wipe, top.canPickKeyboards) { top.check(it) }
                 // checked: nothing below it, a full restore has nothing to choose (owner 2026-10-12, "with the box
-                // ticked, hide every row below it. <- ok"; the greyed rows of before were not the owner's)
-                val wipe = top.wipe
-                val rows = top.rowsEnabled
-                // unchecked: the line under it (owner 2026-10-12, replaces "App data won't be deleted…")
-                if (top.showsMergeLine)
-                    Text(stringResource(R.string.restore_merge_note), style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
-                // (the groups' headings in capitals, as the owner wrote them: KEYBOARDS, RESTORE THEIR, AND MERGE, FOR
-                // OTHER CLASHES)
-                @Composable fun Heading(text: Int) = Text(stringResource(text).uppercase(), style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.padding(top = 12.dp, bottom = 2.dp))
-                if (!wipe) {
+                // ticked, hide every row below it. <- ok")
+                if (!top.wipe) {
+                    // (owner 2026-10-12: only with a ticked row that needs merging; replaces "Prepare to do super-complex
+                    // merging! …")
+                    if (flow.trickyAhead)
+                        Text(stringResource(R.string.restore_tricky), style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+                    // (the sections' headings in capitals, as the owner wrote the earlier ones)
+                    @Composable fun Heading(text: Int) = Text(stringResource(text).uppercase(), style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(top = 12.dp, bottom = 2.dp))
+                    val mergeRequired = stringResource(R.string.restore_merge_required)
                     if (pending.keyboards.isNotEmpty()) Heading(R.string.restore_keyboards)
+                    // (names as in the backup: no "(new)" any more, owner 2026-10-12)
                     pending.keyboards.forEach { keyboard ->
-                        val name = keyboardName(keyboard, ctx).let { if (plan.asks(keyboard)) it else stringResource(R.string.restore_keyboard_new, it) }
-                        CheckRow(name, top.ticked(keyboard), rows) { if (it) selected.add(keyboard) else selected.remove(keyboard) }
+                        CheckRow(keyboardName(keyboard, ctx), top.ticked(keyboard), subtext = if (plan.asks(keyboard)) mergeRequired else null) {
+                            if (it) top.selected.add(keyboard) else top.selected.remove(keyboard)
+                        }
                     }
-                    // RESTORE THEIR: Settings · Dictionaries (owner 2026-10-12, v3)
-                    Heading(R.string.restore_their)
-                    CheckRow(stringResource(R.string.restore_settings), wipe || settings, rows && withKeyboards) { settings = it }
-                    if (pending.hasDictionaries) {
-                        // the restored keyboards' languages whose dictionary differs from the device's: the backup's is
-                        // selected, the device's kept aside as "…_prev" (owner 2026-10-12)
-                        val clashing = if (wipe) emptyList() else plan.dictionaryClashLanguages(selected).map { tag ->
-                            Locale.forLanguageTag(tag).localizedDisplayName(ctx.resources) }
-                        CheckRow(stringResource(R.string.restore_dictionaries), wipe || dictionaries, rows && withKeyboards,
-                            subtext = if (clashing.isEmpty()) null else stringResource(R.string.restore_dictionaries_clash, clashing.joinToString(", "))
-                        ) { dictionaries = it }
-                    }
-                    // AND MERGE: Learned words (with Android's personal dictionary words) · Clipboard history
-                    if (pending.hasWords || pending.hasClipboard) {
-                        Heading(R.string.restore_and_merge)
-                        if (pending.hasWords)
-                            CheckRow(stringResource(R.string.restore_learned_words), wipe || learnedWords, rows && withKeyboards) { learnedWords = it }
-                        if (pending.hasClipboard) CheckRow(stringResource(R.string.restore_clipboard), wipe || clipboard, rows) { clipboard = it }
-                    }
-                    // FOR OTHER CLASHES: the backup's saved items clashing with the device's, by kind, each ticked to start
-                    // with (owner 2026-10-11: "backup wins the name if ticked"; every keyboard too: a keyboard restore never
-                    // wipes). The other backup items, new saved items and dictionaries of other languages, come in silently
-                    // (owner 2026-10-12: "All silent")
-                    if (!wipe && settings && withKeyboards && plan.clashes.isNotEmpty()) {
-                        Heading(R.string.restore_clashes)
-                        Text(stringResource(R.string.restore_clashes_note), style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 4.dp))
-                        plan.clashes.groupBy { it.kind }.toSortedMap().forEach { (kind, clashes) ->
-                            Text(stringResource(clashKindTitle(kind)), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
-                            clashes.forEach { clash ->
-                                CheckRow(clashRowText(ctx, clash), clash.key !in unticked) { if (it) unticked.remove(clash.key) else unticked.add(clash.key) }
-                            }
+                    for (section in flow.sections) {
+                        val items = flow.items(section)
+                        if (items.isEmpty()) continue
+                        Heading(section.title)
+                        for (item in items) {
+                            val key = item.kind to item.key
+                            // used by a ticked keyboard: ticked and greyed out, "Required for English (US)"; both
+                            // subtexts can show together (owner 2026-10-12)
+                            val required = flow.requiredFor(key)
+                            val subtext = listOfNotNull(
+                                if (required.isEmpty()) null else stringResource(R.string.restore_required_for, required.joinToString(", ")),
+                                if (item.mergeRequired) mergeRequired else null,
+                            ).joinToString(" · ").ifEmpty { null }
+                            CheckRow(item.name, flow.ticked(key), required.isEmpty(), subtext) { flow.tick(key, it) }
                         }
                     }
                 }
@@ -686,36 +667,18 @@ private fun RestoreChoiceDialog(pending: PendingRestore, plan: RestorePlan, onDi
         },
         scrollContent = true,
         confirmFirst = true,
-        checkOk = { top.wipe || withKeyboards || (clipboard && pending.hasClipboard) },
+        confirmButtonText = stringResource(when {
+            top.wipe -> android.R.string.ok
+            flow.questions.isEmpty() -> R.string.button_restore
+            else -> R.string.restore_next
+        }),
         onConfirmed = {
             // checked: the wipe is asked about first (never in one tap)
             if (top.ok() == RestoreDialogState.Ok.ConfirmWipe) { everything = true; return@ThreeButtonAlertDialog }
-            // the chosen keyboards whose language the phone has are asked about first, one by one
-            answers.clear()
-            val ask = selected.filter { plan.asks(it) }
-            if (ask.isEmpty()) start() else asking = ask
+            // the questions, one by one; none: the restore runs
+            if (flow.begin()) start()
         },
     )
-}
-
-/** A kind's heading in the restore dialog's clashes. */
-private fun clashKindTitle(kind: SavedItemsMerge.Kind) = when (kind) {
-    SavedItemsMerge.Kind.PALETTES -> R.string.saving_kind_palettes
-    SavedItemsMerge.Kind.THEMES -> R.string.saving_kind_themes
-    SavedItemsMerge.Kind.LAYOUTS -> R.string.saving_kind_layouts
-    SavedItemsMerge.Kind.POPUP_SETS -> R.string.saving_kind_popups
-}
-
-/** A clash's row: what ticked does (owner 2026-10-11: "backup wins the name if ticked"), a Layout's key layouts after it. */
-internal fun clashRowText(ctx: Context, clash: SavedItemsMerge.Clash): String {
-    val files = clash.files.map { ctx.getString(R.string.restore_clash_key_layout, LayoutUtilsCustom.getDisplayName(it.name),
-        LayoutUtilsCustom.getDisplayName(it.phoneNewName)) }
-    val head = when {
-        clash.phoneName == null -> clash.backupName
-        clash.sameName -> ctx.getString(R.string.restore_clash_same_name, clash.backupName, clash.phoneNewName)
-        else -> ctx.getString(R.string.restore_clash_same_content, clash.phoneName, clash.backupName)
-    }
-    return if (files.isEmpty()) head else head + (if (clash.phoneName == null) ": " else "; ") + files.joinToString("; ")
 }
 
 /** A row with a checkbox, and [subtext] under its text if any. */
@@ -731,12 +694,17 @@ private fun CheckRow(text: String, checked: Boolean, enabled: Boolean = true, su
         }
     }
 
+/** A row with a radio button, and [subtext] under its text if any. */
 @Composable
-private fun RadioRow(text: String, selected: Boolean, onClick: () -> Unit) =
+private fun RadioRow(text: String, selected: Boolean, subtext: String? = null, onClick: () -> Unit) =
     Row(verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 2.dp)) {
         RadioButton(selected = selected, onClick = onClick)
-        Text(text)
+        if (subtext == null) Text(text)
+        else Column {
+            Text(text)
+            Text(subtext, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 
 /** The name box of a merged or separate keyboard, and the line saying it would be the same as another keyboard. */
@@ -747,62 +715,114 @@ private fun NameBox(name: String, onChange: (String) -> Unit) {
         modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
 }
 
-/** A phone keyboard as the questions name it: "<name> (switched off)" for one switched off on the Languages screen. */
+/** A device keyboard as the questions name it: "<name> (switched off)" for one switched off on the Languages screen. */
 private fun phoneKeyboardLabel(ctx: Context, plan: RestorePlan, keyboard: SettingsSubtype) =
     if (plan.isSwitchedOff(keyboard)) ctx.getString(R.string.keyboard_switched_off, keyboardName(keyboard, ctx)) else keyboardName(keyboard, ctx)
 
+/** A question's title, with "n of N" small above it (owner 2026-10-12). */
+@Composable
+private fun QuestionTitle(flow: RestoreFlow, title: String) = Column {
+    Text(stringResource(R.string.restore_question_count, flow.index + 1, flow.questions.size), style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(title)
+}
+
 /**
- * The first question for a chosen backup keyboard whose language the phone has: merge it into one of those keyboards (one
- * only), or keep it as a separate keyboard, named in a box (owner 2026-10-11). Nothing picked: Next waits for a pick.
- * Cancel goes back to the restore dialog, nothing restored (as before).
+ * A backup keyboard's question (owner 2026-10-12: today's merge question): merge into a device keyboard of its language
+ * or Keep both ([RestoreMergeDialog]); merging goes on to "What to merge into …" ([RestoreChooseDialog]), worked out off
+ * the main thread (R5: it reads the backup's fonts and pictures), "Reading backup…" meanwhile. Back keeps the answers
+ * and the ticks ([RestoreFlow.keep]).
  */
 @Composable
-private fun RestoreMergeDialog(question: MergeQuestion, onCancel: () -> Unit, onNext: (MergeQuestion.Pick) -> Unit) {
+private fun KeyboardQuestion(flow: RestoreFlow, keyboard: SettingsSubtype, wordsRow: Boolean, onRestore: () -> Unit, onError: (String) -> Unit) {
     val ctx = LocalContext.current
-    // (Next closes the dialog after onConfirmed: the answer moved on already)
-    var answered by remember { mutableStateOf(false) }
+    val question = remember { flow.mergeQuestion(keyboard) }
+    val target = question.picked?.phone
+    if (!flow.choosing || target == null) {
+        RestoreMergeDialog(flow, question,
+            onBack = { flow.keep(question); flow.back() },
+            onNext = {
+                flow.keep(question)
+                if (question.picked?.phone != null) flow.choosing = true
+                else if (flow.next()) onRestore()
+            })
+        return
+    }
+    androidx.compose.runtime.key(target) {
+        val names = remember { flow.choices() }
+        val found by produceState<List<RestoreMatch.Difference>?>(null) {
+            value = try {
+                withContext(Dispatchers.IO) { restoreDifferences(ctx, flow.plan, keyboard, target, true, names) }
+            } catch (e: CancellationException) { throw e } catch (t: Throwable) {
+                Log.w("AdvancedScreen", "error reading backup", t)
+                onError("r" + t.message); null
+            }
+        }
+        found?.let { differences ->
+            val choice = remember(differences) { flow.mergeChoice(question, target, differences, wordsRow) }
+            RestoreChooseDialog(flow, question, choice,
+                onBack = { flow.keep(choice, decide = false); flow.back() },
+                onNext = { flow.keep(choice, decide = true); if (flow.next()) onRestore() })
+        } ?: ReadingDialog(onCancel = { flow.back() })
+    }
+}
+
+/**
+ * The first question for a backup keyboard whose language the device has: merge it into one of those keyboards (one
+ * only), or Keep both, named in a box (owner 2026-10-11). The device's with the backup keyboard's id is picked to start
+ * with, "Suggested: same keyboard as in the backup"; none: Keep both (owner 2026-10-12, so Next is always enabled).
+ */
+@Composable
+private fun RestoreMergeDialog(flow: RestoreFlow, question: MergeQuestion, onBack: () -> Unit, onNext: () -> Unit) {
+    val ctx = LocalContext.current
+    // (its buttons close the dialog after their action: the answer moved on already)
+    var moved by remember { mutableStateOf(false) }
+    fun back() { if (!moved) { moved = true; onBack() } }
+    val separate = question.picked.let { it != null && it.phone == null }
     ThreeButtonAlertDialog(
         keepKeyboard = false, // (a text field)
-        onDismissRequest = { if (!answered) onCancel() },
-        title = { Text(stringResource(R.string.restore_merge_title, keyboardName(question.keyboard, ctx))) },
+        onDismissRequest = { back() },
+        title = { QuestionTitle(flow, stringResource(R.string.restore_merge_title, keyboardName(question.keyboard, ctx))) },
         content = {
             Column {
                 Text(stringResource(R.string.restore_merge_message), modifier = Modifier.padding(bottom = 8.dp))
                 question.options.forEach { phone ->
-                    // (the same id: a hint only, nothing preselected; owner 2026-10-11)
-                    val label = phoneKeyboardLabel(ctx, question.plan, phone).let {
-                        if (question.isSameKeyboard(phone)) it + " " + stringResource(R.string.restore_same_keyboard_hint) else it }
-                    RadioRow(label, question.picked?.phone == phone) { question.picked = MergeQuestion.Pick(phone) }
+                    RadioRow(phoneKeyboardLabel(ctx, question.plan, phone), question.picked?.phone == phone,
+                        subtext = if (question.isSameKeyboard(phone)) stringResource(R.string.restore_same_keyboard_suggested) else null
+                    ) { question.picked = MergeQuestion.Pick(phone) }
                 }
-                val separate = question.picked.let { it != null && it.phone == null }
-                RadioRow(stringResource(R.string.restore_keep_separate), separate) { question.picked = MergeQuestion.Pick(null) }
+                RadioRow(stringResource(R.string.restore_keep_both), separate) { question.picked = MergeQuestion.Pick(null) }
                 if (separate) NameBox(question.separateName) { question.separateName = it }
             }
         },
         scrollContent = true,
+        cancelButtonText = stringResource(R.string.restore_back),
+        onCancel = { back() },
         checkOk = { question.canGoOn },
-        confirmButtonText = stringResource(R.string.restore_next),
-        onConfirmed = { answered = true; onNext(question.picked!!) },
+        confirmButtonText = stringResource(if (flow.isLast && separate) R.string.button_restore else R.string.restore_next),
+        onConfirmed = { moved = true; onNext() },
     )
 }
 
 /**
- * What to merge of the backup's keyboard into the phone's [target]: what differs ([differences]), each unticked (a ticked
- * one takes the backup's, an unticked one keeps the phone's), with [wordsRow] its learned and blacklisted words, ticked,
- * and the name box ([MergeChoice]). Nothing ticked: "Don't restore"; nothing differing and no words: Done.
+ * What to merge of the backup's keyboard into the device's [MergeChoice.target]: what differs, each unticked (a ticked
+ * one takes the backup's, an unticked one keeps the device's), its learned and blacklisted words row, ticked, and the
+ * name box ([MergeChoice]). A key layout of the backup the device has under its name with other keys says what the
+ * device's becomes ("Backup's My numrow; yours becomes My numrow 2", owner 2026-10-12). Nothing ticked: the keyboard isn't
+ * restored. Back / Next, the last question's Restore.
  */
 @Composable
-private fun RestoreChooseDialog(question: MergeQuestion, target: SettingsSubtype, differences: List<RestoreMatch.Difference>,
-                                wordsRow: Boolean, onCancel: () -> Unit, onConfirmed: (RestoreDecision) -> Unit) {
+private fun RestoreChooseDialog(flow: RestoreFlow, question: MergeQuestion, choice: MergeChoice, onBack: () -> Unit, onNext: () -> Unit) {
     val ctx = LocalContext.current
-    val choice = remember(differences) { MergeChoice(question, target, differences, wordsRow) }
-    var confirmed by remember { mutableStateOf(false) }
+    var moved by remember { mutableStateOf(false) }
+    fun back() { if (!moved) { moved = true; onBack() } }
     val decision = choice.decision
+    val target = choice.target
+    val differences = choice.differences
     ThreeButtonAlertDialog(
         keepKeyboard = false, // (a text field)
-        // (OK closes the dialog after onConfirmed: the answer moved on already)
-        onDismissRequest = { if (!confirmed) onCancel() },
-        title = { Text(stringResource(R.string.restore_differs_choose, phoneKeyboardLabel(ctx, question.plan, target))) },
+        onDismissRequest = { back() },
+        title = { QuestionTitle(flow, stringResource(R.string.restore_differs_choose, phoneKeyboardLabel(ctx, question.plan, target))) },
         content = {
             Column {
                 if (choice.nothingDiffers) {
@@ -816,23 +836,99 @@ private fun RestoreChooseDialog(question: MergeQuestion, target: SettingsSubtype
                 choice.commonNote(ctx)?.let { Text(it, style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp)) }
                 differences.forEach { difference ->
-                    CheckRow(RestoreMatch.rowText(ctx, difference, question.keyboard), difference in choice.ticked) {
+                    CheckRow(RestoreMatch.rowText(ctx, difference, question.keyboard, question.plan.items.keyLayouts::deviceRename),
+                        difference in choice.ticked) {
                         if (it) choice.ticked.add(difference) else choice.ticked.remove(difference)
                     }
                 }
-                if (wordsRow) CheckRow(stringResource(R.string.restore_learned_row), choice.wordsTicked) { choice.wordsTicked = it }
+                if (choice.wordsRow) CheckRow(stringResource(R.string.restore_learned_row), choice.wordsTicked) { choice.wordsTicked = it }
                 if (decision is RestoreDecision.Skip)
                     Text(stringResource(R.string.restore_nothing_ticked, keyboardName(question.keyboard, ctx)), modifier = Modifier.padding(top = 8.dp))
                 else NameBox(choice.name) { choice.typed = it }
             }
         },
         scrollContent = true,
-        confirmButtonText = stringResource(when {
-            choice.nothingDiffers -> R.string.restore_done
-            decision is RestoreDecision.Skip -> R.string.restore_dont_restore
-            else -> android.R.string.ok
-        }),
-        onConfirmed = { confirmed = true; onConfirmed(choice.decision) },
+        cancelButtonText = stringResource(R.string.restore_back),
+        onCancel = { back() },
+        confirmButtonText = stringResource(if (flow.isLast) R.string.button_restore else R.string.restore_next),
+        onConfirmed = { moved = true; onNext() },
+    )
+}
+
+/** The noun a saved item's question names its kind with. */
+private fun itemNoun(kind: SavedItemsMerge.Kind) = when (kind) {
+    SavedItemsMerge.Kind.PALETTES -> R.string.restore_noun_palette
+    SavedItemsMerge.Kind.THEMES -> R.string.restore_noun_theme
+    SavedItemsMerge.Kind.LAYOUTS -> R.string.restore_noun_layout
+    SavedItemsMerge.Kind.POPUP_SETS -> R.string.restore_noun_popup_set
+    SavedItemsMerge.Kind.FONTS -> R.string.restore_noun_font
+    SavedItemsMerge.Kind.PICTURES -> R.string.restore_noun_image
+}
+
+/** A candidate's line in a saved item's question (owner 2026-10-12: "Suggested: same name, other colors. Used by your
+ *  English (US), French: they take the backup's look"; "Same colors, other name: renamed Sunset"). [suggested]: the
+ *  first candidate, picked to start with. */
+internal fun restoreCandidateText(ctx: Context, plan: RestorePlan, item: SavedItemsMerge.ItemPlan<*>, name: String, suggested: Boolean): String {
+    val kind = item.kind
+    val colors = kind == SavedItemsMerge.Kind.THEMES || kind == SavedItemsMerge.Kind.PALETTES
+    val files = kind == SavedItemsMerge.Kind.FONTS || kind == SavedItemsMerge.Kind.PICTURES
+    val sameName = name == item.holder
+    val what = if (sameName) ctx.getString(when {
+        colors -> R.string.restore_item_same_name_colors
+        files -> R.string.restore_item_same_name_file
+        else -> R.string.restore_item_same_name_settings
+    }) else ctx.getString(when {
+        colors -> R.string.restore_item_same_content_colors
+        files -> R.string.restore_item_same_content_file
+        else -> R.string.restore_item_same_content_settings
+    }, item.name)
+    val head = if (suggested) ctx.getString(R.string.restore_item_suggested, what)
+        else what.replaceFirstChar { it.titlecase(Locale.getDefault()) }
+    // (the same name: its users take the backup's; one renamed keeps its content, its users their look)
+    val users = if (!sameName) emptyList() else plan.deviceUsers[kind to name].orEmpty().map(plan.nameOf)
+    if (users.isEmpty()) return head
+    val look = kind != SavedItemsMerge.Kind.LAYOUTS && kind != SavedItemsMerge.Kind.POPUP_SETS
+    return ctx.getString(R.string.restore_item_used_by, head,
+        ctx.getString(if (look) R.string.restore_item_used_by_look else R.string.restore_item_used_by_settings, users.joinToString(", ")))
+}
+
+/**
+ * A saved item's question (owner 2026-10-12): "Restoring theme Sunset", "This device has a theme like it. Replace it
+ * with the backup's, or keep both?", its candidates on the device (the same name first, picked to start with) and Keep
+ * both (the backup's keeps its name; the device's becomes "Sunset 2", the keyboards using it keeping their look). The
+ * item acts as a whole: no per-part choice. Back / Next, the last question's Restore.
+ */
+@Composable
+private fun ItemQuestionDialog(flow: RestoreFlow, question: ItemQuestion, onRestore: () -> Unit) {
+    val ctx = LocalContext.current
+    val item = question.item
+    var moved by remember { mutableStateOf(false) }
+    fun back() { if (!moved) { moved = true; flow.keep(question); flow.back() } }
+    val noun = stringResource(itemNoun(item.kind))
+    ThreeButtonAlertDialog(
+        onDismissRequest = { back() },
+        title = { QuestionTitle(flow, stringResource(R.string.restore_item_title, noun, item.name)) },
+        content = {
+            Column {
+                Text(stringResource(R.string.restore_item_message, noun), modifier = Modifier.padding(bottom = 8.dp))
+                item.candidates.forEachIndexed { i, name ->
+                    val answer = SavedItemsMerge.Answer.Replace(name)
+                    RadioRow(name, question.picked == answer, subtext = restoreCandidateText(ctx, flow.plan, item, name, suggested = i == 0)) {
+                        question.picked = answer
+                    }
+                }
+                val keepBoth = item.keepBothName?.let { stringResource(R.string.restore_item_keep_both_renamed, item.name, it) }
+                    ?: stringResource(R.string.restore_item_keep_both_added, item.name)
+                RadioRow(stringResource(R.string.restore_keep_both), question.picked == SavedItemsMerge.Answer.KeepBoth, subtext = keepBoth) {
+                    question.picked = SavedItemsMerge.Answer.KeepBoth
+                }
+            }
+        },
+        scrollContent = true,
+        cancelButtonText = stringResource(R.string.restore_back),
+        onCancel = { back() },
+        confirmButtonText = stringResource(if (flow.isLast) R.string.button_restore else R.string.restore_next),
+        onConfirmed = { moved = true; flow.keep(question); if (flow.next()) onRestore() },
     )
 }
 
@@ -862,7 +958,7 @@ private fun restoreSteps(pending: PendingRestore) = pending.entries.size + 1
  * restore). False when a backup or restore is running already. [onError] is called on the main thread.
  */
 internal fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: Int, steps: Int = 0, note: () -> String? = { null },
-                        fullRestore: Boolean = false, work: () -> Unit): Boolean {
+                        fullRestore: Boolean = false, noteTitle: Int? = null, work: () -> Unit): Boolean {
     if (!BackupRestoreJob.start(R.string.restore_running, steps + 1)) return false
     val app = ctx.applicationContext
     ExecutorUtils.getBackgroundExecutor(ExecutorUtils.KEYBOARD).execute {
@@ -912,7 +1008,8 @@ internal fun runRestore(ctx: Context, onError: (String) -> Unit, doneMessage: In
             // the done message)
             else {
                 val said = note()
-                if (said != null) BackupRestoreJob.afterNote = said
+                // ([noteTitle]: the keyboard by keyboard restore's summary, "Backup restored", owner 2026-10-12)
+                if (said != null) { BackupRestoreJob.afterTitle = noteTitle?.let { app.getString(it) }; BackupRestoreJob.afterNote = said }
                 else Toast.makeText(app, app.getString(doneMessage), Toast.LENGTH_LONG).show()
             }
         }
@@ -1116,45 +1213,48 @@ private fun restoreProtectedPrefs(ctx: Context, lines: List<String>) {
 internal fun restoreEverythingFrom(ctx: Context, file: File) = restoreEverything(ctx, file)
 
 /** Restores from the backup [file] as the restore dialog does, the learned words through [io] (tests). [personal]: the
- *  personal dictionary words, which the Learned words row brings (owner 2026-10-12). */
+ *  personal dictionary words; [names]: the saved items' rows and answers. */
 internal fun restoreChosenFrom(ctx: Context, file: File, keyboards: List<SettingsSubtype>, settings: Boolean, learnedWords: Boolean,
                                io: LearnedStoreIo, decisions: Map<SettingsSubtype, RestoreDecision> = emptyMap(),
-                               dictionaries: Boolean = false, clipboard: Boolean = false, personal: Boolean = false) =
-    restoreChosen(ctx, readBackup(file), RestoreChoice(keyboards, settings, learnedWords, dictionaries, personal, clipboard, decisions = decisions), io)
+                               dictionaries: Boolean = false, clipboard: Boolean = false, personal: Boolean = false,
+                               names: SavedItemsMerge.Choices = SavedItemsMerge.Choices()): Restored {
+    val pending = readBackup(file)
+    return restoreChosen(ctx, pending, restorePlan(ctx, pending),
+        RestoreChoice(keyboards, settings, learnedWords, dictionaries, personal, clipboard, names, decisions), io)
+}
 
 /**
- * Brings what [choice] asks for out of the backup and leaves the rest of the phone as it is: the keyboards keyboard by
- * keyboard, all of them too ([restoreKeyboards]; only the full restore wipes, [restoreEverything]). Learned words and
- * added dictionaries follow the chosen keyboards' languages ([RestoreDictionaries]); the added dictionaries of languages
- * no restored keyboard has come in silently when new (owner 2026-10-12: "All silent"); the clipboard is merged.
+ * Brings what [choice] asks for out of the backup and leaves the rest of the device as it is, as [plan] (made when the
+ * backup was read, owner 2026-10-12: one plan) has it: the keyboards keyboard by keyboard, all of them too
+ * ([restoreKeyboards]; only the full restore wipes, [restoreEverything]). Learned words and added dictionaries follow the
+ * chosen keyboards' languages ([RestoreDictionaries]); the added dictionaries of languages no restored keyboard has come
+ * in silently when new (owner 2026-10-12: "All silent"); the clipboard is merged.
  */
-private fun restoreChosen(ctx: Context, pending: PendingRestore, choice: RestoreChoice, io: LearnedStoreIo = LearnedStoreIo.Native): List<SettingsSubtype> =
+private fun restoreChosen(ctx: Context, pending: PendingRestore, plan: RestorePlan, choice: RestoreChoice,
+                          io: LearnedStoreIo = LearnedStoreIo.Native): Restored =
     LearnedKeyboards.withFiles {
         // (each keyboard its own learned words first, if this start couldn't do it yet: they're restored by keyboard)
         LearnedKeyboards.updateOnce(ctx)
-        restoreChosenLocked(ctx, pending, choice, io)
+        restoreChosenLocked(ctx, pending, plan, choice, io)
     }
 
-/** The result: the restored keyboards whose settings wait behind the common ones (separate settings off, R7). */
-private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, choice: RestoreChoice, io: LearnedStoreIo): List<SettingsSubtype> {
+/**
+ * The order (owner 2026-10-12): the backup's words, dictionaries, clips and personal dictionary words are unpacked aside
+ * first (one read of the zip, nothing changed); then [restoreKeyboards] does the device side (new ids, "… 2" names,
+ * renamed key layouts) and the backup's things, parts before what uses them: saved items, dictionaries, settings,
+ * keyboards; then their word lists, and last the clipboard and Android's personal dictionary words.
+ */
+private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, plan: RestorePlan, choice: RestoreChoice, io: LearnedStoreIo): Restored {
     // (one answered "Don't restore" brings nothing: not its learned words or dictionaries either)
     val restoring = choice.keyboards.filter { choice.decisions[it] != RestoreDecision.Skip }
-    // keyboard by keyboard, every keyboard of the backup too (owner 2026-10-11: a keyboard restore never wipes; only the
-    // full restore does: "partial keyboard by keyboard where all keyboards are just another case"). Each restored
-    // keyboard as it is on the phone now (its custom key layouts can come in under other names; merged: the phone
-    // keyboard it went into, its definition the phone's in parts)
-    var onPhone: Map<SettingsSubtype, SettingsSubtype> = emptyMap()
-    var hidden: List<SettingsSubtype> = emptyList()
-    if (choice.keyboards.isNotEmpty())
-        restoreKeyboards(ctx, pending, restoring, choice.settings, choice.names, choice.decisions).let { onPhone = it.first; hidden = it.second }
     val tags = restoring.flatMap { listOf(it.locale) + getSecondaryLocales(it.extraValues) }.map { it.toLanguageTag() }.toSet()
     // (a keyboard answered "Don't restore" brings no dictionary either, not even silently)
     val skippedTags = choice.keyboards.filter { choice.decisions[it] == RestoreDecision.Skip }
         .flatMap { listOf(it.locale) + getSecondaryLocales(it.extraValues) }.map { it.toLanguageTag() }.toSet() - tags
-    val filesDir = ctx.filesDir ?: return hidden
+    val filesDir = ctx.filesDir
     val deviceProtectedFilesDir = DeviceProtectedUtils.getFilesDir(ctx)
-    // learned words are added to the phone's, never replacing them: the backup's stores are unpacked aside, then put
-    // together with the phone's (the higher count each, DM18); the removed-word lists are combined. The backup's stores are per
+    // learned words are added to the device's, never replacing them: the backup's stores are unpacked aside, then put
+    // together with the device's (the higher count each, DM18); the removed-word lists are combined. The backup's stores are per
     // script (shared, or a keyboard's own: UserHistoryDictionary.<script>[.k<id>].dict), or per language in a backup
     // from before (UserHistoryDictionary.<languageTag>.dict); the chosen keyboards' scripts and languages say which.
     val learnedDir = File(ctx.cacheDir, "restore_learned").apply { deleteRecursively() }
@@ -1166,8 +1266,9 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, choice: R
         if (!path.startsWith("blacklists${File.separator}") || !path.endsWith(".txt")) return false
         return path.substringAfterLast(File.separator).removeSuffix(".txt") in scripts
     }
-    // the backup's added dictionaries, unpacked aside: the restored keyboards' languages with the Dictionaries row ticked,
-    // the languages of no restored keyboard always (silently, new ones only); each language's folder on the device
+    // the backup's added dictionaries, unpacked aside: the restored keyboards' languages (the backup's is used, the
+    // device's kept aside as "…prev"), the languages of no restored keyboard always (silently, new ones only); each
+    // language's folder on the device
     val dictsDir = File(ctx.cacheDir, "restore_dicts").apply { deleteRecursively() }
     val dictFolders = HashMap<String, File>()
     fun wantedDictionary(path: String): RestoreDictionaries.Entry? {
@@ -1179,7 +1280,8 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, choice: R
         }
     }
     val restoredDb = ctx.getDatabasePath(Database.NAME + "_restored")
-    ZipInputStream(FileInputStream(pending.file)).use { zip ->
+    var personalWords: String? = null
+    if (filesDir != null) ZipInputStream(FileInputStream(pending.file)).use { zip ->
         var entry: ZipEntry? = zip.nextEntry
         while (entry != null) {
             val name = entry.name
@@ -1189,11 +1291,7 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, choice: R
             when {
                 !backupFilePatterns.any { path.matches(it) } -> when {
                     name == Database.NAME && choice.clipboard -> FileUtils.copyStreamToNewFile(zip, restoredDb)
-                    name == PERSONAL_DICT_FILE_NAME && choice.personalDictionary -> try {
-                        restorePersonalDictionary(ctx, String(zip.readBytes())) // never fail the whole restore over it
-                    } catch (t: Throwable) {
-                        Log.w("AdvancedScreen", "error restoring personal dictionary", t)
-                    }
+                    name == PERSONAL_DICT_FILE_NAME && choice.personalDictionary -> { personalWords = String(zip.readBytes()) }
                 }
                 choice.learnedWords && isLearnedWords(path) -> {
                     val aside = File(learnedDir, path)
@@ -1213,20 +1311,28 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, choice: R
             entry = zip.nextEntry
         }
     }
-    // merged into the device's clips (owner 2026-10-12: "yes, merge clipboard"; the full restore still replaces them)
-    if (choice.clipboard) Database.copyFromDb(restoredDb, ctx,
-        mergeKeeping = ctx.prefs().getInt(Settings.PREF_CLIPBOARD_HISTORY_SIZE, Defaults.PREF_CLIPBOARD_HISTORY_SIZE))
-    restoreDictionaries(ctx, pending.prefs, dictsDir, dictFolders, clashesFor = tags)
-    dictsDir.deleteRecursively()
+    // the device side, then the saved items, the dictionaries (between them and the keyboards), the settings and the
+    // keyboards (owner 2026-10-12: "A keyboard never arrives before what it names")
+    val restored = restoreKeyboards(ctx, pending, plan, restoring, choice.settings, choice.names, choice.decisions) {
+        restoreDictionaries(ctx, pending.prefs, dictsDir, dictFolders, clashesFor = tags)
+        dictsDir.deleteRecursively()
+    }
     if (choice.learnedWords) {
-        // (merged: with its learned words ticked only)
-        restoreLearnedWords(ctx, pending.prefs, onPhone.filterKeys { (choice.decisions[it] as? RestoreDecision.Merge)?.learnedWords != false }
+        // (merged: with its learned words ticked only; kept both: its own words into a pool of its own, owner 2026-10-12)
+        restoreLearnedWords(ctx, pending.prefs, restored.onDevice.filterKeys { (choice.decisions[it] as? RestoreDecision.Merge)?.learnedWords != false }
             .toList(), learnedDir, io)
         learnedDir.deleteRecursively()
     }
+    // merged into the device's clips (owner 2026-10-12: "yes, merge clipboard"; the full restore still replaces them)
+    if (choice.clipboard) Database.copyFromDb(restoredDb, ctx,
+        mergeKeeping = ctx.prefs().getInt(Settings.PREF_CLIPBOARD_HISTORY_SIZE, Defaults.PREF_CLIPBOARD_HISTORY_SIZE))
+    // Android's personal dictionary words: a word missing for its locale is added (never fail the whole restore over it)
+    personalWords?.let { words ->
+        try { restorePersonalDictionary(ctx, words) } catch (t: Throwable) { Log.w("AdvancedScreen", "error restoring personal dictionary", t) }
+    }
     BackupRestoreJob.step() // (the learned words)
     LayoutUtilsCustom.onLayoutFileChanged()
-    return hidden
+    return restored
 }
 
 /**
@@ -1316,39 +1422,45 @@ internal fun withUserPopupSetMap(real: android.content.SharedPreferences, backup
     return values + (Settings.PREF_SYMBOL_POPUP_MAP to map)
 }
 
-/** Restores [keyboards] from the backup [file] as the restore dialog does when not every keyboard is chosen (tests). */
+/** Restores [keyboards] from the backup [file] as the restore dialog does when not every keyboard is chosen (tests):
+ *  each restored keyboard as it is on the device now, and those whose settings wait behind the common ones. */
 internal fun restoreKeyboardsFrom(ctx: Context, file: File, keyboards: List<SettingsSubtype>, withSettings: Boolean,
                                   names: SavedItemsMerge.Choices = SavedItemsMerge.Choices(),
-                                  decisions: Map<SettingsSubtype, RestoreDecision> = emptyMap()) =
-    restoreKeyboards(ctx, readBackup(file), keyboards.filter { decisions[it] != RestoreDecision.Skip }, withSettings, names, decisions)
+                                  decisions: Map<SettingsSubtype, RestoreDecision> = emptyMap()): Pair<Map<SettingsSubtype, SettingsSubtype>, List<SettingsSubtype>> {
+    val pending = readBackup(file)
+    return restoreKeyboards(ctx, pending, restorePlan(ctx, pending), keyboards.filter { decisions[it] != RestoreDecision.Skip },
+        withSettings, names, decisions).let { it.onDevice to it.hidden }
+}
 
 /**
  * Only [asked] keyboards come out of the backup, each as [decisions] says (owner 2026-10-11: restore matches by language
- * and asks; review R1: no matching of its own here): merged into the phone keyboard picked (in its place, its set and
- * learned words going along; the backup's whole, or the phone's with the ticked parts and menus the backup's, those
- * parts' key layouts named as they came in), or added as a keyboard of its own; named as answered. One without an answer
- * comes in as new, as it is in the backup. A merge keeps the phone keyboard's id; one added keeps the backup's (owner
- * 2026-10-11: "backup's ID should take priority"), and a phone keyboard with that id gets a new one first
- * (KeyboardIds.giveNewId). Nothing is blocked as "the same" (keyboards have unique ids). Each comes with its custom layout files and, [withSettings], its settings and
- * the priorities of its languages, in its own set only; other keyboards stay as they are. A custom layout the phone has
- * under the same name with other keys comes in numbered ([restoreLayoutFiles]), and the keyboard names that one.
- * With one set of settings for all, separate settings stay off (owner 2026-10-11: R7, a restore never turns separate
- * settings on): the keyboard's own set waits until they are turned on, the main keyboard's is what all keyboards use.
- * The result: each restored keyboard as it is on the phone now, and those restored while settings are one for all.
+ * and asks; review R1: no matching of its own here), and the backup's saved items as [names] says, all as [plan] has
+ * them (owner 2026-10-12: one plan, nothing worked out again). A keyboard is merged into the device keyboard picked (in
+ * its place, its set and learned words going along; the backup's whole, or the device's with the ticked parts and menus
+ * the backup's), or added as a keyboard of its own; named as answered. One without an answer comes in as new, as it is
+ * in the backup. A merge keeps the device keyboard's id; one added keeps the backup's (owner 2026-10-11: "backup's ID
+ * should take priority"), and a device keyboard with that id gets a new one first (KeyboardIds.giveNewId). Kept both,
+ * the backup's keeps its name and the device's of that name becomes "… 2" (owner 2026-10-12; before, the backup's was
+ * "English (US) 2"). Each comes with its custom key layouts under the backup's names (the device's of that name with
+ * other keys renamed first, its users following) and, [withSettings], its settings and the priorities of its languages,
+ * in its own set only; other keyboards stay as they are. With one set of settings for all, separate settings stay off
+ * (owner 2026-10-11: R7, a restore never turns separate settings on): the keyboard's own set waits until they are turned
+ * on, the main keyboard's is what all keyboards use. [beforeKeyboards]: what comes between the saved items and the
+ * keyboards (the dictionaries).
  */
-private fun restoreKeyboards(ctx: Context, pending: PendingRestore, asked: List<SettingsSubtype>, withSettings: Boolean,
-                             names: SavedItemsMerge.Choices = SavedItemsMerge.Choices(), decisions: Map<SettingsSubtype, RestoreDecision> = emptyMap()
-): Pair<Map<SettingsSubtype, SettingsSubtype>, List<SettingsSubtype>> {
+private fun restoreKeyboards(ctx: Context, pending: PendingRestore, plan: RestorePlan, asked: List<SettingsSubtype>, withSettings: Boolean,
+                             names: SavedItemsMerge.Choices = SavedItemsMerge.Choices(), decisions: Map<SettingsSubtype, RestoreDecision> = emptyMap(),
+                             beforeKeyboards: () -> Unit = { }): Restored {
     // the unsaved layouts no keyboard uses go once all is restored, not between the keyboards (review 2026-10-11 R3: one
     // only a restored keyboard's settings name went before they were written)
     LayoutUtilsCustom.cleanupHeld++
-    try { return restoreKeyboardsHeld(ctx, pending, asked, withSettings, names, decisions) }
+    try { return restoreKeyboardsHeld(ctx, pending, plan, asked, withSettings, names, decisions, beforeKeyboards) }
     finally { LayoutUtilsCustom.cleanupHeld--; LayoutUtilsCustom.removeUnusedPrivateLayouts(ctx) }
 }
 
-private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, asked: List<SettingsSubtype>, withSettings: Boolean,
-                                 names: SavedItemsMerge.Choices, askedDecisions: Map<SettingsSubtype, RestoreDecision>
-): Pair<Map<SettingsSubtype, SettingsSubtype>, List<SettingsSubtype>> {
+private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, plan: RestorePlan, asked: List<SettingsSubtype>, withSettings: Boolean,
+                                 names: SavedItemsMerge.Choices, askedDecisions: Map<SettingsSubtype, RestoreDecision>,
+                                 beforeKeyboards: () -> Unit): Restored {
     var decisions = askedDecisions
     val real = ctx.realPrefs()
     val prefs = ctx.prefs()
@@ -1357,7 +1469,6 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, asked: L
     // (owner 2026-10-11, keyboards have unique ids: two keyboards set up alike are two keyboards, none is blocked as the
     // same definition any more)
     val chosen = asked.filter { decisions[it] != RestoreDecision.Skip }
-    if (chosen.isEmpty()) return emptyMap<SettingsSubtype, SettingsSubtype>() to emptyList() // (nothing to bring, nothing touched)
     fun replacesNow() = chosen.mapNotNull { keyboard -> (decisions[keyboard] as? RestoreDecision.Merge)?.let { keyboard to it.replace } }.toMap()
     var replaces = replacesNow()
     // (a keyboard merged in parts: only its ticked parts and menus come from the backup)
@@ -1365,61 +1476,87 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, asked: L
     fun takesSetting(keyboard: SettingsSubtype, key: String) =
         replaces[keyboard]?.menus?.let { menus -> RestoreMatch.menusOf(key).any { it in menus } } ?: true
     // its own set when the backup kept one, else the backup's shared set was what it used
-    // (the backup's shared set with the keyboard's own on top: what it read on the old phone)
     // (a backup from before 0.3.008 wrote every setting at its default down: those are left out, so they follow the
-    // defaults here; see pickedOnlyUpgrade)
-    // the backup's saved items come in first (a clash as ticked, owner 2026-10-11: "backup wins the name if ticked"), and
-    // the keyboards name them as they're called on the phone now (before, the names dangled or silently took the phone's
-    // same-named item)
-    // (the loaded fonts and pictures first: a name the phone has for another file comes in numbered, and the themes and
-    // keyboards naming it are rewritten with it; owner 2026-10-11: "for fonts and pictures too do the same pattern")
-    val files = if (withSettings) restoreLibraryFiles(ctx, pending) else null
-    // (by the keyboard as it was in the backup: the backup's sets are found by it)
+    // defaults here; see pickedOnlyUpgrade) (by the keyboard as it was in the backup: the backup's sets are found by it)
     val backupSettings = if (withSettings) chosen.associateWith { restoredSettings(ctx, backup, it) } else emptyMap()
-    // the custom key layouts the chosen keyboards use (picked, or their default for a type), owner 2026-10-11: "Yes", the
-    // pattern of fonts and pictures: one the phone has under that name with other keys comes in numbered, "My numrow 2",
-    // and the keyboards, their defaults and the restored Layouts name that one (before, it was written over the phone's,
-    // and every other keyboard using it silently got the backup's keys). Only those of the parts and menus taken from
-    // the backup (a layout kept as the phone's keeps its file too)
-    val wanted = (chosen.flatMap { keyboard -> LayoutType.entries.filter { takesLayout(keyboard, it) }
+    // the custom key layouts the restore brings: those the chosen keyboards use (picked, or their default for a type), of
+    // the parts and menus taken from the backup (a layout kept as the device's keeps its file too), and those of the
+    // saved Layouts that come in
+    val keyLayouts = plan.items.keyLayouts
+    val wanted = ((chosen.flatMap { keyboard -> LayoutType.entries.filter { takesLayout(keyboard, it) }
             .mapNotNull { type -> keyboard.layoutName(type)?.let { type to it } } } +
         backupSettings.flatMap { (keyboard, values) -> LayoutType.entries.mapNotNull { type ->
             val key = Settings.PREF_LAYOUT_PREFIX + type.name
             (values[key] as? String)?.takeIf { takesSetting(keyboard, key) }?.let { type to it } } })
-        .filter { LayoutUtilsCustom.isCustomLayout(it.second) }.toSet()
-    val keyLayouts = if (wanted.isEmpty()) emptyMap() else restoreLayoutFiles(ctx, pending, wanted, chosen)
-    // the phone's key layout files a restored Layout wins the name of (owner 2026-10-11, R4: ticked, "backup wins the
-    // name"): renamed first, as the editor's rename does, every keyboard (its identity), default and saved Layout using
-    // it following, before the backup's Layouts are on the list; the merge below then writes the Layout's keys under the
-    // name. The merge targets picked follow (their identity changed)
-    if (withSettings) {
-        val plan = SavedItemsMerge.merge(ctx, real, backup, names, files?.first.orEmpty(), files?.second.orEmpty(), keyLayouts, wanted, write = false)
-        for (rename in plan.fileRenames) {
-            decisions = renamePhoneLayoutFile(ctx, rename, decisions)
-        }
-        replaces = replacesNow()
-    }
-    // a backup keyboard added as a keyboard of its own keeps its id (owner 2026-10-11: "backup's ID should take
-    // priority"): a phone keyboard with that id gets a new one first, its records with it, and the merge targets follow
+        .filter { LayoutUtilsCustom.isCustomLayout(it.second) } +
+        (if (!withSettings) emptyList() else plan.items.layouts.filter { names.ticked(SavedItemsMerge.Kind.LAYOUTS, it.key) && it.exact == null }
+            .flatMap { plan.items.layoutFiles(it.content) })).toSet()
+
+    // ---- the device side first (owner 2026-10-12: answers are recorded against the device's keyboards and items as they
+    // were; new ids, then new names, then the renamed key layouts, and every recorded reference through them before
+    // anything of the backup is applied: "Nothing applies an answer by an unmapped id") ----
+
+    // a backup keyboard added (kept both, or new) keeps its id (owner 2026-10-11: "backup's ID should take priority"): a
+    // device keyboard with that id gets a new one first, its records with it (KeyboardIds.giveNewId); old id -> new id
+    val idMap = HashMap<String, String>()
     run {
         val adding = chosen.filter { decisions[it] !is RestoreDecision.Merge }.mapNotNullTo(HashSet()) { it.keyboardId }
         val (on, off) = phoneKeyboards(real)
-        for (phoneKeyboard in on + off) {
-            if (phoneKeyboard.keyboardId !in adding) continue
-            val renewed = helium314.keyboard.latin.settings.KeyboardIds.giveNewId(ctx, phoneKeyboard)
-            decisions = decisions.mapValues { (_, d) -> if (d is RestoreDecision.Merge && d.phone.sameKeyboard(phoneKeyboard)) d.copy(phone = d.phone.withIdOf(renewed).toPref().toSettingsSubtype()) else d }
+        for (device in on + off) {
+            val old = device.keyboardId ?: continue
+            if (old !in adding) continue
+            helium314.keyboard.latin.settings.KeyboardIds.giveNewId(ctx, device).keyboardId?.let { idMap[old] = it }
         }
-        replaces = replacesNow()
     }
-    // one mapping, backup keyboard -> the phone keyboard it becomes: its key layouts as they came in (B4), merged or
-    // added as answered, named as answered
-    val onPhone = chosen.associateWith { keyboard -> RestoreDecision.result(decisions[keyboard], renamedLayouts(keyboard, keyLayouts), nameOf)!! }
-    val renames = if (withSettings) SavedItemsMerge.merge(ctx, real, backup, names, files?.first.orEmpty(), files?.second.orEmpty(), keyLayouts,
-        wanted) else null
-    val settings = backupSettings.mapValues { (_, values) -> renames?.apply(values) ?: values }
+    // a device keyboard as the dialog had it, as it is now: by its id through the map (its name and key layouts as now)
+    fun onDeviceNow(original: SettingsSubtype): SettingsSubtype? {
+        val id = original.keyboardId?.let { idMap[it] ?: it } ?: return null
+        val (on, off) = phoneKeyboards(real)
+        return (on + off).firstOrNull { it.keyboardId == id }
+    }
+    // kept both: the backup's keeps its name, a device keyboard of that name gets the next free one, "English (US) 2"
+    // (owner 2026-10-12; flips 2026-10-11's, which numbered the backup's). Not one a backup keyboard merges into: that one
+    // becomes the backup's
+    run {
+        val keepNames = chosen.filter { decisions[it] is RestoreDecision.Separate }
+            .mapNotNullTo(HashSet()) { RestoreDecision.result(decisions[it], it, nameOf)?.let(nameOf) }
+        if (keepNames.isEmpty()) return@run
+        val targets = chosen.mapNotNullTo(HashSet()) { (decisions[it] as? RestoreDecision.Merge)?.phone?.keyboardId?.let { id -> idMap[id] ?: id } }
+        val (on, off) = phoneKeyboards(real)
+        val taken = HashSet<String>()
+        (on + off).mapTo(taken, nameOf)
+        chosen.mapNotNullTo(taken) { RestoreDecision.result(decisions[it], it, nameOf)?.let(nameOf) }
+        for (device in on + off) {
+            val name = nameOf(device)
+            if (name !in keepNames || device.keyboardId in targets) continue
+            val renamed = RestoreDecision.named(device, RestorePlan.nextFreeName(name, taken).also { taken += it }, nameOf)
+            SubtypeUtilsAdditional.changeAdditionalSubtype(device, renamed, ctx)
+        }
+    }
+    // the device's key layout files of a name the restore brings with other keys: renamed first, as the editor's rename
+    // does, every keyboard (its identity), default and saved Layout using it following (owner 2026-10-12: "Backup's My
+    // numrow; yours becomes My numrow 2"; before, the backup's came in as "My numrow 2")
+    for ((type, name) in wanted) keyLayouts.deviceRename(type, name)?.let { renamePhoneLayoutFile(ctx, SavedItemsMerge.FileClash(type, name, it)) }
+    // the merge targets as they are now (R4: their key layouts renamed; a new id)
+    decisions = decisions.mapValues { (_, d) -> if (d is RestoreDecision.Merge) onDeviceNow(d.phone)?.let { d.copy(phone = it) } ?: d else d }
+    replaces = replacesNow()
+
+    // ---- the backup's things, parts before what uses them (owner 2026-10-12): key layouts; palettes, fonts and pictures,
+    // popup sets, Layouts, themes; the dictionaries; the settings; the keyboards ----
+    writeKeyLayouts(ctx, keyLayouts, wanted)
+    val applied = if (withSettings) SavedItemsMerge.apply(ctx, real, plan.items, names, write = true, files = backupFiles(pending)) else null
+    // the device's keyboards that used an item now the backup's take it ("they take the backup's look"), by the plan's
+    // lists through the id map
+    applied?.let { reapplyReplaced(ctx, plan, it.replaced, ::onDeviceNow) }
+    beforeKeyboards()
+
+    // one mapping, backup keyboard -> the device keyboard it becomes: merged or added as answered, named as answered
+    val onPhone = chosen.associateWith { keyboard -> RestoreDecision.result(decisions[keyboard], keyboard, nameOf)!! }
+    // its saved items named as they are called on the device after the restore
+    val settings = backupSettings.mapValues { (_, values) -> applied?.renames?.apply(values) ?: values }
     val wasSeparate = KeyboardProfiles.isSeparate(real)
 
-    if (withSettings) {
+    if (withSettings && chosen.isNotEmpty()) {
         // the languages' adding times are app-wide (the priorities are the keyboard's: written with its set below)
         val editor = real.edit()
         for (keyboard in chosen)
@@ -1428,20 +1565,17 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, asked: L
         editor.apply()
     }
 
-    // with their settings: the pictures they had, and the loaded fonts and pictures their settings may name (added to
-    // the phone's lists, nothing there replaced)
+    // with their settings: the pictures they had (added to the device's lists, nothing there replaced)
     val pictureFiles = HashMap<String, ByteArray>()
     // only the chosen keyboards' pictures are read (each can be a few MB)
     val wantedPictures = chosen.flatMap { KeyboardProfiles.restoreFileNames(it.keyboardId ?: KeyboardProfiles.SHARED) }.toSet()
-    if (withSettings) {
+    if (withSettings && wantedPictures.isNotEmpty()) {
         ZipInputStream(FileInputStream(pending.file)).use { zip ->
             var entry: ZipEntry? = zip.nextEntry
             while (entry != null) {
                 // (an old backup's pictures are named for its set numbers: by the ids its keyboards got when read)
                 val name = helium314.keyboard.latin.settings.KeyboardIdUpgrade.renamedFile(entry.name.substringAfter("unprotected${File.separator}", ""), pending.pictureRenames)
-                when {
-                    name in wantedPictures -> pictureFiles[name] = zip.readBytes()
-                }
+                if (name in wantedPictures) pictureFiles[name] = zip.readBytes()
                 zip.closeEntry()
                 entry = zip.nextEntry
             }
@@ -1450,10 +1584,10 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, asked: L
 
     for (keyboard in chosen) {
         val phoneKeyboard = onPhone.getValue(keyboard)
-        val plan = replaces[keyboard]
-        // registers it; merged, the phone keyboard picked is changed into it (in its place, its id kept: its set and
+        val replace = replaces[keyboard]
+        // registers it; merged, the device keyboard picked is changed into it (in its place, its id kept: its set and
         // learned words its own, as a Rename does); a switched-off one is switched on (restored)
-        SubtypeUtilsAdditional.changeAdditionalSubtype(plan?.phone ?: phoneKeyboard, phoneKeyboard, ctx)
+        SubtypeUtilsAdditional.changeAdditionalSubtype(replace?.phone ?: phoneKeyboard, phoneKeyboard, ctx)
         if (SubtypeSettings.getEnabledSubtypes().none { it.toSettingsSubtype().sameKeyboard(phoneKeyboard) })
             SubtypeSettings.addEnabledSubtype(prefs, phoneKeyboard.toAdditionalSubtype())
         if (withSettings) {
@@ -1462,15 +1596,13 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, asked: L
             // that keyboard's settings"; the main keyboard's set is the common settings: restored, everyone sees it, owner
             // 2026-10-11: "yep"). Merged in parts: only its entries of the ticked menus, the others stay as they are
             val restored = settings.getValue(keyboard)
-            if (plan?.menus != null) KeyboardProfiles.restoreSet(real, id, restored) { takesSetting(keyboard, it) }
+            if (replace?.menus != null) KeyboardProfiles.restoreSet(real, id, restored) { takesSetting(keyboard, it) }
             else KeyboardProfiles.restoreSet(real, id, restored)
-            // (an item it chose that wasn't brought in, unticked: it names the phone's of that name, owner 2026-10-11:
-            // "backup wins the name if ticked"; before, it named none and showed "Custom")
             // its languages' priorities, into its own set (review session 2026-10-07): the backup's own copy for this
             // keyboard (an old backup's common value is ignored, owner 2026-10-11: "fine to trash common set with upgrade
             // and restore"; merged in parts: only when its languages are the backup's)
             val backupId = keyboard.keyboardId
-            if (plan?.takes(RestoreMatch.Part.Extra(helium314.keyboard.latin.common.Constants.Subtype.ExtraValue.SECONDARY_LOCALES)) != false) real.edit {
+            if (replace?.takes(RestoreMatch.Part.Extra(helium314.keyboard.latin.common.Constants.Subtype.ExtraValue.SECONDARY_LOCALES)) != false) real.edit {
                 for (locale in listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues))
                     for (key in LanguagePriority.keys(locale).filter { LanguagePriority.isPriorityKey(it) }) {
                         val value = backupId?.let { backup[KeyboardProfiles.ownKey(it, key)] } as? Int ?: continue
@@ -1479,7 +1611,7 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, asked: L
             }
             // its own pictures in the backup, or the backup's shared ones when it had no set of its own (merged in
             // parts: with Appearance ticked)
-            if (plan?.takes(KeyboardProfiles.Group.APPEARANCE) != false)
+            if (replace?.takes(KeyboardProfiles.Group.APPEARANCE) != false)
                 KeyboardProfiles.restoreFiles(pictureFiles, keyboard.keyboardId, id,
                     perKeyboardBackup = backup["profile_files_migrated"] == true)
         }
@@ -1487,36 +1619,91 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, asked: L
     if (withSettings) {
         Settings.clearCachedBackgroundImages(); helium314.keyboard.keyboard.KeyboardTypeface.clearCache()
         // whether they use the other keyboards' learned and blacklisted words, as in the backup (merged in parts: the
-        // phone's buttons stay)
-        LearnedKeyboards.restoreButtons(real, backup, chosen.filter { replaces[it]?.whole != false }, onPhone)
+        // device's buttons stay)
+        if (chosen.isNotEmpty()) LearnedKeyboards.restoreButtons(real, backup, chosen.filter { replaces[it]?.whole != false }, onPhone)
     }
     // (merged with no menu ticked: none of its settings came, nothing to say)
-    return onPhone to (if (withSettings && !wasSeparate) chosen.filter { replaces[it]?.menus?.isEmpty() != true }.map { onPhone.getValue(it) } else emptyList())
+    val hidden = if (withSettings && !wasSeparate) chosen.filter { replaces[it]?.menus?.isEmpty() != true }.map { onPhone.getValue(it) } else emptyList()
+    val merged = chosen.filter { decisions[it] is RestoreDecision.Merge }.map { nameOf(onPhone.getValue(it)) } + applied?.replaced.orEmpty().map { it.second }
+    val added = chosen.filter { decisions[it] !is RestoreDecision.Merge }.map { nameOf(onPhone.getValue(it)) } + applied?.added.orEmpty().map { it.second }
+    return Restored(onPhone, hidden, merged, added)
 }
 
-/** The phone's key layout file [rename] names gets its new name, as the layout editor's rename does: every keyboard
- *  (its identity), default and saved Layout using it follows ([SubtypeSettings.onRenameLayout]). [decisions] with the
- *  merge targets named as they are now (R4, owner 2026-10-11). */
-private fun renamePhoneLayoutFile(ctx: Context, rename: SavedItemsMerge.FileClash,
-                                  decisions: Map<SettingsSubtype, RestoreDecision>): Map<SettingsSubtype, RestoreDecision> {
+/** The device's key layout file [rename] names gets its new name, as the layout editor's rename does: every keyboard
+ *  (its identity), default and saved Layout using it follows ([SubtypeSettings.onRenameLayout]). */
+private fun renamePhoneLayoutFile(ctx: Context, rename: SavedItemsMerge.FileClash) {
     val (type, from, to) = rename
     val old = LayoutUtilsCustom.getLayoutFile(from, type, ctx)
     val new = LayoutUtilsCustom.getLayoutFile(to, type, ctx)
-    if (!old.isFile || new.exists()) return decisions
+    if (!old.isFile || new.exists()) return
     old.copyTo(new)
     old.delete()
     LayoutUtilsCustom.onLayoutFileChanged()
     SubtypeSettings.onRenameLayout(type, from, to, ctx)
-    return decisions.mapValues { (_, d) ->
-        if (d is RestoreDecision.Merge && d.phone.layoutName(type) == from) d.copy(phone = d.phone.withLayout(type, to).toPref().toSettingsSubtype()) else d
+}
+
+/** The backup's custom key layouts [wanted] (type, name) written under their names (owner 2026-10-12: the backup's keeps
+ *  its name; the device's of that name with other keys was renamed first): one the device has already is the device's,
+ *  nothing written over. Never outside the app's folder. */
+private fun writeKeyLayouts(ctx: Context, keyLayouts: SavedItemsMerge.KeyLayouts, wanted: Set<Pair<LayoutType, String>>) {
+    val dir = DeviceProtectedUtils.getFilesDir(ctx)
+    var wrote = false
+    for (key in wanted) {
+        val bytes = keyLayouts.contents[key] ?: continue
+        val (type, name) = key
+        val folder = File(dir, type.folder)
+        val target = File(folder, name)
+        if (!target.canonicalPath.startsWith(folder.canonicalPath + File.separator) || target.exists()) continue
+        folder.mkdirs()
+        target.writeBytes(bytes)
+        wrote = true
+    }
+    if (wrote) LayoutUtilsCustom.onLayoutFileChanged()
+}
+
+/** A loaded font's or picture's bytes in the backup of [pending], by kind and name (read when written). */
+private fun backupFiles(pending: PendingRestore): (SavedItemsMerge.Kind, String) -> ByteArray? = { kind, key ->
+    val path = "unprotected${File.separator}${if (kind == SavedItemsMerge.Kind.FONTS) "fonts" else "pictures"}${File.separator}$key"
+    ZipInputStream(FileInputStream(pending.file)).use { zip ->
+        var bytes: ByteArray? = null
+        var entry: ZipEntry? = zip.nextEntry
+        while (entry != null && bytes == null) {
+            if (entry.name == path) bytes = zip.readBytes()
+            zip.closeEntry()
+            entry = zip.nextEntry
+        }
+        bytes
     }
 }
 
-/** [keyboard] with its custom key layouts named as they came in ([keyLayouts], by type: [restoreLayoutFiles]). */
-private fun renamedLayouts(keyboard: SettingsSubtype, keyLayouts: Map<LayoutType, Map<String, String>>) =
-    LayoutType.entries.fold(keyboard) { kb, type -> kb.layoutName(type)?.let { keyLayouts[type]?.get(it) }?.let { kb.withLayout(type, it) } ?: kb }
+/** The device's keyboards that used a saved item the restore made the backup's ([replaced]: kind and name) take it
+ *  (owner 2026-10-12: "Used by your English (US), French: they take the backup's look"): a theme's or a Layout's settings,
+ *  a popup set's arrangement, as their update does on another keyboard. The users are the plan's
+ *  ([RestorePlan.deviceUsers]), each as it is now ([now]: through the id map). Palettes and loaded files are named and
+ *  read as they are: nothing to do. */
+private fun reapplyReplaced(ctx: Context, plan: RestorePlan, replaced: List<Pair<SavedItemsMerge.Kind, String>>,
+                            now: (SettingsSubtype) -> SettingsSubtype?) {
+    if (replaced.isEmpty()) return
+    val real = ctx.realPrefs()
+    for ((kind, name) in replaced) for (user in plan.deviceUsers[kind to name].orEmpty()) {
+        val keyboard = now(user) ?: continue
+        try {
+            when (kind) {
+                SavedItemsMerge.Kind.THEMES -> helium314.keyboard.settings.AppearanceLooks.load(real).firstOrNull { it.name == name }
+                    ?.let { helium314.keyboard.settings.AppearanceLooks.applyToOther(ctx, keyboard, it) }
+                SavedItemsMerge.Kind.LAYOUTS -> helium314.keyboard.settings.LayoutPresets.load(real).firstOrNull { it.name == name }
+                    ?.let { helium314.keyboard.settings.LayoutPresets.applyToOther(ctx, keyboard, it) }
+                SavedItemsMerge.Kind.POPUP_SETS -> helium314.keyboard.latin.utils.KeyPopupOverrides.loadSets(real).firstOrNull { it.name == name }
+                    ?.let { helium314.keyboard.settings.screens.applySetToOther(ctx, keyboard, it, helium314.keyboard.settings.SavedItemDefaults.takeNewDefaults(real)) }
+                else -> { }
+            }
+        } catch (t: Throwable) {
+            Log.w("AdvancedScreen", "error giving a keyboard the restored ${kind.name.lowercase()}", t)
+        }
+    }
+}
 
-/** The phone's keyboards: the enabled ones, and those switched off on the Languages screen (they keep their id and own
+/** The device's keyboards: the enabled ones, and those switched off on the Languages screen (they keep their id and own
  *  set; owner 2026-10-11: treated like switched-on ones). */
 private fun phoneKeyboards(real: SharedPreferences): Pair<List<SettingsSubtype>, List<SettingsSubtype>> {
     val enabled = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }
@@ -1524,65 +1711,138 @@ private fun phoneKeyboards(real: SharedPreferences): Pair<List<SettingsSubtype>,
     return enabled to off
 }
 
-/** The custom key layouts of a restore of [pending]'s keyboards as [restoreLayoutFiles] would bring them, nothing written:
- *  the [renames], by type, and the files it would write, [planned] (path to keys). */
-private class DryLayouts(val renames: Map<LayoutType, Map<String, String>>, val wanted: Set<Pair<LayoutType, String>>, private val planned: Map<String, ByteArray>, private val dir: File) {
-    private fun keysOf(type: LayoutType, name: String): ByteArray? =
-        File(File(dir, type.folder), name).let { f -> planned[f.path] ?: f.takeIf { it.isFile }?.readBytes() }
-
-    /** Whether [a] and [b] are the same keys: one name, or two unsaved layouts with the same keys (review 2026-10-11 R3;
-     *  owner 2026-10-11: "Screen 2 should handle unsaved items as named yes"). */
-    fun same(type: LayoutType, a: String, b: String) = a == b || (LayoutUtilsCustom.isPrivateLayout(a) && LayoutUtilsCustom.isPrivateLayout(b)
-        && keysOf(type, a)?.let { x -> keysOf(type, b)?.contentEquals(x) } == true)
+/** A file's size and SHA-256, read to its end (the stream is left open). */
+private fun fileDigest(input: java.io.InputStream): SavedItemsMerge.FileDigest {
+    val md = java.security.MessageDigest.getInstance("SHA-256")
+    val buffer = ByteArray(8192)
+    var size = 0L
+    while (true) {
+        val n = input.read(buffer)
+        if (n < 0) break
+        md.update(buffer, 0, n)
+        size += n
+    }
+    return SavedItemsMerge.FileDigest(size, md.digest().joinToString("") { "%02x".format(it) })
 }
 
-/** [DryLayouts] for [pending]'s keyboards: their key layouts and their settings' defaults for the types. An unsaved one
- *  with other keys than the phone's of its name gets its planned new name, as the restore gives it one (R3). */
-private fun dryLayouts(ctx: Context, pending: PendingRestore): DryLayouts {
-    val wanted = (pending.keyboards.flatMap { keyboard -> LayoutType.entries.mapNotNull { type -> keyboard.layoutName(type)?.let { type to it } } } +
-        pending.keyboards.flatMap { keyboard -> val values = restoredSettings(ctx, pending.prefs, keyboard)
-            LayoutType.entries.mapNotNull { type -> (values[Settings.PREF_LAYOUT_PREFIX + type.name] as? String)?.let { type to it } } })
-        .filter { LayoutUtilsCustom.isCustomLayout(it.second) }.toSet()
-    val planned = HashMap<String, ByteArray>()
-    val renames = if (wanted.isEmpty()) emptyMap() else try {
-        restoreLayoutFiles(ctx, pending, wanted, pending.keyboards, write = false, planned = planned)
-    } catch (e: Exception) { planned.clear(); emptyMap() } // (then compared as in the backup)
-    return DryLayouts(renames, wanted, planned, DeviceProtectedUtils.getFilesDir(ctx))
+/**
+ * The backup's saved items as the restore plans them ([SavedItemsMerge.plan]), reading its zip once: its loaded fonts
+ * and pictures, compared with the device's by content, and its custom key layouts (its files, and the keys its saved
+ * Layouts keep). A key layout the device has under the same name with other keys gets the device's new name here, once
+ * (owner 2026-10-12: "Backup's My numrow; yours becomes My numrow 2"; an unsaved one a new unsaved name), none the device
+ * or the backup has. Reads only.
+ */
+private fun planItems(ctx: Context, pending: PendingRestore): SavedItemsMerge.Plan {
+    val real = ctx.realPrefs()
+    val dir = DeviceProtectedUtils.getFilesDir(ctx)
+    val fonts = ArrayList<SavedItemsMerge.In<SavedItemsMerge.FileDigest>>()
+    val pictures = ArrayList<SavedItemsMerge.In<SavedItemsMerge.FileDigest>>()
+    val keyFiles = LinkedHashMap<Pair<LayoutType, String>, ByteArray>()
+    ZipInputStream(FileInputStream(pending.file)).use { zip ->
+        var entry: ZipEntry? = zip.nextEntry
+        while (entry != null) {
+            val name = entry.name.substringAfter("unprotected${File.separator}", "")
+            val folder = name.substringBefore(File.separator, "")
+            val file = name.substringAfter(File.separator, "")
+            if ((folder == "fonts" || folder == "pictures") && file.isNotEmpty() && !file.contains(File.separator)
+                    && backupFilePatterns.any { name.matches(it) })
+                (if (folder == "fonts") fonts else pictures) += SavedItemsMerge.In(file, file, fileDigest(zip))
+            else LayoutType.entries.firstOrNull { name.startsWith(it.folder + File.separator) }?.let { type ->
+                val layout = name.removePrefix(type.folder + File.separator)
+                if (LayoutUtilsCustom.isCustomLayout(layout) && !layout.contains(File.separator)) keyFiles[type to layout] = zip.readBytes()
+            }
+            zip.closeEntry()
+            entry = zip.nextEntry
+        }
+    }
+    fun device(folder: String) = File(dir, folder).listFiles()?.filter { it.isFile }?.sortedBy { it.name }
+        ?.map { f -> f.name to f.inputStream().use { fileDigest(it) } }.orEmpty()
+    val items = SavedItemsMerge.plan(ctx, real, pending.prefs, fonts, pictures, device("fonts"), device("pictures"))
+    // the custom key layouts: the backup's files, and the keys its saved Layouts keep (the file's first)
+    val contents = LinkedHashMap(keyFiles)
+    for (layout in items.layouts) for ((type, name) in items.layoutFiles(layout.content))
+        (layout.content.values[helium314.keyboard.settings.LayoutPresets.LAYOUT_TEXT + type.name] as? String)
+            ?.let { text -> if ((type to name) !in contents) contents[type to name] = text.toByteArray() }
+    val renames = HashMap<Pair<LayoutType, String>, String>()
+    val taken = HashMap<LayoutType, MutableSet<String>>()
+    for ((key, bytes) in contents) {
+        val (type, name) = key
+        val folder = File(dir, type.folder)
+        val file = File(folder, name)
+        // (never outside the app's folder, whatever the zip says)
+        if (!file.canonicalPath.startsWith(folder.canonicalPath + File.separator)) continue
+        if (!file.isFile || file.readBytes().contentEquals(bytes)) continue
+        val names = taken.getOrPut(type) {
+            HashSet<String>().apply { folder.list()?.let { addAll(it) }; contents.keys.forEach { if (it.first == type) add(it.second) } } }
+        val newName = if (LayoutUtilsCustom.isPrivateLayout(name))
+                LayoutUtilsCustom.newPrivateLayoutName(type, LayoutUtilsCustom.scopeOf(name, type)) { it in names }
+            else generateSequence(2) { it + 1 }.map { LayoutUtilsCustom.numberedLayoutName(name, type, it) }.first { it !in names }
+        names += newName
+        renames[key] = newName
+    }
+    return SavedItemsMerge.Plan(items.palettes, items.popupSets, items.layouts, items.themes, items.fonts, items.pictures,
+        SavedItemsMerge.KeyLayouts(contents, renames), items.deviceFonts, items.devicePictures)
 }
 
-/** For the restore dialog: [pending]'s keyboards as they would come in, their custom key layouts named as [dry] has them. */
-private fun incomingKeyboards(pending: PendingRestore, dry: DryLayouts): Map<SettingsSubtype, SettingsSubtype> =
-    pending.keyboards.associateWith { renamedLayouts(it, dry.renames) }
-
-/** The restore dialog's questions for [pending]'s keyboards: each as it would come in, and the phone's keyboards. A
- *  backup keyboard's settings are compared with its saved items named as the merge would name them, worked out with
- *  nothing written (R3: before, the backup's "Sunset" coming in as "Sunset 2" compared as "Sunset"), and a phone
- *  keyboard's with the phone's items renamed as the merge would rename them; the clashes asked about, as with every
- *  one ticked (owner 2026-10-11: "backup wins the name if ticked", ticked to start with). */
+/**
+ * The restore's plan of [pending] (owner 2026-10-12: one plan, made once when the backup is read; the dialog, its
+ * questions and the run all read it): its keyboards as they come in (as in the backup), the device's keyboards, every
+ * saved item and custom key layout of the backup with its candidates on the device ([planItems]), what uses what. A
+ * backup keyboard's settings are compared with its saved items named as the restore names them, and a device keyboard's
+ * with the device's items renamed as the restore renames them for the dialog's answers (R3; worked out with nothing
+ * written).
+ */
 private fun restorePlan(ctx: Context, pending: PendingRestore): RestorePlan {
     val real = ctx.realPrefs()
     val (enabled, off) = phoneKeyboards(real)
-    val dry = dryLayouts(ctx, pending)
-    val renames = HashMap<SavedItemsMerge.Choices, SavedItemsMerge.Renames?>()
+    val items = try { planItems(ctx, pending) } catch (e: Exception) {
+        Log.w("AdvancedScreen", "error planning the backup's saved items", e)
+        SavedItemsMerge.Plan()
+    }
+    val keyLayouts = items.keyLayouts
+    val dir = DeviceProtectedUtils.getFilesDir(ctx)
+    fun deviceKeys(type: LayoutType, name: String) = File(File(dir, type.folder), name).takeIf { it.isFile }?.readBytes()
+    // the same keys: one name whose device file the restore doesn't rename, or two unsaved layouts with the same keys
+    // (review 2026-10-11 R3; owner 2026-10-11: "Screen 2 should handle unsaved items as named yes")
+    val sameLayout = { type: LayoutType, phone: String, backup: String ->
+        if (phone == backup) keyLayouts.deviceRename(type, backup) == null
+        else LayoutUtilsCustom.isPrivateLayout(phone) && LayoutUtilsCustom.isPrivateLayout(backup)
+            && keyLayouts.contents[type to backup]?.let { keys -> deviceKeys(type, phone)?.contentEquals(keys) } == true
+    }
+    val cache = HashMap<SavedItemsMerge.Choices, SavedItemsMerge.Renames?>()
     // (one at a time: "What to merge" works it out off the main thread, R5)
-    fun renames(names: SavedItemsMerge.Choices) = synchronized(renames) { renames.getOrPut(names) {
-        try {
-            val files = restoreLibraryFiles(ctx, pending, write = false)
-            SavedItemsMerge.merge(ctx, real, pending.prefs, names, files.first, files.second, dry.renames, dry.wanted, real.all, write = false)
-        } catch (e: Exception) { null } // (then compared as in the backup)
+    fun renames(choices: SavedItemsMerge.Choices) = synchronized(cache) { cache.getOrPut(choices) {
+        try { SavedItemsMerge.apply(ctx, real, items, choices, write = false).renames } catch (e: Exception) { null } // (then compared as in the backup)
     } }
-    return RestorePlan(incomingKeyboards(pending, dry), enabled, off, nameOf = { keyboardName(it, ctx) }, sameLayout = dry::same,
-        backupSettings = { keyboard, names -> restoredSettings(ctx, pending.prefs, keyboard).let { renames(names)?.apply(it) ?: it } },
-        phoneSettings = { values, names -> renames(names)?.phoneApply(values) ?: values },
-        clashes = renames(SavedItemsMerge.Choices())?.clashes.orEmpty(),
-        dictionaryClashes = try { dictionaryClashes(ctx, pending) } catch (e: Exception) { emptySet() })
+    // what uses what: the backup's Layouts and themes their inner items; the backup's keyboards their items, directly or
+    // through a Layout or theme ("Required for"); the device's keyboards each device item a question offers
+    val usedByItems = HashMap<Pair<SavedItemsMerge.Kind, String>, MutableSet<Pair<SavedItemsMerge.Kind, String>>>()
+    for (kind in listOf(SavedItemsMerge.Kind.LAYOUTS, SavedItemsMerge.Kind.THEMES)) for (item in items.of(kind))
+        for (inner in SavedItemsMerge.namedByItem(items, item)) usedByItems.getOrPut(inner) { LinkedHashSet() } += kind to item.key
+    val usedBy = HashMap<Pair<SavedItemsMerge.Kind, String>, MutableList<SettingsSubtype>>()
+    for (keyboard in pending.keyboards) {
+        val values = try { restoredSettings(ctx, pending.prefs, keyboard) } catch (e: Exception) { continue }
+        val direct = SavedItemsMerge.namedBy(items, values)
+        val all = direct + direct.flatMap { (kind, key) -> items.item(kind, key)?.let { SavedItemsMerge.namedByItem(items, it) }.orEmpty() }
+        for (key in all) usedBy.getOrPut(key) { ArrayList() }.let { if (keyboard !in it) it += keyboard }
+    }
+    val deviceSettings = (enabled + off).distinct().associateWith { RestoreMatch.phoneSettings(real, it) }
+    val deviceUsers = HashMap<Pair<SavedItemsMerge.Kind, String>, List<SettingsSubtype>>()
+    for (kind in SavedItemsMerge.Kind.entries) for (item in items.of(kind)) for (name in item.candidates)
+        deviceUsers.getOrPut(kind to name) { deviceSettings.filterValues { SavedItemsMerge.names(kind, name, it) }.keys.toList() }
+    return RestorePlan(pending.keyboards.associateWith { it }, enabled, off, nameOf = { keyboardName(it, ctx) }, sameLayout = sameLayout,
+        backupSettings = { keyboard, choices -> restoredSettings(ctx, pending.prefs, keyboard).let { renames(choices)?.apply(it) ?: it } },
+        phoneSettings = { values, choices -> renames(choices)?.phoneApply(values) ?: values },
+        clashes = items.clashes,
+        dictionaryClashes = try { dictionaryClashes(ctx, pending) } catch (e: Exception) { emptySet() },
+        items = items, usedBy = usedBy, usedByItems = usedByItems, deviceUsers = deviceUsers)
 }
 
 /** The restore dialog's questions for the backup [file]'s keyboards (tests). */
 internal fun restorePlanFrom(ctx: Context, file: File): RestorePlan = restorePlan(ctx, readBackup(file))
 
-/** "What to merge" for the backup [keyboard] into the phone's [phone]: what differs ([RestoreMatch.differences]), the
- *  key layouts and saved items as the restore would bring them in and name them ([plan], [names]; R3). */
+/** "What to merge" for the backup [keyboard] into the device's [phone]: what differs ([RestoreMatch.differences]), the
+ *  key layouts and saved items as the restore brings them in and names them ([plan], [names]; R3). */
 private fun restoreDifferences(ctx: Context, plan: RestorePlan, keyboard: SettingsSubtype, phone: SettingsSubtype,
                                withSettings: Boolean, names: SavedItemsMerge.Choices): List<RestoreMatch.Difference> =
     RestoreMatch.differences(phone, plan.incoming.getValue(keyboard), withSettings,
@@ -1592,123 +1852,6 @@ private fun restoreDifferences(ctx: Context, plan: RestorePlan, keyboard: Settin
 internal fun restoreDifferencesFrom(ctx: Context, file: File, keyboard: SettingsSubtype, phone: SettingsSubtype,
                                     withSettings: Boolean = true, names: SavedItemsMerge.Choices = SavedItemsMerge.Choices()): List<RestoreMatch.Difference> =
     restoreDifferences(ctx, restorePlanFrom(ctx, file), keyboard, phone, withSettings, names)
-
-/**
- * The custom key layouts [wanted] (type to name) out of the backup, for [chosen] keyboards restored on their own: one the
- * phone has under the same name with the same keys is the phone's; a name the phone uses for other keys gets the next
- * free number ("My numrow 2", reusing a numbered one with these keys, so a second restore adds nothing). An unsaved one
- * (a keyboard's own) gets a new unsaved name, reusing one with these keys only if no keyboard but the same one uses it.
- * Nothing on the phone is written over. The renames, by type. Not [write]: what they would be, nothing written, the
- * files it would write in [planned] (path to keys); an unsaved one's new name is planned too (review 2026-10-11 R3; owner
- * 2026-10-11: "Screen 2 should handle unsaved items as named yes").
- */
-private fun restoreLayoutFiles(ctx: Context, pending: PendingRestore, wanted: Set<Pair<LayoutType, String>>,
-                               chosen: List<SettingsSubtype>, write: Boolean = true,
-                               planned: HashMap<String, ByteArray> = HashMap()): Map<LayoutType, Map<String, String>> {
-    val byPath = wanted.associateBy { (type, name) -> type.folder + File.separator + name }
-    val contents = LinkedHashMap<Pair<LayoutType, String>, ByteArray>()
-    ZipInputStream(FileInputStream(pending.file)).use { zip ->
-        var entry: ZipEntry? = zip.nextEntry
-        while (entry != null) {
-            byPath[entry.name.substringAfter("unprotected${File.separator}", "")]?.let { contents[it] = zip.readBytes() }
-            zip.closeEntry()
-            entry = zip.nextEntry
-        }
-    }
-    val renames = HashMap<LayoutType, HashMap<String, String>>()
-    val dir = DeviceProtectedUtils.getFilesDir(ctx)
-    // not [write]: the files it would have written, as if written (review 2026-10-11 R6: else a name numbered earlier in
-    // the run looked free to a later one)
-    fun exists(f: File) = f.path in planned || f.exists()
-    fun bytesOf(f: File) = planned[f.path] ?: f.readBytes()
-    fun put(f: File, bytes: ByteArray) { if (write) f.writeBytes(bytes) else planned[f.path] = bytes }
-    // (named ones first: whether an unsaved one's keyboard is the same is seen with its named layouts as they came in)
-    for ((key, bytes) in contents.entries.sortedBy { LayoutUtilsCustom.isPrivateLayout(it.key.second) }) {
-        val (type, name) = key
-        val folderDir = File(dir, type.folder)
-        val target = File(folderDir, name)
-        // (never outside the app's folder, whatever the zip says)
-        if (!target.canonicalPath.startsWith(folderDir.canonicalPath + File.separator)) continue
-        if (!exists(target)) { if (write) folderDir.mkdirs(); put(target, bytes); continue }
-        if (bytesOf(target).contentEquals(bytes)) continue
-        val newName = if (LayoutUtilsCustom.isPrivateLayout(name)) privateLayoutFor(ctx, type, name, bytes, chosen, renames)
-            ?: LayoutUtilsCustom.scopeOf(name, type).let { scope ->
-                if (write) LayoutUtilsCustom.makePrivateLayout(String(bytes), type, scope, ctx)
-                else LayoutUtilsCustom.newPrivateLayoutName(type, scope) { exists(File(folderDir, it)) }.also { put(File(folderDir, it), bytes) } }
-        else generateSequence(2) { it + 1 }.map { LayoutUtilsCustom.numberedLayoutName(name, type, it) }
-            .first { val f = File(folderDir, it); !exists(f) || bytesOf(f).contentEquals(bytes) }
-            .also { val f = File(folderDir, it); if (!exists(f)) put(f, bytes) }
-        renames.getOrPut(type) { HashMap() }[name] = newName
-    }
-    if (write) LayoutUtilsCustom.onLayoutFileChanged()
-    return renames
-}
-
-/** For [restoreLayoutFiles]: an unsaved layout of the phone with [bytes] that only [chosen]'s keyboards naming [name] use
- *  (a restore of the same backup before), its name; null: none (a new one comes in). */
-private fun privateLayoutFor(ctx: Context, type: LayoutType, name: String, bytes: ByteArray, chosen: List<SettingsSubtype>,
-                             renames: Map<LayoutType, Map<String, String>>): String? {
-    val scope = LayoutUtilsCustom.scopeOf(name, type)
-    // a keyboard with its unsaved layouts left out, its named ones as they came in
-    fun normalized(kb: SettingsSubtype) = LayoutType.entries.fold(kb) { k, t ->
-        val n = k.layoutName(t) ?: return@fold k
-        if (LayoutUtilsCustom.isPrivateLayout(n)) k.withLayout(t, "~") else renames[t]?.get(n)?.let { k.withLayout(t, it) } ?: k }
-    val owners = chosen.filter { it.layoutName(type) == name }.map { normalized(it) }.toSet()
-    val prefs = ctx.prefs()
-    val phone = (SubtypeSettings.createSettingsSubtypes(prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!)
-        + SubtypeSettings.createSettingsSubtypes(prefs.getString(Settings.PREF_ADDITIONAL_SUBTYPES, Defaults.PREF_ADDITIONAL_SUBTYPES)!!)).distinct()
-    val reusable = LayoutUtilsCustom.getLayoutFiles(type, ctx).firstOrNull { file ->
-        val candidate = file.name
-        candidate != name && LayoutUtilsCustom.isPrivateLayout(candidate) && LayoutUtilsCustom.scopeOf(candidate, type) == scope
-            && file.readBytes().contentEquals(bytes)
-            && phone.filter { it.layoutName(type) == candidate }.let { users -> users.isNotEmpty() && users.all { normalized(it) in owners } }
-    }
-    return reusable?.name
-}
-
-/**
- * The backup's loaded fonts and pictures (FontLibrary, PictureLibrary) into the phone's lists, for keyboards restored on
- * their own: a file the phone has under the same name with the same content is the phone's; a name the phone uses for
- * another file gets the next free number ("Mine 2.ttf"). The renames, fonts and pictures, by file name. Not [write]:
- * what they would be, nothing written (review 2026-10-11 R3: the restore question compares with them).
- */
-private fun restoreLibraryFiles(ctx: Context, pending: PendingRestore, write: Boolean = true): Pair<Map<String, String>, Map<String, String>> {
-    val fonts = HashMap<String, String>(); val pictures = HashMap<String, String>()
-    val dir = DeviceProtectedUtils.getFilesDir(ctx)
-    // (not [write]: the files it would have written, as if written)
-    val planned = HashMap<String, ByteArray>()
-    fun File.there() = path in planned || exists()
-    fun File.bytes() = planned[path] ?: readBytes()
-    ZipInputStream(FileInputStream(pending.file)).use { zip ->
-        var entry: ZipEntry? = zip.nextEntry
-        while (entry != null) {
-            val name = entry.name.substringAfter("unprotected${File.separator}", "")
-            val folder = name.substringBefore(File.separator, "")
-            if ((folder == "fonts" || folder == "pictures") && backupFilePatterns.any { name.matches(it) } && !name.removePrefix("$folder${File.separator}").contains(File.separator)) {
-                val bytes = zip.readBytes()
-                val fileName = name.removePrefix("$folder${File.separator}")
-                val folderDir = File(dir, folder)
-                var target = File(folderDir, fileName)
-                // (and never outside the app's folder, whatever the zip says)
-                if (target.canonicalPath.startsWith(folderDir.canonicalPath + File.separator)) {
-                    if (!target.there() || !target.bytes().contentEquals(bytes)) {
-                        if (target.there()) {
-                            // the next free number, reusing a numbered one with this content (a second restore adds nothing)
-                            val base = fileName.substringBeforeLast('.', fileName); val ext = fileName.substringAfterLast('.', "").let { if (it.isEmpty()) "" else ".$it" }
-                            target = generateSequence(2) { it + 1 }.map { File(folderDir, "$base $it$ext") }
-                                .first { !it.there() || it.bytes().contentEquals(bytes) }
-                            (if (folder == "fonts") fonts else pictures)[fileName] = target.name
-                        }
-                        if (!target.there()) { if (write) { folderDir.mkdirs(); target.writeBytes(bytes) } else planned[target.path] = bytes }
-                    }
-                }
-            }
-            zip.closeEntry()
-            entry = zip.nextEntry
-        }
-    }
-    return fonts to pictures
-}
 
 /** The files behind the settings (restored with all of them): custom layouts (a keyboard's layout must exist for it),
  *  the background pictures, the loaded fonts (FontLibrary) and pictures (PictureLibrary), and the saved themes'
@@ -1905,9 +2048,14 @@ private fun restoreLearnedWords(ctx: Context, backup: Map<String, Any?>, keyboar
     // (phone pool, script) -> the backup's stores and lists that go there
     val stores = LinkedHashMap<Pair<Int, String>, MutableSet<File>>()
     val lists = LinkedHashMap<Pair<Int, String>, MutableSet<File>>()
+    // the pools this restore made (a keyboard kept both, or new): the backup's words alone, nothing of the device's mixed
+    // in (owner 2026-10-12: Keep both, "the backup's keyboard gets its own words into an EMPTY pool")
+    val fresh = HashSet<Int>()
     // (each keyboard as it was in the backup, and as it is on the phone now)
     for ((keyboard, onPhone) in keyboards) {
+        val had = LearnedKeyboards.poolOrNull(real, onPhone) != null
         val pool = LearnedKeyboards.poolFor(real, onPhone) // (a restore brings it: creates, owner 2026-10-11)
+        if (!had) fresh += pool
         val backupPool = LearnedKeyboards.poolIn(backup, keyboard)
         val locales = listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)
         if (backupPool != null) for (script in locales.map { it.script() }.distinct()) {
@@ -1937,7 +2085,7 @@ private fun restoreLearnedWords(ctx: Context, backup: Map<String, Any?>, keyboar
     }
     for ((target, parts) in toAdd) {
         val (pool, script) = target
-        val phone = LearnedStoreFiles.read(io, filesDir, script, pool) ?: continue
+        val phone = if (pool in fresh) emptyList<LearnedEntry>() else LearnedStoreFiles.read(io, filesDir, script, pool) ?: continue
         val merged = mergeHighest(listOf(phone) + parts)
         if (!LearnedStoreFiles.write(io, filesDir, script, pool, merged))
             Log.w("AdvancedScreen", "could not restore the learned words of $script")

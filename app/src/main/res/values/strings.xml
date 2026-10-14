@@ -352,21 +352,20 @@
     <string name="restore_delete_app_data">Full restore (delete app data)</string>
     <!-- title and button of the question asked before that wipe; its message: saving_full_everything -->
     <string name="restore_delete_and_restore">Delete and restore</string>
-    <!-- the restore dialog's groups (owner 2026-10-12, v3), shown in capitals: KEYBOARDS · RESTORE THEIR (Settings ·
-         Dictionaries) · AND MERGE (Learned words · Clipboard history) · FOR OTHER CLASHES -->
+    <!-- the restore dialog's sections (owner 2026-10-12, the restore redesign), shown in capitals: KEYBOARDS · LAYOUTS &
+         POPUPS · THEMES · PALETTES & IMAGES · FONTS; one row per backup keyboard or saved item, its name as in the backup -->
     <string name="restore_keyboards">Keyboards</string>
-    <string name="restore_their">Restore their</string>
-    <string name="restore_settings">Settings</string>
-    <string name="restore_dictionaries">Dictionaries</string>
-    <!-- under Dictionaries when the restored keyboards' languages have one that differs from the device's; %s: the
-         languages, comma-separated (owner 2026-10-12 wording) -->
-    <string name="restore_dictionaries_clash">%s: Backup is prioritized, yours is kept aside as \"…prev\"</string>
-    <string name="restore_and_merge">And merge</string>
-    <!-- also brings the backup's words of Android's personal dictionary (added only) -->
-    <string name="restore_learned_words">Learned words</string>
+    <string name="restore_section_layouts">Layouts &amp; popups</string>
+    <string name="restore_section_themes">Themes</string>
+    <string name="restore_section_palettes">Palettes &amp; images</string>
+    <string name="restore_section_fonts">Fonts</string>
+    <!-- under a row whose keyboard or item the device has one like: a question follows -->
+    <string name="restore_merge_required">Merge required</string>
+    <!-- under an item a ticked keyboard (or Layout or theme) uses: ticked, can't be unticked. %s: their names, comma-separated -->
+    <string name="restore_required_for">Required for %s</string>
+    <!-- under the top checkbox, unticked, when a ticked row needs merging (owner 2026-10-12) -->
+    <string name="restore_tricky">Tricky merging ahead!</string>
     <string name="restore_clipboard">Clipboard history</string>
-    <!-- under the restore dialog's top checkbox when it is unchecked (owner 2026-10-12) -->
-    <string name="restore_merge_note">Prepare to do super-complex merging! Select what you want to bring in from the backup:</string>
     <!-- Swipe tuning screen (own gesture decoder): inflection weights and per-setting statistics -->
     <string name="swipe_tuning">Swipe suggestion parameters</string>
     <!-- One line under the heading: what the six sliders below are -->
@@ -663,26 +662,46 @@
     <!-- deleting a keyboard whose word lists other keyboards read -->
     <string name="delete_keyboard_readers">These keyboards use its learned and blacklisted words (Use lists from other keyboards). Pick one to keep them, merged into its own; the others then read them from there:</string>
     <string name="delete_keyboard_merge_none">None: the lists go</string>
-    <!-- the restore dialog: a keyboard not on this phone -->
-    <string name="restore_keyboard_new">%s (new)</string>
-    <!-- the restore dialog, keyboard by keyboard: the backup's saved items clashing with this phone's, each ticked to
-         start with (owner 2026-10-11: "backup wins the name if ticked"; replaces "bring them in as copies") -->
-    <string name="restore_clashes">For other clashes</string>
-    <!-- (owner 2026-10-12 wording; yours is renamed, never overwritten) -->
-    <string name="restore_clashes_note">Checked: Backup item is prioritized, yours is kept as \"… 2\". Unchecked: Backup item is ignored.</string>
-    <!-- same name, other content. %1$s: the name, %2$s: what this phone's item becomes, e.g. "Sunset 2" -->
-    <string name="restore_clash_same_name">%1$s: use the backup\'s, yours becomes %2$s</string>
-    <!-- the same content under another name. %1$s: this phone's name, %2$s: the backup's name -->
-    <string name="restore_clash_same_content">%1$s is the backup\'s %2$s: rename yours to %2$s</string>
-    <!-- a Layout's custom key layout, same name with other keys. %1$s: the key layout's name, %2$s: what this phone's becomes -->
-    <string name="restore_clash_key_layout">key layout %1$s: use the backup\'s, yours becomes %2$s</string>
     <!-- the restore: the phone has keyboards of a chosen backup keyboard's language (owner 2026-10-11: restore matches by
          language and asks). The app can't tell which one is newer: never say newer or older. %s: the backup keyboard's name -->
     <string name="restore_merge_title">Restoring %s</string>
-    <string name="restore_merge_message">This device has a keyboard of the same language. Merge the backup\'s keyboard into one of them, or keep it as a separate keyboard?</string>
-    <string name="restore_keep_separate">Keep as a separate keyboard</string>
-    <!-- after a phone keyboard on the restore's first question: it has the backup keyboard's id (a hint, nothing preselected) -->
-    <string name="restore_same_keyboard_hint">(same keyboard as in the backup)</string>
+    <string name="restore_merge_message">This device has a keyboard of the same language. Merge the backup\'s keyboard into one of them, or keep both?</string>
+    <!-- a question's counter, small above its title: "1 of 3" -->
+    <string name="restore_question_count">%1$d of %2$d</string>
+    <!-- the questions' button back to the one before (from the first: the restore dialog) -->
+    <string name="restore_back">Back</string>
+    <!-- a question's answer: the backup's comes in under its name, the device's of that name becomes "… 2" (owner 2026-10-12) -->
+    <string name="restore_keep_both">Keep both</string>
+    <!-- under the device keyboard with the backup keyboard's id, picked to start with (owner 2026-10-12) -->
+    <string name="restore_same_keyboard_suggested">Suggested: same keyboard as in the backup</string>
+    <!-- a saved item's question (owner 2026-10-12). %1$s: the item's kind (restore_noun_…), %2$s: its name in the backup -->
+    <string name="restore_item_title">Restoring %1$s %2$s</string>
+    <!-- %s: the item's kind (restore_noun_…) -->
+    <string name="restore_item_message">This device has a %s like it. Replace it with the backup\'s, or keep both?</string>
+    <string name="restore_noun_theme">theme</string>
+    <string name="restore_noun_palette">palette</string>
+    <string name="restore_noun_layout">Layout</string>
+    <string name="restore_noun_popup_set">popup set</string>
+    <string name="restore_noun_font">font</string>
+    <string name="restore_noun_image">image</string>
+    <!-- the first candidate, picked to start with. %s: what it is (restore_item_same_…) -->
+    <string name="restore_item_suggested">Suggested: %s</string>
+    <string name="restore_item_same_name_colors">same name, other colors</string>
+    <string name="restore_item_same_name_settings">same name, other settings</string>
+    <string name="restore_item_same_name_file">same name, other file</string>
+    <!-- the device's item with the backup's content under another name. %s: the backup's name, which it gets -->
+    <string name="restore_item_same_content_colors">same colors, other name: renamed %s</string>
+    <string name="restore_item_same_content_settings">same settings, other name: renamed %s</string>
+    <string name="restore_item_same_content_file">same file, other name: renamed %s</string>
+    <!-- %1$s: the candidate's line, %2$s: who uses it (restore_item_used_by_…) -->
+    <string name="restore_item_used_by">%1$s. %2$s</string>
+    <!-- %s: the device's keyboards using it, comma-separated -->
+    <string name="restore_item_used_by_look">Used by your %s: they take the backup\'s look</string>
+    <string name="restore_item_used_by_settings">Used by your %s: they take the backup\'s settings</string>
+    <!-- under Keep both. %1$s: the item's name, %2$s: what the device's becomes, e.g. "Sunset 2" -->
+    <string name="restore_item_keep_both_renamed">The backup\'s is %1$s; yours becomes %2$s (keyboards using it keep their look)</string>
+    <!-- under Keep both when the device's like it has another name. %s: the item's name -->
+    <string name="restore_item_keep_both_added">The backup\'s comes in as %s; yours stays as it is</string>
     <string name="restore_next">Next</string>
     <!-- the name box of a merged or separate keyboard -->
     <string name="restore_name">Name</string>
@@ -694,8 +713,6 @@
     <string name="restore_nothing_differs">Nothing differs: %s on this device is the same as the backup\'s.</string>
     <!-- nothing ticked; %s: the backup keyboard's name -->
     <string name="restore_nothing_ticked">Nothing to restore: %s will not be restored from the backup.</string>
-    <string name="restore_dont_restore">Don\'t restore</string>
-    <string name="restore_done">Done</string>
     <!-- a dialog with OK after a restore with one set of settings for all (separate settings off), which the restore
          leaves off (owner 2026-10-12 wording): %1$s the keyboard(s), %2$s the first keyboard, whose settings all follow -->
     <string name="restore_settings_hidden_one">%1$s\'s settings were restored, but all keyboards follow %2$s for now. To see %1$s\'s restored settings, turn on Separate settings per keyboard (App settings › Per keyboard).</string>
@@ -721,6 +738,10 @@
         <item quantity="one">All settings are common to all your keyboards (App settings › Per keyboard: separate settings off) and come from %1$s, first in your list. The backup\'s %2$s is restored into %3$s\'s own settings, and shows once you turn on Separate settings per keyboard.</item>
         <item quantity="other">All settings are common to all your keyboards (App settings › Per keyboard: separate settings off) and come from %1$s, first in your list. The backup\'s %2$s are restored into %3$s\'s own settings, and show once you turn on Separate settings per keyboard.</item>
     </plurals>
+    <!-- the "Backup restored" dialog after a keyboard by keyboard restore (owner 2026-10-12). %s: names, comma-separated -->
+    <string name="restore_summary_merged">Merged: %s</string>
+    <string name="restore_summary_added">Added: %s</string>
+    <string name="restore_summary_settings">Settings and dictionaries restored; your dictionaries kept as \"…prev\".</string>
     <!-- after a restore of the first keyboard while its settings are the common ones: %s the keyboard -->
     <string name="restore_settings_main">%s\'s settings were restored. All keyboards use them, as they\'re the common settings.</string>
     <string name="restore_differs_choose_message">A ticked item takes the backup\'s. An unticked item keeps this device\'s.</string>
@@ -730,6 +751,9 @@
     <string name="restore_differs_row">%1$s: this device %2$s, backup %3$s</string>
     <!-- a row whose two values can't be shown apart in words -->
     <string name="restore_differs_plain">%s: this device and the backup differ</string>
+    <!-- a key layout the device has under the backup's name with other keys (owner 2026-10-12). %1$s: the row (e.g. Keys),
+         %2$s: the key layout's name, %3$s: what the device's becomes, e.g. "My numrow 2" -->
+    <string name="restore_differs_key_layout">%1$s: Backup\'s %2$s; yours becomes %3$s</string>
     <!-- a row for a menu whose settings differ: %s the menu -->
     <string name="restore_differs_menu">%s settings</string>
     <string name="restore_part_keys">Keys</string>
