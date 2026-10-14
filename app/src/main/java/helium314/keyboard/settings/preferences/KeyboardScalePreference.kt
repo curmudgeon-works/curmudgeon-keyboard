@@ -159,12 +159,12 @@ private fun KeyboardScaleDialog(
                             val default = part.defaults[i]
                             var sliderPosition by remember(key) { mutableFloatStateOf(prefs.getFloat(key, default)) }
                             var touched by remember(key) { mutableStateOf(false) }
+                            // stored = picked (owner 2026-10-06): a value dragged to equal the default is stored, only
+                            // Default (or never stored) follows the default
+                            var follows by remember(key) { mutableStateOf(!prefs.contains(key)) }
                             // live: written when the finger leaves the slider (or Default is tapped), not during the drag
-                            fun applyLive() { if (live && touched) { write(key, if (sliderPosition == default) null else sliderPosition); onDone() } }
-                            done[key] = {
-                                if (sliderPosition == default) prefs.edit { remove(key) }
-                                else prefs.edit { putFloat(key, sliderPosition) }
-                            }
+                            fun applyLive() { if (live && touched) { write(key, if (follows) null else sliderPosition); onDone() } }
+                            done[key] = { write(key, if (follows) null else sliderPosition) }
                             val forbiddenDimensions = dimensions.filterIndexed { index, _ -> !checked[index] }
                             val visible = variant.split(SPLIT).none { it in forbiddenDimensions }
                             // default animations make the dialog flash (see also DictionaryDialog)
@@ -172,7 +172,7 @@ private fun KeyboardScaleDialog(
                                 WithSmallTitle(variant.ifEmpty { baseVariantName }) {
                                     Slider(
                                         value = sliderPosition,
-                                        onValueChange = { sliderPosition = it; touched = true },
+                                        onValueChange = { sliderPosition = it; touched = true; follows = false },
                                         onValueChangeFinished = { applyLive() },
                                         valueRange = part.range,
                                     )
@@ -182,7 +182,7 @@ private fun KeyboardScaleDialog(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(part.description(sliderPosition))
-                                        TextButton({ sliderPosition = default; touched = true; applyLive() }) { Text(stringResource(R.string.button_default)) }
+                                        TextButton({ sliderPosition = default; touched = true; follows = true; applyLive() }) { Text(stringResource(R.string.button_default)) }
                                     }
                                     Spacer(Modifier.height(6.dp))
                                 }
