@@ -33,6 +33,12 @@ class OnDemandDictionariesTest {
         assertEquals("https://curmudgeon.works/dictionaries#et-EE", OnDemandDictionaries.pageFor("et-EE".constructLocale()))
     }
 
+    @Test fun `Urdu and Korean keyboards find their downloads`() { // (2026-10-11: release v2)
+        assertEquals("ur", download("ur-PK")) // (the keyboard's Urdu)
+        assertEquals("ko", download("ko"))
+        assertEquals("https://curmudgeon.works/dictionaries#ur-PK", OnDemandDictionaries.pageFor("ur-PK".constructLocale()))
+    }
+
     @Test fun `without advanced a language shows if it has a dictionary here or to download`() {
         assertTrue(dictionaryAvailable(ctx, "en-US".constructLocale())) // built in
         assertTrue(dictionaryAvailable(ctx, "hi".constructLocale())) // to download
