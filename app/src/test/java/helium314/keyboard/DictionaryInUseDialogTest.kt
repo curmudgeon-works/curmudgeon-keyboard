@@ -11,6 +11,7 @@ import helium314.keyboard.latin.utils.DictionaryInfoUtils
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.dialogs.dictionaryDeleteBlockers
+import helium314.keyboard.settings.dialogs.dictionaryDisplayName
 import helium314.keyboard.settings.dialogs.dictionaryInUse
 import helium314.keyboard.settings.dialogs.replaceAndDelete
 import helium314.keyboard.settings.screens.keyboardName
@@ -75,13 +76,13 @@ class DictionaryInUseDialogTest {
         val prev = File(dir(danish), "main_prev_user.dict").apply { writeText("y") }
         File(dir(danish), "emoji_user.dict").writeText("e") // (another kind: never the replacement)
         val d = dialog(danish, main, da)
-        assertEquals("Replace with main_prev and delete this one", d.replaceButton)
+        assertEquals("Replace with Main dictionary (main_prev) and delete this one", d.replaceButton)
         replaceAndDelete(ctx, danish, main, d.replaceWith!!)
         assertFalse(main.exists())
         assertEquals(prev.name, DictionarySelection.selected(ctx, danish))
         // the one now in use, with the other one gone: the only one
         val again = dialog(danish, prev, da)
-        assertEquals("“main_prev” is in use", again.title)
+        assertEquals("“Main dictionary (main_prev)” is in use", again.title)
         assertNull(again.replaceButton)
     }
 
@@ -92,6 +93,28 @@ class DictionaryInUseDialogTest {
         assertEquals("Used by: ${name(da)}. It is the only dictionary for this language, so it can't be deleted while a keyboard uses the language.", d.message)
         assertNull(d.replaceButton)
         assertNull(d.replaceWith)
+    }
+
+    // 20261013_L12-NAMES (owner: "yep"): one name for a dictionary everywhere, its rows too. Fail before: an added main
+    // one other than the default was its raw file name ("main_prev2") here and "Main dictionary" on its row, the
+    // emoji one "emoji"
+    @Test fun `names - built-in, the default main, another main, another kind`() {
+        assertEquals("Internal main dictionary", dictionaryDisplayName(ctx, DictionarySelection.INTERNAL))
+        assertEquals("Main dictionary", dictionaryDisplayName(ctx, "main_user.dict"))
+        assertEquals("Main dictionary (main_prev2)", dictionaryDisplayName(ctx, "main_prev2_user.dict"))
+        assertEquals("Emoji dictionary (emoji)", dictionaryDisplayName(ctx, "emoji_user.dict"))
+        assertEquals("Emoji dictionary (emoji_prev)", dictionaryDisplayName(ctx, "emoji_prev_user.dict"))
+        useKeyboards(ctx, real, da)
+        File(dir(danish), "main_user.dict").writeText("x")
+        val emoji = File(dir(danish), "emoji_user.dict").apply { writeText("e") }
+        val prev = File(dir(danish), "emoji_prev_user.dict").apply { writeText("f") }
+        val d = dialog(danish, emoji, da)
+        assertEquals("“Emoji dictionary (emoji)” is in use", d.title)
+        assertEquals("Replace with Emoji dictionary (emoji_prev) and delete this one", d.replaceButton)
+        prev.delete()
+        // 20261013_F4 (owner: "4. A"): case 2 of another kind names the kind. Fail before: "the only dictionary"
+        assertEquals("Used by: ${name(da)}. It is the only emoji dictionary for this language, so it can't be deleted while a keyboard uses the language.",
+            dialog(danish, emoji, da).message)
     }
 
     @Test fun `case 3 - other keyboards use it too - those keyboards, OK only`() {

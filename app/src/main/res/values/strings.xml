@@ -703,6 +703,14 @@
     <string name="dictionary_in_use_select_first">To delete it, select another version first.</string>
     <!-- opened from the only keyboard using it, no other dictionary for the language -->
     <string name="dictionary_in_use_only_one">It is the only dictionary for this language, so it can\'t be deleted while a keyboard uses the language.</string>
+    <!-- the same for a dictionary of another kind than main; %s = the kind, lowercase (e.g. emoji) -->
+    <string name="dictionary_in_use_only_one_kind">It is the only %s dictionary for this language, so it can\'t be deleted while a keyboard uses the language.</string>
+    <!-- an added main dictionary other than the default one, in the dictionaries' lists and dialogs; %s = its file name (e.g. main_prev2) -->
+    <string name="main_dictionary_file">Main dictionary (%s)</string>
+    <!-- an added dictionary of another kind than main; %1$s = the kind (e.g. Emoji), %2$s = its file name (e.g. emoji) -->
+    <string name="kind_dictionary_file">%1$s dictionary (%2$s)</string>
+    <!-- the emoji dictionaries' kind, in "Emoji dictionary (emoji)" -->
+    <string name="dictionary_kind_emoji">Emoji</string>
     <!-- other keyboards using it too, or opened from no keyboard -->
     <plurals name="dictionary_in_use_select_for">
         <item quantity="one">To delete it, select another version for that keyboard first.</item>

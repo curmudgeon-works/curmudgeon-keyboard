@@ -143,8 +143,8 @@ private fun DictionaryDetails(dict: File, locale: Locale, keyboard: helium314.ke
     val type = header.mIdString.substringBefore(":")
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
-    val title = if (type != DictionaryInfoUtils.DEFAULT_MAIN_DICT) type
-        else stringResource(R.string.main_dictionary)
+    // (by the file, as the in-use dialog names it: two added main ones were both "Main dictionary", 20261013_L12-NAMES)
+    val title = dictionaryDisplayName(LocalContext.current, dict.name)
     Row(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -225,7 +225,11 @@ internal fun dictionaryInUse(context: android.content.Context, locale: Locale, d
     val next = if (sole) nextDictionary(context, locale, dict) else null
     val case = when {
         next != null -> context.getString(R.string.dictionary_in_use_select_first)
-        sole -> context.getString(R.string.dictionary_in_use_only_one)
+        // (another kind than main: the sentence names it, "the only emoji dictionary", 20261013_F4)
+        sole -> DictionarySelection.typeOf(dict).let { kind ->
+            if (kind == Dictionary.TYPE_MAIN) context.getString(R.string.dictionary_in_use_only_one)
+            else context.getString(R.string.dictionary_in_use_only_one_kind, dictionaryKindName(context, kind).lowercase())
+        }
         else -> context.resources.getQuantityString(R.plurals.dictionary_in_use_select_for, blockers.size)
     }
     return DictionaryInUse(title, "$usedBy $case", next,
@@ -252,12 +256,23 @@ internal fun replaceAndDelete(context: android.content.Context, locale: Locale, 
     context.sendBroadcast(Intent(DictionaryPackConstants.NEW_DICTIONARY_INTENT_ACTION))
 }
 
-/** A dictionary's name in the dialogs: the built-in one's, the added main one's ("Main dictionary"), else the name the
- *  language row shows ("main_prev", "emoji"). */
-internal fun dictionaryDisplayName(context: android.content.Context, name: String): String = when (name) {
-    DictionarySelection.INTERNAL -> context.getString(R.string.internal_dictionary_summary)
-    DictionarySelection.DEFAULT_USER_MAIN -> context.getString(R.string.main_dictionary)
-    else -> name.removeSuffix("_" + DictionaryInfoUtils.USER_DICTIONARY_SUFFIX)
+/** A dictionary's name ([name]: its file name, or [DictionarySelection.INTERNAL]) everywhere the dictionaries are named:
+ *  their rows, the in-use dialog's title and its Replace button (round-5 review 20261013_L12-NAMES): the built-in one's
+ *  ("Internal main dictionary"), the default added main one's ("Main dictionary"), another added main one "Main
+ *  dictionary (main_prev2)", one of another kind "<Kind> dictionary (<file name>)", e.g. "Emoji dictionary (emoji)". */
+internal fun dictionaryDisplayName(context: android.content.Context, name: String): String {
+    if (name == DictionarySelection.INTERNAL) return context.getString(R.string.internal_dictionary_summary)
+    if (name == DictionarySelection.DEFAULT_USER_MAIN) return context.getString(R.string.main_dictionary)
+    val file = name.removeSuffix("_" + DictionaryInfoUtils.USER_DICTIONARY_SUFFIX)
+    val kind = DictionarySelection.typeOf(File(name))
+    return if (kind == Dictionary.TYPE_MAIN) context.getString(R.string.main_dictionary_file, file)
+        else context.getString(R.string.kind_dictionary_file, dictionaryKindName(context, kind), file)
+}
+
+/** A dictionary kind's name, as a title starts it ("Emoji"); a kind the app has no name for: its own word ("Symbols"). */
+internal fun dictionaryKindName(context: android.content.Context, kind: String): String = when (kind) {
+    Dictionary.TYPE_EMOJI -> context.getString(R.string.dictionary_kind_emoji)
+    else -> kind.replaceFirstChar { it.titlecase() }
 }
 
 /** The keyboards keeping the added dictionary [dict] of [locale] from being deleted (review L3.2): it is the version of
