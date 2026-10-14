@@ -49,9 +49,14 @@ class AppearanceDraft private constructor(
     // move could miss one, and that file went with the folder)
 
     /** Font [name] deleted with the screen open: its file moves into the snapshot folder (out of the font list). False
-     *  when it couldn't be moved: then it's deleted at once, as without the screen. */
+     *  when it couldn't be moved: then it's deleted at once, as without the screen. Held only when it was in the list
+     *  when the screen opened and isn't held already: one added during the visit (a new name, or the name of a held
+     *  one) is deleted at once, so it can't take the held original's place (round-6 review 20261013_L5_2, case a,
+     *  owner 2026-10-13; before, the second delete of a name overwrote the held original). */
     fun holdFontDelete(ctx: Context, name: String): Boolean {
+        if (fontsAtStart != null && name !in fontsAtStart) return false
         val target = File(File(dir, HELD_FONTS), name)
+        if (target.exists()) return false
         target.parentFile?.mkdirs()
         if (!File(helium314.keyboard.keyboard.FontLibrary.dir(ctx), name).renameTo(target)) return false
         version.intValue++

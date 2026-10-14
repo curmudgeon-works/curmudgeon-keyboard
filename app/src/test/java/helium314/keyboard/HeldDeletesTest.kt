@@ -187,6 +187,26 @@ class HeldDeletesTest {
         assertFalse(dir.exists())
     }
 
+    // round-6 review 20261013_L5_2, case a (owner 2026-10-13): only a font in the list when the screen opened, and not
+    // held already, is held; one added during the visit is deleted at once. Fail before: deleting a font added under the
+    // held one's name overwrote the held original, and Discard brought back the added one
+    @Test fun `a font added during the visit is deleted at once, the held original stays`() {
+        AppearanceDraft.of(ctx) // the Appearance screen opens
+        FontLibrary.delete(ctx, "Mine.ttf") // held
+        font.writeText("another font") // another one added under the free name
+        FontLibrary.delete(ctx, "Mine.ttf")
+        assertFalse(font.exists())
+        val other = File(FontLibrary.dir(ctx), "Other.ttf").apply { writeText("other") } // a new one
+        FontLibrary.delete(ctx, "Other.ttf")
+        assertFalse(other.exists())
+        val held = File(DeviceProtectedUtils.getFilesDir(ctx), "appearance_draft${File.separator}held_fonts")
+        assertEquals(listOf("Mine.ttf"), held.list()!!.toList(), "only the font of the open held")
+        assertEquals("not really a font", File(held, "Mine.ttf").readText(), "the held original overwritten")
+        AppearanceDraft.rejectOpen(ctx) // Discard
+        assertEquals("not really a font", font.readText(), "the original back")
+        assertFalse(other.exists())
+    }
+
     // round-6 review 20261013_M1_2 (owner 2026-10-13): the snapshot folder is in the device-protected storage, with the
     // font and picture lists, so a held delete is a rename within one storage (on an encrypted device a rename between
     // the two storages is refused, and the file was deleted at once). Fail before: the folder was in the other storage
