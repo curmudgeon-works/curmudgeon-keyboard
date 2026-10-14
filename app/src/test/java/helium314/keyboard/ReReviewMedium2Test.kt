@@ -87,6 +87,24 @@ class ReReviewMedium2Test {
         assertEquals(3, list.entries()["teh"]?.strikes) // the file's 2 plus the strike made meanwhile (reviewer: not written over)
     }
 
+    // fail before (round-5 review): the allowed part made before the read had no own strikes, and the read took the file's off
+    @Test fun `allowing a word during the migration keeps its own strikes from the file in the same row`() {
+        val latch = CountDownLatch(1)
+        LearnedStoreMigration.holdForTest(latch)
+        val file = File(ctx.filesDir, "allow_test_${System.nanoTime()}.txt").apply { writeText("teh\t2\n") }
+        val list = RemovedWords.forFile(file)
+        try {
+            assertTrue(list.allow("teh", 3)) // returns at once (the file isn't read yet)
+            latch.countDown()
+            Thread.sleep(300)
+            assertEquals(2, list.entries()["teh"]?.strikes, "the file's own strikes")
+            assertEquals(3, list.allowedFor("teh"))
+        } finally {
+            LearnedStoreMigration.holdForTest(null)
+            file.delete()
+        }
+    }
+
     // 3
     @Test fun `a copy with one set of settings for all keyboards gets its own set at once`() {
         // (owner 2026-10-11: no separate common set; the first keyboard's own settings are the common ones: every

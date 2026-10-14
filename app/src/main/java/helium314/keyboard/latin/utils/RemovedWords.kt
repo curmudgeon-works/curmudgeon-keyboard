@@ -285,6 +285,9 @@ object RemovedWords {
         // strikes made before the file was read (a Remove during the one-time migration): added to the file's count
         // when the read catches up, not written over it (re-review 2026-10-07)
         private val strikesWhileLoading = HashMap<String, Int>()
+        // the allowed parts set before the file was read (the migration's window), as strikes: the read keeps the file's own
+        // strikes of the word in its row (round-5 review: the pending row had none and took them off)
+        private val allowsWhileLoading = HashMap<String, Int>()
         @Volatile private var loaded = false
         private val lock = Any()
         // the changes made while a full restore ran, as made ([GatedOp])
@@ -301,7 +304,7 @@ object RemovedWords {
             val ops = gatedOps.toList()
             gatedOps.clear()
             // (a strike or disallow changes the lowercase spelling too, L4.2)
-            for (op in ops) for (w in setOf(op.word, op.word.lowercase())) { pending.remove(w); strikesWhileLoading.remove(w) }
+            for (op in ops) for (w in setOf(op.word, op.word.lowercase())) { pending.remove(w); strikesWhileLoading.remove(w); allowsWhileLoading.remove(w) }
             ops
         }
 
@@ -392,7 +395,14 @@ object RemovedWords {
                 allowedResult.remove(word)
                 pending[word] = Change(entry, null)
             }
+            for ((word, level) in allowsWhileLoading) {
+                val entry = if (word in strikesWhileLoading) result[word] else read[word]
+                if (entry == null) result.remove(word) else result[word] = entry
+                allowedResult[word] = level
+                pending[word] = Change(entry, level)
+            }
             strikesWhileLoading.clear()
+            allowsWhileLoading.clear()
             byWord.putAll(result)
             byWord.keys.retainAll(result.keys)
             allowedByWord.putAll(allowedResult)
@@ -444,6 +454,7 @@ object RemovedWords {
             if (!loaded) { if (LearnedStoreMigration.isRunning) reloadAsync() else read() }
             synchronized(lock) {
                 if (allowedByWord[word] == level) return false
+                if (!loaded) allowsWhileLoading[word] = level
                 set(word, byWord[word], level)
                 recordGated(GatedAllow(word, level))
                 return true
@@ -461,7 +472,7 @@ object RemovedWords {
             // lock): the strike counts from what's in memory and the read catches up in the background
             if (!loaded) { if (LearnedStoreMigration.isRunning) reloadAsync() else read() }
             return synchronized(lock) {
-                if (!loaded) strikesWhileLoading[word] = (strikesWhileLoading[word] ?: 0) + 1
+                if (!loaded) { strikesWhileLoading[word] = (strikesWhileLoading[word] ?: 0) + 1; allowsWhileLoading.remove(word) }
                 strikeNow(word, floor)
             }
         }
