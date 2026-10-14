@@ -151,4 +151,64 @@
     <string name="saving_separate_reorder">Moving another keyboard to the top makes its settings the common ones, at once.</string>
     <string name="saving_separate_items">Saved items are shared by all keyboards either way. With one set of settings, the update and delete dialogs have no keyboards to tick.</string>
     <string name="saving_separate_words">Each keyboard always keeps its own learned and blacklisted words.</string>
+
+    <!-- One table (owner 2026-10-14: "a table with save items as rows and actions as columns instead of current
+         tabs? It'll need massive text contraction potentially"): each cell's short text; a tap shows the full rows
+         above. Shared texts are used by every cell that says the same. -->
+    <string name="saving_cell_not_applicable">—</string>
+    <string name="saving_cell_dialog_title">%1$s · %2$s</string>
+    <string name="saving_short_this_keyboard">This keyboard only</string>
+    <string name="saving_short_users_change">Every user changes</string>
+    <string name="saving_short_users_follow">Users follow</string>
+    <string name="saving_short_off_list_kept">Off list; users keep it</string>
+    <string name="saving_short_included">Included</string>
+    <string name="saving_short_kept">Kept</string>
+    <string name="saving_short_gone_unless_ticked">Gone unless ticked</string>
+    <string name="saving_short_clashes">Clashes: you choose</string>
+    <string name="saving_short_switch_stays">Stays as it is</string>
+    <string name="saving_short_choose_layouts">All of it on this keyboard</string>
+    <string name="saving_short_choose_themes">Its look on this keyboard</string>
+    <string name="saving_short_choose_popups">Its popups on this keyboard</string>
+    <string name="saving_short_choose_palettes">This keyboard\'s colors</string>
+    <string name="saving_short_choose_fonts">This keyboard\'s font</string>
+    <string name="saving_short_choose_pictures">This keyboard\'s background</string>
+    <string name="saving_short_choose_key_layouts">This keyboard\'s keys</string>
+    <string name="saving_short_choose_saved_defaults">New defaults or as saved</string>
+    <string name="saving_short_edit_keyboards">One or all, per switch</string>
+    <string name="saving_short_new_items">Saved under a new name</string>
+    <string name="saving_short_rename_keyboards">Long-press the name</string>
+    <string name="saving_short_delete_palettes">All, or this keyboard</string>
+    <string name="saving_short_delete_fonts">Users back to default</string>
+    <string name="saving_short_delete_pictures">Off list; copies kept</string>
+    <string name="saving_short_delete_key_layouts">Off list; users keep keys</string>
+    <string name="saving_short_delete_keyboards">Its words go too</string>
+    <string name="saving_short_delete_dictionaries">Only once unused</string>
+    <string name="saving_short_delete_learned">Gone, as never typed</string>
+    <string name="saving_short_delete_blacklisted">Can be suggested again</string>
+    <string name="saving_short_delete_personal">Gone, and blacklisted</string>
+    <string name="saving_short_delete_clips">Unpin or delete</string>
+    <string name="saving_short_default_items">Choose it again</string>
+    <string name="saving_short_add_palettes">Add, or load</string>
+    <string name="saving_short_add_fonts">Load a font file</string>
+    <string name="saving_short_add_pictures">Joins the picture list</string>
+    <string name="saving_short_add_key_layouts">Paste, or load a file</string>
+    <string name="saving_short_add_keyboards">New, or a copy</string>
+    <string name="saving_short_add_dictionaries">Downloads or website</string>
+    <string name="saving_short_add_personal">Add word</string>
+    <string name="saving_short_export_palettes">File or text</string>
+    <string name="saving_short_export_everything">In a backup</string>
+    <string name="saving_short_backup_items">As saved</string>
+    <string name="saving_short_backup_keyboards">Only what you picked</string>
+    <string name="saving_short_partial_keyboards">Added, merged or separate</string>
+    <string name="saving_short_partial_files">Reused, or renamed</string>
+    <string name="saving_short_partial_dictionaries">Differing one selected</string>
+    <string name="saving_short_partial_words">Merged, higher count</string>
+    <string name="saving_short_partial_clips">Merged</string>
+    <string name="saving_short_full_everything">Replaced by the backup</string>
+    <string name="saving_short_update_keyboards">Picked stays</string>
+    <string name="saving_short_update_items">Per the switch</string>
+    <string name="saving_short_reset_keyboards">Back to defaults</string>
+    <string name="saving_short_separate_keyboards">Own, or the first\'s</string>
+    <string name="saving_short_separate_items">Shared either way</string>
+    <string name="saving_short_separate_words">Always their own</string>
 </resources>
