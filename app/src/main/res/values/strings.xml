@@ -636,15 +636,9 @@
     <!-- after a restore with one set of settings for all (separate settings off), which the restore leaves off: %s the keyboard(s) -->
     <string name="restore_settings_hidden_one">%s\'s settings were restored. You\'ll see them once you turn on Use separate settings in App settings.</string>
     <string name="restore_settings_hidden_many">The settings of %s were restored. You\'ll see them once you turn on Use separate settings in App settings.</string>
-    <!-- what to merge: a ticked row replaces the phone keyboard's unsaved copy (owner 2026-10-11); %1$s the keyboard's
-         name, %2$s the copy's label: restore_unsaved_custom or restore_unsaved_custom_from -->
-    <string name="restore_unsaved_theme">%1$s\'s unsaved theme (%2$s) will be replaced. Save it as a theme first if you want to keep it.</string>
-    <string name="restore_unsaved_layout">%1$s\'s unsaved Layout (%2$s) will be replaced. Save it as a Layout first if you want to keep it.</string>
-    <string name="restore_unsaved_popups">%1$s\'s unsaved popups (%2$s) will be replaced. Save them as a popup set first if you want to keep them.</string>
-    <string name="restore_unsaved_custom">Custom</string>
-    <!-- %s: the saved item the copy came from -->
-    <string name="restore_unsaved_custom_from">Custom · from %s</string>
     <string name="restore_differs_choose_message">A ticked item takes the backup\'s. An unticked item keeps this phone\'s.</string>
+    <!-- what to merge, while something is ticked (owner 2026-10-11) -->
+    <string name="restore_replaces_settings">Selected items replace this keyboard\'s settings, including any unsaved changes.</string>
     <!-- a row of "What to merge": %1$s what it is, %2$s this phone's value, %3$s the backup's -->
     <string name="restore_differs_row">%1$s: this phone %2$s, backup %3$s</string>
     <!-- a row whose two values can't be shown apart in words -->

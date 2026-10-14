@@ -609,13 +609,11 @@ private fun RestoreChooseDialog(question: MergeQuestion, target: SettingsSubtype
                     return@Column
                 }
                 Text(stringResource(R.string.restore_differs_choose_message), modifier = Modifier.padding(bottom = 8.dp))
+                choice.replacesNote(ctx)?.let { Text(it, modifier = Modifier.padding(bottom = 8.dp)) }
                 differences.forEach { difference ->
                     CheckRow(RestoreMatch.rowText(ctx, difference, question.keyboard), difference in choice.ticked) {
                         if (it) choice.ticked.add(difference) else choice.ticked.remove(difference)
                     }
-                    // (an unsaved copy this row replaces: said under it, owner 2026-10-11)
-                    choice.warning(ctx, difference)?.let { Text(it, color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 48.dp, bottom = 4.dp)) }
                 }
                 if (wordsRow) CheckRow(stringResource(R.string.restore_learned_row), choice.wordsTicked) { choice.wordsTicked = it }
                 if (decision is RestoreDecision.Skip)
@@ -1122,32 +1120,7 @@ private fun incomingKeyboards(ctx: Context, pending: PendingRestore): Map<Settin
 /** The restore dialog's questions for [pending]'s keyboards: each as it would come in, and the phone's keyboards. */
 private fun restorePlan(ctx: Context, pending: PendingRestore): RestorePlan {
     val (enabled, off) = phoneKeyboards(ctx.realPrefs())
-    return RestorePlan(incomingKeyboards(ctx, pending), enabled, off, { keyboardName(it, ctx) }, { unsavedCopies(ctx, it) })
-}
-
-/** The unsaved copies phone keyboard [keyboard] holds: each kind with a Custom label, in its own set or on its screens,
- *  and the saved item it came from while that still exists. */
-private fun unsavedCopies(ctx: Context, keyboard: SettingsSubtype): List<UnsavedCopy> {
-    val real = ctx.realPrefs()
-    val id = KeyboardProfiles.idEntries(real)[keyboard.toPref()] ?: return emptyList()
-    val stored = helium314.keyboard.settings.CustomLabels.stored(real, helium314.keyboard.settings.CustomLabels.Kind.entries)
-    val shownView = helium314.keyboard.latin.settings.ProfilePreferences(real) { id }
-    val ownView = helium314.keyboard.latin.settings.ProfilePreferences(real, true) { id }
-    return helium314.keyboard.settings.CustomLabels.Kind.entries.mapNotNull { kind ->
-        val own = KeyboardProfiles.ownKey(id, kind.key) in stored
-        val shown = helium314.keyboard.settings.CustomLabels.has(shownView, kind)
-        if (!own && !shown) return@mapNotNull null
-        val (key, names) = when (kind) {
-            helium314.keyboard.settings.CustomLabels.Kind.THEME -> helium314.keyboard.settings.AppearanceLooks.PREF_SELECTED to {
-                (helium314.keyboard.settings.AppearanceLooks.load(real) + helium314.keyboard.settings.AppearanceLooks.builtIn(ctx)).map { it.name } }
-            helium314.keyboard.settings.CustomLabels.Kind.LAYOUT -> helium314.keyboard.settings.LayoutPresets.PREF_SELECTED to {
-                (helium314.keyboard.settings.LayoutPresets.load(real) + helium314.keyboard.settings.LayoutPresets.builtIn(ctx)).map { it.name } }
-            helium314.keyboard.settings.CustomLabels.Kind.POPUPS -> helium314.keyboard.latin.utils.KeyPopupOverrides.PREF_SELECTED_SET to {
-                helium314.keyboard.latin.utils.KeyPopupOverrides.loadSets(real).map { it.name } }
-        }
-        val from = (if (own) ownView else shownView).getString(key, null)?.takeIf { it in names() }
-        UnsavedCopy(kind, from, own, shown)
-    }
+    return RestorePlan(incomingKeyboards(ctx, pending), enabled, off) { keyboardName(it, ctx) }
 }
 
 /** The restore dialog's questions for the backup [file]'s keyboards (tests). */

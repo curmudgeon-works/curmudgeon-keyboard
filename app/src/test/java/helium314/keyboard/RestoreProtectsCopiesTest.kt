@@ -40,8 +40,8 @@ import kotlin.test.assertNull
 
 /**
  * A restore of some keyboards never trashes what the phone holds unsaved (owner 2026-10-11: "main concern is to make
- * sure nothing gets trashed"; "Go!"): (1) "What to merge" warns when a ticked row replaces an unsaved Custom copy on
- * the phone keyboard (theme, Layout, popups); (2) a kept palette "~custom:N" the phone uses for other colours is never
+ * sure nothing gets trashed"): (1) "What to merge" says once that selected items replace the keyboard's settings,
+ * unsaved changes too (owner 2026-10-11: no per-copy warnings); (2) a kept palette "~custom:N" the phone uses for other colours is never
  * written over: the backup's comes in under the next free number.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -116,63 +116,39 @@ class RestoreProtectsCopiesTest {
     private fun MergeChoice.menu(group: KeyboardProfiles.Group) = differences.single { it == RestoreMatch.Difference.Menu(group) }
     private fun MergeChoice.keys() = differences.single { it is RestoreMatch.Difference.Definition && it.part == RestoreMatch.Part.Layout(LayoutType.MAIN) }
 
-    // ---- (1) the warning ----
+    // ---- (1) the one line ----
 
-    @Test fun `Appearance ticked over the phone keyboard's unsaved theme warns under that row, unticked doesn't`() {
-        AppearanceLooks.save(real, listOf(AppearanceLooks.Look("Work", mapOf(Settings.PREF_THEME_COLORS to "x"))), now = true)
-        phone(mapOf(CustomLabels.Kind.THEME.key to 1, AppearanceLooks.PREF_SELECTED to "Work", Settings.PREF_THEME_COLORS to "x2"))
+    private val replacesLine = "Selected items replace this keyboard's settings, including any unsaved changes."
+
+    @Test fun `the line shows while something is ticked, not while nothing is`() {
+        phone(mapOf(CustomLabels.Kind.THEME.key to 1, Settings.PREF_THEME_COLORS to "x2"))
         backup(mapOf(dvorak to mapOf(Settings.PREF_THEME_COLORS to "y")))
         val choice = choice()
+        assertNull(choice.replacesNote(ctx))
         val appearance = choice.menu(KeyboardProfiles.Group.APPEARANCE)
-        assertNull(choice.warning(ctx, appearance))
         choice.ticked.add(appearance)
-        assertEquals("$english's unsaved theme (Custom · from Work) will be replaced. Save it as a theme first if you want to keep it.",
-            choice.warning(ctx, appearance))
-        // the keys don't touch a theme
+        assertEquals(replacesLine, choice.replacesNote(ctx))
         choice.ticked.add(choice.keys())
-        assertNull(choice.warning(ctx, choice.keys()))
-        // a warning only: confirmed, the merge goes ahead
+        assertEquals(replacesLine, choice.replacesNote(ctx))
+        choice.ticked.clear()
+        assertNull(choice.replacesNote(ctx))
+        // confirmed, the unsaved theme is replaced
+        choice.ticked.add(appearance)
         restoreKeyboardsFrom(ctx, zip, listOf(dvorak), withSettings = true, decisions = mapOf(dvorak to choice.decision))
         val merged = KeyboardProfiles.idEntries(real).values.single { it != KeyboardProfiles.SHARED }
         assertEquals("y", own(merged, Settings.PREF_THEME_COLORS))
         assertFalse(CustomLabels.has(helium314.keyboard.latin.settings.ProfilePreferences(real) { merged }, CustomLabels.Kind.THEME))
     }
 
-    @Test fun `a theme whose saved item is gone is just Custom`() {
-        phone(mapOf(CustomLabels.Kind.THEME.key to 1, Settings.PREF_THEME_COLORS to "x2"))
-        backup(mapOf(dvorak to mapOf(Settings.PREF_THEME_COLORS to "y")))
-        val choice = choice()
-        val appearance = choice.menu(KeyboardProfiles.Group.APPEARANCE)
-        choice.ticked.add(appearance)
-        assertEquals("$english's unsaved theme (Custom) will be replaced. Save it as a theme first if you want to keep it.",
-            choice.warning(ctx, appearance))
-    }
-
-    @Test fun `the Layout and typing menu or the keys over an unsaved Layout and popups warn, once`() {
-        phone(mapOf(CustomLabels.Kind.LAYOUT.key to 1, CustomLabels.Kind.POPUPS.key to 1, Settings.PREF_SHOW_NUMBER_ROW to false))
-        backup(mapOf(dvorak to mapOf(Settings.PREF_SHOW_NUMBER_ROW to true)))
-        val choice = choice()
-        val layout = choice.menu(KeyboardProfiles.Group.LAYOUT)
-        val keys = choice.keys()
-        assertNull(choice.warning(ctx, layout))
-        val layoutLine = "$english's unsaved Layout (Custom) will be replaced. Save it as a Layout first if you want to keep it."
-        val popupsLine = "$english's unsaved popups (Custom) will be replaced. Save them as a popup set first if you want to keep them."
-        choice.ticked.add(keys)
-        assertEquals(layoutLine, choice.warning(ctx, keys))
-        choice.ticked.add(layout)
-        // (the Layout's line stays under the first ticked row that replaces it)
-        assertEquals(popupsLine, choice.warning(ctx, layout))
-        choice.ticked.remove(keys)
-        assertEquals("$layoutLine\n$popupsLine", choice.warning(ctx, layout))
-    }
-
-    @Test fun `no Custom label on the phone keyboard - no warning`() {
+    @Test fun `learned words alone ticked count as selected`() {
         phone(mapOf(Settings.PREF_THEME_COLORS to "x2"))
         backup(mapOf(dvorak to mapOf(Settings.PREF_THEME_COLORS to "y")))
-        val choice = choice()
-        val appearance = choice.menu(KeyboardProfiles.Group.APPEARANCE)
-        choice.ticked.add(appearance)
-        assertNull(choice.warning(ctx, appearance))
+        val plan = restorePlanFrom(ctx, zip)
+        val question = MergeQuestion(plan, dvorak, listOf(dvorak), emptyMap())
+        val choice = MergeChoice(question, qwerty, emptyList(), wordsRow = true)
+        assertEquals(replacesLine, choice.replacesNote(ctx))
+        choice.wordsTicked = false
+        assertNull(choice.replacesNote(ctx))
     }
 
     // ---- (2) kept palettes ----
