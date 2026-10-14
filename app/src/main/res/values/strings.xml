@@ -617,7 +617,8 @@
     <string name="restore_same_as">This would be the same as your other %s keyboard: change the name or what you merge</string>
     <!-- what to merge: %s the phone keyboard's name -->
     <string name="restore_differs_choose">What to merge into %s</string>
-    <string name="restore_learned_row">Learned words (added to this phone\'s)</string>
+    <!-- what to merge: the backup keyboard's learned and blacklisted words, both, one row as the restore brings them -->
+    <string name="restore_learned_row">Learned &amp; blacklisted words (added to this phone\'s)</string>
     <!-- %s: the phone keyboard's name -->
     <string name="restore_nothing_differs">Nothing differs: %s on this phone is the same as the backup\'s.</string>
     <!-- nothing ticked; %s: the backup keyboard's name -->

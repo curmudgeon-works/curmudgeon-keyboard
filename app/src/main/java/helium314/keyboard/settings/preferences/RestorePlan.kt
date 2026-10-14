@@ -114,9 +114,9 @@ internal class RestorePlan(
             if (other in decisions) result(other, decisions[other]) else if (!asks(other)) result(other, null) else null }
     }
 
-    /** The name box's first text: the keyboard's name ([decision] with its name unchanged), or the next free "<name> 2",
-     *  "<name> 3" … when another keyboard has it (owner 2026-10-11: "same Name (or language in absence of name) makes it
-     *  <name> 2"). */
+    /** The name box's first text: the keyboard's name ([decision] with its name unchanged), or the next free one when
+     *  another keyboard after the restore has it ([nextFreeName], among the keyboards [sameAs] compares with; owner
+     *  2026-10-11: "same Name (or language in absence of name) makes it <name> 2"). */
     fun prefillName(keyboard: SettingsSubtype, decision: RestoreDecision, chosen: Collection<SettingsSubtype>,
                     decisions: Map<SettingsSubtype, RestoreDecision>): String {
         val unnamed = when (decision) {
@@ -125,9 +125,7 @@ internal class RestorePlan(
             RestoreDecision.Skip -> return ""
         }
         val name = nameOf(result(keyboard, unnamed)!!)
-        val taken = others(keyboard, decision, chosen, decisions).map(nameOf).toSet()
-        if (name !in taken) return name
-        return generateSequence(2) { it + 1 }.map { "$name $it" }.first { it !in taken }
+        return nextFreeName(name, others(keyboard, decision, chosen, decisions).map(nameOf).toSet())
     }
 
     /** The other keyboard [decision] would make [keyboard] the same as (the same definition: one identity for two,
@@ -138,8 +136,29 @@ internal class RestorePlan(
         return others(keyboard, decision, chosen, decisions).firstOrNull { it == result }
     }
 
+    companion object {
+        private val copyNumber = Regex("""^(.*) \((\d+)\)$""")
+        private val plainNumber = Regex("""^(.*) (\d+)$""")
+
+        /** [name], or when [taken] has it the next free one, counting up a number it ends with (owner 2026-10-11: "Yes,
+         *  count up pls."): a copy's "English (US) (2)" gives "English (US) (3)", "Work 2" gives "Work 3", "Sunset"
+         *  gives "Sunset 2". */
+        fun nextFreeName(name: String, taken: Set<String>): String {
+            if (name !in taken) return name
+            val copy = copyNumber.find(name)
+            val plain = plainNumber.find(name)
+            val first = (copy ?: plain)?.groupValues?.get(2)?.toInt()?.plus(1) ?: 2
+            fun numbered(n: Int) = when {
+                copy != null -> "${copy.groupValues[1]} ($n)"
+                plain != null -> "${plain.groupValues[1]} $n"
+                else -> "$name $n"
+            }
+            return generateSequence(first) { it + 1 }.map(::numbered).first { it !in taken }
+        }
+    }
+
     /**
-     * The answer of "what to merge": [ticked] of [differences] (with [learnedRow], the learned words row, ticked:
+     * The answer of "what to merge": [ticked] of [differences] (with [learnedRow], the learned and blacklisted words row, ticked:
      * [learnedTicked]) under [name]. Nothing ticked is not restored (owner 2026-10-11: "it essentially means nothing is
      * restored"); every one ticked, or nothing differing at all, is the backup's whole keyboard.
      */
@@ -171,4 +190,29 @@ internal class MergeQuestion(val plan: RestorePlan, val keyboard: SettingsSubtyp
     /** The keyboard keeping it apart would be the same as (blocked), or null. */
     val separateSameAs get() = plan.sameAs(keyboard, separate, chosen, decisions)
     val canGoOn get() = picked.let { it != null && (it.phone != null || separateSameAs == null) }
+}
+
+/**
+ * "What to merge" of [question]'s backup keyboard into the phone's [target]: [differences] each unticked (a ticked one
+ * takes the backup's, an unticked one keeps the phone's), with [wordsRow] the learned and blacklisted words (one row:
+ * the restore brings both together, ticked), and the name
+ * box, which follows the ticks until it's typed in.
+ */
+internal class MergeChoice(val question: MergeQuestion, val target: SettingsSubtype, val differences: List<RestoreMatch.Difference>,
+                           val wordsRow: Boolean) {
+    val ticked = androidx.compose.runtime.mutableStateListOf<RestoreMatch.Difference>()
+    // ticked to start with (owner 2026-10-11: "Yes learned and blacklisted words should both come, ticked on by default.
+    // Not off."): words alone are something to restore, never "Nothing differs"
+    var wordsTicked by mutableStateOf(wordsRow)
+    var typed: String? by mutableStateOf(null)
+    private val plan get() = question.plan
+
+    /** Nothing differs and no words come: only Done. */
+    val nothingDiffers get() = differences.isEmpty() && !wordsRow
+    private fun decision(name: String?) = plan.mergeDecision(target, differences, ticked, wordsRow, wordsTicked, name)
+    val name: String get() = typed ?: decision(null).let {
+        if (it is RestoreDecision.Skip) "" else plan.prefillName(question.keyboard, it, question.chosen, question.decisions) }
+    val decision get() = decision(name)
+    /** The keyboard it would be the same as (blocked), or null. */
+    val sameAs get() = decision.let { if (it is RestoreDecision.Skip) null else plan.sameAs(question.keyboard, it, question.chosen, question.decisions) }
 }

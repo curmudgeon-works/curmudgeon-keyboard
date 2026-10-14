@@ -15,6 +15,7 @@ import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSub
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.LayoutType
 import helium314.keyboard.latin.utils.SubtypeSettings
+import helium314.keyboard.settings.preferences.MergeChoice
 import helium314.keyboard.settings.preferences.MergeQuestion
 import helium314.keyboard.settings.preferences.RestoreDecision
 import helium314.keyboard.settings.preferences.RestoreMatch
@@ -269,5 +270,45 @@ class RestoreMergeTest {
         assertEquals(work, named(work, "Work"))
         assertEquals(dvorak, named(work, english))
         assertNotNull(named(qwerty, "$english 2").getExtraValueOf(ExtraValue.KEYBOARD_NAME))
+    }
+
+    // owner 2026-10-11: "Yes, count up pls."
+    @Test fun `a taken copy's name counts its number up - English (US) (2) gives English (US) (3)`() {
+        val copy2 = qwerty.with(ExtraValue.KEYBOARD_COPY, "2").toPref().toSettingsSubtype()
+        val backupCopy = dvorak.with(ExtraValue.KEYBOARD_COPY, "2").toPref().toSettingsSubtype()
+        phoneAndBackup(listOf(qwerty, copy2), listOf(backupCopy))
+        assertEquals("$english (2)", name(copy2))
+        val plan = restorePlanFrom(ctx, zip)
+        assertEquals("$english (3)", plan.prefillName(backupCopy, RestoreDecision.Separate(), listOf(backupCopy), emptyMap()))
+    }
+
+    @Test fun `a taken custom name counts its number up - Work 2 gives Work 3, Sunset gives Sunset 2`() {
+        val work2 = withKeyboardName(colemak, "Work 2").toPref().toSettingsSubtype()
+        val sunset = withKeyboardName(qwerty, "Sunset").toPref().toSettingsSubtype()
+        val backupWork2 = withKeyboardName(dvorak, "Work 2").toPref().toSettingsSubtype()
+        val backupSunset = withKeyboardName(dvorak.withLayout(LayoutType.NUMBER_ROW, "x"), "Sunset").toPref().toSettingsSubtype()
+        phoneAndBackup(listOf(work2, sunset), listOf(backupWork2, backupSunset))
+        val plan = restorePlanFrom(ctx, zip)
+        assertEquals("Work 3", plan.prefillName(backupWork2, RestoreDecision.Separate(), listOf(backupWork2), emptyMap()))
+        assertEquals("Sunset 2", plan.prefillName(backupSunset, RestoreDecision.Separate(), listOf(backupSunset), emptyMap()))
+    }
+
+    // owner 2026-10-11: "Yes learned and blacklisted words should both come, ticked on by default. Not off."
+    @Test fun `the words row starts ticked, and words alone are not dropped as nothing differing`() {
+        phoneAndBackup(listOf(qwerty), listOf(qwerty, dvorak))
+        val plan = restorePlanFrom(ctx, zip)
+        val question = MergeQuestion(plan, dvorak, listOf(dvorak), emptyMap())
+        val words = MergeChoice(question, qwerty, emptyList(), wordsRow = true)
+        assertTrue(words.wordsTicked)
+        assertFalse(words.nothingDiffers)
+        assertEquals(RestoreDecision.Merge(qwerty, name = english), words.decision)
+        words.wordsTicked = false
+        assertEquals(RestoreDecision.Skip, words.decision)
+        // differences and words: only the words, untouched, come with the phone's keyboard as it is
+        val differences = RestoreMatch.definitionDifferences(qwerty, plan.incoming.getValue(dvorak))
+        val some = MergeChoice(question, qwerty, differences, wordsRow = true)
+        assertEquals(RestoreDecision.Merge(qwerty, emptySet(), emptySet(), learnedWords = true, name = english), some.decision)
+        // no words row and nothing differing: Done, nothing to tick
+        assertTrue(MergeChoice(question, qwerty, emptyList(), wordsRow = false).nothingDiffers)
     }
 }

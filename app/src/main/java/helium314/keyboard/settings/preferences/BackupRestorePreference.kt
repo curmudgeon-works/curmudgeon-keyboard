@@ -436,7 +436,7 @@ private fun RestoreChoiceDialog(pending: PendingRestore, onDismiss: () -> Unit, 
                 onNext = { pick -> if (pick.phone == null) answered(asked, question.separate) else choosing = pick.phone })
             else androidx.compose.runtime.key(target) {
                 RestoreChooseDialog(question, target, remember(settings) { differences(asked, target) },
-                    learnedRow = learnedWords && pending.hasLearnedWords,
+                    wordsRow = learnedWords && pending.hasLearnedWords,
                     onCancel = { choosing = null }, // back to the first question
                     onConfirmed = { answered(asked, it) })
             }
@@ -551,58 +551,50 @@ private fun RestoreMergeDialog(question: MergeQuestion, onCancel: () -> Unit, on
 }
 
 /**
- * What to merge of the backup's keyboard into the phone's [target]: what differs ([differences]) and, with [learnedRow],
- * its learned words, each unticked (a ticked one takes the backup's, an unticked one keeps the phone's), and the name
- * box. Nothing ticked: "Don't restore"; nothing differing: Done. A result the same as another keyboard can't be
- * confirmed (owner 2026-10-11: "Yes, keep fully identical block").
+ * What to merge of the backup's keyboard into the phone's [target]: what differs ([differences]), each unticked (a ticked
+ * one takes the backup's, an unticked one keeps the phone's), with [wordsRow] its learned and blacklisted words, ticked,
+ * and the name box ([MergeChoice]). Nothing ticked: "Don't restore"; nothing differing and no words: Done. A result the
+ * same as another keyboard can't be confirmed (owner 2026-10-11: "Yes, keep fully identical block").
  */
 @Composable
 private fun RestoreChooseDialog(question: MergeQuestion, target: SettingsSubtype, differences: List<RestoreMatch.Difference>,
-                                learnedRow: Boolean, onCancel: () -> Unit, onConfirmed: (RestoreDecision) -> Unit) {
+                                wordsRow: Boolean, onCancel: () -> Unit, onConfirmed: (RestoreDecision) -> Unit) {
     val ctx = LocalContext.current
-    val plan = question.plan
-    val ticked = remember(differences) { mutableStateListOf<RestoreMatch.Difference>() }
-    var learnedTicked by remember { mutableStateOf(false) }
-    // the name box follows the ticks until it's typed in
-    var typed: String? by remember { mutableStateOf(null) }
+    val choice = remember(differences) { MergeChoice(question, target, differences, wordsRow) }
     var confirmed by remember { mutableStateOf(false) }
-    val nothingDiffers = differences.isEmpty() && !learnedRow
-    fun decision(name: String?) = plan.mergeDecision(target, differences, ticked, learnedRow, learnedTicked, name)
-    val name = typed ?: decision(null).let { if (it is RestoreDecision.Skip) "" else plan.prefillName(question.keyboard, it, question.chosen, question.decisions) }
-    val decision = decision(name)
-    val sameAs = if (decision is RestoreDecision.Skip) null else plan.sameAs(question.keyboard, decision, question.chosen, question.decisions)
+    val decision = choice.decision
     ThreeButtonAlertDialog(
         keepKeyboard = false, // (a text field)
         // (OK closes the dialog after onConfirmed: the answer moved on already)
         onDismissRequest = { if (!confirmed) onCancel() },
-        title = { Text(stringResource(R.string.restore_differs_choose, phoneKeyboardLabel(ctx, plan, target))) },
+        title = { Text(stringResource(R.string.restore_differs_choose, phoneKeyboardLabel(ctx, question.plan, target))) },
         content = {
             Column {
-                if (nothingDiffers) {
+                if (choice.nothingDiffers) {
                     Text(stringResource(R.string.restore_nothing_differs, keyboardName(target, ctx)))
-                    NameBox(name, sameAs) { typed = it }
+                    NameBox(choice.name, choice.sameAs) { choice.typed = it }
                     return@Column
                 }
                 Text(stringResource(R.string.restore_differs_choose_message), modifier = Modifier.padding(bottom = 8.dp))
                 differences.forEach { difference ->
-                    CheckRow(RestoreMatch.rowText(ctx, difference, question.keyboard), difference in ticked) {
-                        if (it) ticked.add(difference) else ticked.remove(difference)
+                    CheckRow(RestoreMatch.rowText(ctx, difference, question.keyboard), difference in choice.ticked) {
+                        if (it) choice.ticked.add(difference) else choice.ticked.remove(difference)
                     }
                 }
-                if (learnedRow) CheckRow(stringResource(R.string.restore_learned_row), learnedTicked) { learnedTicked = it }
+                if (wordsRow) CheckRow(stringResource(R.string.restore_learned_row), choice.wordsTicked) { choice.wordsTicked = it }
                 if (decision is RestoreDecision.Skip)
                     Text(stringResource(R.string.restore_nothing_ticked, keyboardName(question.keyboard, ctx)), modifier = Modifier.padding(top = 8.dp))
-                else NameBox(name, sameAs) { typed = it }
+                else NameBox(choice.name, choice.sameAs) { choice.typed = it }
             }
         },
         scrollContent = true,
-        checkOk = { sameAs == null },
+        checkOk = { choice.sameAs == null },
         confirmButtonText = stringResource(when {
-            nothingDiffers -> R.string.restore_done
+            choice.nothingDiffers -> R.string.restore_done
             decision is RestoreDecision.Skip -> R.string.restore_dont_restore
             else -> android.R.string.ok
         }),
-        onConfirmed = { confirmed = true; onConfirmed(decision) },
+        onConfirmed = { confirmed = true; onConfirmed(choice.decision) },
     )
 }
 
