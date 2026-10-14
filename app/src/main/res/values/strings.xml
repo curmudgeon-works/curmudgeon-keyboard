@@ -330,6 +330,10 @@
     <!-- Error message when the full restore's check of the backup, before it deletes anything, fails: nothing was
          deleted (owner 2026-10-12: "Yes, check backup before wipe") -->
     <string name="restore_unreadable">This backup can\'t be read; nothing was changed.</string>
+    <!-- At the top of the main settings screen after a full restore failed partway, after its wipe, until a full
+         restore finishes (owner 2026-10-12: "Yes add this"); its button opens the restore's file picker -->
+    <string name="full_restore_unfinished">The full restore didn\'t finish.</string>
+    <string name="restore_again">Restore again</string>
     <!-- backup button -->
     <string name="button_backup">Backup</string>
     <!-- restore button -->

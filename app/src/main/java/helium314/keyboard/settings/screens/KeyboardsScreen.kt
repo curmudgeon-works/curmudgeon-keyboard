@@ -140,6 +140,10 @@ fun KeyboardsScreen(
                     onOrderChanged(ctx, mainBefore)
                     generation++
                 }
+                // a full restore that failed after its wipe, until a full restore finishes (owner 2026-10-12: "Yes add
+                // this"); read again with every setting change, as the switch above
+                if (helium314.keyboard.settings.preferences.FullRestore.isUnfinished(real))
+                    helium314.keyboard.settings.preferences.UnfinishedRestoreNote()
                 HorizontalDivider() // under the title bar, above the first keyboard (like the other screens' first group)
                 for (keyboard in order) key(keyboard) { // stable identity: a reorder moves the block instead of recreating it (which killed the drag)
                     val subtype = keyboard.toAdditionalSubtype()

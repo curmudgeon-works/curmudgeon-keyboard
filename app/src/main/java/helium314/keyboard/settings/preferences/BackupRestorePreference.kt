@@ -116,8 +116,7 @@ fun BackupRestorePreference(setting: Setting) {
     val ctx = LocalContext.current
     var error: String? by rememberSaveable { mutableStateOf(null) }
     val backupLauncher = backupLauncher(onError = { error = it })
-    var picked: PickedBackup? by remember { mutableStateOf(null) }
-    val restoreLauncher = restoreLauncher { picked = it }
+    val restore = restoreEntry(onError = { error = it })
     Preference(name = setting.title, onClick = { showDialog = true })
     if (showDialog) {
         ConfirmationDialog(
@@ -128,30 +127,86 @@ fun BackupRestorePreference(setting: Setting) {
             neutralButtonText = stringResource(R.string.button_restore),
             onNeutral = {
                 showDialog = false
-                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
-                    .addCategory(Intent.CATEGORY_OPENABLE)
-                    .setType("application/zip")
-                restoreLauncher.launch(intent)
+                restore()
             },
             onConfirmed = { backupLauncher.launch(backupIntent(ctx)) }
         )
     }
+    BackupRestoreJob.progress?.let { ProgressDialog(it) }
+    error?.let { BackupRestoreErrorDialog(it) { error = null } }
+}
+
+/** A backup's or restore's error, [error] as [runBackup] and [runRestore] give it; OK closes it ([onDismiss]). */
+@Composable
+private fun BackupRestoreErrorDialog(error: String, onDismiss: () -> Unit) {
+    InfoDialog(
+        if (error.startsWith("b"))
+            stringResource(R.string.backup_error, error.drop(1))
+        // (the full restore found the backup unreadable before it deleted anything, owner 2026-10-12)
+        else if (error.startsWith("u")) stringResource(R.string.restore_unreadable)
+        else stringResource(R.string.restore_error, error.drop(1)),
+        onDismiss
+    )
+}
+
+/**
+ * The restore's way in: the function returned opens the file picker, and the restore dialog of the backup picked
+ * follows (Backup and restore, and [UnfinishedRestoreNote]'s Restore again). [onError] gets the restore's error.
+ */
+@Composable
+internal fun restoreEntry(onError: (String) -> Unit): () -> Unit {
+    val ctx = LocalContext.current
+    var picked: PickedBackup? by remember { mutableStateOf(null) }
+    val restoreLauncher = restoreLauncher { picked = it }
     picked?.let { pick ->
         androidx.compose.runtime.key(pick) {
             RestoreChoiceDialogLoading(pick.file, load = { pick.copyIn(); readRestoreDialog(ctx, pick.file) },
-                onDismiss = { picked = null }, onError = { error = it })
+                onDismiss = { picked = null }, onError = onError)
         }
     }
-    BackupRestoreJob.progress?.let { ProgressDialog(it) }
-    if (error != null) {
-        InfoDialog(
-            if (error!!.startsWith("b"))
-                stringResource(R.string.backup_error, error!!.drop(1))
-            // (the full restore found the backup unreadable before it deleted anything, owner 2026-10-12)
-            else if (error!!.startsWith("u")) stringResource(R.string.restore_unreadable)
-            else stringResource(R.string.restore_error, error!!.drop(1))
-        ) { error = null }
+    return {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("application/zip")
+        restoreLauncher.launch(intent)
     }
+}
+
+/**
+ * A full restore that failed after its wipe (owner 2026-10-12: "Yes add this"): set right before the wipe, kept through
+ * it, cleared once a full restore finished ([restoreEverything]); while set, the main settings screen says so
+ * ([UnfinishedRestoreNote]), across app restarts. App-wide (no keyboard's: KeyboardProfiles), never backed up or
+ * restored ([notBackedUpKeys]).
+ */
+internal object FullRestore {
+    const val PREF_UNFINISHED = "full_restore_unfinished"
+
+    fun isUnfinished(real: SharedPreferences) = real.getBoolean(PREF_UNFINISHED, false)
+
+    fun mark(real: SharedPreferences, unfinished: Boolean) =
+        real.edit(commit = true) { if (unfinished) putBoolean(PREF_UNFINISHED, true) else remove(PREF_UNFINISHED) }
+
+    /** Called right after the wipe (null) and after each entry restored (its name): a failure thrown here is one after
+     *  the wipe (tests). */
+    @Volatile internal var afterStep: ((String?) -> Unit)? = null
+}
+
+/** The device's keys a backup never holds, and a restore never brings ([FullRestore]). */
+internal val notBackedUpKeys = setOf(FullRestore.PREF_UNFINISHED)
+
+/** "The full restore didn't finish." with Restore again, which opens the restore's file picker ([restoreEntry]): at
+ *  the top of the main settings screen while [FullRestore.isUnfinished] (owner 2026-10-12: "Yes add this"). */
+@Composable
+internal fun UnfinishedRestoreNote() {
+    var error: String? by rememberSaveable { mutableStateOf(null) }
+    val restore = restoreEntry(onError = { error = it })
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(stringResource(R.string.full_restore_unfinished), style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.error)
+        androidx.compose.material3.TextButton(onClick = restore) { Text(stringResource(R.string.restore_again)) }
+    }
+    BackupRestoreJob.progress?.let { ProgressDialog(it) }
+    error?.let { BackupRestoreErrorDialog(it) { error = null } }
 }
 
 /** The document picker's request for a new backup file (also the factory reset's Backup, 2026-10-11). */
@@ -255,7 +310,8 @@ private fun writeBackup(ctx: Context, open: () -> OutputStream?): Boolean {
         // every keyboard's set, not just the edited one: what is stored (the settings you picked; none for one at its
         // default, no marks since 2026-10-11), so a setting left at its default follows the defaults of the version it's
         // restored on (0.3.008; from 2026-10-03 every default was written out, which froze them)
-        settingsToJsonStream(ctx.realPrefs().all.mapKeys { it.key as String? }, zipStream)
+        // (not the device's own keys, notBackedUpKeys: a full restore that didn't finish, owner 2026-10-12)
+        settingsToJsonStream(ctx.realPrefs().all.filterKeys { it !in notBackedUpKeys }.mapKeys { it.key as String? }, zipStream)
         zipStream.closeEntry()
         BackupRestoreJob.step()
         zipStream.putNextEntry(ZipEntry(PROTECTED_PREFS_FILE_NAME))
@@ -889,6 +945,8 @@ private fun restoreEverything(ctx: Context, file: File, promised: PendingRestore
     // (a backup from before the keyboards had ids: ids first, so the learned words' update finds each keyboard by its own)
     helium314.keyboard.latin.settings.KeyboardIdUpgrade.upgrade(ctx)
     LearnedKeyboards.updateOnce(ctx)
+    // the full restore finished: the main screen's note goes (owner 2026-10-12: "Yes add this")
+    FullRestore.mark(ctx.realPrefs(), false)
 }
 
 /** [promised]: what the restore dialog showed of [file] (null: no dialog, tests), checked with the rest before the wipe
@@ -946,10 +1004,14 @@ private fun replaceEverythingChecked(ctx: Context, file: File) = keepingPhoneCho
         var entry: ZipEntry? = zip.nextEntry
         val filesDir = ctx.filesDir ?: return@keepingPhoneChoices
         val deviceProtectedFilesDir = DeviceProtectedUtils.getFilesDir(ctx)
+        // until the full restore finished, the main screen says it didn't (owner 2026-10-12: "Yes add this"): set right
+        // before the wipe, put back after the settings are cleared below
+        FullRestore.mark(ctx.realPrefs(), true)
         filesDir.deleteRecursively()
         deviceProtectedFilesDir.deleteRecursively()
         LayoutUtilsCustom.onLayoutFileChanged()
         Settings.getInstance().stopListener()
+        FullRestore.afterStep?.invoke(null)
         while (entry != null) {
             if (entry.name.startsWith("unprotected${File.separator}")) {
                 val adjustedName = entry.name.substringAfter("unprotected${File.separator}")
@@ -969,6 +1031,7 @@ private fun replaceEverythingChecked(ctx: Context, file: File) = keepingPhoneCho
                 val prefs = ctx.realPrefs()
                 prefs.edit { clear() }
                 readJsonLinesToSettings(prefLines, prefs)
+                FullRestore.mark(prefs, true) // (the clear took it; a backup never has it, and never brings it)
             } else if (entry.name == PROTECTED_PREFS_FILE_NAME) {
                 val prefLines = String(zip.readBytes()).split("\n")
                 restoreProtectedPrefs(ctx, prefLines)
@@ -982,6 +1045,7 @@ private fun replaceEverythingChecked(ctx: Context, file: File) = keepingPhoneCho
             }
             zip.closeEntry()
             BackupRestoreJob.step()
+            FullRestore.afterStep?.invoke(entry.name)
             entry = zip.nextEntry
         }
     }
@@ -1645,7 +1709,7 @@ private fun readBackup(file: File): PendingRestore {
 private fun pendingOf(file: File, prefs: Map<String, Any?>, entries: Set<String>): PendingRestore {
     // a backup from before the keyboards had ids: its keyboards get fresh ones here, their sets found by its own old map
     // (owner 2026-10-11: "don't care about ... past backups at this point", crude)
-    val upgraded = HashMap(prefs)
+    val upgraded = HashMap(prefs.filterKeys { it !in notBackedUpKeys }) // (never restored, owner 2026-10-12)
     val renames = helium314.keyboard.latin.settings.KeyboardIdUpgrade.upgrade(upgraded).orEmpty()
     val keyboards = (upgraded[Settings.PREF_ENABLED_SUBTYPES] as? String)?.let { SubtypeSettings.createSettingsSubtypes(it) }.orEmpty()
     return PendingRestore(file, upgraded, keyboards, entries, renames)
