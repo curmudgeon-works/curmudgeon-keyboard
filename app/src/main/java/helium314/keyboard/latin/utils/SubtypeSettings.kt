@@ -336,7 +336,15 @@ object SubtypeSettings {
     }
 
     // requires loadResourceSubtypes to be called before. @return whether the list was found empty and the default stored
-    private fun loadEnabledSubtypes(context: Context): Boolean {
+    // (review 2026-10-12 B2: the list was read and, built aside, published at the end; a writer changing the list in use
+    // in between (remove, switch on, add) was undone in memory until the next load. Now the whole load, from the read to
+    // the publish, holds the writers' lock: such a change waits and is made on the list published here. Readers never
+    // wait. Lock order: the object's monitor (loadingOnce), then this lock; a writer holds only this lock, and only
+    // inside [changeEnabledSubtypes] (no pref writes, no refreshSubtypeCaches under it))
+    private fun loadEnabledSubtypes(context: Context): Boolean =
+        synchronized(enabledSubtypesLock) { loadEnabledSubtypesLocked(context) }
+
+    private fun loadEnabledSubtypesLocked(context: Context): Boolean {
         val prefs = context.prefs()
         // every listed keyboard has its id, given before the list is read (the net, owner 2026-10-11: keyboards have
         // unique ids); its write may have loaded the keyboards already (Settings' listener): loaded once here
@@ -344,6 +352,7 @@ object SubtypeSettings {
         // (built here, the list in use stays whole until the new one replaces it at the end, see [enabledSubtypes])
         val loaded = mutableListOf<InputMethodSubtype>()
         val settingsSubtypes = createSettingsSubtypes(prefs.getString(Settings.PREF_ENABLED_SUBTYPES, Defaults.PREF_ENABLED_SUBTYPES)!!)
+        afterListReadForTest?.invoke()
         for (settingsSubtype in settingsSubtypes) {
             // (a keyboard with an id is the user's own: from its definition)
             if (settingsSubtype.keyboardId != null || settingsSubtype.isAdditionalSubtype(prefs)) {
@@ -391,12 +400,16 @@ object SubtypeSettings {
                     putString(Settings.PREF_SELECTED_SUBTYPE, default.toPref())
             }
             register(real, listOf(default))
-            changeEnabledSubtypes { listOf(default.toAdditionalSubtype()) }
+            changeEnabledSubtypes { listOf(default.toAdditionalSubtype()) } // (its lock is held already, and reentrant)
             return true
         }
         changeEnabledSubtypes { loaded }
         return false
     }
+
+    /** Tests only: run between a load's read of the list and its publish (review 2026-10-12 B2, a writer in between). */
+    @androidx.annotation.VisibleForTesting
+    @Volatile internal var afterListReadForTest: (() -> Unit)? = null
 
     /** @return whether pref was changed */
     private fun removeEnabledSubtype(prefs: SharedPreferences, subtype: SettingsSubtype): Boolean = removeEnabledSubtypeFromPrefs(prefs, subtype)
@@ -434,7 +447,8 @@ object SubtypeSettings {
     private val enabledSubtypesLock = Any()
 
     /** The one way the enabled list changes: [change] gets the list of now and returns the new one, which replaces it.
-     *  Writers take turns (an add and a reload at once must not lose either); readers never wait. */
+     *  Writers take turns (an add and a reload at once must not lose either; a load holds the lock throughout, see
+     *  [loadEnabledSubtypes]); readers never wait. [change] only builds the list: no pref writes, no reloads in it. */
     private fun changeEnabledSubtypes(change: (List<InputMethodSubtype>) -> List<InputMethodSubtype>) {
         synchronized(enabledSubtypesLock) { enabledSubtypes = change(enabledSubtypes) }
     }
