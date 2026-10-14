@@ -464,19 +464,35 @@ internal fun deleteKeyboard(ctx: Context, keyboard: SettingsSubtype, mergeInto: 
     helium314.keyboard.latin.personalization.LearnedKeyboards.deleteKeyboard(ctx, keyboard, mergeInto) // (its words too)
 }
 
-/** The keyboard list was reordered: when another keyboard is first now while its settings are the common ones (separate
- *  settings off, a menu shared), every keyboard reads the new first one's at once (owner 2026-10-11: "yep"): the keyboard
- *  reloads its look and a line says so. */
-internal fun onOrderChanged(ctx: Context, mainBefore: SettingsSubtype) {
-    val real = ctx.realPrefs()
+/** The new main keyboard when the first keyboard is another one than [mainBefore] now while its settings are the common
+ *  ones (separate settings off, a menu shared), else null: nothing for the keyboards to follow. */
+internal fun newCommonMain(real: android.content.SharedPreferences, mainBefore: SettingsSubtype): SettingsSubtype? {
     val main = KeyboardProfiles.mainKeyboard(real)
-    if (main.sameKeyboard(mainBefore) || !KeyboardProfiles.mainIsCommon(real)) return
+    return if (main.sameKeyboard(mainBefore) || !KeyboardProfiles.mainIsCommon(real)) null else main
+}
+
+/** The keyboard list changed (reordered, or the first keyboard switched off): when another keyboard is first now while
+ *  its settings are the common ones ([newCommonMain]), every keyboard reads the new first one's at once (owner
+ *  2026-10-11: "yep"): the keyboard reloads its look and a line says so. @return whether the main keyboard changed so */
+internal fun onOrderChanged(ctx: Context, mainBefore: SettingsSubtype): Boolean {
+    val real = ctx.realPrefs()
+    val main = newCommonMain(real, mainBefore) ?: return false
     helium314.keyboard.latin.utils.SettingsEventLog.log("the main keyboard is ${main.toPref()} now")
     KeyboardProfiles.refreshImeId(real)
     helium314.keyboard.settings.preferences.clearSettingsCaches()
     helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().setThemeNeedsReload()
     (ctx.getActivity() as? helium314.keyboard.settings.SettingsActivity)?.prefChanged()
     android.widget.Toast.makeText(ctx, mainChangedMessage(ctx, main), android.widget.Toast.LENGTH_LONG).show()
+    return true
+}
+
+/** [subtype] switched off (out of the list, not deleted): when it was the first keyboard while its settings were the
+ *  common ones, the next one is the main now, handled as a reorder ([onOrderChanged]). The switch-off isn't blocked
+ *  (unlike a delete, [KeyboardProfiles.mainBlocksDelete]): its own settings stay. @return whether the main changed so */
+internal fun switchOffKeyboard(ctx: Context, subtype: android.view.inputmethod.InputMethodSubtype): Boolean {
+    val mainBefore = KeyboardProfiles.mainKeyboard(ctx.realPrefs())
+    SubtypeSettings.removeEnabledSubtype(ctx, subtype)
+    return onOrderChanged(ctx, mainBefore)
 }
 
 /** What the line says when [main] is the new first keyboard: separate settings off, all settings are common ("Common

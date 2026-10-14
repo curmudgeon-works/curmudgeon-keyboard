@@ -117,7 +117,7 @@ private fun SubtypeRow(subtype: InputMethodSubtype, isEnabled: Boolean) {
                 if (it && !dictsAvailable(subtype.locale(), ctx))
                     showNoDictDialog = true
                 if (it) { SubtypeSettings.addEnabledSubtype(ctx.prefs(), subtype); askImport = true }
-                else SubtypeSettings.removeEnabledSubtype(ctx, subtype)
+                else switchOffKeyboard(ctx, subtype) // (the first one off: the next is the main, as a reorder)
             }
         )
         if (showNoDictDialog)
