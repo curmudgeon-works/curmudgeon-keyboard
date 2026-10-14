@@ -295,6 +295,10 @@ class RestoreBackupWinsNameTest {
     private fun settle() = repeat(2) {
         helium314.keyboard.latin.utils.ExecutorUtils.getBackgroundExecutor(helium314.keyboard.latin.utils.ExecutorUtils.KEYBOARD).submit { }.get()
         org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+        // (the swipe statistics' write scheduled by another class lands 2 s later on its own timer: written now and
+        // dropped from memory, so the scheduled write finds nothing to write)
+        helium314.keyboard.latin.gesture.GestureStats.flush(real)
+        helium314.keyboard.latin.gesture.GestureStats.reload()
     }
 
     /** The keys stored differently in [a] and [b], each with its value in [a] and in [b]. */
