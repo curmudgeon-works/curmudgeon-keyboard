@@ -55,10 +55,10 @@ class RestoreDictionariesPlanTest {
 
     @Test fun `the backup's dictionary of a kind is the one it selected, none when it used the built-in one`() {
         val backup = mapOf(Entry("hi", "main_user.dict") to "a", Entry("hi", "main_prev_user.dict") to "b")
-        assertEquals(listOf("main_user.dict"), RestoreDictionaries.plan(backup, emptyMap()) { emptyMap() }.map { it.backupName })
+        assertEquals(listOf("main_user.dict"), RestoreDictionaries.plan(backup, emptyMap(), device = { emptyMap() }).map { it.backupName })
         assertEquals(listOf("main_prev_user.dict"),
-            RestoreDictionaries.plan(backup, mapOf("dict_selected_hi_main" to "main_prev_user.dict")) { emptyMap() }.map { it.backupName })
-        assertEquals(emptyList(), RestoreDictionaries.plan(backup, mapOf("dict_selected_hi_main" to "internal")) { emptyMap() })
+            RestoreDictionaries.plan(backup, mapOf("dict_selected_hi_main" to "main_prev_user.dict"), device = { emptyMap() }).map { it.backupName })
+        assertEquals(emptyList(), RestoreDictionaries.plan(backup, mapOf("dict_selected_hi_main" to "internal"), device = { emptyMap() }))
     }
 
     @Test fun `only dicts of a language folder are dictionaries, never a path outside it`() {

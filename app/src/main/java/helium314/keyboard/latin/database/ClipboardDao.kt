@@ -57,7 +57,7 @@ class ClipboardDao private constructor(private val db: Database) {
         sort()
     }
 
-    fun addClip(timestamp: Long, pinned: Boolean, text: String) = addClip(timestamp, pinned, text, strict = false)
+    fun addClip(timestamp: Long, pinned: Boolean, text: String) = addClip(timestamp, pinned, text, restoring = false)
 
     // [restoring]: a failed insert throws (a restore's refill, rolled back as a whole) instead of going unnoticed, and the
     // view isn't told clip by clip (owner 2026-10-13, 20261013_L4: once, after the transaction)
