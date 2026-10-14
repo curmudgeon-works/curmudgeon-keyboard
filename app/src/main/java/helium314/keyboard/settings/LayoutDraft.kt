@@ -162,7 +162,7 @@ class LayoutDraft private constructor(
     fun accept() = discard()
 
     private fun discard() {
-        dir.deleteRecursively()
+        AtomicFiles.deleteDir(dir) // (one step: a cut-off delete leaves no part of the snapshot to put back, 20261013_L18)
         savedSubScreens.clear()
         writes.clear()
         if (active === this) active = null
@@ -292,6 +292,8 @@ class LayoutDraft private constructor(
         /** A snapshot left on disk by a process that died with Layout & Typing open: put it back. Called at app start. */
         fun recoverAfterCrash(ctx: Context) {
             if (active != null) return
+            // (a Save's or Discard's delete of the snapshot cut off: nothing of it is put back, 20261013_L18)
+            AtomicFiles.deleteFinished(dir(ctx))
             if (File(dir(ctx), PREFS_FILE).exists()) helium314.keyboard.latin.utils.SettingsEventLog.log("Layout & Typing snapshot found at app start: recovering")
             val dir = dir(ctx)
             val json = runCatching { JSONObject(File(dir, PREFS_FILE).readText()) }.getOrNull()

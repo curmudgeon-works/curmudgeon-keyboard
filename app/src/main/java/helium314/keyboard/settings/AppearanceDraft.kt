@@ -222,7 +222,7 @@ class AppearanceDraft private constructor(
     }
 
     private fun discard() {
-        dir.deleteRecursively()
+        helium314.keyboard.latin.utils.AtomicFiles.deleteDir(dir) // (one step: a cut-off delete leaves no part of the snapshot to put back, 20261013_L18)
         savedPalettes.clear()
         writes.clear()
         if (active === this) active = null
@@ -375,6 +375,8 @@ class AppearanceDraft private constructor(
         fun recoverAfterCrash(ctx: Context) {
             if (active != null) return
             val dir = dir(ctx)
+            // (a Save's or Discard's delete of the snapshot cut off: nothing of it is put back, 20261013_L18)
+            helium314.keyboard.latin.utils.AtomicFiles.deleteFinished(dir)
             val json = runCatching { JSONObject(File(dir, PREFS_FILE).readText()) }.getOrNull()
             // (a snapshot that can't be read: the held fonts and pictures go back to their lists first, then the folder;
             // owner 2026-10-12 B4: before, the folder went first, and the held files with it)

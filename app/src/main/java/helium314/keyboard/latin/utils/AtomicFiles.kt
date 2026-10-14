@@ -25,6 +25,26 @@ object AtomicFiles {
     @JvmStatic
     fun copy(source: File, target: File) = write(target) { out -> source.inputStream().use { it.copyTo(out) } }
 
+    /** Folder [dir] gone in one step (round-5 review 20261013_L18): renamed to its finished name first, then deleted;
+     *  a delete cut off leaves a finished folder, never part of [dir] (a draft folder's partial delete left its
+     *  copies without its snapshot file, and the next start put them back). [deleteFinished] removes the leftover. */
+    @JvmStatic
+    fun deleteDir(dir: File) {
+        val finished = finishedOf(dir)
+        finished.deleteRecursively()
+        if (dir.renameTo(finished)) finished.deleteRecursively()
+        else dir.deleteRecursively() // (no folder to rename: nothing there; a rename that fails anyway: deleted in place, as before)
+    }
+
+    /** The leftover of a [deleteDir] of [dir] cut off, deleted; nothing of it is put back. */
+    @JvmStatic
+    fun deleteFinished(dir: File) { finishedOf(dir).deleteRecursively() }
+
+    private fun finishedOf(dir: File) = File(dir.parentFile, dir.name + FINISHED_SUFFIX)
+
+    /** A finished folder's ending ([deleteDir]). */
+    const val FINISHED_SUFFIX = ".finished"
+
     /** What [content] writes into [file]. Throws what the write throws; then [file] is as it was. */
     fun write(file: File, content: (OutputStream) -> Unit) {
         file.parentFile?.mkdirs()

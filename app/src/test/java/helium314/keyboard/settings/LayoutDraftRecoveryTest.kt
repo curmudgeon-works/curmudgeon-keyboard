@@ -51,4 +51,23 @@ class LayoutDraftRecoveryTest {
         assertEquals("7 8 9", kept.readText())
         assertFalse(draftDir.exists(), "the draft's folder stays")
     }
+
+    // round-5 review 20261013_L18 (owner: "Ok A"): Save's delete of the snapshot is one step (renamed to a finished
+    // folder, then deleted). Fail before: a delete cut off (here: a folder of the copy that can't be emptied) took the
+    // snapshot file and left the copy's layout, and the next start put the layout deleted and saved back
+    @Test fun `a Save whose delete of the snapshot is cut off brings nothing back`() {
+        val deleted = File(layouts, "number_row${File.separator}custom.mine.").apply { parentFile!!.mkdirs(); writeText("1 2 3") }
+        val draft = LayoutDraft.of(ctx, "en_US:") // Layout & Typing opens
+        deleted.delete() // (deleted on the screen)
+        val stuck = listOf(File(draftDir, "layouts${File.separator}number_row"),
+            File(ctx.filesDir, "layout_draft.finished${File.separator}layouts${File.separator}number_row"))
+        stuck[0].setWritable(false) // (its file can't be deleted: the delete stops partway)
+        try {
+            draft.accept() // Save
+        } finally { stuck.forEach { it.setWritable(true) } }
+        LayoutDraft.recoverAfterCrash(ctx) // the next app start
+        assertFalse(deleted.exists(), "the layout deleted and saved came back")
+        assertFalse(draftDir.exists())
+        assertFalse(File(ctx.filesDir, "layout_draft.finished").exists(), "the finished folder is left")
+    }
 }
