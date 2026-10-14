@@ -116,6 +116,15 @@ class FullRestoreCheckTest {
         assertUnreadableChangesNothing("broken settings")
     }
 
+    @Test fun `a settings file that parses but holds no settings changes nothing`() {
+        // (every heading, every map empty: owner 2026-10-12, "yes", unreadable)
+        ZipOutputStream(zip.outputStream()).use { z ->
+            z.putNextEntry(ZipEntry("blacklists/en-US.txt")); z.write("backupwords".toByteArray()); z.closeEntry()
+            z.putNextEntry(ZipEntry("preferences.json")); settingsToJsonStream(emptyMap<String?, Any?>(), z); z.closeEntry()
+        }
+        assertUnreadableChangesNothing("empty settings")
+    }
+
     @Test fun `a backup without a settings file changes nothing`() {
         ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(ZipEntry("blacklists/en-US.txt")); z.write("backupwords".toByteArray()); z.closeEntry()

@@ -971,8 +971,8 @@ private fun replaceEverything(ctx: Context, file: File, promised: PendingRestore
  * Reads the whole backup [file] once, writing nothing, before the full restore deletes anything (owner 2026-10-12: "Yes,
  * check backup before wipe"; there is no safety copy of the device's data): the zip opens and lists its entries (the
  * list is at the zip's end, so a file cut short has none), every entry reads to its end through the restore's own reader
- * (which checks each entry's CRC) and they are the ones listed, the settings lines parse, and it has a settings file and
- * what the restore dialog showed ([promised]: its entries and its keyboards). Throws [UnreadableBackupException].
+ * (which checks each entry's CRC) and they are the ones listed, the settings lines parse, and it has a settings file
+ * with at least one setting and what the restore dialog showed ([promised]: its entries and its keyboards). Throws [UnreadableBackupException].
  * (The protected settings and the personal dictionary words aren't parsed: the restore never fails over those.)
  */
 private fun checkFullBackup(file: File, promised: PendingRestore?) {
@@ -993,6 +993,8 @@ private fun checkFullBackup(file: File, promised: PendingRestore?) {
         }
         if (read != listed) throw UnreadableBackupException("entries not readable: ${listed - read}")
         val settings = prefs ?: throw UnreadableBackupException("no settings file")
+        // (a settings file that parses but holds no setting at all can't be the device's: owner 2026-10-12, "yes")
+        if (settings.isEmpty()) throw UnreadableBackupException("no settings in the settings file")
         if (promised != null) {
             if (!read.containsAll(promised.entries)) throw UnreadableBackupException("entries missing: ${promised.entries - read}")
             // (by language: a backup from before the keyboards had ids gets fresh ids on each read)
