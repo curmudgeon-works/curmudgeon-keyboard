@@ -9,6 +9,7 @@ import org.robolectric.RobolectricTestRunner
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /** The restore's plan for a backup's added dictionaries (owner 2026-10-12): per language and kind, the same content
  *  anywhere: nothing; new: comes in; differs: the backup's selected, the device's renamed "…_prev", "…_prev2" … */
@@ -27,9 +28,10 @@ class RestoreDictionariesPlanTest {
         assertEquals("main_user.dict", kept.target)
         assertEquals(true, kept.select)
         val taken = RestoreDictionaries.plan("hi", "main_user.dict", "x", mapOf("main_user.dict" to "a", "main_prev_user.dict" to "x"))
-        // (B3b: the match steps aside first, so the one of that name takes the prev it leaves free)
-        assertEquals(listOf("main_prev_user.dict" to "main_user.dict.moving", "main_user.dict" to "main_prev_user.dict",
-            "main_user.dict.moving" to "main_user.dict"), taken.renames)
+        // (B3b: the match steps aside first, so the one of that name takes the prev it leaves free; 20261013_L7_2: aside
+        // under the first free prev, a listed name)
+        assertEquals(listOf("main_prev_user.dict" to "main_prev2_user.dict", "main_user.dict" to "main_prev_user.dict",
+            "main_prev2_user.dict" to "main_user.dict"), taken.renames)
         assertEquals(true, taken.select)
         // already under the backup's name: only selected
         val named = RestoreDictionaries.plan("hi", "emoji_user.dict", "x", mapOf("emoji_user.dict" to "x", "emoji_prev_user.dict" to "x"))
@@ -37,6 +39,24 @@ class RestoreDictionariesPlanTest {
         assertEquals(emptyList(), named.renames)
         assertEquals("emoji_user.dict", named.target)
         assertEquals(true, named.select)
+    }
+
+    // round-6 review 20261013_L7_2 (owner 2026-10-13): every name a step renames through is a listed one ("…_user.dict"),
+    // so a restore killed between two renames leaves every dictionary listed and selectable. Fail before: the match
+    // stepped aside as "main_user.dict.moving", unlisted until a recovery that ran only when a restore dialog opened
+    @Test fun `a match's renames go through listed names only`() {
+        for (device in listOf(mapOf("main_user.dict" to "a", "main_prev_user.dict" to "x"),
+                mapOf("main_user.dict" to "a", "main_prev_user.dict" to "b", "main_prev2_user.dict" to "x"),
+                mapOf("main_user.dict" to "a", "main_custom_user.dict" to "x"))) {
+            val step = RestoreDictionaries.plan("hi", "main_user.dict", "x", device)
+            val names = step.renames.flatMap { listOf(it.first, it.second) }
+            assertTrue(names.all { it.endsWith("_user.dict") }, "$names")
+            // each rename's target free when it runs
+            val now = device.keys.toMutableSet()
+            for ((from, to) in step.renames) { assertTrue(from in now && to !in now, "$from -> $to in $now"); now -= from; now += to }
+            // (the match takes the backup's name and the one there moves aside: names change, the count doesn't)
+            assertEquals(device.size, now.size, "a file lost or added")
+        }
     }
 
     @Test fun `a clash moves the default-named one to the next free prev, keeping the user dict ending`() {

@@ -14,7 +14,8 @@ import java.security.MessageDigest
  * - the backup's dictionary of a kind is the one it had selected ([inUse]); one the backup didn't use stays out;
  * - the same content anywhere for that language and kind on the device ([Action.SAME]): that copy is selected and
  *   renamed to the backup's name, a device file of that name with other content moved aside to the first free
- *   "…_prev" ("_prev2" …) once the copy has left its own name (B3b: no gap) (owner 2026-10-12 B4: "When backups dict matches, yes select that copy and also rename that
+ *   "…_prev" ("_prev2" …) once the copy has left its own name (B3b: no gap; the copy steps aside under a free "…_prev"
+ *   too, 20261013_L7_2) (owner 2026-10-12 B4: "When backups dict matches, yes select that copy and also rename that
  *   copy to backups"; before, nothing, and a match kept aside, e.g. "emoji_prev", stayed unused);
  * - none of that kind on the device: it comes in ([Action.NEW]);
  * - content differs: the backup's comes in and is selected, the device's of that name is renamed on disk to
@@ -27,8 +28,6 @@ import java.security.MessageDigest
  */
 internal object RestoreDictionaries {
     const val INTERNAL = "internal"
-    /** A matching copy's name while it steps aside (not listed: no "user.dict" ending). */
-    private const val MOVING = ".moving"
     /** The backup's copy while it waits beside the device's (not listed either). */
     private const val RESTORING = ".restoring"
     private val suffix = "_" + DictionaryInfoUtils.USER_DICTIONARY_SUFFIX
@@ -106,10 +105,14 @@ internal object RestoreDictionaries {
             val match = same.sorted().first()
             // (the one of that name moved to the first prev free once the match has left its own name, review B3b: picked
             // before, "main_prev" matching left "main_prev" empty and the old "main" went to "main_prev2"; so the match
-            // steps aside under a name the app doesn't list first)
+            // steps aside first when that prev is its own name, under the first free prev: only listed names, so a restore
+            // killed between two renames leaves every file listed and selectable, nothing to recover (round-6 review
+            // 20261013_L7_2, owner 2026-10-13; before, "<name>.moving", unlisted, and a recovery that named it "…_prev2"
+            // with "main" free)
             val renames = if (backupName in device) {
-                val aside = backupName + MOVING
-                listOf(match to aside, backupName to nextPrev(kind, device.keys - match), aside to backupName)
+                val kept = nextPrev(kind, device.keys - match)
+                if (kept != match) listOf(backupName to kept, match to backupName)
+                else nextPrev(kind, device.keys).let { aside -> listOf(match to aside, backupName to match, aside to backupName) }
             } else listOf(match to backupName)
             return Step(tag, kind, backupName, Action.SAME, backupName, renames, kept = renames.firstOrNull { it.first == backupName }?.second)
         }
@@ -181,21 +184,14 @@ internal object RestoreDictionaries {
     }
 
     /**
-     * What a restore killed mid-step left in the language folders under [root] (owner 2026-10-13, 20261013_L5): a device
-     * dictionary stepped aside as "<name>.moving" (B3b) gets the next free "…_prev" name of its kind ("main_prev_user.dict",
-     * the ".user.dict" ending kept), so the app lists it and it is selectable again; the backup's copy "<name>.restoring"
-     * is deleted (only the backup's: nothing of the device's lost). Run at the start of a restore's dictionary step,
-     * before planning.
+     * What a restore killed mid-step left in the language folders under [root] (owner 2026-10-13, 20261013_L5): the
+     * backup's copy "<name>.restoring" is deleted (only the backup's: nothing of the device's lost). Run when the restore
+     * dialog opens, before planning. (A device dictionary stepped aside under "<name>.moving" was listed again here too,
+     * until its renames went through listed names only: round-6 review 20261013_L7_2, owner 2026-10-13.)
      */
     fun recoverLeftovers(root: File) {
-        for (dir in root.listFiles()?.filter { it.isDirectory }.orEmpty()) {
-            for (f in dir.listFiles()?.filter { it.isFile }?.sortedBy { it.name }.orEmpty()) {
-                if (f.name.endsWith(RESTORING)) { f.delete(); continue }
-                if (!f.name.endsWith(MOVING)) continue
-                val kind = kindOf(f.name.removeSuffix(MOVING))
-                f.renameTo(File(dir, nextPrev(kind, dir.list()?.toSet().orEmpty())))
-            }
-        }
+        for (dir in root.listFiles()?.filter { it.isDirectory }.orEmpty())
+            for (f in dir.listFiles()?.filter { it.isFile && it.name.endsWith(RESTORING) }.orEmpty()) f.delete()
     }
 
     /** The digests of a language folder's added dictionaries. */

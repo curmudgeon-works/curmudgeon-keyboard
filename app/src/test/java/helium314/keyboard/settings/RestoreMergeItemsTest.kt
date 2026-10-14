@@ -415,7 +415,7 @@ class RestoreMergeItemsTest {
     // (the safety: a rename that can't be done puts back the ones before it, nothing lost or hidden)
     @Test fun `a match whose moves can't all be done changes nothing`() {
         dictDir("fr").mkdirs(); dict("fr", "main_user.dict").writeText("A"); dict("fr", "main_prev_user.dict").writeText("X")
-        dict("fr", "main_user.dict.moving").mkdirs() // (the name the match steps aside under is taken: the first move can't go)
+        dict("fr", "main_prev2_user.dict").mkdirs() // (the name the match steps aside under is taken: the first move can't go)
         backup(listOf(frB), entries = mapOf("dicts/fr/main_user.dict" to "X".toByteArray()))
         restoreDictionaries(ticked = true)
         assertEquals("A", dict("fr", "main_user.dict").readText())
@@ -423,28 +423,14 @@ class RestoreMergeItemsTest {
         assertEquals(null, selected("fr"))
     }
 
-    // fail before (owner 2026-10-13, 20261013_L5): a restore killed mid-step left the device's dictionary as "….moving",
-    // unlisted for good, and the backup's copy as "….restoring"
-    @Test fun `a dictionary a killed restore left stepped aside is listed again as the next prev, the backup's copy deleted`() {
-        dictDir("fr").mkdirs(); dict("fr", "main_user.dict").writeText("A"); dict("fr", "main_prev_user.dict").writeText("B")
-        dict("fr", "main_user.dict.moving").writeText("X"); dict("fr", "emoji_user.dict.restoring").writeText("backup")
-        backup(listOf(frB)) // (no dictionaries in it: every restore recovers them)
-        readRestoreDialog(ctx, zip) // (the restore dialog opens: recovered there, 20261013_F2)
-        assertEquals(setOf("main_user.dict", "main_prev_user.dict", "main_prev2_user.dict"), dictDir("fr").list()!!.toSet())
-        assertEquals("X", dict("fr", "main_prev2_user.dict").readText())
+    // fail before (owner 2026-10-13, 20261013_L5): a restore killed mid-step left the backup's copy as "….restoring"
+    // (a device dictionary stepped aside as "….moving" too, until 20261013_L7_2 renamed only through listed names)
+    @Test fun `the backup's copy a killed restore left is deleted when the restore dialog opens`() {
+        dictDir("fr").mkdirs(); dict("fr", "main_user.dict").writeText("A"); dict("fr", "emoji_user.dict.restoring").writeText("backup")
+        backup(listOf(frB)) // (no dictionaries in it: every restore dialog clears it)
+        readRestoreDialog(ctx, zip) // (the restore dialog opens: cleared there, 20261013_F2)
+        assertEquals(setOf("main_user.dict"), dictDir("fr").list()!!.toSet())
         assertEquals("A", dict("fr", "main_user.dict").readText())
-        assertEquals("B", dict("fr", "main_prev_user.dict").readText())
-    }
-
-    // round-5 review 20261013_F2 (owner: "2. A"): the leftover is recovered when the restore dialog opens, before its plan
-    // and dictionary wording. Fail before: recovered at the restore's start, the dialog said "Dictionary differs" for a
-    // backup dictionary the device had (stepped aside)
-    @Test fun `a dictionary a killed restore left stepped aside counts in the dialog's wording`() {
-        dictDir("fr").mkdirs(); dict("fr", "main_user.dict").writeText("A"); dict("fr", "main_user.dict.moving").writeText("X")
-        backup(listOf(frB), entries = mapOf("dicts/fr/main_user.dict" to "X".toByteArray()))
-        assertEquals("Backup's dictionary set as main, yours kept as main_prev", row(readRestoreDialog(ctx, zip).plan))
-        val restored = restoreDictionaries(ticked = true)
-        assertEquals("Dictionaries: French: backup's set as main (yours kept as main_prev).", restoreSummary(ctx, restored).lines().last())
     }
 
     // fail before (L3.5): the other languages' new dictionaries came in silently with the clipboard

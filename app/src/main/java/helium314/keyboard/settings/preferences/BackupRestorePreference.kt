@@ -608,9 +608,9 @@ internal class RestoreDialogData(val pending: PendingRestore, val plan: RestoreP
 /** Reads the backup [file] for the restore dialog: the zip read whole (the dry runs too), so never on the main thread
  *  (review 2026-10-11 R5: done in composition, a large backup froze the screen). */
 internal fun readRestoreDialog(ctx: Context, file: File): RestoreDialogData {
-    // first, what a restore killed mid-step left: a device dictionary stepped aside listed again (owner 2026-10-13,
-    // 20261013_L5), whatever this backup brings; before the plan and its dictionary wording are worked out (round-5
-    // review 20261013_F2: at the restore's start, the dialog had planned and worded without it)
+    // first, what a restore killed mid-step left: the backup's copy waiting beside the device's goes (owner 2026-10-13,
+    // 20261013_L5; a device dictionary stepped aside, listed again here too until 20261013_L7_2), whatever this backup
+    // brings; before the plan and its dictionary wording are worked out (round-5 review 20261013_F2)
     try { RestoreDictionaries.recoverLeftovers(File(DictionaryInfoUtils.getWordListCacheDirectory(ctx))) }
     catch (t: Throwable) { Log.w("AdvancedScreen", "error recovering dictionaries left by a restore", t) }
     return readBackup(file).let { RestoreDialogData(it, restorePlan(ctx, it)) }
