@@ -792,4 +792,7 @@ class ProfilePreferences(private val real: SharedPreferences, private val active
 
     /** The underlying preferences, for the profile bookkeeping and backup. */
     val underlying: SharedPreferences get() = real
+
+    /** Whether [key] written here goes to the shared set (its plain key), not to a keyboard's own. */
+    fun writesShared(key: String) = k(key) == key
 }

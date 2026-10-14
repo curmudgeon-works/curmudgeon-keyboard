@@ -114,6 +114,8 @@ fun ColorsScreen(
                 if (value == null) remove(key) else helium314.keyboard.latin.settings.KeyboardProfiles.put(this, key, value)
             }
         }.apply()
+        // the hidden sets that followed the rename go back with it (review 2026-10-08 area 4 #3)
+        if (newThemeName.text != openedName) KeyboardTheme.followInHiddenSets(prefs, newThemeName.text, openedName)
         helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().setThemeNeedsReload()
     }
     var askLeave by rememberSaveable { mutableStateOf(false) }

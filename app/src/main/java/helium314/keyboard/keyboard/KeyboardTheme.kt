@@ -22,6 +22,8 @@ import helium314.keyboard.latin.common.SeeThroughKeys
 import helium314.keyboard.latin.common.DefaultColors
 import helium314.keyboard.latin.common.DynamicColors
 import helium314.keyboard.latin.settings.Defaults
+import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.latin.settings.ProfilePreferences
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.ResourceUtils
 import helium314.keyboard.latin.utils.brightenOrDarken
@@ -546,7 +548,35 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                 if (prefs.getString(Settings.PREF_THEME_COLORS, null) == name) remove(Settings.PREF_THEME_COLORS)
                 if (prefs.getString(Settings.PREF_THEME_COLORS_NIGHT, null) == name) remove(Settings.PREF_THEME_COLORS_NIGHT)
             }
+            followInHiddenSets(prefs, name, null)
             KeyboardSwitcher.getInstance().setThemeNeedsReload()
+        }
+
+        /**
+         * Palette [name] deleted ([to] null) or renamed in the shared set: the keyboards' own sets that choose it but
+         * hold no colours of their own under that name read the shared palette, so they follow; hidden ones too
+         * (separate settings off, or Appearance shared), else such a set names a palette with no colours and later
+         * takes up a new one saved under the free name (review 2026-10-08 area 4 #3). A delete leaves that keyboard
+         * at the default colours ("at its default" mark, as forgetValueEverywhere), like the shared set. A palette
+         * deleted in a keyboard's own set is that keyboard's alone: nothing else changes. The palette editor's
+         * Discard calls it back the other way after a rename.
+         */
+        fun followInHiddenSets(prefs: SharedPreferences, name: String, to: String?) {
+            val real = (prefs as? ProfilePreferences)?.underlying ?: prefs
+            if (prefs is ProfilePreferences && !prefs.writesShared(Settings.PREF_THEME_COLORS)) return
+            val all = real.all
+            val editor = real.edit()
+            for ((stored, value) in all) {
+                if (value != name) continue
+                val (id, key) = KeyboardProfiles.splitOwnKey(stored) ?: continue
+                if (key != Settings.PREF_THEME_COLORS && key != Settings.PREF_THEME_COLORS_NIGHT) continue
+                val ownColors = listOf(Settings.PREF_USER_COLORS_PREFIX, Settings.PREF_USER_ALL_COLORS_PREFIX, Settings.PREF_USER_MORE_COLORS_PREFIX)
+                    .any { all.containsKey(KeyboardProfiles.ownKey(id, it + name)) }
+                if (ownColors) continue
+                if (to != null) editor.putString(stored, to)
+                else editor.remove(stored).putBoolean(KeyboardProfiles.ownKey(id, KeyboardProfiles.TOMBSTONE + key), true)
+            }
+            editor.apply()
         }
 
         // returns false if not renamed due to invalid name or collision
@@ -574,6 +604,7 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                 if (prefs.getString(Settings.PREF_THEME_COLORS_NIGHT, Defaults.PREF_THEME_COLORS_NIGHT) == from)
                     putString(Settings.PREF_THEME_COLORS_NIGHT, to)
             }
+            followInHiddenSets(prefs, from, to)
             return true
         }
 
