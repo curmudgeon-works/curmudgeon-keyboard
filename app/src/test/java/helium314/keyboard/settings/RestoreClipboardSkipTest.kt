@@ -258,6 +258,28 @@ class RestoreClipboardSkipTest {
         }
     }
 
+    // round-5 review 20261013_F1 (owner: "1. A"): the merge (partial restore) adds the backup's clips in its one
+    // transaction with inserts that throw. Fail before: the refused "y" went unnoticed, "x" came in, and it said restored
+    @Test fun `copyFromDb merge - an add that fails rolls it all back, none added, not restored, told once`() {
+        val dao = deviceClips()
+        val panel = Panel(ctx)
+        dao.listener = panel
+        restoredDb.parentFile?.mkdirs()
+        restoredDb.writeBytes(clipboardDb(version = 2))
+        val w = Database.getInstance(ctx).writableDatabase
+        w.execSQL("CREATE TRIGGER refuse_y BEFORE INSERT ON CLIPBOARD WHEN NEW.TEXT = 'y' BEGIN SELECT RAISE(ABORT, 'refused'); END")
+        try {
+            assertFalse(Database.copyFromDb(restoredDb, ctx, mergeKeeping = 10), "said restored")
+            assertEquals(setOf("a", "b"), texts(dao), "a backup clip was added (cache)")
+            assertEquals(setOf("a", "b"), tableTexts(), "a backup clip was added (table)")
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(listOf("reloaded"), panel.calls)
+        } finally {
+            w.execSQL("DROP TRIGGER IF EXISTS refuse_y")
+            dao.listener = null
+        }
+    }
+
     // ---- a leftover "heliboard.db_restored" of a failed restore (owner 2026-10-13, 20261013_L2). Fail before: the next
     // restore of a backup with no clipboard database took the leftover's clips ----
 

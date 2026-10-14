@@ -105,12 +105,14 @@ class ClipboardDao private constructor(private val db: Database) {
     /**
      * A clip of a backup merged in (a partial restore, owner 2026-10-12: "yes, merge clipboard"): one with the same text
      * is kept once, pinned if either is, with the newer time; a new one is added. Nothing is dropped here: the history
-     * size is applied once all are in ([keepNewestUnpinned]). The view isn't told ([mergeClips] does, once).
+     * size is applied once all are in ([keepNewestUnpinned]). The view isn't told ([mergeClips] does, once). An add that
+     * fails throws, so [mergeClips] rolls them all back (round-5 review 20261013_F1, as the full restore's, L1: the
+     * insert's error went unnoticed, and the others came in as "restored").
      */
     private fun mergeClip(timestamp: Long, pinned: Boolean, text: String) {
         val existing = cache.firstOrNull { it.text == text }
         if (existing == null) {
-            insertNewEntry(timestamp, pinned, text, trim = false, notify = false)
+            insertNewEntry(timestamp, pinned, text, trim = false, strict = true, notify = false)
             return
         }
         val newPinned = existing.isPinned || pinned
