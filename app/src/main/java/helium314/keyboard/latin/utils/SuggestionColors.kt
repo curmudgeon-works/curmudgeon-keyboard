@@ -10,7 +10,8 @@ import helium314.keyboard.latin.settings.Settings
 
 /**
  * The swipe trail's color: the one picked (Appearance, "Swipe trail color", per keyboard), else the theme's, else
- * the orange where no theme colors can be had.
+ * the orange where no theme colors can be had. (The Dynamic colors' accent is the orange too, 2026-10-14: see
+ * KeyboardTheme.getColorsForCurrentTheme.)
  */
 fun gestureTrailColor(prefs: SharedPreferences, colors: Colors?): Int =
     if (prefs.contains(Settings.PREF_GESTURE_TRAIL_COLOR))

@@ -170,10 +170,17 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             val themeColors = getThemeColors(themeName!!, themeStyle!!, context, prefs, isNight)
             // the accent color picked for the keyboard over the theme's, in the palette editor too (decided 2026-10-07: what
             // the keyboard will show; the trail always read the picked color)
-            val colors = if (prefs.contains(Settings.PREF_GESTURE_TRAIL_COLOR))
-                helium314.keyboard.latin.common.AccentOverride(themeColors,
-                    prefs.getInt(Settings.PREF_GESTURE_TRAIL_COLOR, Defaults.PREF_GESTURE_TRAIL_COLOR))
-                else themeColors
+            // owner 2026-10-14: "the accent color in appearance (swipe trail, suggestions, enter key) should ship as our
+            // orange -- only that": the Dynamic colors take the orange for those while none is picked (nothing stored),
+            // everything else stays the device's; the other themes keep their own accent
+            val accent = when {
+                prefs.contains(Settings.PREF_GESTURE_TRAIL_COLOR) ->
+                    prefs.getInt(Settings.PREF_GESTURE_TRAIL_COLOR, Defaults.PREF_GESTURE_TRAIL_COLOR)
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && themeColors is DynamicColors ->
+                    Defaults.PREF_GESTURE_TRAIL_COLOR
+                else -> null
+            }
+            val colors = if (accent != null) helium314.keyboard.latin.common.AccentOverride(themeColors, accent) else themeColors
             // a background picture shown whole: the keys are clear on it
             return if (prefs.getBoolean(Settings.PREF_BACKGROUND_WHOLE_PICTURE, Defaults.PREF_BACKGROUND_WHOLE_PICTURE)
                     && Settings.readUserBackgroundImage(context, isNight) != null) SeeThroughKeys(colors)
