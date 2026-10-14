@@ -77,7 +77,8 @@ object Palettes {
      * colours when the editor opened (prefix -> value). Each other keyboard ([keyboards]) and saved theme ([themes])
      * using it takes what was chosen for it, in every slot naming it (owner 2026-10-11: "one palette, edits reach every
      * slot using it"): the new colours (nothing to do), the app's default colours, or the old colours as one new palette
-     * on the list shared by all keepers ([keeperName]).
+     * on the list shared by all keepers ([keeperName]); none keeping them, no such palette is made (owner 2026-10-11:
+     * "Would this still cause Warm 2 to be created if no users exist for it?": no).
      * @return the keepers' palette, null when nobody keeps the old colours
      */
     fun afterEdit(real: SharedPreferences, name: String, old: Map<String, Any?>,
