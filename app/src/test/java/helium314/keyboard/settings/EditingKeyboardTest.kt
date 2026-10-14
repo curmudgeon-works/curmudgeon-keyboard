@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.core.content.edit
@@ -180,7 +181,7 @@ class EditingKeyboardTest {
         assertFalse(real.contains(own(idA)), "B's Text correction wrote A's set")
     }
 
-    @Test fun `Back during the slide, then App settings neither names B nor finds a setting of another screen`() = launch { _, activity ->
+    @Test fun `Back during the slide, then App settings neither names B nor finds a setting of another screen, and a row found there edits no keyboard's set`() = launch { _, activity ->
         openCorrectionOfB()
         frames(1000)
         activity.runOnUiThread { activity.onBackPressedDispatcher.onBackPressed() }
@@ -198,7 +199,20 @@ class EditingKeyboardTest {
         frames(500)
         assertEquals(0, compose.onAllNodes(hasText(autoCap) and !hasSetTextAction()).fetchSemanticsNodes().size,
             "App settings' search found another screen's setting")
-        assertFalse(real.contains(own(idB)), "a setting landed in B's set")
+        // a row of its own found there and toggled (round-7 review 20261013_L13_3: before, nothing was toggled, so the
+        // check on B's set couldn't fail). App settings' rows are all app-wide (none is a keyboard's own): the change is
+        // stored plain, and B's set (A's too) is as it was
+        fun setKeys(id: String) = real.all.filterKeys { KeyboardProfiles.splitOwnKey(it)?.first == id }
+        val bBefore = setKeys(idB)
+        val aBefore = setKeys(idA)
+        val preview = ctx.getString(R.string.auto_preview_keyboard)
+        compose.onAllNodes(hasSetTextAction())[0].performTextReplacement(preview)
+        frames(500)
+        compose.onAllNodes(hasText(preview) and !hasSetTextAction())[0].performSemanticsAction(SemanticsActions.OnClick)
+        idle(); compose.mainClock.advanceTimeByFrame()
+        assertEquals(false, real.all[Settings.PREF_AUTO_PREVIEW_KEYBOARD], "the row found didn't change its setting: ${real.all.keys}")
+        assertEquals(bBefore, setKeys(idB), "a setting landed in B's set")
+        assertEquals(aBefore, setKeys(idA), "an app-wide setting landed in A's set")
     }
 
     // ---- 3: the main screen idle ----
