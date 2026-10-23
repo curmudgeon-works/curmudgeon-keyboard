@@ -33,9 +33,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import helium314.keyboard.latin.R
@@ -470,9 +467,9 @@ private fun startWords(ctx: Context, keyboard: SettingsSubtype, learned: List<Se
 }
 
 /** The delete dialog's Delete: [keyboard] (listed or switched off) goes, with its set, its words and its registration as
- *  an added keyboard; [mergeInto] takes its lists ([DeleteKeyboardDialog]). Switched off, it isn't in the list: taking
+ *  an added keyboard; each of [mergeInto] takes its lists ([DeleteKeyboardDialog]). Switched off, it isn't in the list: taking
  *  it out does nothing (an added keyboard's definition marks it as one, so no listed keyboard is taken for it). */
-internal fun deleteKeyboard(ctx: Context, keyboard: SettingsSubtype, mergeInto: SettingsSubtype?) {
+internal fun deleteKeyboard(ctx: Context, keyboard: SettingsSubtype, mergeInto: List<SettingsSubtype> = emptyList()) {
     if (KeyboardProfiles.mainBlocksDelete(ctx.realPrefs(), keyboard)) return // (see DeleteKeyboardDialog)
     logDeleted(ctx, keyboard, mergeInto)
     if (keyboard.isAdditionalSubtype(ctx.prefs())) SubtypeUtilsAdditional.removeAdditionalSubtype(ctx, keyboard.toAdditionalSubtype())
@@ -481,11 +478,12 @@ internal fun deleteKeyboard(ctx: Context, keyboard: SettingsSubtype, mergeInto: 
 }
 
 /** The event log's one line of a delete (owner 2026-10-12 K1): whether it was switched off (its tile's Delete), and the
- *  keyboard taking its lists. */
-internal fun logDeleted(ctx: Context, keyboard: SettingsSubtype, mergeInto: SettingsSubtype?) {
+ *  keyboards taking its lists. */
+internal fun logDeleted(ctx: Context, keyboard: SettingsSubtype, mergeInto: List<SettingsSubtype>) {
     val listed = SubtypeSettings.getEnabledSubtypes(true).any { it.toSettingsSubtype().sameKeyboard(keyboard) }
     val detail = listOfNotNull(if (listed) null else "was switched off",
-        mergeInto?.let { "its lists merged into " + helium314.keyboard.latin.utils.SettingsEventLog.describe(ctx, it) }).joinToString(", ").ifEmpty { null }
+        mergeInto.takeIf { it.isNotEmpty() }?.let { kbs -> "its lists merged into " +
+            kbs.joinToString(" and ") { helium314.keyboard.latin.utils.SettingsEventLog.describe(ctx, it) } }).joinToString(", ").ifEmpty { null }
     helium314.keyboard.latin.utils.SettingsEventLog.keyboard(ctx, "deleted", keyboard, detail)
 }
 
@@ -541,12 +539,13 @@ internal fun mainChangedMessage(ctx: Context, main: SettingsSubtype): String {
 
 /**
  * Delete [keyboard]? Its learned and blacklisted words go too; the keyboards reading them ("Use lists from other
- * keyboards") are named, with one pick, none by default (owner 2026-10-11: "list of keyboards where user can select one
- * keyboard or none (none selected by default) Ok/cancel"): the picked one takes the lists merged into its own, and the
- * others read them from there. [onConfirmed] gets the pick.
+ * keyboards") are listed as [helium314.keyboard.settings.dialogs.SelectOthersList] has it, all selected (owner
+ * 2026-10-18, review SP23a: "we should offer to merge into each keyboard individually. Select which ones should have
+ * these lists merged in (default all on)"; was one pick, none by default, or "None: the lists go"): each selected one
+ * takes both lists merged into its own, the others no longer read them. [onConfirmed] gets the selected ones.
  */
 @Composable
-internal fun DeleteKeyboardDialog(keyboard: SettingsSubtype, onDismissRequest: () -> Unit, onConfirmed: (SettingsSubtype?) -> Unit) {
+internal fun DeleteKeyboardDialog(keyboard: SettingsSubtype, onDismissRequest: () -> Unit, onConfirmed: (List<SettingsSubtype>) -> Unit) {
     val ctx = LocalContext.current
     // the first keyboard while its settings are the common ones: not deleted (owner 2026-10-11: "can't delete when
     // common settings are selected. User should be asked to push it down in prio order first.")
@@ -555,26 +554,19 @@ internal fun DeleteKeyboardDialog(keyboard: SettingsSubtype, onDismissRequest: (
         return
     }
     val readers = remember(keyboard) { helium314.keyboard.latin.personalization.LearnedKeyboards.listReaders(ctx.realPrefs(), keyboard) }
-    var pick: SettingsSubtype? by remember { mutableStateOf(null) }
+    val selected = helium314.keyboard.settings.dialogs.rememberAllSelected(readers)
     helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog(
         onDismissRequest = onDismissRequest,
-        onConfirmed = { onConfirmed(pick) },
+        onConfirmed = { onConfirmed(readers.filterIndexed { i, _ -> i in selected }) },
         confirmButtonText = stringResource(R.string.delete),
         title = { Text(stringResource(R.string.delete_keyboard_title)) },
         scrollContent = true,
         content = {
             androidx.compose.foundation.layout.Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.delete_keyboard_message, keyboardName(keyboard, ctx)))
-                if (readers.isNotEmpty()) {
-                    Text(stringResource(R.string.delete_keyboard_readers))
-                    (listOf<SettingsSubtype?>(null) + readers).forEach { kb ->
-                        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth().clickable { pick = kb }.heightIn(min = 44.dp)) {
-                            androidx.compose.material3.RadioButton(selected = pick == kb, onClick = { pick = kb })
-                            Text(if (kb == null) stringResource(R.string.delete_keyboard_merge_none) else keyboardName(kb, ctx))
-                        }
-                    }
-                }
+                if (readers.isNotEmpty())
+                    helium314.keyboard.settings.dialogs.SelectOthersList(stringResource(R.string.delete_keyboard_readers_select),
+                        readers.map { keyboardName(it, ctx) }, selected)
             }
         },
     )

@@ -39,8 +39,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Owner 2026-10-11, keyboards and dictionaries: a deleted keyboard's lists can go into one of the keyboards that read
- * them ("Merge these lists into one of those keyboards and refer from others"); an added dictionary other keyboards use
+ * Owner 2026-10-11, keyboards and dictionaries: a deleted keyboard's lists can go into the keyboards that read them
+ * ("Merge these lists into one of those keyboards and refer from others"; since 2026-10-18 into each one selected); an added dictionary other keyboards use
  * can't be deleted ("No delete allowed if other keyboards using dict").
  */
 @RunWith(RobolectricTestRunner::class)
@@ -82,16 +82,31 @@ class SharedThingsDeleteTest {
         assertEquals(emptyList(), LearnedKeyboards.listReaders(real, b)) // (A and C read nothing of others)
     }
 
-    @Test fun `a deleted keyboard's lists merge into the picked keyboard before they go`() {
+    @Test fun `a deleted keyboard's lists merge into the selected keyboard before they go`() {
         threeKeyboards()
         io.store(ce, "Latn", 5, word("alpha", 2, 100), word("beta", 5, 110))
         writeList(ce, "Latn", 5, "bad\n")
         io.store(ce, "Latn", 6, word("beta", 1, 50))
-        LearnedKeyboards.deleteKeyboard(ctx, a, mergeInto = b)
+        LearnedKeyboards.deleteKeyboard(ctx, a, mergeInto = listOf(b))
         idleUntil { !LearnedStores.storeFile(ce, "Latn", 5).exists() }
         assertEquals(mapOf("alpha" to (2 to 100), "beta" to (5 to 110)), io.read(ce, "Latn", 6))
         assertEquals(RemovedWords.Entry(1), readList(ce, "Latn", 6)?.get("bad"))
         assertTrue(!LearnedStores.storeFile(ce, "Latn", 5).exists()) // (A's own files went)
+    }
+
+    // review SP23a (owner 2026-10-18: "we should offer to merge into each keyboard individually"): every keyboard
+    // selected gets both lists merged into its own. Fail before: one keyboard only (mergeInto took one)
+    @Test fun `a deleted keyboard's lists merge into each selected keyboard before they go`() {
+        threeKeyboards()
+        io.store(ce, "Latn", 5, word("alpha", 2, 100))
+        writeList(ce, "Latn", 5, "bad\n")
+        io.store(ce, "Latn", 6, word("beta", 1, 50))
+        LearnedKeyboards.deleteKeyboard(ctx, a, mergeInto = listOf(b, c))
+        idleUntil { !LearnedStores.storeFile(ce, "Latn", 5).exists() }
+        assertEquals(mapOf("alpha" to (2 to 100), "beta" to (1 to 50)), io.read(ce, "Latn", 6))
+        assertEquals(mapOf("alpha" to (2 to 100)), io.read(ce, "Latn", 7))
+        assertEquals(RemovedWords.Entry(1), readList(ce, "Latn", 6)?.get("bad"))
+        assertEquals(RemovedWords.Entry(1), readList(ce, "Latn", 7)?.get("bad"))
     }
 
     @Test fun `a merge that didn't fully work keeps the deleted keyboard's lists on disk`() {
@@ -110,7 +125,7 @@ class SharedThingsDeleteTest {
                 if (dir.name.contains("Cyrl")) false else io.writeFile(dir, locale, entries)
         }
         ShadowLog.reset()
-        LearnedKeyboards.deleteKeyboard(ctx, a, mergeInto = b)
+        LearnedKeyboards.deleteKeyboard(ctx, a, mergeInto = listOf(b))
         // (the task's last word: the lists deleted, or kept)
         idleUntil { ShadowLog.getLogsForTag("LearnedKeyboards").any { "pool 9" in it.msg } }
         assertTrue(LearnedStores.storeFile(ce, "Latn", 9).exists())
@@ -121,7 +136,7 @@ class SharedThingsDeleteTest {
         assertTrue(9 !in storedPools(real).values) // (no keyboard has those lists any more)
     }
 
-    @Test fun `none picked - the lists go, nobody else changes`() {
+    @Test fun `none selected - the lists go, nobody else changes`() {
         threeKeyboards()
         io.store(ce, "Latn", 5, word("alpha", 2, 100))
         io.store(ce, "Latn", 6, word("beta", 1, 50))

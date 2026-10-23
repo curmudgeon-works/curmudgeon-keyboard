@@ -147,8 +147,8 @@ class SwitchedOffTileTest {
 
     @Test fun `delete a switched-off keyboard - its id, own settings, pool and words go as a listed one's, the list stays`() {
         leftovers()
-        deleteKeyboard(ctx, e, null) // (as the delete dialog's confirm calls it)
-        deleteKeyboard(ctx, c, null)
+        deleteKeyboard(ctx, e) // (as the delete dialog's confirm calls it)
+        deleteKeyboard(ctx, c)
         idleUntil { !LearnedStores.storeFile(ce, "Latn", 9).exists() }
         assertFalse(KeyboardProfiles.isOnPhone(real, e)) // (out of the added list)
         assertFalse(KeyboardProfiles.isOnPhone(real, c))

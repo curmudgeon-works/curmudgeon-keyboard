@@ -128,7 +128,7 @@ class KeyboardIdsTest {
         assertEquals("k77", KeyboardIds.newId(real))
         randomIds()
         // a keyboard deleted: a keyboard added after it has another id
-        deleteKeyboard(ctx, de, null)
+        deleteKeyboard(ctx, de)
         val added = createKeyboard(ctx, newKeyboardFor(ctx, Locale.GERMANY), null, StartSettings.Defaults)
         assertTrue(KeyboardIds.isId(added.keyboardId))
         assertTrue(added.keyboardId !in setOf("k1", "k2"))
@@ -170,7 +170,7 @@ class KeyboardIdsTest {
         assertEquals(11, LearnedKeyboards.poolOrNull(real, en))
         assertEquals(12, LearnedKeyboards.poolOrNull(real, twin))
         // one deleted: the other stays as it is
-        deleteKeyboard(ctx, twin, null)
+        deleteKeyboard(ctx, twin)
         assertEquals(listOf(en), storedEnabled(real))
         assertEquals("one", real.getString(idKey(1, font), null))
         assertNull(real.getString(idKey(3, font), null))
@@ -425,7 +425,7 @@ class KeyboardIdsTest {
         real.edit().putString(idKey(1, font), "mine").putString(Settings.PREF_SAVED_APP_SUBTYPE_PREFIX + "org.app", en.toPref())
             .putString(LearnedKeyboards.PREF_USE_OTHERS_LEARNED, JSONArray(listOf("k1", "k2")).toString()).commit()
         renameKeyboard(ctx, en, "Work")
-        deleteKeyboard(ctx, en, null) // (as a screen opened before the rename holds it)
+        deleteKeyboard(ctx, en) // (as a screen opened before the rename holds it)
         assertEquals(listOf(de), storedEnabled(real))
         assertFalse(added().any { it.keyboardId == "k1" })
         assertFalse(real.all.keys.any { it.startsWith("pk1/") })

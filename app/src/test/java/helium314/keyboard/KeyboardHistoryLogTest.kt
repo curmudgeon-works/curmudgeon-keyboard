@@ -68,7 +68,7 @@ class KeyboardHistoryLogTest {
 
     // fail before: two "keyboard removed" lines with the definition only, nothing named a delete
     @Test fun `a delete writes exactly one deleted line, the name first`() {
-        deleteKeyboard(ctx, german, null)
+        deleteKeyboard(ctx, german)
         settle()
         val deleted = linesWith("keyboard deleted:")
         assertEquals(1, deleted.size, lines().joinToString("\n"))
@@ -96,7 +96,7 @@ class KeyboardHistoryLogTest {
     @Test fun `deleting a switched-off keyboard from its tile writes one deleted line`() {
         switchOffKeyboard(ctx, german.toAdditionalSubtype())
         settle()
-        deleteKeyboard(ctx, german, null)
+        deleteKeyboard(ctx, german)
         settle()
         val deleted = linesWith("keyboard deleted: $germanName")
         assertEquals(1, deleted.size, lines().joinToString("\n"))
@@ -113,7 +113,7 @@ class KeyboardHistoryLogTest {
         file.delete()
         real.edit().putBoolean(Settings.PREF_LOG_SETTINGS, false).commit()
         SwitchedOffKeyboards.switchOn(ctx, german)
-        deleteKeyboard(ctx, german, null)
+        deleteKeyboard(ctx, german)
         settle()
         assertEquals(emptyList(), lines())
     }

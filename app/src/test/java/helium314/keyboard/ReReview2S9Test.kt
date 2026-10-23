@@ -66,7 +66,7 @@ class ReReview2S9Test {
     /** Deletes A merging into B, and waits for the task's last word about [pool] (its files deleted, or kept). */
     private fun deleteAndWait(pool: Int) {
         ShadowLog.reset()
-        LearnedKeyboards.deleteKeyboard(ctx, a, mergeInto = b)
+        LearnedKeyboards.deleteKeyboard(ctx, a, mergeInto = listOf(b))
         idleUntil { ShadowLog.getLogsForTag("LearnedKeyboards").any { "pool $pool" in it.msg } }
     }
 

@@ -196,19 +196,21 @@ object LearnedKeyboards {
     /**
      * The settings' Delete of [keyboard] (2026-10-10: its words go with it): what KeyboardProfiles.onKeyboardDeleted does,
      * then its learned words and blacklists deleted in the background, under [files]. The pool is read before the entry
-     * goes; pool 0 (the shared words of before) is never touched.
+     * goes; pool 0 (the shared words of before) is never touched. [mergeInto]: the keyboards selected in the delete
+     * dialog (owner 2026-10-18, review SP23a: "we should offer to merge into each keyboard individually. Select which
+     * ones should have these lists merged in (default all on)"; was one pick): each takes both lists, merged into its
+     * own, before they're deleted, in the same task.
      */
-    fun deleteKeyboard(context: Context, keyboard: SettingsSubtype, mergeInto: SettingsSubtype? = null) {
+    fun deleteKeyboard(context: Context, keyboard: SettingsSubtype, mergeInto: List<SettingsSubtype> = emptyList()) {
         val real = DeviceProtectedUtils.getRealSharedPreferences(context)
         val pool = if (!isDone(real)) null else synchronized(this) {
             pools(real).let { map -> keyboard.keyboardId?.takeIf { map.has(it) }?.let { map.getInt(it) } }
         }
-        // [mergeInto] (picked in the delete dialog, 2026-10-11: "Merge these lists into one of those keyboards and refer
-        // from others"): it takes the lists, merged into its own, before they're deleted, in the same task
-        val target = mergeInto?.let { poolForListed(real, it) }?.takeIf { it != pool && it != LearnedStores.SHARED }
-        // (a pick with no pool to take them, not listed: the lists stay on disk rather than go unmerged)
-        if (mergeInto != null && target == null && pool != null && pool != LearnedStores.SHARED && poolOrNull(real, mergeInto) == null) {
-            Log.w(TAG, "the keyboard picked to take a deleted keyboard's lists has no pool: its files kept (pool $pool)")
+        val selected = mergeInto.map { poolForListed(real, it) }
+        val targets = selected.filterNotNull().filter { it != pool && it != LearnedStores.SHARED }.distinct()
+        // (a selected one with no pool to take them, not listed: the lists stay on disk rather than go unmerged)
+        if (pool != null && pool != LearnedStores.SHARED && selected.any { it == null }) {
+            Log.w(TAG, "a keyboard selected to take a deleted keyboard's lists has no pool: its files kept (pool $pool)")
             KeyboardProfiles.onKeyboardDeleted(real, keyboard)
             return
         }
@@ -216,14 +218,14 @@ object LearnedKeyboards {
         if (pool == null || pool == LearnedStores.SHARED) return
         val app = context.applicationContext ?: context
         ExecutorUtils.getBackgroundExecutor(ExecutorUtils.KEYBOARD).execute {
-            // (review 2026-10-11: its files only go once every store and list of every script is merged; else they stay
-            // on disk, read by nobody, rather than lose words)
+            // (review 2026-10-11: its files only go once every store and list of every script is merged into every
+            // selected one; else they stay on disk, read by nobody, rather than lose words)
             var merged = true
-            if (target != null) try {
+            for (target in targets) try {
                 val result = LearnedImport.importNow(app, target, listOf(pool), listOf(pool))
                 if (result != null)
                     android.os.Handler(android.os.Looper.getMainLooper()).post { LearnedStores.notifyPoolChanged(target) }
-                merged = result?.complete == true
+                if (result?.complete != true) merged = false
             } catch (e: Exception) { Log.e(TAG, "could not merge a deleted keyboard's words", e); merged = false }
             if (!merged) { Log.w(TAG, "a deleted keyboard's words could not all be merged: its files kept (pool $pool)"); return@execute }
             try { deleteWordsOf(app, pool) } catch (e: Exception) { Log.e(TAG, "could not delete a deleted keyboard's words", e) }
@@ -231,7 +233,7 @@ object LearnedKeyboards {
     }
 
     /** The other enabled keyboards that read [keyboard]'s lists ("Use lists from other keyboards" on): the delete
-     *  dialog names them and offers to merge the lists into one. */
+     *  dialog names them and offers to merge the lists into each one selected. */
     fun listReaders(real: SharedPreferences, keyboard: SettingsSubtype): List<SettingsSubtype> =
         SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.distinct()
             .filter { !it.sameKeyboard(keyboard) && buttonPrefs.any { pref -> usesOthers(real, pref, it) } }

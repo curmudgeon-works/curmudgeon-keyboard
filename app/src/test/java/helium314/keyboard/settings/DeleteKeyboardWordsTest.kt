@@ -11,6 +11,10 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.hasParent
+import androidx.compose.ui.test.isToggleable
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import helium314.keyboard.latin.R
@@ -134,6 +138,35 @@ class DeleteKeyboardWordsTest {
         assertFalse(kid(2) in storedPools(real))
         assertEquals(setOf(5, 7), LearnedStores.keyboardPoolsOnDisk(ce))
         assertEquals(setOf("w0"), body.words(ce, "Latn", 0))
+    }
+
+    // review SP23a (owner 2026-10-18: "we should offer to merge into each keyboard individually. Select which ones should
+    // have these lists merged in (default all on)"): A and C read the other keyboards' lists; B's delete lists both, a
+    // checkbox each, all selected; C unselected: A gets B's learned words and blacklist merged into its own, C nothing.
+    // Fail before: one pick of A, C or "None: the lists go", none picked to start
+    @Test fun `delete - each keyboard reading the lists selected to start, the selected ones get both lists merged in`() {
+        phone()
+        real.edit().putString(LearnedKeyboards.PREF_USE_OTHERS_LEARNED, org.json.JSONArray(listOf(a.keyboardId, c.keyboardId)).toString()).commit()
+        ActivityScenario.launch(SettingsActivity::class.java).onActivity { it.setContent { KeyboardsScreen { } } }.use {
+            compose.onNodeWithText(keyboardName(b, ctx)).performTouchInput { longClick() }
+            compose.onNodeWithText(ctx.getString(R.string.delete)).performClick()
+            compose.onNodeWithText("These keyboards use its learned and blacklisted words (Use lists from other keyboards). " +
+                "Select those that should have them merged into their own; the others no longer read them.").assertExists()
+            compose.onNodeWithText("None: the lists go").assertDoesNotExist()
+            fun checkbox(kb: SettingsSubtype) = compose.onNode(isToggleable() and hasAnyAncestor(isDialog()) and hasParent(hasText(keyboardName(kb, ctx))))
+            checkbox(a).assertIsOn()
+            checkbox(c).assertIsOn()
+            checkbox(c).performClick()
+            checkbox(c).assertIsOff()
+            compose.onNode(hasText(ctx.getString(R.string.delete)) and hasAnyAncestor(isDialog())).performClick()
+            idleUntil { !File(ce, "${LearnedStores.BLACKLIST_DIR}/k6").exists() } // (the last thing deleted)
+        }
+        assertEquals(setOf("w5", "w6"), body.words(ce, "Latn", 5)) // A: merged in
+        assertEquals(setOf("bad5", "bad6"), helium314.keyboard.latin.personalization.readList(ce, "Latn", 5)?.keys)
+        assertEquals(setOf("cyr"), body.words(ce, "Cyrl", 5))
+        assertEquals(setOf("w7"), body.words(ce, "Latn", 7)) // C: as it was
+        assertEquals(setOf("bad7"), helium314.keyboard.latin.personalization.readList(ce, "Latn", 7)?.keys)
+        assertFalse(LearnedStores.storeFile(ce, "Latn", 6).exists())
     }
 
     @Test fun `delete - a store the keyboard has open is emptied, not deleted`() {
