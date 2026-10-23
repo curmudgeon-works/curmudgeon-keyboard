@@ -414,11 +414,17 @@ internal fun nextNumbered(ctx: Context, source: SettingsSubtype): SettingsSubtyp
 }
 
 /** @return the copy (its settings: [startSettings]): a new id, came from the original's (owner 2026-10-11) */
-private fun copyKeyboard(ctx: Context, source: SettingsSubtype): SettingsSubtype {
+internal fun copyKeyboard(ctx: Context, source: SettingsSubtype): SettingsSubtype {
     val numbered = LayoutUtilsCustom.withOwnPrivateLayouts(nextNumbered(ctx, source), ctx) // (its own unnamed keys, not the source's file)
     val copy = helium314.keyboard.latin.settings.KeyboardIds.fresh(ctx.realPrefs(), numbered, from = source.keyboardId)
     SubtypeUtilsAdditional.changeAdditionalSubtype(copy, copy, ctx) // registers it
     SubtypeSettings.addEnabledSubtype(ctx.prefs(), copy.toAdditionalSubtype())
+    // its "Use lists from other keyboards" buttons as the source has them (review 2026-10-18 SP23c: the copy read fewer
+    // learned words than the source)
+    val real = ctx.realPrefs()
+    for (pref in helium314.keyboard.latin.personalization.LearnedKeyboards.buttonPrefs)
+        if (helium314.keyboard.latin.personalization.LearnedKeyboards.usesOthers(real, pref, source))
+            helium314.keyboard.latin.personalization.LearnedKeyboards.setUsesOthers(real, pref, copy, true)
     helium314.keyboard.latin.utils.SettingsEventLog.keyboard(ctx, "copied", copy, "from " + helium314.keyboard.latin.utils.SettingsEventLog.describe(ctx, source)) // (owner 2026-10-12 K1)
     return copy
 }
