@@ -35,7 +35,6 @@ import helium314.keyboard.settings.screens.DictionaryScreen
 import androidx.compose.runtime.getValue
 import helium314.keyboard.settings.screens.KeyboardsScreen
 import helium314.keyboard.settings.screens.LanguageListScreen
-import helium314.keyboard.settings.screens.LanguageScreen
 import helium314.keyboard.settings.screens.MainSettingsScreen
 import helium314.keyboard.settings.screens.PersonalDictionariesScreen
 import helium314.keyboard.settings.screens.PersonalDictionaryScreen
@@ -144,10 +143,6 @@ fun SettingsNavHost(
                 // the keyboard whose own learned words these are (see LearnedKeyboards; 0: the shared ones of before)
                 pool = it.arguments?.getString("pool")?.toIntOrNull() ?: 0)
         }
-        screen(SettingsDestination.AllKeyboards) {
-            // the list of all keyboards incl. disabled ones; the keyboards screen shows the enabled ones as entries
-            LanguageScreen(onClickBack = ::goBack)
-        }
         screen(SettingsDestination.Dictionaries) {
             DictionaryScreen(onClickBack = ::goBack)
         }
@@ -227,7 +222,6 @@ object SettingsDestination {
     const val LearnedWords = "learned_words_of/"
     const val LearnedWordsOfScript = "learned_words/"
     const val Languages = "languages/"
-    const val AllKeyboards = "all_keyboards"
     const val Subtype = "subtype/"
     const val SwipeTuning = "swipe_tuning/"
     const val LearningSwiping = "learning_swiping"
