@@ -128,12 +128,12 @@ class LayoutOwnDefaultTest {
         real.edit { putString(idKey(1, key), numrow); remove(idKey(2, key)) }
         val others = users(edited = b)
         assertEquals(listOf(kid(3)), ids(others))
+        // edited from A's screen: B, only reading the common default, isn't asked either
+        assertEquals(listOf(kid(3)), ids(users(edited = a)))
         LayoutUtilsCustom.keepOldKeys(numrow, old, type, others, ctx)
         assertNull(stored(1).layoutName(type)) // (A: no pick written)
         assertEquals(numrow, real.getString(idKey(1, key), null)) // (the common default: A and B read the new keys)
         assertEquals(old, real.getString(idKey(3, key), null))
         assertNull(stored(3).layoutName(type))
-        // edited from A's screen: B, only reading the common default, isn't asked either
-        assertEquals(listOf(kid(3)), ids(users(edited = a)))
     }
 }
