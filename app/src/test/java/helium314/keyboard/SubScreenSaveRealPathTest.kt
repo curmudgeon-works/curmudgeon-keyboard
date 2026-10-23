@@ -10,6 +10,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasParent
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
@@ -307,6 +309,38 @@ class SubScreenSaveRealPathTest {
         assertEquals(listOf("Warm", "Warm 2").map { Settings.PREF_USER_COLORS_PREFIX + it },
             real.all.keys.filter { it.contains(Settings.PREF_USER_COLORS_PREFIX) }.sorted())
         discardOnAppearanceAndCheck()
+    }
+
+    // (owner 2026-10-18: palettes come from a common set, so "only this keyboard is no longer valid": the edit reaches
+    // every user, the first line says so)
+    @Test fun `edit question - the first line says the palette changes everywhere it's used`() {
+        appearance()
+        screen = SUB; idle()
+        editWarm()
+        arrowBack()
+        click(ctx.getString(R.string.save_and_exit))
+        shows(ctx.getString(R.string.palette_edit_title, "Warm"))
+        shows("“Warm” changes everywhere it's used. Choose what each one below takes:")
+        compose.onNodeWithText("This keyboard takes the new colors. Choose what each one below takes.").assertDoesNotExist()
+    }
+
+    // (owner 2026-10-18: "delete palette dialog should defo be updated to remove only this keyboard" and "the headline
+    // question "Delete Warm?" should be answered by the button in an obvious way"): the trash on Warm in the Colors list
+    @Test fun `delete question - Yes all to default and Cancel only, and Yes sends every user to the default colors`() {
+        appearance()
+        compose.onNode(hasText(ctx.getString(R.string.theme_colors_light)) and hasClickAction()).performClick(); idle()
+        compose.onNode(hasContentDescription(ctx.getString(R.string.delete)) and hasAnyAncestor(isDialog())).performClick(); idle()
+        shows(ctx.getString(R.string.palette_delete_title, "Warm"))
+        shows("Used by:\n" + ctx.getString(R.string.keyboard_switched_off, helium314.keyboard.settings.screens.keyboardName(kb2, ctx)) +
+            "\n" + ctx.getString(R.string.update_item_theme, "Sunset"))
+        shows("They go to the default colors, and “Warm” leaves the list.")
+        compose.onNodeWithText("Only this keyboard").assertDoesNotExist()
+        compose.onNodeWithText("All to default").assertDoesNotExist() // (the button says "Yes")
+        // (the palette list behind it has its own Cancel: the question adds a second)
+        assertEquals(2, compose.onAllNodes(hasText(ctx.getString(android.R.string.cancel)) and hasAnyAncestor(isDialog())).fetchSemanticsNodes().size)
+        click("Yes, all to default")
+        assertEquals(null, real.getString(own(2, Settings.PREF_THEME_COLORS), null)) // keyboard 2: the default colors
+        assertFalse(real.contains(Settings.PREF_USER_COLORS_PREFIX + "Warm")) // off the list
     }
 
     private fun layoutSetup() {

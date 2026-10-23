@@ -255,9 +255,10 @@ private fun ColorItemRow(onDismissRequest: () -> Unit, item: String, isSelected:
                 SettingsDestination.navigateTo(targetScreen + android.net.Uri.encode(item), ctx)
             }
             // (done everywhere at once; the open Appearance screen's Discard undoes it: owner 2026-10-11)
-            fun delete(onlyHere: Boolean) {
+            // (always for everyone: palettes are one common set, owner 2026-10-18)
+            fun delete() {
                 showDialog = false
-                helium314.keyboard.settings.Palettes.delete(ctx.realPrefs(), prefs, item, onlyHere)
+                helium314.keyboard.settings.Palettes.delete(ctx.realPrefs(), prefs, item, onlyHere = false)
                 onDeleted()
             }
             val (keyboards, themes) = users ?: (emptyList<helium314.keyboard.latin.settings.SettingsSubtype>() to emptyList())
@@ -265,14 +266,13 @@ private fun ColorItemRow(onDismissRequest: () -> Unit, item: String, isSelected:
                 ConfirmationDialog(
                     onDismissRequest = { showDialog = false },
                     content = { Text(stringResource(R.string.delete_confirmation, item)) },
-                    onConfirmed = { delete(onlyHere = false) } // (nobody else uses it: the plain delete)
+                    onConfirmed = { delete() } // (nobody else uses it: the plain delete)
                 )
             else if (showDialog)
                 PaletteDeleteDialog(item,
                     helium314.keyboard.settings.screens.userNames(ctx, keyboards) + themes.map { ctx.getString(R.string.update_item_theme, it) },
                     onDismissRequest = { showDialog = false },
-                    onAll = { delete(onlyHere = false) },
-                    onOnlyHere = { delete(onlyHere = true) })
+                    onAll = { delete() })
         }
     }
 }

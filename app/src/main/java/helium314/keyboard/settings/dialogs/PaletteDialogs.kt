@@ -26,7 +26,8 @@ import helium314.keyboard.settings.Palettes
  * [name] (owner 2026-10-11: "Each keyboard using it should have three options -- use the new edited; use app default;
  * use 'Warm N', not 'Custom N'"): each takes the new colors, the default ones, or the old ones as [keeper] ("Warm 2",
  * one for all that keep them, made only when one does). Each starts on the new colors (owner 2026-10-11: "on second
- * thought, yes let's do new colors as the default option").
+ * thought, yes let's do new colors as the default option"). The first line says the edit reaches every user, as
+ * palettes come from one common set (owner 2026-10-18: "only this keyboard is no longer valid").
  */
 @Composable
 fun PaletteEditDialog(
@@ -45,7 +46,7 @@ fun PaletteEditDialog(
         scrollContent = true,
         content = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(stringResource(R.string.palette_edit_text))
+                Text(stringResource(R.string.palette_edit_text_everywhere, name))
                 val options = listOf(
                     Palettes.Choice.NEW to stringResource(R.string.palette_take_new),
                     Palettes.Choice.DEFAULT to stringResource(R.string.palette_take_default),
@@ -68,24 +69,23 @@ fun PaletteEditDialog(
 }
 
 /**
- * The trash on a palette that other keyboards or saved themes ([others], their names) use (owner 2026-10-11: "Move all
- * to default, Or keep all on Warm and move this to default"): [onAll] every one of them and this keyboard go to the
- * default colors and the palette leaves the list; [onOnlyHere] only this keyboard does, the others keep it.
+ * The trash on a palette that other keyboards or saved themes ([others], their names) use: [onAll] every one of them
+ * and this keyboard go to the default colors and the palette leaves the list. No "only this keyboard": palettes come
+ * from one common set, like fonts, and the button answers the question (owner 2026-10-18: "the headline question
+ * "Delete Warm?" should be answered by the button in an obvious way").
  */
 @Composable
-fun PaletteDeleteDialog(name: String, others: List<String>, onDismissRequest: () -> Unit, onAll: () -> Unit, onOnlyHere: () -> Unit) {
+fun PaletteDeleteDialog(name: String, others: List<String>, onDismissRequest: () -> Unit, onAll: () -> Unit) {
     ThreeButtonAlertDialog(
         onDismissRequest = onDismissRequest,
         onConfirmed = onAll,
-        confirmButtonText = stringResource(R.string.palette_delete_all),
-        neutralButtonText = stringResource(R.string.palette_delete_only_here),
-        onNeutral = { onOnlyHere(); onDismissRequest() },
+        confirmButtonText = stringResource(R.string.palette_delete_all_yes),
         title = { Text(stringResource(R.string.palette_delete_title, name)) },
         scrollContent = true,
         content = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(stringResource(R.string.palette_delete_users, others.joinToString("\n")))
-                Text(stringResource(R.string.palette_delete_text, name))
+                Text(stringResource(R.string.palette_delete_users_all, others.joinToString("\n")))
+                Text(stringResource(R.string.palette_delete_text_all, name))
             }
         },
     )

@@ -718,6 +718,8 @@
     <!-- the palette editor's Save when other keyboards or saved themes use the palette (owner 2026-10-11: palettes are one app-wide list); %s = its name -->
     <string name="palette_edit_title">Save “%s”?</string>
     <string name="palette_edit_text">This keyboard takes the new colors. Choose what each one below takes.</string>
+    <!-- the edit question's first line since palettes are one common set (owner 2026-10-18); %s = its name -->
+    <string name="palette_edit_text_everywhere">“%s” changes everywhere it\'s used. Choose what each one below takes:</string>
     <string name="palette_take_new">The new colors</string>
     <string name="palette_take_default">The default colors</string>
     <!-- %s = the palette the old colors are kept as, the next free number: "Warm 2" -->
@@ -729,6 +731,12 @@
     <string name="palette_delete_text">All to default: they and this keyboard go to the default colors, and “%1$s” leaves the list. Only this keyboard: this keyboard goes to the default colors, they keep “%1$s”.</string>
     <string name="palette_delete_all">All to default</string>
     <string name="palette_delete_only_here">Only this keyboard</string>
+    <!-- the delete question since palettes are one common set, its button answering "Delete “%s”?" (owner 2026-10-18) -->
+    <string name="palette_delete_all_yes">Yes, all to default</string>
+    <!-- %s = the keyboards and saved themes using it, one per line -->
+    <string name="palette_delete_users_all">Used by:\n%s</string>
+    <!-- %s = the palette's name -->
+    <string name="palette_delete_text_all">They go to the default colors, and “%s” leaves the list.</string>
     <string name="update_item_icon">Update with this keyboard\'s settings</string>
     <!-- a saved item with these exact settings exists already (Update, Save as new); nothing is blocked -->
     <string name="same_settings_as">These settings are the same as “%s”.</string>
