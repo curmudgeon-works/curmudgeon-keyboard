@@ -122,7 +122,7 @@ class LayoutOwnDefaultTest {
     // (the agreed saving-policy model, owner 2026-10-18, rules 1, 2 and 4: "in such a scenario, Work keyboard shouldn't
     // even come up to begin with". Fail before: A, whose own set is the common default the screen edits, was asked and
     // got a pick of its own, and a keyboard only reading the common default was asked too)
-    @Test fun `answering No - the common default is the screen's, not asked, it gets the edit; only own defaults keep the old keys`() {
+    @Test fun `answering No - the common default is the screen's, not asked, it gets the edit - only own defaults keep the old keys`() {
         // (A's own set, the common one, has it as the default; B, edited, reads it; C's own keeps it)
         separate(false)
         real.edit { putString(idKey(1, key), numrow); remove(idKey(2, key)) }
