@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import helium314.keyboard.latin.gesture.SwipeMetrics
+import helium314.keyboard.latin.gesture.GestureCorpusRecorder
 import helium314.keyboard.latin.personalization.LearningEventLog
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.dialogs.ConfirmationDialog
@@ -146,7 +147,8 @@ internal fun appSettingsItems(prefs: android.content.SharedPreferences, real: an
 
 /** The logs drawn on the Fine-tune screens, on App settings while those are hidden ([helium314.keyboard.settings.REFINE_MENU_SHOWN]).
  *  (Before [advancedOnlyAppSettings]: top-level values start in file order.) */
-internal val hiddenMenuLogKeys = listOf(Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_SWIPE_METRICS, Settings.PREF_LEARNING_LOG)
+internal val hiddenMenuLogKeys = listOf(Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_GESTURE_CORPUS_KEPT,
+    Settings.PREF_SWIPE_METRICS, Settings.PREF_LEARNING_LOG)
 
 /** The App settings shown only in advanced mode. */
 internal val advancedOnlyAppSettings = setOf(Settings.PREF_LEAVING_KEEPS_CHANGES) + hiddenMenuLogKeys
@@ -385,6 +387,20 @@ fun createAdvancedSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_RECORD_GESTURE_CORPUS, R.string.record_gesture_corpus, R.string.record_gesture_corpus_summary) {
         SwitchPreference(it, Defaults.PREF_RECORD_GESTURE_CORPUS)
     },
+    // how many swipes the corpus keeps, the oldest deleted beyond them; at the far end all (owner 2026-10-18)
+    Setting(context, Settings.PREF_GESTURE_CORPUS_KEPT, R.string.gesture_corpus_kept) { setting ->
+        SliderPreference(
+            name = setting.title,
+            key = setting.key,
+            default = Defaults.PREF_GESTURE_CORPUS_KEPT,
+            description = {
+                if (it >= GestureCorpusRecorder.KEPT_ALL) stringResource(R.string.gesture_corpus_kept_all)
+                else stringResource(R.string.gesture_corpus_kept_value, keptCount(it), keptMegabytes(it, GestureCorpusRecorder.BYTES_PER_SWIPE))
+            },
+            range = GestureCorpusRecorder.KEPT_MIN.toFloat()..GestureCorpusRecorder.KEPT_ALL.toFloat(),
+            stepSize = GestureCorpusRecorder.KEPT_STEP,
+        ) { GestureCorpusRecorder.onKeptChanged() }
+    },
     Setting(context, Settings.PREF_AUTO_PREVIEW_KEYBOARD, R.string.auto_preview_keyboard) {
         SwitchPreference(it, Defaults.PREF_AUTO_PREVIEW_KEYBOARD)
     },
@@ -452,6 +468,13 @@ fun createAdvancedSettings(context: Context) = listOf(
         }
     },
 )
+
+/** A number of kept records as the "… kept" sliders show it: with thousands separators. */
+internal fun keptCount(count: Int): String = String.format(java.util.Locale.getDefault(), "%,d", count)
+
+/** About how large [count] records of [bytesEach] bytes are, in MB with one decimal. */
+internal fun keptMegabytes(count: Int, bytesEach: Int): String =
+    String.format(java.util.Locale.getDefault(), "%.1f", count.toLong() * bytesEach / 1_000_000.0)
 
 @Preview
 @Composable

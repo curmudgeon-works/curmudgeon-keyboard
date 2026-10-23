@@ -196,7 +196,8 @@ object Defaults {
     const val CURMUDGEON_SYMBOL_POPUP_MAP = "q~` w× e÷ r{ t} y[ u] i| o_ p- a@ s+ d—– f… g: h; j' k\" l/ z= x\\ c< v> b, n! m?"
     // none: the default popups are HeliBoard extra's (2026-10-10; the Curmudgeon map 2026-10-07 to 0.3.011, "" in 0.3.008)
     const val PREF_SYMBOL_POPUP_MAP = ""
-    const val PREF_RECORD_GESTURE_CORPUS = false
+    const val PREF_RECORD_GESTURE_CORPUS = true // on, kept to the newest swipes (owner 2026-10-18; off before)
+    const val PREF_GESTURE_CORPUS_KEPT = 3_000 // swipes, about 4.5 MB
     const val PREF_SWIPE_METRICS = false
     const val PREF_LOG_SETTINGS = true // the settings event log, the keyboards' history too (owner 2026-10-12 K1: on)
     const val PREF_LEARNING_LOG = false

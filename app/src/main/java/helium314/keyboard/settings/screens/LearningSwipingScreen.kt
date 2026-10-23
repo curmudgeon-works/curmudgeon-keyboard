@@ -58,8 +58,8 @@ internal fun fineTuneSuggestionsKeys(prefs: android.content.SharedPreferences): 
     listOf(Settings.PREF_SUGGESTION_COUNT, Settings.PREF_SUGGESTION_RULES) +
         (if (swipeLogsShown(prefs)) swipeTuningKeys + swipeLogKeys else emptyList())
 
-/** The two swipe logs (recording the swipe corpus, logging swipe results). */
-internal val swipeLogKeys = listOf(Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_SWIPE_METRICS)
+/** The two swipe logs (recording the swipe corpus with how many swipes it keeps, logging swipe results). */
+internal val swipeLogKeys = listOf(Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_GESTURE_CORPUS_KEPT, Settings.PREF_SWIPE_METRICS)
 
 /** Whether the swipe logs (and the tuning) show, with [prefs] of the keyboard edited: only while swiping is on, here and
  *  on App settings while this screen is hidden (round-7c review 20261014_L13_2, owner: "yep"). */
@@ -208,6 +208,7 @@ fun LearningSwipingScreen(onClickBack: () -> Unit) {
             helium314.keyboard.settings.AdvancedReveal(gestureOn) { Column {
                 GroupTitle(R.string.swipe_logging)
                 SettingsActivity.settingsContainer[Settings.PREF_RECORD_GESTURE_CORPUS]?.Preference()
+                SettingsActivity.settingsContainer[Settings.PREF_GESTURE_CORPUS_KEPT]?.Preference()
                 SettingsActivity.settingsContainer[Settings.PREF_SWIPE_METRICS]?.Preference()
                 // (the settings log: on App settings since 2026-10-13, K1 placement)
             } }

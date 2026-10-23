@@ -605,6 +605,10 @@
     <string name="learning_log_line">%1$d accepted · %2$d auto-corrections reverted · %3$d swipes deleted · %4$d words edited later · %5$d swipes edited · %6$d removed · %7$d restored · %8$d undone (%9$d untracked) · %10$d redone (%11$d untracked)</string>
     <!-- Description of the setting to record swipes into a local corpus file -->
     <string name="record_gesture_corpus_summary">Log every swipe (touch path, keyboard layout, suggested words and your corrections) to gesture_corpus.jsonl in this app\'s external files folder. Local only, never uploaded. Includes the words you swipe.</string>
+    <!-- How many swipes the swipe corpus keeps (a slider; its far end keeps all) -->
+    <string name="gesture_corpus_kept">Swipes kept</string>
+    <string name="gesture_corpus_kept_value">%1$s swipes, about %2$s MB. Lowering it deletes the oldest swipes for good.</string>
+    <string name="gesture_corpus_kept_all">All (no limit), about 1.5 KB per swipe</string>
     <!-- Message in load gesture library dialog -->
     <string name="load_gesture_library_message">You will need the library for \'%s\'. Incompatible libraries may crash when using gesture typing.
         \n\nWarning: loading external code can be a security risk. Only use a library from a source you trust.</string>

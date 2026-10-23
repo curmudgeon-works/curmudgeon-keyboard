@@ -208,6 +208,8 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_SYMBOL_POPUP_MAP = "symbol_popup_map";
     public static final String PREF_ADVANCED_SETTINGS = "advanced_settings";
     public static final String PREF_RECORD_GESTURE_CORPUS = "record_gesture_corpus";
+    // "Swipes kept": the corpus is trimmed to this many newest swipes (GestureCorpusRecorder.KEPT_ALL: all)
+    public static final String PREF_GESTURE_CORPUS_KEPT = "gesture_corpus_kept";
     public static final String PREF_SWIPE_METRICS = "swipe_metrics";
     // the settings event log (SettingsEventLog): its own switch since 2026-10-12 (before: PREF_SWIPE_METRICS)
     public static final String PREF_LOG_SETTINGS = "log_settings_changes";

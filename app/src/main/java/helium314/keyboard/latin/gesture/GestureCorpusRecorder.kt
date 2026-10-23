@@ -2,12 +2,16 @@
 package helium314.keyboard.latin.gesture
 
 import android.content.Context
+import android.content.SharedPreferences
 import helium314.keyboard.keyboard.Keyboard
 import helium314.keyboard.latin.BuildConfig
 import helium314.keyboard.latin.SuggestedWords.SuggestedWordInfo
 import helium314.keyboard.latin.common.ComposedData
+import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.utils.KeptRecords
 import helium314.keyboard.latin.utils.Log
+import helium314.keyboard.latin.utils.prefs
 import org.json.JSONArray
 import helium314.keyboard.latin.NgramContext
 import org.json.JSONObject
@@ -16,7 +20,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Opt-in local corpus of real swipes from everyday typing (M4 tuning data for the in-tree decoder).
+ * Local corpus of real swipes from everyday typing (M4 tuning data for the in-tree decoder).
  *
  * One JSONL line per completed swipe: raw touch path in keyboard pixels, the letter-key geometry
  * of the keyboard it was drawn on, and the decoder's top candidates (top-1 is what got committed,
@@ -25,17 +29,27 @@ import java.util.concurrent.atomic.AtomicLong
  * follow-up line `{"type":"final","ref":id,"how":"pick"|"deleted"|"edited",...}` records the correction.
  *
  * Schema shares `points` / `locale` / `committed` with gesturelab's and the trainer's swipes.jsonl.
- * Everything stays in the app's external files dir (`gesture_corpus.jsonl`); nothing is uploaded.
+ * Everything stays in the app's external files dir (`gesture_corpus.jsonl`); nothing is uploaded. On by default, kept to
+ * the newest "Swipes kept" ([Settings.PREF_GESTURE_CORPUS_KEPT]) swipes with their follow-up lines (2026-10-18).
  * Gesture typing is off in password fields, so those never reach here.
  */
 object GestureCorpusRecorder {
     private const val TAG = "GestureCorpusRecorder"
     private const val FILE_NAME = "gesture_corpus.jsonl"
     private const val MAX_CANDIDATES = 5
+    // "Swipes kept": the slider's range, its far end keeping all
+    const val KEPT_MIN = 1_000
+    const val KEPT_MAX = 20_000
+    const val KEPT_STEP = 1_000
+    const val KEPT_ALL = KEPT_MAX + KEPT_STEP
+    const val BYTES_PER_SWIPE = 1_500 // about, for the size the slider shows
 
     private val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "gesture-corpus").apply { isDaemon = true } }
     private val counter = AtomicLong(0)
     @Volatile private var file: File? = null
+    @Volatile private var prefs: SharedPreferences? = null
+    // a swipe line starts a record, its "final" lines follow it (they are written before the next swipe's)
+    private val kept = KeptRecords { it.contains("\"type\":\"swipe\"") }
     /** id of the most recent swipe whose outcome is still open (its word is being composed or edited), or -1 */
     @Volatile private var pendingId = -1L
     // the most recent swipe, its word as the keyboard put it in, and when: a committed word opened for editing again
@@ -51,6 +65,25 @@ object GestureCorpusRecorder {
 
     fun init(context: Context) {
         file = File(context.getExternalFilesDir(null) ?: context.filesDir, FILE_NAME)
+        prefs = context.prefs()
+    }
+
+    /** The fewest swipes another reader of the corpus needs kept (it sets this): the corpus never keeps fewer. */
+    @Volatile internal var minimumKept: () -> Int = { 0 }
+
+    /** How many swipes the corpus keeps, null for all: "Swipes kept", or more if [minimumKept] asks. */
+    internal fun keptLimit(): Int? {
+        val setting = prefs?.getInt(Settings.PREF_GESTURE_CORPUS_KEPT, Defaults.PREF_GESTURE_CORPUS_KEPT) ?: Defaults.PREF_GESTURE_CORPUS_KEPT
+        if (setting >= KEPT_ALL) return null
+        return maxOf(setting, minimumKept())
+    }
+
+    /** "Swipes kept" was changed: a lower number deletes the oldest swipes now (on the corpus' own thread). */
+    fun onKeptChanged() {
+        executor.execute {
+            try { file?.let { kept.trimIfOver(it, keptLimit()) } }
+            catch (e: Exception) { Log.w(TAG, "failed to trim the corpus", e) }
+        }
     }
 
     internal var corpusOn: () -> Boolean = { Settings.getValues()?.mRecordGestureCorpus == true } // (replaceable by tests)
@@ -218,8 +251,9 @@ object GestureCorpusRecorder {
         }
     }
 
-    private fun append(obj: JSONObject) {
-        file?.appendText(obj.toString() + "\n")
+    // (on the corpus' own thread; internal for tests)
+    internal fun append(obj: JSONObject) {
+        file?.let { kept.append(it, obj.toString() + "\n", keptLimit()) }
     }
 
     private class KeyGeom(val c: Char, val cx: Float, val cy: Float, val w: Float, val h: Float)
