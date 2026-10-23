@@ -166,21 +166,26 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
         var setToDelete: String? by remember { mutableStateOf(null) }
         var setToRename: String? by remember { mutableStateOf(null) }
         var setToUpdate: String? by remember { mutableStateOf(null) }
+        // the settings common to all keyboards: the first one's name, said in the save icon and the update question
+        val common = remember(showAccentsDialog) { commonFrom(ctx, KeyboardProfiles.Group.LAYOUT) }
         val takeNew = helium314.keyboard.settings.SavedItemDefaults.takeNewDefaults(ctx.realPrefs())
         // which of the user's sets differ from the keyboard's popups as they were when the list opened
         val setDiffers = remember(showAccentsDialog, generation) {
             userSets.associate { it.name to popupSetDiffers(prefs, keyboard, it, overrides, takeNew) } }
         setToUpdate?.let { name ->
             val set = userSets.firstOrNull { it.name == name }
-            // the other keyboards on it, and the saved Layouts that hold it (owner 2026-10-11: those are listed too)
-            val keyboards = remember(name) { otherUsers(ctx, KeyPopupOverrides.PREF_SELECTED_SET, name, keyboard,
+            // the other keyboards on it, and the saved Layouts that hold it (owner 2026-10-11: those are listed too); not the
+            // keyboard whose set the change is written to, as for themes and palettes: none for the common settings, so this
+            // keyboard's own set hidden behind them is listed too (review SP5/6; was this keyboard, left out in every mode)
+            val edited = remember(name) { KeyboardProfiles.editingKeyboard(ctx.realPrefs(), helium314.keyboard.settings.PrefsDraft.currentSetId(ctx)) }
+            val keyboards = remember(name) { otherUsers(ctx, KeyPopupOverrides.PREF_SELECTED_SET, name, edited,
                 KeyboardProfiles.Group.LAYOUT) }
             val layouts = remember(name) { helium314.keyboard.settings.LayoutPresets.load(ctx.realPrefs())
                 .filter { it.values[KeyPopupOverrides.PREF_SELECTED_SET] == name }.map { it.name } }
             val sameAs = remember(name) { userSets.firstOrNull { it.name != name && setDiffers[it.name] == false }?.name }
             if (set != null) helium314.keyboard.settings.dialogs.UpdateSavedItemDialog(name,
-                userNames(ctx, keyboards) + layouts.map { ctx.getString(R.string.update_item_layout, it) }, sameAs,
-                onDismissRequest = { setToUpdate = null },
+                updateNames(ctx, keyboards, common) + layouts.map { ctx.getString(R.string.update_item_layout, it) }, sameAs,
+                onDismissRequest = { setToUpdate = null }, commonFrom = common, anyHidden = keyboards.isNotEmpty(),
             ) { selected ->
                 storeInSet(name, KeyPopupOverrides.load(prefs))
                 val updated = KeyPopupOverrides.loadSets(ctx.realPrefs()).first { it.name == name }
@@ -295,7 +300,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                 trailing = { p -> p.userName?.let { name ->
                     if (setDiffers[name] == true)
                         IconButton({ if (!confirmed) putBack(); confirmed = true; showAccentsDialog = false; setToUpdate = name }) {
-                            Icon(painterResource(R.drawable.ic_save), stringResource(R.string.update_item_icon)) }
+                            Icon(painterResource(R.drawable.ic_save), stringResource(if (common != null) R.string.update_item_icon_common else R.string.update_item_icon)) }
                     DeleteButton { if (!confirmed) putBack(); confirmed = true; showAccentsDialog = false; setToDelete = name }
                 } },
                 onItemLongClick = { p -> p.userName?.let { name -> if (!confirmed) putBack(); confirmed = true; showAccentsDialog = false; setToRename = name } },

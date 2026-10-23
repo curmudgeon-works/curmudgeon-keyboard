@@ -112,6 +112,24 @@ fun userNames(ctx: Context, keyboards: List<SettingsSubtype>): List<String> {
     return keyboards.map { kb -> if (enabled.any { it.sameKeyboard(kb) }) keyboardName(kb, ctx) else ctx.getString(R.string.keyboard_switched_off, keyboardName(kb, ctx)) }
 }
 
+/** The first keyboard in the list, whose settings are the common ones, by name, when [group]'s settings are common to
+ *  all keyboards (separate settings off, or the menu shared) and there is more than one keyboard (switched-off ones
+ *  counting); else null. The update questions then say "the common settings" instead of "this keyboard", and mark the
+ *  keyboards whose own sets the change goes into, as the restore's note on common menus does (owner 2026-10-18: "yes,
+ *  makes sense to follow established pattern from restore"). */
+fun commonFrom(ctx: Context, group: helium314.keyboard.latin.settings.KeyboardProfiles.Group): String? {
+    val real = ctx.realPrefs()
+    if (helium314.keyboard.latin.settings.KeyboardProfiles.isSeparate(real) && !helium314.keyboard.latin.settings.KeyboardProfiles.isShared(real, group)) return null
+    if (helium314.keyboard.latin.settings.KeyboardIds.phoneKeyboards(real).size < 2) return null
+    return keyboardName(helium314.keyboard.latin.settings.KeyboardProfiles.mainKeyboard(real), ctx)
+}
+
+/** [keyboards] as the update questions name them ([userNames]), each "<name> (hidden)" when [commonFrom] isn't null:
+ *  they're listed by their own sets' choices ([otherUsers]), and with the settings common those sets are hidden behind
+ *  the common ones, which the change already reaches (review SP28, SP5/6). */
+fun updateNames(ctx: Context, keyboards: List<SettingsSubtype>, commonFrom: String?): List<String> =
+    userNames(ctx, keyboards).map { if (commonFrom == null) it else ctx.getString(R.string.keyboard_hidden_set, it) }
+
 /** The keyboards, in the Keyboards screen's order, that use a saved item (a Layout, theme, popup set or font) through
  *  [keys] ([helium314.keyboard.latin.settings.KeyboardProfiles.keyboardsUsing]), then the switched-off ones
  *  ([switchedOffUsing]): the ones its delete warning names. */

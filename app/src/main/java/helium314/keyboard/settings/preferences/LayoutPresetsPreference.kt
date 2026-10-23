@@ -58,6 +58,8 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
     // what was set when the list opened, for Cancel: the settings and the keyboard (its keys)
     val initial = remember(showList) { LayoutPresets.current(prefs) }
     val initialKeyboard = remember(showList) { keyboard }
+    // the settings common to all keyboards: the first one's name, said in the save icon and the update question
+    val common = remember(showList) { helium314.keyboard.settings.screens.commonFrom(ctx, KeyboardProfiles.Group.LAYOUT) }
     var confirmed by remember(showList) { mutableStateOf(false) }
     var previewed: LayoutPresets.Preset? by remember(showList) { mutableStateOf(null) } // the one tapped, on the keyboard now
     var saveAs by remember { mutableStateOf(false) }
@@ -134,7 +136,7 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
             trailing = { preset -> if (!preset.builtIn) {
                 if (differs[preset] == true)
                     IconButton({ if (previewed != null) { putBack(); previewed = null }; toUpdate = preset }) {
-                        Icon(painterResource(R.drawable.ic_save), stringResource(R.string.update_item_icon)) }
+                        Icon(painterResource(R.drawable.ic_save), stringResource(if (common != null) R.string.update_item_icon_common else R.string.update_item_icon)) }
                 DeleteButton { toDelete = preset }
             } },
             onItemLongClick = { preset -> if (!preset.builtIn) toRename = preset },
@@ -183,13 +185,16 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
         )
     }
     toUpdate?.let { preset ->
-        // (the keyboard as it was when the list opened: a preview was put back first)
+        // (the keyboard whose set the update question's change is written to, as for themes and palettes: none for the
+        // common settings, so this keyboard's own set hidden behind them is listed too, review SP5/6; was the keyboard
+        // as it was when the list opened, left out in every mode)
+        val edited = remember(preset) { KeyboardProfiles.editingKeyboard(ctx.realPrefs(), helium314.keyboard.settings.PrefsDraft.currentSetId(ctx)) }
         val others = remember(preset) { helium314.keyboard.settings.screens.otherUsers(ctx, LayoutPresets.PREF_SELECTED, preset.name,
-            initialKeyboard, KeyboardProfiles.Group.LAYOUT) }
+            edited, KeyboardProfiles.Group.LAYOUT) }
         val sameAs = remember(preset) { presets.firstOrNull { it != preset && differs[it] == false }?.name }
         helium314.keyboard.settings.dialogs.UpdateSavedItemDialog(preset.name,
-            helium314.keyboard.settings.screens.userNames(ctx, others), sameAs,
-            onDismissRequest = { toUpdate = null },
+            helium314.keyboard.settings.screens.updateNames(ctx, others, common), sameAs,
+            onDismissRequest = { toUpdate = null }, commonFrom = common, anyHidden = others.isNotEmpty(),
         ) { selected ->
             val updated = LayoutPresets.saved(ctx, initialKeyboard, preset.name, chosen)
             store(presets.map { if (it.name == preset.name) updated else it })

@@ -18,6 +18,7 @@ import helium314.keyboard.settings.Palettes
  * their current colors as [keeper] ("Warm 2", one for all that keep them, made only when one does). All start selected
  * (owner 2026-10-11: "new colors as the default option"; 2026-10-18: "all should come selected yes"). The default
  * colors aren't offered any more (were, with the new and the old colors, one radio each per user; owner 2026-10-18).
+ * [commonFrom], [anyHidden]: as [UpdateSavedItemDialog]'s.
  */
 @Composable
 fun PaletteEditDialog(
@@ -25,6 +26,8 @@ fun PaletteEditDialog(
     keeper: String,
     others: List<String>,
     onDismissRequest: () -> Unit,
+    commonFrom: String? = null,
+    anyHidden: Boolean = false,
     onConfirmed: (choices: List<Palettes.Choice>) -> Unit, // in [others]' order: NEW or KEEP_OLD
 ) {
     val selected = rememberAllSelected(others)
@@ -37,6 +40,7 @@ fun PaletteEditDialog(
         content = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SelectOthersList(stringResource(R.string.palette_edit_text_select, name, keeper), others, selected)
+                if (commonFrom != null && anyHidden) HiddenSetsNote(commonFrom)
             }
         },
     )

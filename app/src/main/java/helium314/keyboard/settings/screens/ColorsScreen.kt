@@ -341,9 +341,10 @@ fun ColorsScreen(
         val keeper = remember { helium314.keyboard.settings.Palettes.keeperName(ctx.realPrefs(), newThemeName.text) }
         // each other keyboard and saved theme using it: selected, the new colors; else the old ones as "Warm 2" (owner
         // 2026-10-18: "select which each one takes, else they retain their current setting named Warm 2")
+        val common = remember { commonFrom(ctx, helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE) }
         helium314.keyboard.settings.dialogs.PaletteEditDialog(newThemeName.text, keeper,
-            userNames(ctx, keyboards) + themes.map { ctx.getString(R.string.update_item_theme, it) },
-            onDismissRequest = { askUpdate = false },
+            updateNames(ctx, keyboards, common) + themes.map { ctx.getString(R.string.update_item_theme, it) },
+            onDismissRequest = { askUpdate = false }, commonFrom = common, anyHidden = keyboards.isNotEmpty(),
         ) { choices ->
             val old = helium314.keyboard.settings.Palettes.prefixes.mapNotNull { p -> opened[p + openedName]?.let { p to it } }.toMap()
             helium314.keyboard.settings.Palettes.afterEdit(ctx.realPrefs(), newThemeName.text, old,

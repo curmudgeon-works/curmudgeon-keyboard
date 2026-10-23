@@ -743,6 +743,15 @@
     <!-- %s = the palette's name -->
     <string name="palette_delete_text_all">They go to the default colors, and “%s” leaves the list.</string>
     <string name="update_item_icon">Update with this keyboard\'s settings</string>
+    <!-- the same when the item's menu is common to all keyboards and there are more than one (owner 2026-10-18, as the restore's note on common menus) -->
+    <string name="update_item_icon_common">Update with the common settings</string>
+    <!-- update_item_text when the item's menu is common to all keyboards and there are more than one; %1$s = the saved
+         item, %2$s = the first keyboard in the list, whose settings are the common ones -->
+    <string name="update_item_text_common">%1$s gets the common settings, which all your keyboards follow (from %2$s, first in your list).</string>
+    <!-- a keyboard in an update question whose own settings, which the change goes into, are hidden behind the common ones; %s = its name -->
+    <string name="keyboard_hidden_set">%s (hidden)</string>
+    <!-- under an update question's list when one is marked (hidden); %s = the first keyboard in the list -->
+    <string name="update_item_hidden_note">Settings are common to all your keyboards (App settings › Per keyboard), so every keyboard follows %s, first in your list. Keyboards marked (hidden) keep this change for when settings are per keyboard.</string>
     <!-- a saved item with these exact settings exists already (Update, Save as new); nothing is blocked -->
     <string name="same_settings_as">These settings are the same as “%s”.</string>
     <string name="save_anyway">Save anyway</string>

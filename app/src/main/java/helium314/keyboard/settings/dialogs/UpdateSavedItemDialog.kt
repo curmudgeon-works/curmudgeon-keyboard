@@ -25,6 +25,10 @@ import helium314.keyboard.latin.R
  * other keyboards (or saved Layouts / themes holding it) use it, they're listed as [SelectOthersList] has it: the
  * selected ones take the change too, the others keep their current settings, named Custom. [sameAs]: another saved
  * item that already has these settings, said in a note ("include the already exists note"); nothing is blocked.
+ * [commonFrom]: the first keyboard's name when the item's menu is common to all keyboards and there are more than one
+ * ([helium314.keyboard.settings.screens.commonFrom]): the item gets the common settings, not "this keyboard's"; with
+ * [anyHidden] (a keyboard listed, its own set hidden behind the common ones) a line says what (hidden) means (owner
+ * 2026-10-18: "yes, makes sense to follow established pattern from restore").
  */
 @Composable
 fun UpdateSavedItemDialog(
@@ -32,6 +36,8 @@ fun UpdateSavedItemDialog(
     others: List<String>, // the other users' names, in the order to show
     sameAs: String?,
     onDismissRequest: () -> Unit,
+    commonFrom: String? = null,
+    anyHidden: Boolean = false,
     onConfirmed: (selected: Set<Int>) -> Unit, // indices into [others]
 ) {
     val selected = rememberAllSelected(others)
@@ -43,8 +49,10 @@ fun UpdateSavedItemDialog(
         content = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 sameAs?.let { SameSettingsNote(it) }
-                Text(stringResource(R.string.update_item_text, name))
+                Text(if (commonFrom != null) stringResource(R.string.update_item_text_common, name, commonFrom)
+                    else stringResource(R.string.update_item_text, name))
                 if (others.isNotEmpty()) SelectOthersList(stringResource(R.string.update_item_others_select), others, selected)
+                if (commonFrom != null && anyHidden) HiddenSetsNote(commonFrom)
             }
         },
     )
@@ -75,6 +83,13 @@ fun SelectOthersList(text: String, others: List<String>, selected: SnapshotState
             }
         }
     }
+}
+
+/** Under an update question's list when a keyboard in it is marked (hidden) ([commonFrom]: the first keyboard's name):
+ *  why, as the restore's note on common menus says it (owner 2026-10-18). */
+@Composable
+fun HiddenSetsNote(commonFrom: String) {
+    Text(stringResource(R.string.update_item_hidden_note, commonFrom), style = MaterialTheme.typography.bodyMedium)
 }
 
 /** "These settings are the same as “Moonlight”." (Update and Save as new). */

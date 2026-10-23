@@ -326,6 +326,20 @@ class SubScreenSaveRealPathTest {
         compose.onNodeWithText("The new colors").assertDoesNotExist()
         compose.onNodeWithText("The default colors").assertDoesNotExist()
         compose.onNodeWithText("The old colors", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("(hidden)", substring = true).assertDoesNotExist() // (separate settings: none hidden)
+    }
+
+    @Test fun `edit question - settings common, two keyboards - keyboard 2 marked hidden, the line says why`() {
+        commonSettings()
+        appearance()
+        screen = SUB; idle()
+        editWarm()
+        arrowBack()
+        click(ctx.getString(R.string.save_and_exit))
+        shows(ctx.getString(R.string.palette_edit_title, "Warm"))
+        checkbox("$kb2Name (hidden)").assertIsOn()
+        checkbox(sunsetName).assertIsOn() // (a saved theme: no mark)
+        shows(hiddenNote)
     }
 
     // (owner 2026-10-18: "delete palette dialog should defo be updated to remove only this keyboard" and "the headline
@@ -357,13 +371,40 @@ class SubScreenSaveRealPathTest {
 
     /** Keyboard 1 on other colors, so saved theme Sunset (keyboard 2's) differs from it and has the save icon; its
      *  Update question opened from the Themes list. */
-    private fun openUpdateSunset() {
+    private fun openUpdateSunset(icon: Int = R.string.update_item_icon) {
         real.edit().putString(own(1, Settings.PREF_THEME_COLORS), "ocean").commit()
         appearance()
         compose.onNodeWithText(ctx.getString(R.string.appearance_looks), substring = true).performClick(); idle()
         compose.onNode(hasScrollAction() and hasAnyAncestor(isDialog())).performScrollToNode(hasText("Sunset"))
-        clickIcon(ctx.getString(R.string.update_item_icon))
+        clickIcon(ctx.getString(icon))
         shows(ctx.getString(R.string.update_item_title, "Sunset"))
+    }
+
+    // (owner 2026-10-18: "yes, makes sense to follow established pattern from restore": with the settings common and
+    // more than one keyboard, the questions say "the common settings", not "this keyboard", and mark the keyboards whose
+    // hidden own sets the change goes into)
+    private val kb1Name get() = helium314.keyboard.settings.screens.keyboardName(kb1, ctx)
+    private val hiddenNote get() = "Settings are common to all your keyboards (App settings › Per keyboard), so every keyboard " +
+        "follows $kb1Name, first in your list. Keyboards marked (hidden) keep this change for when settings are per keyboard."
+    private fun commonSettings() { real.edit().putBoolean("separate_settings_per_keyboard", false).commit() }
+
+    @Test fun `Update question - settings common, two keyboards - the common settings, keyboard 2 marked hidden, the line says why`() {
+        commonSettings()
+        openUpdateSunset(R.string.update_item_icon_common)
+        shows("Sunset gets the common settings, which all your keyboards follow (from $kb1Name, first in your list).")
+        compose.onNodeWithText("gets this keyboard", substring = true).assertDoesNotExist()
+        checkbox("$kb2Name (hidden)").assertIsOn()
+        shows(hiddenNote)
+        click(ctx.getString(R.string.update_item))
+        assertEquals("ocean", real.getString(own(2, Settings.PREF_THEME_COLORS), null)) // into keyboard 2's own (hidden) set
+    }
+
+    @Test fun `Update question - separate settings - this keyboard's settings, no hidden mark, no line`() {
+        openUpdateSunset()
+        shows("Sunset gets this keyboard's settings.")
+        compose.onNodeWithText("gets the common settings", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("(hidden)", substring = true).assertDoesNotExist()
+        checkbox(kb2Name).assertIsOn()
     }
 
     @Test fun `Update question - select those that should take this change, all selected to start, they take it`() {

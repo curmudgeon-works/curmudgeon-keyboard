@@ -689,6 +689,8 @@ private fun SavedLooksPreference(setting: Setting) {
     // which of the user's themes differ from the keyboard as it was when the list opened: those get the save icon
     val differs = remember(showList, generation) { looks.associateWith { AppearanceLooks.isTweaked(ctx, it) } }
     var toUpdate: AppearanceLooks.Look? by remember { mutableStateOf(null) }
+    // the settings common to all keyboards: the first one's name, said in the save icon and the update question
+    val common = remember(showList) { commonFrom(ctx, helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE) }
     Preference(name = setting.title, description = summary, onClick = { showList = true }) { NextScreenIcon() }
     // the previewed theme off again: what was there when the list opened
     fun putBack() {
@@ -724,7 +726,7 @@ private fun SavedLooksPreference(setting: Setting) {
             trailing = { look -> if (builtIn.none { it === look }) { // (by identity: a theme of the same content is still yours)
                 if (differs[look] == true)
                     IconButton({ if (previewed != null) { putBack(); previewed = null }; toUpdate = look }) {
-                        Icon(painterResource(R.drawable.ic_save), stringResource(R.string.update_item_icon)) }
+                        Icon(painterResource(R.drawable.ic_save), stringResource(if (common != null) R.string.update_item_icon_common else R.string.update_item_icon)) }
                 DeleteButton { toDelete = look }
             } },
             onItemLongClick = { look -> if (builtIn.none { it === look }) toRename = look },
@@ -779,8 +781,8 @@ private fun SavedLooksPreference(setting: Setting) {
         val others = remember(look) { otherUsers(ctx, AppearanceLooks.PREF_SELECTED, look.name,
             edited, helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE) }
         val sameAs = remember(look) { looks.firstOrNull { it !== look && differs[it] == false }?.name }
-        helium314.keyboard.settings.dialogs.UpdateSavedItemDialog(look.name, userNames(ctx, others), sameAs,
-            onDismissRequest = { toUpdate = null },
+        helium314.keyboard.settings.dialogs.UpdateSavedItemDialog(look.name, updateNames(ctx, others, common), sameAs,
+            onDismissRequest = { toUpdate = null }, commonFrom = common, anyHidden = others.isNotEmpty(),
         ) { selected ->
             val updated = AppearanceLooks.saved(ctx, look.name, chosen)
             store(looks.map { if (it === look) updated else it })
