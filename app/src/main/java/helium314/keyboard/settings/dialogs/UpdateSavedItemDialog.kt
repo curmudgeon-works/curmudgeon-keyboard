@@ -62,7 +62,7 @@ fun UpdateSavedItemDialog(
 
 /** All of [others] selected, the start of every [SelectOthersList] (owner 2026-10-18: "all should come selected yes"). */
 @Composable
-fun rememberAllSelected(others: List<String>): SnapshotStateList<Int> =
+fun <T> rememberAllSelected(others: List<T>): SnapshotStateList<Int> =
     remember(others) { mutableStateListOf<Int>().apply { addAll(others.indices) } }
 
 /**
