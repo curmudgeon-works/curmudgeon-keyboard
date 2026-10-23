@@ -151,7 +151,7 @@ class DeleteKeyboardWordsTest {
             compose.onNodeWithText(keyboardName(b, ctx)).performTouchInput { longClick() }
             compose.onNodeWithText(ctx.getString(R.string.delete)).performClick()
             compose.onNodeWithText("These keyboards use its learned and blacklisted words (Use lists from other keyboards). " +
-                "Select those that should have them merged into their own; the others no longer read them.").assertExists()
+                "Select those that should have them merged into their own.").assertExists()
             compose.onNodeWithText("None: the lists go").assertDoesNotExist()
             fun checkbox(kb: SettingsSubtype) = compose.onNode(isToggleable() and hasAnyAncestor(isDialog()) and hasParent(hasText(keyboardName(kb, ctx))))
             checkbox(a).assertIsOn()

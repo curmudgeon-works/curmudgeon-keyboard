@@ -543,7 +543,7 @@ internal fun mainChangedMessage(ctx: Context, main: SettingsSubtype): String {
  * keyboards") are listed as [helium314.keyboard.settings.dialogs.SelectOthersList] has it, all selected (owner
  * 2026-10-18, review SP23a: "we should offer to merge into each keyboard individually. Select which ones should have
  * these lists merged in (default all on)"; was one pick, none by default, or "None: the lists go"): each selected one
- * takes both lists merged into its own, the others no longer read them. [onConfirmed] gets the selected ones.
+ * takes both lists merged into its own (an unselected one using other keyboards' lists still sees them through a selected one). [onConfirmed] gets the selected ones.
  */
 @Composable
 internal fun DeleteKeyboardDialog(keyboard: SettingsSubtype, onDismissRequest: () -> Unit, onConfirmed: (List<SettingsSubtype>) -> Unit) {

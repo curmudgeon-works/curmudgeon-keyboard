@@ -810,7 +810,7 @@
     <string name="delete_keyboard_merge_none">None: the lists go</string>
     <!-- the same, a checkbox per keyboard, all selected (owner 2026-10-18, review SP23a: "we should offer to merge into
          each keyboard individually. Select which ones should have these lists merged in (default all on)") -->
-    <string name="delete_keyboard_readers_select">These keyboards use its learned and blacklisted words (Use lists from other keyboards). Select those that should have them merged into their own; the others no longer read them.</string>
+    <string name="delete_keyboard_readers_select">These keyboards use its learned and blacklisted words (Use lists from other keyboards). Select those that should have them merged into their own.</string>
     <!-- the restore: the phone has keyboards of a chosen backup keyboard's language (owner 2026-10-11: restore matches by
          language and asks). The app can't tell which one is newer: never say newer or older. %s: the backup keyboard's name -->
     <string name="restore_merge_title">Restoring %s</string>
