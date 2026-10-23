@@ -59,6 +59,11 @@ import helium314.keyboard.latin.gesture.GestureStats;
 import helium314.keyboard.latin.personalization.LearningEventLog;
 import helium314.keyboard.latin.settings.SpacingAndPunctuations;
 import helium314.keyboard.latin.suggestions.SuggestionStripViewAccessor;
+import helium314.keyboard.latin.translit.SuggestInScript;
+import helium314.keyboard.latin.translit.TranslitChoice;
+import helium314.keyboard.latin.translit.TranslitTable;
+import helium314.keyboard.latin.translit.TranslitWordInfo;
+import helium314.keyboard.latin.translit.Transliteration;
 import helium314.keyboard.latin.utils.AsyncResultHolder;
 import helium314.keyboard.latin.utils.DictionaryInfoUtils;
 import helium314.keyboard.latin.utils.InputTypeUtils;
@@ -370,6 +375,8 @@ public final class InputLogic {
         editContinues(); // picking a word replaces the one being typed: same step, but no more redo
         if (suggestionInfo.isKindOf(SuggestedWordInfo.KIND_WHOLE_RUN))
             return pickWholeRun(settingsValues, suggestionInfo, keyboardShiftState, handler);
+        if (suggestionInfo instanceof TranslitWordInfo translit && translit.inPlace)
+            return pickScriptInPlace(settingsValues, translit, keyboardShiftState, handler);
         if (isInlineEmojiSearchAction()) {
             deleteTextReplacedByEmoji();
         }
@@ -426,6 +433,12 @@ public final class InputLogic {
         final int pickedRank = rankInStrip(mSuggestedWords, suggestion);
         commitChosenWord(settingsValues, suggestion, LastComposedWord.COMMIT_TYPE_MANUAL_PICK, LastComposedWord.NOT_A_SEPARATOR);
         mConnection.endBatchEdit();
+        // Suggest in हिंदी (Some): a Latin word picked that the strip had no other script's word for gets it offered
+        // first, until the next input
+        final TranslitChoice translitChoice = settingsValues.mSuggestInScript;
+        final TranslitTable translitTable = translitChoice == null ? null : Transliteration.INSTANCE.table(translitChoice.getSpec());
+        if (translitTable != null && !(suggestionInfo instanceof TranslitWordInfo))
+            mLastComposedWord.mScriptAfterPick = SuggestInScript.afterPick(suggestion, suggestedWords, translitChoice.getMode(), translitTable);
         // a swiped word still open — including one re-opened for editing and then corrected from the strip — was
         // picked over; the recorder ignores the call when no swipe is open
         GestureCorpusRecorder.INSTANCE.onSuggestionPicked(suggestion, pickedRank);
@@ -474,6 +487,36 @@ public final class InputLogic {
                 suggestedWords.mInputStyle, suggestedWords.mSequenceNumber);
     }
 
+    /**
+     * Suggest in हिंदी (SettingsValues.mSuggestInScript): the other script's words of the strip's Latin word
+     * (SuggestInScript.forStrip: found by the table alone, nothing of how the word was typed or swiped), and right
+     * after a Latin word was picked, its other script's word first in the predictions. As they are while the keyboard
+     * has it off or the table is still being read.
+     */
+    public SuggestedWords withScript(final SuggestedWords suggestedWords, final SettingsValues settingsValues) {
+        final TranslitChoice choice = settingsValues.mSuggestInScript;
+        if (choice == null) return suggestedWords;
+        final TranslitTable table = Transliteration.INSTANCE.table(choice.getSpec());
+        if (table == null) return suggestedWords;
+        if (suggestedWords.isPrediction()) {
+            final SuggestedWordInfo afterPick = mLastComposedWord.mScriptAfterPick;
+            return afterPick == null ? suggestedWords : SuggestInScript.withFirst(suggestedWords, afterPick);
+        }
+        return SuggestInScript.forStrip(suggestedWords, choice.getMode(), table, settingsValues.mAutoCorrectEnabled,
+                word -> inAnotherLatinLanguage(word, choice.getLocale()));
+    }
+
+    /** Whether the word is in the main dictionary of another Latin-script language of the keyboard than the one with
+     *  the table ("meeting" for English): Suggest in हिंदी's All leaves it in Latin. */
+    private boolean inAnotherLatinLanguage(final String word, final Locale locale) {
+        for (final Locale other : mDictionaryFacilitator.getLocales()) {
+            if (other.toLanguageTag().equals(locale.toLanguageTag())
+                    || !ScriptUtils.SCRIPT_LATIN.equals(ScriptUtils.script(other))) continue;
+            if (mDictionaryFacilitator.getMainDictionaryFrequency(word, other) >= 0) return true;
+        }
+        return false;
+    }
+
     /** The whole run tapped in the strip: learned like a strip pick (+4); the text stays as typed. */
     private InputTransaction pickWholeRun(final SettingsValues settingsValues, final SuggestedWordInfo suggestionInfo,
             final int keyboardShiftState, final LatinIME.UIHandler handler) {
@@ -491,6 +534,28 @@ public final class InputLogic {
         mConnection.endBatchEdit();
         if (settingsValues.mAutospaceAfterSuggestion)
             mSpaceState = SpaceState.PHANTOM;
+        inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_NOW);
+        handler.postUpdateSuggestionStrip(SuggestedWords.INPUT_STYLE_NONE);
+        return inputTransaction;
+    }
+
+    /** The other script's word offered after its Latin word was picked (Suggest in हिंदी, Some, SuggestInScript.afterPick):
+     *  it takes that word's place in the text, the space to come stays to come. Nothing more is learned: the pick was. */
+    private InputTransaction pickScriptInPlace(final SettingsValues settingsValues, final TranslitWordInfo info,
+            final int keyboardShiftState, final LatinIME.UIHandler handler) {
+        final Event event = Event.createSuggestionPickedEvent(info);
+        final InputTransaction inputTransaction = new InputTransaction(settingsValues,
+                event, SystemClock.uptimeMillis(), mSpaceState, keyboardShiftState);
+        mLastComposedWord.mScriptAfterPick = null;
+        final String latin = info.source;
+        final CharSequence before = mConnection.getTextBeforeCursor(latin.length(), 0);
+        if (!mWordComposer.isComposingWord() && !mConnection.hasSelection() && TextUtils.equals(before, latin)) {
+            mConnection.beginBatchEdit();
+            mConnection.deleteTextBeforeCursor(latin.length());
+            mConnection.commitText(info.mWord, 1);
+            mConnection.endBatchEdit();
+            inputTransaction.setDidAffectContents();
+        }
         inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_NOW);
         handler.postUpdateSuggestionStrip(SuggestedWords.INPUT_STYLE_NONE);
         return inputTransaction;
@@ -686,6 +751,8 @@ public final class InputLogic {
             // a swiped word keeps its strip for a backspace right after the space that committed it (the
             // deactivation above comes with that space already); any later event ends that
             if (mLastComposedWord == lastComposedWordBefore) mLastComposedWord.mBatchSuggestedWords = null;
+            // and the other script's word offered after a pick goes with the next input
+            lastComposedWordBefore.mScriptAfterPick = null;
         }
         if (KeyCode.DELETE != processedEvent.getKeyCode()) {
             mEnteredText = null;
@@ -697,6 +764,7 @@ public final class InputLogic {
     public void onStartBatchInput(final SettingsValues settingsValues,
             final KeyboardSwitcher keyboardSwitcher, final LatinIME.UIHandler handler) {
         mWordBeingCorrectedByCursor = null;
+        mLastComposedWord.mScriptAfterPick = null; // (offered after a pick, until the next input)
         editStepStart(); // each swipe is a step
         mLastEditKeyCode = 0;
         mInputLogicHandler.onStartBatchInput();
@@ -3386,7 +3454,7 @@ public final class InputLogic {
                     settingsValues.mSettingsValuesForSuggestion,
                     settingsValues.mAutoCorrectEnabled,
                     inputStyle, sequenceNumber);
-            callback.onGetSuggestedWords(suggestedWords);
+            callback.onGetSuggestedWords(withScript(suggestedWords, settingsValues));
         } catch (Exception e) {
             // better go without suggestions than have the keyboard crash
             Log.e(TAG, "Error fetching suggested words, using empty words instead", e);

@@ -24,6 +24,11 @@ import helium314.keyboard.latin.common.LocaleUtils.constructLocale
 import helium314.keyboard.latin.common.StringUtils
 import helium314.keyboard.latin.inputlogic.InputLogic
 import helium314.keyboard.latin.inputlogic.SpaceState
+import helium314.keyboard.latin.personalization.available
+import helium314.keyboard.latin.personalization.useKeyboards
+import helium314.keyboard.latin.common.Constants.Subtype.ExtraValue
+import helium314.keyboard.latin.translit.Transliteration
+import helium314.keyboard.withId
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.ScriptUtils
 import helium314.keyboard.latin.utils.SubtypeSettings
@@ -46,6 +51,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
 @Config(shadows = [
@@ -1505,6 +1511,132 @@ class InputLogicTest {
         assertEquals("the ", text)
     }
 
+
+    // ------- Suggest in हिंदी (a keyboard with English and Hinglish, the table read) ---------
+
+    @Test fun `Some - space types the Latin word, a tap on the chip puts in the Devanagari`() {
+        reset()
+        suggestInScript(Transliteration.SOME)
+        chainInput("bohot")
+        val strip = showScript(typingStrip("bohot", "bahut"))
+        assertEquals(listOf("bohot", "बहुत", "bahut"), strip.words())
+        assertTrue(strip.getInfo(1).isOtherScript)
+        input(' ')
+        assertEquals("bohot ", text)
+
+        chainInput("bohot")
+        val again = showScript(typingStrip("bohot", "bahut"))
+        latinIME.pickSuggestionManually(again.getInfo(1))
+        assertEquals("bohot बहुत", text)
+    }
+
+    @Test fun `Some - after picking another word its Devanagari comes first and takes its place`() {
+        reset()
+        suggestInScript(Transliteration.SOME)
+        chainInput("bah")
+        val strip = showScript(typingStrip("bah", "bahut", "bohot"))
+        latinIME.pickSuggestionManually(strip.getInfo(strip.words().indexOf("bahut")))
+        assertEquals("bahut", text)
+        val predictions = showScript(predictionStrip("hai", "tha"))
+        assertEquals(listOf("बहुत", "hai", "tha"), predictions.words())
+        assertTrue(predictions.getInfo(0).isOtherScript)
+        latinIME.pickSuggestionManually(predictions.getInfo(0))
+        assertEquals("बहुत", text)
+        assertEquals(SpaceState.PHANTOM, spaceState) // the space after it still comes with the next word
+        assertEquals(listOf("hai", "tha"), showScript(predictionStrip("hai", "tha")).words()) // offered once
+        chainInput("hai")
+        assertEquals("बहुत hai", text)
+    }
+
+    @Test fun `Some - the Devanagari offered after a pick goes with the next input`() {
+        reset()
+        suggestInScript(Transliteration.SOME)
+        chainInput("bah")
+        val strip = showScript(typingStrip("bah", "bahut"))
+        latinIME.pickSuggestionManually(strip.getInfo(strip.words().indexOf("bahut")))
+        assertEquals("बहुत", showScript(predictionStrip("hai")).getWord(0))
+        input('h')
+        functionalKeyPress(KeyCode.DELETE)
+        assertEquals(listOf("hai"), showScript(predictionStrip("hai")).words())
+    }
+
+    @Test fun `All - space types the Devanagari, backspace brings the Latin word back`() {
+        reset()
+        setInputType(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_AUTO_CORRECT)
+        suggestInScript(Transliteration.ALL)
+        chainInput("bohot")
+        val strip = showScript(typingStrip("bohot", "bahut"))
+        assertEquals("बहुत", strip.getWord(SuggestedWords.INDEX_OF_AUTO_CORRECTION))
+        assertTrue(strip.mWillAutoCorrect)
+        assertTrue(strip.getInfo(0).isOtherScript) // the Latin word one tap away
+        input(' ')
+        assertEquals("बहुत ", text)
+        functionalKeyPress(KeyCode.DELETE)
+        assertEquals("bohot", text)
+    }
+
+    @Test fun `All - a tap on the Latin word types it`() {
+        reset()
+        setInputType(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_AUTO_CORRECT)
+        suggestInScript(Transliteration.ALL)
+        chainInput("bohot")
+        val strip = showScript(typingStrip("bohot", "bahut"))
+        latinIME.pickSuggestionManually(strip.getInfo(0))
+        assertEquals("bohot", text)
+    }
+
+    @Test fun `All - a swipe puts in the Devanagari`() {
+        reset()
+        suggestInScript(Transliteration.ALL)
+        latinIME.mInputLogic.onStartBatchInput(settingsValues, KeyboardSwitcher.getInstance(), latinIME.mHandler)
+        handleMessages()
+        val swiped = scriptWord("bohot")
+        val strip = showScript(SuggestedWords(arrayListOf(swiped, scriptWord("bahut")), null, swiped, true, false, false,
+            SuggestedWords.INPUT_STYLE_TAIL_BATCH, 0))
+        assertEquals(listOf("बहुत", "bohot", "बोहोत", "बहोत", "bahut"), strip.words())
+        latinIME.mInputLogic.onUpdateTailBatchInputCompleted(settingsValues, strip, KeyboardSwitcher.getInstance())
+        assertEquals("बहुत", text)
+        input(' ')
+        assertEquals("बहुत ", text)
+    }
+
+    @Test fun `off - the strip stays as it is`() {
+        reset()
+        suggestInScript(Transliteration.OFF)
+        chainInput("bohot")
+        assertEquals(listOf("bohot", "bahut"), showScript(typingStrip("bohot", "bahut")).words())
+    }
+
+    private val hinglish = Locale.forLanguageTag("hi-Latn")
+
+    // the keyboard in use has English and Hinglish, Suggest in हिंदी is [mode] on it, its table is read
+    private fun suggestInScript(mode: Int) {
+        checkNotNull(Transliteration.load(latinIME, Transliteration.specFor(hinglish)!!))
+        val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(latinIME)
+        useKeyboards(latinIME, real, available("en-US").with(ExtraValue.SECONDARY_LOCALES, "hi-Latn").withId(1))
+        latinIME.prefs().edit { putInt(Transliteration.key(hinglish), mode) }
+        setText(text) // the field again: the settings as they are now
+        if (mode == Transliteration.OFF) assertEquals(null, settingsValues.mSuggestInScript)
+        else assertEquals(mode, settingsValues.mSuggestInScript?.mode)
+    }
+
+    private fun scriptWord(word: String, kind: Int = SuggestedWordInfo.KIND_CORRECTION) = SuggestedWordInfo(word, "", 100, kind,
+        null, SuggestedWordInfo.NOT_AN_INDEX, SuggestedWordInfo.NOT_A_CONFIDENCE)
+
+    // the typed word first, as Suggest makes them; no auto-correction
+    private fun typingStrip(typed: String, vararg others: String): SuggestedWords {
+        val typedInfo = scriptWord(typed, SuggestedWordInfo.KIND_TYPED)
+        return SuggestedWords(ArrayList(listOf(typedInfo) + others.map { scriptWord(it) }), null, typedInfo, false, false,
+            false, SuggestedWords.INPUT_STYLE_TYPING, 0)
+    }
+
+    private fun predictionStrip(vararg words: String) = SuggestedWords(ArrayList(words.map { scriptWord(it, SuggestedWordInfo.KIND_PREDICTION) }),
+        null, null, false, false, false, SuggestedWords.INPUT_STYLE_PREDICTION, 0)
+
+    // as the keyboard shows them: with Suggest in हिंदी's words (InputLogic.getSuggestedWords), then taken by InputLogic
+    private fun showScript(words: SuggestedWords) = inputLogic.withScript(words, settingsValues).also { inputLogic.setSuggestedWords(it) }
+
+    private fun SuggestedWords.words() = (0 until size()).map { getWord(it) }
 
     // ------- helper functions ---------
 

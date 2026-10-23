@@ -46,6 +46,9 @@ public final class LastComposedWord {
     public final int mCapitalizedMode;
     /** The suggestion strip a swiped word was committed with, so a reverted commit can show it again; null for typed words. */
     public SuggestedWords mBatchSuggestedWords = null;
+    /** A Latin word picked from the strip (Suggest in हिंदी, Some): its word in the other script, offered first in the
+     *  strip until the next input; a tap puts it in this word's place. Null for none. */
+    public SuggestedWords.SuggestedWordInfo mScriptAfterPick = null;
     public final InputPointers mInputPointers =
             new InputPointers(DecoderSpecificConstants.DICTIONARY_MAX_WORD_LENGTH);
 

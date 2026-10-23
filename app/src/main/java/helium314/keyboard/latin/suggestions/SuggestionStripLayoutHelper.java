@@ -12,6 +12,10 @@ import android.content.res.TypedArray;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.InsetDrawable;
+import android.graphics.drawable.LayerDrawable;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.Spanned;
@@ -48,6 +52,7 @@ import helium314.keyboard.latin.utils.KtxKt;
 import helium314.keyboard.latin.utils.ResourceUtils;
 
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 
 final class SuggestionStripLayoutHelper {
     // Orange used for all suggestion strip words. Roughly matches the warm
@@ -329,12 +334,44 @@ final class SuggestionStripLayoutHelper {
             wordView.setText(getStyledSuggestedWord(suggestedWords, indexInSuggestedWords));
             wordView.setTextColor(suggestionColor);
             applyCustomSuggestionStyle(wordView, prefs); // sets the font too (emoji font for emojis)
+            setOtherScriptChip(wordView, suggestedWords.getInfo(indexInSuggestedWords).isOtherScript());
             if (SuggestionStripView.DEBUG_SUGGESTIONS) {
                 mDebugInfoViews.get(positionInStrip).setText(suggestedWords.getDebugString(indexInSuggestedWords));
             }
             positionInStrip++;
         }
         return indexInSuggestedWords;
+    }
+
+    // the word views' own backgrounds while they show a chip (the views are reused for every list)
+    private final IdentityHashMap<TextView, Drawable> mPlainBackgrounds = new IdentityHashMap<>();
+    private static final float CHIP_RADIUS_DP = 12f;
+    private static final float CHIP_INSET_VERTICAL_DP = 6f;
+    private static final float CHIP_INSET_HORIZONTAL_DP = 2f;
+
+    /** Suggest in हिंदी: the word in the other script one tap away (or, with All, the Latin one) on a chip, a shade off
+     *  the strip's background (the theme's clipboard suggestion color); every other word on the strip's own. */
+    private void setOtherScriptChip(final TextView wordView, final boolean chip) {
+        final Drawable plain = mPlainBackgrounds.get(wordView);
+        if (!chip && plain == null) return;
+        // (a background with insets brings its own padding: the word's spacing is kept)
+        final int left = wordView.getPaddingLeft(), top = wordView.getPaddingTop(),
+                right = wordView.getPaddingRight(), bottom = wordView.getPaddingBottom();
+        if (!chip) {
+            wordView.setBackground(plain);
+            mPlainBackgrounds.remove(wordView);
+        } else {
+            final Drawable own = plain != null ? plain : wordView.getBackground();
+            if (plain == null) mPlainBackgrounds.put(wordView, own);
+            final float density = wordView.getResources().getDisplayMetrics().density;
+            final GradientDrawable shape = new GradientDrawable();
+            shape.setColor(Settings.getValues().mColors.get(ColorType.CLIPBOARD_SUGGESTION_BACKGROUND));
+            shape.setCornerRadius(CHIP_RADIUS_DP * density);
+            final int insetH = (int) (CHIP_INSET_HORIZONTAL_DP * density), insetV = (int) (CHIP_INSET_VERTICAL_DP * density);
+            final Drawable inset = new InsetDrawable(shape, insetH, insetV, insetH, insetV);
+            wordView.setBackground(own == null ? inset : new LayerDrawable(new Drawable[] { own, inset }));
+        }
+        wordView.setPadding(left, top, right, bottom);
     }
 
     private int layoutPunctuationsAndReturnStartIndexOfMoreSuggestions(
@@ -356,6 +393,7 @@ final class SuggestionStripLayoutHelper {
             wordView.setTextScaleX(1.0f);
             wordView.setCompoundDrawables(null, null, null, null);
             wordView.setTextColor(mColorAutoCorrect);
+            setOtherScriptChip(wordView, false);
             KeyboardTypeface.applyToTextView(wordView);
             stripView.addView(wordView);
             setLayoutWeight(wordView, 1.0f, mSuggestionsStripHeight);

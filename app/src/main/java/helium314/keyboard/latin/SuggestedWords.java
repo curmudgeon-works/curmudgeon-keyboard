@@ -219,6 +219,8 @@ public class SuggestedWords {
         final int previousSize = previousSuggestions.size();
         for (int index = 1; index < previousSize; index++) {
             final SuggestedWordInfo prevWordInfo = previousSuggestions.getInfo(index);
+            // (the other script's words were for the word before: not kept)
+            if (prevWordInfo.isKindOf(SuggestedWordInfo.KIND_TRANSLIT)) continue;
             final String prevWord = prevWordInfo.mWord;
             // Filter out duplicate suggestions.
             if (!alreadySeen.contains(prevWord)) {
@@ -258,11 +260,16 @@ public class SuggestedWords {
         // everything typed since the last space, when more than the word being typed ("sender+tag@gmail.com" while
         // typing "tag@gmail.com"): tapped, it's learned and the text stays as it is
         public static final int KIND_WHOLE_RUN = 11;
+        // a word in another script from a table, for a Latin word of the strip (Suggest in हिंदी):
+        // helium314.keyboard.latin.translit.TranslitWordInfo, which knows the Latin word
+        public static final int KIND_TRANSLIT = 12;
 
         public static final int KIND_FLAG_POSSIBLY_OFFENSIVE = 0x80000000;
         public static final int KIND_FLAG_EXACT_MATCH = 0x40000000;
         public static final int KIND_FLAG_EXACT_MATCH_WITH_INTENTIONAL_OMISSION = 0x20000000;
         public static final int KIND_FLAG_APPROPRIATE_FOR_AUTO_CORRECTION = 0x10000000;
+        // drawn on a tint in the strip: the word in the other script one tap away, or (Suggest in …: All) the Latin one
+        public static final int KIND_FLAG_OTHER_SCRIPT = 0x08000000;
 
         public final String mWord;
         public final String mPrevWordsContext;
@@ -348,6 +355,10 @@ public class SuggestedWords {
 
         public boolean isExactMatchWithIntentionalOmission() {
             return (mKindAndFlags & KIND_FLAG_EXACT_MATCH_WITH_INTENTIONAL_OMISSION) != 0;
+        }
+
+        public boolean isOtherScript() {
+            return (mKindAndFlags & KIND_FLAG_OTHER_SCRIPT) != 0;
         }
 
         public boolean isAppropriateForAutoCorrection() {
