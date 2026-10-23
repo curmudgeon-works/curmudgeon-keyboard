@@ -1061,6 +1061,12 @@
     <string name="language_priority_low">L</string>
     <string name="language_priority_medium">M</string>
     <string name="language_priority_high">H</string>
+    <!-- Languages: the row under a language whose words can also be suggested in another script; %1$s: that language's
+         own name, e.g. हिंदी -->
+    <string name="suggest_in_script">Suggest in %1$s</string>
+    <!-- Its buttons Off / Some / All: "Some" = the other script one tap away, "All" = space types the other script -->
+    <string name="suggest_in_script_some">Some</string>
+    <string name="suggest_in_script_all">All</string>
     <!-- Advanced: one set of learned and blacklisted words for all keyboards (on), or one per keyboard (off) -->
     <!-- Title of the setting to enable number row -->
     <string name="number_row">Number row</string>

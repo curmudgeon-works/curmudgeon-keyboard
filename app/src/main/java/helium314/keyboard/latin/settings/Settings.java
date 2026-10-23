@@ -253,6 +253,8 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_REDO_UNIT = "redo_unit";
     public static final String PREF_SUGGESTION_COUNT = "suggestion_count";
     public static final String PREF_SUGGESTION_RULES = "suggestion_rules";
+    // + a language tag: the keyboard's "Suggest in …" for a language with a table (Off / Some / All, Transliteration)
+    public static final String PREF_SUGGEST_IN_SCRIPT_PREFIX = "suggest_in_script_";
     public static final String PREF_TOOLBAR_MODE = "toolbar_mode";
     public static final String PREF_TOOLBAR_HIDING_GLOBAL = "toolbar_hiding_global";
     public static final String PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE = "toolbar_swipe_down_to_hide";

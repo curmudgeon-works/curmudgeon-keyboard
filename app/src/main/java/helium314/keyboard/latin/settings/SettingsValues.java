@@ -16,6 +16,7 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodSubtype;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.util.TypedValueCompat;
 
 import helium314.keyboard.compat.ConfigurationCompatKt;
@@ -30,6 +31,8 @@ import helium314.keyboard.latin.R;
 import helium314.keyboard.latin.RichInputMethodManager;
 import helium314.keyboard.latin.common.Colors;
 import helium314.keyboard.latin.permissions.PermissionsUtil;
+import helium314.keyboard.latin.translit.TranslitChoice;
+import helium314.keyboard.latin.translit.Transliteration;
 import helium314.keyboard.latin.utils.FoldableUtils;
 import helium314.keyboard.latin.utils.InputTypeUtils;
 import helium314.keyboard.latin.utils.JniUtils;
@@ -38,6 +41,7 @@ import helium314.keyboard.latin.utils.SubtypeSettings;
 import helium314.keyboard.latin.utils.SubtypeUtilsKt;
 import helium314.keyboard.latin.utils.ToolbarMode;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -111,6 +115,8 @@ public class SettingsValues {
     public final List<String> mPopupKeyTypes;
     public final List<String> mPopupKeyLabelSources;
     public final List<Locale> mSecondaryLocales;
+    /** Suggest in …: what this keyboard does here, null for nothing (helium314.keyboard.latin.translit.Transliteration). */
+    @Nullable public final TranslitChoice mSuggestInScript;
     public final boolean mBigramPredictionEnabled;// Use bigrams to predict the next word when there is no input for it yet
     public final boolean mSuggestPunctuation;
     public final boolean mCenterSuggestionTextToEnter;
@@ -383,6 +389,12 @@ public class SettingsValues {
         } else
             mOneHandedModeScale = 1f;
         mSecondaryLocales = SubtypeUtilsKt.getSecondaryLocales(selectedSubtype.getExtraValue());
+        // Suggest in हिंदी: as the keyboard's languages have it, in text fields only (not passwords, addresses, URLs)
+        final List<Locale> languages = new ArrayList<>();
+        languages.add(SubtypeUtilsKt.locale(selectedSubtype));
+        languages.addAll(mSecondaryLocales);
+        mSuggestInScript = inputAttributes.mIsGeneralTextInput
+                ? Transliteration.INSTANCE.choice(context, prefs, languages) : null;
         mShowMorePopupKeys = selectedSubtype.isAsciiCapable()
                 ? SubtypeUtilsKt.getMoreKeys(selectedSubtype, prefs)
                 : LocaleKeyboardInfosKt.POPUP_KEYS_NORMAL;

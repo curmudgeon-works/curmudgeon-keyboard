@@ -45,6 +45,8 @@ import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.latin.utils.DictionaryInfoUtils
 import helium314.keyboard.latin.utils.LanguagePriority
+import helium314.keyboard.latin.translit.TranslitSpec
+import helium314.keyboard.latin.translit.Transliteration
 import helium314.keyboard.latin.utils.MissingDictionaryDialog
 import helium314.keyboard.latin.utils.ScriptUtils.script
 import helium314.keyboard.latin.utils.SubtypeSettings
@@ -270,6 +272,10 @@ private fun LanguageRow(locale: Locale, keyboard: SettingsSubtype, generation: I
                 }
             }
         }
+        // Suggest in हिंदी: under a language with a table while it is on the keyboard (no subtext line)
+        val translit = Transliteration.specFor(locale)
+        if (translit != null && priority != OFF)
+            SuggestInScriptRow(locale, translit, keyboard, generation)
         if (showNoDictDialog)
             MissingDictionaryDialog({ showNoDictDialog = false }, locale)
         if (showDictionaryDialog)
@@ -280,6 +286,42 @@ private fun LanguageRow(locale: Locale, keyboard: SettingsSubtype, generation: I
 }
 
 private const val OFF = 0
+
+/** "Suggest in हिंदी" with its Off / Some / All, just under its language, a little indented; the keyboard's own setting
+ *  (Transliteration, stored like the language's priority). */
+@Composable
+private fun SuggestInScriptRow(locale: Locale, spec: TranslitSpec, keyboard: SettingsSubtype, generation: Int) {
+    val ctx = LocalContext.current
+    val prefs = ctx.prefs()
+    var mode by remember(locale, keyboard, generation) { mutableIntStateOf(Transliteration.get(prefs, locale)) }
+    Row(verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 6.dp).testTag(SUGGEST_IN_SCRIPT_TAG)) {
+        Text(stringResource(R.string.suggest_in_script, spec.name), style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f).padding(end = 8.dp))
+        val options = listOf(
+            Transliteration.OFF to stringResource(R.string.language_priority_off),
+            Transliteration.SOME to stringResource(R.string.suggest_in_script_some),
+            Transliteration.ALL to stringResource(R.string.suggest_in_script_all),
+        )
+        SingleChoiceSegmentedButtonRow {
+            options.forEachIndexed { index, (value, label) ->
+                SegmentedButton(
+                    selected = mode == value,
+                    onClick = {
+                        if (mode != value) {
+                            Transliteration.set(prefs, locale, value)
+                            mode = value
+                        }
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(index, options.size),
+                    label = { Text(label) }
+                )
+            }
+        }
+    }
+}
+
+internal const val SUGGEST_IN_SCRIPT_TAG = "suggest_in_script"
 
 /** The line under a language with no dictionary here (built in or added; one to download counts as none until it's
  *  downloaded): turned on for the keyboard, what that means (owner 2026-10-18: ""No dictionary: swipe and suggestions
