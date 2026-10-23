@@ -9,6 +9,7 @@ import helium314.keyboard.latin.common.ComposedData
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.Log
 import org.json.JSONArray
+import helium314.keyboard.latin.NgramContext
 import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.Executors
@@ -83,8 +84,15 @@ object GestureCorpusRecorder {
 
     fun corpusFile(): File? = file
 
-    /** Called with the final (tail) batch-input decode; [candidates] are the decoder's ranked results. */
-    fun onSwipe(composedData: ComposedData, keyboard: Keyboard, candidates: Collection<SuggestedWordInfo>, localeTag: String) {
+    /** The word before the swipe as the corpus records it: "<s>" at the start of a sentence, "" when there is none. */
+    fun previousWord(ngramContext: NgramContext): String =
+        if (ngramContext.isNthPrevWordBeginningOfSentence(1)) "<s>" else ngramContext.getNthPrevWord(1)?.toString() ?: ""
+
+    /** Called with the final (tail) batch-input decode; [candidates] are the decoder's ranked results. [previousWord]
+     *  goes into the corpus only (2026-10-18: to measure how far the word before decides ties like its / it's); the
+     *  corpus is written only while recording is on and the field isn't private, and stays on the phone. */
+    fun onSwipe(composedData: ComposedData, keyboard: Keyboard, candidates: Collection<SuggestedWordInfo>, localeTag: String,
+                previousWord: String = "") {
         if (!isFollowing()) return
         val pointers = composedData.mInputPointers
         val size = pointers.pointerSize
@@ -129,6 +137,7 @@ object GestureCorpusRecorder {
                 obj.put("locale", localeTag)
                 obj.put("layout", layoutName)
                 obj.put("committed", cands.firstOrNull()?.first ?: "")
+                obj.put("prev", previousWord)
                 val pts = JSONArray()
                 for (i in 0 until size) pts.put(JSONArray().put(xs[i]).put(ys[i]).put(ts[i]))
                 obj.put("points", pts)
