@@ -114,7 +114,7 @@ fun LanguageListScreen(
                     name = stringResource(R.string.learned_words),
                     onClick = { SettingsDestination.navigateTo(SettingsDestination.withKeyboard(SettingsDestination.LearnedWords, keyboard)) },
                 ) { NextScreenIcon() }
-                else -> LanguageRow(item as Locale, keyboard, ::setKeyboard)
+                else -> LanguageRow(item as Locale, keyboard, generation, ::setKeyboard)
             }
         },
     )
@@ -211,11 +211,13 @@ internal fun languageRowDictionaries(ctx: android.content.Context, locale: Local
 }
 
 @Composable
-private fun LanguageRow(locale: Locale, keyboard: SettingsSubtype, setKeyboard: (SettingsSubtype) -> Unit) {
+private fun LanguageRow(locale: Locale, keyboard: SettingsSubtype, generation: Int, setKeyboard: (SettingsSubtype) -> Unit) {
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
     val own = listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)
-    val priority = if (locale in own) LanguagePriority.get(prefs, locale) else OFF
+    // read again after every change: a second language's new priority leaves the keyboard equal, so without
+    // [generation] the row kept showing the old one and ignored a tap on it (owner 2026-10-18: "stuck on M")
+    val priority = remember(locale, keyboard, generation) { if (locale in own) LanguagePriority.get(prefs, locale) else OFF }
     var showNoDictDialog by remember { mutableStateOf(false) }
     var showDictionaryDialog by remember { mutableStateOf(false) }
     var dictGeneration by remember { mutableIntStateOf(0) }
