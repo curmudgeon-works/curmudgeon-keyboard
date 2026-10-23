@@ -722,6 +722,9 @@
     <string name="palette_edit_text">This keyboard takes the new colors. Choose what each one below takes.</string>
     <!-- the edit question's first line since palettes are one common set (owner 2026-10-18); %s = its name -->
     <string name="palette_edit_text_everywhere">“%s” changes everywhere it\'s used. Choose what each one below takes:</string>
+    <!-- the same, as every dialog changing a saved item others use asks it (owner 2026-10-18); %1$s = its name, %2$s = the
+         palette the others' current colors are kept as, the next free number: "Warm 2" -->
+    <string name="palette_edit_text_select">“%1$s” changes everywhere it\'s used. Also used by the ones below. Select those that should take this change. The others keep their current colors, named “%2$s”.</string>
     <string name="palette_take_new">The new colors</string>
     <string name="palette_take_default">The default colors</string>
     <!-- %s = the palette the old colors are kept as, the next free number: "Warm 2" -->

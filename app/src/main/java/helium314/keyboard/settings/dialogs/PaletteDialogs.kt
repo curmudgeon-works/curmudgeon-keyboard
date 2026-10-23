@@ -3,31 +3,21 @@ package helium314.keyboard.settings.dialogs
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import helium314.keyboard.latin.R
 import helium314.keyboard.settings.Palettes
 
 /**
  * The palette editor's Save when other keyboards or saved themes ([others], their names in order) use the palette
- * [name] (owner 2026-10-11: "Each keyboard using it should have three options -- use the new edited; use app default;
- * use 'Warm N', not 'Custom N'"): each takes the new colors, the default ones, or the old ones as [keeper] ("Warm 2",
- * one for all that keep them, made only when one does). Each starts on the new colors (owner 2026-10-11: "on second
- * thought, yes let's do new colors as the default option"). The first line says the edit reaches every user, as
- * palettes come from one common set (owner 2026-10-18: "only this keyboard is no longer valid").
+ * [name]: the edit reaches every user, as palettes come from one common set (owner 2026-10-18: "only this keyboard is
+ * no longer valid"), and the others are listed as [SelectOthersList] has it (owner 2026-10-18: "select which each one
+ * takes, else they retain their current setting named Warm 2"): the selected ones take the new colors, the others keep
+ * their current colors as [keeper] ("Warm 2", one for all that keep them, made only when one does). All start selected
+ * (owner 2026-10-11: "new colors as the default option"; 2026-10-18: "all should come selected yes"). The default
+ * colors aren't offered any more (were, with the new and the old colors, one radio each per user; owner 2026-10-18).
  */
 @Composable
 fun PaletteEditDialog(
@@ -35,34 +25,18 @@ fun PaletteEditDialog(
     keeper: String,
     others: List<String>,
     onDismissRequest: () -> Unit,
-    onConfirmed: (choices: List<Palettes.Choice>) -> Unit, // in [others]' order
+    onConfirmed: (choices: List<Palettes.Choice>) -> Unit, // in [others]' order: NEW or KEEP_OLD
 ) {
-    val choices = remember(others) { mutableStateListOf<Palettes.Choice>().apply { repeat(others.size) { add(Palettes.Choice.NEW) } } }
+    val selected = rememberAllSelected(others)
     ThreeButtonAlertDialog(
         onDismissRequest = onDismissRequest,
-        onConfirmed = { onConfirmed(choices.toList()) },
+        onConfirmed = { onConfirmed(others.indices.map { if (it in selected) Palettes.Choice.NEW else Palettes.Choice.KEEP_OLD }) },
         confirmButtonText = stringResource(R.string.save),
         title = { Text(stringResource(R.string.palette_edit_title, name)) },
         scrollContent = true,
         content = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(stringResource(R.string.palette_edit_text_everywhere, name))
-                val options = listOf(
-                    Palettes.Choice.NEW to stringResource(R.string.palette_take_new),
-                    Palettes.Choice.DEFAULT to stringResource(R.string.palette_take_default),
-                    Palettes.Choice.KEEP_OLD to stringResource(R.string.palette_take_old, keeper),
-                )
-                others.forEachIndexed { i, other ->
-                    Column {
-                        Text(other, style = MaterialTheme.typography.titleSmall)
-                        for ((choice, text) in options) Row(verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
-                                .selectable(selected = choices[i] == choice, role = Role.RadioButton) { choices[i] = choice }) {
-                            RadioButton(selected = choices[i] == choice, onClick = null)
-                            Text(text, style = MaterialTheme.typography.bodyLarge)
-                        }
-                    }
-                }
+                SelectOthersList(stringResource(R.string.palette_edit_text_select, name, keeper), others, selected)
             }
         },
     )

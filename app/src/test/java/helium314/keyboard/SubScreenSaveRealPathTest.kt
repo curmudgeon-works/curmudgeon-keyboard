@@ -16,7 +16,6 @@ import androidx.compose.ui.test.hasParent
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
-import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.isEditable
@@ -254,26 +253,23 @@ class SubScreenSaveRealPathTest {
         discardOnAppearanceAndCheck()
     }
 
-    // the editor's save asks what each other user takes (owner 2026-10-11: "use the new edited; use app default; use
-    // 'Warm N'"): switched-off keyboard 2 and saved theme Sunset, the three options each; Appearance's Discard undoes all
-    private fun option(text: Int, user: Int, vararg args: Any) {
-        val row = compose.onAllNodes(hasText(ctx.getString(text, *args)) and hasAnyAncestor(isDialog()))[user]
-        row.performClick(); idle()
-        row.assertIsSelected()
-    }
+    // the editor's save lists the other users to select (owner 2026-10-18: "select which each one takes, else they
+    // retain their current setting named Warm 2"): switched-off keyboard 2 and saved theme Sunset, a checkbox each;
+    // Appearance's Discard undoes all
+    private val sunsetName get() = ctx.getString(R.string.update_item_theme, "Sunset")
 
     // (owner 2026-10-11: "on second thought, yes let's do new colors as the default option"; and no "Warm 2" when
     // nobody keeps the old colors)
-    @Test fun `edit question - all on the new colors, the starting choice - no Warm 2, Appearance's Discard puts it back`() {
+    @Test fun `edit question - all selected to start, they take the new colors - no Warm 2, Appearance's Discard puts it back`() {
         appearance()
         screen = SUB; idle()
         editWarm()
         systemBack()
         click(ctx.getString(R.string.save_and_exit))
         shows(ctx.getString(R.string.palette_edit_title, "Warm"))
-        shows(ctx.getString(R.string.keyboard_switched_off, helium314.keyboard.settings.screens.keyboardName(kb2, ctx)))
-        shows(ctx.getString(R.string.update_item_theme, "Sunset"))
-        click(ctx.getString(R.string.save)) // (nothing picked: each on the new colors)
+        checkbox(kb2Name).assertIsOn()
+        checkbox(sunsetName).assertIsOn()
+        click(ctx.getString(R.string.save))
         assertEquals("Warm", real.getString(own(2, Settings.PREF_THEME_COLORS), null))
         assertEquals("Warm", AppearanceLooks.load(real).single().values[Settings.PREF_THEME_COLORS])
         assertFalse(real.contains(Settings.PREF_USER_COLORS_PREFIX + "Warm 2")) // (nobody keeps the old colors)
@@ -281,49 +277,55 @@ class SubScreenSaveRealPathTest {
         discardOnAppearanceAndCheck()
     }
 
-    @Test fun `edit question - keyboard 2 to the default colors, the saved theme keeps the old ones as Warm 2`() {
+    @Test fun `edit question - keyboard 2 selected takes the new colors, the saved theme not selected keeps the old ones as Warm 2`() {
         appearance()
         screen = SUB; idle()
         editWarm()
         arrowBack()
         click(ctx.getString(R.string.save_and_exit))
-        option(R.string.palette_take_default, 0)
-        option(R.string.palette_take_old, 1, "Warm 2")
+        checkbox(sunsetName).performClick(); idle()
+        checkbox(sunsetName).assertIsOff()
         click(ctx.getString(R.string.save))
-        assertEquals(null, real.getString(own(2, Settings.PREF_THEME_COLORS), null)) // the default colors
-        assertFalse(real.contains(own(2, KeyboardProfiles.TOMBSTONE + Settings.PREF_THEME_COLORS))) // (owner 2026-10-11: no default marks; nothing stored = the default)
+        assertEquals("Warm", real.getString(own(2, Settings.PREF_THEME_COLORS), null)) // the new colors
         assertEquals("Warm 2", AppearanceLooks.load(real).single().values[Settings.PREF_THEME_COLORS])
         assertEquals(before, real.getString(Settings.PREF_USER_COLORS_PREFIX + "Warm 2", null)) // the old colors, on the list
         assertEquals("Warm", real.getString(own(1, Settings.PREF_THEME_COLORS), null)) // the edited one: the new
         discardOnAppearanceAndCheck()
     }
 
-    @Test fun `edit question - both keep the old colors, one Warm 2 for both`() {
+    @Test fun `edit question - neither selected, both keep the old colors, one Warm 2 for both`() {
         appearance()
         screen = SUB; idle()
         editWarm()
         arrowBack()
         click(ctx.getString(R.string.save_and_exit))
-        option(R.string.palette_take_old, 0, "Warm 2"); option(R.string.palette_take_old, 1, "Warm 2")
+        checkbox(kb2Name).performClick(); idle()
+        checkbox(sunsetName).performClick(); idle()
         click(ctx.getString(R.string.save))
         assertEquals("Warm 2", real.getString(own(2, Settings.PREF_THEME_COLORS), null))
         assertEquals("Warm 2", AppearanceLooks.load(real).single().values[Settings.PREF_THEME_COLORS])
+        assertEquals(before, real.getString(Settings.PREF_USER_COLORS_PREFIX + "Warm 2", null))
         assertEquals(listOf("Warm", "Warm 2").map { Settings.PREF_USER_COLORS_PREFIX + it },
             real.all.keys.filter { it.contains(Settings.PREF_USER_COLORS_PREFIX) }.sorted())
         discardOnAppearanceAndCheck()
     }
 
     // (owner 2026-10-18: palettes come from a common set, so "only this keyboard is no longer valid": the edit reaches
-    // every user, the first line says so)
-    @Test fun `edit question - the first line says the palette changes everywhere it's used`() {
+    // every user, the first line says so; then the one question of the others as every saved item asks it, no radios,
+    // no default colors)
+    @Test fun `edit question - says the palette changes everywhere, select those that should take it, the others named Warm 2`() {
         appearance()
         screen = SUB; idle()
         editWarm()
         arrowBack()
         click(ctx.getString(R.string.save_and_exit))
         shows(ctx.getString(R.string.palette_edit_title, "Warm"))
-        shows("“Warm” changes everywhere it's used. Choose what each one below takes:")
-        compose.onNodeWithText("This keyboard takes the new colors. Choose what each one below takes.").assertDoesNotExist()
+        shows("“Warm” changes everywhere it's used. Also used by the ones below. Select those that should take this change. " +
+            "The others keep their current colors, named “Warm 2”.")
+        compose.onNodeWithText("Choose what each one below takes", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("The new colors").assertDoesNotExist()
+        compose.onNodeWithText("The default colors").assertDoesNotExist()
+        compose.onNodeWithText("The old colors", substring = true).assertDoesNotExist()
     }
 
     // (owner 2026-10-18: "delete palette dialog should defo be updated to remove only this keyboard" and "the headline
