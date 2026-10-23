@@ -15,6 +15,11 @@ import kotlin.test.Test
  */
 class ReplayTest {
 
+    private companion object {
+        /** [Variant.learnedFreq] for the phone's learned-word model. */
+        const val LEARNED_PHONE = -1
+    }
+
     private class Swipe(
         val id: Int, val locale: String, val labelSource: String, val label: String, val phoneGot: String,
         val geometry: KeyboardGeometry, val points: List<GesturePoint>,
@@ -25,9 +30,22 @@ class ReplayTest {
     /**
      * [decode] returns the ranked words a variant would put on the strip. With [learnedFreq] the swipes run in
      * time order and every word the phone committed before (kept or picked) is added to the vocabulary at that
-     * frequency first, the way the phone's learned words would have been (a flat model: one level, plus boost).
+     * frequency first (a flat model: one level, as a dictionary word). With [LEARNED_PHONE] instead, as the phone's
+     * learned words: a learned weight from the word's count ([phoneLearnedWeight]), the boost added at scoring.
      */
     private class Variant(val name: String, val decode: (Swipe, Vocabulary) -> List<ScoredWord>, val learnedFreq: Int = 0)
+
+    /**
+     * The weight the phone's learned-word store gives a word used [count] times out of [total] uses of all words
+     * (language_model_dict_content.cpp: encodeRawProbability(count / max(total, 8192)), then the unigram backoff -32;
+     * no time decay within 90 days): count 1 = 111, 3 = 125, 10 = 140. The replay only sees swiped words, so
+     * [total] leaves out typed words (the floor of 8192 makes that matter only for long corpora).
+     */
+    private fun phoneLearnedWeight(count: Int, total: Int): Int {
+        val p = count.toDouble() / maxOf(total, 8192)
+        val encoded = minOf((255 + Math.log(p) / Math.log(2.0) * 8.58923700372 + 0.5).toInt(), 255).coerceAtLeast(0)
+        return (encoded - 32).coerceIn(0, 255)
+    }
 
     private class Tally {
         var runs = 0; var top1 = 0; var top3 = 0; var top8 = 0
@@ -51,6 +69,8 @@ class ReplayTest {
         var reference: List<Int>? = null
         for ((locale, factor) in factors) {
             if (factor <= 0f) continue // GESTURE_REPLAY_HI_FACTOR=0: an English-only keyboard
+            // a list the data folder doesn't hold isn't loaded: FUTO is English only and never gets personal lists (2026-10-18)
+            if (!File(dir, "$locale.vocab.tsv").isFile) { println("ReplayTest: no $locale.vocab.tsv in $dir, not loaded"); continue }
             val entries = File(dir, "$locale.vocab.tsv").readLines().map { line -> val (word, freq) = line.split('\t'); word to freq.toInt() }
                 .sortedByDescending { it.second }
             val freqs = entries.map { it.second }
@@ -80,6 +100,9 @@ class ReplayTest {
     private val normalizeScales = System.getenv("GESTURE_REPLAY_NORMALIZE") != "0"
     private val tieAware = System.getenv("GESTURE_REPLAY_NORMALIZE") == "ties"
     private val hiFactor = System.getenv("GESTURE_REPLAY_HI_FACTOR")?.toFloatOrNull() ?: 0.85f
+    // the phone's default since 7b5f8f75e: the apostrophe is skipped (swipe im for I'm); GESTURE_REPLAY_APOSTROPHE=period
+    // swipes it through the period key, as the replay did before 2026-10-18 (review MM1 / S5)
+    private val apostropheViaPeriod = System.getenv("GESTURE_REPLAY_APOSTROPHE") == "period"
 
     private fun corpus(dir: File): List<Swipe> = File(dir, "corpus.tsv").readLines().map { line ->
         val f = line.split('\t')
@@ -88,7 +111,7 @@ class ReplayTest {
             KeyInfo(p[0][0], p[1].toFloat(), p[2].toFloat(), p[3].toFloat(), p[4].toFloat())
         }
         val points = f[7].split(';').map { p -> val v = p.split(','); GesturePoint(v[0].toFloat(), v[1].toFloat(), v[2].toLong()) }
-        Swipe(f[0].toInt(), f[1], f[2], f[3], f[4], KeyboardGeometry(keys), points, f.getOrElse(8) { "" })
+        Swipe(f[0].toInt(), f[1], f[2], f[3], f[4], KeyboardGeometry(keys, apostropheViaPeriod), points, f.getOrElse(8) { "" })
     }
 
     /**
@@ -136,10 +159,13 @@ class ReplayTest {
         fun plain(d: GestureDecoder): (Swipe, Vocabulary) -> List<ScoredWord> = { s, v -> d.decode(s.points, s.geometry, v, 50) }
         // GESTURE_REPLAY_SPECS="k=0.4 slow=1;k=0.4": these instead of the sweep
         val specs = System.getenv("GESTURE_REPLAY_SPECS")?.split(';')?.map { it.trim() }?.filter { it.isNotEmpty() } ?: sweep
-        val history = (System.getenv("GESTURE_REPLAY_HISTORY") ?: "").split(',').mapNotNull { it.trim().toIntOrNull() }
+        // GESTURE_REPLAY_HISTORY="150,phone": learned-word variants, flat at a frequency or as the phone learns
+        val history = (System.getenv("GESTURE_REPLAY_HISTORY") ?: "").split(',').map { it.trim() }
+            .mapNotNull { if (it == "phone") LEARNED_PHONE else it.toIntOrNull() }
         return specs.flatMap { spec ->
             listOf(Variant(spec, plain(decoder(spec)))) +
-                history.map { Variant("$spec, learned words at $it", plain(decoder(spec)), learnedFreq = it) }
+                history.map { Variant(if (it == LEARNED_PHONE) "$spec, learned words as on the phone" else "$spec, learned words at $it",
+                    plain(decoder(spec)), learnedFreq = it) }
         }
     }
 
@@ -226,7 +252,7 @@ class ReplayTest {
         val dir = dataDir() ?: run { println("ReplayTest: no replay data, skipped"); return }
         val vocab = vocabulary(dir, mapOf("en-US" to 1f, "hi-Latn" to hiFactor))
         val swipes = corpus(dir)
-        println("\n=== Replay: ${swipes.size} labelled swipes, vocabulary ${vocab.size} words, scales normalized by rank: $normalizeScales, Hinglish factor $hiFactor ===")
+        println("\n=== Replay: ${swipes.size} labelled swipes, vocabulary ${vocab.size} words, scales normalized by rank: $normalizeScales, Hinglish factor $hiFactor, apostrophe ${if (apostropheViaPeriod) "via the period key" else "skipped"} ===")
 
         // what the phone itself got (whatever build recorded it), for reference
         val phone = Tally()
@@ -249,15 +275,22 @@ class ReplayTest {
             val missList = mutableListOf<String>()
             val hits = BooleanArray(swipes.size)
             // a learned-words model needs its own vocabulary, grown as the replay goes
-            val vocabForVariant = if (v.learnedFreq > 0) vocabulary(dir, mapOf("en-US" to 1f, "hi-Latn" to hiFactor)) else vocab
+            val vocabForVariant = if (v.learnedFreq != 0) vocabulary(dir, mapOf("en-US" to 1f, "hi-Latn" to hiFactor)) else vocab
+            val learnedCounts = HashMap<String, Int>()
+            var learnedTotal = 0
             var nanos = 0L
             val bySession = HashMap<String, Tally>()
             for ((index, s) in swipes.withIndex()) {
                 val t0 = System.nanoTime()
                 val results = v.decode(s, vocabForVariant)
                 nanos += System.nanoTime() - t0
-                if (v.learnedFreq > 0 && (s.labelSource == "kept" || s.labelSource == "pick"))
-                    vocabForVariant.add(s.label, maxOf(vocabForVariant.frequencyOf(s.label), v.learnedFreq))
+                if (v.learnedFreq != 0 && (s.labelSource == "kept" || s.labelSource == "pick")) {
+                    if (v.learnedFreq == LEARNED_PHONE) {
+                        val count = learnedCounts.merge(s.label, 1, Int::plus)!!
+                        learnedTotal++
+                        vocabForVariant.addLearned(s.label, phoneLearnedWeight(count, learnedTotal))
+                    } else vocabForVariant.add(s.label, maxOf(vocabForVariant.frequencyOf(s.label), v.learnedFreq))
+                }
                 if (s.label == "?") { // outcome unknown: shown when watched, never tallied
                     if (s.phoneGot in watch) details.add(String.format("%-44s #%-4d label=?         phone=%-9s -> %s", v.name, s.id, s.phoneGot,
                         results.take(10).joinToString(", ") { it.word }))
