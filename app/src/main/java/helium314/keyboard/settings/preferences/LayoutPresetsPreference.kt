@@ -194,7 +194,7 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
         val sameAs = remember(preset) { presets.firstOrNull { it != preset && differs[it] == false }?.name }
         helium314.keyboard.settings.dialogs.UpdateSavedItemDialog(preset.name,
             helium314.keyboard.settings.screens.userNames(ctx, others), sameAs,
-            onDismissRequest = { toUpdate = null }, commonFrom = common, anyListed = others.isNotEmpty(),
+            onDismissRequest = { toUpdate = null }, commonFrom = common, group = KeyboardProfiles.Group.LAYOUT, anyListed = others.isNotEmpty(),
         ) { selected ->
             val updated = LayoutPresets.saved(ctx, initialKeyboard, preset.name, chosen)
             store(presets.map { if (it.name == preset.name) updated else it })

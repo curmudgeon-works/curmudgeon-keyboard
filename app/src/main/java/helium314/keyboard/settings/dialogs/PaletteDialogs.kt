@@ -40,7 +40,7 @@ fun PaletteEditDialog(
         content = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SelectOthersList(stringResource(R.string.palette_edit_text_select, name, keeper), others, selected)
-                if (commonFrom != null && anyListed) HiddenSetsNote(commonFrom)
+                if (commonFrom != null && anyListed) HiddenSetsNote(commonFrom, helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE)
             }
         },
     )

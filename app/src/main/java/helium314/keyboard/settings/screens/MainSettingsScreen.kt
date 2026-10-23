@@ -196,6 +196,18 @@ fun deleteKeepersText(ctx: Context, @androidx.annotation.PluralsRes id: Int, key
     return keepersText(ctx, id, keyboards, names)?.let { listOfNotNull(it, note).joinToString("\n\n") }
 }
 
+/** The line on the common settings under a saved item's question when keyboards are listed ([first]: the first
+ *  keyboard's name, [commonFrom]): every keyboard follows it, the listed ones get the change in their own settings,
+ *  which they use once the switch is on, named as App settings names it (owner 2026-10-18: "Phrasing should match
+ *  exactly"): "Use separate settings" while it is off, else the shared menus of [groups] ("Appearance"). */
+fun commonChangeNote(ctx: Context, first: String, groups: Collection<helium314.keyboard.latin.settings.KeyboardProfiles.Group>): String {
+    val real = ctx.realPrefs()
+    if (!helium314.keyboard.latin.settings.KeyboardProfiles.isSeparate(real)) return ctx.getString(R.string.update_item_hidden_note, first)
+    val shared = helium314.keyboard.latin.settings.KeyboardProfiles.Group.entries
+        .filter { it in groups && helium314.keyboard.latin.settings.KeyboardProfiles.isShared(real, it) }
+    return ctx.getString(R.string.update_item_hidden_note_menu, first, shared.joinToString(", ") { ctx.getString(groupTitle(it)) })
+}
+
 /** The first keyboard in the list by name when a saved item chosen through [keys] is read from the common settings
  *  (separate settings off, or its menu shared: [helium314.keyboard.latin.settings.KeyboardProfiles.isCommon]) and
  *  there is more than one keyboard (switched-off ones counting); else null. [commonFrom] by the item's keys. */
@@ -223,7 +235,8 @@ fun deleteWarningNames(ctx: Context, keyboards: List<SettingsSubtype>, keys: Col
     val viaSet = keyboards.filter { kb -> throughSet.any { it.sameKeyboard(kb) } }
     val common = viaSet.takeIf { it.isNotEmpty() }?.let { commonFromKeys(ctx, keys) } ?: return names to null
     val first = helium314.keyboard.latin.settings.KeyboardProfiles.mainKeyboard(ctx.realPrefs())
-    val note = if (viaSet.any { !it.sameKeyboard(first) }) ctx.getString(R.string.update_item_hidden_note, common)
+    val note = if (viaSet.any { !it.sameKeyboard(first) })
+            commonChangeNote(ctx, common, keys.flatMapTo(HashSet()) { helium314.keyboard.latin.settings.KeyboardProfiles.groupsOf(it) })
         else ctx.getString(R.string.delete_common_note, common)
     return names to note
 }

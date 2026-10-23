@@ -70,8 +70,8 @@ class ReReview2S6Test {
         real.edit { putBoolean("separate_settings_per_keyboard", false) }
         // (the line on the common settings under the list: owner 2026-10-18, review SP10; no "(hidden)" mark)
         assertEquals(listOf(offName()), fontUsers(ctx, "Mine.ttf"))
-        assertEquals("Settings are common to all your keyboards (App settings › Per keyboard), so every keyboard follows Work, " +
-            "first in your list. The keyboards below get this change in their own settings, which they use once you turn on Per keyboard.",
+        assertEquals("Settings are common to all your keyboards (App settings › Separate settings per keyboard), so every keyboard follows Work, " +
+            "first in your list. The keyboards below get this change in their own settings, which they use once you turn on Use separate settings.",
             fontDeleteWarning(ctx, "Mine.ttf").second)
     }
 
@@ -86,7 +86,7 @@ class ReReview2S6Test {
         }
         SubtypeSettings.reloadEnabledSubtypes(ctx)
         assertEquals(listOf("Work"), fontUsers(ctx, "Mine.ttf"))
-        assertEquals("Settings are common to all your keyboards (App settings › Per keyboard), so every keyboard follows Work, " +
+        assertEquals("Settings are common to all your keyboards (App settings › Separate settings per keyboard), so every keyboard follows Work, " +
             "first in your list.", fontDeleteWarning(ctx, "Mine.ttf").second)
         real.edit { putBoolean("separate_settings_per_keyboard", true) }
         assertEquals(null, fontDeleteWarning(ctx, "Mine.ttf").second) // (separate settings: no line)

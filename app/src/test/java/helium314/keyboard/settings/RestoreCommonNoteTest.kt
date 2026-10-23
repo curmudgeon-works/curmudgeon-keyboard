@@ -89,34 +89,34 @@ class RestoreCommonNoteTest {
 
     @Test fun `separate settings, a shared menu restored into the first keyboard shows on every keyboard`() {
         separate(true, Group.APPEARANCE)
-        assertEquals("$appearance is common to all your keyboards (App settings › Per keyboard), and $enName is first in your " +
+        assertEquals("$appearance is common to all your keyboards (App settings › Separate settings per keyboard), and $enName is first in your " +
             "list. The backup's $appearance will show on every keyboard. Each keyboard's own settings stay saved.",
             commonMenusNote(ctx, en, listOf(Group.APPEARANCE, Group.SWIPE)))
         separate(true, Group.LAYOUT, Group.APPEARANCE)
-        assertEquals("$layout, $appearance are common to all your keyboards (App settings › Per keyboard), and $enName is first " +
+        assertEquals("$layout, $appearance are common to all your keyboards (App settings › Separate settings per keyboard), and $enName is first " +
             "in your list. The backup's $layout, $appearance will show on every keyboard. Each keyboard's own settings stay saved.",
             commonMenusNote(ctx, en, listOf(Group.APPEARANCE, Group.LAYOUT)))
     }
 
     @Test fun `separate settings, a shared menu restored into another keyboard waits in its own settings`() {
         separate(true, Group.APPEARANCE)
-        assertEquals("$appearance is common to all your keyboards (App settings › Per keyboard) and comes from $enName, first in " +
-            "your list. The backup's $appearance is restored into $hiName's own settings, and shows once that menu is set per keyboard.",
+        assertEquals("$appearance is common to all your keyboards (App settings › Separate settings per keyboard) and comes from $enName, first in " +
+            "your list. The backup's $appearance is restored into $hiName's own settings, and shows once you turn on $appearance there.",
             commonMenusNote(ctx, hi, listOf(Group.APPEARANCE)))
         separate(true, Group.LAYOUT, Group.APPEARANCE)
-        assertEquals("$layout, $appearance are common to all your keyboards (App settings › Per keyboard) and come from $enName, " +
-            "first in your list. The backup's $layout, $appearance are restored into $hiName's own settings, and show once those " +
-            "menus are set per keyboard.", commonMenusNote(ctx, hi, listOf(Group.LAYOUT, Group.APPEARANCE)))
+        assertEquals("$layout, $appearance are common to all your keyboards (App settings › Separate settings per keyboard) and come from $enName, " +
+            "first in your list. The backup's $layout, $appearance are restored into $hiName's own settings, and show once you turn on " +
+            "$layout, $appearance there.", commonMenusNote(ctx, hi, listOf(Group.LAYOUT, Group.APPEARANCE)))
     }
 
     @Test fun `separate settings off, all settings are common`() {
         separate(false)
-        assertEquals("All settings are common to all your keyboards (App settings › Per keyboard: separate settings off), and " +
+        assertEquals("All settings are common to all your keyboards (App settings › Separate settings per keyboard: Use separate settings off), and " +
             "$enName is first in your list. The backup's $layout will show on every keyboard. Each keyboard's own settings stay saved.",
             commonMenusNote(ctx, en, listOf(Group.LAYOUT)))
-        assertEquals("All settings are common to all your keyboards (App settings › Per keyboard: separate settings off) and come " +
+        assertEquals("All settings are common to all your keyboards (App settings › Separate settings per keyboard: Use separate settings off) and come " +
             "from $enName, first in your list. The backup's $layout is restored into $hiName's own settings, and shows once you " +
-            "turn on Separate settings per keyboard.", commonMenusNote(ctx, hi, listOf(Group.LAYOUT)))
+            "turn on Use separate settings.", commonMenusNote(ctx, hi, listOf(Group.LAYOUT)))
     }
 
     @Test fun `nothing common ticked, nothing to say`() {

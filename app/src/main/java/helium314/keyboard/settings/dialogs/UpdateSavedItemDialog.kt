@@ -40,6 +40,7 @@ fun UpdateSavedItemDialog(
     onDismissRequest: () -> Unit,
     commonFrom: String? = null,
     anyListed: Boolean = false,
+    group: helium314.keyboard.latin.settings.KeyboardProfiles.Group = helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE, // (the item's menu)
     onConfirmed: (selected: Set<Int>) -> Unit, // indices into [others]
 ) {
     val selected = rememberAllSelected(others)
@@ -53,7 +54,7 @@ fun UpdateSavedItemDialog(
                 sameAs?.let { SameSettingsNote(it) }
                 Text(stringResource(R.string.update_item_text_screen, name))
                 if (others.isNotEmpty()) SelectOthersList(stringResource(R.string.update_item_others_select), others, selected)
-                if (commonFrom != null && anyListed) HiddenSetsNote(commonFrom)
+                if (commonFrom != null && anyListed) HiddenSetsNote(commonFrom, group)
             }
         },
     )
@@ -90,8 +91,9 @@ fun SelectOthersList(text: String, others: List<String>, selected: SnapshotState
  *  keyboard's name): every keyboard follows the first, the listed ones get the change in their own settings, as the
  *  restore's note on common menus says it (owner 2026-10-18). */
 @Composable
-fun HiddenSetsNote(commonFrom: String) {
-    Text(stringResource(R.string.update_item_hidden_note, commonFrom), style = MaterialTheme.typography.bodyMedium)
+fun HiddenSetsNote(commonFrom: String, group: helium314.keyboard.latin.settings.KeyboardProfiles.Group) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    Text(helium314.keyboard.settings.screens.commonChangeNote(ctx, commonFrom, listOf(group)), style = MaterialTheme.typography.bodyMedium)
 }
 
 /** "These settings are the same as “Moonlight”." (Update and Save as new). */

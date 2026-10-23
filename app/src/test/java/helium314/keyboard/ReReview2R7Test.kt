@@ -102,14 +102,14 @@ class ReReview2R7Test {
         // them once you turn on Use separate settings in App settings.")
         val hiName = keyboardName(hi, ctx); val enName = keyboardName(en, ctx)
         assertEquals("$hiName's settings were restored, but all keyboards follow $enName for now. To see $hiName's restored " +
-            "settings, turn on Separate settings per keyboard (App settings › Per keyboard).", hiddenSettingsNote(ctx, hidden))
+            "settings, turn on Use separate settings (App settings › Separate settings per keyboard).", hiddenSettingsNote(ctx, hidden))
         // (English is the first keyboard: its settings are the common ones; owner 2026-10-11, no separate common set)
         assertEquals("The settings of $hiName, ${keyboardName(de, ctx)} were restored, but all keyboards follow $enName for now. " +
-            "To see their restored settings, turn on Separate settings per keyboard (App settings › Per keyboard).",
+            "To see their restored settings, turn on Use separate settings (App settings › Separate settings per keyboard).",
             hiddenSettingsNote(ctx, listOf(hi, de)))
         assertEquals("$enName's settings were restored. All keyboards use them, as they're the common settings.\n" +
             "$hiName's settings were restored, but all keyboards follow $enName for now. To see $hiName's restored " +
-            "settings, turn on Separate settings per keyboard (App settings › Per keyboard).",
+            "settings, turn on Use separate settings (App settings › Separate settings per keyboard).",
             hiddenSettingsNote(ctx, listOf(hi, en)))
 
         // separate settings on: Hindi reads the backup's, English the common ones
@@ -132,13 +132,13 @@ class ReReview2R7Test {
         val appearance = ctx.getString(helium314.keyboard.settings.screens.groupTitle(KeyboardProfiles.Group.APPEARANCE))
         val restoredHi = restoreChosenFrom(ctx, zip, listOf(hiInBackup), settings = true, learnedWords = false,
             io = helium314.keyboard.latin.personalization.LearnedStoreIo.Native, decisions = mapOf(hiInBackup to RestoreDecision.Merge(hi)))
-        assertTrue("$hiName's settings were restored. $appearance is common to all your keyboards (App settings › Per keyboard) " +
+        assertTrue("$hiName's settings were restored. $appearance is common to all your keyboards (App settings › Separate settings per keyboard) " +
             "and comes from $enName, first in your list, so every keyboard follows $enName for it. $hiName's restored $appearance " +
-            "shows once that menu is set per keyboard." in restoreSummary(ctx, restoredHi).lines(), restoreSummary(ctx, restoredHi))
+            "shows once you turn on $appearance there." in restoreSummary(ctx, restoredHi).lines(), restoreSummary(ctx, restoredHi))
         // the first keyboard's: every keyboard uses them
         val restoredEn = restoreChosenFrom(ctx, zip, listOf(enInBackup), settings = true, learnedWords = false,
             io = helium314.keyboard.latin.personalization.LearnedStoreIo.Native, decisions = mapOf(enInBackup to RestoreDecision.Merge(en)))
-        assertTrue("$enName's settings were restored. $appearance is common to all your keyboards (App settings › Per keyboard), " +
+        assertTrue("$enName's settings were restored. $appearance is common to all your keyboards (App settings › Separate settings per keyboard), " +
             "and $enName is first in your list, so every keyboard uses its restored $appearance." in restoreSummary(ctx, restoredEn).lines(),
             restoreSummary(ctx, restoredEn))
         // nothing shared: nothing said about common menus

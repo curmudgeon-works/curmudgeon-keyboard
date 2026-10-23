@@ -421,8 +421,8 @@ class SubScreenSaveRealPathTest {
     // more than one keyboard, a line under the list says every keyboard follows the first and the listed ones get the
     // change in their own settings; no "(hidden)" marks, owner 2026-10-18)
     private val kb1Name get() = helium314.keyboard.settings.screens.keyboardName(kb1, ctx)
-    private val hiddenNote get() = "Settings are common to all your keyboards (App settings › Per keyboard), so every keyboard " +
-        "follows $kb1Name, first in your list. The keyboards below get this change in their own settings, which they use once you turn on Per keyboard."
+    private val hiddenNote get() = "Settings are common to all your keyboards (App settings › Separate settings per keyboard), so every keyboard " +
+        "follows $kb1Name, first in your list. The keyboards below get this change in their own settings, which they use once you turn on Use separate settings."
     private fun commonSettings() { real.edit().putBoolean("separate_settings_per_keyboard", false).commit() }
 
     // (owner 2026-10-18, SP3: "Sunset gets the settings on this screen." "I like this common message": the first line and
@@ -440,6 +440,18 @@ class SubScreenSaveRealPathTest {
         shows(hiddenNote)
         click(ctx.getString(R.string.update_item))
         assertEquals("ocean", real.getString(own(2, Settings.PREF_THEME_COLORS), null)) // into keyboard 2's own (hidden) set
+    }
+
+    // (owner 2026-10-18: "don't say per keyboard -- the toggle doesn't say that ... Phrasing should match exactly":
+    // with separate settings on and Appearance shared, the line names Appearance's switch. Fail before: "App settings ›
+    // Per keyboard" and "turn on Per keyboard")
+    @Test fun `Update question - Appearance shared - the line names the menu's switch under Separate settings per keyboard`() {
+        real.edit().putBoolean(KeyboardProfiles.Group.APPEARANCE.prefKey, true).commit(); KeyboardProfiles.loadGroups(real)
+        openUpdateSunset()
+        val appearance = ctx.getString(helium314.keyboard.settings.screens.groupTitle(KeyboardProfiles.Group.APPEARANCE))
+        shows("Settings are common to all your keyboards (App settings › Separate settings per keyboard), so every keyboard " +
+            "follows $kb1Name, first in your list. The keyboards below get this change in their own settings, which they use " +
+            "once you turn on $appearance there.")
     }
 
     @Test fun `Update question - separate settings - the settings on this screen, no line`() {
