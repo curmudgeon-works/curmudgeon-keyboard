@@ -19,7 +19,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-class App : Application() {
+open class App : Application() {
+    /** Whether the start builds the missing swipe lists. Off in the unit tests' app (TestApp): every test starts the
+     *  app, and a build running on would write into the next tests' dictionary folders. */
+    internal open val buildsSwipeListsAtStart get() = true
+
     override fun onCreate() {
         super.onCreate()
         // the crash-safe writes' temporary folders, before anything is written (round-5 review 20261013_L20)
@@ -98,9 +102,8 @@ class App : Application() {
         app = this
         Defaults.initDynamicDefaults(this)
         // the swipe lists of the keyboards' languages that have none yet (a fresh install): built now in the background,
-        // so they're ready by the end of the setup (owner 2026-10-14: "Yes, option A"). Not under the unit tests: every
-        // test starts the app, and a build running on would write into the next tests' dictionary folders
-        if (Build.FINGERPRINT != "robolectric" && prefs().getBoolean(Settings.PREF_GESTURE_INPUT, Defaults.PREF_GESTURE_INPUT))
+        // so they're ready by the end of the setup (owner 2026-10-14: "Yes, option A")
+        if (buildsSwipeListsAtStart && prefs().getBoolean(Settings.PREF_GESTURE_INPUT, Defaults.PREF_GESTURE_INPUT))
             CoroutineScope(Dispatchers.Default).launch {
                 val locales = SubtypeSettings.getEnabledSubtypes().flatMap { subtype ->
                     listOf(subtype.locale()) + helium314.keyboard.latin.utils.getSecondaryLocales(subtype.extraValue) }
