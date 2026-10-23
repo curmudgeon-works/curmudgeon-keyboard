@@ -55,8 +55,22 @@ class FontNumberingTest {
     @Test fun `a name ending in a number counts up, a name without an extension too`() {
         load("Font 2.otf", "one")
         assertEquals(FontLibrary.PREFIX + "Font 3.otf", load("Font 2.otf", "two"))
-        load("plain", "one")
-        assertEquals(FontLibrary.PREFIX + "plain 2", load("plain", "two"))
+        load("plain", "three") // (other bytes than the fonts above: a font of the same bytes is reused, SP20)
+        assertEquals(FontLibrary.PREFIX + "plain 2", load("plain", "four"))
+    }
+
+    // review SP20 (owner 2026-10-18: "Yes, match fonts by content too."): the same font loaded under another name is
+    // the one in the list, chosen under its name there; no second copy. Fail before: "Other.ttf" stored beside it
+    @Test fun `the same font under another name - the one in the list is chosen, no copy`() {
+        load("Mine.ttf", "the font")
+        assertEquals(FontLibrary.PREFIX + "Mine.ttf", load("Other.ttf", "the font"))
+        assertEquals(listOf("Mine.ttf"), FontLibrary.names(ctx))
+        assertEquals(emptyList(), FontLibrary.dir(ctx).listFiles()!!.filter { it.isDirectory }.flatMap { it.listFiles()!!.toList() })
+        // the same name and bytes: the same, as before; another font of the name: numbered
+        assertEquals(FontLibrary.PREFIX + "Mine.ttf", load("Mine.ttf", "the font"))
+        assertEquals(FontLibrary.PREFIX + "Mine 2.ttf", load("Mine.ttf", "another font"))
+        assertEquals(FontLibrary.PREFIX + "Mine 2.ttf", load("Third.ttf", "another font"))
+        assertEquals(listOf("Mine 2.ttf", "Mine.ttf"), FontLibrary.names(ctx))
     }
 
     // Fail before: "User-Defined1", "User-Defined2"

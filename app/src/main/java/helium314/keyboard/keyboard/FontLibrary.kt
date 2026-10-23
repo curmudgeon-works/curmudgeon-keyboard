@@ -69,22 +69,29 @@ object FontLibrary {
         return "$PREFIX$PENDING/$clean"
     }
 
-    /** OK in a dialog: a pending file joins the list (the same font already there is reused); returns the choice to store.
-     *  Another font of the same name: the next free number, "Mine 2.ttf", as every saved item is numbered (owner
-     *  2026-10-18, review SP19: "use numbering without parentheses everywhere"; was "Mine (2).ttf";
-     *  [helium314.keyboard.settings.preferences.RestorePlan.nextFreeName]). */
+    /** OK in a dialog: a pending file joins the list, or the same font already there (the same bytes, under any name:
+     *  owner 2026-10-18, review SP20, "Yes, match fonts by content too", as pictures are; was only under its own name)
+     *  is chosen instead, and no second copy is stored; returns the choice to store. Another font of the same name: the
+     *  next free number, "Mine 2.ttf", as every saved item is numbered (owner 2026-10-18, review SP19: "use numbering
+     *  without parentheses everywhere"; was "Mine (2).ttf"; [helium314.keyboard.settings.preferences.RestorePlan.nextFreeName]). */
     fun commit(ctx: Context, value: String): String {
         if (!isPending(value)) return value
         val file = File(dir(ctx), value.removePrefix(PREFIX))
         if (!file.isFile) return "default"
+        // (one of its own name first)
+        val same = dir(ctx).listFiles()?.filter { it.isFile }?.sortedBy { it.name != file.name }?.firstOrNull { sameContent(it, file) }
+        if (same != null) {
+            discardPending(ctx)
+            return PREFIX + same.name
+        }
         val extension = if (file.extension.isEmpty()) "" else ".${file.extension}"
         var base = file.nameWithoutExtension
         var target = File(dir(ctx), file.name)
-        while (target.exists() && !sameContent(target, file)) {
+        while (target.exists()) {
             base = helium314.keyboard.settings.preferences.RestorePlan.nextFreeName(base, setOf(base))
             target = File(dir(ctx), base + extension)
         }
-        if (!target.exists()) file.copyTo(target)
+        file.copyTo(target)
         discardPending(ctx)
         return PREFIX + target.name
     }
