@@ -7,6 +7,7 @@ import helium314.keyboard.latin.BuildConfig
 import helium314.keyboard.latin.dictionary.ExpandableBinaryDictionary
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.utils.KeptRecords
 import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.prefs
 import java.io.File
@@ -28,12 +29,20 @@ import java.util.concurrent.TimeUnit
  * The counts before are read when the event happens, the counts after a moment later ([SETTLE_MS]) on the log's own
  * thread, because the dictionaries apply their changes on a background thread. The same word used again within that
  * moment shows in the counts after too.
+ *
+ * Kept to the newest "Learning entries kept" ([Settings.PREF_LEARNING_LOG_KEPT]) lines (2026-10-18).
  */
 object LearningEventLog {
     private const val TAG = "LearningEventLog"
     private const val FILE_NAME = "learning_events.tsv"
     private const val SETTLE_MS = 400L
     private const val FIELDS = 11
+    // "Learning entries kept": the slider's range, its far end keeping all
+    const val KEPT_MIN = 1_000
+    const val KEPT_MAX = 100_000
+    const val KEPT_STEP = 1_000
+    const val KEPT_ALL = KEPT_MAX + KEPT_STEP
+    const val BYTES_PER_ENTRY = 70 // about, for the size the slider shows
 
     // events
     /** a word committed as it stands (space, a pick from the strip, a swipe kept): +1 */
@@ -85,6 +94,8 @@ object LearningEventLog {
     private val executor = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "learning-log").apply { isDaemon = true } }
     @Volatile private var file: File? = null
     @Volatile private var prefs: SharedPreferences? = null
+    // one line per entry (the file has no header)
+    private val kept = KeptRecords { it.isNotEmpty() }
 
     fun init(context: Context) {
         file = File(context.getExternalFilesDir(null) ?: context.filesDir, FILE_NAME)
@@ -108,12 +119,26 @@ object LearningEventLog {
         val afterThen = countOf(counts, after)
         executor.schedule({
             try {
-                file?.appendText(line(time, event, origin, before, after, beforeThen, countOf(counts, before),
-                    afterThen, countOf(counts, after), language, BuildConfig.VERSION_NAME, change) + "\n")
+                file?.let { kept.append(it, line(time, event, origin, before, after, beforeThen, countOf(counts, before),
+                    afterThen, countOf(counts, after), language, BuildConfig.VERSION_NAME, change) + "\n", keptLimit()) }
             } catch (e: Exception) {
                 Log.w(TAG, "could not log a learning event", e)
             }
         }, SETTLE_MS, TimeUnit.MILLISECONDS)
+    }
+
+    /** How many entries the log keeps, null for all. */
+    internal fun keptLimit(): Int? {
+        val setting = prefs?.getInt(Settings.PREF_LEARNING_LOG_KEPT, Defaults.PREF_LEARNING_LOG_KEPT) ?: Defaults.PREF_LEARNING_LOG_KEPT
+        return if (setting >= KEPT_ALL) null else setting
+    }
+
+    /** "Learning entries kept" was changed: a lower number deletes the oldest entries now (on the log's own thread). */
+    fun onKeptChanged() {
+        executor.execute {
+            try { file?.let { kept.trimIfOver(it, keptLimit()) } }
+            catch (e: Exception) { Log.w(TAG, "could not trim the learning events", e) }
+        }
     }
 
     private fun countOf(counts: Counts, word: String): Int =

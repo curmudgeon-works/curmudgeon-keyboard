@@ -148,7 +148,7 @@ internal fun appSettingsItems(prefs: android.content.SharedPreferences, real: an
 /** The logs drawn on the Fine-tune screens, on App settings while those are hidden ([helium314.keyboard.settings.REFINE_MENU_SHOWN]).
  *  (Before [advancedOnlyAppSettings]: top-level values start in file order.) */
 internal val hiddenMenuLogKeys = listOf(Settings.PREF_RECORD_GESTURE_CORPUS, Settings.PREF_GESTURE_CORPUS_KEPT,
-    Settings.PREF_SWIPE_METRICS, Settings.PREF_LEARNING_LOG)
+    Settings.PREF_SWIPE_METRICS, Settings.PREF_LEARNING_LOG, Settings.PREF_LEARNING_LOG_KEPT)
 
 /** The App settings shown only in advanced mode. */
 internal val advancedOnlyAppSettings = setOf(Settings.PREF_LEAVING_KEEPS_CHANGES) + hiddenMenuLogKeys
@@ -466,6 +466,21 @@ fun createAdvancedSettings(context: Context) = listOf(
                 }
             }
         }
+    },
+    // how many lines the learning log keeps, as the swipe corpus (owner 2026-10-18: "Learning list should have a similar
+    // slider yes"); one step of 1,000 all along: the slider has one step size
+    Setting(context, Settings.PREF_LEARNING_LOG_KEPT, R.string.learning_log_kept) { setting ->
+        SliderPreference(
+            name = setting.title,
+            key = setting.key,
+            default = Defaults.PREF_LEARNING_LOG_KEPT,
+            description = {
+                if (it >= LearningEventLog.KEPT_ALL) stringResource(R.string.learning_log_kept_all)
+                else stringResource(R.string.learning_log_kept_value, keptCount(it), keptMegabytes(it, LearningEventLog.BYTES_PER_ENTRY))
+            },
+            range = LearningEventLog.KEPT_MIN.toFloat()..LearningEventLog.KEPT_ALL.toFloat(),
+            stepSize = LearningEventLog.KEPT_STEP,
+        ) { LearningEventLog.onKeptChanged() }
     },
 )
 

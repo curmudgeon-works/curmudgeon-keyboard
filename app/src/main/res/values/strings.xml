@@ -601,6 +601,10 @@
     <string name="swipe_metrics_chart_decode">Decode time (right axis)</string>
     <string name="learning_log">Log corrections</string>
     <string name="learning_log_summary">Keep a local log of what each correction does to the learned words. Nothing leaves the phone.</string>
+    <!-- How many lines the learning log keeps (a slider; its far end keeps all) -->
+    <string name="learning_log_kept">Learning entries kept</string>
+    <string name="learning_log_kept_value">%1$s entries, about %2$s MB. Lowering it deletes the oldest entries for good.</string>
+    <string name="learning_log_kept_all">All (no limit), about 70 bytes per entry</string>
     <string name="learning_log_none">No corrections logged yet</string>
     <string name="learning_log_line">%1$d accepted · %2$d auto-corrections reverted · %3$d swipes deleted · %4$d words edited later · %5$d swipes edited · %6$d removed · %7$d restored · %8$d undone (%9$d untracked) · %10$d redone (%11$d untracked)</string>
     <!-- Description of the setting to record swipes into a local corpus file -->

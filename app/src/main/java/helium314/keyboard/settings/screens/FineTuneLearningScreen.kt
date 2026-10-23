@@ -33,7 +33,8 @@ import helium314.keyboard.settings.SearchSettingsScreen
 import helium314.keyboard.settings.SettingsActivity
 
 /** The settings Fine-tune learning shows (always the same): what its search and the main screen's search find. */
-internal val fineTuneLearningKeys = listOf(Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, Settings.PREF_LEARNING_LOG)
+internal val fineTuneLearningKeys = listOf(Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, Settings.PREF_LEARNING_LOG,
+    Settings.PREF_LEARNING_LOG_KEPT)
 
 /**
  * "Fine-tune learning" (2026-10-10, split from Refine, now "Fine-tune suggestions"): how the keyboard learns your

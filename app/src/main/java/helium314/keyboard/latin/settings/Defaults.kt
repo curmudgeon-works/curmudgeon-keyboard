@@ -201,6 +201,7 @@ object Defaults {
     const val PREF_SWIPE_METRICS = false
     const val PREF_LOG_SETTINGS = true // the settings event log, the keyboards' history too (owner 2026-10-12 K1: on)
     const val PREF_LEARNING_LOG = false
+    const val PREF_LEARNING_LOG_KEPT = 10_000 // entries, about 0.7 MB
     const val PREF_LEAVING_KEEPS_CHANGES = true // owner 2026-10-14: "App starts with switcch on yes. Advanced only."
     const val PREF_SHARE_LEARNED_WORDS = true
     const val PREF_AUTO_PREVIEW_KEYBOARD = true // settings bring the preview keyboard up by themselves
