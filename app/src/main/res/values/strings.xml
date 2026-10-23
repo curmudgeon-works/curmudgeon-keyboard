@@ -1433,6 +1433,11 @@ language, hence "No language". -->
     <string name="layout_overwrite_yes">Yes</string>
     <string name="layout_overwrite_no">No</string>
     <string name="layout_overwrite_name_title">Name for their layout (with the keys they have now)</string>
+    <!-- saving changed keys of a custom key layout other keyboards use, as every dialog changing a saved item others use
+         asks it (owner 2026-10-18); %s = the name the others' current keys are kept under, the next free number: "My keys 2" -->
+    <string name="layout_overwrite_select">Also used by the ones below. Select those that should take this change. The others keep their current keys, named “%s”.</string>
+    <!-- its button, answering "Overwrite %s?" -->
+    <string name="layout_overwrite_confirm">Overwrite</string>
     <string name="unsaved_layout_will_be_lost">This keyboard\'s unsaved layout will be lost. To keep it, cancel, then give it a name: Keys, its pencil, a name, Save.</string>
     <!-- Message on layout error -->
     <string name="layout_error">Layout error: %s</string>

@@ -312,7 +312,20 @@ object LayoutUtilsCustom {
     private fun ownDefault(all: Map<String, *>, kb: helium314.keyboard.latin.settings.SettingsSubtype, type: LayoutType): Any? =
         kb.keyboardId?.let { all[helium314.keyboard.latin.settings.KeyboardProfiles.ownKey(it, Settings.PREF_LAYOUT_PREFIX + type.name)] }
 
-    /** "No" in the edit question: [others] keep [name]'s keys of now, under [oldFileName] (then the edit is written). One
+    /** The name the keyboards keeping [name]'s keys of now get them under when its keys are overwritten: its display
+     *  name with the next free number, "My keys 2", for the same languages (as a palette's "Warm 2", owner 2026-10-18:
+     *  "they retain their current setting named Warm 2"; [helium314.keyboard.settings.preferences.RestorePlan.nextFreeName]). */
+    fun keeperLayoutName(name: String, type: LayoutType, context: Context): String {
+        val taken = getLayoutFiles(type, context).map { it.name }.toSet()
+        val scope = scopeOf(name, type)
+        var display = getDisplayName(name)
+        do { display = helium314.keyboard.settings.preferences.RestorePlan.nextFreeName(display, setOf(display)) }
+        while (namedLayoutName(display, type, scope) in taken)
+        return namedLayoutName(display, type, scope)
+    }
+
+    /** The ones not selected in the edit question: [others] keep [name]'s keys of now, under [oldFileName] (then the
+     *  edit is written; the selected ones, not in [others], take it). One
      *  that picked it gets the old name as its pick. One that has it as its default keeps it the way it has it: its own
      *  set's default (shown or hidden) becomes the old name there (owner 2026-10-12: "our saving policies should not be
      *  affected by the common/separate toggle at all."), and one that reads it now through the common settings gets the

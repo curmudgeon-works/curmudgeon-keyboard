@@ -2,6 +2,8 @@
 package helium314.keyboard.settings.dialogs
 
 import android.widget.Toast
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.ime
@@ -55,9 +57,8 @@ fun LayoutEditDialog(
     isNameValid: ((String) -> Boolean)?
 ) {
     val ctx = LocalContext.current
-    // saving changed keys of a named layout other keyboards use: "change theirs too?" (Yes / No / back to editing)
+    // saving changed keys of a named layout other keyboards use: which of them take the change (Overwrite / back to editing)
     var askOthers: Pair<String, List<helium314.keyboard.latin.settings.SettingsSubtype>>? by androidx.compose.runtime.remember { mutableStateOf(null) }
-    var askName by androidx.compose.runtime.remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val startIsCustom = LayoutUtilsCustom.isCustomLayout(initialLayoutName)
     var displayNameValue by rememberSaveable(stateSaver = TextFieldValue.Saver) {
@@ -144,28 +145,31 @@ fun LayoutEditDialog(
         reducePadding = true,
     )
     askOthers?.let { (name, others) ->
+        // the others as every dialog changing a saved item lists them (owner 2026-10-18: "select which each one takes,
+        // else they retain their current setting named Warm 2"; "all should come selected yes"): the selected ones take
+        // the new keys, the others keep their keys of now under the next free name, "My keys 2" (was a Yes / No
+        // question for all of them, then a name to type)
         val shown = LayoutUtilsCustom.getDisplayName(name)
-        val names = helium314.keyboard.settings.screens.userNames(ctx, others).joinToString(", ")
-        if (!askName) ThreeButtonAlertDialog(
+        val names = androidx.compose.runtime.remember(others) { helium314.keyboard.settings.screens.userNames(ctx, others) }
+        val keeper = androidx.compose.runtime.remember(name) { LayoutUtilsCustom.keeperLayoutName(name, layoutType, ctx) }
+        val selected = rememberAllSelected(names)
+        ThreeButtonAlertDialog(
             onDismissRequest = { askOthers = null }, // back to editing
             title = { Text(stringResource(R.string.layout_overwrite_title, shown)) },
-            content = { Text(stringResource(R.string.layout_overwrite_message, names)) },
-            confirmButtonText = stringResource(R.string.layout_overwrite_yes),
-            onConfirmed = { write(pendingText); askOthers = null; onDismissRequest() },
-            neutralButtonText = stringResource(R.string.layout_overwrite_no),
-            onNeutral = { askName = true },
-        )
-        else TextInputDialog(
-            onDismissRequest = { askName = false }, // back to the question
-            title = { Text(stringResource(R.string.layout_overwrite_name_title)) },
-            initialText = shown + "_old",
-            checkTextValid = { it.isNotBlank() && !LayoutUtilsCustom.getLayoutFile(LayoutUtilsCustom.getLayoutName(it, layoutType, locale), layoutType, ctx).exists() },
-            onConfirmed = { oldName ->
-                // the others keep their keys, under the new name; then this keyboard's change is written
-                val oldFileName = LayoutUtilsCustom.getLayoutName(oldName.trim(), layoutType, locale)
-                LayoutUtilsCustom.keepOldKeys(name, oldFileName, layoutType, others, ctx)
+            scrollContent = true,
+            content = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SelectOthersList(stringResource(R.string.layout_overwrite_select, LayoutUtilsCustom.getDisplayName(keeper)), names, selected)
+                }
+            },
+            // (the button answers the title's question)
+            confirmButtonText = stringResource(R.string.layout_overwrite_confirm),
+            onConfirmed = {
+                // the ones not selected keep their keys, under the keeper's name; then this keyboard's change is written
+                val keeping = others.filterIndexed { i, _ -> i !in selected }
+                if (keeping.isNotEmpty()) LayoutUtilsCustom.keepOldKeys(name, keeper, layoutType, keeping, ctx)
                 write(pendingText)
-                askName = false; askOthers = null
+                askOthers = null
                 onDismissRequest()
             },
         )
