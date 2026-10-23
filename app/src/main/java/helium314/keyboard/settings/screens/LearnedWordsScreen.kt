@@ -4,6 +4,12 @@ package helium314.keyboard.settings.screens
 import android.content.Context
 import android.provider.UserDictionary
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.rotate
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Checkbox
@@ -146,6 +152,10 @@ internal fun scriptRows(context: Context, keyboard: helium314.keyboard.latin.set
  * delete; with every word of the list ticked a second time (owner 2026-10-11: "select all and delete should have
  * additional warning for are you sure?"). Then each word goes exactly as by the single delete, in one background job.
  * Back, the back arrow and the cross leave selection mode first. Numbers / edit / batch edit: later.
+ * Groups (see ListView): a tap on a heading folds / unfolds it, a long-press ticks its words (all of them ticked
+ * already: unticks them; owner 2026-10-17: "I should be able to press and hold the header to select all itmes in that
+ * group too"). Selection mode keeps the rows above the words and the title's height as they are, so the word pressed
+ * stays where it is (owner 2026-10-17: "the word I pressed moves up when the checkmarks come on").
  */
 @Composable
 fun LearnedWordsScreen(onClickBack: () -> Unit, script: String, blacklisted: Boolean, pool: Int = LearnedStores.SHARED) {
@@ -166,6 +176,10 @@ fun LearnedWordsScreen(onClickBack: () -> Unit, script: String, blacklisted: Boo
     val listEntries = data?.let { if (blacklisted) it.blacklisted else it.yours }.orEmpty()
     // the search term the list was last shown for (Select all ticks what's shown)
     val shownTerm = remember { arrayOf("") }
+    var view by remember { mutableStateOf(ListView.read(ctx, blacklisted)) }
+    fun setView(new: ListView) { view = new; ListView.write(ctx, blacklisted, new) }
+    var folded by remember { mutableStateOf(emptySet<String>()) }
+    var showSortMenu by remember { mutableStateOf(false) }
 
     // the delete dialog's "Also delete them from your device's personal dictionary" (owner 2026-10-12 "DM22 STRIP
     // REMOVE"): ticked each time a dialog opens, shown only when a word to delete is in Android's personal dictionary
@@ -205,9 +219,10 @@ fun LearnedWordsScreen(onClickBack: () -> Unit, script: String, blacklisted: Boo
         // (read at the time of Back: the state now, not as composed)
         onClickBack = { if (picked.isNotEmpty()) picked = emptySet() else onClickBack() },
         title = {
-            if (selecting) Text(pluralStringResource(R.plurals.learned_words_selected, picked.size, picked.size))
-            else Column {
-                Text(stringResource(if (blacklisted) R.string.learned_words_section_blacklisted else R.string.learned_words_section_yours))
+            // (two lines in selection mode too: the list doesn't move up when it starts)
+            Column {
+                Text(if (selecting) pluralStringResource(R.plurals.learned_words_selected, picked.size, picked.size)
+                    else stringResource(if (blacklisted) R.string.learned_words_section_blacklisted else R.string.learned_words_section_yours))
                 Text(scriptName(script), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
@@ -221,17 +236,28 @@ fun LearnedWordsScreen(onClickBack: () -> Unit, script: String, blacklisted: Boo
                     Icon(painterResource(R.drawable.ic_bin), stringResource(R.string.delete)) }
                 IconButton({ picked = emptySet() }) {
                     Icon(painterResource(R.drawable.ic_close), stringResource(R.string.learned_words_selection_close)) }
+            } else androidx.compose.foundation.layout.Box {
+                IconButton({ showSortMenu = true }) {
+                    Icon(painterResource(if (view.sort == SortBy.DATE) R.drawable.ic_sort_chronologically else R.drawable.ic_sort_alphabetically),
+                        stringResource(R.string.learned_words_sort_menu)) }
+                SortMenu(showSortMenu, { showSortMenu = false }, view, blacklisted) { setView(it) }
             }
         },
-        // Add a word: the list's first row (as Add keyboard on the keyboards list), not while searching or selecting
+        // Add a word: the list's first row (as Add keyboard on the keyboards list), not while searching; greyed while
+        // selecting (not taken away: the words below would move up)
         filteredItems = { term -> shownTerm[0] = term;
-            (if (term.isBlank() && !blacklisted && !selecting) listOf(Row.Add) else emptyList()) +
-            (data?.rows(term, blacklisted) ?: listOf(Row.Note(R.string.learned_words_loading))) },
+            (if (term.isBlank() && !blacklisted) listOf(Row.Add) else emptyList()) +
+            (data?.rows(term, blacklisted, view, folded) ?: listOf(Row.Note(R.string.learned_words_loading))) },
         itemContent = { row ->
             when (row) {
-                Row.Add -> Preference(name = stringResource(R.string.user_dict_add_word_button), onClick = { adding = true },
-                    icon = R.drawable.ic_plus)
+                Row.Add -> Preference(name = stringResource(R.string.user_dict_add_word_button),
+                    onClick = { if (picked.isEmpty()) adding = true }, icon = R.drawable.ic_plus,
+                    modifier = if (selecting) Modifier.alpha(0.38f) else Modifier)
                 is Row.Heading -> PreferenceCategory(stringResource(row.title))
+                is Row.Group -> GroupHeading(row,
+                    onClick = { folded = if (row.id in folded) folded - row.id else folded + row.id },
+                    // (the state at the time of the press)
+                    onLongClick = { picked = if (picked.containsAll(row.keys)) picked - row.keys.toSet() else picked + row.keys })
                 is Row.Note -> Text(stringResource(row.text), style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 22.dp, end = 12.dp, top = 4.dp, bottom = 8.dp))
                 is Item -> CompositionLocalProvider(LocalRowStart provides 22.dp) {
@@ -288,6 +314,52 @@ fun LearnedWordsScreen(onClickBack: () -> Unit, script: String, blacklisted: Boo
         EditWordDialog(Word("", null, null), locales.firstOrNull()) { adding = false; reload++ }
 }
 
+/** The sort and group menu: the sort in use shows its order (picked again: turned round), the grouping a tick. */
+@Composable
+private fun SortMenu(expanded: Boolean, onDismiss: () -> Unit, view: ListView, blacklisted: Boolean, onPick: (ListView) -> Unit) {
+    // (its own window: the screen's keyboard all the same, as SearchScreen's menu)
+    val keyboardId = helium314.keyboard.latin.settings.KeyboardScopeContext.idOf(LocalContext.current)
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) { helium314.keyboard.settings.KeyboardScope(keyboardId) { Column {
+        @Composable
+        fun Label(text: Int) = Text(stringResource(text), style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.secondary, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+        @Composable
+        fun Choice(text: Int, chosen: Boolean, mark: String, pick: () -> Unit) = DropdownMenuItem(
+            text = { Text(stringResource(text)) }, onClick = { pick(); onDismiss() },
+            trailingIcon = if (chosen) ({ Text(mark) }) else null)
+        Label(R.string.learned_words_sort_heading)
+        val sorts = listOf(SortBy.ALPHA to R.string.learned_words_sort_alpha,
+            SortBy.COUNT to (if (blacklisted) R.string.learned_words_sort_strikes else R.string.learned_words_sort_typed),
+            SortBy.DATE to (if (blacklisted) R.string.learned_words_sort_last_removed else R.string.learned_words_sort_last_typed))
+        for ((by, text) in sorts) Choice(text, view.sort == by, if (view.descending) "↓" else "↑") { onPick(view.sortedBy(by)) }
+        HorizontalDivider()
+        Label(R.string.learned_words_group_heading)
+        val groups = listOfNotNull(GroupBy.LETTER to R.string.learned_words_group_letter,
+            GroupBy.COUNT to (if (blacklisted) R.string.learned_words_sort_strikes else R.string.learned_words_sort_typed),
+            if (blacklisted) null else GroupBy.SOURCE to R.string.learned_words_group_source)
+        for ((by, text) in groups) Choice(text, view.group == by, "✓") { onPick(view.copy(group = by)) }
+    } } }
+}
+
+/** A group's heading, as the list's other headings, with its number of words and whether it's folded. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun GroupHeading(group: Row.Group, onClick: () -> Unit, onLongClick: () -> Unit) {
+    Column(Modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = onLongClick)) {
+        HorizontalDivider()
+        androidx.compose.foundation.layout.Row(
+            Modifier.padding(top = 12.dp, start = 12.dp, end = 12.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("${group.title.text()} · ${group.keys.size}", Modifier.weight(1f),
+                color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.titleMedium)
+            // pointing down while open, right while folded
+            Icon(painterResource(R.drawable.ic_arrow_left), null, Modifier.rotate(if (group.folded) 180f else -90f),
+                tint = MaterialTheme.colorScheme.secondary)
+        }
+    }
+}
+
 // ------------------------------- data -------------------------------
 
 internal enum class Kind { YOURS, BLACKLISTED }
@@ -302,6 +374,10 @@ internal class Entry(
     val personal: List<PersonalEntry>,
     val listed: List<String>, // blacklist rows: the spelling of each
     val strikes: Int, // how often removed (the most of its rows), 0: not blacklisted
+    val lastTyped: Long = 0, // when last typed (seconds, the latest of its spellings), 0: not learned
+    val removedAt: Long = 0, // when last removed (seconds, the latest of its rows), 0: not known
+    val inDictionary: Boolean = false, // a main dictionary of the script's languages has it (a spelling of it)
+    val confirmed: Boolean = false, // removed 3 times and brought back with the strip's "+"
 ) {
     /** The word's key in its list (the lists are case-insensitive): what selection mode ticks. */
     val key: String get() = word.lowercase()
@@ -311,6 +387,79 @@ internal sealed interface Row {
     object Add : Row
     class Heading(val title: Int) : Row
     class Note(val text: Int) : Row
+    /** A group's heading: [keys] are its words (shown by the search), [folded]: its words aren't listed. */
+    class Group(val id: String, val title: GroupTitle, val keys: List<String>, val folded: Boolean) : Row
+}
+
+/** What a group heading says. */
+internal sealed interface GroupTitle {
+    class Letter(val letter: String) : GroupTitle // "#" for a word not starting with a letter
+    class Typed(val from: Int, val to: Int?) : GroupTitle // to null: more than [from] - 1
+    object NotTyped : GroupTitle // in the personal dictionary only
+    class Strikes(val strikes: Int, val confirmed: Boolean) : GroupTitle
+    object New : GroupTitle
+    object Dictionary : GroupTitle
+
+    @Composable
+    fun text(): String = when (this) {
+        is Letter -> letter
+        is Typed -> when {
+            to == null -> stringResource(R.string.learned_words_group_typed_more, from - 1)
+            from == 1 && to == 1 -> stringResource(R.string.learned_words_group_typed_once)
+            from == to -> stringResource(R.string.learned_words_group_typed_exactly, from)
+            else -> stringResource(R.string.learned_words_group_typed_range, from, to)
+        }
+        NotTyped -> stringResource(R.string.learned_words_group_not_typed)
+        is Strikes -> when {
+            confirmed -> stringResource(R.string.learned_words_group_removed_confirmed)
+            strikes <= 1 -> stringResource(R.string.learned_words_removed_once)
+            else -> stringResource(R.string.learned_words_removed_times, strikes)
+        }
+        New -> stringResource(R.string.learned_words_group_new)
+        Dictionary -> stringResource(R.string.learned_words_group_dictionary)
+    }
+}
+
+/*
+ * Sorting and grouping (owner 2026-10-17: "Learned & blacklisted words page should have options to sort (1) learned by
+ * typed count and by date late typed, both back and fwd; (2) blacklisted by strikes and by last deleted date"; "lists
+ * should also be able to be grouped by these -- typed count, strike count"; ranges "1, 2, 3, 4, 5-10, 11-20, 21-50,
+ * 50+"; "Heading should be first letter of the word by default, can be changed to count group"; "Agree we should have a
+ * grouping for personal word / dictionary word"). The choice is remembered per list. Picking the sort in use again
+ * turns its order round. Inside a group the sort applies; words without a count or date (personal dictionary only, a
+ * removal from before dates were kept) go last either way, and equal ones A–Z.
+ */
+internal enum class SortBy { ALPHA, COUNT, DATE }
+internal enum class GroupBy { LETTER, COUNT, SOURCE }
+
+internal data class ListView(val sort: SortBy = SortBy.ALPHA, val descending: Boolean = false, val group: GroupBy = GroupBy.LETTER) {
+    /** [by] picked in the menu: the sort in use turned round, another one from its usual end (A–Z; most, latest first). */
+    fun sortedBy(by: SortBy) = if (by == sort) copy(descending = !descending) else copy(sort = by, descending = by != SortBy.ALPHA)
+
+    fun encode() = "$sort,$descending,$group"
+
+    companion object {
+        fun decode(value: String?): ListView = try {
+            val (sort, descending, group) = value!!.split(',')
+            ListView(SortBy.valueOf(sort), descending.toBooleanStrict(), GroupBy.valueOf(group))
+        } catch (e: Exception) { ListView() }
+
+        // (a view setting of this screen, not a keyboard setting: its own file, not in the settings or their backups)
+        private fun prefs(context: Context) = context.getSharedPreferences("learned_words_view", Context.MODE_PRIVATE)
+        fun read(context: Context, blacklisted: Boolean) = decode(prefs(context).getString(key(blacklisted), null))
+        fun write(context: Context, blacklisted: Boolean, view: ListView) = prefs(context).edit().putString(key(blacklisted), view.encode()).apply()
+        private fun key(blacklisted: Boolean) = if (blacklisted) LIST_BLACKLISTED else LIST_LEARNED
+    }
+}
+
+/** The learned-words count groups (owner 2026-10-17): the group of a word typed [typed] times, 0: not typed. */
+internal fun typedGroup(typed: Int): GroupTitle = when {
+    typed <= 0 -> GroupTitle.NotTyped
+    typed <= 4 -> GroupTitle.Typed(typed, typed)
+    typed <= 10 -> GroupTitle.Typed(5, 10)
+    typed <= 20 -> GroupTitle.Typed(11, 20)
+    typed <= 50 -> GroupTitle.Typed(21, 50)
+    else -> GroupTitle.Typed(51, null)
 }
 
 internal class Item(val entry: Entry, val kind: Kind) : Row {
@@ -322,23 +471,39 @@ internal class Item(val entry: Entry, val kind: Kind) : Row {
                 1 -> stringResource(R.string.learned_words_typed_once)
                 else -> stringResource(R.string.learned_words_typed_times, entry.typed)
             },
+            // (owner 2026-10-17: "date visible always")
+            if (entry.lastTyped <= 0) null else stringResource(R.string.learned_words_last_typed, dateText(entry.lastTyped)),
             if (entry.personal.isEmpty()) null else stringResource(R.string.learned_words_in_personal_dictionary),
         ).joinToString(" · ").ifEmpty { null }
         // (what the strikes mean is said once, under the section's heading)
-        Kind.BLACKLISTED -> if (entry.strikes <= 1) stringResource(R.string.learned_words_removed_once)
-            else stringResource(R.string.learned_words_removed_times, entry.strikes)
+        Kind.BLACKLISTED -> listOfNotNull(
+            if (entry.strikes <= 1) stringResource(R.string.learned_words_removed_once)
+                else stringResource(R.string.learned_words_removed_times, entry.strikes),
+            if (entry.removedAt <= 0) null else stringResource(R.string.learned_words_last_removed, dateText(entry.removedAt)),
+        ).joinToString(" · ")
     }
 }
 
+private fun dateText(seconds: Long): String =
+    java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(seconds * 1000))
+
 internal class WordLists(val yours: List<Entry>, val blacklisted: List<Entry>) {
-    /** One list: the learned words with the personal dictionary's, or the blacklisted words (the page's title says which). */
-    fun rows(term: String, ofBlacklist: Boolean): List<Row> {
+    /**
+     * One list: the learned words with the personal dictionary's, or the blacklisted words (the page's title says
+     * which), grouped and sorted as [view] says; the words of a group in [folded] aren't listed (while searching all are).
+     */
+    fun rows(term: String, ofBlacklist: Boolean, view: ListView = ListView(), folded: Set<String> = emptySet()): List<Row> {
         val result = mutableListOf<Row>()
         val entries = if (ofBlacklist) blacklisted else yours
         val shown = matching(entries, term)
         if (ofBlacklist && shown.isNotEmpty() && term.isBlank()) result.add(Row.Note(R.string.learned_words_blacklisted_summary))
         if (shown.isEmpty()) result.add(Row.Note(R.string.learned_words_none))
-        shown.mapTo(result) { Item(it, if (ofBlacklist) Kind.BLACKLISTED else Kind.YOURS) }
+        val kind = if (ofBlacklist) Kind.BLACKLISTED else Kind.YOURS
+        for ((id, title, words) in groups(shown, ofBlacklist, view)) {
+            val fold = term.isBlank() && id in folded
+            result.add(Row.Group(id, title, words.map { it.key }, fold))
+            if (!fold) words.mapTo(result) { Item(it, kind) }
+        }
         return result
     }
 
@@ -346,6 +511,43 @@ internal class WordLists(val yours: List<Entry>, val blacklisted: List<Entry>) {
         /** The [entries] the search for [term] finds (all for a blank term). */
         fun matching(entries: List<Entry>, term: String): List<Entry> =
             if (term.isBlank()) entries else entries.filter { e -> e.spellings.any { it.contains(term, true) } }
+
+        /** [entries] in their groups (id, heading, words), each sorted, in [view]'s order. */
+        fun groups(entries: List<Entry>, ofBlacklist: Boolean, view: ListView): List<Triple<String, GroupTitle, List<Entry>>> {
+            fun count(e: Entry) = if (ofBlacklist) e.strikes else e.typed
+            fun date(e: Entry) = if (ofBlacklist) e.removedAt else e.lastTyped
+            // A–Z, or by count or date with the ones without either last (whichever way round); equal ones A–Z
+            val alpha = compareBy<Entry> { it.key }.thenBy { it.word }
+            val inGroup: Comparator<Entry> = when (view.sort) {
+                SortBy.ALPHA -> if (view.descending) alpha.reversed() else alpha
+                SortBy.COUNT -> compareBy<Entry> { count(it) <= 0 }.thenComparator { a, b ->
+                    if (view.descending) count(b).compareTo(count(a)) else count(a).compareTo(count(b)) }.then(alpha)
+                SortBy.DATE -> compareBy<Entry> { date(it) <= 0 }.thenComparator { a, b ->
+                    if (view.descending) date(b).compareTo(date(a)) else date(a).compareTo(date(b)) }.then(alpha)
+            }
+            // the groups: letters A–Z (Z–A with the words), counts most first (fewest first with the words sorted so),
+            // new words before dictionary words; "#" and "Not typed yet" last
+            val group = view.group.takeUnless { ofBlacklist && it == GroupBy.SOURCE } ?: GroupBy.LETTER
+            val countUp = view.sort == SortBy.COUNT && !view.descending
+            val byGroup = when (group) {
+                GroupBy.LETTER -> entries.groupBy { e -> e.word.firstOrNull()?.takeIf { it.isLetter() }?.uppercase() ?: "#" }
+                    .entries.sortedWith(compareBy<Map.Entry<String, List<Entry>>> { it.key == "#" }.thenComparator { a, b ->
+                        if (view.sort == SortBy.ALPHA && view.descending) b.key.compareTo(a.key) else a.key.compareTo(b.key) })
+                    .map { Triple("letter:${it.key}", GroupTitle.Letter(it.key) as GroupTitle, it.value) }
+                GroupBy.COUNT -> if (ofBlacklist)
+                    entries.groupBy { it.strikes to (it.strikes == 3 && it.confirmed) }.entries
+                        .sortedWith(compareBy<Map.Entry<Pair<Int, Boolean>, List<Entry>>> { it.key.first }.thenBy { it.key.second }
+                            .let { if (countUp) it else it.reversed() })
+                        .map { Triple("strikes:${it.key.first}:${it.key.second}", GroupTitle.Strikes(it.key.first, it.key.second) as GroupTitle, it.value) }
+                else entries.groupBy { typedGroup(it.typed).let { t -> if (t is GroupTitle.Typed) t.from else 0 } }.entries
+                        .sortedWith(compareBy<Map.Entry<Int, List<Entry>>> { it.key == 0 }.thenComparator { a, b ->
+                            if (countUp) a.key.compareTo(b.key) else b.key.compareTo(a.key) })
+                        .map { Triple("typed:${it.key}", typedGroup(it.value.first().typed), it.value) }
+                GroupBy.SOURCE -> entries.groupBy { it.inDictionary }.entries.sortedBy { it.key }
+                    .map { Triple("source:${it.key}", (if (it.key) GroupTitle.Dictionary else GroupTitle.New), it.value) }
+            }
+            return byGroup.map { (id, title, words) -> Triple(id, title, words.sortedWith(inGroup)) }
+        }
     }
 }
 
@@ -355,8 +557,8 @@ private fun scriptLocales(): Map<String, List<Locale>> = getSortedDictionaryLoca
 private fun scriptName(script: String): String =
     runCatching { Locale.Builder().setScript(script).build().displayScript }.getOrNull()?.ifEmpty { null } ?: script
 
-/** The learned words of [script] in [pool] with how often each was typed. */
-private fun readLearned(context: Context, script: String, pool: Int): List<Pair<String, Int>> {
+/** The learned words of [script] in [pool] with how often each was typed and when last (seconds, 0: not known). */
+private fun readLearned(context: Context, script: String, pool: Int): List<Triple<String, Int, Long>> {
     // (no store yet: don't create one by asking)
     if (PersonalizationHelper.getCachedUserHistoryDictionary(script, pool) == null
         && !LearnedStores.storeFile(context.filesDir, script, pool).exists())
@@ -369,7 +571,7 @@ private fun readLearned(context: Context, script: String, pool: Int): List<Pair<
             val word = wp.mWord
             if (word.isNullOrBlank() || wp.mIsBeginningOfSentence || wp.mIsNotAWord) null
             // a word is stored at count 0 by its first use (see DictionaryFacilitatorImpl.isTrustedWord): typed count + 1 times
-            else word to (wp.mProbabilityInfo.mCount.coerceAtLeast(0) + 1)
+            else Triple(word, wp.mProbabilityInfo.mCount.coerceAtLeast(0) + 1, wp.mProbabilityInfo.mTimestamp.toLong().coerceAtLeast(0))
         }
     } catch (e: Exception) {
         Log.w("LearnedWordsScreen", "could not read the learned words of $script", e)
@@ -401,10 +603,14 @@ private class Builder(val lower: String) {
     val personal = mutableListOf<PersonalEntry>()
     val listed = mutableListOf<String>()
     var strikes = 0
-    fun build(): Entry {
+    var confirmed = false
+    var lastTyped = 0L
+    var removedAt = 0L
+    fun build(inDictionary: Set<String>): Entry {
         val spellings = counts.keys + personal.map { it.word.word } + listed
         val word = counts.maxByOrNull { it.value }?.key ?: personal.firstOrNull()?.word?.word ?: listed.firstOrNull() ?: lower
-        return Entry(word, spellings.toSet(), counts.values.sum(), personal, listed, strikes)
+        return Entry(word, spellings.toSet(), counts.values.sum(), personal, listed, strikes, lastTyped, removedAt,
+            spellings.any { it in inDictionary }, confirmed)
     }
 }
 
@@ -413,29 +619,47 @@ private fun readWordLists(context: Context, script: String, pool: Int): WordList
     val personal = scriptLocales().flatMap { (localeScript, locales) -> locales.flatMap { locale ->
         readPersonal(context, locale).map { it to localeScript } } } +
         readPersonal(context, null).map { it to ScriptUtils.SCRIPT_LATIN } // for all languages
-    return buildWordLists(script, readLearned(context, script, pool), personal,
-        RemovedWords.blacklist(context, script, pool).apply { reload() }.entries())
+    val learned = readLearned(context, script, pool)
+    // which of Your words a dictionary has (the group New or dictionary word): the script's languages' dictionaries
+    val inDictionary = try {
+        DictionaryFacilitatorImpl.inMainDictionaries(context, scriptLocales()[script].orEmpty(),
+            learned.map { it.first } + personal.map { it.first.word.word })
+    } catch (e: Exception) {
+        Log.w("LearnedWordsScreen", "could not look the words of $script up in the dictionaries", e)
+        emptySet()
+    }
+    return buildWordLists(script, learned.map { it.first to it.second }, personal,
+        RemovedWords.blacklist(context, script, pool).apply { reload() }.entries(),
+        lastTyped = learned.associate { it.first to it.third }, inDictionary = inDictionary)
 }
 
 /**
  * The two lists of [script]: its [learned] words (with how often each was typed) together with the [personal]
  * dictionary's words of the script (each with the script of its language, for a word without letters), and the
- * [blacklist]; each word once, case-insensitive.
+ * [blacklist]; each word once, case-insensitive. [lastTyped]: when each learned spelling was last typed (seconds);
+ * [inDictionary]: the spellings a dictionary of the script's languages has.
  */
 internal fun buildWordLists(script: String, learned: List<Pair<String, Int>>, personal: List<Pair<PersonalEntry, String>>,
-                            blacklist: Map<String, RemovedWords.Entry>): WordLists {
+                            blacklist: Map<String, RemovedWords.Entry>, lastTyped: Map<String, Long> = emptyMap(),
+                            inDictionary: Set<String> = emptySet()): WordLists {
     val yours = HashMap<String, Builder>()
     val blacklisted = HashMap<String, Builder>()
     fun MutableMap<String, Builder>.of(word: String) = word.lowercase().let { getOrPut(it) { Builder(it) } }
     // (the store is the script's: its words are of the script, a word without letters too)
-    for ((word, typed) in learned) yours.of(word).apply { counts[word] = (counts[word] ?: 0) + typed }
+    for ((word, typed) in learned) yours.of(word).apply {
+        counts[word] = (counts[word] ?: 0) + typed
+        this.lastTyped = maxOf(this.lastTyped, lastTyped[word] ?: 0) // (the parameter: the map)
+    }
     for ((p, localeScript) in personal)
         if (ScriptUtils.scriptOfWord(p.word.word, localeScript) == script) yours.of(p.word.word).personal.add(p)
     for ((word, removed) in blacklist) blacklisted.of(word).apply {
         listed.add(word)
+        // (the row with the most strikes says whether it was brought back, as RemovedWords.Entry.max)
+        if (removed.strikes > strikes) confirmed = removed.confirmed else if (removed.strikes == strikes) confirmed = confirmed || removed.confirmed
         strikes = maxOf(strikes, removed.strikes)
+        removedAt = maxOf(removedAt, removed.removedAt)
     }
-    fun Map<String, Builder>.sorted() = values.sortedBy { it.lower }.map { it.build() }
+    fun Map<String, Builder>.sorted() = values.sortedBy { it.lower }.map { it.build(inDictionary) }
     return WordLists(yours.sorted(), blacklisted.sorted())
 }
 

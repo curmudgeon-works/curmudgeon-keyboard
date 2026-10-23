@@ -22,6 +22,43 @@ class RemovedWordsTest {
     private val script = "Zzzz" // (a script code no keyboard has: the file is the test's own)
     private val file get() = File(ctx.filesDir, "blacklists/Zzzz.txt")
 
+    // (no Remove dates unless a test sets a time: the rows as before them)
+    @org.junit.Before fun setUp() { RemovedWords.clock = { 0 } }
+    @org.junit.After fun tearDown() { RemovedWords.clock = { System.currentTimeMillis() / 1000 } }
+
+    @Test fun `each Remove writes its time after the strikes and confirmation, before an allowed part`() {
+        file.delete()
+        val list = RemovedWords.blacklist(ctx, script, 0)
+        list.reload()
+        RemovedWords.clock = { 1_000 }
+        list.strike("teh")
+        RemovedWords.clock = { 2_000 }
+        list.strike("teh")
+        list.strike("once")
+        list.reload()
+        assertEquals(listOf("once\t1\t@2000", "teh\t2\t@2000"), file.readLines())
+        assertEquals(Entry(2, false, 2_000), list.entry("teh"))
+        // a confirmation keeps it, and an allowed part goes after it (the row's own part first)
+        RemovedWords.clock = { 3_000 }
+        assertEquals(3, list.strike("teh"))
+        assertTrue(list.confirm("teh"))
+        assertTrue(list.allow("teh", 2))
+        list.reload()
+        assertEquals("teh\t3\tconfirmed\t@3000\tallowed\t2", file.readLines()[1])
+        // read back: the strikes, confirmation, time and allowed part
+        assertEquals("x" to Entry(3, true, 5), RemovedWords.parse("x\t3\tconfirmed\t@5\tallowed\t2"))
+        assertEquals("x" to 2, RemovedWords.parseAllowed("x\t3\tconfirmed\t@5\tallowed\t2"))
+        // a row without one (written before): no date
+        assertEquals("old" to Entry(2), RemovedWords.parse("old\t2"))
+    }
+
+    @Test fun `a merge keeps the later time and the most strikes`() {
+        assertEquals(Entry(3, false, 50), Entry(3, false, 10).max(Entry(1, false, 50)))
+        assertEquals(Entry(3, false, 50), Entry(1, false, 50).max(Entry(3, false, 10)))
+        assertEquals(Entry(2, true, 7), Entry(2, false, 7).max(Entry(2, true, 0)))
+        assertEquals(mapOf("w" to Entry(2, false, 9)), RemovedWords.mergeLists(listOf(mapOf("w" to Entry(2, false, 9)), mapOf("w" to Entry(1)))))
+    }
+
     @Test fun `an edit is seen by every holder and lands in the file`() {
         file.delete()
         val list = RemovedWords.blacklist(ctx, script, 0)

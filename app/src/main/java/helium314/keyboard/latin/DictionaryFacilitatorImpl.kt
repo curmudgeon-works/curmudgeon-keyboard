@@ -1009,6 +1009,32 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
             }
         }
 
+        /**
+         * The [words] a main dictionary of [locales] has, as written or in lowercase (the Learned words list groups them
+         * apart from the user's own words, owner 2026-10-17). A running keyboard's dictionaries of a language are used
+         * if it has them loaded, else they're loaded for this and closed. Call off the main thread.
+         */
+        fun inMainDictionaries(context: Context, locales: Collection<Locale>, words: Collection<String>): Set<String> {
+            val result = HashSet<String>()
+            if (words.isEmpty()) return result
+            val live = synchronized(liveFacilitators) { liveFacilitators.toList() }
+            for (locale in locales) {
+                val loaded = live.firstNotNullOfOrNull { f -> f.dictionaryGroups.firstOrNull { it.locale == locale && it.hasDict(Dictionary.TYPE_MAIN) } }
+                val group = loaded ?: DictionaryGroup(locale, DictionaryFactory.createMainDictionaryCollection(context, locale, false))
+                try {
+                    val main = group.getDict(Dictionary.TYPE_MAIN) ?: continue
+                    for (word in words) if (word !in result
+                        && (main.isInDictionary(word) || word.lowercase(locale).let { it != word && main.isInDictionary(it) }))
+                        result.add(word)
+                } catch (e: Exception) {
+                    Log.w(TAG, "could not look words up in the dictionary of $locale", e)
+                } finally {
+                    if (loaded == null) group.closeDict(Dictionary.TYPE_MAIN)
+                }
+            }
+            return result
+        }
+
         /** The times [removeWords] loaded the languages' main dictionaries (no running keyboard had them; tests: a batch
          *  delete loads them once). */
         @androidx.annotation.VisibleForTesting

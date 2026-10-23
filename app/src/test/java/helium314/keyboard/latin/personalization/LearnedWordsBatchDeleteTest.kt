@@ -139,6 +139,35 @@ class LearnedWordsBatchDeleteTest {
     private fun inDialog(text: String) = compose.onNode(hasText(text) and hasAnyAncestor(isDialog()))
     private fun trash() = compose.onNodeWithContentDescription(ctx.getString(R.string.delete)).performClick()
 
+    private fun top(word: String) = compose.onNodeWithText(word).fetchSemanticsNode().boundsInRoot.top
+
+    // fail before (owner 2026-10-17: "the word I pressed moves up when the checkmarks come on"): selection mode took
+    // the Add a word row away and the title down to one line
+    @Test fun `holding a word starts selection with the word where it was`() {
+        learn("alpha", "beta", "gamma")
+        show(blacklisted = false, firstWord = "alpha")
+        val before = top("beta")
+        hold("beta")
+        compose.onNodeWithText(selected(1)).assertExists()
+        assertEquals(before, top("beta"))
+    }
+
+    @Test fun `holding a heading ticks its group, again unticks it, and a tap folds it`() {
+        learn("alpha", "avocado", "beta")
+        show(blacklisted = false, firstWord = "alpha")
+        compose.onNodeWithText("A · 2").performTouchInput { longClick() }
+        compose.onNodeWithText(selected(2)).assertExists()
+        tap("beta")
+        compose.onNodeWithText(selected(3)).assertExists()
+        compose.onNodeWithText("A · 2").performTouchInput { longClick() }
+        compose.onNodeWithText(selected(1)).assertExists()
+        compose.onNodeWithText("A · 2").performClick()
+        waitFor("not folded") { compose.onAllNodesWithText("avocado").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithText("beta").assertExists()
+        compose.onNodeWithText("A · 2").performClick()
+        waitFor("not unfolded") { compose.onAllNodesWithText("avocado").fetchSemanticsNodes().isNotEmpty() }
+    }
+
     @Test fun `long-press starts selection, taps add to it, Delete asks once and deletes only those`() {
         learn("alpha", "beta", "gamma", "delta", "omega")
         show(blacklisted = false, firstWord = "alpha")

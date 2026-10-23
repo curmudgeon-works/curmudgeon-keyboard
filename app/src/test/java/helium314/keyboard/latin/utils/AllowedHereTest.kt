@@ -42,8 +42,9 @@ class AllowedHereTest {
         }
     }
 
-    @Before fun setUp() = clean()
-    @After fun tearDown() = clean()
+    // (no Remove dates in these rows: what they check is the same with or without them, see RemovedWordsTest)
+    @Before fun setUp() { RemovedWords.clock = { 0 }; clean() }
+    @After fun tearDown() { clean(); RemovedWords.clock = { System.currentTimeMillis() / 1000 } }
 
     // what DictionaryFacilitatorImpl.addWordToUserHistory does once the word is typed often enough on B
     private fun typedEnoughOnB(word: String, learnedCount: Int): Boolean =

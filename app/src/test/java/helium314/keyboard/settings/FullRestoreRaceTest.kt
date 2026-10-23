@@ -184,7 +184,8 @@ class FullRestoreRaceTest {
         // after the restore a Remove counts on from the restored count, once
         assertEquals(3, list.strike("zorp"))
         RemovedWords.awaitWrites()
-        assertEquals(setOf("backupword", "zorp\t3"), file.readLines().filter { it.isNotEmpty() }.toSet())
+        // (the strikes; a Remove's time, "<TAB>@<seconds>", left out)
+        assertEquals(setOf("backupword", "zorp\t3"), file.readLines().filter { it.isNotEmpty() }.map { it.replace(Regex("\t@\\d+"), "") }.toSet())
     }
 
     /**

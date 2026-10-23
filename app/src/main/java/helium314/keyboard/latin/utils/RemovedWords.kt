@@ -34,6 +34,11 @@ import java.util.concurrent.Executors
  * from there. The allowed part is no block: [WordListFile.entries] and [parseAll] have the own strikes only (an
  * allowed-only row isn't listed on the Blacklisted words screen); [Lists] reads the allowed part. Backups, restores and
  * copies carry it with the list (the same file). Older versions read a combined row as its own strikes alone.
+ *
+ * Last removed (owner 2026-10-17, the Blacklisted words list sorts by it): each Remove writes its time into the row's own
+ * part, "<TAB>@<seconds>" after the strikes (then N is written even for 1): "word<TAB>N[<TAB>confirmed]<TAB>@T
+ * [<TAB>allowed<TAB>L]". Older versions skip it (a part they don't know), and a row without one (all of them before) has
+ * no date: 0. A word on several lists, or merged from a backup: the later time.
  */
 object RemovedWords {
     private val lists = ConcurrentHashMap<String, WordListFile>()
@@ -68,15 +73,22 @@ object RemovedWords {
 
     // ------------------------------- the rule -------------------------------
 
-    /** A removed word: removed [strikes] times; [confirmed]: brought back with the strip's "+" (3rd strike). */
-    data class Entry(val strikes: Int = 1, val confirmed: Boolean = false) {
-        /** The same word in another list or spelling: the one removed more often counts (and its confirmation). */
+    /** A removed word: removed [strikes] times; [confirmed]: brought back with the strip's "+" (3rd strike);
+     *  [removedAt]: when last removed, in seconds (0: not known, removed before dates were kept). */
+    data class Entry(val strikes: Int = 1, val confirmed: Boolean = false, val removedAt: Long = 0) {
+        /** The same word in another list or spelling: the one removed more often counts (and its confirmation), the
+         *  later time of the two. */
         fun max(other: Entry?): Entry = when {
-            other == null || other.strikes < strikes -> this
-            other.strikes > strikes -> other
-            else -> Entry(strikes, confirmed || other.confirmed)
+            other == null -> this
+            other.strikes < strikes -> copy(removedAt = maxOf(removedAt, other.removedAt))
+            other.strikes > strikes -> other.copy(removedAt = maxOf(removedAt, other.removedAt))
+            else -> Entry(strikes, confirmed || other.confirmed, maxOf(removedAt, other.removedAt))
         }
     }
+
+    /** The time a Remove writes, in seconds (tests set it). */
+    @androidx.annotation.VisibleForTesting
+    internal var clock: () -> Long = { System.currentTimeMillis() / 1000 }
 
     /** How often a word removed [strikes] times must be typed again to come back; null: never by typing (Un-blacklist only). */
     fun requiredUses(strikes: Int): Int? = when {
@@ -201,8 +213,15 @@ object RemovedWords {
         val strikes = parts.getOrNull(1)?.trim()?.toIntOrNull()?.coerceAtLeast(1) ?: 1
         val at = allowedAt(parts)
         val own = if (at < 0) parts.drop(2) else parts.subList(2, at) // (at >= 2: "word<TAB>allowed" returned above)
-        return word to Entry(strikes, own.any { it.trim() == CONFIRMED })
+        return word to Entry(strikes, own.any { it.trim() == CONFIRMED }, own.firstNotNullOfOrNull { dateOf(it) } ?: 0)
     }
+
+    // the time of a row's "@<seconds>" part, null for another part
+    private fun dateOf(part: String): Long? = part.trim().takeIf { it.startsWith(DATE) }?.drop(1)?.toLongOrNull()?.takeIf { it > 0 }
+
+    // the own part after the word: strikes (written even for 1 when more follows), confirmation, time
+    private fun ownParts(entry: Entry): String =
+        "\t${entry.strikes}${if (entry.confirmed) "\t$CONFIRMED" else ""}${if (entry.removedAt > 0) "\t$DATE${entry.removedAt}" else ""}"
 
     // the index of the "allowed" part of a line's [parts] (after the word), -1 without one
     private fun allowedAt(parts: List<String>): Int {
@@ -211,11 +230,8 @@ object RemovedWords {
     }
 
     /** A plain word for a single strike: the lines everything before strikes wrote and read. */
-    internal fun format(word: String, entry: Entry): String = when {
-        entry.confirmed -> "$word\t${entry.strikes}\t$CONFIRMED"
-        entry.strikes > 1 -> "$word\t${entry.strikes}"
-        else -> word
-    }
+    internal fun format(word: String, entry: Entry): String =
+        if (entry.strikes > 1 || entry.confirmed || entry.removedAt > 0) word + ownParts(entry) else word
 
     /** The allowed part of a row, "word<TAB>allowed<TAB>N" ([formatAllowed]) or after the own strikes of a combined
      *  row ([formatRow]): the word and N, the borrowed strikes it overrides; null for a line without one. */
@@ -234,7 +250,7 @@ object RemovedWords {
     internal fun formatRow(word: String, entry: Entry?, allowed: Int?): String = when {
         allowed == null -> format(word, entry ?: Entry())
         entry == null -> formatAllowed(word, allowed)
-        else -> "$word\t${entry.strikes}${if (entry.confirmed) "\t$CONFIRMED" else ""}\t$ALLOWED\t$allowed"
+        else -> "$word${ownParts(entry)}\t$ALLOWED\t$allowed"
     }
 
     /** The allowed parts of [lines] (a word allowed twice: the higher level; its own strikes don't change it, owner
@@ -371,7 +387,7 @@ object RemovedWords {
                 if (allowed == null) allowedResult.remove(word) else allowedResult[word] = allowed
             }
             for ((word, n) in strikesWhileLoading) {
-                val entry = Entry((read[word]?.strikes ?: 0) + n)
+                val entry = Entry((read[word]?.strikes ?: 0) + n, removedAt = byWord[word]?.removedAt ?: clock())
                 result[word] = entry
                 allowedResult.remove(word)
                 pending[word] = Change(entry, null)
@@ -473,7 +489,7 @@ object RemovedWords {
             // review L4.2; the as-typed one goes with its new row)
             val lower = word.lowercase()
             if (lower != word && allowedByWord.containsKey(lower)) set(lower, byWord[lower], null)
-            set(word, Entry(strikes), null)
+            set(word, Entry(strikes, removedAt = clock()), null)
             return strikes
         }
 
@@ -553,5 +569,6 @@ object RemovedWords {
 
     private const val CONFIRMED = "confirmed"
     private const val ALLOWED = "allowed"
+    private const val DATE = "@"
     private const val TAG = "RemovedWords"
 }

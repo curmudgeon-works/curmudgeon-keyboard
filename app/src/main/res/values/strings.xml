@@ -210,6 +210,32 @@
     </plurals>
     <string name="learned_words_delete_all_message">This can\'t be undone.</string>
     <string name="learned_words_delete_all_button">Delete all</string>
+    <!-- Learned & blacklisted words: the sort and group menu (owner 2026-10-17) -->
+    <string name="learned_words_sort_menu">Sort and group</string>
+    <string name="learned_words_sort_heading">Sort by</string>
+    <string name="learned_words_group_heading">Group by</string>
+    <string name="learned_words_sort_alpha">A–Z</string>
+    <string name="learned_words_sort_typed">Times typed</string>
+    <string name="learned_words_sort_last_typed">Last typed</string>
+    <string name="learned_words_sort_strikes">Strikes</string>
+    <string name="learned_words_sort_last_removed">Last removed</string>
+    <string name="learned_words_group_letter">First letter</string>
+    <string name="learned_words_group_source">New or dictionary word</string>
+    <string name="learned_words_sort_ascending">Ascending</string>
+    <string name="learned_words_sort_descending">Descending</string>
+    <!-- the date a word was last typed / removed, on its row -->
+    <string name="learned_words_last_typed">last %s</string>
+    <string name="learned_words_last_removed">last %s</string>
+    <!-- group headings -->
+    <string name="learned_words_group_typed_once">Typed once</string>
+    <string name="learned_words_group_typed_exactly">Typed %d times</string>
+    <string name="learned_words_group_typed_range">Typed %1$d–%2$d times</string>
+    <string name="learned_words_group_typed_more">Typed more than %d times</string>
+    <string name="learned_words_group_not_typed">Not typed yet</string>
+    <string name="learned_words_group_removed_confirmed">Removed 3 times, brought back with +</string>
+    <string name="learned_words_group_new">New words</string>
+    <string name="learned_words_group_dictionary">Dictionary words</string>
+    <string name="learned_words_group_other">#</string>
     <!-- Name of the main dictionary, as opposed to auxiliary dictionaries (medical/entertainment/sports...) -->
     <string name="main_dictionary">Main dictionary</string>
     <!-- Option to enable showing suggestions -->
