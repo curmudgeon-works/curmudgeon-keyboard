@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -46,6 +47,13 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import androidx.core.content.edit
 import java.util.Locale
+
+/** A platform dialog's Close (its positive button) in the settings theme's [color], its primary, as the buttons of the
+ *  Compose dialogs are (owner 2026-10-18: "fine to code clode button orange (or the right theme color)"); it had the
+ *  platform's own color. */
+internal fun AlertDialog.closeInThemeColor(color: Int) {
+    getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(color)
+}
 
 @Composable
 fun AboutScreen(
@@ -149,6 +157,7 @@ fun createAboutSettings(context: Context) = listOf(
     },
     Setting(context, SettingsWithoutKey.HIDDEN_FEATURES, R.string.hidden_features_title, R.string.hidden_features_summary) {
         val ctx = LocalContext.current
+        val primary = androidx.compose.material3.MaterialTheme.colorScheme.primary.toArgb()
         Preference(
             name = it.title,
             description = it.description,
@@ -166,6 +175,7 @@ fun createAboutSettings(context: Context) = listOf(
                     .setPositiveButton(R.string.dialog_close, null)
                     .create()
                 builder.show()
+                builder.closeInThemeColor(primary)
                 (builder.findViewById<View>(android.R.id.message) as TextView).movementMethod = LinkMovementMethod.getInstance()
             },
             icon = R.drawable.ic_settings_about_hidden_features
