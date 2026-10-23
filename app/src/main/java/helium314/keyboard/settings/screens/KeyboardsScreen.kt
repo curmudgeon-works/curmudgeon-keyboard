@@ -341,10 +341,11 @@ fun KeyboardsScreen(
                     adding = newKeyboardFor(ctx, item as Locale) to null // (it appears at the end of the list, the screen stays)
                 },
                 title = { Text(stringResource(R.string.add_keyboard)) },
-                // copies of the keyboards first, then a new keyboard for any language
-                // (without advanced only languages with a dictionary, built in, added or to download; 2026-10-10)
+                // copies of the keyboards first, then a new keyboard for any language, with or without Advanced (owner
+                // 2026-10-18, as a keyboard's language list: "fine to show all langs even without dict in non-advanced";
+                // until then without Advanced only those with a dictionary, built in, added or to download)
                 items = enabledNow.map { CopyOf(it) } + SubtypeSettings.getAvailableSubtypeLocales()
-                    .filter { advanced || dictionaryAvailable(ctx, it) }.sortedBy { it.localizedDisplayName(ctx.resources) },
+                    .sortedBy { it.localizedDisplayName(ctx.resources) },
                 getItemName = { if (it is CopyOf) stringResource(R.string.copy_of_keyboard, keyboardName(it.keyboard, ctx)) else (it as Locale).localizedDisplayName(ctx.resources) },
                 showRadioButtons = false,
             )

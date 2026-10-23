@@ -3,7 +3,10 @@ package helium314.keyboard.settings
 
 import android.content.Context
 import androidx.activity.compose.setContent
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -30,7 +33,8 @@ import org.robolectric.annotation.Config
  * A keyboard's language list without Advanced (owner 2026-10-18: "fine to show all langs even without dict in
  * non-advanced. "No dictionary: swipe and suggestions won't work" <- yes need this"): every language is listed; one
  * turned on with no dictionary says that swipe and suggestions won't work, one turned off keeps "No dictionary".
- * Afrikaans: a Latin keyboard language with no dictionary, built in or to download.
+ * The Add keyboard choice lists every language too. Afrikaans: a Latin keyboard language with no dictionary, built in or
+ * to download.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w400dp-h2400dp")
@@ -67,6 +71,20 @@ class NoDictionaryLanguagesTest {
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("Afrikaans"))
         compose.onNodeWithText("Afrikaans").assertExists()
         compose.onNodeWithText(onLine).assertDoesNotExist() // (off: no such line)
+    }
+
+    // the Add keyboard choice too (owner 2026-10-18, "1. Yes"; it has no line under a language, so nothing more). Fail
+    // before: without Advanced only languages with a dictionary were offered
+    @Test fun `without Advanced Add keyboard offers a language with no dictionary`() {
+        useKeyboards(ctx, real, available("en-US").withId(1))
+        scenario = ActivityScenario.launch(SettingsActivity::class.java).onActivity {
+            it.setContent { helium314.keyboard.settings.screens.KeyboardsScreen { } }
+        }
+        compose.waitForIdle()
+        compose.onNodeWithText(ctx.getString(helium314.keyboard.latin.R.string.add_keyboard)).performClick()
+        compose.waitForIdle()
+        compose.onNode(hasScrollAction() and hasAnyAncestor(isDialog())).performScrollToNode(hasText("Afrikaans"))
+        compose.onNodeWithText("Afrikaans").assertExists()
     }
 
     @Test fun `turned on, a language with no dictionary says swipe and suggestions won't work`() {
