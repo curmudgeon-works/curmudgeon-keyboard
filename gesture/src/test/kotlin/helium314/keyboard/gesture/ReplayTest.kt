@@ -121,7 +121,7 @@ class ReplayTest {
      * endR = start/end key radius, corridor = how far off the path a letter may be, stop = stop detection (dt factor),
      * skip = penalty for an inflection no letter uses, cap = candidates scored, reach / shortR / shortL = the long-reach
      * corner rule (reach length, allowed shortfall reaching right / left), prog = letter-order slack, band / slack =
-     * the path-length band (ratio, additive key widths).
+     * the path-length band (ratio, additive key widths), exc = how far above the keys (key heights) a swipe is cut.
      */
     private fun decoder(spec: String): GestureDecoder {
         val v = spec.split(' ').filter { '=' in it }.associate { it.substringBefore('=') to it.substringAfter('=').toFloat() }
@@ -143,7 +143,8 @@ class ReplayTest {
                 frequencyEmphasisFromKeysPerSecond = f("fqFrom", 12f), frequencyEmphasisPerKeyPerSecond = f("fqRate", 0.05f),
                 maxCandidates = f("cap", 4096f).toInt(), longReachKeyWidths = f("reach", 4f),
                 reachShortfallRightKeyWidths = f("shortR", 0.6f), reachShortfallLeftKeyWidths = f("shortL", 0.4f)),
-            GesturePreprocessor(PreprocessorConfig(turnConfidenceScale = f("turn", 1f), stopDtFactor = f("stop", 2.5f))),
+            GesturePreprocessor(PreprocessorConfig(turnConfidenceScale = f("turn", 1f), stopDtFactor = f("stop", 2.5f),
+                excursionMinHeightKeyHeights = f("exc", 1.25f) /* the phone cuts swipes this far above the keys (Defaults 125; the replay cut at 0.5 until 2026-10-18) */)),
         )
     }
 
