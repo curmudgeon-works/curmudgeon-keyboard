@@ -66,7 +66,7 @@ class SuggestInScriptTest {
     // ---- Some ----
 
     @Test fun `Some puts the Devanagari right after the word space types, on a chip`() {
-        val strip = SuggestInScript.forStrip(typing(typed("bohot"), suggestion("bahut")), Transliteration.SOME, table, true, noOtherLanguage)
+        val strip = SuggestInScript.forStrip(typing(typed("bohot"), suggestion("bahut")), Transliteration.SOME, table, noOtherLanguage)
         assertEquals(listOf("bohot", "बहुत", "bahut"), strip.words())
         assertEquals(listOf("बहुत"), strip.chips())
         assertFalse(strip.mWillAutoCorrect) // space still types "bohot"
@@ -75,32 +75,32 @@ class SuggestInScriptTest {
 
     @Test fun `Some with an auto-correction looks up the auto-correction`() {
         val strip = SuggestInScript.forStrip(typing(typed("bohat"), suggestion("bohot"), suggestion("bahut"), autoCorrect = true),
-            Transliteration.SOME, table, true, noOtherLanguage)
+            Transliteration.SOME, table, noOtherLanguage)
         assertEquals(listOf("bohat", "bohot", "बहुत", "bahut"), strip.words())
         assertTrue(strip.mWillAutoCorrect)
         assertEquals("bohot", strip.getInfo(SuggestedWords.INDEX_OF_AUTO_CORRECTION).mWord) // space types it
     }
 
     @Test fun `Some for a swipe`() {
-        val strip = SuggestInScript.forStrip(swiping(suggestion("bohot"), suggestion("bahut")), Transliteration.SOME, table, true, noOtherLanguage)
+        val strip = SuggestInScript.forStrip(swiping(suggestion("bohot"), suggestion("bahut")), Transliteration.SOME, table, noOtherLanguage)
         assertEquals(listOf("bohot", "बहुत", "bahut"), strip.words())
         assertEquals("bohot", strip.mTypedWordInfo?.mWord) // the swipe puts in the Latin word
     }
 
     @Test fun `a word the table doesn't have leaves the strip as it is`() {
         val words = typing(typed("zzzzqx"), suggestion("bahut"))
-        assertEquals(words, SuggestInScript.forStrip(words, Transliteration.SOME, table, true, noOtherLanguage))
-        assertEquals(words, SuggestInScript.forStrip(words, Transliteration.OFF, table, true, noOtherLanguage))
+        assertEquals(words, SuggestInScript.forStrip(words, Transliteration.SOME, table, noOtherLanguage))
+        assertEquals(words, SuggestInScript.forStrip(words, Transliteration.OFF, table, noOtherLanguage))
     }
 
     @Test fun `predictions are left as they are`() {
         val predictions = SuggestedWords(arrayListOf(suggestion("hai")), null, null, false, false, false,
             SuggestedWords.INPUT_STYLE_PREDICTION, 1)
-        assertEquals(predictions, SuggestInScript.forStrip(predictions, Transliteration.ALL, table, true, noOtherLanguage))
+        assertEquals(predictions, SuggestInScript.forStrip(predictions, Transliteration.ALL, table, noOtherLanguage))
     }
 
     @Test fun `after a pick of another word its Devanagari is offered once, to put in place`() {
-        val strip = SuggestInScript.forStrip(typing(typed("bohot"), suggestion("bahut")), Transliteration.SOME, table, true, noOtherLanguage)
+        val strip = SuggestInScript.forStrip(typing(typed("bohot"), suggestion("bahut")), Transliteration.SOME, table, noOtherLanguage)
         val offered = assertNotNull(SuggestInScript.afterPick("nahi", strip, Transliteration.SOME, table))
         assertEquals("नहीं", offered.mWord)
         assertTrue(offered.inPlace)
@@ -117,7 +117,7 @@ class SuggestInScriptTest {
     // ---- All ----
 
     @Test fun `All makes the Devanagari what space types, the typed Latin word one tap away`() {
-        val strip = SuggestInScript.forStrip(typing(typed("bohot"), suggestion("bahut")), Transliteration.ALL, table, true, noOtherLanguage)
+        val strip = SuggestInScript.forStrip(typing(typed("bohot"), suggestion("bahut")), Transliteration.ALL, table, noOtherLanguage)
         assertEquals(listOf("bohot", "बहुत", "बोहोत", "बहोत", "bahut"), strip.words())
         assertTrue(strip.mWillAutoCorrect)
         assertEquals("बहुत", strip.getInfo(SuggestedWords.INDEX_OF_AUTO_CORRECTION).mWord)
@@ -127,34 +127,34 @@ class SuggestInScriptTest {
 
     @Test fun `All with an auto-correction puts the corrected Latin word on the chip`() {
         val strip = SuggestInScript.forStrip(typing(typed("bohat"), suggestion("bohot"), suggestion("bahut"), autoCorrect = true),
-            Transliteration.ALL, table, true, noOtherLanguage)
+            Transliteration.ALL, table, noOtherLanguage)
         assertEquals(listOf("bohat", "बहुत", "bohot", "बोहोत", "बहोत", "bahut"), strip.words())
         assertEquals(listOf("bohot"), strip.chips())
         assertTrue(strip.mWillAutoCorrect)
     }
 
     @Test fun `All leaves a word of another language of the keyboard in Latin`() {
-        val strip = SuggestInScript.forStrip(typing(typed("meeting")), Transliteration.ALL, table, true) { it == "meeting" }
+        val strip = SuggestInScript.forStrip(typing(typed("meeting")), Transliteration.ALL, table) { it == "meeting" }
         assertEquals(listOf("meeting", "मीटिंग"), strip.words())
         assertEquals(listOf("मीटिंग"), strip.chips())
         assertFalse(strip.mWillAutoCorrect)
     }
 
-    @Test fun `All with auto-correction off - space types what was typed`() {
-        val strip = SuggestInScript.forStrip(typing(typed("bohot")), Transliteration.ALL, table, false, noOtherLanguage)
-        assertEquals(listOf("bohot", "बहुत"), strip.words())
-        assertFalse(strip.mWillAutoCorrect)
+    @Test fun `All for a typed word that is the top word - the Devanagari is the auto-correction`() {
+        val strip = SuggestInScript.forStrip(typing(typed("bohot")), Transliteration.ALL, table, noOtherLanguage)
+        assertEquals("बहुत", strip.getInfo(SuggestedWords.INDEX_OF_AUTO_CORRECTION).mWord)
+        assertTrue(strip.mWillAutoCorrect)
     }
 
     @Test fun `All for a swipe puts in the Devanagari`() {
-        val strip = SuggestInScript.forStrip(swiping(suggestion("bohot"), suggestion("bahut")), Transliteration.ALL, table, true, noOtherLanguage)
+        val strip = SuggestInScript.forStrip(swiping(suggestion("bohot"), suggestion("bahut")), Transliteration.ALL, table, noOtherLanguage)
         assertEquals(listOf("बहुत", "bohot", "बोहोत", "बहोत", "bahut"), strip.words())
         assertEquals("बहुत", strip.mTypedWordInfo?.mWord)
         assertEquals(listOf("bohot"), strip.chips())
     }
 
     @Test fun `the Devanagari is learned as its Latin word`() {
-        val strip = SuggestInScript.forStrip(swiping(suggestion("bohot")), Transliteration.ALL, table, true, noOtherLanguage)
+        val strip = SuggestInScript.forStrip(swiping(suggestion("bohot")), Transliteration.ALL, table, noOtherLanguage)
         assertEquals("bohot", SuggestInScript.learnedAs("बहुत", strip))
         assertEquals("bohot", SuggestInScript.learnedAs("बोहोत", strip))
         assertEquals("bahut", SuggestInScript.learnedAs("bahut", strip))

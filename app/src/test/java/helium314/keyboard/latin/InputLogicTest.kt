@@ -1577,6 +1577,19 @@ class InputLogicTest {
         assertEquals(listOf("bohot"), unlearnedWords) // the revert takes that use back
     }
 
+    // a field that asks for no auto-correction (no TYPE_TEXT_FLAG_AUTO_CORRECT): typed words still go in as Devanagari,
+    // as swiped ones do
+    @Test fun `All - space types the Devanagari where nothing is auto-corrected`() {
+        reset()
+        setInputType(InputType.TYPE_CLASS_TEXT)
+        suggestInScript(Transliteration.ALL)
+        assertFalse(settingsValues.mAutoCorrectEnabled)
+        chainInput("bohot")
+        showScript(typingStrip("bohot", "bahut"))
+        input(' ')
+        assertEquals("बहुत ", text)
+    }
+
     @Test fun `All - a tap on the Latin word types it`() {
         reset()
         setInputType(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_AUTO_CORRECT)

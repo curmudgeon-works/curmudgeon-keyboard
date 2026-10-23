@@ -28,12 +28,12 @@ object SuggestInScript {
      * - [Transliteration.SOME]: right after the top word, on a tint; space still types the Latin word.
      * - [Transliteration.ALL]: in the top word's place (space, or the swipe, puts it in), the Latin word right after it
      *   on a tint, the table's other words for it after that. Not when [inOtherLanguage] (a word of another Latin-script
-     *   language of the keyboard, "meeting"), nor for typing with auto-correction off ([autoCorrects]: space types what
-     *   was typed): then as with SOME.
+     *   language of the keyboard, "meeting"): then as with SOME. Typing too with auto-correction off: space types the
+     *   Devanagari all the same (InputLogic: ALL commits it like an auto-correction).
      * Predictions, punctuation and anything else come back as they are.
      */
     @JvmStatic
-    fun forStrip(words: SuggestedWords, mode: Int, table: TranslitTable, autoCorrects: Boolean,
+    fun forStrip(words: SuggestedWords, mode: Int, table: TranslitTable,
                  inOtherLanguage: (String) -> Boolean): SuggestedWords {
         if (mode == Transliteration.OFF || words.isEmpty || words.isPunctuationSuggestions) return words
         val batch = words.mInputStyle == SuggestedWords.INPUT_STYLE_UPDATE_BATCH
@@ -46,7 +46,7 @@ object SuggestInScript {
         if (scripts.isEmpty()) return words
         val infos = ArrayList<SuggestedWordInfo>(words.size() + scripts.size + 1)
         for (i in 0 until words.size()) infos.add(words.getInfo(i))
-        if (mode == Transliteration.SOME || (!batch && !autoCorrects) || inOtherLanguage(top.mWord)) {
+        if (mode == Transliteration.SOME || inOtherLanguage(top.mWord)) {
             infos.add(topIndex + 1, TranslitWordInfo(scripts[0], top.mWord, top.mScore, tinted = true))
             return copy(words, infos, words.mTypedWordInfo, words.mWillAutoCorrect)
         }

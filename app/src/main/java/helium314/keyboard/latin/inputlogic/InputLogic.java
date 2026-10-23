@@ -504,7 +504,7 @@ public final class InputLogic {
             final SuggestedWordInfo afterPick = mLastComposedWord.mScriptAfterPick;
             return afterPick == null ? suggestedWords : SuggestInScript.withFirst(suggestedWords, afterPick);
         }
-        return SuggestInScript.forStrip(suggestedWords, choice.getMode(), table, settingsValues.mAutoCorrectEnabled,
+        return SuggestInScript.forStrip(suggestedWords, choice.getMode(), table,
                 word -> inAnotherLatinLanguage(word, choice.getLocale()));
     }
 
@@ -1503,7 +1503,11 @@ public final class InputLogic {
         }
         // isComposingWord() may have changed since we stored wasComposing
         if (mWordComposer.isComposingWord()) {
-            if (settingsValues.mAutoCorrectEnabled && ! isInlineEmojiSearchAction()) {
+            // Suggest in हिंदी, All: space types the Devanagari with auto-correction off too (the strip auto-corrects
+            // only to it then)
+            final boolean scriptAll = settingsValues.mSuggestInScript != null
+                    && settingsValues.mSuggestInScript.getMode() == Transliteration.ALL;
+            if ((settingsValues.mAutoCorrectEnabled || scriptAll) && ! isInlineEmojiSearchAction()) {
                 final String separator = shouldAvoidSendingCode ? LastComposedWord.NOT_A_SEPARATOR
                         : StringUtils.newSingleCodePointString(codePoint);
                 commitCurrentAutoCorrection(settingsValues, separator, handler);
