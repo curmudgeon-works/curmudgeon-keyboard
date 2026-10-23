@@ -311,9 +311,9 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
         sInstance.onCreate(context);
     }
 
-    /** Forgets the loaded settings, as a new process starts with none: the unit tests' app (TestApp) at each test's
-     *  start, as the singleton outlives each test's app (otherwise the keyboard an earlier test left selected decided
-     *  what a later test's preference writes reloaded, 2026-10-18). */
+    /** Forgets the loaded settings, as a new process starts with none (tests whose placeholder preferences aren't
+     *  real settings: the singleton outlives each test's app, and settings an earlier test loaded reloaded on their
+     *  writes and choked on them, 2026-10-18). */
     @androidx.annotation.VisibleForTesting
     public void forgetLoadedValues() {
         mSettingsValuesLock.lock();

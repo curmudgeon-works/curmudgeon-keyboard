@@ -47,7 +47,10 @@ class PartialRestoreCustomNumbersTest {
     private val hidden1 = "~custom:1" // (an older backup's kept copy)
     private fun palette(name: String) = real.getString(Settings.PREF_USER_COLORS_PREFIX + name, null)
 
-    @Before fun setUp() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
+    @Before fun setUp() {
+        helium314.keyboard.latin.settings.Settings.getInstance().forgetLoadedValues() // (placeholder colors: no reload, see there)
+        real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
+    }
     @After fun tearDown() { zip.delete(); real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
 
     /** The backup (of this build): [restored] with a set of its own (k2) holding [own], plus [extra] backup-wide entries. */

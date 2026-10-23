@@ -40,6 +40,7 @@ class ReReview2PaletteOffTest {
     private val bChoice = idKey(2, Settings.PREF_THEME_COLORS)
 
     @Before fun setUp() {
+        helium314.keyboard.latin.settings.Settings.getInstance().forgetLoadedValues() // (placeholder colors: no reload, see there)
         real.edit().clear().commit(); KeyboardProfiles.loadGroups(real)
         real.edit {
             putBoolean("separate_settings_per_keyboard", true)
