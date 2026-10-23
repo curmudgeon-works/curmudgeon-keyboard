@@ -352,6 +352,16 @@ class FactoryResetTest {
         assertEquals(ResetKeep(), picked)
     }
 
+    // (owner 2026-10-18, review SP32: "Maybe add a bit saying items not saved as theme/layout/palette/font/image/
+    // blah/blah will still be lost?") Fail before: no such line
+    @Test fun `the dialog - under the saved items box while it is ticked, that unsaved changes are still reset`() {
+        showDialog()
+        val line = "Changes you haven't saved as a layout, popup set, theme or palette are still reset."
+        compose.onNodeWithText(line).assertExists()
+        compose.onNodeWithText("Saved layouts & popups, themes & color palettes, added dictionaries, and loaded fonts and pictures").performClick()
+        compose.onNodeWithText(line).assertDoesNotExist()
+    }
+
     @Test fun `the dialog - Backup asks for the backup`() {
         var asked = 0
         showDialog(onBackup = { asked++ })

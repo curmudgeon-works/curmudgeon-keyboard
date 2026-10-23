@@ -452,6 +452,9 @@
     <string name="factory_reset_learned_words">Learned and blacklisted words</string>
     <string name="factory_reset_clipboard">Clipboard history</string>
     <string name="factory_reset_custom">Saved layouts &amp; popups, themes &amp; color palettes, added dictionaries, and loaded fonts and pictures</string>
+    <!-- under factory_reset_custom while it is ticked (owner 2026-10-18, review SP32: "Maybe add a bit saying items not
+         saved as theme/layout/palette/font/image/blah/blah will still be lost?") -->
+    <string name="factory_reset_custom_unsaved">Changes you haven\'t saved as a layout, popup set, theme or palette are still reset.</string>
     <string name="factory_reset_button">Reset</string>
     <string name="factory_reset_done">Reset done</string>
     <string name="backspace_settings">Backspace</string>

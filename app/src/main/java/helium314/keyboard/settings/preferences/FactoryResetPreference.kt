@@ -129,6 +129,10 @@ internal fun FactoryResetDialog(backedUp: Boolean, backupRunning: Boolean, onDis
                 CheckRow(R.string.factory_reset_learned_words, words) { words = it }
                 CheckRow(R.string.factory_reset_clipboard, clipboard) { clipboard = it }
                 CheckRow(R.string.factory_reset_custom, own) { own = it }
+                // (owner 2026-10-18, review SP32: "Maybe add a bit saying items not saved as theme/layout/palette/font/
+                // image/blah/blah will still be lost?": only while that box is ticked)
+                if (own) Text(stringResource(R.string.factory_reset_custom_unsaved), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 48.dp))
                 if (backupRunning) Text(stringResource(R.string.backup_running), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
             }
