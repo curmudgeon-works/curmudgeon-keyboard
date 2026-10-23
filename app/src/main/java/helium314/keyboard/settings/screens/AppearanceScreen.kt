@@ -781,8 +781,8 @@ private fun SavedLooksPreference(setting: Setting) {
         val others = remember(look) { otherUsers(ctx, AppearanceLooks.PREF_SELECTED, look.name,
             edited, helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE) }
         val sameAs = remember(look) { looks.firstOrNull { it !== look && differs[it] == false }?.name }
-        helium314.keyboard.settings.dialogs.UpdateSavedItemDialog(look.name, updateNames(ctx, others, common), sameAs,
-            onDismissRequest = { toUpdate = null }, commonFrom = common, anyHidden = others.isNotEmpty(),
+        helium314.keyboard.settings.dialogs.UpdateSavedItemDialog(look.name, userNames(ctx, others), sameAs,
+            onDismissRequest = { toUpdate = null }, commonFrom = common, anyListed = others.isNotEmpty(),
         ) { selected ->
             val updated = AppearanceLooks.saved(ctx, look.name, chosen)
             store(looks.map { if (it === look) updated else it })

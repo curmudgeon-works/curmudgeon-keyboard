@@ -122,12 +122,12 @@ class LayoutDeleteEffectsTest {
         assertEquals("These keyboards keep their keys, as an unsaved layout:\n$bName\n$aName\n\n" +
             "Settings are common to all your keyboards (App settings › Per keyboard), so every keyboard follows $aName, first in your list.",
             LayoutUtilsCustom.deleteWarning(x, type, ctx))
-        // a hidden own default: marked, and the update questions' line (a pick is in the keyboard's definition: never)
+        // a hidden own default: listed (no "(hidden)" mark, owner 2026-10-18), and the update questions' line
         real.edit().putString(idKey(3, defaultKey), x).commit()
         val cName = helium314.keyboard.settings.screens.keyboardName(before[2], ctx)
-        assertEquals("These keyboards keep their keys, as an unsaved layout:\n$bName\n$aName\n$cName (hidden)\n\n" +
+        assertEquals("These keyboards keep their keys, as an unsaved layout:\n$bName\n$aName\n$cName\n\n" +
             "Settings are common to all your keyboards (App settings › Per keyboard), so every keyboard follows $aName, first in " +
-            "your list. Keyboards marked (hidden) keep this change for when settings are per keyboard.",
+            "your list. The keyboards below get this change in their own settings, which they use once you turn on Per keyboard.",
             LayoutUtilsCustom.deleteWarning(x, type, ctx))
         real.edit().remove(idKey(3, defaultKey)).commit()
         LayoutUtilsCustom.deleteLayout(x, type, ctx)

@@ -68,10 +68,10 @@ class ReReview2S6Test {
     @Test fun `with one set of settings a switched-off keyboard's kept own set is named too, like an enabled one's`() {
         // (the delete resets every set, hidden ones too; enabled keyboards' hidden sets are named already)
         real.edit { putBoolean("separate_settings_per_keyboard", false) }
-        // (marked hidden, and the line on the common settings under the list: owner 2026-10-18, review SP10)
-        assertEquals(listOf(ctx.getString(R.string.keyboard_hidden_set, offName())), fontUsers(ctx, "Mine.ttf"))
+        // (the line on the common settings under the list: owner 2026-10-18, review SP10; no "(hidden)" mark)
+        assertEquals(listOf(offName()), fontUsers(ctx, "Mine.ttf"))
         assertEquals("Settings are common to all your keyboards (App settings › Per keyboard), so every keyboard follows Work, " +
-            "first in your list. Keyboards marked (hidden) keep this change for when settings are per keyboard.",
+            "first in your list. The keyboards below get this change in their own settings, which they use once you turn on Per keyboard.",
             fontDeleteWarning(ctx, "Mine.ttf").second)
     }
 

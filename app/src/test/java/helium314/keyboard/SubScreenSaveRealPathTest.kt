@@ -329,7 +329,9 @@ class SubScreenSaveRealPathTest {
         compose.onNodeWithText("(hidden)", substring = true).assertDoesNotExist() // (separate settings: none hidden)
     }
 
-    @Test fun `edit question - settings common, two keyboards - keyboard 2 marked hidden, the line says why`() {
+    // (owner 2026-10-18: "Don't mention '(hidden)' in parentheses, that seems confusing. Broader messaging on common
+    // settings should address this". Fail before: "(hidden)" after keyboard 2, and the line named the marks)
+    @Test fun `edit question - settings common, two keyboards - keyboard 2 listed without a mark, the line says why`() {
         commonSettings()
         appearance()
         screen = SUB; idle()
@@ -337,8 +339,9 @@ class SubScreenSaveRealPathTest {
         arrowBack()
         click(ctx.getString(R.string.save_and_exit))
         shows(ctx.getString(R.string.palette_edit_title, "Warm"))
-        checkbox("$kb2Name (hidden)").assertIsOn()
-        checkbox(sunsetName).assertIsOn() // (a saved theme: no mark)
+        checkbox(kb2Name).assertIsOn()
+        checkbox(sunsetName).assertIsOn()
+        compose.onNodeWithText("(hidden)", substring = true).assertDoesNotExist() // (owner 2026-10-18: no marks)
         shows(hiddenNote)
     }
 
@@ -362,14 +365,14 @@ class SubScreenSaveRealPathTest {
     }
 
     // (owner 2026-10-18, SP10: "Only show those that actually go back to default (as they would with separate settings).
-    // But should clarify as per usual pattern that keyboards are using common settings of primary.") Fail before: no
-    // (hidden) mark and no line
-    @Test fun `delete question - settings common - keyboard 2 marked hidden, the line says why`() {
+    // But should clarify as per usual pattern that keyboards are using common settings of primary.") Fail before: no line
+    @Test fun `delete question - settings common - keyboard 2 listed, the line says why`() {
         commonSettings()
         appearance()
         compose.onNode(hasText(ctx.getString(R.string.theme_colors_light)) and hasClickAction()).performClick(); idle()
         compose.onNode(hasContentDescription(ctx.getString(R.string.delete)) and hasAnyAncestor(isDialog())).performClick(); idle()
-        shows("Used by:\n$kb2Name (hidden)\n" + ctx.getString(R.string.update_item_theme, "Sunset"))
+        shows("Used by:\n$kb2Name\n" + ctx.getString(R.string.update_item_theme, "Sunset"))
+        compose.onNodeWithText("(hidden)", substring = true).assertDoesNotExist() // (owner 2026-10-18: no marks)
         shows(hiddenNote)
     }
 
@@ -382,8 +385,8 @@ class SubScreenSaveRealPathTest {
     }
 
     // the theme's trash on Appearance (owner 2026-10-18, SP10). Fail before: keyboard 3, which only reads keyboard 1's
-    // choice through the common settings, was named too; keyboard 2 wasn't marked, and no line
-    @Test fun `theme delete - settings common - only the own sets named, keyboard 2 marked hidden, the line says why`() {
+    // choice through the common settings, was named too, and no line
+    @Test fun `theme delete - settings common - only the own sets named, the line says why`() {
         commonSettings()
         withKeyboard3()
         real.edit().putString(own(1, AppearanceLooks.PREF_SELECTED), "Sunset").commit()
@@ -391,7 +394,7 @@ class SubScreenSaveRealPathTest {
         compose.onNodeWithText(ctx.getString(R.string.appearance_looks), substring = true).performClick(); idle()
         compose.onNode(hasScrollAction() and hasAnyAncestor(isDialog())).performScrollToNode(hasText("Sunset"))
         clickIcon(ctx.getString(R.string.delete))
-        shows(ctx.resources.getQuantityString(R.plurals.delete_keeps_theme, 2, "$kb1Name\n$kb2Name (hidden)") + "\n\n" + hiddenNote)
+        shows(ctx.resources.getQuantityString(R.plurals.delete_keeps_theme, 2, "$kb1Name\n$kb2Name") + "\n\n" + hiddenNote)
         compose.onNodeWithText(helium314.keyboard.settings.screens.keyboardName(kb3, ctx), substring = true).assertDoesNotExist()
     }
 
@@ -415,30 +418,31 @@ class SubScreenSaveRealPathTest {
     }
 
     // (owner 2026-10-18: "yes, makes sense to follow established pattern from restore": with the settings common and
-    // more than one keyboard, the questions say "the common settings", not "this keyboard", and mark the keyboards whose
-    // hidden own sets the change goes into)
+    // more than one keyboard, a line under the list says every keyboard follows the first and the listed ones get the
+    // change in their own settings; no "(hidden)" marks, owner 2026-10-18)
     private val kb1Name get() = helium314.keyboard.settings.screens.keyboardName(kb1, ctx)
     private val hiddenNote get() = "Settings are common to all your keyboards (App settings › Per keyboard), so every keyboard " +
-        "follows $kb1Name, first in your list. Keyboards marked (hidden) keep this change for when settings are per keyboard."
+        "follows $kb1Name, first in your list. The keyboards below get this change in their own settings, which they use once you turn on Per keyboard."
     private fun commonSettings() { real.edit().putBoolean("separate_settings_per_keyboard", false).commit() }
 
     // (owner 2026-10-18, SP3: "Sunset gets the settings on this screen." "I like this common message": the first line and
     // the save icon are the same in both modes; the line under the list stays). Fail before: "gets the common settings,
     // which all your keyboards follow" and "Update with the common settings" when common, "gets this keyboard's settings"
     // and "Update with this keyboard's settings" when separate
-    @Test fun `Update question - settings common, two keyboards - the settings on this screen, keyboard 2 marked hidden, the line says why`() {
+    @Test fun `Update question - settings common, two keyboards - the settings on this screen, keyboard 2 listed, the line says why`() {
         commonSettings()
         openUpdateSunset()
         shows("Sunset gets the settings on this screen.")
         compose.onNodeWithText("gets the common settings", substring = true).assertDoesNotExist()
         compose.onNodeWithText("gets this keyboard", substring = true).assertDoesNotExist()
-        checkbox("$kb2Name (hidden)").assertIsOn()
+        checkbox(kb2Name).assertIsOn()
+        compose.onNodeWithText("(hidden)", substring = true).assertDoesNotExist() // (owner 2026-10-18: no marks)
         shows(hiddenNote)
         click(ctx.getString(R.string.update_item))
         assertEquals("ocean", real.getString(own(2, Settings.PREF_THEME_COLORS), null)) // into keyboard 2's own (hidden) set
     }
 
-    @Test fun `Update question - separate settings - the settings on this screen, no hidden mark, no line`() {
+    @Test fun `Update question - separate settings - the settings on this screen, no line`() {
         openUpdateSunset()
         shows("Sunset gets the settings on this screen.")
         compose.onNodeWithText("gets this keyboard", substring = true).assertDoesNotExist()

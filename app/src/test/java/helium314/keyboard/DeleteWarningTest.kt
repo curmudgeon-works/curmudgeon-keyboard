@@ -145,17 +145,17 @@ class DeleteWarningTest {
             deleteKeepersText(ctx, R.plurals.delete_keeps_layout, layout, "Y"))
         val set = KeyPopupOverrides.PREF_SELECTED_SET
         real.edit { putString(idKey(1, set), "S") } // hidden
-        assertEquals("This keyboard keeps its popups, shown as Custom:\nWork (hidden)\n\n" + hiddenNote(bName),
+        assertEquals("This keyboard keeps its popups, shown as Custom:\nWork\n\n" + hiddenNote(bName),
             deleteKeepersText(ctx, R.plurals.delete_keeps_popup_set, set, "S"))
     }
 
     private fun hiddenNote(first: String) = "Settings are common to all your keyboards (App settings › Per keyboard), so every " +
-        "keyboard follows $first, first in your list. Keyboards marked (hidden) keep this change for when settings are per keyboard."
+        "keyboard follows $first, first in your list. The keyboards below get this change in their own settings, which they use once you turn on Per keyboard."
 
     // (owner 2026-10-18, SP10: "Only show those that actually go back to default (as they would with separate settings).
     // But should clarify as per usual pattern that keyboards are using common settings of primary." Fail before: B,
     // reading A's theme through the common settings, was named, and nothing said why the others follow A)
-    @Test fun `settings common - names the own sets only, the first keyboard unmarked, the others hidden, and the line`() {
+    @Test fun `settings common - names the own sets only, no marks, and the line`() {
         val key = AppearanceLooks.PREF_SELECTED
         real.edit { putBoolean("separate_settings_per_keyboard", false); putString(idKey(1, key), "Sunset") }
         assertEquals("This keyboard keeps its colors and look, shown as Custom. Nothing goes back to the default:\nWork\n\n" +
@@ -163,9 +163,9 @@ class DeleteWarningTest {
             deleteKeepersText(ctx, R.plurals.delete_keeps_theme, key, "Sunset"))
         real.edit { putString(idKey(2, key), "Sunset") } // B's own set, hidden behind A's
         assertEquals("These keyboards keep its colors and look, shown as Custom. Nothing goes back to the default:\nWork\n" +
-            "${keyboardName(b, ctx)} (hidden)\n\n" + hiddenNote("Work"),
+            "${keyboardName(b, ctx)}\n\n" + hiddenNote("Work"),
             deleteKeepersText(ctx, R.plurals.delete_keeps_theme, key, "Sunset"))
-        // separate settings: the same keyboards, no mark, no line
+        // separate settings: the same keyboards, no line
         real.edit { putBoolean("separate_settings_per_keyboard", true) }
         assertEquals("These keyboards keep its colors and look, shown as Custom. Nothing goes back to the default:\nWork\n" +
             keyboardName(b, ctx), deleteKeepersText(ctx, R.plurals.delete_keeps_theme, key, "Sunset"))
@@ -174,7 +174,7 @@ class DeleteWarningTest {
     @Test fun `a shared menu with separate settings - the line too`() {
         real.edit { putBoolean(KeyboardProfiles.Group.LAYOUT.prefKey, true); putString(idKey(2, KeyPopupOverrides.PREF_SELECTED_SET), "T") }
         KeyboardProfiles.loadGroups(real)
-        assertEquals("This keyboard keeps its popups, shown as Custom:\n${keyboardName(b, ctx)} (hidden)\n\n" + hiddenNote("Work"),
+        assertEquals("This keyboard keeps its popups, shown as Custom:\n${keyboardName(b, ctx)}\n\n" + hiddenNote("Work"),
             deleteKeepersText(ctx, R.plurals.delete_keeps_popup_set, KeyPopupOverrides.PREF_SELECTED_SET, "T"))
         assertNull(deleteKeepersText(ctx, R.plurals.delete_keeps_layout, layout, "T")) // (nobody: no line alone)
     }

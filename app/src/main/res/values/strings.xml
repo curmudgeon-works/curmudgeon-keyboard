@@ -760,10 +760,11 @@
     <string name="update_item_icon_screen">Update with the settings on this screen</string>
     <!-- a keyboard in an update question whose own settings, which the change goes into, are hidden behind the common ones; %s = its name -->
     <string name="keyboard_hidden_set">%s (hidden)</string>
-    <!-- under an update question's list when one is marked (hidden); %s = the first keyboard in the list -->
-    <string name="update_item_hidden_note">Settings are common to all your keyboards (App settings › Per keyboard), so every keyboard follows %s, first in your list. Keyboards marked (hidden) keep this change for when settings are per keyboard.</string>
-    <!-- under a delete warning's list when the item's settings are common to all keyboards and none listed is marked
-         (hidden): update_item_hidden_note's first sentence (owner 2026-10-18: "should clarify as per usual pattern that
+    <!-- under an update question's list when the settings are common and a keyboard is listed (owner 2026-10-18, no
+         "(hidden)" marks); %s = the first keyboard in the list -->
+    <string name="update_item_hidden_note">Settings are common to all your keyboards (App settings › Per keyboard), so every keyboard follows %s, first in your list. The keyboards below get this change in their own settings, which they use once you turn on Per keyboard.</string>
+    <!-- under a delete warning's list when the item's settings are common to all keyboards and only the first keyboard
+         is listed: update_item_hidden_note's first sentence (owner 2026-10-18: "should clarify as per usual pattern that
          keyboards are using common settings of primary"); %s = the first keyboard in the list -->
     <string name="delete_common_note">Settings are common to all your keyboards (App settings › Per keyboard), so every keyboard follows %s, first in your list.</string>
     <!-- a saved item with these exact settings exists already (Update, Save as new); nothing is blocked -->

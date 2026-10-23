@@ -184,8 +184,8 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                 .filter { it.values[KeyPopupOverrides.PREF_SELECTED_SET] == name }.map { it.name } }
             val sameAs = remember(name) { userSets.firstOrNull { it.name != name && setDiffers[it.name] == false }?.name }
             if (set != null) helium314.keyboard.settings.dialogs.UpdateSavedItemDialog(name,
-                updateNames(ctx, keyboards, common) + layouts.map { ctx.getString(R.string.update_item_layout, it) }, sameAs,
-                onDismissRequest = { setToUpdate = null }, commonFrom = common, anyHidden = keyboards.isNotEmpty(),
+                userNames(ctx, keyboards) + layouts.map { ctx.getString(R.string.update_item_layout, it) }, sameAs,
+                onDismissRequest = { setToUpdate = null }, commonFrom = common, anyListed = keyboards.isNotEmpty(),
             ) { selected ->
                 storeInSet(name, KeyPopupOverrides.load(prefs))
                 val updated = KeyPopupOverrides.loadSets(ctx.realPrefs()).first { it.name == name }

@@ -124,11 +124,6 @@ fun commonFrom(ctx: Context, group: helium314.keyboard.latin.settings.KeyboardPr
     return keyboardName(helium314.keyboard.latin.settings.KeyboardProfiles.mainKeyboard(real), ctx)
 }
 
-/** [keyboards] as the update questions name them ([userNames]), each "<name> (hidden)" when [commonFrom] isn't null:
- *  they're listed by their own sets' choices ([otherUsers]), and with the settings common those sets are hidden behind
- *  the common ones, which the change already reaches (review SP28, SP5/6). */
-fun updateNames(ctx: Context, keyboards: List<SettingsSubtype>, commonFrom: String?): List<String> =
-    userNames(ctx, keyboards).map { if (commonFrom == null) it else ctx.getString(R.string.keyboard_hidden_set, it) }
 
 /** The keyboards, in the Keyboards screen's order, that use a saved item (a Layout, theme, popup set or font) through
  *  [keys] ([helium314.keyboard.latin.settings.KeyboardProfiles.keyboardsUsing]), then the switched-off ones
@@ -215,11 +210,12 @@ fun commonFromKeys(ctx: Context, keys: Collection<String>): String? {
  * A delete warning's [keyboards] by name ([userNames]) and the line under them (owner 2026-10-18, review SP10: "Only
  * show those that actually go back to default (as they would with separate settings). But should clarify as per usual
  * pattern that keyboards are using common settings of primary."). With the item's [keys] read from the common settings
- * ([commonFromKeys]), each of [throughSet] but the first keyboard (whose own set is the common one) is "<name>
- * (hidden)", as the update questions mark them ([updateNames]), and the line is theirs ([HiddenSetsNote]'s) when one
- * is marked, else its first sentence: every keyboard follows the first one. No line with separate settings, nor when
- * none is listed through its set. [throughSet]: the ones of [keyboards] listed by their own set's choice (not by a
- * layout picked in their definition, which is never hidden).
+ * ([commonFromKeys]) the line is the update questions' ([HiddenSetsNote]'s) when one of [throughSet] but the first
+ * keyboard (whose own set is the common one) is listed, else its first sentence: every keyboard follows the first one.
+ * No "(hidden)" marks (owner 2026-10-18: "Don't mention '(hidden)' in parentheses, that seems confusing. Broader
+ * messaging on common settings should address this"). No line with separate settings, nor when none is listed through
+ * its set. [throughSet]: the ones of [keyboards] listed by their own set's choice (not by a layout picked in their
+ * definition, whose settings are never hidden).
  */
 fun deleteWarningNames(ctx: Context, keyboards: List<SettingsSubtype>, keys: Collection<String>,
                        throughSet: List<SettingsSubtype> = keyboards): Pair<List<String>, String?> {
@@ -227,11 +223,9 @@ fun deleteWarningNames(ctx: Context, keyboards: List<SettingsSubtype>, keys: Col
     val viaSet = keyboards.filter { kb -> throughSet.any { it.sameKeyboard(kb) } }
     val common = viaSet.takeIf { it.isNotEmpty() }?.let { commonFromKeys(ctx, keys) } ?: return names to null
     val first = helium314.keyboard.latin.settings.KeyboardProfiles.mainKeyboard(ctx.realPrefs())
-    fun hidden(kb: SettingsSubtype) = viaSet.any { it.sameKeyboard(kb) } && !kb.sameKeyboard(first)
-    val marked = keyboards.zip(names) { kb, name -> if (hidden(kb)) ctx.getString(R.string.keyboard_hidden_set, name) else name }
-    val note = if (keyboards.any(::hidden)) ctx.getString(R.string.update_item_hidden_note, common)
+    val note = if (viaSet.any { !it.sameKeyboard(first) }) ctx.getString(R.string.update_item_hidden_note, common)
         else ctx.getString(R.string.delete_common_note, common)
-    return marked to note
+    return names to note
 }
 
 /** [KeyboardSettingsEntries] of the keyboard's own screen, one search result each ([KeyboardSettingsEntries]' only);
