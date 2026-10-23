@@ -132,17 +132,18 @@ class ReReview2R7Test {
         val appearance = ctx.getString(helium314.keyboard.settings.screens.groupTitle(KeyboardProfiles.Group.APPEARANCE))
         val restoredHi = restoreChosenFrom(ctx, zip, listOf(hiInBackup), settings = true, learnedWords = false,
             io = helium314.keyboard.latin.personalization.LearnedStoreIo.Native, decisions = mapOf(hiInBackup to RestoreDecision.Merge(hi)))
-        assertTrue("$hiName's settings were restored. $appearance is common to all your keyboards (App settings › Separate settings per keyboard) " +
-            "and comes from $enName, first in your list, so every keyboard follows $enName for it. $hiName's restored $appearance " +
-            "shows once you turn on $appearance there." in restoreSummary(ctx, restoredHi).lines(), restoreSummary(ctx, restoredHi))
+        // (the private build has more menus, the Fine-tune ones, and lists those restored and shared: the line, not the list)
+        val hiLine = restoreSummary(ctx, restoredHi).lines().firstOrNull { it.startsWith("$hiName's settings were restored. ") }
+        assertTrue(hiLine != null && "common to all your keyboards (App settings › Separate settings per keyboard)" in hiLine &&
+            "from $enName, first in your list, so every keyboard follows $enName" in hiLine && "once you turn on" in hiLine, restoreSummary(ctx, restoredHi))
         // the first keyboard's: every keyboard uses them
         val restoredEn = restoreChosenFrom(ctx, zip, listOf(enInBackup), settings = true, learnedWords = false,
             io = helium314.keyboard.latin.personalization.LearnedStoreIo.Native, decisions = mapOf(enInBackup to RestoreDecision.Merge(en)))
-        assertTrue("$enName's settings were restored. $appearance is common to all your keyboards (App settings › Separate settings per keyboard), " +
-            "and $enName is first in your list, so every keyboard uses its restored $appearance." in restoreSummary(ctx, restoredEn).lines(),
-            restoreSummary(ctx, restoredEn))
-        // nothing shared: nothing said about common menus
-        real.edit().putBoolean(KeyboardProfiles.Group.APPEARANCE.prefKey, false).commit()
+        val enLine = restoreSummary(ctx, restoredEn).lines().firstOrNull { it.startsWith("$enName's settings were restored. ") }
+        assertTrue(enLine != null && appearance in enLine && "common to all your keyboards (App settings › Separate settings per keyboard)" in enLine &&
+            "$enName is first in your list, so every keyboard uses its restored" in enLine, restoreSummary(ctx, restoredEn))
+        // nothing shared: nothing said about common menus (every menu, the private build's Fine-tune ones shared by default)
+        real.edit().apply { for (group in KeyboardProfiles.Group.entries) putBoolean(group.prefKey, false) }.commit()
         KeyboardProfiles.loadGroups(real)
         val again = restoreChosenFrom(ctx, zip, listOf(hiInBackup), settings = true, learnedWords = false,
             io = helium314.keyboard.latin.personalization.LearnedStoreIo.Native, decisions = mapOf(hiInBackup to RestoreDecision.Merge(hi)))
