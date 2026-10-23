@@ -236,6 +236,11 @@
     <string name="learned_words_group_new">New words</string>
     <string name="learned_words_group_dictionary">Dictionary words</string>
     <string name="learned_words_group_other">#</string>
+    <string name="learned_words_group_same_as_sort">Same as sort</string>
+    <string name="learned_words_group_this_week">This week</string>
+    <string name="learned_words_group_this_month">This month</string>
+    <string name="learned_words_group_older">Older</string>
+    <string name="learned_words_group_date_unknown">Date unknown</string>
     <!-- Name of the main dictionary, as opposed to auxiliary dictionaries (medical/entertainment/sports...) -->
     <string name="main_dictionary">Main dictionary</string>
     <!-- Option to enable showing suggestions -->

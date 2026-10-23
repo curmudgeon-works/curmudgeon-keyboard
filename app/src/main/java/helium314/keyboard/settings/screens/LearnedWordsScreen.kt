@@ -332,12 +332,13 @@ private fun SortMenu(expanded: Boolean, onDismiss: () -> Unit, view: ListView, b
             SortBy.COUNT to (if (blacklisted) R.string.learned_words_sort_strikes else R.string.learned_words_sort_typed),
             SortBy.DATE to (if (blacklisted) R.string.learned_words_sort_last_removed else R.string.learned_words_sort_last_typed))
         for ((by, text) in sorts) Choice(text, view.sort == by, if (view.descending) "↓" else "↑") { onPick(view.sortedBy(by)) }
-        HorizontalDivider()
-        Label(R.string.learned_words_group_heading)
-        val groups = listOfNotNull(GroupBy.LETTER to R.string.learned_words_group_letter,
-            GroupBy.COUNT to (if (blacklisted) R.string.learned_words_sort_strikes else R.string.learned_words_sort_typed),
-            if (blacklisted) null else GroupBy.SOURCE to R.string.learned_words_group_source)
-        for ((by, text) in groups) Choice(text, view.group == by, "✓") { onPick(view.copy(group = by)) }
+        // (the blacklist has one grouping only, the sort's: no choice to show)
+        if (!blacklisted) {
+            HorizontalDivider()
+            Label(R.string.learned_words_group_heading)
+            val groups = listOf(GroupBy.SORT to R.string.learned_words_group_same_as_sort, GroupBy.SOURCE to R.string.learned_words_group_source)
+            for ((by, text) in groups) Choice(text, view.group == by, "✓") { onPick(view.copy(group = by)) }
+        }
     } } }
 }
 
@@ -399,6 +400,10 @@ internal sealed interface GroupTitle {
     class Strikes(val strikes: Int, val confirmed: Boolean) : GroupTitle
     object New : GroupTitle
     object Dictionary : GroupTitle
+    object ThisWeek : GroupTitle // last typed / removed in the last 7 days
+    object ThisMonth : GroupTitle // in the last 30 days, before that
+    object Older : GroupTitle
+    object DateUnknown : GroupTitle
 
     @Composable
     fun text(): String = when (this) {
@@ -417,6 +422,10 @@ internal sealed interface GroupTitle {
         }
         New -> stringResource(R.string.learned_words_group_new)
         Dictionary -> stringResource(R.string.learned_words_group_dictionary)
+        ThisWeek -> stringResource(R.string.learned_words_group_this_week)
+        ThisMonth -> stringResource(R.string.learned_words_group_this_month)
+        Older -> stringResource(R.string.learned_words_group_older)
+        DateUnknown -> stringResource(R.string.learned_words_group_date_unknown)
     }
 }
 
@@ -428,11 +437,15 @@ internal sealed interface GroupTitle {
  * grouping for personal word / dictionary word"). The choice is remembered per list. Picking the sort in use again
  * turns its order round. Inside a group the sort applies; words without a count or date (personal dictionary only, a
  * removal from before dates were kept) go last either way, and equal ones A–Z.
+ * Groups follow the sort (owner 2026-10-18: "groups follow sort"): A–Z gives first letters, Times typed / Strikes the
+ * count groups, Last typed / Last removed date groups (this week, this month, older); "New or dictionary word" stays as
+ * the one other grouping (Your words only).
  */
 internal enum class SortBy { ALPHA, COUNT, DATE }
-internal enum class GroupBy { LETTER, COUNT, SOURCE }
+/** SORT: the groups of the sort in use (letters, counts or dates). */
+internal enum class GroupBy { SORT, SOURCE }
 
-internal data class ListView(val sort: SortBy = SortBy.ALPHA, val descending: Boolean = false, val group: GroupBy = GroupBy.LETTER) {
+internal data class ListView(val sort: SortBy = SortBy.ALPHA, val descending: Boolean = false, val group: GroupBy = GroupBy.SORT) {
     /** [by] picked in the menu: the sort in use turned round, another one from its usual end (A–Z; most, latest first). */
     fun sortedBy(by: SortBy) = if (by == sort) copy(descending = !descending) else copy(sort = by, descending = by != SortBy.ALPHA)
 
@@ -441,7 +454,9 @@ internal data class ListView(val sort: SortBy = SortBy.ALPHA, val descending: Bo
     companion object {
         fun decode(value: String?): ListView = try {
             val (sort, descending, group) = value!!.split(',')
-            ListView(SortBy.valueOf(sort), descending.toBooleanStrict(), GroupBy.valueOf(group))
+            // (the groupings before they followed the sort, first letter and count: the sort's now)
+            ListView(SortBy.valueOf(sort), descending.toBooleanStrict(),
+                if (group == "LETTER" || group == "COUNT") GroupBy.SORT else GroupBy.valueOf(group))
         } catch (e: Exception) { ListView() }
 
         // (a view setting of this screen, not a keyboard setting: its own file, not in the settings or their backups)
@@ -461,6 +476,16 @@ internal fun typedGroup(typed: Int): GroupTitle = when {
     typed <= 50 -> GroupTitle.Typed(21, 50)
     else -> GroupTitle.Typed(51, null)
 }
+
+/** The date groups: the group of a word last typed / removed at [seconds] (0: not known), [now] in seconds. */
+internal fun dateGroup(seconds: Long, now: Long): GroupTitle = when {
+    seconds <= 0 -> GroupTitle.DateUnknown
+    now - seconds <= 7 * DAY_SECONDS -> GroupTitle.ThisWeek
+    now - seconds <= 30 * DAY_SECONDS -> GroupTitle.ThisMonth
+    else -> GroupTitle.Older
+}
+
+private const val DAY_SECONDS = 24 * 60 * 60L
 
 internal class Item(val entry: Entry, val kind: Kind) : Row {
     @Composable
@@ -492,14 +517,15 @@ internal class WordLists(val yours: List<Entry>, val blacklisted: List<Entry>) {
      * One list: the learned words with the personal dictionary's, or the blacklisted words (the page's title says
      * which), grouped and sorted as [view] says; the words of a group in [folded] aren't listed (while searching all are).
      */
-    fun rows(term: String, ofBlacklist: Boolean, view: ListView = ListView(), folded: Set<String> = emptySet()): List<Row> {
+    fun rows(term: String, ofBlacklist: Boolean, view: ListView = ListView(), folded: Set<String> = emptySet(),
+             now: Long = System.currentTimeMillis() / 1000): List<Row> {
         val result = mutableListOf<Row>()
         val entries = if (ofBlacklist) blacklisted else yours
         val shown = matching(entries, term)
         if (ofBlacklist && shown.isNotEmpty() && term.isBlank()) result.add(Row.Note(R.string.learned_words_blacklisted_summary))
         if (shown.isEmpty()) result.add(Row.Note(R.string.learned_words_none))
         val kind = if (ofBlacklist) Kind.BLACKLISTED else Kind.YOURS
-        for ((id, title, words) in groups(shown, ofBlacklist, view)) {
+        for ((id, title, words) in groups(shown, ofBlacklist, view, now)) {
             val fold = term.isBlank() && id in folded
             result.add(Row.Group(id, title, words.map { it.key }, fold))
             if (!fold) words.mapTo(result) { Item(it, kind) }
@@ -512,8 +538,10 @@ internal class WordLists(val yours: List<Entry>, val blacklisted: List<Entry>) {
         fun matching(entries: List<Entry>, term: String): List<Entry> =
             if (term.isBlank()) entries else entries.filter { e -> e.spellings.any { it.contains(term, true) } }
 
-        /** [entries] in their groups (id, heading, words), each sorted, in [view]'s order. */
-        fun groups(entries: List<Entry>, ofBlacklist: Boolean, view: ListView): List<Triple<String, GroupTitle, List<Entry>>> {
+        /** [entries] in their groups (id, heading, words), each sorted, in [view]'s order; [now]: in seconds, for the
+         *  date groups. */
+        fun groups(entries: List<Entry>, ofBlacklist: Boolean, view: ListView,
+                   now: Long = System.currentTimeMillis() / 1000): List<Triple<String, GroupTitle, List<Entry>>> {
             fun count(e: Entry) = if (ofBlacklist) e.strikes else e.typed
             fun date(e: Entry) = if (ofBlacklist) e.removedAt else e.lastTyped
             // A–Z, or by count or date with the ones without either last (whichever way round); equal ones A–Z
@@ -525,16 +553,25 @@ internal class WordLists(val yours: List<Entry>, val blacklisted: List<Entry>) {
                 SortBy.DATE -> compareBy<Entry> { date(it) <= 0 }.thenComparator { a, b ->
                     if (view.descending) date(b).compareTo(date(a)) else date(a).compareTo(date(b)) }.then(alpha)
             }
-            // the groups: letters A–Z (Z–A with the words), counts most first (fewest first with the words sorted so),
-            // new words before dictionary words; "#" and "Not typed yet" last
-            val group = view.group.takeUnless { ofBlacklist && it == GroupBy.SOURCE } ?: GroupBy.LETTER
-            val countUp = view.sort == SortBy.COUNT && !view.descending
+            // the groups, the sort's unless New or dictionary word: letters A–Z (Z–A with the words), counts and dates
+            // in the words' order (most / latest first, or fewest / earliest), new words before dictionary words; "#",
+            // "Not typed yet" and "Date unknown" last
+            val group = if (ofBlacklist || view.group == GroupBy.SORT) view.sort else null
+            val countUp = !view.descending
             val byGroup = when (group) {
-                GroupBy.LETTER -> entries.groupBy { e -> e.word.firstOrNull()?.takeIf { it.isLetter() }?.uppercase() ?: "#" }
+                SortBy.ALPHA -> entries.groupBy { e -> e.word.firstOrNull()?.takeIf { it.isLetter() }?.uppercase() ?: "#" }
                     .entries.sortedWith(compareBy<Map.Entry<String, List<Entry>>> { it.key == "#" }.thenComparator { a, b ->
-                        if (view.sort == SortBy.ALPHA && view.descending) b.key.compareTo(a.key) else a.key.compareTo(b.key) })
+                        if (view.descending) b.key.compareTo(a.key) else a.key.compareTo(b.key) })
                     .map { Triple("letter:${it.key}", GroupTitle.Letter(it.key) as GroupTitle, it.value) }
-                GroupBy.COUNT -> if (ofBlacklist)
+                SortBy.DATE -> {
+                    val order = listOf<GroupTitle>(GroupTitle.Older, GroupTitle.ThisMonth, GroupTitle.ThisWeek)
+                        .let { if (view.descending) it.reversed() else it } + GroupTitle.DateUnknown
+                    val ids = mapOf(GroupTitle.ThisWeek to "week", GroupTitle.ThisMonth to "month", GroupTitle.Older to "older",
+                        GroupTitle.DateUnknown to "unknown")
+                    val byDate = entries.groupBy { dateGroup(date(it), now) }
+                    order.mapNotNull { title -> byDate[title]?.let { Triple("date:${ids[title]}", title, it) } }
+                }
+                SortBy.COUNT -> if (ofBlacklist)
                     entries.groupBy { it.strikes to (it.strikes == 3 && it.confirmed) }.entries
                         .sortedWith(compareBy<Map.Entry<Pair<Int, Boolean>, List<Entry>>> { it.key.first }.thenBy { it.key.second }
                             .let { if (countUp) it else it.reversed() })
@@ -543,7 +580,7 @@ internal class WordLists(val yours: List<Entry>, val blacklisted: List<Entry>) {
                         .sortedWith(compareBy<Map.Entry<Int, List<Entry>>> { it.key == 0 }.thenComparator { a, b ->
                             if (countUp) a.key.compareTo(b.key) else b.key.compareTo(a.key) })
                         .map { Triple("typed:${it.key}", typedGroup(it.value.first().typed), it.value) }
-                GroupBy.SOURCE -> entries.groupBy { it.inDictionary }.entries.sortedBy { it.key }
+                null -> entries.groupBy { it.inDictionary }.entries.sortedBy { it.key }
                     .map { Triple("source:${it.key}", (if (it.key) GroupTitle.Dictionary else GroupTitle.New), it.value) }
             }
             return byGroup.map { (id, title, words) -> Triple(id, title, words.sortedWith(inGroup)) }
