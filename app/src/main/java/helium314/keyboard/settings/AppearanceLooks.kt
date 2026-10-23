@@ -188,6 +188,48 @@ object AppearanceLooks {
     private const val OWN = "own" // (saved looks name a uuid folder or the library; [HELD] is the list's Cancel)
     private fun ownedDir(ctx: Context) = picturesDir(ctx, OWN)
 
+    /** The own pictures ([ownedDir]) [look]'s slots name ({"t": …}). */
+    fun ownPictureNames(look: Look): Set<String> {
+        val refs = (look.values[PICTURES] as? String)?.let { refsOf(it) } ?: return emptySet()
+        return refs.keys().asSequence().mapNotNull { k -> refs.optJSONObject(k)?.optString("t")?.takeIf { it.isNotEmpty() } }.toSet()
+    }
+
+    /** [look] with its own pictures named as [renames] says (old name to new). */
+    fun ownPicturesRenamed(look: Look, renames: Map<String, String>): Look {
+        if (renames.isEmpty()) return look
+        val refs = (look.values[PICTURES] as? String)?.let { refsOf(it) } ?: return look
+        for (k in refs.keys()) refs.optJSONObject(k)?.let { slot -> renames[slot.optString("t")]?.let { slot.put("t", it) } }
+        return Look(look.name, look.values + (PICTURES to LIB + refs.toString()), look.remembered)
+    }
+
+    /**
+     * A partial restore's saved themes ([looks]) that came from the backup: the own pictures they name come too
+     * ([bytes]: the backup's file of a name; review SP26, owner 2026-10-18: "yes, should fix this"; until then only the
+     * library's pictures came, and such a theme named a missing picture). One with the same bytes here already (its name
+     * first) is that one; else it lands under its name, or the next free one ("x 2") when another picture has it. Only
+     * the names a theme has. @return the renames (backup's name to the one here), for [ownPicturesRenamed]; one the
+     * backup hasn't, or that can't be written, stays as it is.
+     */
+    fun landOwnPictures(ctx: Context, looks: List<Look>, bytes: (String) -> ByteArray?): Map<String, String> {
+        val dir = ownedDir(ctx)
+        val renames = HashMap<String, String>()
+        for (name in looks.flatMap { ownPictureNames(it) }.distinct()) {
+            val content = bytes(name) ?: continue
+            val here = dir.listFiles()?.filter { it.isFile }.orEmpty()
+            val same = here.sortedBy { it.name != name }.firstOrNull { it.length() == content.size.toLong() && it.readBytes().contentEquals(content) }
+            val target = same?.name ?: helium314.keyboard.settings.preferences.SavedItemsMerge.freeFileName(name, here.mapTo(HashSet()) { it.name })
+            if (same == null) {
+                val file = java.io.File(dir, target)
+                // (never outside the folder, whatever the backup says)
+                if (!file.canonicalPath.startsWith(dir.canonicalPath + java.io.File.separator)) continue
+                try { dir.mkdirs(); helium314.keyboard.latin.utils.AtomicFiles.write(file, content) }
+                catch (e: Exception) { android.util.Log.w("AppearanceLooks", "could not write a theme's own picture", e); continue }
+            }
+            if (target != name) renames[name] = target
+        }
+        return renames
+    }
+
     /** The file a look's [slot] takes its picture from: its own copy, or the library's. */
     private fun sourceOf(ctx: Context, slot: JSONObject): java.io.File =
         if (slot.has("t")) java.io.File(ownedDir(ctx), slot.optString("t")) else PictureLibrary.file(ctx, slot.optString("p"))

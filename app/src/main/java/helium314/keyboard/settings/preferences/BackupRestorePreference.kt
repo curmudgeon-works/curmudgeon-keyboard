@@ -1935,7 +1935,8 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, plan: Re
     // popup sets, Layouts, themes; the dictionaries; the settings; the keyboards ----
     changing() // (from here on each step changes the device)
     writeKeyLayouts(ctx, keyLayouts, wanted)
-    val applied = if (withSettings) SavedItemsMerge.apply(ctx, real, plan.items, names, write = true, files = backupFiles(pending)) else null
+    val applied = if (withSettings) SavedItemsMerge.apply(ctx, real, plan.items, names, write = true, files = backupFiles(pending),
+        ownPictures = backupOwnPictures(pending)) else null
     // the device's keyboards that used an item now the backup's take it ("they take the backup's look"), by the plan's
     // lists through the id map; a Layout can change their keys, so the merge targets are looked up again
     applied?.let { if (it.replaced.isNotEmpty()) { reapplyReplaced(ctx, plan, it.replaced, ::onDeviceNow); mapTargets() } }
@@ -2069,6 +2070,21 @@ private fun writeKeyLayouts(ctx: Context, keyLayouts: SavedItemsMerge.KeyLayouts
 /** A loaded font's or picture's bytes in the backup of [pending], by kind and name (read when written). */
 private fun backupFiles(pending: PendingRestore): (SavedItemsMerge.Kind, String) -> ByteArray? = { kind, key ->
     val path = "unprotected${File.separator}${if (kind == SavedItemsMerge.Kind.FONTS) "fonts" else "pictures"}${File.separator}$key"
+    ZipInputStream(FileInputStream(pending.file)).use { zip ->
+        var bytes: ByteArray? = null
+        var entry: ZipEntry? = zip.nextEntry
+        while (entry != null && bytes == null) {
+            if (entry.name == path) bytes = zip.readBytes()
+            zip.closeEntry()
+            entry = zip.nextEntry
+        }
+        bytes
+    }
+}
+
+/** A saved theme's own picture in the backup by its name (looks/own/<name>, review SP26), or null. */
+private fun backupOwnPictures(pending: PendingRestore): (String) -> ByteArray? = { name ->
+    val path = "looks${File.separator}own${File.separator}$name"
     ZipInputStream(FileInputStream(pending.file)).use { zip ->
         var bytes: ByteArray? = null
         var entry: ZipEntry? = zip.nextEntry

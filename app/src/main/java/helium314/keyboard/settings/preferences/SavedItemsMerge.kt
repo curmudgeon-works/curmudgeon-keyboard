@@ -353,7 +353,8 @@ internal object SavedItemsMerge {
      * device item follows; else the names only, for "What to merge" (review 2026-10-11 R3).
      */
     fun apply(ctx: Context, real: SharedPreferences, plan: Plan, choices: Choices, write: Boolean,
-              files: ((Kind, String) -> ByteArray?)? = null, phone: Map<String, Any?> = real.all): Applied {
+              files: ((Kind, String) -> ByteArray?)? = null, phone: Map<String, Any?> = real.all,
+              ownPictures: ((String) -> ByteArray?)? = null): Applied {
         val phonePalettes = Palettes.list(phone)
         val palettes = applyKind(plan.palettes, phonePalettes.toList(), choices)
         if (write) Palettes.writeList(real, phonePalettes, palettes.list.toMap())
@@ -393,8 +394,15 @@ internal object SavedItemsMerge {
             look.name to AppearanceLooks.Look(look.name, values, look.remembered)
         }
         val themes = applyKind(plan.themes, phoneThemes, choices)
+        // the backup's themes brought in: the own pictures they name ([ownPictures]: the backup's files), on disk before
+        // the themes naming them (review SP26)
+        val broughtIn = themes.added.keys.mapNotNullTo(HashSet()) { themes.names[it] } + themes.replaced
+        val ownRenames = if (!write || ownPictures == null) emptyMap()
+            else AppearanceLooks.landOwnPictures(ctx, themes.list.filter { it.first in broughtIn }.map { it.second }, ownPictures)
         if (write && (themes.changed() || palettes.phoneRenames.isNotEmpty() || fontRenames.isNotEmpty() || pictures.phoneRenames.isNotEmpty()))
-            AppearanceLooks.save(real, themes.list.map { (name, look) -> AppearanceLooks.Look(name, look.values, look.remembered) }, now = true)
+            AppearanceLooks.save(real, themes.list.map { (name, look) ->
+                AppearanceLooks.Look(name, look.values, look.remembered).let { if (name in broughtIn) AppearanceLooks.ownPicturesRenamed(it, ownRenames) else it }
+            }, now = true)
 
         val phoneRenames = buildMap<String, List<Pair<String, String>>> {
             if (sets.phoneRenames.isNotEmpty()) put(setKey, sets.phoneRenames)
