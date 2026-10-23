@@ -495,14 +495,11 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             return colorMap
         }
 
-        fun getUnusedThemeName(initialName: String, prefs: SharedPreferences): String {
-            val existingNames = getExistingThemeNames(prefs)
-            if (initialName !in existingNames) return initialName
-            var i = 1
-            while ("$initialName$i" in existingNames)
-                i++
-            return "$initialName$i"
-        }
+        /** [initialName], or the next free number when a palette has it, "User 2", as every saved item is numbered
+         *  (owner 2026-10-18, review SP19: "Good to have a standard pattern"; was "User1";
+         *  [helium314.keyboard.settings.preferences.RestorePlan.nextFreeName]). */
+        fun getUnusedThemeName(initialName: String, prefs: SharedPreferences): String =
+            helium314.keyboard.settings.preferences.RestorePlan.nextFreeName(initialName, getExistingThemeNames(prefs).toSet())
 
         private fun getExistingThemeNames(prefs: SharedPreferences) =
             prefs.all.keys.mapNotNull {
