@@ -119,16 +119,21 @@ class LayoutOwnDefaultTest {
         assertKeptInOwnSets(users())
     }
 
-    @Test fun `answering No, a keyboard reading the common default gets a pick, the common default gets the edit`() {
+    // (the agreed saving-policy model, owner 2026-10-18, rules 1, 2 and 4: "in such a scenario, Work keyboard shouldn't
+    // even come up to begin with". Fail before: A, whose own set is the common default the screen edits, was asked and
+    // got a pick of its own, and a keyboard only reading the common default was asked too)
+    @Test fun `answering No - the common default is the screen's, not asked, it gets the edit; only own defaults keep the old keys`() {
         // (A's own set, the common one, has it as the default; B, edited, reads it; C's own keeps it)
         separate(false)
         real.edit { putString(idKey(1, key), numrow); remove(idKey(2, key)) }
         val others = users(edited = b)
-        assertEquals(listOf(kid(1), kid(3)), ids(others))
+        assertEquals(listOf(kid(3)), ids(others))
         LayoutUtilsCustom.keepOldKeys(numrow, old, type, others, ctx)
-        assertEquals(old, stored(1).layoutName(type)) // (A: a pick of its own)
-        assertEquals(numrow, real.getString(idKey(1, key), null)) // (the common default: B reads the new keys)
+        assertNull(stored(1).layoutName(type)) // (A: no pick written)
+        assertEquals(numrow, real.getString(idKey(1, key), null)) // (the common default: A and B read the new keys)
         assertEquals(old, real.getString(idKey(3, key), null))
         assertNull(stored(3).layoutName(type))
+        // edited from A's screen: B, only reading the common default, isn't asked either
+        assertEquals(listOf(kid(3)), ids(users(edited = a)))
     }
 }
