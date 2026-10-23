@@ -4,6 +4,7 @@ package helium314.keyboard.settings
 import android.content.SharedPreferences
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.KeyboardProfiles
+import helium314.keyboard.latin.settings.ProfilePreferences
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.settings.preferences.RestorePlan
@@ -76,7 +77,7 @@ object Palettes {
      * Palette [name] was saved with new colors in the palette editor; the keyboard edited takes them. [old]: its
      * colors when the editor opened (prefix -> value). Each other keyboard ([keyboards]) and saved theme ([themes])
      * using it takes what was chosen for it, in every slot naming it (owner 2026-10-11: "one palette, edits reach every
-     * slot using it"; a keyboard's: the ones its own set names it in, review SP8): the new colors (nothing to do), the app's default colors, or the old colors as one new palette
+     * slot using it"): the new colors (nothing to do), the app's default colors, or the old colors as one new palette
      * on the list shared by all keepers ([keeperName]); none keeping them, no such palette is made (owner 2026-10-11:
      * "Would this still cause Warm 2 to be created if no users exist for it?": no).
      * @return the keepers' palette, null when nobody keeps the old colors
@@ -91,12 +92,11 @@ object Palettes {
             // (owner 2026-10-11: lookups never create records; a listed one gets its set from the net)
             val id = KeyboardProfiles.idForListed(real, keyboard) ?: continue
             for (slot in slots) {
-                // (only its own set's choice: it's listed by that, and a switched-off keyboard is asked by its own choice,
-                // owner 2026-10-11. A slot it has nothing stored for is left alone: read through the common settings (one
-                // set of settings: the main keyboard's) it was the main keyboard's choice, and "Warm 2" went into a slot
-                // it never chose, review SP8)
+                // (its own set's choice first: with one set of settings the view reads the main keyboard's, and a
+                // switched-off keyboard is asked by its own choice; owner 2026-10-11)
                 val own = KeyboardProfiles.ownKey(id, slot)
-                if (real.getString(own, null) != name) continue
+                val chosen = if (real.contains(own)) real.getString(own, null) else ProfilePreferences(real) { id }.getString(slot, null)
+                if (chosen != name) continue
                 // (the default: nothing stored, owner 2026-10-11: no default marks)
                 if (choice == Choice.KEEP_OLD) editor.putString(own, keeper) else editor.remove(own)
             }
