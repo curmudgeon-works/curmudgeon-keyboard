@@ -149,6 +149,21 @@ class CentralPalettesTest {
         assertEquals("Warm", real.getString(own(3, day), null)) // (C not asked here: as it was)
     }
 
+    // review SP8: B kept the old colors, and its dark colors, nothing of its own stored, read through the common settings
+    // (one set of settings: A's, the main keyboard's) were Warm: "Warm 2" went into a slot B never chose
+    @Test fun `edit - B keeps the old colors only in the slots its own set chose, with one set of settings too`() {
+        real.edit {
+            putBoolean("separate_settings_per_keyboard", false)
+            putString(warm, "new")
+            putString(own(1, day), "Warm"); putString(own(1, night), "Warm")
+            putString(own(2, day), "Warm") // (no dark colors of its own)
+        }
+        assertEquals("Warm 2", Palettes.afterEdit(real, "Warm", old, mapOf(b to Choice.KEEP_OLD), emptyMap()))
+        assertEquals("Warm 2", real.getString(own(2, day), null))
+        assertFalse(real.contains(own(2, night))) // (nothing written: it still has no dark colors of its own)
+        assertEquals("Warm", real.getString(own(1, night), null)) // A, the edited one: the new colors
+    }
+
     @Test fun `edit - all keepers share one Warm 2, the switched-off keyboard and the theme too`() {
         everyoneOnWarm()
         Palettes.afterEdit(real, "Warm", old, mapOf(b to Choice.KEEP_OLD, c to Choice.KEEP_OLD), mapOf("Sunset" to Choice.KEEP_OLD))

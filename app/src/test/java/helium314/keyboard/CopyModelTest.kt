@@ -159,7 +159,9 @@ class CopyModelTest {
     }
 
     // (owner 2026-10-11: palettes are one app-wide list; the old colors are kept as "Warm 2" on the list, was Custom N)
-    @Test fun `a palette saved with new colors - keepers share one Warm 2, a theme taking the new names Warm still`() {
+    // (the agreed saving-policy model, owner 2026-10-18, rule 4: a keyboard that only shows the palette through the
+    // common settings isn't affected, nothing is written for it; until then it got "Warm 2" in a slot it never chose)
+    @Test fun `a palette saved with new colors - a keeper theme gets Warm 2, a theme taking the new names Warm still, a keyboard only reading it gets nothing`() {
         val warm = Settings.PREF_USER_COLORS_PREFIX + "Warm"
         // (one set of settings: keyboard 2 reads US's, the common one)
         real.edit().putBoolean("separate_settings_per_keyboard", false).putString(warm, "new").putString(own(1, Settings.PREF_THEME_COLORS), "Warm").commit()
@@ -168,8 +170,8 @@ class CopyModelTest {
         helium314.keyboard.settings.Palettes.afterEdit(real, "Warm", mapOf(Settings.PREF_USER_COLORS_PREFIX to "old"),
             mapOf(fr to helium314.keyboard.settings.Palettes.Choice.KEEP_OLD),
             mapOf("Kept" to helium314.keyboard.settings.Palettes.Choice.KEEP_OLD, "Updated" to helium314.keyboard.settings.Palettes.Choice.NEW))
-        assertEquals("Warm 2", real.getString(own(2, Settings.PREF_THEME_COLORS), null))
-        assertEquals("old", real.getString(Settings.PREF_USER_COLORS_PREFIX + "Warm 2", null)) // (on the list)
+        assertFalse(real.contains(own(2, Settings.PREF_THEME_COLORS))) // (keyboard 2: nothing of its own, nothing written)
+        assertEquals("old", real.getString(Settings.PREF_USER_COLORS_PREFIX + "Warm 2", null)) // (on the list, for the theme)
         assertEquals("new", real.getString(warm, null)) // (the palette itself: the new colors)
         val looks = AppearanceLooks.load(real).associateBy { it.name }
         assertEquals("Warm 2", looks.getValue("Kept").values[Settings.PREF_THEME_COLORS])
@@ -213,16 +215,19 @@ class CopyModelTest {
         assertEquals("Mine", real.getString(own(3, KeyPopupOverrides.PREF_SELECTED_SET), null))
     }
 
-    @Test fun `a palette saved with new colors - a keeper with no set of its own yet keeps the old ones`() {
+    // (the agreed saving-policy model, owner 2026-10-18, rule 4: "in such a scenario, Work keyboard shouldn't even come
+    // up to begin with": a keyboard with no set of its own only shows the palette through the common settings, so it
+    // isn't affected; until then it got a set and "Warm 2", and "Warm 2" was made)
+    @Test fun `a palette saved with new colors - a keeper with no set of its own only reads it, nothing is written for it`() {
         val warm = Settings.PREF_USER_COLORS_PREFIX + "Warm"
         // (one set of settings: de reads US's, the common one)
         real.edit().putBoolean("separate_settings_per_keyboard", false).putString(warm, "new").putString(own(1, Settings.PREF_THEME_COLORS), "Warm").commit()
-        helium314.keyboard.settings.Palettes.afterEdit(real, "Warm", mapOf(Settings.PREF_USER_COLORS_PREFIX to "old"),
-            mapOf(de to helium314.keyboard.settings.Palettes.Choice.KEEP_OLD), emptyMap())
-        assertTrue(KeyboardProfiles.hasOwnEntries(real, kid(3))) // (its set: under its own id)
-        assertEquals("Warm 2", real.getString(own(3, Settings.PREF_THEME_COLORS), null))
-        assertEquals("old", real.getString(Settings.PREF_USER_COLORS_PREFIX + "Warm 2", null))
+        assertEquals(null, helium314.keyboard.settings.Palettes.afterEdit(real, "Warm", mapOf(Settings.PREF_USER_COLORS_PREFIX to "old"),
+            mapOf(de to helium314.keyboard.settings.Palettes.Choice.KEEP_OLD), emptyMap()))
+        assertFalse(real.contains(own(3, Settings.PREF_THEME_COLORS)))
+        assertFalse(real.contains(Settings.PREF_USER_COLORS_PREFIX + "Warm 2")) // (no keeper: none made)
         assertEquals("Warm", real.getString(own(1, Settings.PREF_THEME_COLORS), null)) // (US's, the common one: still the palette)
+        // (and it isn't listed: OwnSetUsersTest, "only reading the item through the common settings is no use of its own")
     }
 
     // review 2026-10-11 D1: owner "yes, one copy one number". A menu shared by all keyboards shows them one copy, so one
