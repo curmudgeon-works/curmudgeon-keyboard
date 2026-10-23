@@ -710,6 +710,8 @@
     <string name="update_item_title">Update %s?</string>
     <string name="update_item_text">%s gets this keyboard\'s settings.</string>
     <string name="update_item_others">Also used by the ones below: tick those that should get the change. The others keep %s as it was, shown as Custom.</string>
+    <!-- the same, as every dialog changing a saved item others use asks it (owner 2026-10-18: "This should be our standard pattern") -->
+    <string name="update_item_others_select">Also used by the ones below. Select those that should take this change. The others keep their current settings, named Custom.</string>
     <string name="update_item">Update</string>
     <string name="update_item_anyway">Update anyway</string>
     <!-- a saved Layout holding the popup set, in its update dialog's list -->

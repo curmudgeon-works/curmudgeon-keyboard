@@ -181,10 +181,10 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
             if (set != null) helium314.keyboard.settings.dialogs.UpdateSavedItemDialog(name,
                 userNames(ctx, keyboards) + layouts.map { ctx.getString(R.string.update_item_layout, it) }, sameAs,
                 onDismissRequest = { setToUpdate = null },
-            ) { ticked ->
+            ) { selected ->
                 storeInSet(name, KeyPopupOverrides.load(prefs))
                 val updated = KeyPopupOverrides.loadSets(ctx.realPrefs()).first { it.name == name }
-                for (i in ticked) {
+                for (i in selected) {
                     if (i < keyboards.size) applySetToOther(ctx, keyboards[i], updated, takeNew)
                     else updateSetInLayout(ctx.realPrefs(), layouts[i - keyboards.size], updated)
                 }
@@ -405,7 +405,7 @@ internal fun renamePopupSet(ctx: Context, oldName: String, name: String) {
 /** Deletes the user's popup set [name]: every keyboard that had it chosen has none chosen (2026-10-07: only the keyboard
  *  being edited forgot it) and keeps its popups as they are, shown as "Custom" (2026-10-08: the keyboard being edited
  *  lost its popups, and with separate settings off or the Layout menu shared every keyboard did). */
-/** User set [set] (just updated with the edited keyboard's popups) on another [keyboard] ticked in the update dialog
+/** User set [set] (just updated with the edited keyboard's popups) on another [keyboard] selected in the update dialog
  *  (2026-10-11): its arrangement, accents level, symbols page, map and order, the set's name, no Custom label. */
 internal fun applySetToOther(ctx: Context, keyboard: SettingsSubtype, set: KeyPopupOverrides.UserSet, takeNew: Boolean) {
     val real = ctx.realPrefs()
@@ -435,7 +435,7 @@ internal fun applySetToOther(ctx: Context, keyboard: SettingsSubtype, set: KeyPo
     if (changed != keyboard) helium314.keyboard.latin.utils.SubtypeUtilsAdditional.changeAdditionalSubtype(keyboard, changed, ctx)
 }
 
-/** Saved Layout [layoutName] ticked in a popup set's update dialog: its copy of the set becomes [set]'s. */
+/** Saved Layout [layoutName] selected in a popup set's update dialog: its copy of the set becomes [set]'s. */
 internal fun updateSetInLayout(real: SharedPreferences, layoutName: String, set: KeyPopupOverrides.UserSet) {
     val presets = helium314.keyboard.settings.LayoutPresets.load(real)
     helium314.keyboard.settings.LayoutPresets.save(real, presets.map { p ->

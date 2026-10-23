@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -21,9 +22,9 @@ import helium314.keyboard.latin.R
 
 /**
  * "Update Sunset?" (owner 2026-10-11): the save icon on a saved item's row gives it this keyboard's settings. When
- * other keyboards (or saved Layouts / themes holding it) use it, each is listed with a tick, all unticked: the ticked
- * ones get the change too, the others keep it as it was (shown as Custom). [sameAs]: another saved item that already
- * has these settings, said in a note ("include the already exists note"); nothing is blocked.
+ * other keyboards (or saved Layouts / themes holding it) use it, they're listed as [SelectOthersList] has it: the
+ * selected ones take the change too, the others keep their current settings, named Custom. [sameAs]: another saved
+ * item that already has these settings, said in a note ("include the already exists note"); nothing is blocked.
  */
 @Composable
 fun UpdateSavedItemDialog(
@@ -31,34 +32,49 @@ fun UpdateSavedItemDialog(
     others: List<String>, // the other users' names, in the order to show
     sameAs: String?,
     onDismissRequest: () -> Unit,
-    onConfirmed: (ticked: Set<Int>) -> Unit, // indices into [others]
+    onConfirmed: (selected: Set<Int>) -> Unit, // indices into [others]
 ) {
-    val ticked = remember(others) { mutableStateListOf<Int>() }
+    val selected = rememberAllSelected(others)
     ThreeButtonAlertDialog(
         onDismissRequest = onDismissRequest,
-        onConfirmed = { onConfirmed(ticked.toSet()) },
+        onConfirmed = { onConfirmed(selected.toSet()) },
         confirmButtonText = stringResource(if (sameAs != null) R.string.update_item_anyway else R.string.update_item),
         title = { Text(stringResource(R.string.update_item_title, name)) },
         content = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 sameAs?.let { SameSettingsNote(it) }
                 Text(stringResource(R.string.update_item_text, name))
-                if (others.isNotEmpty()) {
-                    Text(stringResource(R.string.update_item_others, name))
-                    Column {
-                        others.forEachIndexed { i, other ->
-                            Row(verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)
-                                    .clickable { if (i in ticked) ticked.remove(i) else ticked.add(i) }) {
-                                Checkbox(checked = i in ticked, onCheckedChange = { if (it) ticked.add(i) else ticked.remove(i) })
-                                Text(other, style = MaterialTheme.typography.bodyLarge)
-                            }
-                        }
-                    }
-                }
+                if (others.isNotEmpty()) SelectOthersList(stringResource(R.string.update_item_others_select), others, selected)
             }
         },
     )
+}
+
+/** All of [others] selected, the start of every [SelectOthersList] (owner 2026-10-18: "all should come selected yes"). */
+@Composable
+fun rememberAllSelected(others: List<String>): SnapshotStateList<Int> =
+    remember(others) { mutableStateListOf<Int>().apply { addAll(others.indices) } }
+
+/**
+ * The one way a dialog changing a saved item (a saved Layout, theme or popup set, a palette, a custom key layout) asks
+ * about the others using it (owner 2026-10-18: "select those that should take this change. The others will retain
+ * their current settings named Warm 2 / Custom <- as applicable. This should be our standard pattern."): [text], then a
+ * checkbox per other ([others], their names); the selected ones ([selected], indices into [others]) take the change,
+ * the others keep what they have now, under the name [text] gives. No second question, no choice per one.
+ */
+@Composable
+fun SelectOthersList(text: String, others: List<String>, selected: SnapshotStateList<Int>) {
+    Text(text)
+    Column {
+        others.forEachIndexed { i, other ->
+            Row(verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)
+                    .clickable { if (i in selected) selected.remove(i) else selected.add(i) }) {
+                Checkbox(checked = i in selected, onCheckedChange = { if (it) selected.add(i) else selected.remove(i) })
+                Text(other, style = MaterialTheme.typography.bodyLarge)
+            }
+        }
+    }
 }
 
 /** "These settings are the same as “Moonlight”." (Update and Save as new). */

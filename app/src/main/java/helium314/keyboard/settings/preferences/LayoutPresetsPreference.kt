@@ -190,12 +190,12 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
         helium314.keyboard.settings.dialogs.UpdateSavedItemDialog(preset.name,
             helium314.keyboard.settings.screens.userNames(ctx, others), sameAs,
             onDismissRequest = { toUpdate = null },
-        ) { ticked ->
+        ) { selected ->
             val updated = LayoutPresets.saved(ctx, initialKeyboard, preset.name, chosen)
             store(presets.map { if (it.name == preset.name) updated else it })
             prefs.edit { putString(LayoutPresets.PREF_SELECTED, preset.name) } // (this keyboard is that Layout now)
             helium314.keyboard.settings.CustomLabels.clear(prefs, helium314.keyboard.settings.CustomLabels.Kind.LAYOUT)
-            for (i in ticked) LayoutPresets.applyToOther(ctx, others[i], updated)
+            for (i in selected) LayoutPresets.applyToOther(ctx, others[i], updated)
             toUpdate = null
         }
     }

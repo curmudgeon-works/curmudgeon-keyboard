@@ -781,12 +781,12 @@ private fun SavedLooksPreference(setting: Setting) {
         val sameAs = remember(look) { looks.firstOrNull { it !== look && differs[it] == false }?.name }
         helium314.keyboard.settings.dialogs.UpdateSavedItemDialog(look.name, userNames(ctx, others), sameAs,
             onDismissRequest = { toUpdate = null },
-        ) { ticked ->
+        ) { selected ->
             val updated = AppearanceLooks.saved(ctx, look.name, chosen)
             store(looks.map { if (it === look) updated else it })
             prefs.edit { putString(AppearanceLooks.PREF_SELECTED, look.name) } // (this keyboard is that theme now)
             helium314.keyboard.settings.CustomLabels.clear(prefs, helium314.keyboard.settings.CustomLabels.Kind.THEME)
-            for (i in ticked) AppearanceLooks.applyToOther(ctx, others[i], updated)
+            for (i in selected) AppearanceLooks.applyToOther(ctx, others[i], updated)
             toUpdate = null
         }
     }

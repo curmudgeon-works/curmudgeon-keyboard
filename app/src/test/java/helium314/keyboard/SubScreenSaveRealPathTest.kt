@@ -17,6 +17,8 @@ import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.isEditable
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -341,6 +343,44 @@ class SubScreenSaveRealPathTest {
         click("Yes, all to default")
         assertEquals(null, real.getString(own(2, Settings.PREF_THEME_COLORS), null)) // keyboard 2: the default colors
         assertFalse(real.contains(Settings.PREF_USER_COLORS_PREFIX + "Warm")) // off the list
+    }
+
+    // ---- the one question about the others using a changed saved item (owner 2026-10-18: "select those that should
+    // take this change. The others will retain their current settings named Warm 2 / Custom <- as applicable. This
+    // should be our standard pattern."; "all should come selected yes") ----
+
+    private val kb2Name get() = ctx.getString(R.string.keyboard_switched_off, helium314.keyboard.settings.screens.keyboardName(kb2, ctx))
+    /** The checkbox of [name]'s row in the open question. */
+    private fun checkbox(name: String) = compose.onNode(isToggleable() and hasAnyAncestor(isDialog()) and hasParent(hasText(name)))
+
+    /** Keyboard 1 on other colors, so saved theme Sunset (keyboard 2's) differs from it and has the save icon; its
+     *  Update question opened from the Themes list. */
+    private fun openUpdateSunset() {
+        real.edit().putString(own(1, Settings.PREF_THEME_COLORS), "ocean").commit()
+        appearance()
+        compose.onNodeWithText(ctx.getString(R.string.appearance_looks), substring = true).performClick(); idle()
+        compose.onNode(hasScrollAction() and hasAnyAncestor(isDialog())).performScrollToNode(hasText("Sunset"))
+        clickIcon(ctx.getString(R.string.update_item_icon))
+        shows(ctx.getString(R.string.update_item_title, "Sunset"))
+    }
+
+    @Test fun `Update question - select those that should take this change, all selected to start, they take it`() {
+        openUpdateSunset()
+        shows("Also used by the ones below. Select those that should take this change. The others keep their current settings, named Custom.")
+        compose.onNodeWithText("tick those", substring = true).assertDoesNotExist()
+        checkbox(kb2Name).assertIsOn()
+        click(ctx.getString(R.string.update_item))
+        assertEquals("ocean", AppearanceLooks.load(real).single().values[Settings.PREF_THEME_COLORS])
+        assertEquals("ocean", real.getString(own(2, Settings.PREF_THEME_COLORS), null)) // keyboard 2 took the change
+    }
+
+    @Test fun `Update question - one not selected keeps its current settings`() {
+        openUpdateSunset()
+        checkbox(kb2Name).performClick(); idle()
+        checkbox(kb2Name).assertIsOff()
+        click(ctx.getString(R.string.update_item))
+        assertEquals("ocean", AppearanceLooks.load(real).single().values[Settings.PREF_THEME_COLORS])
+        assertEquals("Warm", real.getString(own(2, Settings.PREF_THEME_COLORS), null)) // keyboard 2: as it was
     }
 
     private fun layoutSetup() {
