@@ -674,6 +674,8 @@
     <!-- content description of the "+" after a typed word that was removed 3 times: tapping it brings the word back -->
     <string name="bring_back_removed_word">Bring back \"%s\"</string>
     <string name="no_dictionary_short">No dictionary</string>
+    <!-- under a language turned on for the keyboard that has no dictionary (built in or added); turned-off ones keep no_dictionary_short (owner 2026-10-18) -->
+    <string name="no_dictionary_on">No dictionary: swipe and suggestions won\'t work</string>
     <string name="keyboard_languages">Languages</string>
     <string name="key_popups_title">Long-press popups</string>
     <string name="key_popups_group">Keys &amp; Popups</string>

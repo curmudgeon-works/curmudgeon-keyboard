@@ -75,8 +75,7 @@ fun LanguageListScreen(
     val ctx = LocalContext.current
     var keyboard by remember { mutableStateOf(initialKeyboard) }
     var generation by remember { mutableIntStateOf(0) } // bumped after every change so the list re-sorts
-    val advanced by helium314.keyboard.settings.SettingsMode.state(ctx)
-    val (ownLanguages, otherLanguages) = remember(keyboard, generation, advanced) { languagesFor(ctx, keyboard, advanced) }
+    val (ownLanguages, otherLanguages) = remember(keyboard, generation) { languagesFor(ctx, keyboard) }
     // the buttons "Use lists from other keyboards": only with other keyboards in the list (what's stored stays)
     val severalKeyboards = remember(keyboard, generation) {
         SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype().toPref() }.distinct().size > 1 }
@@ -172,14 +171,13 @@ private fun UseOthersToggle(label: String, on: Boolean, onClick: () -> Unit) {
 }
 
 /** The keyboard's languages by priority, the same priority in the order they were added; and every other language:
- *  same script first, then with a dictionary, then alphabetically. Without [advanced] only the other languages that
- *  have a dictionary, built in, added or to download (owner 2026-10-10: "make sure langs without dict don't appear
- *  without advanced"). */
-private fun languagesFor(ctx: android.content.Context, keyboard: SettingsSubtype, advanced: Boolean): Pair<List<Locale>, List<Locale>> {
+ *  same script first, then with a dictionary, then alphabetically. All of them with or without Advanced (owner
+ *  2026-10-18: "fine to show all langs even without dict in non-advanced"; until then only those with a dictionary,
+ *  built in, added or to download): one turned on without a dictionary says so ([languageSubtext]). */
+private fun languagesFor(ctx: android.content.Context, keyboard: SettingsSubtype): Pair<List<Locale>, List<Locale>> {
     val prefs = ctx.prefs()
     val own = listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues)
     val others = (SubtypeSettings.getAvailableSubtypeLocales() + getDictionaryLocales(ctx)).distinct().filter { it !in own }
-        .filter { advanced || dictionaryAvailable(ctx, it) }
     // the same test the rows use for fading (a language-level dictionary counts, e.g. English (India) has English's)
     fun hasDictionary(locale: Locale): Boolean {
         val (dicts, hasInternal) = getUserAndInternalDictionaries(ctx, locale)
@@ -243,7 +241,7 @@ private fun LanguageRow(locale: Locale, keyboard: SettingsSubtype, generation: I
                                 else append(name)
                             }
                         }
-                        else -> androidx.compose.ui.text.AnnotatedString(stringResource(R.string.no_dictionary_short))
+                        else -> androidx.compose.ui.text.AnnotatedString(languageSubtext(ctx, on = priority != OFF))
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = nameColor
@@ -282,6 +280,12 @@ private fun LanguageRow(locale: Locale, keyboard: SettingsSubtype, generation: I
 }
 
 private const val OFF = 0
+
+/** The line under a language with no dictionary here (built in or added; one to download counts as none until it's
+ *  downloaded): turned on for the keyboard, what that means (owner 2026-10-18: ""No dictionary: swipe and suggestions
+ *  won't work" <- yes need this"); turned off, "No dictionary" as before. */
+internal fun languageSubtext(ctx: android.content.Context, on: Boolean): String =
+    ctx.getString(if (on) R.string.no_dictionary_on else R.string.no_dictionary_short)
 
 /**
  * Apply a priority change to a keyboard: [OFF] removes the language, a priority adds it if needed and stores it;
