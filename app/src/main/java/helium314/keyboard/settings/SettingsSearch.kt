@@ -33,7 +33,8 @@ object SettingsSearch {
         listOf("theme", "color", "color", "dark", "light", "night", "look", "appearance", "style"),
         listOf("size", "height", "scale", "big", "bigger", "large", "larger", "small", "smaller", "tiny"),
         listOf("spacing", "space", "gap", "padding", "tight", "compact", "dense", "pack"),
-        listOf("language", "locale", "multilingual", "dictionary", "hindi", "hinglish"),
+        // (any language's name finds these too, [languageNames]; was "hindi" and "hinglish" only, owner 2026-10-18)
+        listOf("language", "locale", "multilingual", "dictionary"),
         listOf("emoji", "smiley", "emoticon"),
         listOf("clipboard", "copy", "paste", "clip"),
         listOf("number", "digit", "numeric"),
@@ -52,15 +53,38 @@ object SettingsSearch {
     // per Setting object: they are recreated when the app language changes, and with them the titles
     private val wordsOfSetting = java.util.WeakHashMap<Setting, Words>()
 
-    /** @return [settings] that match [query], best match first; titles starting with the typed text above the rest */
-    fun search(query: String, settings: List<Setting>): List<Setting> {
+    /** The words of every keyboard language's name, in the app's language and in English ("german", "deutsch" in a
+     *  German app, "hinglish"): a query word starting one of them finds what "language" finds, the way the language
+     *  list's own search matches a name (owner 2026-10-18: searching "german" or "spanish" found nothing, only "hindi"
+     *  and "hinglish" were synonyms). Worked out once per app language. */
+    fun languageNames(ctx: android.content.Context): Set<String> {
+        val ui = ctx.resources.configuration.locales[0]
+        languageNamesOf?.let { (language, names) -> if (language == ui) return names }
+        val names = HashSet<String>()
+        for (locale in helium314.keyboard.latin.utils.SubtypeSettings.getAvailableSubtypeLocales()) {
+            with(helium314.keyboard.latin.common.LocaleUtils) { names += splitWords(locale.localizedDisplayName(ctx.resources)) }
+            names += splitWords(locale.getDisplayName(java.util.Locale.ENGLISH))
+        }
+        names -= fillerWords
+        languageNamesOf = ui to names
+        return names
+    }
+    @Volatile private var languageNamesOf: Pair<java.util.Locale, Set<String>>? = null
+    // (a language name's beginning counts from this many letters: "spa" finds Spanish, "s" finds nothing of it)
+    private const val LANGUAGE_PREFIX_MIN = 3
+
+    /** @return [settings] that match [query], best match first; titles starting with the typed text above the rest.
+     *  [languages]: [languageNames], a query word starting one of them finds what "language" finds. */
+    fun search(query: String, settings: List<Setting>, languages: Set<String> = emptySet()): List<Setting> {
         val queryWords = splitWords(query).filterNot { it in fillerWords }.ifEmpty { splitWords(query) }
         if (queryWords.isEmpty()) return emptyList()
+        val namesLanguage = queryWords.associateWith { word ->
+            word.length >= LANGUAGE_PREFIX_MIN && languages.any { it.startsWith(word) } }
         val scored = settings.mapNotNull { setting ->
             val words = wordsOfSetting.getOrPut(setting) {
                 Words(splitWords(setting.title), splitWords(setting.description ?: ""), splitWords(setting.key))
             }
-            val scores = queryWords.map { score(it, words) }
+            val scores = queryWords.map { score(it, words, namesLanguage.getValue(it)) }
             val matched = scores.count { it > 0f }
             // every word has to find something, except in longer sentences where one may miss
             if (matched == 0 || matched < queryWords.size - queryWords.size / 3) null
@@ -73,11 +97,13 @@ object SettingsSearch {
         return starting + others
     }
 
-    private fun score(queryWord: String, words: Words): Float {
+    private fun score(queryWord: String, words: Words, namesLanguage: Boolean = false): Float {
         val direct = scoreInFields(queryWord, words)
-        val viaSynonym = synonyms[queryWord]?.maxOfOrNull { scoreInFields(it, words) } ?: 0f
+        val viaSynonym = (synonyms[queryWord].orEmpty() + if (namesLanguage) listOf(LANGUAGE_WORD) else emptyList())
+            .maxOfOrNull { scoreInFields(it, words) } ?: 0f
         return maxOf(direct, viaSynonym * SYNONYM_FACTOR)
     }
+    private const val LANGUAGE_WORD = "language"
 
     private fun scoreInFields(word: String, words: Words) = maxOf(
         WEIGHT_TITLE * (words.title.maxOfOrNull { similarity(word, it) } ?: 0f),

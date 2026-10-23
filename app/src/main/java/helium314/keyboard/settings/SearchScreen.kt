@@ -243,9 +243,10 @@ fun SearchSettingsScreen(
             }
         },
         filteredItems = { term ->
-            if (wholeApp != null) SettingsSearch.search(term, wholeApp.settings)
+            // (a language's name finds the Languages entry, where a screen lists one; owner 2026-10-18)
+            if (wholeApp != null) SettingsSearch.search(term, wholeApp.settings, SettingsSearch.languageNames(ctx))
             else screenSearch(term, searchSettings ?: screenSettings(settings + searchKeys,
-                helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx), menu))
+                helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(ctx), menu), SettingsSearch.languageNames(ctx))
         },
         // (under no menu: a result hidden on the menu search was opened from is still a setting, review 2026-10-06)
         // a result shown only in advanced mode on this screen: found in simple mode too, on the advanced tint (owner
@@ -268,7 +269,8 @@ fun screenSettings(keys: List<Any?>, real: android.content.SharedPreferences, me
         .filter { !hiddenFromSearch(it.key) && (menu == null || !helium314.keyboard.latin.settings.KeyboardProfiles.hiddenOn(real, menu, it.key)) }
 
 /** [settings] (a screen's own) matching [term], best first, as the main screen's search matches every setting. */
-fun screenSearch(term: String, settings: List<Setting>): List<Setting> = SettingsSearch.search(term, settings)
+fun screenSearch(term: String, settings: List<Setting>, languages: Set<String> = emptySet()): List<Setting> =
+    SettingsSearch.search(term, settings, languages)
 
 /** A setting a screen shows only in advanced mode ([simpleModeKeys]: the ones it shows in simple mode); none on a
  *  screen without simple mode, or one advanced as a whole (empty: its entry carries the tint instead). */

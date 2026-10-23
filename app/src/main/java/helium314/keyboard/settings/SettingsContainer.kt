@@ -47,7 +47,8 @@ class SettingsContainer(context: Context) {
      *  2026-10-14: "in main home screen, searching for "Color" with the toggle off also shows "Colors (dark)" -- wrong
      *  behavior"; "same thing happens with the separate settings toggle off". [ctx]: the main screen's, so the
      *  conditions are read from the settings its results edit (KeyboardProfiles.mainEditingId). */
-    fun filter(searchTerm: String, ctx: Context): List<Setting> = SettingsSearch.search(searchTerm, shown(ctx))
+    fun filter(searchTerm: String, ctx: Context): List<Setting> =
+        SettingsSearch.search(searchTerm, shown(ctx), SettingsSearch.languageNames(ctx))
 
     /** Every setting on some screen's current list ([shownScreenLists]), as that screen's own search finds it
      *  ([screenSettings]: not what no screen shows, [hiddenFromSearch], nor what the screen's menu leaves to another). */
