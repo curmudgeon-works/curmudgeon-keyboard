@@ -1571,8 +1571,10 @@ class InputLogicTest {
         assertTrue(strip.getInfo(0).isOtherScript) // the Latin word one tap away
         input(' ')
         assertEquals("बहुत ", text)
+        assertEquals(listOf("bohot"), addedWords) // learned as the Latin word
         functionalKeyPress(KeyCode.DELETE)
         assertEquals("bohot", text)
+        assertEquals(listOf("bohot"), unlearnedWords) // the revert takes that use back
     }
 
     @Test fun `All - a tap on the Latin word types it`() {
@@ -1598,6 +1600,31 @@ class InputLogicTest {
         assertEquals("बहुत", text)
         input(' ')
         assertEquals("बहुत ", text)
+        assertEquals(listOf("bohot"), addedWords)
+    }
+
+    @Test fun `a Devanagari word picked is learned as its Latin word, the Devanagari nowhere`() {
+        reset()
+        suggestInScript(Transliteration.SOME)
+        chainInput("bohot")
+        val strip = showScript(typingStrip("bohot", "bahut"))
+        latinIME.pickSuggestionManually(strip.getInfo(1))
+        assertEquals("बहुत", text)
+        assertEquals(listOf("bohot"), addedWords)
+        assertEquals("bohot", lastAddedWord)
+        assertFalse(addedWords.any { it == "बहुत" })
+    }
+
+    @Test fun `the Devanagari put in place after a pick learns nothing more`() {
+        reset()
+        suggestInScript(Transliteration.SOME)
+        chainInput("bah")
+        val strip = showScript(typingStrip("bah", "bahut"))
+        latinIME.pickSuggestionManually(strip.getInfo(strip.words().indexOf("bahut")))
+        assertEquals(listOf("bahut"), addedWords)
+        latinIME.pickSuggestionManually(showScript(predictionStrip("hai")).getInfo(0))
+        assertEquals("बहुत", text)
+        assertEquals(listOf("bahut"), addedWords)
     }
 
     @Test fun `off - the strip stays as it is`() {

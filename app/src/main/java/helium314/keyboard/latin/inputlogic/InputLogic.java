@@ -430,7 +430,9 @@ public final class InputLogic {
         }
 
         final boolean pickedForBatchWord = mWordComposer.isBatchMode();
-        final int pickedRank = rankInStrip(mSuggestedWords, suggestion);
+        // (the other script's word is reported as its Latin word: the swipe meant that one)
+        final String pickedLatin = suggestionInfo instanceof TranslitWordInfo translitPick ? translitPick.source : suggestion;
+        final int pickedRank = rankInStrip(mSuggestedWords, pickedLatin);
         commitChosenWord(settingsValues, suggestion, LastComposedWord.COMMIT_TYPE_MANUAL_PICK, LastComposedWord.NOT_A_SEPARATOR);
         mConnection.endBatchEdit();
         // Suggest in हिंदी (Some): a Latin word picked that the strip had no other script's word for gets it offered
@@ -441,7 +443,7 @@ public final class InputLogic {
             mLastComposedWord.mScriptAfterPick = SuggestInScript.afterPick(suggestion, suggestedWords, translitChoice.getMode(), translitTable);
         // a swiped word still open — including one re-opened for editing and then corrected from the strip — was
         // picked over; the recorder ignores the call when no swipe is open
-        GestureCorpusRecorder.INSTANCE.onSuggestionPicked(suggestion, pickedRank);
+        GestureCorpusRecorder.INSTANCE.onSuggestionPicked(pickedLatin, pickedRank);
         if (pickedForBatchWord) GestureStats.INSTANCE.onPicked(pickedRank);
         // Don't allow cancellation of manual pick
         mLastComposedWord.deactivate();
@@ -2594,7 +2596,9 @@ public final class InputLogic {
         mConnection.deleteTextBeforeCursor(deleteLength);
         // learning rules: the correction loses the one use its commit counted (it used to be wiped from the learned
         // words); the typed word put back is learned when it's committed
-        unlearnOneUse(committedWordString, LearningEventLog.AUTOCORRECT_REVERTED, LearningEventLog.AUTOCORRECT,
+        // (a word in the other script was learned as its Latin word: that one loses the use)
+        final String learnedWord = mLastComposedWord.mLearnedAs != null ? mLastComposedWord.mLearnedAs : committedWordString;
+        unlearnOneUse(learnedWord, LearningEventLog.AUTOCORRECT_REVERTED, LearningEventLog.AUTOCORRECT,
                 originallyTypedWord.toString(), inputTransaction.getSettingsValues());
         final String stringToCommit = originallyTypedWord +
                 (usePhantomSpace ? "" : separatorString);
@@ -3299,6 +3303,9 @@ public final class InputLogic {
                     + "Connection.commitText");
             startTimeMillis = SystemClock.elapsedRealtime();
         }
+        // Suggest in हिंदी: a word in the other script is learned as the Latin word it was looked up for, as if that one
+        // had been committed; the other script's word itself goes into nothing
+        final String learnedWord = SuggestInScript.learnedAs(chosenWord, mSuggestedWords);
         // learning rules: an accepted word picked up again and committed as another word takes back the use it was
         // counted with; the word committed counts as usual (below)
         final String resumedFrom = mWordComposer.getResumedFrom();
@@ -3308,8 +3315,9 @@ public final class InputLogic {
         // acceptance, maybe just a pause; picked again from the strip it counts (2026-10-04)
         final boolean reAccepted = resumedFrom != null && resumedFrom.equals(chosenWord)
                 && commitType != LastComposedWord.COMMIT_TYPE_MANUAL_PICK;
-        final String origin = learningOrigin(commitType, chosenWord);
-        if (!afterDigit && !notLearnedBySpace(settingsValues, chosenWord, origin) && learnsHere(settingsValues) && LearningEventLog.isEnabled()) {
+        // (the Devanagari of the typed word counts as the typed word)
+        final String origin = learningOrigin(commitType, chosenWord.equals(mWordComposer.getTypedWord()) ? chosenWord : learnedWord);
+        if (!afterDigit && !notLearnedBySpace(settingsValues, learnedWord, origin) && learnsHere(settingsValues) && LearningEventLog.isEnabled()) {
             final String event;
             final String before;
             if (reAccepted) {
@@ -3326,7 +3334,7 @@ public final class InputLogic {
                 before = mEditedInPlaceWord != null ? mEditedInPlaceWord
                         : swipedWord != null ? swipedWord : mWordComposer.getTypedWord();
             }
-            logLearningEvent(event, origin, before, chosenWord);
+            logLearningEvent(event, origin, before, learnedWord);
         }
         mEditedInPlaceWord = null;
         if (editedAccepted && !afterDigit && learnsHere(settingsValues)) {
@@ -3347,7 +3355,7 @@ public final class InputLogic {
         // Add the word to the user history dictionary: extra uses for an accepted word changed by hand (the most
         // deliberate), then a corrected swipe or a strip pick; the same whether it ends with space or a tap on the strip
         if (!reAccepted && !afterDigit)
-            performAdditionToUserHistoryDictionary(settingsValues, chosenWord, ngramContext,
+            performAdditionToUserHistoryDictionary(settingsValues, learnedWord, ngramContext,
                     editedAccepted ? EDITED_WORD_EXTRA_USES
                             : correctedSwipe ? CORRECTED_SWIPE_EXTRA_USES
                             : commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK ? PICKED_SUGGESTION_EXTRA_USES : 0,
@@ -3364,9 +3372,11 @@ public final class InputLogic {
         // strings.
         mLastComposedWord = mWordComposer.commitWord(commitType, chosenWord, separatorString, ngramContext);
         mLastComposedWord.mBatchSuggestedWords = batchSuggestedWords;
-        // a swiped word edited into another word (a pick from the strip reports itself)
+        if (!learnedWord.equals(chosenWord)) mLastComposedWord.mLearnedAs = learnedWord;
+        // a swiped word edited into another word (a pick from the strip reports itself; the other script's word as
+        // its Latin word)
         if (commitType != LastComposedWord.COMMIT_TYPE_MANUAL_PICK)
-            GestureCorpusRecorder.INSTANCE.onWordCommitted(chosenWord);
+            GestureCorpusRecorder.INSTANCE.onWordCommitted(learnedWord);
         // a typed word committed: a swipe deleted before it is settled
         if (swipedWord == null) GestureCorpusRecorder.INSTANCE.onTypedWordCommitted();
         if (DebugFlags.DEBUG_ENABLED) {

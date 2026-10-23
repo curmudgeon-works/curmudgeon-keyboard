@@ -1958,7 +1958,7 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, plan: Re
         val editor = real.edit()
         for (keyboard in chosen)
             for (locale in listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues))
-                for (key in LanguagePriority.keys(locale)) if (!LanguagePriority.isPriorityKey(key)) backup[key]?.let { KeyboardProfiles.put(editor, key, it) }
+                for (key in LanguagePriority.keys(locale)) if (!LanguagePriority.isKeyboardsOwnKey(key)) backup[key]?.let { KeyboardProfiles.put(editor, key, it) }
         editor.apply()
     }
 
@@ -2000,11 +2000,11 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, plan: Re
             else KeyboardProfiles.restoreSet(real, id, restored)
             // its languages' priorities, into its own set (review session 2026-10-07): the backup's own copy for this
             // keyboard (an old backup's common value is ignored, owner 2026-10-11: "fine to trash common set with upgrade
-            // and restore"; merged in parts: only when its languages are the backup's)
+            // and restore"; merged in parts: only when its languages are the backup's). Their Suggest in … the same way.
             val backupId = keyboard.keyboardId
             if (replace?.takes(RestoreMatch.Part.Extra(helium314.keyboard.latin.common.Constants.Subtype.ExtraValue.SECONDARY_LOCALES)) != false) real.edit {
                 for (locale in listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues))
-                    for (key in LanguagePriority.keys(locale).filter { LanguagePriority.isPriorityKey(it) }) {
+                    for (key in LanguagePriority.keys(locale).filter { LanguagePriority.isKeyboardsOwnKey(it) }) {
                         val value = backupId?.let { backup[KeyboardProfiles.ownKey(it, key)] } as? Int ?: continue
                         putInt(KeyboardProfiles.ownKey(id, key), value)
                     }

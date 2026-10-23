@@ -2,6 +2,7 @@
 package helium314.keyboard.latin.utils
 
 import android.content.SharedPreferences
+import helium314.keyboard.latin.settings.Settings
 import java.util.Locale
 
 /**
@@ -23,16 +24,22 @@ object LanguagePriority {
     private const val PREF_SHARE_HISTORY_PREFIX = "share_user_history_"
     const val PREF_ADDED_PREFIX = "language_added_"
 
-    /** The preference keys holding a language's priority (the keyboard's own with separate settings, 2026-10-07) and
-     *  adding time (app-wide), one per language. */
+    /** The preference keys holding a language's priority and its "Suggest in …" (both the keyboard's own with
+     *  separate settings, 2026-10-07; helium314.keyboard.latin.translit.Transliteration) and adding time (app-wide),
+     *  one each per language. */
     fun keys(locale: Locale): List<String> =
-        listOf(PREF_PRIORITY_PREFIX + locale.toLanguageTag(), PREF_ADDED_PREFIX + locale.toLanguageTag())
+        listOf(PREF_PRIORITY_PREFIX + locale.toLanguageTag(), PREF_ADDED_PREFIX + locale.toLanguageTag(),
+            Settings.PREF_SUGGEST_IN_SCRIPT_PREFIX + locale.toLanguageTag())
 
     fun isPriorityKey(key: String) = key.startsWith(PREF_PRIORITY_PREFIX)
 
-    /** Whether [key] is one of the per-language keys (priority, adding time; the retired share switch). */
+    /** Whether [key] is a language key of the keyboard's own (priority, Suggest in …), not app-wide. */
+    fun isKeyboardsOwnKey(key: String) = isPriorityKey(key) || key.startsWith(Settings.PREF_SUGGEST_IN_SCRIPT_PREFIX)
+
+    /** Whether [key] is one of the per-language keys (priority, Suggest in …, adding time; the retired share switch). */
     fun isLanguageKey(key: String) =
         key.startsWith(PREF_PRIORITY_PREFIX) || key.startsWith(PREF_SHARE_HISTORY_PREFIX) || key.startsWith(PREF_ADDED_PREFIX)
+            || key.startsWith(Settings.PREF_SUGGEST_IN_SCRIPT_PREFIX)
 
     fun get(prefs: SharedPreferences, locale: Locale): Int =
         prefs.getInt(PREF_PRIORITY_PREFIX + locale.toLanguageTag(), DEFAULT).coerceIn(LOW, HIGH)

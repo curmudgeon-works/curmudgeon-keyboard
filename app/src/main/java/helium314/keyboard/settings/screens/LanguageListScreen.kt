@@ -61,6 +61,8 @@ import helium314.keyboard.settings.SettingsDestination
 import helium314.keyboard.latin.BuildConfig
 import helium314.keyboard.latin.gesture.OwnGestureDecoder
 import helium314.keyboard.settings.preferences.Preference
+import helium314.keyboard.settings.Setting
+import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.NextScreenIcon
 import java.util.Locale
 
@@ -106,6 +108,9 @@ fun LanguageListScreen(
             else (ownLanguages + otherLanguages).filter { locale ->
                 locale.localizedDisplayName(ctx.resources).replace("(", "")
                     .splitOnWhitespace().any { it.startsWith(term, true) }
+                    // or its Suggest in … row ("हिंदी", "suggest in"), shown while it is on the keyboard
+                    || (locale in ownLanguages && Transliteration.specFor(locale)
+                        ?.let { ctx.getString(R.string.suggest_in_script, it.name).contains(term.trim(), true) } == true)
             }
         },
         itemContent = { item ->
@@ -290,12 +295,13 @@ private const val OFF = 0
 /** "Suggest in हिंदी" with its Off / Some / All, just under its language, a little indented; the keyboard's own setting
  *  (Transliteration, stored like the language's priority). */
 @Composable
-private fun SuggestInScriptRow(locale: Locale, spec: TranslitSpec, keyboard: SettingsSubtype, generation: Int) {
+internal fun SuggestInScriptRow(locale: Locale, spec: TranslitSpec, keyboard: SettingsSubtype, generation: Int,
+                                modifier: Modifier = Modifier.padding(start = 16.dp, top = 6.dp)) {
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
     var mode by remember(locale, keyboard, generation) { mutableIntStateOf(Transliteration.get(prefs, locale)) }
     Row(verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 6.dp).testTag(SUGGEST_IN_SCRIPT_TAG)) {
+        modifier = Modifier.fillMaxWidth().then(modifier).testTag(SUGGEST_IN_SCRIPT_TAG)) {
         Text(stringResource(R.string.suggest_in_script, spec.name), style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f).padding(end = 8.dp))
         val options = listOf(
@@ -322,6 +328,25 @@ private fun SuggestInScriptRow(locale: Locale, spec: TranslitSpec, keyboard: Set
 }
 
 internal const val SUGGEST_IN_SCRIPT_TAG = "suggest_in_script"
+
+/** The Suggest in … rows as settings of the main screen's search ("हिंदी", "suggest in"), one per table, each for the
+ *  keyboard the main screen's results edit; found while that keyboard has the language ([suggestInScriptItems]). */
+fun createLanguageListSettings(context: android.content.Context): List<Setting> = Transliteration.specs.map { spec ->
+    Setting(context, suggestInScriptKey(spec), R.string.suggest_in_script, titleArgs = arrayOf(spec.name)) {
+        val keyboard = mainSearchKeyboard(LocalContext.current)
+        SuggestInScriptRow(Locale.forLanguageTag(spec.latinTag), spec, keyboard, 0,
+            Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+    }
+}
+
+private fun suggestInScriptKey(spec: TranslitSpec) = Settings.PREF_SUGGEST_IN_SCRIPT_PREFIX + spec.latinTag
+
+/** The Suggest in … rows the main screen's keyboard ([mainSearchKeyboard]) shows on its Languages screen now. */
+internal fun suggestInScriptItems(ctx: android.content.Context): List<String> {
+    val keyboard = mainSearchKeyboard(ctx)
+    return (listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues))
+        .mapNotNull { Transliteration.specFor(it) }.map { suggestInScriptKey(it) }
+}
 
 /** The line under a language with no dictionary here (built in or added; one to download counts as none until it's
  *  downloaded): turned on for the keyboard, what that means (owner 2026-10-18: ""No dictionary: swipe and suggestions

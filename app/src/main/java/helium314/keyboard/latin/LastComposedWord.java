@@ -49,6 +49,9 @@ public final class LastComposedWord {
     /** A Latin word picked from the strip (Suggest in हिंदी, Some): its word in the other script, offered first in the
      *  strip until the next input; a tap puts it in this word's place. Null for none. */
     public SuggestedWords.SuggestedWordInfo mScriptAfterPick = null;
+    /** A word in the other script committed (Suggest in हिंदी): the Latin word it was learned as; a revert takes that
+     *  word's use back. Null for any other word. */
+    public String mLearnedAs = null;
     public final InputPointers mInputPointers =
             new InputPointers(DecoderSpecificConstants.DICTIONARY_MAX_WORD_LENGTH);
 

@@ -31,6 +31,8 @@ import helium314.keyboard.settings.screens.correctionSimpleModeKeys
 import helium314.keyboard.settings.screens.mainSearchKeyboard
 import helium314.keyboard.settings.screens.swipeAdvancedKeys
 import helium314.keyboard.settings.screens.swipeScreenKeys
+import helium314.keyboard.settings.screens.createLanguageListSettings
+import helium314.keyboard.settings.screens.suggestInScriptItems
 
 class SettingsContainer(context: Context) {
     private val list = createSettings(context)
@@ -103,8 +105,8 @@ fun shownScreenLists(ctx: Context): List<ScreenList> {
         if (REFINE_MENU_SHOWN) ScreenList(fineTuneLearningKeys, Menu.LEARNING) else null,
         ScreenList(appSettings, null, appSettings.filterIsInstance<String>().filterTo(HashSet()) { it in advancedOnlyAppSettings }),
         ScreenList(aboutItems, null),
-        // a keyboard's Languages screen: its Learned words entry
-        ScreenList(listOf(SettingsWithoutKey.LEARNED_WORDS), null),
+        // a keyboard's Languages screen: its Learned words entry, the Suggest in … rows of its languages
+        ScreenList(listOf(SettingsWithoutKey.LEARNED_WORDS) + suggestInScriptItems(ctx), null),
     ).map { screen ->
         // a row's parts are found with it, tinted as it is
         val strings = screen.keys.filterIsInstance<String>()
@@ -129,9 +131,10 @@ class Setting(
     val key: String,
     @StringRes titleId: Int,
     @StringRes descriptionId: Int? = null,
+    titleArgs: Array<out Any> = emptyArray(), // a title with a placeholder ("Suggest in %1$s"): what goes in
     private val content: @Composable (Setting) -> Unit
 ) {
-    val title = context.getString(titleId)
+    val title = if (titleArgs.isEmpty()) context.getString(titleId) else context.getString(titleId, *titleArgs)
     val description = descriptionId?.let { context.getString(it) }
 
     @Composable
@@ -157,7 +160,7 @@ val LocalSettingsMenu = androidx.compose.runtime.compositionLocalOf<helium314.ke
 private fun createSettings(context: Context) = createAboutSettings(context) + createAppearanceSettings(context) +
         createCorrectionSettings(context) + createPreferencesSettings(context) + createToolbarSettings(context) +
         createLayoutSettings(context) + createAdvancedSettings(context) +
-        createGestureTypingSettings(context)
+        createGestureTypingSettings(context) + createLanguageListSettings(context)
 
 object SettingsWithoutKey {
     /** Not a setting: a line across the list (e.g. around a screen's saved themes / layouts, which cover all of it). */

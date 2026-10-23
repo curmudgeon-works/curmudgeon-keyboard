@@ -38,6 +38,7 @@ import java.util.Locale
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /** "Suggest in हिंदी" (Off / Some / All) under Hinglish in a keyboard's language list. */
 @RunWith(RobolectricTestRunner::class)
@@ -97,6 +98,19 @@ class SuggestInScriptSettingTest {
     @Test fun `no row while Hinglish is off on the keyboard`() {
         show(available("en-US").withId(1))
         compose.onAllNodesWithTag(SUGGEST_IN_SCRIPT_TAG).assertCountEquals(0)
+    }
+
+    @Test fun `the main screen's search finds it by हिंदी or Suggest in, while the keyboard has Hinglish`() {
+        useKeyboards(ctx, real, available("en-US").with(ExtraValue.SECONDARY_LOCALES, "hi-Latn").withId(1))
+        KeyboardProfiles.loadGroups(real)
+        val container = SettingsContainer(ctx)
+        val key = Transliteration.key(hinglish)
+        assertTrue(key in container.filter("हिंदी", ctx).map { it.key })
+        assertTrue(key in container.filter("Suggest in", ctx).map { it.key })
+        assertEquals(ctx.getString(R.string.suggest_in_script, "हिंदी"), container[key]?.title)
+
+        useKeyboards(ctx, real, available("en-US").withId(2))
+        assertFalse(key in SettingsContainer(ctx).filter("हिंदी", ctx).map { it.key })
     }
 
     @Test fun `a tap on Some or All is the keyboard's own pick`() {
