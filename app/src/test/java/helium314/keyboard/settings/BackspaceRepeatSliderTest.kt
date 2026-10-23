@@ -32,7 +32,8 @@ import kotlin.test.assertFalse
 /**
  * The backspace long press delay row and its dialog with the second slider (2026-10-21, owner: "backspace repeat slider
  * (to be in the same dialog box as the current backspace longpress) 200", "300 ms, 200 ms if you keep holding <- keep
- * this", "Same as longpress need only be for the first delete like we have now").
+ * this", "Same as longpress need only be for the first delete like we have now"; defaults "change the default to
+ * 500/300 for curm").
  */
 @RunWith(RobolectricTestRunner::class)
 class BackspaceRepeatSliderTest {
@@ -62,12 +63,15 @@ class BackspaceRepeatSliderTest {
     private fun sliders() = compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress) and hasAnyAncestor(isDialog()))
     private fun ok() { compose.onNodeWithText(ctx.getString(android.R.string.ok)).performClick(); idle() }
 
-    @Test fun `Curmudgeon - the row says 300 ms, 200 ms if you keep holding, the dialog has both sliders`() {
+    private val first = Defaults.PREF_BACKSPACE_LONGPRESS_DELAY // 500
+    private val repeat = Defaults.PREF_BACKSPACE_REPEAT_INTERVAL // 300
+
+    @Test fun `Curmudgeon - the row says 500 ms, 300 ms if you keep holding, the dialog has both sliders`() {
         showRow()
-        compose.onNodeWithText("300 ms, 200 ms if you keep holding").assertExists()
+        compose.onNodeWithText("$first ms, $repeat ms if you keep holding").assertExists()
         openDialog()
-        compose.onNodeWithText("300 ms for first delete").assertExists()
-        compose.onNodeWithText("200 ms if you keep holding").assertExists()
+        compose.onNodeWithText("$first ms for first delete").assertExists()
+        compose.onNodeWithText("$repeat ms if you keep holding").assertExists()
         compose.onNodeWithText(ctx.getString(R.string.backspace_delay_follows)).assertExists()
         assertEquals(2, sliders().fetchSemanticsNodes().size)
     }
@@ -79,7 +83,7 @@ class BackspaceRepeatSliderTest {
         ok()
         assertEquals(120, prefs.getInt(Settings.PREF_BACKSPACE_REPEAT_INTERVAL, 0))
         assertFalse(prefs.contains(Settings.PREF_BACKSPACE_LONGPRESS_DELAY), "the untouched first slider stores nothing")
-        compose.onNodeWithText("300 ms, 120 ms if you keep holding").assertExists()
+        compose.onNodeWithText("$first ms, 120 ms if you keep holding").assertExists()
     }
 
     @Test fun `an untouched second slider stores nothing (stored = picked)`() {
