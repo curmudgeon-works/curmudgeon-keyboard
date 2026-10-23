@@ -903,6 +903,18 @@
     <string name="restore_summary_personal">Personal dictionary words added.</string>
     <!-- after a restore of the first keyboard while its settings are the common ones: %s the keyboard -->
     <string name="restore_settings_main">%s\'s settings were restored. All keyboards use them, as they\'re the common settings.</string>
+    <!-- the same dialog with separate settings on and restored menus shared (owner 2026-10-18, review SP25: "Fine to have
+         a similar dialog at the end of restore with some menus shared"), as restore_common_first said before the
+         restore: %1$s the keyboard, first in the list, %2$s the shared menus -->
+    <plurals name="restore_shared_first">
+        <item quantity="one">%1$s\'s settings were restored. %2$s is common to all your keyboards (App settings › Per keyboard), and %1$s is first in your list, so every keyboard uses its restored %2$s.</item>
+        <item quantity="other">%1$s\'s settings were restored. %2$s are common to all your keyboards (App settings › Per keyboard), and %1$s is first in your list, so every keyboard uses its restored %2$s.</item>
+    </plurals>
+    <!-- %1$s the keyboard, %2$s the shared menus, %3$s the first keyboard -->
+    <plurals name="restore_shared_other">
+        <item quantity="one">%1$s\'s settings were restored. %2$s is common to all your keyboards (App settings › Per keyboard) and comes from %3$s, first in your list, so every keyboard follows %3$s for it. %1$s\'s restored %2$s shows once that menu is set per keyboard.</item>
+        <item quantity="other">%1$s\'s settings were restored. %2$s are common to all your keyboards (App settings › Per keyboard) and come from %3$s, first in your list, so every keyboard follows %3$s for them. %1$s\'s restored %2$s show once those menus are set per keyboard.</item>
+    </plurals>
     <string name="restore_differs_choose_message">A ticked item takes the backup\'s. An unticked item keeps this device\'s.</string>
     <!-- what to merge, while something is ticked (owner 2026-10-11) -->
     <string name="restore_replaces_settings">Selected items replace this keyboard\'s settings, including any unsaved changes.</string>

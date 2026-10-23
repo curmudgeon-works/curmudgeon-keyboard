@@ -518,11 +518,13 @@ private class RestoreChoice(
  *  those whose settings wait behind the common ones ([hidden], R7), and by name what was merged into the device's
  *  ([merged]: keyboards, and saved items replaced) and what was added ([added]); the dictionaries ([dictionaries]);
  *  whether keyboards' settings came ([settings]), the clipboard history ([clipboard]) and Android's personal dictionary
- *  words ([personalWords]). */
+ *  words ([personalWords]); with separate settings, the restored keyboards' menus that are shared ([shared], review
+ *  SP25). */
 internal class Restored(val onDevice: Map<SettingsSubtype, SettingsSubtype>, val hidden: List<SettingsSubtype>,
                         val merged: List<String>, val added: List<String>,
                         val dictionaries: RestoredDictionaries = RestoredDictionaries(),
-                        val settings: Boolean = false, val clipboard: Boolean = false, val personalWords: Boolean = false)
+                        val settings: Boolean = false, val clipboard: Boolean = false, val personalWords: Boolean = false,
+                        val shared: Map<SettingsSubtype, List<KeyboardProfiles.Group>> = emptyMap())
 
 /** The backup's dictionaries a restore brought: [steps], each carried out that changed something (a match already in
  *  use is left out: owner 2026-10-13, 20261013_L3), with the device's dictionary each kept aside ("main_prev"), kept and
@@ -580,6 +582,7 @@ internal fun restoreSummary(ctx: Context, restored: Restored): String = listOfNo
         else -> null
     },
     hiddenSettingsNote(ctx, restored.hidden),
+    sharedMenusNote(ctx, restored.shared),
 ).joinToString("\n")
 
 /** A backup picked for restore, and the cache file it's copied to: its own per pick, so a read cancelled and still
@@ -1141,6 +1144,22 @@ internal fun hiddenSettingsNote(ctx: Context, keyboards: List<SettingsSubtype>):
     return listOfNotNull(mainNote, others).joinToString("\n")
 }
 
+/** What the restore says when done (the dialog with OK) about restored keyboards' menus that are shared while settings
+ *  are separate ([shared]: by keyboard, the shared menus it got), one line each, as the restore's note before said it
+ *  ([commonMenusNote], R-4) and [hiddenSettingsNote] does after (owner 2026-10-18, review SP25: "Fine to have a similar
+ *  dialog at the end of restore with some menus shared"): the first keyboard's are the common ones, which every
+ *  keyboard uses; another's wait in its own set while every keyboard follows the first for them. Null: none. */
+internal fun sharedMenusNote(ctx: Context, shared: Map<SettingsSubtype, List<KeyboardProfiles.Group>>): String? {
+    if (shared.isEmpty()) return null
+    val first = KeyboardProfiles.mainKeyboard(ctx.realPrefs())
+    return shared.map { (keyboard, menus) ->
+        val names = menus.joinToString(", ") { ctx.getString(helium314.keyboard.settings.screens.groupTitle(it)) }
+        if (keyboard.sameKeyboard(first))
+            ctx.resources.getQuantityString(R.plurals.restore_shared_first, menus.size, keyboardName(keyboard, ctx), names)
+        else ctx.resources.getQuantityString(R.plurals.restore_shared_other, menus.size, keyboardName(keyboard, ctx), names, keyboardName(first, ctx))
+    }.joinToString("\n")
+}
+
 /** True, with a word to the user, when a Save/Discard edit is open ([editOpen]): a restore or factory reset doesn't
  *  start then (round-6 review 20261013_L4_2, owner 2026-10-13). */
 internal fun refusedForOpenEdit(ctx: Context): Boolean {
@@ -1604,7 +1623,8 @@ private fun restoreChosenLocked(ctx: Context, pending: PendingRestore, plan: Res
         LayoutUtilsCustom.onLayoutFileChanged()
         switchToKeptCopy(ctx, choice, restored.onDevice, typing)
         return Restored(restored.onDevice, restored.hidden, restored.merged, restored.added, dictionaries,
-            settings = choice.settings && restored.onDevice.isNotEmpty(), clipboard = clipboard, personalWords = personalWords != null)
+            settings = choice.settings && restored.onDevice.isNotEmpty(), clipboard = clipboard, personalWords = personalWords != null,
+            shared = restored.shared)
     } catch (t: Throwable) {
         throw if (changed) RestoreStoppedPartway(t) else t
     }
@@ -2003,9 +2023,15 @@ private fun restoreKeyboardsHeld(ctx: Context, pending: PendingRestore, plan: Re
     }
     // (merged with no menu ticked: none of its settings came, nothing to say)
     val hidden = if (withSettings && !wasSeparate) chosen.filter { replaces[it]?.menus?.isEmpty() != true }.map { onPhone.getValue(it) } else emptyList()
+    // with separate settings: the shown menus restored (all, or the ticked ones of a merge) that are shared, by keyboard
+    // (owner 2026-10-18, review SP25: "Fine to have a similar dialog at the end of restore with some menus shared")
+    val shared = if (!withSettings || !wasSeparate) emptyMap() else chosen.associate { keyboard ->
+        onPhone.getValue(keyboard) to RestoreMatch.shownMenus().filter { group ->
+            KeyboardProfiles.isShared(real, group) && replaces[keyboard]?.menus?.let { group in it } != false }
+    }.filterValues { it.isNotEmpty() }
     val merged = chosen.filter { decisions[it] is RestoreDecision.Merge }.map { nameOf(onPhone.getValue(it)) } + applied?.replaced.orEmpty().map { it.second }
     val added = chosen.filter { decisions[it] !is RestoreDecision.Merge }.map { nameOf(onPhone.getValue(it)) } + applied?.added.orEmpty().map { it.second }
-    return Restored(onPhone, hidden, merged, added)
+    return Restored(onPhone, hidden, merged, added, shared = shared)
 }
 
 /** The device's key layout file [rename] names gets its new name, as the layout editor's rename does: every keyboard

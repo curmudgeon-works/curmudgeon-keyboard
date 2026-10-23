@@ -14,6 +14,8 @@ import helium314.keyboard.latin.utils.DeviceProtectedUtils
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.settings.preferences.RestoreDecision
 import helium314.keyboard.settings.preferences.hiddenSettingsNote
+import helium314.keyboard.settings.preferences.restoreChosenFrom
+import helium314.keyboard.settings.preferences.restoreSummary
 import helium314.keyboard.settings.preferences.restoreKeyboardsFrom
 import helium314.keyboard.settings.preferences.settingsToJsonStream
 import helium314.keyboard.settings.screens.keyboardName
@@ -28,6 +30,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * (review 2026-10-11 R7, owner: a restore never turns separate settings on) With one set of settings for all, a
@@ -115,6 +118,35 @@ class ReReview2R7Test {
         assertEquals(true, view(2).getBoolean(autoCap, false))
         assertEquals(2f, view(1).getFloat(gap, 0f))
         assertFalse(view(1).getBoolean(autoCap, true))
+    }
+
+    // review SP25 (owner 2026-10-18: "Fine to have a similar dialog at the end of restore with some menus shared"): with
+    // separate settings on and Appearance shared, the "Backup restored" dialog says Appearance is common and whose every
+    // keyboard follows, as the note before the restore does. Fail before: nothing said, only R7's note with one set
+    @Test fun `separate settings on with a shared menu - the after-restore dialog names it and who every keyboard follows`() {
+        KeyboardProfiles.enable(real)
+        real.edit().putBoolean(KeyboardProfiles.Group.APPEARANCE.prefKey, true).commit()
+        KeyboardProfiles.loadGroups(real)
+        backup()
+        val hiName = keyboardName(hi, ctx); val enName = keyboardName(en, ctx)
+        val appearance = ctx.getString(helium314.keyboard.settings.screens.groupTitle(KeyboardProfiles.Group.APPEARANCE))
+        val restoredHi = restoreChosenFrom(ctx, zip, listOf(hiInBackup), settings = true, learnedWords = false,
+            io = helium314.keyboard.latin.personalization.LearnedStoreIo.Native, decisions = mapOf(hiInBackup to RestoreDecision.Merge(hi)))
+        assertTrue("$hiName's settings were restored. $appearance is common to all your keyboards (App settings › Per keyboard) " +
+            "and comes from $enName, first in your list, so every keyboard follows $enName for it. $hiName's restored $appearance " +
+            "shows once that menu is set per keyboard." in restoreSummary(ctx, restoredHi).lines(), restoreSummary(ctx, restoredHi))
+        // the first keyboard's: every keyboard uses them
+        val restoredEn = restoreChosenFrom(ctx, zip, listOf(enInBackup), settings = true, learnedWords = false,
+            io = helium314.keyboard.latin.personalization.LearnedStoreIo.Native, decisions = mapOf(enInBackup to RestoreDecision.Merge(en)))
+        assertTrue("$enName's settings were restored. $appearance is common to all your keyboards (App settings › Per keyboard), " +
+            "and $enName is first in your list, so every keyboard uses its restored $appearance." in restoreSummary(ctx, restoredEn).lines(),
+            restoreSummary(ctx, restoredEn))
+        // nothing shared: nothing said about common menus
+        real.edit().putBoolean(KeyboardProfiles.Group.APPEARANCE.prefKey, false).commit()
+        KeyboardProfiles.loadGroups(real)
+        val again = restoreChosenFrom(ctx, zip, listOf(hiInBackup), settings = true, learnedWords = false,
+            io = helium314.keyboard.latin.personalization.LearnedStoreIo.Native, decisions = mapOf(hiInBackup to RestoreDecision.Merge(hi)))
+        assertFalse("common to all your keyboards" in restoreSummary(ctx, again), restoreSummary(ctx, again))
     }
 
     @Test fun `with separate settings on, nothing to say`() {
