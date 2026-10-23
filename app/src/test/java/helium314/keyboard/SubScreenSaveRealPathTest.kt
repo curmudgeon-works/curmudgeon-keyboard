@@ -371,12 +371,12 @@ class SubScreenSaveRealPathTest {
 
     /** Keyboard 1 on other colors, so saved theme Sunset (keyboard 2's) differs from it and has the save icon; its
      *  Update question opened from the Themes list. */
-    private fun openUpdateSunset(icon: Int = R.string.update_item_icon) {
+    private fun openUpdateSunset() {
         real.edit().putString(own(1, Settings.PREF_THEME_COLORS), "ocean").commit()
         appearance()
         compose.onNodeWithText(ctx.getString(R.string.appearance_looks), substring = true).performClick(); idle()
         compose.onNode(hasScrollAction() and hasAnyAncestor(isDialog())).performScrollToNode(hasText("Sunset"))
-        clickIcon(ctx.getString(icon))
+        clickIcon("Update with the settings on this screen") // (in both modes, owner 2026-10-18)
         shows(ctx.getString(R.string.update_item_title, "Sunset"))
     }
 
@@ -388,10 +388,15 @@ class SubScreenSaveRealPathTest {
         "follows $kb1Name, first in your list. Keyboards marked (hidden) keep this change for when settings are per keyboard."
     private fun commonSettings() { real.edit().putBoolean("separate_settings_per_keyboard", false).commit() }
 
-    @Test fun `Update question - settings common, two keyboards - the common settings, keyboard 2 marked hidden, the line says why`() {
+    // (owner 2026-10-18, SP3: "Sunset gets the settings on this screen." "I like this common message": the first line and
+    // the save icon are the same in both modes; the line under the list stays). Fail before: "gets the common settings,
+    // which all your keyboards follow" and "Update with the common settings" when common, "gets this keyboard's settings"
+    // and "Update with this keyboard's settings" when separate
+    @Test fun `Update question - settings common, two keyboards - the settings on this screen, keyboard 2 marked hidden, the line says why`() {
         commonSettings()
-        openUpdateSunset(R.string.update_item_icon_common)
-        shows("Sunset gets the common settings, which all your keyboards follow (from $kb1Name, first in your list).")
+        openUpdateSunset()
+        shows("Sunset gets the settings on this screen.")
+        compose.onNodeWithText("gets the common settings", substring = true).assertDoesNotExist()
         compose.onNodeWithText("gets this keyboard", substring = true).assertDoesNotExist()
         checkbox("$kb2Name (hidden)").assertIsOn()
         shows(hiddenNote)
@@ -399,9 +404,10 @@ class SubScreenSaveRealPathTest {
         assertEquals("ocean", real.getString(own(2, Settings.PREF_THEME_COLORS), null)) // into keyboard 2's own (hidden) set
     }
 
-    @Test fun `Update question - separate settings - this keyboard's settings, no hidden mark, no line`() {
+    @Test fun `Update question - separate settings - the settings on this screen, no hidden mark, no line`() {
         openUpdateSunset()
-        shows("Sunset gets this keyboard's settings.")
+        shows("Sunset gets the settings on this screen.")
+        compose.onNodeWithText("gets this keyboard", substring = true).assertDoesNotExist()
         compose.onNodeWithText("gets the common settings", substring = true).assertDoesNotExist()
         compose.onNodeWithText("(hidden)", substring = true).assertDoesNotExist()
         checkbox(kb2Name).assertIsOn()

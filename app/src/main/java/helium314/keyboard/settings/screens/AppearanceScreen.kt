@@ -689,7 +689,7 @@ private fun SavedLooksPreference(setting: Setting) {
     // which of the user's themes differ from the keyboard as it was when the list opened: those get the save icon
     val differs = remember(showList, generation) { looks.associateWith { AppearanceLooks.isTweaked(ctx, it) } }
     var toUpdate: AppearanceLooks.Look? by remember { mutableStateOf(null) }
-    // the settings common to all keyboards: the first one's name, said in the save icon and the update question
+    // the settings common to all keyboards: the first one's name, said under the update question's list
     val common = remember(showList) { commonFrom(ctx, helium314.keyboard.latin.settings.KeyboardProfiles.Group.APPEARANCE) }
     Preference(name = setting.title, description = summary, onClick = { showList = true }) { NextScreenIcon() }
     // the previewed theme off again: what was there when the list opened
@@ -726,7 +726,7 @@ private fun SavedLooksPreference(setting: Setting) {
             trailing = { look -> if (builtIn.none { it === look }) { // (by identity: a theme of the same content is still yours)
                 if (differs[look] == true)
                     IconButton({ if (previewed != null) { putBack(); previewed = null }; toUpdate = look }) {
-                        Icon(painterResource(R.drawable.ic_save), stringResource(if (common != null) R.string.update_item_icon_common else R.string.update_item_icon)) }
+                        Icon(painterResource(R.drawable.ic_save), stringResource(R.string.update_item_icon_screen)) }
                 DeleteButton { toDelete = look }
             } },
             onItemLongClick = { look -> if (builtIn.none { it === look }) toRename = look },

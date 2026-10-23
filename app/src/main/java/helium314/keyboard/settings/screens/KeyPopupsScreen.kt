@@ -166,7 +166,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
         var setToDelete: String? by remember { mutableStateOf(null) }
         var setToRename: String? by remember { mutableStateOf(null) }
         var setToUpdate: String? by remember { mutableStateOf(null) }
-        // the settings common to all keyboards: the first one's name, said in the save icon and the update question
+        // the settings common to all keyboards: the first one's name, said under the update question's list
         val common = remember(showAccentsDialog) { commonFrom(ctx, KeyboardProfiles.Group.LAYOUT) }
         val takeNew = helium314.keyboard.settings.SavedItemDefaults.takeNewDefaults(ctx.realPrefs())
         // which of the user's sets differ from the keyboard's popups as they were when the list opened
@@ -300,7 +300,7 @@ fun KeyPopupsSection(keyboard: SettingsSubtype, onKeyboardChanged: (SettingsSubt
                 trailing = { p -> p.userName?.let { name ->
                     if (setDiffers[name] == true)
                         IconButton({ if (!confirmed) putBack(); confirmed = true; showAccentsDialog = false; setToUpdate = name }) {
-                            Icon(painterResource(R.drawable.ic_save), stringResource(if (common != null) R.string.update_item_icon_common else R.string.update_item_icon)) }
+                            Icon(painterResource(R.drawable.ic_save), stringResource(R.string.update_item_icon_screen)) }
                     DeleteButton { if (!confirmed) putBack(); confirmed = true; showAccentsDialog = false; setToDelete = name }
                 } },
                 onItemLongClick = { p -> p.userName?.let { name -> if (!confirmed) putBack(); confirmed = true; showAccentsDialog = false; setToRename = name } },

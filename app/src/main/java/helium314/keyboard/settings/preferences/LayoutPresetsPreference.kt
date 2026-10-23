@@ -58,7 +58,7 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
     // what was set when the list opened, for Cancel: the settings and the keyboard (its keys)
     val initial = remember(showList) { LayoutPresets.current(prefs) }
     val initialKeyboard = remember(showList) { keyboard }
-    // the settings common to all keyboards: the first one's name, said in the save icon and the update question
+    // the settings common to all keyboards: the first one's name, said under the update question's list
     val common = remember(showList) { helium314.keyboard.settings.screens.commonFrom(ctx, KeyboardProfiles.Group.LAYOUT) }
     var confirmed by remember(showList) { mutableStateOf(false) }
     var previewed: LayoutPresets.Preset? by remember(showList) { mutableStateOf(null) } // the one tapped, on the keyboard now
@@ -136,7 +136,7 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
             trailing = { preset -> if (!preset.builtIn) {
                 if (differs[preset] == true)
                     IconButton({ if (previewed != null) { putBack(); previewed = null }; toUpdate = preset }) {
-                        Icon(painterResource(R.drawable.ic_save), stringResource(if (common != null) R.string.update_item_icon_common else R.string.update_item_icon)) }
+                        Icon(painterResource(R.drawable.ic_save), stringResource(R.string.update_item_icon_screen)) }
                 DeleteButton { toDelete = preset }
             } },
             onItemLongClick = { preset -> if (!preset.builtIn) toRename = preset },

@@ -750,6 +750,11 @@
     <!-- update_item_text when the item's menu is common to all keyboards and there are more than one; %1$s = the saved
          item, %2$s = the first keyboard in the list, whose settings are the common ones -->
     <string name="update_item_text_common">%1$s gets the common settings, which all your keyboards follow (from %2$s, first in your list).</string>
+    <!-- the Update question's first line in every mode, separate or common settings (owner 2026-10-18: "Sunset gets the
+         settings on this screen." "I like this common message"); %s = the saved item -->
+    <string name="update_item_text_screen">%s gets the settings on this screen.</string>
+    <!-- the save icon on a saved Layout, theme or popup set, in every mode (owner 2026-10-18) -->
+    <string name="update_item_icon_screen">Update with the settings on this screen</string>
     <!-- a keyboard in an update question whose own settings, which the change goes into, are hidden behind the common ones; %s = its name -->
     <string name="keyboard_hidden_set">%s (hidden)</string>
     <!-- under an update question's list when one is marked (hidden); %s = the first keyboard in the list -->

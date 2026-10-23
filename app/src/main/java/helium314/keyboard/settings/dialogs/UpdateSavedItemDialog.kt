@@ -21,14 +21,15 @@ import androidx.compose.ui.unit.dp
 import helium314.keyboard.latin.R
 
 /**
- * "Update Sunset?" (owner 2026-10-11): the save icon on a saved item's row gives it this keyboard's settings. When
+ * "Update Sunset?" (owner 2026-10-11): the save icon on a saved item's row gives it the settings on the screen. When
  * other keyboards (or saved Layouts / themes holding it) use it, they're listed as [SelectOthersList] has it: the
  * selected ones take the change too, the others keep their current settings, named Custom. [sameAs]: another saved
  * item that already has these settings, said in a note ("include the already exists note"); nothing is blocked.
- * [commonFrom]: the first keyboard's name when the item's menu is common to all keyboards and there are more than one
- * ([helium314.keyboard.settings.screens.commonFrom]): the item gets the common settings, not "this keyboard's"; with
- * [anyHidden] (a keyboard listed, its own set hidden behind the common ones) a line says what (hidden) means (owner
- * 2026-10-18: "yes, makes sense to follow established pattern from restore").
+ * The first line is the same in every mode, "Sunset gets the settings on this screen." (owner 2026-10-18: "I like this
+ * common message"). [commonFrom]: the first keyboard's name when the item's menu is common to all keyboards and there
+ * are more than one ([helium314.keyboard.settings.screens.commonFrom]); with [anyHidden] (a keyboard listed, its own
+ * set hidden behind the common ones) a line says what (hidden) means (owner 2026-10-18: "yes, makes sense to follow
+ * established pattern from restore").
  */
 @Composable
 fun UpdateSavedItemDialog(
@@ -49,8 +50,7 @@ fun UpdateSavedItemDialog(
         content = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 sameAs?.let { SameSettingsNote(it) }
-                Text(if (commonFrom != null) stringResource(R.string.update_item_text_common, name, commonFrom)
-                    else stringResource(R.string.update_item_text, name))
+                Text(stringResource(R.string.update_item_text_screen, name))
                 if (others.isNotEmpty()) SelectOthersList(stringResource(R.string.update_item_others_select), others, selected)
                 if (commonFrom != null && anyHidden) HiddenSetsNote(commonFrom)
             }
