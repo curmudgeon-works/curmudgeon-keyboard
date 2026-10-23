@@ -139,6 +139,7 @@ fun createAboutSettings(context: Context) = listOf(
     // the CC BY / CC BY-SA word lists require naming their sources (attribution text in donottranslate.xml)
     Setting(context, SettingsWithoutKey.DICTIONARY_SOURCES, R.string.dictionary_sources_title, R.string.dictionary_sources_summary) {
         val ctx = LocalContext.current
+        val primary = androidx.compose.material3.MaterialTheme.colorScheme.primary.toArgb() // (its Close, as hidden features', owner 2026-10-18)
         Preference(
             name = it.title,
             description = it.description,
@@ -150,6 +151,7 @@ fun createAboutSettings(context: Context) = listOf(
                     .setPositiveButton(R.string.dialog_close, null)
                     .create()
                 dialog.show()
+                dialog.closeInThemeColor(primary)
                 (dialog.findViewById<View>(android.R.id.message) as TextView).movementMethod = LinkMovementMethod.getInstance()
             },
             icon = R.drawable.ic_settings_about_license
