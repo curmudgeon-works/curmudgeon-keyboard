@@ -124,8 +124,8 @@ class NoDefaultMarksTest {
         view(2).edit().putString(key, "X").commit()
         view(2).edit().remove(key).commit() // ("Default" again: nothing stored)
         assertEquals(listOf(us), using("X"))
-        real.edit().putBoolean("separate_settings_per_keyboard", false).commit() // French reads US's
-        assertEquals(listOf(us, fr), using("X"))
+        real.edit().putBoolean("separate_settings_per_keyboard", false).commit() // French reads US's: not its own choice
+        assertEquals(listOf(us), using("X")) // (owner 2026-10-18, review SP10: the own sets only)
         real.edit().putString(own(2, key), "Y").commit() // a hidden own choice still counts
         assertEquals(listOf(fr), using("Y"))
     }

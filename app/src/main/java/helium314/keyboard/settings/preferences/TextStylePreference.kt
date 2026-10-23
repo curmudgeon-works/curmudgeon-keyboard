@@ -518,22 +518,26 @@ fun SuggestionColorRow(reload: () -> Unit) {
     }
 }
 
-/** Who goes back to the default font when font [name] is deleted: the enabled keyboards choosing it (the one being
- *  edited too), by name, then the switched-off keyboards whose own set chose it, "<name> (switched off)", then the
- *  saved themes, "theme <name>"; one line each. */
-internal fun fontUsers(ctx: Context, name: String): List<String> {
+/** Who goes back to the default font when font [name] is deleted: the enabled keyboards whose own set chose it (the
+ *  one being edited too), by name, then the switched-off keyboards whose own set chose it, "<name> (switched off)",
+ *  then the saved themes, "theme <name>"; one line each ([fontDeleteWarning]). */
+internal fun fontUsers(ctx: Context, name: String): List<String> = fontDeleteWarning(ctx, name).first
+
+/** [fontUsers], and the line on the common settings under them (owner 2026-10-18, review SP10:
+ *  [helium314.keyboard.settings.screens.deleteWarningNames]), or null. */
+internal fun fontDeleteWarning(ctx: Context, name: String): Pair<List<String>, String?> {
     val value = FontLibrary.PREFIX + name
     val real = DeviceProtectedUtils.getRealSharedPreferences(ctx)
     val edited = helium314.keyboard.latin.settings.KeyboardProfiles.editingKeyboard(real, helium314.keyboard.settings.PrefsDraft.currentSetId(ctx))
     // (review 2026-10-11 S6: a keyboard switched off on the Languages screen keeps its id and own set, and the delete
     // resets that set too: the wrapper names it last, whether or not separate settings is on, as enabled keyboards'
     // hidden sets are. A set no keyboard maps to: nothing to name)
-    val keyboards = helium314.keyboard.settings.screens.userNames(ctx,
-        helium314.keyboard.settings.screens.keyboardsUsing(ctx, FontLibrary.fontPrefs, edited) { _, v -> v == value })
+    val (keyboards, note) = helium314.keyboard.settings.screens.deleteWarningNames(ctx,
+        helium314.keyboard.settings.screens.keyboardsUsing(ctx, FontLibrary.fontPrefs, edited) { _, v -> v == value }, FontLibrary.fontPrefs)
     val themes = helium314.keyboard.settings.AppearanceLooks.load(real)
         .filter { look -> FontLibrary.fontPrefs.any { look.values[it] == value } }
         .map { ctx.getString(R.string.font_delete_theme, it.name) }
-    return keyboards + themes
+    return keyboards + themes to note
 }
 
 /**
@@ -546,15 +550,15 @@ internal fun fontUsers(ctx: Context, name: String): List<String> {
 internal fun FontDeleteButton(choice: String, onDone: () -> Unit) {
     val ctx = LocalContext.current
     val name = FontLibrary.displayName(choice)
-    var users by remember { mutableStateOf<List<String>?>(null) }
-    DeleteButton { users = fontUsers(ctx, name) }
-    users?.let { list ->
+    var users by remember { mutableStateOf<Pair<List<String>, String?>?>(null) }
+    DeleteButton { users = fontDeleteWarning(ctx, name) }
+    users?.let { (list, note) ->
         helium314.keyboard.settings.dialogs.ConfirmationDialog(
             onDismissRequest = { users = null },
             onConfirmed = { FontLibrary.delete(ctx, name); onDone() },
             title = { Text(stringResource(R.string.font_delete_title, name)) },
             content = { Text(if (list.isEmpty()) stringResource(R.string.font_delete_unused)
-                else stringResource(R.string.font_delete_users, list.joinToString("\n"))) },
+                else listOfNotNull(stringResource(R.string.font_delete_users, list.joinToString("\n")), note).joinToString("\n\n")) },
             confirmButtonText = stringResource(R.string.delete),
         )
     }

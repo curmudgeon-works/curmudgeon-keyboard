@@ -106,17 +106,43 @@ class LayoutDeleteEffectsTest {
         assertOutcome(effects, before, mapOf(2 to "7 8 9"))
     }
 
-    @Test fun `separate settings off - the keyboards reading the shared default keep the keys too`() {
-        val a = available("en-US").withLayout(type, x)
-        val b = available("de-DE")
+    // (owner 2026-10-18, review SP10: "Only show those that actually go back to default (as they would with separate
+    // settings)": the ones only reading the first keyboard's default aren't named, the line says they follow it. Fail
+    // before: B and C were named too, and no line)
+    @Test fun `separate settings off - only the own pick and own default are named, the line says the others follow the first`() {
+        val a = available("en-US")
+        val b = available("de-DE").withLayout(type, x)
         val c = available("en-GB")
         val before = keyboards(false, a, b, c)
         real.edit().putString(idKey(1, defaultKey), x).commit() // (the first keyboard's: owner 2026-10-11, no separate common set; the first keyboard's own settings are the common ones)
         val effects = LayoutUtilsCustom.deleteEffects(x, type, ctx)
-        assertEquals(listOf("en-US", "de-DE", "en-GB"), names(effects.first))
+        assertEquals(listOf("de-DE", "en-US"), names(effects.first)) // (the pick, then the own default)
         assertEquals(emptyList(), names(effects.second))
+        val (aName, bName) = before.take(2).map { helium314.keyboard.settings.screens.keyboardName(it, ctx) }
+        assertEquals("These keyboards keep its keys, each as an unsaved layout of its own:\n$bName\n$aName\n\n" +
+            "Settings are common to all your keyboards (App settings › Per keyboard), so every keyboard follows $aName, first in your list.",
+            LayoutUtilsCustom.deleteWarning(x, type, ctx))
+        // a hidden own default: marked, and the update questions' line (a pick is in the keyboard's definition: never)
+        real.edit().putString(idKey(3, defaultKey), x).commit()
+        val cName = helium314.keyboard.settings.screens.keyboardName(before[2], ctx)
+        assertEquals("These keyboards keep its keys, each as an unsaved layout of its own:\n$bName\n$aName\n$cName (hidden)\n\n" +
+            "Settings are common to all your keyboards (App settings › Per keyboard), so every keyboard follows $aName, first in " +
+            "your list. Keyboards marked (hidden) keep this change for when settings are per keyboard.",
+            LayoutUtilsCustom.deleteWarning(x, type, ctx))
+        real.edit().remove(idKey(3, defaultKey)).commit()
         LayoutUtilsCustom.deleteLayout(x, type, ctx)
         assertOutcome(effects, before, emptyMap())
+        // C, reading the first keyboard's default, kept the keys all the same
+        Settings.readDefaultLayoutName(type, ProfilePreferences(real) { kid(3) }).let { assertTrue(LayoutUtilsCustom.isPrivateLayout(it)); assertEquals("1 2 3", file(it).readText()) }
+    }
+
+    @Test fun `separate settings on - no mark, no line`() {
+        val a = available("en-US")
+        val b = available("de-DE")
+        val before = keyboards(true, a, b)
+        real.edit().putString(idKey(2, defaultKey), x).commit()
+        assertEquals("This keyboard keeps its keys, as an unsaved layout of its own:\n" + helium314.keyboard.settings.screens.keyboardName(before[1], ctx),
+            LayoutUtilsCustom.deleteWarning(x, type, ctx))
     }
 
     @Test fun `separate settings off - a hidden set's default is named and keeps the keys`() {

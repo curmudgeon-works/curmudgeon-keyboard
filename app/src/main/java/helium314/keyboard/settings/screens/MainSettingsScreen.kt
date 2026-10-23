@@ -192,10 +192,47 @@ fun keepersText(ctx: Context, @androidx.annotation.PluralsRes id: Int, keyboards
     if (keyboards.isEmpty()) null
     else ctx.resources.getQuantityString(id, keyboards.size, names.joinToString("\n"))
 
-/** The delete warning of a saved item chosen by name under [key] (Layout, theme, popup set). */
+/** The delete warning of a saved item chosen by name under [key] (Layout, theme, popup set): the keyboards whose own
+ *  set chose it ([keyboardsUsing]), then the line on the common settings ([deleteWarningNames]). */
 fun deleteKeepersText(ctx: Context, @androidx.annotation.PluralsRes id: Int, key: String, name: String,
-                      edited: SettingsSubtype? = null): String? =
-    keyboardsUsing(ctx, listOf(key), edited) { _, value -> value == name }.let { keepersText(ctx, id, it, userNames(ctx, it)) }
+                      edited: SettingsSubtype? = null): String? {
+    val keyboards = keyboardsUsing(ctx, listOf(key), edited) { _, value -> value == name }
+    val (names, note) = deleteWarningNames(ctx, keyboards, listOf(key))
+    return keepersText(ctx, id, keyboards, names)?.let { listOfNotNull(it, note).joinToString("\n\n") }
+}
+
+/** The first keyboard in the list by name when a saved item chosen through [keys] is read from the common settings
+ *  (separate settings off, or its menu shared: [helium314.keyboard.latin.settings.KeyboardProfiles.isCommon]) and
+ *  there is more than one keyboard (switched-off ones counting); else null. [commonFrom] by the item's keys. */
+fun commonFromKeys(ctx: Context, keys: Collection<String>): String? {
+    val real = ctx.realPrefs()
+    if (keys.none { helium314.keyboard.latin.settings.KeyboardProfiles.isCommon(real, it) }) return null
+    if (helium314.keyboard.latin.settings.KeyboardIds.phoneKeyboards(real).size < 2) return null
+    return keyboardName(helium314.keyboard.latin.settings.KeyboardProfiles.mainKeyboard(real), ctx)
+}
+
+/**
+ * A delete warning's [keyboards] by name ([userNames]) and the line under them (owner 2026-10-18, review SP10: "Only
+ * show those that actually go back to default (as they would with separate settings). But should clarify as per usual
+ * pattern that keyboards are using common settings of primary."). With the item's [keys] read from the common settings
+ * ([commonFromKeys]), each of [throughSet] but the first keyboard (whose own set is the common one) is "<name>
+ * (hidden)", as the update questions mark them ([updateNames]), and the line is theirs ([HiddenSetsNote]'s) when one
+ * is marked, else its first sentence: every keyboard follows the first one. No line with separate settings, nor when
+ * none is listed through its set. [throughSet]: the ones of [keyboards] listed by their own set's choice (not by a
+ * layout picked in their definition, which is never hidden).
+ */
+fun deleteWarningNames(ctx: Context, keyboards: List<SettingsSubtype>, keys: Collection<String>,
+                       throughSet: List<SettingsSubtype> = keyboards): Pair<List<String>, String?> {
+    val names = userNames(ctx, keyboards)
+    val viaSet = keyboards.filter { kb -> throughSet.any { it.sameKeyboard(kb) } }
+    val common = viaSet.takeIf { it.isNotEmpty() }?.let { commonFromKeys(ctx, keys) } ?: return names to null
+    val first = helium314.keyboard.latin.settings.KeyboardProfiles.mainKeyboard(ctx.realPrefs())
+    fun hidden(kb: SettingsSubtype) = viaSet.any { it.sameKeyboard(kb) } && !kb.sameKeyboard(first)
+    val marked = keyboards.zip(names) { kb, name -> if (hidden(kb)) ctx.getString(R.string.keyboard_hidden_set, name) else name }
+    val note = if (keyboards.any(::hidden)) ctx.getString(R.string.update_item_hidden_note, common)
+        else ctx.getString(R.string.delete_common_note, common)
+    return marked to note
+}
 
 /** [KeyboardSettingsEntries] of the keyboard's own screen, one search result each ([KeyboardSettingsEntries]' only);
  *  App settings only where the screen shows it (not with separate settings). */

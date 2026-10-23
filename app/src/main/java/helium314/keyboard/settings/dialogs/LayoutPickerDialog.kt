@@ -49,7 +49,6 @@ import helium314.keyboard.settings.Setting
 import helium314.keyboard.settings.SettingsActivity
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.settings.contentTextDirectionStyle
-import helium314.keyboard.settings.screens.userNames
 import helium314.keyboard.latin.utils.previewDark
 
 @Composable
@@ -188,8 +187,7 @@ private fun LayoutItemRow(
             DeleteButton { showDeleteDialog = true }
             if (showDeleteDialog) {
                 // who keeps its keys and who goes back to the default, by name
-                val effects = remember(layoutName) { LayoutUtilsCustom.deleteEffects(layoutName, layoutType, ctx).let { (keeps, back) ->
-                    LayoutUtilsCustom.deleteEffectsText(ctx, userNames(ctx, keeps), userNames(ctx, back)) } }
+                val effects = remember(layoutName) { LayoutUtilsCustom.deleteWarning(layoutName, layoutType, ctx) }
                 ConfirmationDialog(
                     onDismissRequest = { showDeleteDialog = false },
                     title = { Text(stringResource(R.string.delete_layout, LayoutUtilsCustom.getDisplayName(layoutName))) },

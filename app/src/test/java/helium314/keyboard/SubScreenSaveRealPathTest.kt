@@ -361,6 +361,40 @@ class SubScreenSaveRealPathTest {
         assertFalse(real.contains(Settings.PREF_USER_COLORS_PREFIX + "Warm")) // off the list
     }
 
+    // (owner 2026-10-18, SP10: "Only show those that actually go back to default (as they would with separate settings).
+    // But should clarify as per usual pattern that keyboards are using common settings of primary.") Fail before: no
+    // (hidden) mark and no line
+    @Test fun `delete question - settings common - keyboard 2 marked hidden, the line says why`() {
+        commonSettings()
+        appearance()
+        compose.onNode(hasText(ctx.getString(R.string.theme_colors_light)) and hasClickAction()).performClick(); idle()
+        compose.onNode(hasContentDescription(ctx.getString(R.string.delete)) and hasAnyAncestor(isDialog())).performClick(); idle()
+        shows("Used by:\n$kb2Name (hidden)\n" + ctx.getString(R.string.update_item_theme, "Sunset"))
+        shows(hiddenNote)
+    }
+
+    /** Keyboard 3 (English UK), switched on, after keyboard 1: with the settings common it reads keyboard 1's. */
+    private val kb3 = SubtypeSettings.getResourceSubtypesForLocale(Locale.UK).first().toSettingsSubtype().withId(3)
+    private fun withKeyboard3() {
+        real.edit().putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(kb1, kb3)))
+            .putString(Settings.PREF_ADDITIONAL_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(kb1, kb2, kb3))).commit()
+        SubtypeSettings.reloadEnabledSubtypes(ctx)
+    }
+
+    // the theme's trash on Appearance (owner 2026-10-18, SP10). Fail before: keyboard 3, which only reads keyboard 1's
+    // choice through the common settings, was named too; keyboard 2 wasn't marked, and no line
+    @Test fun `theme delete - settings common - only the own sets named, keyboard 2 marked hidden, the line says why`() {
+        commonSettings()
+        withKeyboard3()
+        real.edit().putString(own(1, AppearanceLooks.PREF_SELECTED), "Sunset").commit()
+        appearance()
+        compose.onNodeWithText(ctx.getString(R.string.appearance_looks), substring = true).performClick(); idle()
+        compose.onNode(hasScrollAction() and hasAnyAncestor(isDialog())).performScrollToNode(hasText("Sunset"))
+        clickIcon(ctx.getString(R.string.delete))
+        shows(ctx.resources.getQuantityString(R.plurals.delete_keeps_theme, 2, "$kb1Name\n$kb2Name (hidden)") + "\n\n" + hiddenNote)
+        compose.onNodeWithText(helium314.keyboard.settings.screens.keyboardName(kb3, ctx), substring = true).assertDoesNotExist()
+    }
+
     // ---- the one question about the others using a changed saved item (owner 2026-10-18: "select those that should
     // take this change. The others will retain their current settings named Warm 2 / Custom <- as applicable. This
     // should be our standard pattern."; "all should come selected yes") ----

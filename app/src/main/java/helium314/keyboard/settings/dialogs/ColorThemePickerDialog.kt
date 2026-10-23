@@ -268,11 +268,13 @@ private fun ColorItemRow(onDismissRequest: () -> Unit, item: String, isSelected:
                     content = { Text(stringResource(R.string.delete_confirmation, item)) },
                     onConfirmed = { delete() } // (nobody else uses it: the plain delete)
                 )
-            else if (showDialog)
-                PaletteDeleteDialog(item,
-                    helium314.keyboard.settings.screens.userNames(ctx, keyboards) + themes.map { ctx.getString(R.string.update_item_theme, it) },
-                    onDismissRequest = { showDialog = false },
+            else if (showDialog) {
+                // (with the colors common: the hidden own sets marked, and the line on the common settings, owner 2026-10-18)
+                val (names, note) = helium314.keyboard.settings.screens.deleteWarningNames(ctx, keyboards, helium314.keyboard.settings.Palettes.slots)
+                PaletteDeleteDialog(item, names + themes.map { ctx.getString(R.string.update_item_theme, it) },
+                    onDismissRequest = { showDialog = false }, note = note,
                     onAll = { delete() })
+            }
         }
     }
 }

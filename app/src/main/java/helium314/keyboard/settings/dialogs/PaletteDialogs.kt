@@ -50,10 +50,11 @@ fun PaletteEditDialog(
  * The trash on a palette that other keyboards or saved themes ([others], their names) use: [onAll] every one of them
  * and this keyboard go to the default colors and the palette leaves the list. No "only this keyboard": palettes come
  * from one common set, like fonts, and the button answers the question (owner 2026-10-18: "the headline question
- * "Delete Warm?" should be answered by the button in an obvious way").
+ * "Delete Warm?" should be answered by the button in an obvious way"). [note]: the line on the common settings under
+ * the list ([helium314.keyboard.settings.screens.deleteWarningNames]), or null.
  */
 @Composable
-fun PaletteDeleteDialog(name: String, others: List<String>, onDismissRequest: () -> Unit, onAll: () -> Unit) {
+fun PaletteDeleteDialog(name: String, others: List<String>, onDismissRequest: () -> Unit, note: String? = null, onAll: () -> Unit) {
     ThreeButtonAlertDialog(
         onDismissRequest = onDismissRequest,
         onConfirmed = onAll,
@@ -64,6 +65,7 @@ fun PaletteDeleteDialog(name: String, others: List<String>, onDismissRequest: ()
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(stringResource(R.string.palette_delete_users_all, others.joinToString("\n")))
                 Text(stringResource(R.string.palette_delete_text_all, name))
+                note?.let { Text(it, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium) }
             }
         },
     )

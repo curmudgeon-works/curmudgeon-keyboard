@@ -13,6 +13,7 @@ import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSub
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.realPrefs
 import helium314.keyboard.settings.AppearanceDraft
+import helium314.keyboard.settings.preferences.fontDeleteWarning
 import helium314.keyboard.settings.preferences.fontUsers
 import helium314.keyboard.settings.screens.keyboardName
 import helium314.keyboard.settings.screens.withKeyboardName
@@ -67,7 +68,28 @@ class ReReview2S6Test {
     @Test fun `with one set of settings a switched-off keyboard's kept own set is named too, like an enabled one's`() {
         // (the delete resets every set, hidden ones too; enabled keyboards' hidden sets are named already)
         real.edit { putBoolean("separate_settings_per_keyboard", false) }
-        assertEquals(listOf(offName()), fontUsers(ctx, "Mine.ttf"))
+        // (marked hidden, and the line on the common settings under the list: owner 2026-10-18, review SP10)
+        assertEquals(listOf(ctx.getString(R.string.keyboard_hidden_set, offName())), fontUsers(ctx, "Mine.ttf"))
+        assertEquals("Settings are common to all your keyboards (App settings › Per keyboard), so every keyboard follows Work, " +
+            "first in your list. Keyboards marked (hidden) keep this change for when settings are per keyboard.",
+            fontDeleteWarning(ctx, "Mine.ttf").second)
+    }
+
+    // (owner 2026-10-18, review SP10: "Only show those that actually go back to default (as they would with separate
+    // settings)". Fail before: B, switched on again with nothing of its own, was named as reading A's font, and no line)
+    @Test fun `with one set of settings - only the own sets are named, the first keyboard unmarked, and the line`() {
+        real.edit {
+            putBoolean("separate_settings_per_keyboard", false)
+            putString(Settings.PREF_ENABLED_SUBTYPES, SubtypeSettings.createPrefSubtypes(listOf(a, b)))
+            putString(idKey(1, Settings.PREF_KEY_FONT), value) // A's, the common one
+            remove(idKey(2, Settings.PREF_SUGGESTION_FONT)) // B: nothing of its own
+        }
+        SubtypeSettings.reloadEnabledSubtypes(ctx)
+        assertEquals(listOf("Work"), fontUsers(ctx, "Mine.ttf"))
+        assertEquals("Settings are common to all your keyboards (App settings › Per keyboard), so every keyboard follows Work, " +
+            "first in your list.", fontDeleteWarning(ctx, "Mine.ttf").second)
+        real.edit { putBoolean("separate_settings_per_keyboard", true) }
+        assertEquals(null, fontDeleteWarning(ctx, "Mine.ttf").second) // (separate settings: no line)
     }
 
     @Test fun `switched on again it is named once, without the mark`() {

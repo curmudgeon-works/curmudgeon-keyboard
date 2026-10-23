@@ -19,7 +19,6 @@ import helium314.keyboard.latin.define.DebugFlags
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.KeyboardProfiles
-import helium314.keyboard.latin.settings.ProfilePreferences
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
@@ -148,22 +147,21 @@ object LayoutUtilsCustom {
 
     /**
      * What [deleteLayout] does to the enabled keyboards, in the Keyboards screen's order, for the delete warning: the
-     * ones whose own pick it is, then the ones without a pick of their own for [layoutType] that have it as their default
-     * (what they read now, or what their own set keeps, hidden too). All keep its keys, as an unsaved layout (2026-10-11,
-     * the standard delete pattern; until then the second ones went back to the default keys): the second list is empty.
-     * A keyboard that picks another layout uses none of this one.
+     * ones whose own pick it is, then the ones without a pick of their own for [layoutType] whose own set has it as
+     * their default, shown or hidden (one that only reads the main keyboard's default, separate settings off or the
+     * Layout menu shared, isn't: owner 2026-10-18, review SP10, as separate settings would list them; [deleteWarning]'s
+     * line on the common settings says so). All keep its keys, as an unsaved layout (2026-10-11, the standard delete
+     * pattern; until then the second ones went back to the default keys): the second list is empty. A keyboard that
+     * picks another layout uses none of this one.
      */
     fun deleteEffects(layoutName: String, layoutType: LayoutType, context: Context): Pair<List<SettingsSubtype>, List<SettingsSubtype>> {
-        val real = context.realPrefs()
-        val all = real.all
+        val all = context.realPrefs().all
         val key = Settings.PREF_LAYOUT_PREFIX + layoutType.name
         val keyboards = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }.distinct()
         val keeps = keyboards.filter { it.layoutName(layoutType) == layoutName }
         val backToDefault = keyboards.filter { keyboard ->
-            if (keyboard.layoutName(layoutType) != null) return@filter false
-            val id = keyboard.keyboardId
-            ProfilePreferences(real) { id ?: KeyboardProfiles.SHARED }.getString(key, null) == layoutName
-                || id != null && all[KeyboardProfiles.ownKey(id, key)] == layoutName
+            keyboard.layoutName(layoutType) == null
+                && keyboard.keyboardId?.let { all[KeyboardProfiles.ownKey(it, key)] } == layoutName
         }
         // then the switched-off ones (owner 2026-10-11): their pick, or their own set's default
         val off = switchedOffKeyboards(context).filter { keyboard ->
@@ -178,6 +176,19 @@ object LayoutUtilsCustom {
         val enabled = SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype() }
         return SubtypeSettings.createSettingsSubtypes(context.prefs().getString(Settings.PREF_ADDITIONAL_SUBTYPES, Defaults.PREF_ADDITIONAL_SUBTYPES)!!)
             .distinct().filter { kb -> enabled.none { it.sameKeyboard(kb) } }
+    }
+
+    /** The delete warning of [layoutName] ([deleteEffects]), the keyboards by name, then the line on the common
+     *  settings when one is listed through its own set's default (not a pick, which is in its definition):
+     *  [helium314.keyboard.settings.screens.deleteWarningNames]. Null: nobody uses it. */
+    fun deleteWarning(layoutName: String, layoutType: LayoutType, context: Context): String? {
+        val (keeps, back) = deleteEffects(layoutName, layoutType, context)
+        val defaultKey = Settings.PREF_LAYOUT_PREFIX + layoutType.name
+        val (keepNames, keepNote) = helium314.keyboard.settings.screens.deleteWarningNames(context, keeps, listOf(defaultKey),
+            throughSet = keeps.filter { it.layoutName(layoutType) == null })
+        val (backNames, backNote) = helium314.keyboard.settings.screens.deleteWarningNames(context, back, listOf(defaultKey))
+        val text = deleteEffectsText(context, keepNames, backNames) ?: return null
+        return listOfNotNull(text, keepNote ?: backNote).joinToString("\n\n")
     }
 
     /** The delete warning's text for [keeps] and [backToDefault] (keyboard names, see [deleteEffects]); null: none. */

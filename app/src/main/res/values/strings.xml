@@ -759,6 +759,10 @@
     <string name="keyboard_hidden_set">%s (hidden)</string>
     <!-- under an update question's list when one is marked (hidden); %s = the first keyboard in the list -->
     <string name="update_item_hidden_note">Settings are common to all your keyboards (App settings › Per keyboard), so every keyboard follows %s, first in your list. Keyboards marked (hidden) keep this change for when settings are per keyboard.</string>
+    <!-- under a delete warning's list when the item's settings are common to all keyboards and none listed is marked
+         (hidden): update_item_hidden_note's first sentence (owner 2026-10-18: "should clarify as per usual pattern that
+         keyboards are using common settings of primary"); %s = the first keyboard in the list -->
+    <string name="delete_common_note">Settings are common to all your keyboards (App settings › Per keyboard), so every keyboard follows %s, first in your list.</string>
     <!-- a saved item with these exact settings exists already (Update, Save as new); nothing is blocked -->
     <string name="same_settings_as">These settings are the same as “%s”.</string>
     <string name="save_anyway">Save anyway</string>

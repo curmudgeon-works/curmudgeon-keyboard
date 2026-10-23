@@ -256,24 +256,28 @@ object KeyboardProfiles {
     }
 
     /** The keyboards (in [keyboards]' order) that use a saved item through [keys], for the delete warnings (2026-10-08):
-     *  what each reads now (separate settings off or the menu shared: the main keyboard's value), or what its own set
-     *  keeps, hidden or not (nothing stored there: nothing chosen, not asked again). [matches] gets the plain key and the
-     *  value (null: nothing chosen). Reads only. [edited]: the keyboard a settings screen edits and the set it edits
-     *  ([editingId]), which wins over the keyboard's own id (the screen's set). */
+     *  the ones whose own set keeps it, shown or hidden (nothing stored there: nothing chosen, not asked again), as
+     *  separate settings would list them; one that only reads the main keyboard's value (separate settings off or the
+     *  menu shared) isn't, the warning's line on the common settings says so (owner 2026-10-18, review SP10: "Only show
+     *  those that actually go back to default (as they would with separate settings)"; until then they were listed
+     *  too). [matches] gets the plain key and the stored value. Reads only. [edited]: the keyboard a settings screen
+     *  edits and the set it edits ([editingId]), which wins over the keyboard's own id (the screen's set). A keyboard
+     *  without an id has no set: never one. */
     fun keyboardsUsing(real: SharedPreferences, keyboards: List<SettingsSubtype>, keys: Collection<String>,
                        edited: Pair<SettingsSubtype, String>? = null,
                        matches: (key: String, value: String?) -> Boolean): List<SettingsSubtype> {
         return keyboards.filter { keyboard ->
-            val id = edited?.takeIf { it.first.sameKeyboard(keyboard) }?.second ?: keyboard.keyboardId ?: SHARED
-            val now = ProfilePreferences(real) { id } // (separate settings off or a shared menu: the main's set)
+            val id = edited?.takeIf { it.first.sameKeyboard(keyboard) }?.second ?: keyboard.keyboardId ?: return@filter false
             keys.any { key ->
-                if (matches(key, now.getString(key, null))) return@any true
-                if (id == SHARED) return@any false
                 val own = ownKey(id, key)
                 real.contains(own) && matches(key, real.getString(own, null))
             }
         }
     }
+
+    /** Whether every keyboard reads [key] from the main keyboard's set now: separate settings off, or all of its menus
+     *  shared (as [setOf] has it). */
+    fun isCommon(real: SharedPreferences, key: String): Boolean = !isPlain(key) && (!isSeparate(real) || sharedByGroups(key))
 
     /** The keyboards (in [keyboards]' order) whose own stored set names a saved item through [keys] ([matches] gets the
      *  plain key and the value), shown or hidden behind the common settings: the ones an update question asks
