@@ -147,9 +147,9 @@ object Defaults {
     /** Stored as the backspace delay: the key long press delay, whatever it is (the HeliBoard Layouts, as before 2026-10-07). */
     const val BACKSPACE_DELAY_FOLLOWS = -1
     const val PREF_KEY_LONGPRESS_TIMEOUT = 150 // the Curmudgeon Layout's (2026-10-07; 300 before, as HeliBoard)
-    const val PREF_GESTURE_CAPS_SWIPE = true // swiping up above the keyboard capitalizes the letter left from (own gesture decoder)
+    const val PREF_GESTURE_CAPS_SWIPE = false // swiping up above the keyboard capitalizes the letter left from (own gesture decoder); off since 2026-10-18 (stray capitals: goIng, thOugh in 1% of real swipes)
     const val PREF_GESTURE_APOSTROPHE_VIA_PERIOD = false // off = the apostrophe is skipped (swipe im for I'm); on = swiped through the period key (own gesture decoder)
-    const val PREF_GESTURE_CAPS_HEIGHT = 75 // percent of a key height the swipe must rise above the keyboard to capitalize (own gesture decoder)
+    const val PREF_GESTURE_CAPS_HEIGHT = 125 // percent of a key height the swipe must rise above the keyboard to capitalize (own gesture decoder); 75 until 2026-10-18
     // own gesture decoder tuning (see OwnGestureDecoder.Tuning): inflection confidences and the scorer blend
     const val PREF_GESTURE_TURN_WEIGHT = 1.0f // multiplier on the confidence of turn inflections
     const val PREF_GESTURE_SLOWDOWN_WEIGHT = 0.5f // how much slowing down over a key favours words with that letter (soft weight); 0 = off
