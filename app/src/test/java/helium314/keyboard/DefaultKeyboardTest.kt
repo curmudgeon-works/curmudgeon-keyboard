@@ -61,8 +61,9 @@ class DefaultKeyboardTest {
     }
 
     @Test fun `the first start stores the phone's first language that has a built-in dictionary`() {
-        // Korean has keyboards but no built-in dictionary: skipped (before, the list stayed empty and showed Korean)
-        firstStart(Locale.KOREA, Locale.FRANCE)
+        // Thai has keyboards but no built-in dictionary: skipped (before, the list stayed empty and showed it; was Korean,
+        // built in since 2026-10-18)
+        firstStart(Locale.forLanguageTag("th"), Locale.FRANCE)
         assertEquals(listOf("fr"), stored().map { it.locale.language })
         assertEquals(stored().single().toPref(), real.getString(Settings.PREF_SELECTED_SUBTYPE, null))
         assertEquals(stored(), SubtypeSettings.getEnabledSubtypes(false).map { with(SettingsSubtype) { it.toSettingsSubtype() } })
@@ -77,7 +78,7 @@ class DefaultKeyboardTest {
     }
 
     @Test fun `no phone language with a built-in dictionary - English (US)`() {
-        firstStart(Locale.KOREA, Locale.JAPAN)
+        firstStart(Locale.forLanguageTag("th"), Locale.JAPAN) // (Korean is built in since 2026-10-18)
         assertEquals(listOf(Locale.US), stored().map { it.locale })
     }
 

@@ -63,13 +63,6 @@
   "licence": "CC BY 4.0"
  },
  {
-  "tag": "ko",
-  "name": "Korean",
-  "file": "main_ko.dict",
-  "bytes": 5111688,
-  "licence": "CC BY 4.0"
- },
- {
   "tag": "lv",
   "name": "Latvian",
   "file": "main_lv.dict",
@@ -116,13 +109,6 @@
   "name": "Ukrainian",
   "file": "main_uk.dict",
   "bytes": 12727554,
-  "licence": "CC BY 4.0"
- },
- {
-  "tag": "ur",
-  "name": "Urdu",
-  "file": "main_ur.dict",
-  "bytes": 1313053,
   "licence": "CC BY 4.0"
  }
 ]

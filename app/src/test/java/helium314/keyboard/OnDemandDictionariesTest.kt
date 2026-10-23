@@ -33,10 +33,19 @@ class OnDemandDictionariesTest {
         assertEquals("https://curmudgeon.works/dictionaries#et-EE", OnDemandDictionaries.pageFor("et-EE".constructLocale()))
     }
 
-    @Test fun `Urdu and Korean keyboards find their downloads`() { // (2026-10-11: release v2)
-        assertEquals("ur", download("ur-PK")) // (the keyboard's Urdu)
-        assertEquals("ko", download("ko"))
-        assertEquals("https://curmudgeon.works/dictionaries#ur-PK", OnDemandDictionaries.pageFor("ur-PK".constructLocale()))
+    // (2026-10-11 downloads, release v2; owner 2026-10-18: "bundle these two dicts also in our rollout")
+    @Test fun `Urdu and Korean are built in - their keyboards get the bundled dictionary, nothing to download`() {
+        val bundled = File("src/main/assets/dicts").list()!!.filter { it.startsWith("main_") }
+        fun pick(tag: String) =
+            helium314.keyboard.latin.common.LocaleUtils.getBestMatch(tag.constructLocale(), bundled) { DictionaryInfoUtils.extractLocaleFromAssetsDictionaryFile(it) }
+        assertEquals("main_ur.dict", pick("ur-PK")) // (the keyboard's Urdu)
+        assertEquals("main_ko.dict", pick("ko"))
+        assertNull(download("ur-PK")); assertNull(download("ko"))
+        assertTrue(dictionaryAvailable(ctx, "ur-PK".constructLocale())); assertTrue(dictionaryAvailable(ctx, "ko".constructLocale()))
+        for (tag in listOf("ur-PK", "ko")) { // (an extracted copy is the built-in one's: cleared as before, not kept as the user's)
+            val dir = File(DictionaryInfoUtils.getCacheDirectoryForLocale(tag.constructLocale(), ctx)!!)
+            assertFalse(keepUnbundledMainDict(ctx, dir, File(dir, "main.dict").apply { writeText("x") }), tag)
+        }
     }
 
     @Test fun `without advanced a language shows if it has a dictionary here or to download`() {
