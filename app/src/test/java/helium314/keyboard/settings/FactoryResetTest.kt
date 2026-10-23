@@ -6,7 +6,7 @@ import android.os.Looper
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -314,8 +314,9 @@ class FactoryResetTest {
         }
     }
 
-    // (owner 2026-10-14: the boxes start ticked, "all checkboxes on"; fail before: all four started unticked)
-    @Test fun `the dialog - its texts, all four boxes ticked, Cancel left of Reset, Reset with all ticked keeps all four`() {
+    // (owner 2026-10-18: "All unchecked. Factory reset should allow full factory reset with few clicks instead of having
+    // to uncheck evreything"; fail before: all four started ticked, owner 2026-10-14)
+    @Test fun `the dialog - its texts, all four boxes unticked, Cancel left of Reset, Reset at once keeps nothing`() {
         var picked: ResetKeep? = null
         showDialog(onReset = { picked = it })
         compose.onNodeWithText("All settings go back to their defaults. This can't be undone.").assertExists()
@@ -325,31 +326,31 @@ class FactoryResetTest {
             compose.onNodeWithText(text).assertExists()
         val boxes = compose.onAllNodes(isToggleable())
         assertEquals(4, boxes.fetchSemanticsNodes().size)
-        for (i in 0 until 4) boxes[i].assertIsOn()
+        for (i in 0 until 4) boxes[i].assertIsOff()
         val cancel = compose.onNodeWithText(ctx.getString(android.R.string.cancel)).fetchSemanticsNode().boundsInRoot
         val reset = compose.onNodeWithText("Reset").fetchSemanticsNode().boundsInRoot
         assertTrue(cancel.left < reset.left, "Cancel left of Reset: $cancel / $reset")
         compose.onNodeWithText("Backup").assertIsEnabled()
         compose.onNodeWithText("Reset").performClick()
-        assertEquals(ResetKeep(keyboards = true, words = true, clipboard = true, own = true), picked)
+        assertEquals(ResetKeep(), picked)
     }
 
-    @Test fun `the dialog - a box unticked is reset`() {
+    @Test fun `the dialog - a box ticked is kept`() {
         var picked: ResetKeep? = null
         showDialog(onReset = { picked = it })
         compose.onNodeWithText("Learned and blacklisted words").performClick()
         compose.onNodeWithText("Reset").performClick()
-        assertEquals(ResetKeep(keyboards = true, words = false, clipboard = true, own = true), picked)
+        assertEquals(ResetKeep(words = true), picked)
     }
 
-    @Test fun `the dialog - all four unticked keeps nothing`() {
+    @Test fun `the dialog - all four ticked keeps all four`() {
         var picked: ResetKeep? = null
         showDialog(onReset = { picked = it })
         for (text in listOf("Keyboards and languages", "Learned and blacklisted words", "Clipboard history",
                 "Saved layouts & popups, themes & color palettes, added dictionaries, and loaded fonts and pictures"))
             compose.onNodeWithText(text).performClick()
         compose.onNodeWithText("Reset").performClick()
-        assertEquals(ResetKeep(), picked)
+        assertEquals(ResetKeep(keyboards = true, words = true, clipboard = true, own = true), picked)
     }
 
     // (owner 2026-10-18, review SP32: "Maybe add a bit saying items not saved as theme/layout/palette/font/image/
@@ -357,9 +358,9 @@ class FactoryResetTest {
     @Test fun `the dialog - under the saved items box while it is ticked, that unsaved changes are still reset`() {
         showDialog()
         val line = "Changes you haven't saved as a layout, popup set, theme or palette are still reset."
-        compose.onNodeWithText(line).assertExists()
+        compose.onNodeWithText(line).assertDoesNotExist() // (unticked to start with, owner 2026-10-18)
         compose.onNodeWithText("Saved layouts & popups, themes & color palettes, added dictionaries, and loaded fonts and pictures").performClick()
-        compose.onNodeWithText(line).assertDoesNotExist()
+        compose.onNodeWithText(line).assertExists()
     }
 
     @Test fun `the dialog - Backup asks for the backup`() {
