@@ -119,13 +119,13 @@ class LayoutDeleteEffectsTest {
         assertEquals(listOf("de-DE", "en-US"), names(effects.first)) // (the pick, then the own default)
         assertEquals(emptyList(), names(effects.second))
         val (aName, bName) = before.take(2).map { helium314.keyboard.settings.screens.keyboardName(it, ctx) }
-        assertEquals("These keyboards keep its keys, each as an unsaved layout of its own:\n$bName\n$aName\n\n" +
+        assertEquals("These keyboards keep their keys, as an unsaved layout:\n$bName\n$aName\n\n" +
             "Settings are common to all your keyboards (App settings › Per keyboard), so every keyboard follows $aName, first in your list.",
             LayoutUtilsCustom.deleteWarning(x, type, ctx))
         // a hidden own default: marked, and the update questions' line (a pick is in the keyboard's definition: never)
         real.edit().putString(idKey(3, defaultKey), x).commit()
         val cName = helium314.keyboard.settings.screens.keyboardName(before[2], ctx)
-        assertEquals("These keyboards keep its keys, each as an unsaved layout of its own:\n$bName\n$aName\n$cName (hidden)\n\n" +
+        assertEquals("These keyboards keep their keys, as an unsaved layout:\n$bName\n$aName\n$cName (hidden)\n\n" +
             "Settings are common to all your keyboards (App settings › Per keyboard), so every keyboard follows $aName, first in " +
             "your list. Keyboards marked (hidden) keep this change for when settings are per keyboard.",
             LayoutUtilsCustom.deleteWarning(x, type, ctx))
@@ -141,7 +141,7 @@ class LayoutDeleteEffectsTest {
         val b = available("de-DE")
         val before = keyboards(true, a, b)
         real.edit().putString(idKey(2, defaultKey), x).commit()
-        assertEquals("This keyboard keeps its keys, as an unsaved layout of its own:\n" + helium314.keyboard.settings.screens.keyboardName(before[1], ctx),
+        assertEquals("This keyboard keeps its keys, as an unsaved layout:\n" + helium314.keyboard.settings.screens.keyboardName(before[1], ctx),
             LayoutUtilsCustom.deleteWarning(x, type, ctx))
     }
 
@@ -161,13 +161,15 @@ class LayoutDeleteEffectsTest {
         Settings.readDefaultLayoutName(type, ProfilePreferences(real) { kid(3) }).let { assertTrue(LayoutUtilsCustom.isPrivateLayout(it)); assertEquals("1 2 3", file(it).readText()) }
     }
 
+    // (owner 2026-10-18, review SP12: "These keyboards keep their keys, as an unsaved layout." Fail before: "These
+    // keyboards keep its keys, each as an unsaved layout of its own")
     @Test fun `the warning text - none, one, many, both`() {
         assertNull(LayoutUtilsCustom.deleteEffectsText(ctx, emptyList(), emptyList()))
-        assertEquals("This keyboard keeps its keys, as an unsaved layout of its own:\nEnglish (US)",
+        assertEquals("This keyboard keeps its keys, as an unsaved layout:\nEnglish (US)",
             LayoutUtilsCustom.deleteEffectsText(ctx, listOf("English (US)"), emptyList()))
         assertEquals("These keyboards go back to the default keys:\nA\nB\nC",
             LayoutUtilsCustom.deleteEffectsText(ctx, emptyList(), listOf("A", "B", "C")))
-        assertEquals("These keyboards keep its keys, each as an unsaved layout of its own:\nA\nB\n\n" +
+        assertEquals("These keyboards keep their keys, as an unsaved layout:\nA\nB\n\n" +
             "This keyboard goes back to the default keys:\nC",
             LayoutUtilsCustom.deleteEffectsText(ctx, listOf("A", "B"), listOf("C")))
     }
