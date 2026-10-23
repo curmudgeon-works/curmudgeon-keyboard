@@ -498,7 +498,9 @@ fun SubtypeScreen(
                 WithBigTitle(stringResource(R.string.settings_category_input)) {
                     CompositionLocalProvider(LocalCompactPreferences provides true) {
                         lists.input.filter { it !in advancedInputItems }.forEach { Listed(lists, it) {
-                            CompositionLocalProvider(LocalPendingChange provides keyChanged(it)) {
+                            // (the backspace delay's row also holds its repeat, the dialog's second slider)
+                            CompositionLocalProvider(LocalPendingChange provides (keyChanged(it)
+                                    || (it == Settings.PREF_BACKSPACE_LONGPRESS_DELAY && keyChanged(Settings.PREF_BACKSPACE_REPEAT_INTERVAL)))) {
                             // the rows that appear under Vibrate / Sound when they're on sit a little in; the dialogs
                             // of the long-press delay and the sound / vibration rows keep the keyboard up to try them
                             val row: @Composable () -> Unit = {

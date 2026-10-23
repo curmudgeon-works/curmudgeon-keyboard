@@ -78,7 +78,9 @@ object Defaults {
     const val PREF_KEY_TEXT_UNDERLINE = false
     const val PREF_HINT_FONT_SCALE = 1.0f // the symbols on the keys, relative to their usual size
     const val PREF_HINT_TEXT_BOLD = true // symbols were always drawn bold
-    const val PREF_BACKSPACE_REPEAT_INTERVAL = 200 // ms between deletions while backspace is held
+    // ms between deletions while backspace is held, and between moves of a held arrow / word / page key; read again since
+    // 2026-10-21 ("if you keep holding", the second slider of the backspace long press delay; before, the key long press delay)
+    const val PREF_BACKSPACE_REPEAT_INTERVAL = 200
     const val PREF_BACKSPACE_SPEED_UP = true // held long enough, backspace ramps to the top speed (the Curmudgeon Layout's, 2026-10-07)
     const val PREF_BACKSPACE_SPEED_UP_AFTER = 2000 // ms of holding before the speed-up starts
     const val PREF_BACKSPACE_TOP_INTERVAL = 50 // ms between deletions at the top speed
@@ -142,8 +144,8 @@ object Defaults {
     const val PREF_KEYPRESS_SOUND_VOLUME = -0.01f
     const val PREF_KEYPRESS_SOUND = "android" // KeypressSounds
     // a held backspace starts deleting after this (the Curmudgeon Layout's, 2026-10-07; before, unset meant the key long press
-    // delay, which went to 150 ms the same day)
-    const val PREF_BACKSPACE_LONGPRESS_DELAY = 200
+    // delay, which went to 150 ms the same day; 200 until 2026-10-21, 300 after tester feedback)
+    const val PREF_BACKSPACE_LONGPRESS_DELAY = 300
     /** Stored as the backspace delay: the key long press delay, whatever it is (the HeliBoard Layouts, as before 2026-10-07). */
     const val BACKSPACE_DELAY_FOLLOWS = -1
     const val PREF_KEY_LONGPRESS_TIMEOUT = 150 // the Curmudgeon Layout's (2026-10-07; 300 before, as HeliBoard)

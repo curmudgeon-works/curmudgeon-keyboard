@@ -14,8 +14,17 @@ import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.getActivity
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.settings.SettingsActivity
+import helium314.keyboard.settings.dialogs.SecondSlider
 import helium314.keyboard.settings.dialogs.SliderDialog
 import androidx.core.content.edit
+
+/** A second Int setting in the same dialog, its slider under the first (see [SecondSlider]). */
+class SliderPart(
+    val key: String,
+    val default: Int,
+    val range: ClosedFloatingPointRange<Float>,
+    val description: @Composable (Int) -> String,
+)
 
 @Suppress("UNCHECKED_CAST") // it's sort of checked
 @Composable
@@ -35,6 +44,8 @@ fun <T: Number> SliderPreference(
     summary: String? = null, // with [valueOnRight]: the line under the name
     offLabel: String? = null, // a checkbox in the dialog that sets [offValue] (outside the range) and greys the slider out
     offValue: T? = null,
+    dialogDescription: (@Composable (T) -> String)? = null, // the value line in the dialog, if not [description]
+    second: SliderPart? = null,
     onConfirmed: (T) -> Unit = { },
 ) {
     helium314.keyboard.settings.KnownDefaults.note(key, default)
@@ -52,6 +63,7 @@ fun <T: Number> SliderPreference(
     // the value when the dialog opened: live drags write the pref and redraw this row, so the current value would
     // make Cancel "restore" the dragged one
     val openValue = rememberSaveable(showDialog) { initialValue }
+    val secondOpen = rememberSaveable(showDialog) { second?.let { prefs.getInt(it.key, it.default) } ?: 0 }
     @Suppress("UNCHECKED_CAST")
     fun write(value: Float) {
         if (live && !hadValue && value == openValue.toFloat()) prefs.edit { remove(key) } // Cancel: unset stays unset
@@ -86,7 +98,7 @@ fun <T: Number> SliderPreference(
             range = range,
             positionString = {
                 @Suppress("UNCHECKED_CAST")
-                description((if (default is Int) it.toInt() else it) as T)
+                (dialogDescription ?: description)((if (default is Int) it.toInt() else it) as T)
             },
             onValueChanged = { if (live && it != null) write(it); onValueChanged(it) },
             showDefault = true,
@@ -95,6 +107,11 @@ fun <T: Number> SliderPreference(
             offLabel = offLabel,
             offValue = offValue?.toFloat() ?: -1f,
             onDefault = { prefs.edit { remove(key) }; onConfirmed(default) },
+            second = second?.let { part ->
+                SecondSlider(secondOpen.toFloat(), part.range, part.default.toFloat(), { part.description(it.toInt()) }) { v ->
+                    prefs.edit { if (v == null) remove(part.key) else putInt(part.key, v.toInt()) }
+                }
+            },
             defaultValue = default.toFloat(),
             intermediateSteps = stepSize?.let {
                 // this is not nice, but slider wants it like this...

@@ -466,6 +466,12 @@
     <string name="backspace_start_speed">Speed</string>
     <string name="backspace_speed_up">Backspace goes faster when held</string>
     <string name="backspace_longpress_delay">Backspace long press delay</string>
+    <!-- Backspace long press delay dialog, top slider; %s is milliseconds -->
+    <string name="backspace_first_delete">%s ms for first delete</string>
+    <!-- Backspace long press delay dialog, second slider: the time between deletions while backspace stays held; %s is milliseconds -->
+    <string name="backspace_keep_holding">%s ms if you keep holding</string>
+    <!-- Backspace long press delay row: %1$s is the first wait ("300 ms" or "Same as long press"), %2$s the milliseconds between deletions after it -->
+    <string name="backspace_delay_summary">%1$s, %2$s ms if you keep holding</string>
     <string name="backspace_speed_up_after">Speed up after</string>
     <string name="backspace_top_speed">Top speed</string>
     <!-- %s is a number of seconds like 2.0 -->

@@ -133,7 +133,7 @@ class Batch1007Test {
 
     @Test fun `the defaults are the Curmudgeon Layout's`() {
         assertEquals(150, Defaults.PREF_KEY_LONGPRESS_TIMEOUT)
-        assertEquals(200, Defaults.PREF_BACKSPACE_LONGPRESS_DELAY, "a held backspace starts after 200 ms, not the keys' 150")
+        assertEquals(300, Defaults.PREF_BACKSPACE_LONGPRESS_DELAY, "a held backspace starts after 300 ms (200 until 2026-10-21), not the keys' 150")
         assertEquals(200, Defaults.PREF_BACKSPACE_REPEAT_INTERVAL)
         assertTrue(Defaults.PREF_BACKSPACE_SPEED_UP)
         assertTrue(Defaults.PREF_BOTTOM_PADDING_SCALE.all { it == 0f }, "no space under the bottom row")

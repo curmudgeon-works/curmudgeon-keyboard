@@ -320,7 +320,7 @@ public class SettingsValues {
 
         // Compute other readable settings
         mKeyLongpressTimeout = prefs.getInt(Settings.PREF_KEY_LONGPRESS_TIMEOUT, Defaults.PREF_KEY_LONGPRESS_TIMEOUT);
-        // backspace's own delay (200 ms unless set), or the key long press delay where it is set to follow it (the HeliBoard Layouts)
+        // backspace's own delay (300 ms unless set; 200 until 2026-10-21), or the key long press delay where it is set to follow it (the HeliBoard Layouts)
         final int backspaceDelay = prefs.getInt(Settings.PREF_BACKSPACE_LONGPRESS_DELAY, Defaults.PREF_BACKSPACE_LONGPRESS_DELAY);
         mBackspaceLongpressDelay = backspaceDelay(backspaceDelay, mKeyLongpressTimeout);
         mKeypressVibrationDuration = prefs.getInt(Settings.PREF_VIBRATION_DURATION_SETTINGS, Defaults.PREF_VIBRATION_DURATION_SETTINGS);

@@ -189,7 +189,8 @@ fun createAdvancedSettings(context: Context) = listOf(
             description = { stringResource(R.string.abbreviation_unit_milliseconds, it.toString()) }
         )
     },
-    // backspace's own long press delay (before the first deletion); unset, it shows and uses the key long press delay
+    // backspace's own long press delay (before the first deletion) and, its second slider, the time between deletions
+    // while it stays held (2026-10-21; before, that was the key long press delay)
     Setting(context, Settings.PREF_BACKSPACE_LONGPRESS_DELAY, R.string.backspace_longpress_delay) { setting ->
         val prefs = LocalContext.current.prefs()
         SliderPreference(
@@ -197,11 +198,23 @@ fun createAdvancedSettings(context: Context) = listOf(
             key = setting.key,
             default = Defaults.PREF_BACKSPACE_LONGPRESS_DELAY,
             range = 100f..700f,
-            // "same as the long press" (the HeliBoard Layouts): a checkbox in the dialog
+            // "same as the long press" (the HeliBoard Layouts): a checkbox in the dialog, for the first delete only
             offLabel = stringResource(R.string.backspace_delay_follows),
             offValue = Defaults.BACKSPACE_DELAY_FOLLOWS,
-            description = { if (it < 0) stringResource(R.string.backspace_delay_follows)
-                else stringResource(R.string.abbreviation_unit_milliseconds, it.toString()) }
+            description = {
+                // (read here: the row redraws on every change, the second slider's too)
+                val repeat = prefs.getInt(Settings.PREF_BACKSPACE_REPEAT_INTERVAL, Defaults.PREF_BACKSPACE_REPEAT_INTERVAL)
+                stringResource(R.string.backspace_delay_summary, if (it < 0) stringResource(R.string.backspace_delay_follows)
+                    else stringResource(R.string.abbreviation_unit_milliseconds, it.toString()), repeat.toString())
+            },
+            // ticked, the first delete's line shows the key long press delay it follows
+            dialogDescription = {
+                val ms = if (it < 0) prefs.getInt(Settings.PREF_KEY_LONGPRESS_TIMEOUT, Defaults.PREF_KEY_LONGPRESS_TIMEOUT) else it
+                stringResource(R.string.backspace_first_delete, ms.toString())
+            },
+            second = helium314.keyboard.settings.preferences.SliderPart(Settings.PREF_BACKSPACE_REPEAT_INTERVAL, Defaults.PREF_BACKSPACE_REPEAT_INTERVAL, 50f..500f) {
+                stringResource(R.string.backspace_keep_holding, it.toString())
+            },
         )
     },
     Setting(context, Settings.PREF_SPACE_HORIZONTAL_SWIPE, R.string.show_horizontal_space_swipe) {
