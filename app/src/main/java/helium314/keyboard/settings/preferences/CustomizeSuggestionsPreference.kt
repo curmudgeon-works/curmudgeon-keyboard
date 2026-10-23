@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.preferences
 
-import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRequester
@@ -39,14 +38,10 @@ import helium314.keyboard.latin.SuggestionRules.Kind
 import helium314.keyboard.latin.SuggestionRules.Rule
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
-import helium314.keyboard.latin.utils.SubtypeSettings
-import helium314.keyboard.latin.utils.getSecondaryLocales
-import helium314.keyboard.latin.utils.locale
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.settings.Setting
 import helium314.keyboard.settings.dialogs.ListPickerDialog
 import helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog
-import java.util.Locale
 
 /**
  * "Customize suggestions" (Others): how many suggestions the strip shows, and a rule for each position from the 2nd
@@ -68,8 +63,6 @@ fun CustomizeSuggestionsPreference(setting: Setting) {
             else stringResource(R.string.suggestion_rules_set, set.toString())
     )
     if (!showDialog) return
-    // the keyboard's languages in the order the rules number them: the main one, then the others
-    val languages = remember(ctx) { keyboardLanguages(ctx) }
     // the listed positions, defaults included (unlike the stored form, which drops trailing ones)
     var listedText by rememberSaveable { mutableStateOf(listText(rules)) }
     val listed = SuggestionRules.parse(listedText)
@@ -87,13 +80,15 @@ fun CustomizeSuggestionsPreference(setting: Setting) {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(stringResource(R.string.suggestion_rules_intro),
                     style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.suggestion_rules_languages),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 listed.forEachIndexed { i, rule ->
                     Row(
                         Modifier.fillMaxWidth().clickable { picking = i }.padding(vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(ordinal(i + 2), Modifier.width(52.dp), style = MaterialTheme.typography.titleSmall)
-                        Text(ruleName(rule, languages), Modifier.weight(1f))
+                        Text(ruleName(rule), Modifier.weight(1f))
                         if (i == listed.lastIndex)
                             IconButton(onClick = { setListed(listed.dropLast(1)) }) {
                                 Icon(painterResource(R.drawable.ic_bin), stringResource(R.string.delete))
@@ -114,20 +109,13 @@ fun CustomizeSuggestionsPreference(setting: Setting) {
     )
     if (picking in listed.indices) {
         val position = picking // the picker is closed (picking = -1) before it reports the choice
-        val options = buildList {
-            add(SuggestionRules.DEFAULT)
-            languages.indices.forEach { add(Rule(Kind.LANGUAGE, it + 1)) }
-            add(Rule(Kind.OTHER_FIRST_LETTER))
-            add(Rule(Kind.LOW_SCORE))
-            languages.indices.forEach { add(Rule(Kind.COMMON, it + 1)) }
-        }
         ListPickerDialog(
             onDismissRequest = { picking = -1 },
-            items = options,
+            items = ruleOptions(),
             onItemSelected = { chosen -> setListed(listed.toMutableList().also { it[position] = chosen }); picking = -1 },
             title = { Text(stringResource(R.string.suggestion_rule_for, ordinal(position + 2))) },
             selectedItem = listed[position],
-            getItemName = { ruleName(it, languages) },
+            getItemName = { ruleName(it) },
         )
     }
 }
@@ -197,8 +185,16 @@ private fun listText(rules: List<Rule>) =
     rules.joinToString(",") { if (it.kind.hasLanguage) "${it.kind.code}${it.language}" else "${it.kind.code}" }
 
 @Composable
-private fun ruleName(rule: Rule, languages: List<String>): String {
-    val language = languages.getOrNull(rule.language - 1) ?: stringResource(R.string.suggestion_rule_language_n, rule.language.toString())
+internal fun ruleName(rule: Rule): String {
+    // by position, not by name (owner 2026-10-18: "should say first, second, third, fourth lang"): the rules number the
+    // languages, and the same rules serve keyboards with other languages
+    val language = when (rule.language) {
+        1 -> stringResource(R.string.suggestion_rule_language_1)
+        2 -> stringResource(R.string.suggestion_rule_language_2)
+        3 -> stringResource(R.string.suggestion_rule_language_3)
+        4 -> stringResource(R.string.suggestion_rule_language_4)
+        else -> stringResource(R.string.suggestion_rule_language_n, rule.language.toString())
+    }
     return when (rule.kind) {
         Kind.DEFAULT -> stringResource(R.string.suggestion_rule_default)
         Kind.LANGUAGE -> stringResource(R.string.suggestion_rule_language, language)
@@ -217,9 +213,11 @@ private fun ordinal(n: Int): String = n.toString() + when {
     else -> "th"
 }
 
-/** The selected keyboard's languages, main one first, as the suggestion rules number them. */
-private fun keyboardLanguages(ctx: Context): List<String> {
-    val subtype = SubtypeSettings.getSelectedSubtype(ctx.prefs())
-    val display = ctx.resources.configuration.locales[0] ?: Locale.getDefault()
-    return (listOf(subtype.locale()) + getSecondaryLocales(subtype.extraValue)).distinct().map { it.getDisplayName(display) }
+/** What a position can be set to: the languages by number, the first four of any keyboard. */
+internal fun ruleOptions() = buildList {
+    add(SuggestionRules.DEFAULT)
+    (1..4).forEach { add(Rule(Kind.LANGUAGE, it)) }
+    add(Rule(Kind.OTHER_FIRST_LETTER))
+    add(Rule(Kind.LOW_SCORE))
+    (1..4).forEach { add(Rule(Kind.COMMON, it)) }
 }

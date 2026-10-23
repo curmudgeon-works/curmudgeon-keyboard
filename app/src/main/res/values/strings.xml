@@ -552,14 +552,19 @@
     <string name="suggestion_count_n">%s suggestions</string>
     <string name="suggestion_rules_set">%s positions set</string>
     <string name="suggestion_rules_intro">The 1st suggestion is always the best match. From the 2nd on:</string>
+    <string name="suggestion_rules_languages">Your first language is the keyboard\'s main one. The others count in the order they were added.</string>
+    <string name="suggestion_rule_language_1">first</string>
+    <string name="suggestion_rule_language_2">second</string>
+    <string name="suggestion_rule_language_3">third</string>
+    <string name="suggestion_rule_language_4">fourth</string>
     <string name="suggestion_rule_add">Set the %s</string>
     <string name="suggestion_rule_for">The %s suggestion</string>
     <string name="suggestion_rule_default">Default</string>
-    <string name="suggestion_rule_language">A %s word</string>
+    <string name="suggestion_rule_language">A word in your %s language</string>
     <string name="suggestion_rule_language_n">language %s</string>
     <string name="suggestion_rule_first_letter">A different first letter than the 1st</string>
     <string name="suggestion_rule_low_score">A low scorer (a tenth of the 1st or less)</string>
-    <string name="suggestion_rule_common">The next common %s word</string>
+    <string name="suggestion_rule_common">The next common word in your %s language</string>
     <!-- Message in preferences how to get timestamp key -->
     <string name="timestamp_description">You can add the timestamp key using a custom layout with \'timestamp\' key, or key code -10043</string>
     <!-- Preferences item for choosing secondary language -->
