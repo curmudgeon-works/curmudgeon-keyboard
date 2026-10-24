@@ -10,6 +10,21 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
+import helium314.keyboard.latin.settings.Defaults
+import helium314.keyboard.latin.utils.prefs
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -84,8 +99,10 @@ fun WelcomeWizard(
     WelcomeWizardSteps(close, finish)
 }
 
-/** The setup's checklist, the same rows on every screen (owner 2026-10-14: one list, the step's text in a card above). */
-internal enum class SetupRow { ENABLE, SWITCH, THEME, CONFIGURE, FINISH }
+/** The setup's checklist, the same rows on every screen (owner 2026-10-14: one list, the step's text in a card above).
+ *  THEME is the third step's tiles (2026-10-24: Pick a theme, Pick a layout, All settings; the "Configure the keyboard"
+ *  row went into the last tile). */
+internal enum class SetupRow { ENABLE, SWITCH, THEME, FINISH }
 
 /** How a row of the checklist looks: done (faded orange with a check), the step to take now (orange, framed), later
  *  (faint), open (orange, as a step can be taken again), or the filled Finished. */
@@ -95,9 +112,8 @@ internal class SetupRowState(val look: SetupRowLook, val clickable: Boolean)
 
 /**
  * Row [row] of the checklist on screen [step]: 1 the keyboard isn't enabled, 2 enabled but not the one in use, 3 in use.
- * Configure looks faint until 3 but can be tapped from 2 on (owner 2026-10-14: "maybe even faded Configure button should
- * let you go into our settings?"; on 1 the settings' Switch bar would open a picker without the keyboard in it);
- * Finished only on 3.
+ * The tiles (THEME) and Finished only on 3. (Configure looked faint until 3 but could be tapped from 2 on, owner
+ * 2026-10-14; its action is the All settings tile's since 2026-10-24, on 3.)
  */
 internal fun setupRowState(row: SetupRow, step: Int): SetupRowState = when (row) {
     SetupRow.ENABLE -> if (step <= 1) SetupRowState(SetupRowLook.CURRENT, true) else SetupRowState(SetupRowLook.DONE, false)
@@ -107,11 +123,6 @@ internal fun setupRowState(row: SetupRow, step: Int): SetupRowState = when (row)
         else -> SetupRowState(SetupRowLook.DONE, false)
     }
     SetupRow.THEME -> if (step >= 3) SetupRowState(SetupRowLook.OPEN, true) else SetupRowState(SetupRowLook.LATER, false)
-    SetupRow.CONFIGURE -> when {
-        step <= 1 -> SetupRowState(SetupRowLook.LATER, false)
-        step == 2 -> SetupRowState(SetupRowLook.LATER, true)
-        else -> SetupRowState(SetupRowLook.OPEN, true)
-    }
     SetupRow.FINISH -> if (step >= 3) SetupRowState(SetupRowLook.FILLED, true) else SetupRowState(SetupRowLook.LATER, false)
 }
 
@@ -230,18 +241,11 @@ private fun WelcomeWizardSteps(
             }
             row(SetupRow.SWITCH, stringResource(R.string.setup_step2_action), painterResource(R.drawable.ic_setup_select),
                 imm::showInputMethodPicker)
-            // (no Dynamic colors before Android 12: nothing to pick there, the keyboard is Curmudgeon's)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                // a faint row until the keyboard is in use, then the two themes to pick from
-                if (setupRowState(SetupRow.THEME, step).look == SetupRowLook.OPEN) {
-                    Spacer(Modifier.height(4.dp))
-                    ThemePick(stepBackgroundColor)
-                } else
-                    row(SetupRow.THEME, stringResource(R.string.setup_theme_title), painterResource(R.drawable.ic_settings_appearance)) { }
-            }
-            // (no "(optional)": owner 2026-10-14)
-            row(SetupRow.CONFIGURE, stringResource(R.string.setup_step3_action),
-                painterResource(R.drawable.sym_keyboard_language_switch), close)
+            // a faint row until the keyboard is in use, then the tiles to swipe through (2026-10-24): Pick a theme
+            // (Android 12 and up: no Dynamic colors before, the keyboard is Curmudgeon's), Pick a layout, All settings
+            // (the "Configure the keyboard" row until then; no "(optional)": owner 2026-10-14)
+            if (setupRowState(SetupRow.THEME, step).look == SetupRowLook.OPEN) SetupTiles(stepBackgroundColor, close)
+            else row(SetupRow.THEME, stringResource(R.string.setup_theme_layout_title), painterResource(R.drawable.ic_settings_appearance)) { }
             if (step >= 3) DictionaryDownloads(stepBackgroundColor, textColor)
             // on every screen, faint until the keyboard is in use
             // (a checkered flag, not the check of the steps done: owner 2026-10-14)
@@ -318,36 +322,233 @@ private fun WidePreview() {
     }
 }
 
+/** The third step's tiles (2026-10-24), in their order; no theme tile before Android 12 (no Dynamic colors to pick). */
+internal enum class SetupTile { THEME, LAYOUT, SETTINGS }
+internal fun setupTiles(sdk: Int = Build.VERSION.SDK_INT): List<SetupTile> =
+    listOfNotNull(if (sdk >= Build.VERSION_CODES.S) SetupTile.THEME else null, SetupTile.LAYOUT, SetupTile.SETTINGS)
+
+internal const val SETUP_TILES_TAG = "setup_tiles"
+internal fun setupTileTag(tile: SetupTile) = "setup_tile_" + tile.name.lowercase()
+internal fun setupLayoutWordTag(pick: SetupLayout.Pick) = "setup_layout_" + pick.name.lowercase()
+
 /**
- * The last screen's "Pick a theme": Dynamic (the default, picked at first) or Curmudgeon, each a picture of the keyboard
- * in its real colors; the whole choice is tapped, the picked one's picture ringed in orange (owner 2026-10-14: "can you
- * remove the radio button, and let user tap the thumbnail which can be, sort of, encircled?"). See [SetupTheme].
+ * The third step's tiles, swiped through, one at a time, no wrap (2026-10-24): Pick a theme (as before), Pick a layout
+ * (a preview of the keyboard in the picked theme's colors, Minimal · Classic · Dense under it; [SetupLayout]), All
+ * settings (what the "Configure the keyboard" row did: [close]). All as tall as the tallest, the theme tile's; a thin
+ * chevron just outside each edge that has a neighbor, the tiles a little narrower for it; no dots, no hint.
  */
 @Composable
-private fun ThemePick(background: androidx.compose.ui.graphics.Color) {
+internal fun SetupTiles(background: androidx.compose.ui.graphics.Color, close: () -> Unit,
+                        state: PagerState = rememberPagerState { setupTiles().size }) {
     val ctx = LocalContext.current
+    val tiles = setupTiles()
     var curmudgeon by rememberSaveable { mutableStateOf(SetupTheme.isCurmudgeon(ctx)) }
-    // the keyboards' Appearance settings before the first pick here (null: none yet)
-    var before by rememberSaveable { mutableStateOf<String?>(null) }
+    // the keyboards' Appearance / Layout & Typing settings before the first pick here (null: none yet)
+    var themeBefore by rememberSaveable { mutableStateOf<String?>(null) }
+    var layoutPick by rememberSaveable { mutableStateOf(SetupLayout.current(ctx)) }
+    var layoutBefore by rememberSaveable { mutableStateOf<String?>(null) }
+    // every tile as tall as the tallest one measured (the theme tile's height)
+    var tileHeight by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+    val chevronColor = MaterialTheme.colorScheme.surfaceContainerHighest // (a shade lighter than the tile)
+    // the preview keyboard's colors: the theme picked on the first tile (before Android 12 the keyboard is Curmudgeon's)
+    val colors = remember(curmudgeon) { SetupTheme.colors(ctx,
+        if (curmudgeon || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) KeyboardTheme.THEME_CURMUDGEON else KeyboardTheme.THEME_DYNAMIC) }
+    Spacer(Modifier.height(4.dp))
+    HorizontalPager(state, Modifier.fillMaxWidth().testTag(SETUP_TILES_TAG), beyondViewportPageCount = tiles.size,
+        verticalAlignment = Alignment.Top) { index ->
+        val tile = tiles[index]
+        val rowHeight = if (tileHeight > 0) Modifier.height(with(density) { tileHeight.toDp() }) else Modifier.height(IntrinsicSize.Min)
+        Row(Modifier.fillMaxWidth().then(rowHeight)) {
+            Chevron(left = true, shown = index > 0, chevronColor)
+            val tileModifier = Modifier.weight(1f).fillMaxHeight().testTag(setupTileTag(tile))
+                .onSizeChanged { if (it.height > tileHeight) tileHeight = it.height }
+            when (tile) {
+                SetupTile.THEME -> ThemePick(background, curmudgeon, tileModifier,
+                    pickDynamic = { SetupTheme.pickDynamic(ctx, themeBefore); curmudgeon = false },
+                    pickCurmudgeon = {
+                        // (only the first time: a keyboard that came with Curmudgeon has nothing to go back to, see pickDynamic)
+                        if (themeBefore == null && !SetupTheme.isCurmudgeon(ctx)) themeBefore = SetupTheme.before(ctx)
+                        SetupTheme.pickCurmudgeon(ctx)
+                        curmudgeon = true
+                    })
+                SetupTile.LAYOUT -> LayoutPick(background, colors, layoutPick, tileModifier) { pick ->
+                    if (pick == SetupLayout.Pick.DENSE) SetupLayout.pickDense(ctx, layoutBefore)
+                    else {
+                        // (only the first time: a keyboard not on Dense when the setup opened has nothing to go back to)
+                        if (layoutBefore == null && SetupLayout.current(ctx) == SetupLayout.Pick.DENSE) layoutBefore = SetupLayout.before(ctx)
+                        SetupLayout.pick(ctx, pick)
+                    }
+                    layoutPick = pick
+                }
+                SetupTile.SETTINGS -> AllSettingsTile(background, close, tileModifier)
+            }
+            Chevron(left = false, shown = index < tiles.size - 1, chevronColor)
+        }
+    }
+}
+
+private val CHEVRON_SLOT = 14.dp
+
+/** One hairline, a wide angle pointing away from the tile, no arrowhead, two thirds of the tile's height; or nothing
+ *  ([shown] false: no neighbor on that side, the slot stays so every tile has the same width). */
+@Composable
+private fun Chevron(left: Boolean, shown: Boolean, color: androidx.compose.ui.graphics.Color) {
+    Canvas(Modifier.width(CHEVRON_SLOT).fillMaxHeight()) {
+        if (!shown) return@Canvas
+        val span = size.height * 2f / 3f
+        val top = (size.height - span) / 2f
+        val depth = size.width * 0.4f
+        val edge = if (left) size.width * 0.7f else size.width * 0.3f
+        val tip = if (left) edge - depth else edge + depth
+        val path = Path().apply { moveTo(edge, top); lineTo(tip, top + span / 2f); lineTo(edge, top + span) }
+        drawPath(path, color, style = Stroke(width = 1.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+    }
+}
+
+/**
+ * "Pick a theme": Dynamic (the default, picked at first) or Curmudgeon, each a picture of the keyboard in its real
+ * colors; the whole choice is tapped, the picked one's picture ringed in orange (owner 2026-10-14: "can you remove the
+ * radio button, and let user tap the thumbnail which can be, sort of, encircled?"). See [SetupTheme]; the picks are
+ * [SetupTiles]'s (the layout tile's preview follows the theme).
+ */
+@Composable
+private fun ThemePick(background: androidx.compose.ui.graphics.Color, curmudgeon: Boolean, modifier: Modifier,
+                      pickDynamic: () -> Unit, pickCurmudgeon: () -> Unit) {
+    val ctx = LocalContext.current
     val dynamicColors = remember { SetupTheme.colors(ctx, KeyboardTheme.THEME_DYNAMIC) }
     val curmudgeonColors = remember { SetupTheme.colors(ctx, KeyboardTheme.THEME_CURMUDGEON) }
-    Column(Modifier.fillMaxWidth().background(color = background).padding(16.dp)) {
+    Column(modifier.background(color = background).padding(16.dp)) {
         Text(stringResource(R.string.setup_theme_title))
         Row(Modifier.padding(top = 8.dp).fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ThemeChoice(dynamicColors, stringResource(R.string.theme_preset_dynamic), stringResource(R.string.setup_theme_dynamic_hint),
-                selected = !curmudgeon) {
-                if (curmudgeon) { SetupTheme.pickDynamic(ctx, before); curmudgeon = false }
-            }
+                selected = !curmudgeon) { if (curmudgeon) pickDynamic() }
             ThemeChoice(curmudgeonColors, stringResource(R.string.theme_preset_curmudgeon), stringResource(R.string.setup_theme_curmudgeon_hint),
-                selected = curmudgeon) {
-                if (!curmudgeon) {
-                    // (only the first time: a keyboard that came with Curmudgeon has nothing to go back to, see pickDynamic)
-                    if (before == null && !SetupTheme.isCurmudgeon(ctx)) before = SetupTheme.before(ctx)
-                    SetupTheme.pickCurmudgeon(ctx)
-                    curmudgeon = true
-                }
+                selected = curmudgeon) { if (!curmudgeon) pickCurmudgeon() }
+        }
+    }
+}
+
+/** "Pick a layout": a small preview of the keyboard as [pick] has it, in [colors], and Minimal · Classic · Dense under
+ *  it in bold, the picked one orange; a tap on a word is the pick ([onPick], not for the one picked already). */
+@Composable
+private fun LayoutPick(background: androidx.compose.ui.graphics.Color, colors: Colors, pick: SetupLayout.Pick, modifier: Modifier,
+                       onPick: (SetupLayout.Pick) -> Unit) {
+    val ctx = LocalContext.current
+    val dim = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+    Column(modifier.background(color = background).padding(16.dp)) {
+        Text(stringResource(R.string.setup_layout_title))
+        LayoutPreview(colors, pick, SetupLayout.wordPadding(ctx, pick),
+            Modifier.padding(top = 8.dp).fillMaxWidth().aspectRatio(2.4f).clip(RoundedCornerShape(4.dp)))
+        Row(Modifier.padding(top = 6.dp).fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+            val words = listOf(SetupLayout.Pick.MINIMAL to stringResource(R.string.setup_layout_minimal),
+                SetupLayout.Pick.CLASSIC to stringResource(R.string.layout_preset_classic), SetupLayout.Pick.DENSE to stringResource(R.string.layout_preset_dense))
+            words.forEachIndexed { i, (p, name) ->
+                if (i > 0) Text("·", color = dim, style = MaterialTheme.typography.bodyLarge)
+                Text(name, Modifier.clickable { if (p != pick) onPick(p) }.testTag(setupLayoutWordTag(p)).padding(horizontal = 8.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold,
+                    color = if (p == pick) MaterialTheme.colorScheme.primary else dim)
             }
         }
+    }
+}
+
+/** The sample words on the preview's strip (nothing is typed yet). */
+internal val SETUP_SAMPLE_WORDS = listOf("wor", "WOR", "work", "works", "worked", "wo")
+
+/** The first symbol of each letter in the Curmudgeon symbol map (Classic's hints), by letter. */
+private val curmudgeonSymbolHints: Map<Char, String> by lazy {
+    Defaults.CURMUDGEON_SYMBOL_POPUP_MAP.split(' ').filter { it.length >= 2 }.associate { it[0] to it.substring(1, 2) }
+}
+/** Sample accent hints for Dense (no symbol map: the letters' popups are their accents). */
+private val accentHints = mapOf('e' to "é", 'a' to "à", 'u' to "ü", 'i' to "í", 'o' to "ó", 'n' to "ñ", 'c' to "ç", 's' to "ß", 'y' to "ý", 'z' to "ž")
+
+/**
+ * The keyboard as [pick] lays it out, small, in [colors]: a suggestion strip with [SETUP_SAMPLE_WORDS] spaced
+ * [wordPadding] dp (at the preview's scale: the keyboard is drawn as wide as the device's screen, shrunk), the number
+ * row (not Minimal), the letters with their symbols at the top right (not Minimal: Classic the Curmudgeon map's, Dense
+ * accents), shift and backspace, the bottom row. A drawing, not the keyboard view itself (2026-10-24).
+ */
+@Composable
+private fun LayoutPreview(colors: Colors, pick: SetupLayout.Pick, wordPadding: Int, modifier: Modifier) {
+    val ctx = LocalContext.current
+    val measurer = rememberTextMeasurer()
+    val screenWidth = ctx.resources.displayMetrics.widthPixels.toFloat().coerceAtLeast(1f)
+    val wordColor = androidx.compose.ui.graphics.Color(helium314.keyboard.latin.utils.suggestionTextColor(ctx.prefs(), colors))
+    fun c(type: ColorType) = androidx.compose.ui.graphics.Color(colors.get(type))
+    val background = c(ColorType.MAIN_BACKGROUND); val strip = c(ColorType.STRIP_BACKGROUND)
+    val key = c(ColorType.KEY_BACKGROUND); val functional = c(ColorType.FUNCTIONAL_KEY_BACKGROUND); val space = c(ColorType.SPACE_BAR_BACKGROUND)
+    val keyText = c(ColorType.KEY_TEXT); val hintText = c(ColorType.KEY_HINT_TEXT)
+    val numberRow = pick != SetupLayout.Pick.MINIMAL
+    val hints: Map<Char, String> = when (pick) {
+        SetupLayout.Pick.MINIMAL -> emptyMap(); SetupLayout.Pick.CLASSIC -> curmudgeonSymbolHints; SetupLayout.Pick.DENSE -> accentHints }
+    Canvas(modifier) {
+        drawRect(background)
+        val scale = size.width / screenWidth
+        // the strip
+        val stripHeight = size.height * 0.17f
+        drawRect(strip, size = Size(size.width, stripHeight))
+        val padPx = wordPadding.dp.toPx() * scale
+        val wordStyle = TextStyle(color = wordColor, fontSize = (stripHeight * 0.42f).toSp())
+        val laidOut = SETUP_SAMPLE_WORDS.map { measurer.measure(it, wordStyle, maxLines = 1) }
+        val total = laidOut.sumOf { it.size.width } + padPx * 2 * laidOut.size
+        var x = ((size.width - total) / 2f).coerceAtLeast(0f)
+        for (word in laidOut) {
+            x += padPx
+            drawText(word, topLeft = Offset(x, (stripHeight - word.size.height) / 2f))
+            x += word.size.width + padPx
+        }
+        // the keys
+        val letterRows = listOfNotNull(if (numberRow) "1234567890" else null, "qwertyuiop", "asdfghjkl", "zxcvbnm")
+        val rowCount = letterRows.size + 1
+        val pad = size.height * 0.03f
+        val gap = size.height * 0.022f
+        val rowHeight = (size.height - stripHeight - 2 * pad - (rowCount - 1) * gap) / rowCount
+        val corner = CornerRadius(rowHeight * 0.15f)
+        val unit = (size.width - 2 * pad - gap * 9) / 10f // ten keys across
+        val labelStyle = TextStyle(color = keyText, fontSize = (rowHeight * 0.5f).toSp())
+        val hintStyle = TextStyle(color = hintText, fontSize = (rowHeight * 0.3f).toSp())
+        fun drawKey(x: Float, y: Float, width: Float, fill: androidx.compose.ui.graphics.Color, label: Char?) {
+            drawRoundRect(fill, Offset(x, y), Size(width, rowHeight), corner)
+            if (label == null) return
+            val text = measurer.measure(label.toString(), labelStyle, maxLines = 1)
+            drawText(text, topLeft = Offset(x + (width - text.size.width) / 2f, y + (rowHeight - text.size.height) / 2f))
+            val hint = hints[label] ?: return
+            val h = measurer.measure(hint, hintStyle, maxLines = 1)
+            drawText(h, topLeft = Offset(x + width - h.size.width - rowHeight * 0.08f, y + rowHeight * 0.04f))
+        }
+        letterRows.forEachIndexed { row, letters ->
+            val y = stripHeight + pad + row * (rowHeight + gap)
+            if (letters.length == 7) { // shift, the letters, backspace
+                val side = (size.width - 2 * pad - 7 * unit - 8 * gap) / 2f
+                drawKey(pad, y, side, functional, null)
+                letters.forEachIndexed { i, ch -> drawKey(pad + side + gap + i * (unit + gap), y, unit, key, ch) }
+                drawKey(size.width - pad - side, y, side, functional, null)
+            } else {
+                val start = pad + (size.width - 2 * pad - letters.length * unit - (letters.length - 1) * gap) / 2f
+                letters.forEachIndexed { i, ch -> drawKey(start + i * (unit + gap), y, unit, key, ch) }
+            }
+        }
+        // the bottom row: two function keys, the space bar, two more
+        val y = stripHeight + pad + letterRows.size * (rowHeight + gap)
+        val widths = listOf(1.5f, 1f, 5f, 1f, 1.5f)
+        val bottomUnit = (size.width - 2 * pad - gap * 4) / widths.sum()
+        var bx = pad
+        widths.forEachIndexed { i, w -> drawKey(bx, y, w * bottomUnit, if (i == 2) space else functional, null); bx += w * bottomUnit + gap }
+    }
+}
+
+/** "All settings": the gear in orange, the bold title, a small line of what is there; the whole tile is tapped and does
+ *  what the "Configure the keyboard" row did ([close]: the setup closes, the settings open, with the Switch bar when the
+ *  keyboard isn't the one in use yet). */
+@Composable
+private fun AllSettingsTile(background: androidx.compose.ui.graphics.Color, close: () -> Unit, modifier: Modifier) {
+    Column(modifier.background(color = background).clickable { close() }.padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        Icon(painterResource(R.drawable.sym_keyboard_language_switch), null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
+        Text(stringResource(R.string.setup_all_settings), Modifier.padding(top = 8.dp), fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Text(stringResource(R.string.setup_all_settings_hint), style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), textAlign = TextAlign.Center)
     }
 }
 

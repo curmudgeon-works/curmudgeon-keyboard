@@ -1653,6 +1653,13 @@ language, hence "No language". -->
     <string name="setup_done_hint">Pick a theme or configure settings (you can do these later too).</string>
     <!-- The setup's last screen: the keyboard's colors, Dynamic or Curmudgeon. -->
     <string name="setup_theme_title">Pick a theme</string>
+    <!-- The checklist row of the setup's third tile group (2026-10-24: a theme tile, a layout tile, an all-settings tile) -->
+    <string name="setup_theme_layout_title">Pick a theme &amp; layout</string>
+    <string name="setup_layout_title">Pick a layout</string>
+    <!-- The setup's layout that is no built-in Layout: Classic without the number row, the symbol map and the symbols on the keys -->
+    <string name="setup_layout_minimal">Minimal</string>
+    <string name="setup_all_settings">All settings</string>
+    <string name="setup_all_settings_hint">languages · layouts · looks · swipe</string>
     <!-- Below the Dynamic theme's name in the setup. -->
     <string name="setup_theme_dynamic_hint">matches your device</string>
     <!-- Below the Curmudgeon theme's name in the setup. -->

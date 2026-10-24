@@ -27,8 +27,8 @@ import org.json.JSONObject
 object SetupTheme {
     private val labelKeys = CustomLabels.Kind.THEME.let { listOf(it.key, it.fromKey) }
 
-    /** The sets of the device's keyboards (listed or switched off). */
-    private fun ids(real: SharedPreferences): List<String> =
+    /** The sets of the device's keyboards (listed or switched off); [SetupLayout] asks too. */
+    internal fun ids(real: SharedPreferences): List<String> =
         KeyboardIds.phoneKeyboards(real).mapNotNull { KeyboardProfiles.idForListed(real, it) }.distinct()
 
     /** Whether the keyboard shows Curmudgeon's colors now (the settings' view: the keyboard edited from the main screen). */
