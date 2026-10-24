@@ -41,7 +41,6 @@ import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSub
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.LayoutUtilsCustom
 import helium314.keyboard.latin.utils.SubtypeUtilsAdditional
-import helium314.keyboard.latin.utils.getStringResourceOrName
 import helium314.keyboard.latin.utils.mainLayoutName
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.NextScreenIcon
@@ -144,7 +143,6 @@ fun KeyboardsScreen(
                     helium314.keyboard.settings.preferences.UnfinishedRestoreNote()
                 HorizontalDivider() // under the title bar, above the first keyboard (like the other screens' first group)
                 for (keyboard in order) key(keyboard) { // stable identity: a reorder moves the block instead of recreating it (which killed the drag)
-                    val subtype = keyboard.toAdditionalSubtype()
                     val isDragged = dragging == keyboard
                     // tap: languages & layout of the keyboard (with separate settings: unfold all its sections);
                     // press and hold: delete it (while another remains)
@@ -159,9 +157,10 @@ fun KeyboardsScreen(
                             // the picked-up block: lifted, opaque, so it visibly slides over the others
                             .then(if (isDragged) Modifier.shadow(8.dp).background(MaterialTheme.colorScheme.surfaceContainerHigh) else Modifier)
                     ) {
+                    // (no layout line under the name: the layout has its own setting now, and an empty one pushed the
+                    // name above the globe; owner 2026-10-24: "remove the space for layout entirely for keyboards")
                     Preference(
                         name = keyboardName(keyboard, ctx),
-                        description = subtype.mainLayoutName()?.getStringResourceOrName("layout_", ctx) ?: "",
                         onClick = {
                             if (folding) { if (isExpanded) expanded.remove(keyboard) else expanded.add(keyboard) }
                             else {
@@ -242,7 +241,6 @@ fun KeyboardsScreen(
                             val switchOn = stringResource(R.string.switch_on_keyboard_of, name)
                             Preference(
                                 name = name,
-                                description = keyboard.toAdditionalSubtype().mainLayoutName()?.getStringResourceOrName("layout_", ctx) ?: "",
                                 onClick = { }, // (its two buttons do it)
                             ) {
                                 // Delete is the main one: these are most likely left behind (owner 2026-10-11)
