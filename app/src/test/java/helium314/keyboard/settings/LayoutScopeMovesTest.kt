@@ -71,7 +71,7 @@ class LayoutScopeMovesTest {
         SubtypeSettings.reloadEnabledSubtypes(ctx)
     }
 
-    @Test fun `the spacing and the symbols are the Layout's, not the theme's; the old symbol keys are nobody's`() {
+    @Test fun `the spacing and the symbols are the Layout's, not the theme's, and the old symbol keys are nobody's`() {
         for (key in listOf(Settings.PREF_SUGGESTION_WORD_PADDING, Settings.PREF_SHOW_HINTS)) {
             assertTrue(LayoutDraft.inScope(key), key)
             assertTrue(LayoutPresets.inScope(key), key)
