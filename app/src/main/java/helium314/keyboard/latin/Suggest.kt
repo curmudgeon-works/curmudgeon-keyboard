@@ -363,9 +363,12 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
             mDictionaryFacilitator.locales, Settings.getValues().mGestureDecoderScorer,
             Settings.getValues().mGestureCapsHeight, fillTarget())
         // the recorder follows the swiped word for the corpus and/or the swipe results log; nothing to follow without a word
-        if (inputStyle == SuggestedWords.INPUT_STYLE_TAIL_BATCH && GestureCorpusRecorder.isFollowing())
+        if (inputStyle == SuggestedWords.INPUT_STYLE_TAIL_BATCH && GestureCorpusRecorder.isFollowing()) {
+            // (whether the keyboard knows the word the swipe ends as: the corpus' "known", 2026-10-23)
+            GestureCorpusRecorder.isKnown = { w -> mDictionaryFacilitator.isValidSpellingWord(w) }
             GestureCorpusRecorder.onSwipe(wordComposer.composedDataSnapshot, keyboard, suggestionResults,
                 mDictionaryFacilitator.mainLocale.toLanguageTag(), GestureCorpusRecorder.previousWord(ngramContext))
+        }
         if (inputStyle == SuggestedWords.INPUT_STYLE_TAIL_BATCH && suggestionResults.isNotEmpty())
             GestureStats.onSwipe(OwnGestureDecoder.currentTuning.key, OwnGestureDecoder.lastDecodeMs)
 

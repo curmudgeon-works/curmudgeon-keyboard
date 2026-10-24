@@ -17,7 +17,6 @@ import helium314.keyboard.latin.NgramContext
 import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Local corpus of real swipes from everyday typing (M4 tuning data for the in-tree decoder).
@@ -26,7 +25,9 @@ import java.util.concurrent.atomic.AtomicLong
  * of the keyboard it was drawn on, and the decoder's top candidates (top-1 is what got committed,
  * serving as pseudo-label). If the user then picks another suggestion, deletes the swiped word, or edits it into
  * another word (also after committing it, when it is opened for editing again within [RESUME_WINDOW_MS]), a
- * follow-up line `{"type":"final","ref":id,"how":"pick"|"deleted"|"edited",...}` records the correction.
+ * follow-up line `{"type":"final","ref":id,"how":"pick"|"deleted"|"edited",...}` records the correction. Since 2026-10-23 a
+ * pick's or an edit's line also says what happened ([correction]: kept, typed, via, auto, known), and ids are the swipe's
+ * time in ms (unique across keyboard starts; before, a count that began again at every start).
  *
  * Schema shares `points` / `locale` / `committed` with gesturelab's and the trainer's swipes.jsonl.
  * Everything stays in the app's external files dir (`gesture_corpus.jsonl`); nothing is uploaded. On by default, kept to
@@ -45,7 +46,9 @@ object GestureCorpusRecorder {
     const val BYTES_PER_SWIPE = 1_500 // about, for the size the slider shows
 
     private val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "gesture-corpus").apply { isDaemon = true } }
-    private val counter = AtomicLong(0)
+    // the last id given: ids are the swipe's time in ms, one more than the last when two would be the same (2026-10-23:
+    // a count that began again at every keyboard start left the corpus' finals to be matched to swipes by guesswork)
+    private var lastIssuedId = 0L
     @Volatile private var file: File? = null
     @Volatile private var prefs: SharedPreferences? = null
     // a swipe line starts a record, its "final" lines follow it (they are written before the next swipe's)
@@ -62,6 +65,12 @@ object GestureCorpusRecorder {
     @Volatile private var lastDecodeMs = 0L
     @Volatile private var lastSpeed = 0f
     @Volatile private var lastTuning = ""
+    // the pending swipe's word as it is edited, counted as it happens (2026-10-23): how many of its leading letters were
+    // never deleted (deleting all and typing the same first letter again leaves 0), and how many letters were typed in
+    @Volatile private var editKept = 0
+    @Volatile private var editTyped = 0
+    /** Whether the keyboard knows a word (dictionaries, learned words): set by Suggest with each swipe. */
+    @Volatile var isKnown: (String) -> Boolean = { false }
 
     fun init(context: Context) {
         file = File(context.getExternalFilesDir(null) ?: context.filesDir, FILE_NAME)
@@ -137,16 +146,18 @@ object GestureCorpusRecorder {
         val cands = candidates.distinctBy { it.mWord }.take(MAX_CANDIDATES).map { it.mWord to it.mScore }
         if (cands.isEmpty()) { // nothing to follow: a dead swipe or a decode failure, logged so "never offered" stays honest
             val outcome = if (OwnGestureDecoder.lastVocabularyMissing) SwipeMetrics.OUTCOME_NO_VOCABULARY else SwipeMetrics.OUTCOME_NONE
-            if (!lastPrivate) SwipeMetrics.onOutcome(counter.incrementAndGet(), "", outcome, -1, null,
+            if (!lastPrivate) SwipeMetrics.onOutcome(nextId(System.currentTimeMillis()), "", outcome, -1, null,
                 OwnGestureDecoder.lastDecodeMs, OwnGestureDecoder.lastSpeedKeysPerSecond, OwnGestureDecoder.currentTuning.key)
             return
         }
-        val id = counter.incrementAndGet()
         val time = System.currentTimeMillis()
+        val id = nextId(time)
         pendingId = id
         lastId = id
         lastWord = cands.firstOrNull()?.first ?: ""
         lastTime = time
+        editKept = lastWord.length
+        editTyped = 0
         lastDecodeMs = OwnGestureDecoder.lastDecodeMs
         lastSpeed = OwnGestureDecoder.lastSpeedKeysPerSecond // the decoder's own figure, from the preprocessed path
         lastTuning = OwnGestureDecoder.currentTuning.key
@@ -158,7 +169,7 @@ object GestureCorpusRecorder {
         val keys = letterKeys(keyboard)
         val kbW = keyboard.mOccupiedWidth
         val kbH = keyboard.mOccupiedHeight
-        val layoutName = keyboard.mId.mSubtype.mainLayoutName
+        val layoutName = keyboard.mId?.mSubtype?.mainLayoutName ?: "" // (a test's stand-in keyboard has none)
         executor.execute {
             try {
                 val obj = JSONObject()
@@ -195,10 +206,38 @@ object GestureCorpusRecorder {
     fun onShown(word: String?) {
         if (pendingId < 0 || word.isNullOrEmpty()) return
         lastWord = word
+        editKept = word.length // (shown before any edit)
     }
 
-    /** The user replaced the pending swiped word with [word] via the suggestion strip; [rank] 0-based (0 = the word itself). */
-    fun onSuggestionPicked(word: String, rank: Int) = finish(SwipeMetrics.OUTCOME_PICKED, rank, word)
+    /** A swiped word's id: its time [now] in ms, one more than the last id if that is not later (unique across keyboard
+     *  starts unless the clock goes back; internal for tests). */
+    @Synchronized internal fun nextId(now: Long): Long = maxOf(now, lastIssuedId + 1).also { lastIssuedId = it }
+
+    /**
+     * The user replaced the pending swiped word with [word] via the suggestion strip; [rank] 0-based (0 = the word itself).
+     * [fromSwipeStrip]: the strip still showed the swipe's own words (the word was untouched since the swipe), else it
+     * showed words for what was typed or deleted since.
+     */
+    fun onSuggestionPicked(word: String, rank: Int, fromSwipeStrip: Boolean) =
+        finish(SwipeMetrics.OUTCOME_PICKED, rank, word, if (fromSwipeStrip) VIA_STRIP else VIA_STRIP_TYPED, false)
+
+    /**
+     * The keyboard edited the pending swiped word: [now] is the word as it reads after the edit (null: not known there),
+     * [letterTyped] whether a letter was typed into it (else letters were deleted). Counted as it happens, so a word
+     * deleted to nothing and typed again keeps none of its letters, whatever it ends as.
+     */
+    fun onEdited(now: String?, letterTyped: Boolean) {
+        if (pendingId < 0) return
+        if (letterTyped) editTyped++
+        if (now != null) editKept = minOf(editKept, keptPrefix(lastWord, now))
+    }
+
+    /** How many leading letters [now] still has of [swiped] (case aside: shift is no edit). */
+    private fun keptPrefix(swiped: String, now: String): Int {
+        var i = 0
+        while (i < swiped.length && i < now.length && swiped[i].equals(now[i], ignoreCase = true)) i++
+        return i
+    }
 
     /** The user deleted the pending swiped word (backspace on a batch word). */
     fun onWordDeleted() = finish(SwipeMetrics.OUTCOME_DELETED, -1, null)
@@ -208,16 +247,19 @@ object GestureCorpusRecorder {
 
     /**
      * The composing word was committed as [word] some way other than a pick from the strip (which reports itself):
-     * the pending swiped word is settled if that is what it still says, else it was edited into [word].
+     * the pending swiped word is settled if that is what it still says, else it was edited into [word]. [typed] is the
+     * word as typed before the commit (an auto-correction commits another word).
      */
-    fun onWordCommitted(word: String) {
+    fun onWordCommitted(word: String, typed: String = word) {
         if (pendingId < 0) return
         // auto-capitalisation ("the" committed as "The") is not an edit
-        if (word.equals(lastWord, ignoreCase = true)) finish(SwipeMetrics.OUTCOME_KEPT, -1, null) else finish(SwipeMetrics.OUTCOME_EDITED, -1, word)
+        if (word.equals(lastWord, ignoreCase = true)) finish(SwipeMetrics.OUTCOME_KEPT, -1, null)
+        else finish(SwipeMetrics.OUTCOME_EDITED, -1, word, VIA_COMMIT, word != typed)
     }
 
-    /** The pending swipe's outcome: to the swipe results log, and (corrections only) to the corpus. */
-    private fun finish(outcome: String, rank: Int, word: String?) {
+    /** The pending swipe's outcome: to the swipe results log, and (corrections only) to the corpus; [via] and [auto] as
+     *  [correction] writes them. */
+    private fun finish(outcome: String, rank: Int, word: String?, via: String? = null, auto: Boolean = false) {
         val id = pendingId
         if (id < 0) return
         pendingId = -1L
@@ -226,24 +268,46 @@ object GestureCorpusRecorder {
         if (lastPrivate || SwipeMetrics.privateNow()) return
         SwipeMetrics.onOutcome(id, lastWord, outcome, rank, word, lastDecodeMs, lastSpeed, lastTuning)
         when (outcome) {
-            SwipeMetrics.OUTCOME_PICKED -> if (rank != 0) correction(id, "pick", word)
+            // (a pick at rank 0 is the swiped word itself, unless letters were typed: then the strip's first word is
+            // another word, and it was a correction too; 2026-10-23)
+            SwipeMetrics.OUTCOME_PICKED -> if (rank != 0 || word != lastWord) correction(id, "pick", word, via, auto)
             SwipeMetrics.OUTCOME_DELETED -> correction(id, "deleted", null)
-            SwipeMetrics.OUTCOME_EDITED -> correction(id, "edited", word)
+            SwipeMetrics.OUTCOME_EDITED -> correction(id, "edited", word, via, auto)
         }
     }
 
+    // where a picked or edited word came from (the "via" of its final line)
+    const val VIA_STRIP = "strip" // picked from the strip while it showed the swipe's own words
+    const val VIA_STRIP_TYPED = "strip_typed" // picked from the strip after letters were typed or deleted
+    const val VIA_COMMIT = "commit" // committed by space, punctuation or anything else
+
     /** A committed word was opened for editing again, reading [word]: the last swipe's outcome is open again if that is its word. */
     fun onWordResumed(word: String) {
-        if (lastId >= 0 && word.equals(lastWord, ignoreCase = true) && System.currentTimeMillis() - lastTime <= RESUME_WINDOW_MS) pendingId = lastId
+        // an open swipe's word set up again (the cursor moved, or a letter changed in its middle): what it reads now
+        if (pendingId >= 0) { onEdited(word, false); return }
+        if (lastId >= 0 && word.equals(lastWord, ignoreCase = true) && System.currentTimeMillis() - lastTime <= RESUME_WINDOW_MS) {
+            pendingId = lastId
+            editKept = lastWord.length
+            editTyped = 0
+        }
     }
 
-    private fun correction(id: Long, how: String, word: String?) {
+    /**
+     * A "final" line. A pick's or an edit's (since 2026-10-23) also has what happened: `kept` leading letters of the
+     * swiped word never deleted, `typed` letters typed in, `via` ([VIA_STRIP], [VIA_STRIP_TYPED], [VIA_COMMIT]), `auto`
+     * whether auto-correction changed what was typed at the commit, `known` whether the keyboard knows the final word.
+     */
+    private fun correction(id: Long, how: String, word: String?, via: String? = null, auto: Boolean = false) {
         if (!isEnabled()) return
         val time = System.currentTimeMillis()
+        val kept = editKept
+        val typed = editTyped
+        val known = if (via != null && word != null) runCatching { isKnown(word) }.getOrDefault(false) else false
         executor.execute {
             try {
                 val obj = JSONObject().put("type", "final").put("ref", id).put("time", time).put("how", how)
                 if (word != null) obj.put("final", word)
+                if (via != null) obj.put("kept", kept).put("typed", typed).put("via", via).put("auto", auto).put("known", known)
                 append(obj)
             } catch (e: Exception) {
                 Log.w(TAG, "failed to record correction", e)

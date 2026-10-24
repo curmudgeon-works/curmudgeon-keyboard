@@ -20,6 +20,13 @@ import helium314.keyboard.latin.ShadowFacilitator2.Companion.unlearnedWords
 import helium314.keyboard.latin.ShadowFacilitator2.Companion.addedWords
 import helium314.keyboard.latin.SuggestedWords.SuggestedWordInfo
 import helium314.keyboard.latin.common.Constants
+import helium314.keyboard.latin.common.ComposedData
+import helium314.keyboard.latin.common.InputPointers
+import helium314.keyboard.latin.gesture.GestureCorpusRecorder
+import helium314.keyboard.latin.gesture.SwipeMetrics
+import helium314.keyboard.keyboard.Keyboard
+import org.json.JSONObject
+import kotlin.test.assertTrue
 import helium314.keyboard.latin.common.LocaleUtils.constructLocale
 import helium314.keyboard.latin.common.StringUtils
 import helium314.keyboard.latin.inputlogic.InputLogic
@@ -1459,6 +1466,130 @@ class InputLogicTest {
         assertEquals(listOf(), unlearnedWords)
         assertEquals("help", lastAddedWord)
     }
+
+    // ---- the swipe corpus: what happened to a swiped word, counted as it happens (2026-10-23) ----
+
+    @Test fun `a real fix of a swiped word keeps its first letters`() = withCorpus {
+        recordedSwipe("thw", "the")
+        functionalKeyPress(KeyCode.DELETE)
+        chainInput("e ")
+        val f = onlyFinal()
+        assertEquals("edited", f.getString("how"))
+        assertEquals("the", f.getString("final"))
+        assertEquals(2, f.getInt("kept"))
+        assertEquals(1, f.getInt("typed"))
+        assertEquals("commit", f.getString("via"))
+        assertFalse(f.getBoolean("auto"))
+        assertTrue(f.getBoolean("known"))
+    }
+
+    @Test fun `a stray letter after a swipe keeps the whole swiped word`() = withCorpus {
+        latinIME.prefs().edit { putBoolean(Settings.PREF_AUTOSPACE_AFTER_GESTURE_TYPING, false) }
+        recordedSwipe("become")
+        chainInput("n ")
+        val f = onlyFinal()
+        assertEquals("becomen", f.getString("final"))
+        assertEquals(6, f.getInt("kept"))
+        assertEquals(1, f.getInt("typed"))
+        assertFalse(f.getBoolean("known"))
+    }
+
+    @Test fun `a swiped word deleted letter by letter and typed again keeps nothing, even its first letter`() = withCorpus {
+        recordedSwipe("hello")
+        repeat(5) { functionalKeyPress(KeyCode.DELETE) }
+        chainInput("nps ")
+        recordedSwipe("hello")
+        repeat(5) { functionalKeyPress(KeyCode.DELETE) }
+        chainInput("hip ")
+        val (nps, hip) = finals()
+        assertEquals("nps", nps.getString("final"))
+        assertEquals(0, nps.getInt("kept"))
+        assertEquals(3, nps.getInt("typed"))
+        assertEquals("hip", hip.getString("final"))
+        assertEquals(0, hip.getInt("kept"), "the h was deleted and typed again")
+        assertEquals(3, hip.getInt("typed"))
+    }
+
+    @Test fun `a pick from the swipe's own strip and a pick after typing say where they came from`() = withCorpus {
+        recordedSwipe("thw", "the")
+        stripOf("thw", "the")
+        pickSuggestion("the")
+        recordedSwipe("thw", "the")
+        functionalKeyPress(KeyCode.DELETE)
+        input('e')
+        stripOf("the", "then")
+        pickSuggestion("then")
+        val (fromSwipe, afterTyping) = finals()
+        assertEquals("pick", fromSwipe.getString("how"))
+        assertEquals("the", fromSwipe.getString("final"))
+        assertEquals("strip", fromSwipe.getString("via"))
+        assertEquals(3, fromSwipe.getInt("kept"))
+        assertEquals(0, fromSwipe.getInt("typed"))
+        assertEquals("pick", afterTyping.getString("how"))
+        assertEquals("then", afterTyping.getString("final"))
+        assertEquals("strip_typed", afterTyping.getString("via"))
+        assertEquals(2, afterTyping.getInt("kept"))
+        assertEquals(1, afterTyping.getInt("typed"))
+    }
+
+    @Test fun `an auto-correction at the commit of an edited swipe is noted`() = withCorpus {
+        setInputType(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_AUTO_CORRECT)
+        recordedSwipe("thx")
+        functionalKeyPress(KeyCode.DELETE)
+        input('w')
+        getAutocorrectedWithSpaceAfter("the", "thw")
+        val f = onlyFinal()
+        assertEquals("the", f.getString("final"))
+        assertEquals("commit", f.getString("via"))
+        assertTrue(f.getBoolean("auto"))
+        assertEquals(2, f.getInt("kept"))
+        assertEquals(1, f.getInt("typed"))
+    }
+
+    /** The corpus recorded for [test] (the facts the recorder writes), from a clean start. */
+    private fun withCorpus(test: () -> Unit) {
+        reset()
+        latinIME.prefs().edit { putBoolean(Settings.PREF_BACKSPACE_DELETES_SWIPED_WORD, false) } // (backspace edits it)
+        GestureCorpusRecorder.init(latinIME)
+        GestureCorpusRecorder.onFieldChanged() // (no swipe left open by another test)
+        GestureCorpusRecorder.corpusOn = { true }
+        SwipeMetrics.privateNow = { false }
+        GestureCorpusRecorder.isKnown = { it in setOf("the", "then") }
+        Thread.sleep(300) // (another test's lines written)
+        GestureCorpusRecorder.corpusFile()!!.delete()
+        try { test() } finally {
+            GestureCorpusRecorder.corpusOn = { Settings.getValues()?.mRecordGestureCorpus == true }
+            SwipeMetrics.privateNow = { Settings.getValues()?.mIncognitoModeEnabled == true }
+            GestureCorpusRecorder.isKnown = { false }
+            Thread.sleep(300)
+            GestureCorpusRecorder.corpusFile()?.delete()
+        }
+    }
+
+    // a swipe as the keyboard gets it, with the decoder's words as the recorder is told of them (Suggest does that)
+    private fun recordedSwipe(word: String, vararg others: String) {
+        latinIME.mInputLogic.onStartBatchInput(settingsValues, KeyboardSwitcher.getInstance(), latinIME.mHandler)
+        handleMessages()
+        val pointers = InputPointers(4).apply { addPointer(10, 10, 0, 0); addPointer(50, 20, 0, 30); addPointer(90, 30, 0, 60) }
+        val candidates = (listOf(word) + others).map { SuggestedWordInfo(it, "", 100, SuggestedWordInfo.KIND_CORRECTION, null, 0, 0) }
+        GestureCorpusRecorder.onSwipe(ComposedData(pointers, true, word), Mockito.mock(Keyboard::class.java), candidates, "en")
+        glideTypingInput(word)
+        handleMessages()
+    }
+
+    // the strip showing [words], the first as typed
+    private fun stripOf(vararg words: String) {
+        val infos = words.map { SuggestedWordInfo(it, "", 0, 0, null, 0, 0) }
+        latinIME.mInputLogic.setSuggestedWords(SuggestedWords(ArrayList(infos), null, infos[0], false, false, false, 0, 0))
+    }
+
+    private fun finals(): List<JSONObject> {
+        Thread.sleep(300) // (written on the corpus' own thread)
+        val file = GestureCorpusRecorder.corpusFile()!!
+        return if (!file.exists()) emptyList() else file.readLines().map { JSONObject(it) }.filter { it.optString("type") == "final" }
+    }
+
+    private fun onlyFinal(): JSONObject = finals().also { assertEquals(1, it.size, "final lines: $it") }.first()
 
     @Test fun timestamp() {
         reset()

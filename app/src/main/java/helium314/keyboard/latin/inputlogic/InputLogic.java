@@ -443,7 +443,7 @@ public final class InputLogic {
             mLastComposedWord.mScriptAfterPick = SuggestInScript.afterPick(suggestion, suggestedWords, translitChoice.getMode(), translitTable);
         // a swiped word still open — including one re-opened for editing and then corrected from the strip — was
         // picked over; the recorder ignores the call when no swipe is open
-        GestureCorpusRecorder.INSTANCE.onSuggestionPicked(pickedLatin, pickedRank);
+        GestureCorpusRecorder.INSTANCE.onSuggestionPicked(pickedLatin, pickedRank, pickedForBatchWord);
         if (pickedForBatchWord) GestureStats.INSTANCE.onPicked(pickedRank);
         // Don't allow cancellation of manual pick
         mLastComposedWord.deactivate();
@@ -1417,7 +1417,11 @@ public final class InputLogic {
                 mWordComposer.setCapitalizedModeAtStartComposingTime(inputTransaction.getShiftState());
             }
             setComposingTextInternal(getTextWithUnderline(mWordComposer.getTypedWord()), 1);
+            // a letter typed into an open swipe's word (or where it was deleted)
+            GestureCorpusRecorder.INSTANCE.onEdited(mWordComposer.getTypedWord(), true);
         } else {
+            // (not composing: an open swipe's word reads as it is when it's set up again)
+            if (settingsValues.isWordCodePoint(codePoint)) GestureCorpusRecorder.INSTANCE.onEdited(null, true);
             final boolean swapWeakSpace = tryStripSpaceAndReturnWhetherShouldSwapInstead(event, inputTransaction);
 
             if (swapWeakSpace && trySwapSwapperAndSpace(event, inputTransaction)) {
@@ -1657,6 +1661,7 @@ public final class InputLogic {
                     unlearnWord(word, settingsValues, Constants.EVENT_BACKSPACE);
                     mWordComposer.reset();
                     mConnection.commitText("", 1);
+                    GestureCorpusRecorder.INSTANCE.onEdited("", false); // (an open swipe's word, deleted whole)
                     inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_LATER);
                     inputTransaction.setRequiresUpdateSuggestions();
                     StatsUtils.onBackspaceWordDelete(word.length());
@@ -1714,6 +1719,8 @@ public final class InputLogic {
             } else {
                 mWordComposer.applyProcessedEvent(event);
                 StatsUtils.onBackspacePressed(1);
+                // an open swipe's word edited: what of it is left, counted as it happens
+                GestureCorpusRecorder.INSTANCE.onEdited(mWordComposer.getTypedWord(), false);
             }
             if (mWordComposer.isComposingWord()) {
                 setComposingTextInternal(getTextWithUnderline(mWordComposer.getTypedWord()), 1);
@@ -3374,13 +3381,14 @@ public final class InputLogic {
         // what user typed. Note: currently this is done much later in
         // LastComposedWord#didCommitTypedWord by string equality of the remembered
         // strings.
+        final String typedBeforeCommit = mWordComposer.getTypedWord(); // (an auto-correction commits another word)
         mLastComposedWord = mWordComposer.commitWord(commitType, chosenWord, separatorString, ngramContext);
         mLastComposedWord.mBatchSuggestedWords = batchSuggestedWords;
         if (!learnedWord.equals(chosenWord)) mLastComposedWord.mLearnedAs = learnedWord;
         // a swiped word edited into another word (a pick from the strip reports itself; the other script's word as
         // its Latin word)
         if (commitType != LastComposedWord.COMMIT_TYPE_MANUAL_PICK)
-            GestureCorpusRecorder.INSTANCE.onWordCommitted(learnedWord);
+            GestureCorpusRecorder.INSTANCE.onWordCommitted(learnedWord, typedBeforeCommit);
         // a typed word committed: a swipe deleted before it is settled
         if (swipedWord == null) GestureCorpusRecorder.INSTANCE.onTypedWordCommitted();
         if (DebugFlags.DEBUG_ENABLED) {
