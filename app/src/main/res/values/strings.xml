@@ -975,10 +975,9 @@
     </plurals>
     <string name="key_popups_preset_standard">Curmudgeon</string>
     <string name="key_popups_preset_heliboard">HeliBoard</string>
-    <!-- The Layouts that ship with the app (Layout & Typing > Layouts) -->
-    <string name="layout_preset_curmudgeon">Curmudgeon</string>
-    <string name="layout_preset_heliboard">HeliBoard</string>
-    <string name="layout_preset_heliboard_extra">HeliBoard extra</string>
+    <!-- The Layouts that ship with the app (Layout & Typing > Layouts): Dense (the default) and Classic (2026-10-24; Curmudgeon, HeliBoard and HeliBoard extra before) -->
+    <string name="layout_preset_dense">Dense</string>
+    <string name="layout_preset_classic">Classic</string>
     <string name="key_popups_preset_heliboard_packed">HeliBoard extra</string>
     <string name="key_popups_preset_arabic">Arabic-script symbols</string>
     <string name="key_popups_add">Add your own</string>

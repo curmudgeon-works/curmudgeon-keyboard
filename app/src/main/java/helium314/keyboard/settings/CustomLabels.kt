@@ -19,7 +19,7 @@ import org.json.JSONObject
  * The item deleted: its name at that moment is stored next to the label ([Kind.fromKey]) and still shown, "Custom · from
  * Work", until the copy goes (owner 2026-10-11: "I see, so reference that name with rename. Hardcode with delete?"):
  * while the item exists the label references it, a rename shows the new name. That stored name alone tells a deleted
- * item ([deleted]); a keyboard that never chose one is a copy of the built-in default, "Custom · from Curmudgeon" (review
+ * item ([deleted]); a keyboard that never chose one is a copy of the built-in default, "Custom · from Dense" (review
  * E2, [row]).
  */
 object CustomLabels {
@@ -139,7 +139,7 @@ object CustomLabels {
     /** The row of [kind] for the keyboard ([prefs], its choice at [selectedKey]). [chosen]: the item it reads, the one it
      *  chose while that exists, or the built-in default when it never chose one (null: none to name). [differs]: the
      *  keyboard's settings differ from [chosen]. Its chosen item deleted: "Custom · from Work" until it chooses again;
-     *  else differing: "Custom · from Curmudgeon" (labelled from now on, [mark]), and the item's plain name again once
+     *  else differing: "Custom · from Dense" (labelled from now on, [mark]), and the item's plain name again once
      *  it matches (review E2, the same for a never-chosen keyboard as for a chosen built-in or saved item). */
     fun row(ctx: Context, prefs: SharedPreferences, kind: Kind, selectedKey: String, chosen: String?, differs: () -> Boolean): Row {
         if (deleted(prefs, kind, selectedKey)) return Row(text(ctx, origin(prefs, kind)), true)
@@ -158,7 +158,7 @@ object CustomLabels {
     }
 
     /** The Layouts row for [keyboard] ([prefs]: its settings view; [ctx]: the screen editing it), [chosen] the Layout it
-     *  reads: its chosen one, none chosen the default, Curmudgeon. */
+     *  reads: its chosen one, none chosen the default, Dense. */
     fun layoutRow(ctx: Context, prefs: SharedPreferences, keyboard: helium314.keyboard.latin.settings.SettingsSubtype,
                   chosen: LayoutPresets.Preset): Row =
         row(ctx, prefs, Kind.LAYOUT, LayoutPresets.PREF_SELECTED, chosen.name) { LayoutPresets.isTweaked(ctx, keyboard, chosen) }

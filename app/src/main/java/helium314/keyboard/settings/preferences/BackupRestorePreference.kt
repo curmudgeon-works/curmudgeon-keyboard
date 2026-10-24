@@ -1722,15 +1722,18 @@ private fun keepingPhoneChoices(ctx: Context, restore: () -> Unit) {
 }
 
 /** What [keyboard] gets when restored on its own from [backup]: what it read there, left at the defaults where the
- *  backup only wrote defaults down, and with the HeliBoard Layouts' values a backup from before 2026-10-07 lacks. */
+ *  backup only wrote defaults down, with the HeliBoard Layouts' values a backup from before 2026-10-07 lacks, and its
+ *  built-in Layout under today's name. */
 internal fun restoredSettings(ctx: Context, backup: Map<String, Any?>, keyboard: SettingsSubtype): Map<String, Any?> {
     val values = KeyboardProfiles.effectiveSettingsIn(backup, keyboard)
         .let { values -> if (backup[helium314.keyboard.latin.PICKED_ONLY_DONE] == true) values else helium314.keyboard.latin.withoutDefaults(values, oldGaps = backup[helium314.keyboard.latin.KEY_GAP_DEFAULTS_DONE] != true) }
     // (after the defaults went, so a HeliBoard value that equals a default is never stripped as one)
     val pinned = if (backup[helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE] == true) values
         else helium314.keyboard.latin.withHeliBoardPins(ctx, values)
-    return if (backup[helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE] == true) pinned
+    val mapped = if (backup[helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE] == true) pinned
         else withUserPopupSetMap(ctx.realPrefs(), backup, pinned)
+    // (its built-in Layout under today's name: Dense, Classic; 2026-10-24)
+    return helium314.keyboard.latin.withBuiltInLayoutNames(ctx, mapped)
 }
 
 /**

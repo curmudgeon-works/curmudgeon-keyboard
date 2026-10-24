@@ -69,6 +69,7 @@ fun checkVersionUpgrade(context: Context, restoring: Boolean = false) {
     helium314.keyboard.settings.AppearanceLooks.migratePictureFolders(context, prefs)
     pickedOnlyUpgrade(context.realPrefs(), freshInstall = oldVersion == 0)
     heliBoardLayoutPins(context, context.realPrefs(), freshInstall = oldVersion == 0)
+    builtInLayoutRenames(context, context.realPrefs()) // (after it: it still knows the HeliBoard names)
     ownSetUpgrades(context.realPrefs(), freshInstall = oldVersion == 0)
     keepUserPopupSetsSymbolMap(context.realPrefs())
     // (last: after the steps above changed saved items) saved items remember what their unpicked settings show today
@@ -151,9 +152,9 @@ internal fun heliBoardPins(): Map<String, Any> = mapOf(
 internal fun heliBoardLayoutPins(context: Context, real: SharedPreferences, freshInstall: Boolean) {
     if (real.getBoolean(HELIBOARD_LAYOUT_PINS_DONE, false)) return
     if (!freshInstall) {
-        val heli = context.getString(R.string.layout_preset_heliboard)
-        val extra = context.getString(R.string.layout_preset_heliboard_extra)
-        val oldExtra = "HeliBoard Extra"
+        val heli = OLD_LAYOUT_HELIBOARD
+        val extra = OLD_LAYOUT_HELIBOARD_EXTRA
+        val oldExtra = OLD_LAYOUT_HELIBOARD_EXTRA_3008
         // (each keyboard's set by its id, the sets there are; owner 2026-10-11, keyboards have unique ids)
         val ids = KeyboardProfiles.setIds(real.all)
         val all = real.all
@@ -184,13 +185,56 @@ internal fun heliBoardLayoutPins(context: Context, real: SharedPreferences, fres
  */
 internal fun withHeliBoardPins(context: Context, values: Map<String, Any?>): Map<String, Any?> {
     val sel = helium314.keyboard.settings.LayoutPresets.PREF_SELECTED
-    val extra = context.getString(R.string.layout_preset_heliboard_extra)
+    val extra = OLD_LAYOUT_HELIBOARD_EXTRA
     val selected = values[sel] as? String ?: return values
-    if (selected != context.getString(R.string.layout_preset_heliboard) && selected != extra && selected != "HeliBoard Extra") return values
+    if (selected != OLD_LAYOUT_HELIBOARD && selected != extra && selected != OLD_LAYOUT_HELIBOARD_EXTRA_3008) return values
     val out = HashMap(values)
-    out[sel] = if (selected == "HeliBoard Extra") extra else selected
+    out[sel] = if (selected == OLD_LAYOUT_HELIBOARD_EXTRA_3008) extra else selected
     for ((key, value) in heliBoardPins()) if (out[key] == null) out[key] = value
     return out
+}
+
+// The built-in Layouts' names before 2026-10-24 (Curmudgeon = today's Dense; HeliBoard and HeliBoard extra = Classic,
+// with the number row and the Curmudgeon symbol map on top; "HeliBoard Extra" was 0.3.008's spelling).
+internal const val OLD_LAYOUT_CURMUDGEON = "Curmudgeon"
+internal const val OLD_LAYOUT_HELIBOARD = "HeliBoard"
+internal const val OLD_LAYOUT_HELIBOARD_EXTRA = "HeliBoard extra"
+internal const val OLD_LAYOUT_HELIBOARD_EXTRA_3008 = "HeliBoard Extra"
+
+/** The built-in Layout called [name] before 2026-10-24 under its name today, or null when [name] is no old name. */
+internal fun builtInLayoutRenamed(context: Context, name: String): String? = when (name) {
+    OLD_LAYOUT_CURMUDGEON -> context.getString(R.string.layout_preset_dense)
+    OLD_LAYOUT_HELIBOARD, OLD_LAYOUT_HELIBOARD_EXTRA, OLD_LAYOUT_HELIBOARD_EXTRA_3008 -> context.getString(R.string.layout_preset_classic)
+    else -> null
+}
+
+/**
+ * 2026-10-24: the built-in Layouts are Dense (the Curmudgeon Layout's values) and Classic (the HeliBoard Layouts' typing).
+ * Every stored choice of a built-in Layout (the plain set and every keyboard's own, in use or not) and every "Custom ·
+ * from …" origin that names an old one gets the new name; saved Layouts carrying one of these values follow. Values are
+ * not touched: a keyboard whose settings differ from Classic (HeliBoard's had no number row) shows Custom. Checks its
+ * own state, like the other steps: cheap on every start.
+ */
+internal fun builtInLayoutRenames(context: Context, real: SharedPreferences) {
+    val keys = setOf(helium314.keyboard.settings.LayoutPresets.PREF_SELECTED, helium314.keyboard.settings.CustomLabels.Kind.LAYOUT.fromKey)
+    val all = real.all
+    val renamed = all.mapNotNull { (stored, value) ->
+        val key = KeyboardProfiles.splitOwnKey(stored)?.second ?: stored
+        if (key !in keys || value !is String) null else builtInLayoutRenamed(context, value)?.let { stored to it }
+    }
+    if (renamed.isNotEmpty()) real.edit { for ((stored, name) in renamed) putString(stored, name) }
+    val presets = LayoutPresets.load(real)
+    if (presets.any { p -> keys.any { (p.values[it] as? String)?.let { v -> builtInLayoutRenamed(context, v) } != null } })
+        LayoutPresets.save(real, presets.map { p -> LayoutPresets.Preset(p.name, p.values.mapValues { (k, v) ->
+            if (k in keys && v is String) builtInLayoutRenamed(context, v) ?: v else v }, p.builtIn, p.remembered) })
+}
+
+/** [values] (one keyboard's, plain keys, e.g. from a backup) with its built-in Layout choice and origin under today's
+ *  names ([builtInLayoutRenamed]): what [builtInLayoutRenames] does on the device, for a keyboard restored on its own. */
+internal fun withBuiltInLayoutNames(context: Context, values: Map<String, Any?>): Map<String, Any?> {
+    val keys = listOf(helium314.keyboard.settings.LayoutPresets.PREF_SELECTED, helium314.keyboard.settings.CustomLabels.Kind.LAYOUT.fromKey)
+    val changes = keys.mapNotNull { key -> (values[key] as? String)?.let { builtInLayoutRenamed(context, it) }?.let { key to it } }
+    return if (changes.isEmpty()) values else values + changes
 }
 
 /** Set once [pickedOnlyUpgrade] ran; a backup made since carries it, one from before doesn't (its restore runs it again). */

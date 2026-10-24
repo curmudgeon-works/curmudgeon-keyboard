@@ -51,7 +51,7 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
     val presets = remember(generation) { LayoutPresets.load(prefs) }
     // Layouts that couldn't be read: said under the list until a save has set them aside (R9 2026-10-11)
     val skipped = remember(generation) { LayoutPresets.skipped(prefs) }
-    // the built-in Layouts first (Curmudgeon, the default; HeliBoard; HeliBoard extra), then the user's
+    // the built-in Layouts first (Dense, the default; Classic), then the user's
     val builtIn = remember { LayoutPresets.builtIn(ctx) }
     val all = builtIn + presets
     var showList by remember { mutableStateOf(false) }
@@ -66,12 +66,12 @@ fun LayoutPresetsPreference(keyboard: SettingsSubtype, setKeyboard: (SettingsSub
     var toRename: LayoutPresets.Preset? by remember { mutableStateOf(null) }
     var toDelete: LayoutPresets.Preset? by remember { mutableStateOf(null) }
     fun store(list: List<LayoutPresets.Preset>) { LayoutPresets.save(prefs, list); generation++ }
-    // none chosen: the default, Curmudgeon; "unsaved" in italics the moment anything differs from the chosen one (2026-10-07:
-    // it said "Curmudgeon (tweaked)", and only once the row was drawn again): read again on every settings change
+    // none chosen: the default, Dense; "unsaved" in italics the moment anything differs from the chosen one (2026-10-07:
+    // it said "Curmudgeon (tweaked)" (the default's name then), and only once the row was drawn again): read again on every settings change
     val changed = (ctx.getActivity() as? helium314.keyboard.settings.SettingsActivity)?.prefChanged?.collectAsState()
     val chosen = prefs.getString(LayoutPresets.PREF_SELECTED, null)?.let { name -> all.firstOrNull { it.name == name } }
         ?: builtIn.first()
-    // differs from it (none chosen: Curmudgeon, the default): the keyboard's own copy, "Custom · from Work" (2026-10-11, no
+    // differs from it (none chosen: Dense, the default): the keyboard's own copy, "Custom · from Work" (2026-10-11, no
     // number since; was "unsaved"); its Layout deleted: "Custom · from Work" until it chooses one again (review E2: only a
     // stored origin means deleted, CustomLabels.row)
     val row = remember(changed?.value, keyboard, chosen, generation, prefs.getString(LayoutPresets.PREF_SELECTED, null),

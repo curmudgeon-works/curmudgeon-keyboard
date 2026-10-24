@@ -63,26 +63,28 @@ object LayoutPresets {
     /**
      * The Layouts that ship with the app (2026-10-06), like the built-in themes: each sets the whole Layout & Typing
      * screen, what it doesn't name back to its default ([complete]); not the keys' arrangement (QWERTY, Dvorak…: the
-     * language's), the keyboards, or the saved popup sets. Curmudgeon is the default (everything at its default, so it
-     * follows them); HeliBoard is upstream HeliBoard's; HeliBoard extra is HeliBoard's with every accent and the number row.
+     * language's), the keyboards, or the saved popup sets. Two since 2026-10-24: Dense is the default (everything at its
+     * default, so it follows them; the Curmudgeon Layout until then), Classic is upstream HeliBoard's typing with the
+     * number row, the Curmudgeon symbol map and HeliBoard's main popups (the HeliBoard and HeliBoard extra Layouts went;
+     * a keyboard on one of them is on Classic now, see AppUpgrade.builtInLayoutRenames). First = the default.
      */
     fun builtIn(ctx: Context): List<Preset> {
         // HeliBoard's own typing: ?123 long-press does nothing, holding backspace deletes letters, 50 ms apart, no
-        // speed-up, a 300 ms long press, 100% under the bottom row in portrait, no symbol map (what the Curmudgeon Layout,
-        // the defaults, changed on 2026-10-07 stays HeliBoard's here)
+        // speed-up, a 300 ms long press, 100% under the bottom row in portrait (what the Dense Layout, the defaults,
+        // changed on 2026-10-07 stays HeliBoard's here)
         // (the backspace waits as long as any key; the same values the update step writes for 0.3.008's HeliBoard keyboards)
         val heliBoardTyping = mapOf(Settings.PREF_LONG_PRESS_SYMBOL_ACTION to "none",
             Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS to false, Settings.PREF_BACKSPACE_REPEAT_INTERVAL to 50) +
             helium314.keyboard.latin.heliBoardPins()
         val fullBottomRow = sizeKeys.keys.filter { it.startsWith(Settings.PREF_BOTTOM_ROW_SCALE_PREFIX) }.associateWith { 1f }
         return listOf(
-            Preset(ctx.getString(R.string.layout_preset_curmudgeon), complete(emptyMap()), builtIn = true),
-            Preset(ctx.getString(R.string.layout_preset_heliboard), complete(heliBoardTyping + fullBottomRow + mapOf(
-                Settings.PREF_SHOW_NUMBER_ROW to false, MORE_POPUPS to "main",
+            Preset(ctx.getString(R.string.layout_preset_dense), complete(emptyMap()), builtIn = true),
+            Preset(ctx.getString(R.string.layout_preset_classic), complete(heliBoardTyping + fullBottomRow + mapOf(
+                // the number row and the Curmudgeon symbol map (the pins' "" is HeliBoard's none), HeliBoard's main popups
+                Settings.PREF_SHOW_NUMBER_ROW to true, Settings.PREF_SYMBOL_POPUP_MAP to Defaults.CURMUDGEON_SYMBOL_POPUP_MAP,
+                MORE_POPUPS to "main",
                 // (HeliBoard has no undo history length: the Curmudgeon one before 2026-10-06; no emoji key, as upstream)
                 Settings.PREF_UNDO_HISTORY_LENGTH to 20, Settings.PREF_SHOW_EMOJI_KEY to false)), builtIn = true),
-            Preset(ctx.getString(R.string.layout_preset_heliboard_extra), complete(heliBoardTyping + mapOf(
-                MORE_POPUPS to "all")), builtIn = true), // (number row, 110% bottom row, undo 50, emoji key: the defaults)
         )
     }
 

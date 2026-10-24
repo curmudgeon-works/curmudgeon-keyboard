@@ -124,18 +124,18 @@ class CustomLabelNeverChosenTest {
 
     private val builtInLayouts get() = LayoutPresets.builtIn(ctx)
     private fun layoutText(): String {
-        // (the chosen Layout as the Layouts row finds it: none chosen, the default Curmudgeon)
+        // (the chosen Layout as the Layouts row finds it: none chosen, the default Dense)
         val chosen = prefs.getString(LayoutPresets.PREF_SELECTED, null)
             ?.let { name -> (builtInLayouts + LayoutPresets.load(real)).firstOrNull { it.name == name } } ?: builtInLayouts.first()
         return CustomLabels.layoutRow(screen, prefs, keyboard, chosen).text ?: chosen.name
     }
 
-    @Test fun `Layout never chosen - Custom from Curmudgeon while it differs, Curmudgeon again once it matches`() {
-        assertEquals("Curmudgeon", layoutText())
+    @Test fun `Layout never chosen - Custom from Dense while it differs, Dense again once it matches`() {
+        assertEquals("Dense", layoutText())
         prefs.edit { putBoolean(Settings.PREF_SHOW_NUMBER_ROW, false) }
-        assertEquals("Custom · from Curmudgeon", layoutText())
+        assertEquals("Custom · from Dense", layoutText())
         prefs.edit { remove(Settings.PREF_SHOW_NUMBER_ROW) }
-        assertEquals("Curmudgeon", layoutText()) // (was "Custom" for good)
+        assertEquals("Dense", layoutText()) // (was "Custom" for good)
     }
 
     @Test fun `Layout chosen saved Work - Custom from Work while it differs, Work once it matches`() {
@@ -148,15 +148,15 @@ class CustomLabelNeverChosenTest {
         assertEquals("Work", layoutText())
     }
 
-    @Test fun `Layout chosen built-in HeliBoard - Custom from HeliBoard while it differs, HeliBoard once it matches`() {
-        val heliBoard = builtInLayouts.first { it.name == ctx.getString(R.string.layout_preset_heliboard) }
-        LayoutPresets.applySettings(screen, LayoutPresets.settingsFor(keyboard, heliBoard, true), prefs)
-        prefs.edit { putString(LayoutPresets.PREF_SELECTED, heliBoard.name) }
-        assertEquals("HeliBoard", layoutText())
-        prefs.edit { putBoolean(Settings.PREF_SHOW_NUMBER_ROW, true) } // (HeliBoard has none)
-        assertEquals("Custom · from HeliBoard", layoutText())
-        prefs.edit { putBoolean(Settings.PREF_SHOW_NUMBER_ROW, false) }
-        assertEquals("HeliBoard", layoutText())
+    @Test fun `Layout chosen built-in Classic - Custom from Classic while it differs, Classic once it matches`() {
+        val classic = builtInLayouts.first { it.name == ctx.getString(R.string.layout_preset_classic) }
+        LayoutPresets.applySettings(screen, LayoutPresets.settingsFor(keyboard, classic, true), prefs)
+        prefs.edit { putString(LayoutPresets.PREF_SELECTED, classic.name) }
+        assertEquals("Classic", layoutText())
+        prefs.edit { putBoolean(Settings.PREF_SHOW_NUMBER_ROW, false) } // (Classic has it)
+        assertEquals("Custom · from Classic", layoutText())
+        prefs.edit { putBoolean(Settings.PREF_SHOW_NUMBER_ROW, true) }
+        assertEquals("Classic", layoutText())
     }
 
     @Test fun `Layout deleted - Custom from Work even when it matches Curmudgeon`() {

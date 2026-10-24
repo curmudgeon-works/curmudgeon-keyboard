@@ -7,6 +7,7 @@ import androidx.test.core.app.ApplicationProvider
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.heliBoardLayoutPins
 import helium314.keyboard.latin.heliBoardPins
+import helium314.keyboard.latin.OLD_LAYOUT_HELIBOARD
 import helium314.keyboard.latin.settings.KeyboardProfiles
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype
@@ -35,7 +36,9 @@ class HeliBoardPinsTest {
     @Before fun setUp() { real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
     @After fun tearDown() { randomIds(); real.edit().clear().commit(); KeyboardProfiles.loadGroups(real) }
 
-    private fun heli() = LayoutPresets.builtIn(ctx).single { it.name == ctx.getString(R.string.layout_preset_heliboard) }
+    /** The HeliBoard Layout as it was in 0.3.008 to 0.3.106: Classic (2026-10-24) without its number row and symbol map. */
+    private fun heli() = LayoutPresets.builtIn(ctx).single { it.name == ctx.getString(R.string.layout_preset_classic) }.let {
+        LayoutPresets.Preset(OLD_LAYOUT_HELIBOARD, it.values + mapOf(Settings.PREF_SHOW_NUMBER_ROW to false, Settings.PREF_SYMBOL_POPUP_MAP to ""), builtIn = true) }
 
     @Test fun `a keyboard that picked HeliBoard in 0_3_008 stays HeliBoard's`() {
         // what 0.3.008's HeliBoard Layout stored, in the common set of then: its named keys, the five later-pinned ones
@@ -44,7 +47,7 @@ class HeliBoardPinsTest {
             putString(Settings.PREF_ENABLED_SUBTYPES, SettingsSubtype(Locale.US, "").withId(1).toPref())
             putString(Settings.PREF_ADDITIONAL_SUBTYPES, SettingsSubtype(Locale.US, "").withId(1).toPref())
             for ((key, value) in heli().values - heliBoardPins().keys) KeyboardProfiles.put(this, key, value)
-            putString(sel, ctx.getString(R.string.layout_preset_heliboard))
+            putString(sel, OLD_LAYOUT_HELIBOARD)
         }
         heliBoardLayoutPins(ctx, real, freshInstall = false)
         for ((key, value) in heliBoardPins()) assertEquals(value, real.all[key], key)
@@ -61,7 +64,7 @@ class HeliBoardPinsTest {
             putString(idKey(3, sel), "Mine") // another Layout: untouched
         }
         heliBoardLayoutPins(ctx, real, freshInstall = false)
-        assertEquals(ctx.getString(R.string.layout_preset_heliboard_extra), real.getString(idKey(2, sel), null))
+        assertEquals("HeliBoard extra", real.getString(idKey(2, sel), null)) // (the rename to Classic is the next step's)
         assertEquals(450, real.getInt(idKey(2, Settings.PREF_KEY_LONGPRESS_TIMEOUT), 0))
         assertEquals(false, real.all[idKey(2, Settings.PREF_BACKSPACE_SPEED_UP)])
         assertEquals("", real.all[idKey(2, Settings.PREF_SYMBOL_POPUP_MAP)])
@@ -73,7 +76,6 @@ class HeliBoardPinsTest {
     // HeliBoard's values once the shared set later took another Layout (2026-10-10)
     @Test fun `an update pins only the sets that picked a HeliBoard Layout, not keyboards reading the shared one`() {
         val longPress = Settings.PREF_KEY_LONGPRESS_TIMEOUT
-        val extra = ctx.getString(R.string.layout_preset_heliboard_extra)
         // (a 0.3.008 phone's old sets and id map: the ids upgrade gives en k2, de k3, fr k4, it k5)
         countingIds(from = 2)
         real.edit {
@@ -86,11 +88,11 @@ class HeliBoardPinsTest {
             putString(sel, "HeliBoard Extra") // the shared set, under 0.3.008's name
             // keyboard 2: nothing of its own (learned words only)
             putBoolean("p3/${KeyboardProfiles.TOMBSTONE}$longPress", true) // keyboard 3: its long press "at the default"
-            putString("p4/$sel", ctx.getString(R.string.layout_preset_heliboard)) // keyboard 4: its own pick
+            putString("p4/$sel", OLD_LAYOUT_HELIBOARD) // keyboard 4: its own pick
             putBoolean("p5/${KeyboardProfiles.TOMBSTONE}$sel", true) // keyboard 5: no Layout chosen (the Curmudgeon one)
         }
         helium314.keyboard.latin.checkVersionUpgrade(ctx)
-        assertEquals(extra, real.getString(sel, null))
+        assertEquals("Classic", real.getString(sel, null)) // (HeliBoard extra, then Classic since 2026-10-24)
         for ((key, value) in heliBoardPins()) assertEquals(value, real.all[key], key)
         assertEquals(emptyList(), real.all.keys.filter { it.startsWith(idKey(2, "")) }, "keyboard 2 got a set of its own")
         // keyboard 3 read the default of then, HeliBoard's (300), and reads it still; the rest it reads from the shared set
@@ -102,7 +104,7 @@ class HeliBoardPinsTest {
     }
 
     @Test fun `a fresh install writes nothing and runs once`() {
-        real.edit { putString(sel, ctx.getString(R.string.layout_preset_heliboard)) }
+        real.edit { putString(sel, OLD_LAYOUT_HELIBOARD) }
         heliBoardLayoutPins(ctx, real, freshInstall = true)
         assertNull(real.all[Settings.PREF_KEY_LONGPRESS_TIMEOUT])
         heliBoardLayoutPins(ctx, real, freshInstall = false) // already done
@@ -117,7 +119,7 @@ class HeliBoardPinsTest {
         // ids: the ids upgrade gives it k2)
         countingIds(from = 2)
         real.edit().clear().putInt(Settings.PREF_VERSION_CODE, 3008).putString("keyboard_profile_ids", """{"en_US:":2}""")
-            .putString("p2/$sel", ctx.getString(R.string.layout_preset_heliboard)).commit()
+            .putString("p2/$sel", OLD_LAYOUT_HELIBOARD).commit()
         helium314.keyboard.settings.preferences.restoreFollowUp(ctx)
         assertEquals(false, real.all[idKey(2, Settings.PREF_BACKSPACE_SPEED_UP)], "keyboard 2 missed its pins: ${real.all.keys}")
     }
@@ -125,7 +127,7 @@ class HeliBoardPinsTest {
     // 2026-10-07: "On restoring a single keyboard from 3008 backup -- the backup should apply backup's values."
     @Test fun `a keyboard restored on its own from a 0_3_008 backup gets HeliBoard's values`() {
         val keyboard = SettingsSubtype(java.util.Locale.US, "").withId(1)
-        val heliName = ctx.getString(R.string.layout_preset_heliboard)
+        val heliName = OLD_LAYOUT_HELIBOARD
         // (its own set in the backup: owner 2026-10-11, no separate common set; a backup's common set is ignored; its
         // sets by id, as a backup is read)
         val backup = mapOf<String, Any?>(helium314.keyboard.latin.PICKED_ONLY_DONE to true,
@@ -137,7 +139,7 @@ class HeliBoardPinsTest {
         // a backup made since has its values as they are, and a keyboard on another Layout gets none
         val since = backup + (helium314.keyboard.latin.HELIBOARD_LAYOUT_PINS_DONE to true)
         assertEquals(null, helium314.keyboard.settings.preferences.restoredSettings(ctx, since, keyboard)[Settings.PREF_KEY_LONGPRESS_TIMEOUT])
-        val curmudgeon = backup + (idKey(1, sel) to ctx.getString(R.string.layout_preset_curmudgeon))
+        val curmudgeon = backup + (idKey(1, sel) to "Curmudgeon")
         assertEquals(null, helium314.keyboard.settings.preferences.restoredSettings(ctx, curmudgeon, keyboard)[Settings.PREF_KEY_LONGPRESS_TIMEOUT])
     }
 
@@ -145,7 +147,7 @@ class HeliBoardPinsTest {
     // to what the Layouts row shows
     @Test fun `a 0_3_008 HeliBoard keyboard restored on its own reads HeliBoard's values and its Layouts row is not unsaved`() {
         val keyboard = SettingsSubtype(Locale.US, "").withId(1)
-        val heliName = ctx.getString(R.string.layout_preset_heliboard)
+        val heliName = OLD_LAYOUT_HELIBOARD
         val zip = java.io.File(ctx.cacheDir, "backup-3008.zip")
         java.util.zip.ZipOutputStream(zip.outputStream()).use { z ->
             z.putNextEntry(java.util.zip.ZipEntry("preferences.json"))
@@ -181,14 +183,14 @@ class HeliBoardPinsTest {
         val keyboard = SettingsSubtype(Locale.US, "").withId(1)
         // (its own set in the backup: owner 2026-10-11, no separate common set; a backup's common set is ignored; its
         // set by id, as a backup is read)
-        val old = mapOf<String, Any?>(idKey(1, sel) to ctx.getString(R.string.layout_preset_heliboard), idKey(1, Settings.PREF_MORE_POPUP_KEYS) to "all")
+        val old = mapOf<String, Any?>(idKey(1, sel) to OLD_LAYOUT_HELIBOARD, idKey(1, Settings.PREF_MORE_POPUP_KEYS) to "all")
         val restored = helium314.keyboard.settings.preferences.restoredSettings(ctx, old, keyboard)
         assertNull(restored[Settings.PREF_MORE_POPUP_KEYS]) // a default written down: left out
         for ((key, value) in heliBoardPins()) assertEquals(value, restored[key], key)
         val extra = helium314.keyboard.settings.preferences.restoredSettings(ctx,
             mapOf(helium314.keyboard.latin.PICKED_ONLY_DONE to true, idKey(1, sel) to "HeliBoard Extra"), keyboard)
 
-        assertEquals(ctx.getString(R.string.layout_preset_heliboard_extra), extra[sel])
+        assertEquals("Classic", extra[sel]) // (under today's name, 2026-10-24)
         assertEquals(300, extra[Settings.PREF_KEY_LONGPRESS_TIMEOUT])
     }
 }
