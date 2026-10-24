@@ -16,8 +16,14 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import helium314.keyboard.latin.personalization.LearnedKeyboards
 import helium314.keyboard.latin.utils.realPrefs
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
@@ -84,8 +90,13 @@ fun LanguageListScreen(
 ) {
     val ctx = LocalContext.current
     var keyboard by remember { mutableStateOf(initialKeyboard) }
-    var generation by remember { mutableIntStateOf(0) } // bumped after every change so the list re-sorts
-    val (ownLanguages, otherLanguages) = remember(keyboard, generation) { languagesFor(ctx, keyboard) }
+    var generation by remember { mutableIntStateOf(0) } // bumped after every change: every row reads its priority again
+    // the ORDER is worked out when the screen opens (and for another keyboard), not after every change (2026-10-24: a
+    // language set to L / M / H jumped to the top group and vanished from view); the next open sorts as before. Keyed on
+    // the keyboard's id, not the keyboard: every priority change makes a new SettingsSubtype of the same keyboard
+    val (ownLanguages, otherLanguages) = remember(keyboard.keyboardId) { languagesFor(ctx, keyboard) }
+    // the keyboard's languages as they are now (the search's "Suggest in …" test; the rows read the keyboard themselves)
+    val ownNow = remember(keyboard) { listOf(keyboard.locale) + getSecondaryLocales(keyboard.extraValues) }
     // the buttons "Use lists from other keyboards": only with other keyboards in the list (what's stored stays)
     val severalKeyboards = remember(keyboard, generation) {
         SubtypeSettings.getEnabledSubtypes(true).map { it.toSettingsSubtype().toPref() }.distinct().size > 1 }
@@ -95,6 +106,19 @@ fun LanguageListScreen(
         keyboard = new
         generation++
     }
+    // a try-it box at the bottom, as the other screens have (2026-10-24): the keyboard comes up when the box is tapped,
+    // and only then (a priority change leaves it down: onFocus wired, onUsed not)
+    val tryIt = remember { TryItState() }
+    val scope = rememberCoroutineScope()
+    val softKeyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    val preview = remember { PreviewKeyboard(tryIt, scope, showIme = { softKeyboard?.show() }, reveal = { }) {
+        focusManager.clearFocus(force = true); softKeyboard?.hide() } }
+    Scaffold(
+        contentWindowInsets = WindowInsets(0),
+        bottomBar = { TryItBar(keyboard, tryIt, onFocus = preview::onFocus) },
+    ) { inner ->
+    Box(Modifier.padding(inner)) {
     SearchScreen(
         onClickBack = onClickBack,
         title = {
@@ -115,7 +139,7 @@ fun LanguageListScreen(
                 locale.localizedDisplayName(ctx.resources).replace("(", "")
                     .splitOnWhitespace().any { it.startsWith(term, true) }
                     // or its Suggest in … row ("हिंदी", "suggest in"), shown while it is on the keyboard
-                    || (locale in ownLanguages && Transliteration.specFor(locale)
+                    || (locale in ownNow && Transliteration.specFor(locale)
                         ?.let { ctx.getString(R.string.suggest_in_script, it.name).contains(term.trim(), true) } == true)
             }
         },
@@ -130,7 +154,12 @@ fun LanguageListScreen(
             }
         },
     )
+    }
+    }
 }
+
+/** The test tag of a language's row: this prefix + the language tag (the tests read the rows' order). */
+internal const val LANGUAGE_ROW_TAG = "language_row:"
 
 private object UseOthersItem
 private object LearnedWordsItem
@@ -238,7 +267,7 @@ private fun LanguageRow(locale: Locale, keyboard: SettingsSubtype, generation: I
     // no dictionary = no suggestions for it; another script = can't be on this keyboard: both faded
     val nameColor = if (hasDictionary && sameScript) MaterialTheme.colorScheme.onSurface
         else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp, horizontal = 16.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp, horizontal = 16.dp).testTag(LANGUAGE_ROW_TAG + locale.toLanguageTag())) {
         NameBesideChoices(name = {
             // tapping the language manages its dictionaries
             Column(modifier = Modifier.clickable { showDictionaryDialog = true }) {

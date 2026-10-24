@@ -1844,6 +1844,20 @@ class InputLogicTest {
         assertEquals(listOf("बहुत", "bahut"), inputLogic.mSuggestedWords.words().take(2))
     }
 
+    // DIAGNOSTIC 2026-10-24 (owner: "With 'Some' mode transliteration, I typed haan > selected the devnagiri version >
+    // came back to it > saw a radically different suggestions strip"): the Devanagari picked from the TYPING strip under Some
+    @Test fun `Some - the Devanagari picked from the typing strip brings back its strip`() {
+        reset()
+        suggestInScript(Transliteration.SOME)
+        chainInput("bahut")
+        val strip = showScript(typingStrip("bahut", "bohot"))
+        assertEquals(listOf("bahut", "बहुत", "bohot"), strip.words())
+        latinIME.pickSuggestionManually(strip.getInfo(1))
+        assertEquals("बहुत", text)
+        setCursorPosition(1)
+        assertEquals(listOf("बहुत", "bahut"), inputLogic.mSuggestedWords.words().take(2))
+    }
+
     // the word picked up again counts as the Latin word it was learned as: another word for it takes that word's use
     // back, not the Devanagari's (never learned)
     @Test fun `a Devanagari word picked up again and changed takes back its Latin word's use`() {
