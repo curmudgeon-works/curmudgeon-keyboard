@@ -24,6 +24,7 @@ import helium314.keyboard.latin.common.ComposedData
 import helium314.keyboard.latin.common.InputPointers
 import helium314.keyboard.latin.gesture.GestureCorpusRecorder
 import helium314.keyboard.latin.gesture.SwipeMetrics
+import helium314.keyboard.latin.gesture.OwnGestureDecoder
 import helium314.keyboard.keyboard.Keyboard
 import org.json.JSONObject
 import kotlin.test.assertTrue
@@ -1544,6 +1545,38 @@ class InputLogicTest {
         assertTrue(f.getBoolean("auto"))
         assertEquals(2, f.getInt("kept"))
         assertEquals(1, f.getInt("typed"))
+    }
+
+    @Test fun `a swipe line has the settings it was decoded with`() = withCorpus {
+        latinIME.prefs().edit {
+            putBoolean(Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD, true)
+            putBoolean(Settings.PREF_GESTURE_CAPS_SWIPE, true)
+            putInt(Settings.PREF_GESTURE_CAPS_HEIGHT, 90)
+            putBoolean(Settings.PREF_KEY_USE_PERSONALIZED_DICTS, false)
+            putInt(Settings.PREF_SUGGESTION_COUNT, 7)
+            putFloat(Settings.PREF_GESTURE_TURN_WEIGHT, 0.7f)
+        }
+        val sv = settingsValues
+        val pointers = InputPointers(4).apply { addPointer(10, 10, 0, 0); addPointer(50, 20, 0, 30); addPointer(90, 30, 0, 60) }
+        val keyboard = Mockito.mock(Keyboard::class.java)
+        // decoded as Suggest asks for it (a stand-in keyboard: no words come out), then recorded
+        OwnGestureDecoder.getSuggestionResults(ComposedData(pointers, true, ""), keyboard, listOf(Locale.US),
+            sv.mGestureDecoderScorer, sv.mGestureCapsHeight, 9)
+        GestureCorpusRecorder.onSwipe(ComposedData(pointers, true, "hello"), keyboard,
+            listOf(SuggestedWordInfo("hello", "", 100, SuggestedWordInfo.KIND_CORRECTION, null, 0, 0)), "en")
+        Thread.sleep(300)
+        val swipes = GestureCorpusRecorder.corpusFile()!!.readLines().map { JSONObject(it) }.filter { it.optString("type") == "swipe" }
+        val d = swipes.single().getJSONObject("decode")
+        assertTrue(d.getBoolean("apostropheViaPeriod"))
+        assertTrue(d.getBoolean("capsSwipe"))
+        assertEquals(0.9, d.getDouble("capsHeight"))
+        assertFalse(d.getBoolean("learnedWords"))
+        assertEquals(sv.mGestureDecoderScorer, d.getString("scorer"))
+        assertEquals(9, d.getInt("wanted"))
+        assertEquals(7, d.getInt("suggestionCount"))
+        assertTrue(d.getJSONArray("languages").getString(0).startsWith("en-US*"), "languages: ${d.getJSONArray("languages")}")
+        assertEquals(OwnGestureDecoder.Tuning.read(latinIME.prefs()).key, d.getString("tuning"))
+        assertTrue(d.getString("tuning").startsWith("T0.7 "), "tuning: ${d.getString("tuning")}")
     }
 
     /** The corpus recorded for [test] (the facts the recorder writes), from a clean start. */

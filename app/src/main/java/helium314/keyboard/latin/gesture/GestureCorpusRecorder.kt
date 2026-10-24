@@ -26,8 +26,9 @@ import java.util.concurrent.Executors
  * serving as pseudo-label). If the user then picks another suggestion, deletes the swiped word, or edits it into
  * another word (also after committing it, when it is opened for editing again within [RESUME_WINDOW_MS]), a
  * follow-up line `{"type":"final","ref":id,"how":"pick"|"deleted"|"edited",...}` records the correction. Since 2026-10-23 a
- * pick's or an edit's line also says what happened ([correction]: kept, typed, via, auto, known), and ids are the swipe's
- * time in ms (unique across keyboard starts; before, a count that began again at every start).
+ * pick's or an edit's line also says what happened ([correction]: kept, typed, via, auto, known), ids are the swipe's
+ * time in ms (unique across keyboard starts; before, a count that began again at every start), and a swipe line has the
+ * settings it was decoded with (`decode`: [OwnGestureDecoder.DecodeSettings]).
  *
  * Schema shares `points` / `locale` / `committed` with gesturelab's and the trainer's swipes.jsonl.
  * Everything stays in the app's external files dir (`gesture_corpus.jsonl`); nothing is uploaded. On by default, kept to
@@ -170,6 +171,7 @@ object GestureCorpusRecorder {
         val kbW = keyboard.mOccupiedWidth
         val kbH = keyboard.mOccupiedHeight
         val layoutName = keyboard.mId?.mSubtype?.mainLayoutName ?: "" // (a test's stand-in keyboard has none)
+        val settings = OwnGestureDecoder.lastSettings
         executor.execute {
             try {
                 val obj = JSONObject()
@@ -182,6 +184,17 @@ object GestureCorpusRecorder {
                 obj.put("layout", layoutName)
                 obj.put("committed", cands.firstOrNull()?.first ?: "")
                 obj.put("prev", previousWord)
+                // the settings it was decoded with, to build the same decoder in a replay (2026-10-23)
+                if (settings != null) obj.put("decode", JSONObject()
+                    .put("apostropheViaPeriod", settings.apostropheViaPeriod)
+                    .put("capsSwipe", settings.capsSwipe)
+                    .put("capsHeight", Math.round(settings.capsHeight * 100) / 100.0) // (key heights; the setting is in percent)
+                    .put("learnedWords", settings.learnedWords)
+                    .put("scorer", settings.scorer)
+                    .put("wanted", settings.wanted)
+                    .put("suggestionCount", settings.suggestionCount)
+                    .put("languages", JSONArray(settings.languages))
+                    .put("tuning", settings.tuning))
                 val pts = JSONArray()
                 for (i in 0 until size) pts.put(JSONArray().put(xs[i]).put(ys[i]).put(ts[i]))
                 obj.put("points", pts)

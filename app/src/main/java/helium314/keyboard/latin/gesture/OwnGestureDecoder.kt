@@ -120,6 +120,18 @@ object OwnGestureDecoder {
     @Volatile var lastSpeedKeysPerSecond: Float = 0f
         private set
 
+    /**
+     * What of the user's settings the last swipe was decoded with: all the decoder is built and asked from, so a replay
+     * can build the same one (the corpus records it with each swipe, 2026-10-23). [scorer] the active scorer, [wanted] the
+     * results asked for (the strip's fill target; the decoder makes at least [MAX_RESULTS]), [suggestionCount] the
+     * "number of suggestions" setting (0: as many as fill the strip), [languages] the word lists' keys (language and
+     * priority factor), [tuning] the parameter set's key.
+     */
+    class DecodeSettings(val apostropheViaPeriod: Boolean, val capsSwipe: Boolean, val capsHeight: Float, val learnedWords: Boolean,
+                         val scorer: String, val wanted: Int, val suggestionCount: Int, val languages: List<String>, val tuning: String)
+    @Volatile var lastSettings: DecodeSettings? = null
+        private set
+
     private var scorers: List<Scorer> = listOf(HybridScorer(), KushlerScorer(), LocationScorer())
     // the caps settings and the tuning are part of the immutable configs, so the decoder is rebuilt when they change
     private var decoderCapsHeight = Float.NaN
@@ -176,6 +188,7 @@ object OwnGestureDecoder {
         lastVocabularyMissing = false
         lastDecodeMs = 0
         lastSpeedKeysPerSecond = 0f
+        lastSettings = null
         val locale = locales.first()
         val points = adaptPointers(composedData)
         if (points.size < 2) return results
@@ -183,13 +196,16 @@ object OwnGestureDecoder {
         val apostropheViaPeriod = prefs?.getBoolean(Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD, Defaults.PREF_GESTURE_APOSTROPHE_VIA_PERIOD)
             ?: Defaults.PREF_GESTURE_APOSTROPHE_VIA_PERIOD
         val capsSwipe = prefs?.getBoolean(Settings.PREF_GESTURE_CAPS_SWIPE, Defaults.PREF_GESTURE_CAPS_SWIPE) ?: Defaults.PREF_GESTURE_CAPS_SWIPE
-        val geometry = geometryFor(keyboard, apostropheViaPeriod) ?: return results
         val tuning = prefs?.let { Tuning.read(it) } ?: Tuning.DEFAULT
-        currentTuning = tuning
         val learnedWords = Settings.getValues()?.mUsePersonalizedDicts != false
         val context = Settings.getCurrentContext()
         val specs = if (context != null) GestureDecoderVocabulary.specsFor(context, locales)
                     else locales.map { GestureDecoderVocabulary.LocaleSpec(it, 1f) }
+        lastSettings = DecodeSettings(apostropheViaPeriod, capsSwipe, capsHeight, learnedWords,
+            activeScorerPref ?: Defaults.PREF_GESTURE_DECODER_SCORER, wanted, Settings.getValues()?.mSuggestionCount ?: 0,
+            specs.map { it.key }, tuning.key)
+        val geometry = geometryFor(keyboard, apostropheViaPeriod) ?: return results
+        currentTuning = tuning
         val vocabulary = GestureDecoderVocabulary.getOrBuildAsync(specs)
         lastVocabularyMissing = vocabulary == null
         if (vocabulary == null) {
