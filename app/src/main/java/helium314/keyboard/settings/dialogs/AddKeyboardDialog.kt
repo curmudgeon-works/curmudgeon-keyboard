@@ -3,6 +3,7 @@ package helium314.keyboard.settings.dialogs
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Checkbox
@@ -66,7 +67,9 @@ fun AddKeyboardDialog(added: SettingsSubtype, copyOf: SettingsSubtype?, keyboard
             Column {
                 for (keyboard in keyboards) {
                     Text(keyboardName(keyboard, ctx), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    // a choice that doesn't fit goes on the next line, whole (it was squeezed: "Blacklisted" one
+                    // letter per line; owner 2026-10-23, as on the Languages screen)
+                    FlowRow(itemVerticalAlignment = Alignment.CenterVertically) {
                         RadioItem(stringResource(R.string.add_keyboard_settings), picked(StartSettings.From(keyboard))) { start = StartSettings.From(keyboard) }
                         if (withLists) {
                             CheckBoxItem(stringResource(R.string.learned_words_list_learned), keyboard, learned)
@@ -91,7 +94,7 @@ fun AddKeyboardDialog(added: SettingsSubtype, copyOf: SettingsSubtype?, keyboard
 
 @Composable
 private fun RadioItem(text: String, selected: Boolean, onClick: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(onClick = onClick).padding(end = 16.dp)) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(onClick = onClick).padding(end = 8.dp)) {
         RadioButton(selected = selected, onClick = onClick)
         Text(text)
     }
@@ -101,7 +104,7 @@ private fun RadioItem(text: String, selected: Boolean, onClick: () -> Unit) {
 private fun CheckBoxItem(text: String, source: SettingsSubtype, ticked: SnapshotStateList<SettingsSubtype>) {
     fun toggle(on: Boolean) { if (on) { if (source !in ticked) ticked.add(source) } else ticked.remove(source) }
     Row(verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.clickable { toggle(source !in ticked) }.padding(end = 16.dp)) {
+        modifier = Modifier.clickable { toggle(source !in ticked) }.padding(end = 8.dp)) {
         Checkbox(checked = source in ticked, onCheckedChange = { toggle(it) })
         Text(text)
     }

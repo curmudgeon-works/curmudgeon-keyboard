@@ -4,6 +4,12 @@ package helium314.keyboard.settings.screens
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.selected
@@ -233,9 +239,9 @@ private fun LanguageRow(locale: Locale, keyboard: SettingsSubtype, generation: I
     val nameColor = if (hasDictionary && sameScript) MaterialTheme.colorScheme.onSurface
         else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp, horizontal = 16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        NameBesideChoices(name = {
             // tapping the language manages its dictionaries
-            Column(modifier = Modifier.weight(1f).clickable { showDictionaryDialog = true }) {
+            Column(modifier = Modifier.clickable { showDictionaryDialog = true }) {
                 Text(locale.localizedDisplayName(ctx.resources), style = MaterialTheme.typography.bodyLarge, color = nameColor)
                 Text(
                     when {
@@ -254,26 +260,19 @@ private fun LanguageRow(locale: Locale, keyboard: SettingsSubtype, generation: I
                     color = nameColor
                 )
             }
+        }) {
             val options = listOf(
                 OFF to stringResource(R.string.language_priority_off),
                 LanguagePriority.LOW to stringResource(R.string.language_priority_low),
                 LanguagePriority.MEDIUM to stringResource(R.string.language_priority_medium),
                 LanguagePriority.HIGH to stringResource(R.string.language_priority_high),
             )
-            SingleChoiceSegmentedButtonRow {
-                options.forEachIndexed { index, (value, label) ->
-                    SegmentedButton(
-                        selected = priority == value,
-                        enabled = sameScript && (value != OFF || own.size > 1), // the last language stays
-                        onClick = {
-                            if (priority != value) {
-                                if (priority == OFF && !hasDictionary) showNoDictDialog = true
-                                setKeyboard(withLanguagePriority(ctx, keyboard, locale, value))
-                            }
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index, options.size),
-                        label = { Text(label) }
-                    )
+            NarrowChoices(options, priority,
+                enabled = { sameScript && (it != OFF || own.size > 1) }, // the last language stays
+            ) { value ->
+                if (priority != value) {
+                    if (priority == OFF && !hasDictionary) showNoDictDialog = true
+                    setKeyboard(withLanguagePriority(ctx, keyboard, locale, value))
                 }
             }
         }
@@ -300,29 +299,89 @@ internal fun SuggestInScriptRow(locale: Locale, spec: TranslitSpec, keyboard: Se
     val ctx = LocalContext.current
     val prefs = ctx.prefs()
     var mode by remember(locale, keyboard, generation) { mutableIntStateOf(Transliteration.get(prefs, locale)) }
-    Row(verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().then(modifier).testTag(SUGGEST_IN_SCRIPT_TAG)) {
-        Text(stringResource(R.string.suggest_in_script, spec.name), style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f).padding(end = 8.dp))
+    NameBesideChoices(modifier = Modifier.fillMaxWidth().then(modifier).testTag(SUGGEST_IN_SCRIPT_TAG), name = {
+        Text(stringResource(R.string.suggest_in_script, spec.name), style = MaterialTheme.typography.bodyMedium)
+    }) {
         val options = listOf(
             Transliteration.OFF to stringResource(R.string.language_priority_off),
             Transliteration.SOME to stringResource(R.string.suggest_in_script_some),
             Transliteration.ALL to stringResource(R.string.suggest_in_script_all),
         )
-        SingleChoiceSegmentedButtonRow {
-            options.forEachIndexed { index, (value, label) ->
-                SegmentedButton(
-                    selected = mode == value,
-                    onClick = {
-                        if (mode != value) {
-                            Transliteration.set(prefs, locale, value)
-                            mode = value
-                        }
-                    },
-                    shape = SegmentedButtonDefaults.itemShape(index, options.size),
-                    label = { Text(label) }
-                )
+        NarrowChoices(options, mode) { value ->
+            if (mode != value) {
+                Transliteration.set(prefs, locale, value)
+                mode = value
             }
+        }
+    }
+}
+
+/**
+ * A name with its choice buttons on its right, while the name's longest word still fits beside them; else (narrow
+ * device, big text) the buttons go on their own line under the name, at its end (owner 2026-10-23: "defo do (a), but
+ * also use (b) as fallback if needed in case screen is too narrow / text too big"; (a) = [NarrowChoices]).
+ * The name was squeezed before: the buttons took their width first ("Hinglis / h").
+ */
+@Composable
+private fun NameBesideChoices(modifier: Modifier = Modifier.fillMaxWidth(), name: @Composable () -> Unit,
+                              choices: @Composable () -> Unit) {
+    Layout(contents = listOf(name, choices), modifier = modifier) { (nameParts, choiceParts), constraints ->
+        val nameItem = nameParts.single()
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val buttons = choiceParts.single().measure(loose)
+        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else Constraints.Infinity
+        val gap = NAME_GAP.roundToPx()
+        if (!constraints.hasBoundedWidth || choicesFitBeside(nameItem.minIntrinsicWidth(Constraints.Infinity), buttons.width, width, gap)) {
+            val nameWidth = (width - buttons.width - gap).coerceAtLeast(0)
+            val text = nameItem.measure(loose.copy(minWidth = nameWidth, maxWidth = nameWidth))
+            val height = maxOf(text.height, buttons.height)
+            layout(nameWidth + gap + buttons.width, height) {
+                text.place(0, (height - text.height) / 2)
+                buttons.place(nameWidth + gap, (height - buttons.height) / 2)
+            }
+        } else {
+            val text = nameItem.measure(loose.copy(minWidth = width, maxWidth = width))
+            val top = text.height + STACKED_GAP.roundToPx()
+            layout(width, top + buttons.height) {
+                text.place(0, 0)
+                buttons.place(width - buttons.width, top)
+            }
+        }
+    }
+}
+
+/** The buttons stay beside the name while its longest word ([nameMinWidth], a Text's min intrinsic width) fits. */
+internal fun choicesFitBeside(nameMinWidth: Int, choicesWidth: Int, width: Int, gap: Int) =
+    nameMinWidth + gap + choicesWidth <= width
+
+private val NAME_GAP = 8.dp
+private val STACKED_GAP = 4.dp
+private val NARROW_PADDING = 6.dp
+
+/**
+ * Off / L / M / H style choices, narrowed (owner 2026-10-23: "off/l/m/h tabs in the langs screen can be narrowed"): no
+ * tick on the picked one (its fill shows it; the tick made every button wider, they share one width), little padding,
+ * each button as wide as the widest label needs at the current text size, but at least a finger's 48 dp.
+ */
+@Composable
+private fun <T> NarrowChoices(options: List<Pair<T, String>>, picked: T, enabled: (T) -> Boolean = { true },
+                              onPick: (T) -> Unit) {
+    val measurer = rememberTextMeasurer()
+    val style = MaterialTheme.typography.labelLarge
+    val widest = options.maxOf { measurer.measure(it.second, style, maxLines = 1).size.width }
+    val buttonWidth = maxOf(48.dp, with(LocalDensity.current) { widest.toDp() } + NARROW_PADDING * 2 + 2.dp) // (+ borders)
+    SingleChoiceSegmentedButtonRow {
+        options.forEachIndexed { index, (value, label) ->
+            SegmentedButton(
+                selected = picked == value,
+                enabled = enabled(value),
+                onClick = { onPick(value) },
+                shape = SegmentedButtonDefaults.itemShape(index, options.size),
+                modifier = Modifier.width(buttonWidth),
+                contentPadding = PaddingValues(horizontal = NARROW_PADDING),
+                icon = {},
+                label = { Text(label, maxLines = 1) }
+            )
         }
     }
 }
