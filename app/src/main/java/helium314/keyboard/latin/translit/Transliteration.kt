@@ -5,14 +5,16 @@ import android.content.Context
 import android.content.SharedPreferences
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.utils.ScriptUtils
 import helium314.keyboard.latin.utils.ExecutorUtils
 import java.util.Collections
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
 /** A language whose words can be suggested in another script ([TranslitTable]): [latinTag] is the keyboard language
- *  typed in, [name] the other language's own name for the setting ("Suggest in हिंदी"), [asset] its table. */
-class TranslitSpec(val latinTag: String, val name: String, val asset: String)
+ *  typed in, [name] the other language's own name for the setting ("Suggest in हिंदी"), [asset] its table, [script]
+ *  the other script (ScriptUtils.SCRIPT_*: its words in the text are words the cursor can pick up again). */
+class TranslitSpec(val latinTag: String, val name: String, val asset: String, val script: String)
 
 /** What a keyboard does with Suggest in …: [locale]'s words (one of its languages, with the table [spec]) in [mode]
  *  ([Transliteration.SOME] or [Transliteration.ALL]). */
@@ -33,7 +35,7 @@ object Transliteration {
 
     /** The tables there are. */
     val specs = listOf(
-        TranslitSpec("hi-Latn", "हिंदी", "translit/hi-Latn.bin"),
+        TranslitSpec("hi-Latn", "हिंदी", "translit/hi-Latn.bin", ScriptUtils.SCRIPT_DEVANAGARI),
     )
 
     fun specFor(locale: Locale): TranslitSpec? = specFor(locale.toLanguageTag())

@@ -111,6 +111,24 @@ object SuggestInScript {
         return if (typed is TranslitWordInfo && typed.mWord == word) typed.source else word
     }
 
+    /**
+     * A word the cursor picked up again, its strip back from the text ([restored]: the word first, then the words of
+     * its suggestion span): the other script's words in it know again the Latin word they were looked up for, so a pick
+     * of one learns the Latin word, as the first pick did. Returns the Latin word of the word itself (what its
+     * commit learned), or null when it is not the other script's word of one of them.
+     */
+    @JvmStatic
+    fun resumed(restored: MutableList<SuggestedWordInfo>, table: TranslitTable): String? {
+        var source: String? = null
+        for (i in restored.indices) {
+            val word = restored[i].mWord
+            val from = restored.firstOrNull { it.mWord != word && word in table.lookup(it.mWord) }?.mWord ?: continue
+            if (i == 0) source = from
+            else restored[i] = TranslitWordInfo(word, from, restored[i].mScore, tinted = false)
+        }
+        return source
+    }
+
     /** [info] drawn on the tint (the Latin word one tap away under ALL). */
     private fun tinted(info: SuggestedWordInfo): SuggestedWordInfo =
         SuggestedWordInfo(info.mWord, info.mPrevWordsContext, info.mScore, info.mKindAndFlags or SuggestedWordInfo.KIND_FLAG_OTHER_SCRIPT,

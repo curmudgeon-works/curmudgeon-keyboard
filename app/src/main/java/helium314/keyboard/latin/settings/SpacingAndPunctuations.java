@@ -88,7 +88,11 @@ public final class SpacingAndPunctuations {
     }
 
     public boolean isWordCodePoint(final int code) {
-        return Character.isLetter(code) || isWordConnector(code) || Character.COMBINING_SPACING_MARK == Character.getType(code);
+        // (a vowel sign or other mark ends a word too: नहीं ends in ं, a non-spacing mark; owner 2026-10-23, Devanagari
+        // words picked up again)
+        final int type = Character.getType(code);
+        return Character.isLetter(code) || isWordConnector(code) || Character.COMBINING_SPACING_MARK == type
+                || Character.NON_SPACING_MARK == type;
     }
 
     public boolean isUsuallyPrecededBySpace(final int code) {

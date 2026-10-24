@@ -6,6 +6,9 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Message
 import android.text.InputType
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.SuggestionSpan
 import android.view.KeyEvent
 import android.view.inputmethod.*
 import androidx.core.content.edit
@@ -1811,6 +1814,59 @@ class InputLogicTest {
         assertEquals(listOf("bohot", "bahut"), showScript(typingStrip("bohot", "bahut")).words())
     }
 
+    // going back into a word brings back its strip: also a Devanagari word (owner 2026-10-23: "going back to that word
+    // brings back the original list of suggestions? That doesn't seem to be happening with devnagiri words"). Fail
+    // before: the word wasn't one (the keyboard's script only), the strip went blank
+    @Test fun `All - the cursor back in a Devanagari word brings back its strip`() {
+        reset()
+        setInputType(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_AUTO_CORRECT)
+        suggestInScript(Transliteration.ALL)
+        chainInput("bohot")
+        showScript(typingStrip("bohot", "bahut"))
+        input(' ')
+        assertEquals("बहुत ", text)
+        setCursorPosition(2)
+        val back = inputLogic.mSuggestedWords.words()
+        assertEquals("बहुत", back.first())
+        assertTrue("bohot" in back && "bahut" in back, "$back")
+    }
+
+    // Some's swap after a pick keeps the Latin word's strip, the Latin word first. Fail before: plain text, no strip
+    @Test fun `Some - the Devanagari put in place after a pick brings back a strip too`() {
+        reset()
+        suggestInScript(Transliteration.SOME)
+        chainInput("bah")
+        val strip = showScript(typingStrip("bah", "bahut", "bohot"))
+        latinIME.pickSuggestionManually(strip.getInfo(strip.words().indexOf("bahut")))
+        latinIME.pickSuggestionManually(showScript(predictionStrip("hai")).getInfo(0))
+        assertEquals("बहुत", text)
+        setCursorPosition(1)
+        assertEquals(listOf("बहुत", "bahut"), inputLogic.mSuggestedWords.words().take(2))
+    }
+
+    // the word picked up again counts as the Latin word it was learned as: another word for it takes that word's use
+    // back, not the Devanagari's (never learned)
+    @Test fun `a Devanagari word picked up again and changed takes back its Latin word's use`() {
+        reset()
+        setInputType(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_AUTO_CORRECT)
+        suggestInScript(Transliteration.ALL)
+        chainInput("bohot")
+        showScript(typingStrip("bohot", "bahut"))
+        input(' ')
+        assertEquals(listOf("bohot"), addedWords)
+        setCursorPosition(2)
+        val back = inputLogic.mSuggestedWords
+        latinIME.pickSuggestionManually(back.getInfo(back.words().indexOf("bahut")))
+        assertEquals("bahut ", text)
+        assertEquals(listOf("bohot"), unlearnedWords)
+    }
+
+    @Test fun `a word may end in a vowel sign`() {
+        reset()
+        assertTrue(settingsValues.isWordCodePoint('ं'.code)) // नहीं (a non-spacing mark)
+        assertTrue(settingsValues.isWordCodePoint('ा'.code)) // किया (a spacing one, as before)
+    }
+
     private val hinglish = Locale.forLanguageTag("hi-Latn")
 
     // the keyboard in use has English and Hinglish, Suggest in हिंदी is [mode] on it, its table is read
@@ -1849,6 +1905,7 @@ class InputLogicTest {
         // reset input connection & facilitator
         currentScript = ScriptUtils.SCRIPT_LATIN
         text = ""
+        suggestionSpans.clear()
         batchEdit = 0
         currentInputType = InputType.TYPE_CLASS_TEXT
         lastAddedWord = ""
@@ -1933,7 +1990,7 @@ class InputLogicTest {
         checkConnectionConsistency()
     }
 
-    private fun getWordAtCursor() = connection.getWordRangeAtCursor(settingsValues.mSpacingAndPunctuations, currentScript)?.mWord
+    private fun getWordAtCursor() = connection.getWordRangeAtCursor(settingsValues.mSpacingAndPunctuations, currentScript)?.mWord?.toString()
 
     private fun setCursorPosition(start: Int, end: Int = start, weirdTextField: Boolean = false) {
         val ei = EditorInfo()
@@ -2118,13 +2175,43 @@ private fun beforeEdit() {
 private val composingText get() = if (composingStart == -1 || composingEnd == -1) ""
     else text.substring(composingStart, composingEnd)
 
+// the suggestion spans of the text committed (start, the word, the span), as an editor keeps them; one counts while its
+// word is still there at its start
+private val suggestionSpans = mutableListOf<Triple<Int, String, SuggestionSpan>>()
+
+private fun parcelled(span: SuggestionSpan): SuggestionSpan {
+    val parcel = android.os.Parcel.obtain()
+    try {
+        span.writeToParcel(parcel, 0)
+        parcel.setDataPosition(0)
+        return SuggestionSpan.CREATOR.createFromParcel(parcel)
+    } finally { parcel.recycle() }
+}
+
+/** [piece] (the text from [offset] on) with the suggestion spans on it, when [flags] ask for styles. */
+private fun withSuggestionSpans(piece: String, offset: Int, flags: Int): CharSequence {
+    if (flags and InputConnection.GET_TEXT_WITH_STYLES == 0) return piece
+    val out = SpannableString(piece)
+    for ((start, word, span) in suggestionSpans) {
+        if (!text.startsWith(word, start)) continue
+        // cut at the ends of the piece, as an editor gives them (the cursor inside the word: a part before, one after)
+        val from = maxOf(start - offset, 0)
+        val to = minOf(start - offset + word.length, piece.length)
+        // (a copy, as an editor's answer carries: the two parts are equal spans, not one object)
+        if (from < to) out.setSpan(parcelled(span), from, to, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+    }
+    return out
+}
+
 // essentially this is the text field we're editing in
 private val ic = object : InputConnection {
     // pretty clear (though this may be slow depending on the editor)
     // bad return value here is likely the cause for that weird bug improved/fixed by fixIncorrectLength
-    override fun getTextBeforeCursor(p0: Int, p1: Int): CharSequence = (staleText?.substring(0, staleSelection) ?: textBeforeCursor).take(p0)
+    override fun getTextBeforeCursor(p0: Int, p1: Int): CharSequence = staleText?.substring(0, staleSelection)?.take(p0)
+        ?: withSuggestionSpans(textBeforeCursor.take(p0), 0, p1)
     // pretty clear (though this may be slow depending on the editor)
-    override fun getTextAfterCursor(p0: Int, p1: Int): CharSequence = (staleText?.substring(staleSelection) ?: textAfterCursor).take(p0)
+    override fun getTextAfterCursor(p0: Int, p1: Int): CharSequence = staleText?.substring(staleSelection)?.take(p0)
+        ?: withSuggestionSpans(textAfterCursor.take(p0), selectionEnd, p1)
     // pretty clear
     override fun getSelectedText(p0: Int): CharSequence? = if (selectionStart == selectionEnd) null
         else text.substring(selectionStart, selectionEnd)
@@ -2173,6 +2260,9 @@ private val ic = object : InputConnection {
     }
     // as per documentation: "This behaves like calling setComposingText(text, newCursorPosition) then finishComposingText()"
     override fun commitText(p0: CharSequence, p1: Int): Boolean {
+        val insertStart = if (composingStart == -1) selectionStart else composingStart
+        if (p0 is Spanned) for (span in p0.getSpans(0, p0.length, SuggestionSpan::class.java))
+            suggestionSpans.add(Triple(insertStart + p0.getSpanStart(span), p0.toString().substring(p0.getSpanStart(span), p0.getSpanEnd(span)), span))
         setComposingText(p0, p1)
         finishComposingText()
         return true // whether we added the text

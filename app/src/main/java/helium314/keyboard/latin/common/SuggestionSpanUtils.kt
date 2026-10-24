@@ -46,3 +46,13 @@ fun getTextWithSuggestionSpan(context: Context, pickedWord: String, suggestedWor
     spannable.setSpan(suggestionSpan, 0, pickedWord.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
     return spannable
 }
+
+/** [word] with [suggestions] as its suggestion span (the first [SuggestionSpan.SUGGESTIONS_MAX_SIZE] that aren't [word]),
+ *  which the cursor brings back to the strip when it picks the word up again. */
+fun getTextWithSuggestions(context: Context, word: String, suggestions: List<String>, locale: Locale): CharSequence {
+    val others = suggestions.filter { it != word }.distinct().take(SuggestionSpan.SUGGESTIONS_MAX_SIZE)
+    if (word.isEmpty() || others.isEmpty()) return word
+    val spannable = SpannableString(word)
+    spannable.setSpan(SuggestionSpan(context, locale, others.toTypedArray(), 0, null), 0, word.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+    return spannable
+}

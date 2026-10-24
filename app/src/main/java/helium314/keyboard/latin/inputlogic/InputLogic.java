@@ -80,6 +80,7 @@ import helium314.keyboard.latin.utils.TimestampKt;
 import helium314.keyboard.latin.utils.WebEndings;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
@@ -552,9 +553,17 @@ public final class InputLogic {
         final String latin = info.source;
         final CharSequence before = mConnection.getTextBeforeCursor(latin.length(), 0);
         if (!mWordComposer.isComposingWord() && !mConnection.hasSelection() && TextUtils.equals(before, latin)) {
+            // the word keeps the Latin word's strip (the Latin word first): the cursor brings it back as for any pick
+            final ArrayList<String> strip = new ArrayList<>();
+            strip.add(latin);
+            final TextRange range = mConnection.getWordRangeAtCursor(settingsValues.mSpacingAndPunctuations, ScriptUtils.SCRIPT_LATIN);
+            if (range != null)
+                for (final SuggestionSpan span : range.getSuggestionSpansAtWord())
+                    strip.addAll(Arrays.asList(span.getSuggestions()));
             mConnection.beginBatchEdit();
             mConnection.deleteTextBeforeCursor(latin.length());
-            mConnection.commitText(info.mWord, 1);
+            mConnection.commitText(SuggestionSpanUtilsKt.getTextWithSuggestions(mLatinIME, info.mWord, strip,
+                    getDictionaryFacilitatorLocale()), 1);
             mConnection.endBatchEdit();
             inputTransaction.setDidAffectContents();
         }
@@ -1342,7 +1351,7 @@ public final class InputLogic {
             final CharSequence text = mConnection.textBeforeCursorUntilLastWhitespaceOrDoubleSlash();
             final TextRange range = new TextRange(text, 0, text.length(), text.length(), false);
             isComposingWord = true;
-            restartSuggestions(range);
+            restartSuggestions(range, settingsValues);
         }
         // TODO: remove isWordConnector() and use isUsuallyFollowedBySpace() instead.
         // See onStartBatchInput() to see how to do it.
@@ -2459,7 +2468,8 @@ public final class InputLogic {
             mConnection.finishComposingText();
             return;
         }
-        final TextRange range = mConnection.getWordRangeAtCursor(settingsValues.mSpacingAndPunctuations, currentKeyboardScript);
+        final TextRange range = mConnection.getWordRangeAtCursor(settingsValues.mSpacingAndPunctuations,
+                scriptAtCursor(settingsValues, currentKeyboardScript));
         if (null == range) return; // Happens if we don't have an input connection at all
         if (range.length() <= 0) {
             // Race condition, or touching a word in a non-supported script.
@@ -2483,20 +2493,40 @@ public final class InputLogic {
         // (a cursor moved within the word being composed comes here too, and the composition is set up again)
         final boolean wasComposing = mWordComposer.isComposingWord();
         final String resumedBefore = mWordComposer.getResumedFrom();
-        restartSuggestions(range);
+        final String learnedAs = restartSuggestions(range, settingsValues);
         // learning rules: a word already in the text counts as accepted (the keyboard can't tell who typed it, and
         // what it typed was counted at its commit), so changing it takes that use back. Not a word still being typed
         // (it stays what it was), and not the half-changed word of an edit in place, which took the use back already.
         final String word = range.mWord.toString();
         if (!mWordComposer.isComposingWord() || !word.equals(mWordComposer.getTypedWord())) return;
         if (wasComposing) mWordComposer.setResumedFrom(resumedBefore);
-        else if (mEditedInPlaceWord == null) mWordComposer.setResumedFrom(word);
+        else if (mEditedInPlaceWord == null) mWordComposer.setResumedFrom(learnedAs);
     }
 
-    private void restartSuggestions(final TextRange range) {
+    /**
+     * The script of the word at the cursor: the keyboard's, or with Suggest in हिंदी the table's when the cursor
+     * touches one of its letters (बहुत on a Hinglish keyboard: picked up again with its strip like a Latin word; it was
+     * not a word at all before, owner 2026-10-23: "going back to that word brings back the original list of
+     * suggestions? That doesn't seem to be happening with devnagiri words").
+     */
+    private String scriptAtCursor(final SettingsValues settingsValues, final String keyboardScript) {
+        final TranslitChoice choice = settingsValues.mSuggestInScript;
+        if (choice == null) return keyboardScript;
+        final String script = choice.getSpec().getScript();
+        final CharSequence after = mConnection.getTextAfterCursor(1, 0);
+        final int before = mConnection.getCodePointBeforeCursor();
+        if ((before != Constants.NOT_A_CODE && ScriptUtils.isLetterPartOfScript(before, script))
+                || (!TextUtils.isEmpty(after) && ScriptUtils.isLetterPartOfScript(Character.codePointAt(after, 0), script)))
+            return script;
+        return keyboardScript;
+    }
+
+    /** Returns the word to count as picked up again: the word, or the Latin word its commit learned (Suggest in हिंदी,
+     *  SuggestInScript.resumed). */
+    private String restartSuggestions(final TextRange range, final SettingsValues settingsValues) {
         final int numberOfCharsInWordBeforeCursor = range.getNumberOfCharsInWordBeforeCursor();
         final int expectedCursorPosition = mConnection.getExpectedSelectionStart();
-        if (numberOfCharsInWordBeforeCursor > expectedCursorPosition) return;
+        if (numberOfCharsInWordBeforeCursor > expectedCursorPosition) return range.mWord.toString();
         final ArrayList<SuggestedWordInfo> suggestions = new ArrayList<>();
         final String typedWordString = range.mWord.toString();
         final SuggestedWordInfo typedWordInfo = new SuggestedWordInfo(typedWordString,
@@ -2519,6 +2549,12 @@ public final class InputLogic {
                 }
             }
         }
+        // Suggest in हिंदी: the other script's words in it as the first strip had them (a pick learns the Latin word)
+        final TranslitChoice translitChoice = settingsValues.mSuggestInScript;
+        final TranslitTable translitTable = translitChoice == null ? null : Transliteration.INSTANCE.table(translitChoice.getSpec());
+        final String source = translitTable == null ? null : SuggestInScript.resumed(suggestions, translitTable);
+        final SuggestedWordInfo stripTypedWord = source == null ? typedWordInfo
+                : new TranslitWordInfo(typedWordString, source, SuggestedWords.MAX_SUGGESTIONS + 1, false, false);
         final int[] codePoints = StringUtils.toCodePointArray(typedWordString);
         mWordComposer.setComposingWord(codePoints, mLatinIME.getCoordinatesForCurrentKeyboard(codePoints));
         mWordComposer.setCursorPositionWithinWord(typedWordString.codePointCount(0, numberOfCharsInWordBeforeCursor));
@@ -2537,11 +2573,12 @@ public final class InputLogic {
             // color of the word in the suggestion strip changes according to this parameter,
             // and false gives the correct color.
             final SuggestedWords suggestedWords = new SuggestedWords(suggestions,
-                    null /* rawSuggestions */, typedWordInfo, false /* typedWordValid */,
+                    null /* rawSuggestions */, stripTypedWord, false /* typedWordValid */,
                     false /* willAutoCorrect */, false /* isObsoleteSuggestions */,
                     SuggestedWords.INPUT_STYLE_RECORRECTION, SuggestedWords.NOT_A_SEQUENCE_NUMBER);
             doShowSuggestionsAndClearAutoCorrectionIndicator(suggestedWords);
         }
+        return source == null ? typedWordString : source;
     }
 
     private void doShowSuggestionsAndClearAutoCorrectionIndicator(final SuggestedWords suggestedWords) {
@@ -3321,10 +3358,11 @@ public final class InputLogic {
         // counted with; the word committed counts as usual (below)
         final String resumedFrom = mWordComposer.getResumedFrom();
         final String swipedWord = mWordComposer.getSwipedWord();
-        final boolean editedAccepted = resumedFrom != null && !resumedFrom.equals(chosenWord);
+        // (as the words learned: बहुत picked up again was bohot's, SuggestInScript.resumed)
+        final boolean editedAccepted = resumedFrom != null && !resumedFrom.equals(learnedWord);
         // picked up again and committed unchanged by a space or punctuation (space, backspace, space): not a new
         // acceptance, maybe just a pause; picked again from the strip it counts (2026-10-04)
-        final boolean reAccepted = resumedFrom != null && resumedFrom.equals(chosenWord)
+        final boolean reAccepted = resumedFrom != null && resumedFrom.equals(learnedWord)
                 && commitType != LastComposedWord.COMMIT_TYPE_MANUAL_PICK;
         // (the Devanagari of the typed word counts as the typed word)
         final String origin = learningOrigin(commitType, chosenWord.equals(mWordComposer.getTypedWord()) ? chosenWord : learnedWord);
