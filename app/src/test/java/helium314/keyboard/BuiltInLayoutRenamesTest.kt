@@ -77,7 +77,8 @@ class BuiltInLayoutRenamesTest {
             putString(sel, "HeliBoard Extra"); putString(idKey(1, sel), "Curmudgeon")
         }
         helium314.keyboard.latin.checkVersionUpgrade(ctx)
-        assertEquals("Classic", real.getString(sel, null))
+        // (the plain set went into a keyboard's own set on the same start: no common set, 2026-10-11)
+        assertEquals(listOf("Classic"), real.all.filterKeys { it.endsWith("/" + sel) && !it.startsWith("pk1/") }.values.toList())
         assertEquals("Dense", real.getString(idKey(1, sel), null))
     }
 

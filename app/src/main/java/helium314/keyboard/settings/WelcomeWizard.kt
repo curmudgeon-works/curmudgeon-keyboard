@@ -23,7 +23,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
-import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.utils.prefs
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -456,12 +455,10 @@ private fun LayoutPick(background: androidx.compose.ui.graphics.Color, colors: C
 /** The sample words on the preview's strip (nothing is typed yet). */
 internal val SETUP_SAMPLE_WORDS = listOf("wor", "WOR", "work", "works", "worked", "wo")
 
-/** The first symbol of each letter in the Curmudgeon symbol map (Classic's hints), by letter. */
-private val curmudgeonSymbolHints: Map<Char, String> by lazy {
-    Defaults.CURMUDGEON_SYMBOL_POPUP_MAP.split(' ').filter { it.length >= 2 }.associate { it[0] to it.substring(1, 2) }
-}
-/** Sample accent hints for Dense (no symbol map: the letters' popups are their accents). */
-private val accentHints = mapOf('e' to "é", 'a' to "à", 'u' to "ü", 'i' to "í", 'o' to "ó", 'n' to "ñ", 'c' to "ç", 's' to "ß", 'y' to "ý", 'z' to "ž")
+/** The symbols HeliBoard's layout puts on the letters when the number row is shown (Classic's and Dense's hints; read
+ *  off the keyboard on 2026-10-24), by letter. */
+private val numberRowSymbolHints: Map<Char, String> = "q` w\\ e| r= t[ y] u< i> o{ p} a€ s§ d$ f– g— h- j+ k« l» z× x\" c' v: b; n÷ m?"
+    .split(' ').associate { it[0] to it.substring(1) }
 
 /**
  * The keyboard as [pick] lays it out, small, in [colors]: a suggestion strip with [SETUP_SAMPLE_WORDS] spaced
@@ -481,7 +478,7 @@ private fun LayoutPreview(colors: Colors, pick: SetupLayout.Pick, wordPadding: I
     val keyText = c(ColorType.KEY_TEXT); val hintText = c(ColorType.KEY_HINT_TEXT)
     val numberRow = pick != SetupLayout.Pick.MINIMAL
     val hints: Map<Char, String> = when (pick) {
-        SetupLayout.Pick.MINIMAL -> emptyMap(); SetupLayout.Pick.CLASSIC -> curmudgeonSymbolHints; SetupLayout.Pick.DENSE -> accentHints }
+        SetupLayout.Pick.MINIMAL -> emptyMap(); SetupLayout.Pick.CLASSIC, SetupLayout.Pick.DENSE -> numberRowSymbolHints }
     Canvas(modifier) {
         drawRect(background)
         val scale = size.width / screenWidth
