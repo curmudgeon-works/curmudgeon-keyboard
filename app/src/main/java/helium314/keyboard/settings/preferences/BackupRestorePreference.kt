@@ -1732,8 +1732,8 @@ internal fun restoredSettings(ctx: Context, backup: Map<String, Any?>, keyboard:
         else helium314.keyboard.latin.withHeliBoardPins(ctx, values)
     val mapped = if (backup[helium314.keyboard.latin.USER_POPUP_SETS_MAP_DONE] == true) pinned
         else withUserPopupSetMap(ctx.realPrefs(), backup, pinned)
-    // (its built-in Layout under today's name: Dense, Classic; 2026-10-24)
-    return helium314.keyboard.latin.withBuiltInLayoutNames(ctx, mapped)
+    // (its built-in Layout under today's name, Dense or Classic, and without the "show symbols" keys that went; 2026-10-24)
+    return helium314.keyboard.latin.withoutOldHintKeys(helium314.keyboard.latin.withBuiltInLayoutNames(ctx, mapped))
 }
 
 /**

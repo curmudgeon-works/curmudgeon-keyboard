@@ -118,7 +118,7 @@ object Defaults {
     const val PREF_SUGGESTION_BOLD = true
     const val PREF_SUGGESTION_ITALIC = false
     const val PREF_SUGGESTION_UNDERLINE = false
-    const val PREF_SUGGESTION_WORD_PADDING = 10  // dp
+    const val PREF_SUGGESTION_WORD_PADDING = 5  // dp; the Dense Layout's packed strip (2026-10-24; 10 before, 5 was the Curmudgeon theme's)
     // Key gap (% of keyboard width/height) — values match the new defaults in config.xml
     const val PREF_KEY_HORIZONTAL_GAP = 1f // (2026-10-03; was 0.5)
     const val PREF_KEY_VERTICAL_GAP = 2f // (2026-10-03; was 0.75)
@@ -187,11 +187,9 @@ object Defaults {
     const val PREF_SHOW_NUMBER_ROW = true // Curmudgeon default: the letter-key symbol map assumes the number row is shown
     const val PREF_SHOW_NUMBER_ROW_IN_SYMBOLS = true
     const val PREF_LOCALIZED_NUMBER_ROW = true
-    const val PREF_SHOW_NUMBER_ROW_HINTS = true
-    const val PREF_SHOW_HINTS = true
+    const val PREF_SHOW_HINTS = true // the one "Hide symbols on keys" value (2026-10-24: the number row's and the ellipsis's own switches went)
     const val PREF_POPUP_KEYS_ORDER = POPUP_KEYS_ORDER_DEFAULT
     const val PREF_POPUP_KEYS_LABELS_ORDER = POPUP_KEYS_LABEL_DEFAULT
-    const val PREF_SHOW_POPUP_HINTS = false
     const val PREF_SHOW_TLD_POPUP_KEYS = true
     const val PREF_ADVANCED_SETTINGS = false // simple settings menu by default; switch at the top of the main screen
     // letter followed by its popup symbols, entries separated by whitespace; only used when the number row is on

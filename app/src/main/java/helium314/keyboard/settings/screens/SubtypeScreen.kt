@@ -401,6 +401,13 @@ fun SubtypeScreen(
                         CompositionLocalProvider(LocalEditedKeyboard provides editedKeyboard) {
                             SettingsActivity.settingsContainer[Settings.PREF_LOCALIZED_NUMBER_ROW]?.Preference() }
                     } } }
+                    // the spacing between suggestions, under the numbers row and its sub-rows (moved from Appearance
+                    // 2026-10-24: the Layout's, Dense packs the strip); its slider keeps the preview keyboard up
+                    CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
+                        LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
+                        Listed(lists, Settings.PREF_SUGGESTION_WORD_PADDING) { Pending(keyChanged(Settings.PREF_SUGGESTION_WORD_PADDING)) {
+                            SettingsActivity.settingsContainer[Settings.PREF_SUGGESTION_WORD_PADDING]?.Preference() } }
+                    }
                     // then the emoji key switch, and the voice key's (right of the space bar)
                     Listed(lists, Settings.PREF_SHOW_EMOJI_KEY) { Pending(keyChanged(Settings.PREF_SHOW_EMOJI_KEY)) {
                         PrefSwitchRow(Settings.PREF_SHOW_EMOJI_KEY, Defaults.PREF_SHOW_EMOJI_KEY, R.string.show_emoji_key) {
@@ -414,7 +421,13 @@ fun SubtypeScreen(
                             KeyboardSwitcher.getInstance().reloadKeyboard()
                         }
                     } }
-                    // split keyboard (and its gap), with the preview keyboard
+                    // "Hide symbols on keys", under the voice key (moved from Appearance 2026-10-24: the Layout's)
+                    CompositionLocalProvider(LocalCompactPreferences provides true) {
+                        Listed(lists, SettingsWithoutKey.HIDE_ALL_SYMBOLS) { Pending(keyChanged(Settings.PREF_SHOW_HINTS)) {
+                            SettingsActivity.settingsContainer[SettingsWithoutKey.HIDE_ALL_SYMBOLS]?.Preference() } }
+                    }
+                    // split keyboard (and its gap), with the preview keyboard; advanced since 2026-10-24
+                    AdvancedBlock(advanced) {
                     CompositionLocalProvider(LocalCompactPreferences provides true, LocalKeepKeyboard provides true,
                         LocalPreviewKeyboard provides preview, LocalBottomBarTop provides bottomBarTop) {
                         Listed(lists, Settings.PREF_ENABLE_SPLIT_KEYBOARD) {
@@ -424,6 +437,7 @@ fun SubtypeScreen(
                         Listed(lists, Settings.PREF_SPLIT_SPACER_SCALE_PREFIX) {
                             Pending(prefixChanged(Settings.PREF_SPLIT_SPACER_SCALE_PREFIX)) { Box(Modifier.padding(start = 16.dp)) {
                                 SettingsActivity.settingsContainer[Settings.PREF_SPLIT_SPACER_SCALE_PREFIX]?.Preference() } } }
+                    }
                     }
                     // the send/enter key on the rows under the emoji and clipboard panels: one switch for both
                     val withAction = (currentSubtype.layoutName(LayoutType.EMOJI_BOTTOM) ?: Settings.readDefaultLayoutName(LayoutType.EMOJI_BOTTOM, prefs)) == "emoji_bottom_row_with_action"
@@ -788,7 +802,7 @@ private val previewDialogItems = setOf(Settings.PREF_KEYPRESS_SOUND, Settings.PR
 private val previewedSwitches = listOf(
     Settings.PREF_SHOW_NUMBER_ROW, Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS, Settings.PREF_ENABLE_SPLIT_KEYBOARD,
     Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE,
-    Settings.PREF_SHOW_EMOJI_KEY, Settings.PREF_SHOW_VOICE_KEY,
+    Settings.PREF_SHOW_EMOJI_KEY, Settings.PREF_SHOW_VOICE_KEY, Settings.PREF_SHOW_HINTS,
     Settings.PREF_POPUP_ON, Settings.PREF_VIBRATE_ON, Settings.PREF_SOUND_ON,
     Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS, Settings.PREF_BACKSPACE_SPEED_UP, Settings.PREF_DELETE_SWIPE,
     Settings.PREF_LONG_PRESS_SYMBOL_ACTION, Settings.PREF_REMOVE_REDUNDANT_POPUPS,
@@ -827,6 +841,11 @@ internal class LayoutScreenLists(prefs: android.content.SharedPreferences, ctx: 
     val advanced: List<String> = listOfNotNull(
         // the language's own digits on the number row: only for a keyboard whose language has them (owner 2026-10-14)
         if (keyboard != null && hasLocalizedNumberRow(keyboard.locale, ctx)) Settings.PREF_LOCALIZED_NUMBER_ROW else null,
+        // the split keyboard (advanced since 2026-10-24), its gap only while the keyboard is split somewhere
+        Settings.PREF_ENABLE_SPLIT_KEYBOARD,
+        if (listOf(Settings.PREF_ENABLE_SPLIT_KEYBOARD, Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE,
+                Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE)
+                .any { prefs.getBoolean(it, Defaults.PREF_ENABLE_SPLIT_KEYBOARD) }) Settings.PREF_SPLIT_SPACER_SCALE_PREFIX else null,
         Settings.PREF_SPACE_TO_CHANGE_LANG, Settings.PREF_BOTTOM_ROW_SCALE_PREFIX, Settings.PREF_SIDE_PADDING_SCALE_PREFIX,
         Settings.PREF_BACKSPACE_LONGPRESS_DELAY, Settings.PREF_DELETE_SWIPE,
         // undoing an autocorrection: only while autocorrect is on
@@ -838,11 +857,9 @@ internal class LayoutScreenLists(prefs: android.content.SharedPreferences, ctx: 
         Settings.PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, Settings.PREF_SHOW_NUMBER_ROW,
         // the symbols page's number row: only while the number row is off
         if (!prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, Defaults.PREF_SHOW_NUMBER_ROW)) Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS else null,
-        Settings.PREF_SHOW_EMOJI_KEY, Settings.PREF_SHOW_VOICE_KEY, Settings.PREF_ENABLE_SPLIT_KEYBOARD,
-        // the split's gap: only while the keyboard is split somewhere
-        if (listOf(Settings.PREF_ENABLE_SPLIT_KEYBOARD, Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE,
-                Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED, Settings.PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE)
-                .any { prefs.getBoolean(it, Defaults.PREF_ENABLE_SPLIT_KEYBOARD) }) Settings.PREF_SPLIT_SPACER_SCALE_PREFIX else null,
+        // the spacing between suggestions under the numbers row, "Hide symbols on keys" under the voice key (2026-10-24)
+        Settings.PREF_SUGGESTION_WORD_PADDING,
+        Settings.PREF_SHOW_EMOJI_KEY, Settings.PREF_SHOW_VOICE_KEY, SettingsWithoutKey.HIDE_ALL_SYMBOLS,
         Settings.PREF_TOOLBAR_VISIBILITY, Settings.PREF_BACKSPACE_HOLD_DELETES_WORDS, Settings.PREF_BACKSPACE_SPEED_UP,
     ) + input + advanced
     private val shown = all.toHashSet()

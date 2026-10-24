@@ -26,12 +26,8 @@ import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.settings.Setting
 import helium314.keyboard.settings.SettingsActivity
 
-/** The three "show symbols" preferences the one switch stands for: number row, non-number keys, bottom-right ellipsis. */
-val symbolHintPrefs = listOf(
-    Settings.PREF_SHOW_NUMBER_ROW_HINTS to Defaults.PREF_SHOW_NUMBER_ROW_HINTS,
-    Settings.PREF_SHOW_HINTS to Defaults.PREF_SHOW_HINTS,
-    Settings.PREF_SHOW_POPUP_HINTS to Defaults.PREF_SHOW_POPUP_HINTS,
-)
+/** The one "show symbols" preference the switch stands for (2026-10-24; three until then: number row, letters, ellipsis). */
+val symbolHintPrefs = listOf(Settings.PREF_SHOW_HINTS to Defaults.PREF_SHOW_HINTS)
 
 /** The symbols are drawn when a keyboard is built, and built keyboards are cached. */
 fun reloadSymbolHints() {
@@ -40,8 +36,8 @@ fun reloadSymbolHints() {
 }
 
 /**
- * "Hide symbols on keys": a plain switch, on when all three are hidden (the per-area rows on Others can hide some: then
- * it's off, and turning it on hides them all). Off shows them all.
+ * "Hide symbols on keys" (Layout & Typing since 2026-10-24, Appearance before): a plain switch, on when the symbols on
+ * the letters and the number row are hidden; off shows them.
  */
 @Composable
 fun HideAllSymbolsPreference(setting: Setting) {

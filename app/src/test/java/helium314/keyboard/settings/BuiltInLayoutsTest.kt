@@ -75,9 +75,12 @@ class BuiltInLayoutsTest {
         assertEquals(true, classic[Settings.PREF_SHOW_NUMBER_ROW])
         assertEquals(Defaults.CURMUDGEON_SYMBOL_POPUP_MAP, classic[Settings.PREF_SYMBOL_POPUP_MAP])
         assertEquals("main", classic["morePopups"])
-        // the hints as the default has them: shown
+        // the hints as the default has them: shown; the roomy strip (Dense: the default, 5, packed)
         assertNull(classic[Settings.PREF_SHOW_HINTS])
+        assertEquals(10, classic[Settings.PREF_SUGGESTION_WORD_PADDING])
         val dense = named(R.string.layout_preset_dense).values
+        assertNull(dense[Settings.PREF_SUGGESTION_WORD_PADDING])
+        assertEquals(5, Defaults.PREF_SUGGESTION_WORD_PADDING)
         assertNull(dense[Settings.PREF_KEY_LONGPRESS_TIMEOUT]) // the defaults
         assertNull(dense[Settings.PREF_SYMBOL_POPUP_MAP])
     }

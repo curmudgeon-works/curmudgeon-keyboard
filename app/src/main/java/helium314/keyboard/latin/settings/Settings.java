@@ -197,12 +197,12 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_SHOW_NUMBER_ROW = "show_number_row";
     public static final String PREF_SHOW_NUMBER_ROW_IN_SYMBOLS = "show_number_row_in_symbols";
     public static final String PREF_LOCALIZED_NUMBER_ROW = "localized_number_row";
-    public static final String PREF_SHOW_NUMBER_ROW_HINTS = "show_number_row_hints";
+    public static final String PREF_SHOW_NUMBER_ROW_HINTS = "show_number_row_hints"; // (old: folded into PREF_SHOW_HINTS 2026-10-24, removed by the upgrade)
 
     public static final String PREF_SHOW_HINTS = "show_hints";
     public static final String PREF_POPUP_KEYS_ORDER = "popup_keys_order";
     public static final String PREF_POPUP_KEYS_LABELS_ORDER = "popup_keys_labels_order";
-    public static final String PREF_SHOW_POPUP_HINTS = "show_popup_hints";
+    public static final String PREF_SHOW_POPUP_HINTS = "show_popup_hints"; // (old: never shown, removed by the upgrade 2026-10-24)
     public static final String PREF_MORE_POPUP_KEYS = "more_popup_keys";
     public static final String PREF_SHOW_TLD_POPUP_KEYS = "show_tld_popup_keys";
     public static final String PREF_SYMBOL_POPUP_MAP = "symbol_popup_map";

@@ -23,9 +23,9 @@ import org.json.JSONObject
 /**
  * A "look" (theme) is the keyboard's styling saved under a name: colors, background pictures, key borders and gaps,
  * key and icon style, icons, fonts. Saved looks are one JSON list in the preferences, shared by all keyboards; a
- * look's background pictures are copies in their own folder (see [PICTURES]); also the symbols on the keys (the
- * hide-symbols switches) and the space bar text (since 2026-10-02: a theme saved before keeps the current ones), and the
- * emoji settings. A theme sets all of the Theme and Emoji groups: what it doesn't name goes back to its default
+ * look's background pictures are copies in their own folder (see [PICTURES]); also the space bar text (since 2026-10-02:
+ * a theme saved before keeps the current ones), and the emoji settings. Not since 2026-10-24: the symbols on the keys
+ * and the spacing between suggestions, which are the Layout's (a theme saved before holds them; [apply] skips them). A theme sets all of the Theme and Emoji groups: what it doesn't name goes back to its default
  * (2026-10-06: the built-in themes named a few settings and left the rest as they were).
  */
 object AppearanceLooks {
@@ -45,11 +45,11 @@ object AppearanceLooks {
         Settings.PREF_BACKGROUND_WHOLE_PICTURE,
         Settings.PREF_FONT_SCALE,
         Settings.PREF_SUGGESTION_TEXT_SIZE, Settings.PREF_SUGGESTION_BOLD, Settings.PREF_SUGGESTION_ITALIC,
-        Settings.PREF_SUGGESTION_UNDERLINE, Settings.PREF_SUGGESTION_WORD_PADDING,
+        Settings.PREF_SUGGESTION_UNDERLINE,
         Settings.PREF_KEY_HORIZONTAL_GAP, Settings.PREF_KEY_VERTICAL_GAP,
         Settings.PREF_KEY_TEXT_BOLD, Settings.PREF_KEY_TEXT_ITALIC, Settings.PREF_KEY_TEXT_UNDERLINE, Settings.PREF_HINT_FONT_SCALE,
         Settings.PREF_KEY_FONT, Settings.PREF_HINT_FONT, Settings.PREF_SUGGESTION_FONT, Settings.PREF_FONT_FOLLOWS_KEY_TEXT, Settings.PREF_HINT_TEXT_BOLD, Settings.PREF_HINT_TEXT_ITALIC, Settings.PREF_HINT_TEXT_UNDERLINE,
-        Settings.PREF_SPACE_BAR_TEXT, Settings.PREF_SHOW_NUMBER_ROW_HINTS, Settings.PREF_SHOW_HINTS, Settings.PREF_SHOW_POPUP_HINTS,
+        Settings.PREF_SPACE_BAR_TEXT,
         Settings.PREF_SUGGESTION_TEXT_COLOR, Settings.PREF_GESTURE_TRAIL_COLOR,
         // the emoji look (since 2026-10-03; a theme saved before leaves them as they are): not the emoji version, which
         // is about what the phone's font can draw
@@ -368,14 +368,13 @@ object AppearanceLooks {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) R.string.theme_preset_dynamic else R.string.theme_preset_curmudgeon)
 
     /** [defaultName]'s theme among [builtIn] as a keyboard that never chose one has it (what "tweaked" compares with):
-     *  older than Android 12, Curmudgeon with the default colors (Dynamic, drawn in Curmudgeon's) and the default
-     *  suggestion spacing (only its colors are the fallback), so the defaults themselves aren't a change. */
+     *  older than Android 12, Curmudgeon with the default colors (Dynamic, drawn in Curmudgeon's; only its colors are
+     *  the fallback), so the defaults themselves aren't a change. */
     fun defaultLook(ctx: Context, builtIn: List<Look>): Look? {
         val look = builtIn.firstOrNull { it.name == defaultName(ctx) } ?: return null
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) return look
         return Look(look.name, look.values + mapOf(Settings.PREF_THEME_COLORS to Defaults.PREF_THEME_COLORS,
-            Settings.PREF_THEME_COLORS_NIGHT to Defaults.PREF_THEME_COLORS_NIGHT, Settings.PREF_THEME_DAY_NIGHT to Defaults.PREF_THEME_DAY_NIGHT,
-            Settings.PREF_SUGGESTION_WORD_PADDING to Defaults.PREF_SUGGESTION_WORD_PADDING),
+            Settings.PREF_THEME_COLORS_NIGHT to Defaults.PREF_THEME_COLORS_NIGHT, Settings.PREF_THEME_DAY_NIGHT to Defaults.PREF_THEME_DAY_NIGHT),
             look.remembered)
     }
 
@@ -390,12 +389,12 @@ object AppearanceLooks {
                 Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_DYNAMIC, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_DYNAMIC,
                 Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to true)))
         else null,
-        // Curmudgeon's own: black, the orange swipe trail and suggestions, the suggestions close together (2026-10-06)
+        // Curmudgeon's own: black, the orange swipe trail and suggestions (2026-10-06; the suggestions' spacing was its
+        // too until 2026-10-24: the Layout's now, the default is its 5)
         Look(ctx.getString(R.string.theme_preset_curmudgeon), complete(mapOf(PICTURES to NO_PICTURES,
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
             Settings.PREF_THEME_COLORS to KeyboardTheme.THEME_CURMUDGEON, Settings.PREF_THEME_COLORS_NIGHT to KeyboardTheme.THEME_CURMUDGEON,
-            Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to false,
-            Settings.PREF_SUGGESTION_WORD_PADDING to 5))),
+            Settings.PREF_THEME_KEY_BORDERS to true, Settings.PREF_THEME_DAY_NIGHT to false))),
         Look(ctx.getString(R.string.theme_preset_midnight), complete(mapOf(PICTURES to NO_PICTURES,
             Settings.PREF_THEME_STYLE to KeyboardTheme.STYLE_MATERIAL, Settings.PREF_ICON_STYLE to KeyboardTheme.STYLE_MATERIAL,
             // one color set, always (the light / dark switch off)

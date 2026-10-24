@@ -105,7 +105,6 @@ import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.keyboard.KeyboardTheme
 import helium314.keyboard.keyboard.internal.KeyboardIconsSet
 import helium314.keyboard.latin.R
-import helium314.keyboard.settings.preferences.symbolHintPrefs
 import helium314.keyboard.settings.preferences.HideAllSymbolsPreference
 import helium314.keyboard.keyboard.KeyboardTypeface
 import helium314.keyboard.keyboard.FontLibrary
@@ -265,13 +264,11 @@ internal fun appearanceItems(ctx: Context, prefs: android.content.SharedPreferen
         if (dayNightMode) Settings.PREF_THEME_COLORS_NIGHT else null,
         // the keyboard's accent over the theme's: trail, suggestions, enter key (advanced, under the colors; 2026-10-07)
         Settings.PREF_GESTURE_TRAIL_COLOR,
-        Settings.PREF_SUGGESTION_WORD_PADDING, // spacing between suggestions (advanced; saved with a theme)
+        // (the spacing between suggestions and "Hide symbols on keys": Layout & Typing's since 2026-10-24)
         SettingsWithoutKey.FONTS, // keys, symbols, suggestions: one dialog
         Settings.PREF_THEME_STYLE,
         Settings.PREF_ICON_STYLE,
         Settings.PREF_CUSTOM_ICON_NAMES,
-        // (part of themes too since 2026-10-02; the per-area symbol rows are on Others)
-        SettingsWithoutKey.HIDE_ALL_SYMBOLS,
         Settings.PREF_THEME_KEY_BORDERS,
         Settings.PREF_KEY_HORIZONTAL_GAP,
         Settings.PREF_KEY_VERTICAL_GAP,
@@ -300,7 +297,6 @@ internal fun appearanceItems(ctx: Context, prefs: android.content.SharedPreferen
 internal val appearanceSimpleModeKeys = setOf(
     SettingsWithoutKey.DIVIDER, SettingsWithoutKey.APPEARANCE_LOOKS, Settings.PREF_THEME_STYLE, Settings.PREF_THEME_COLORS, Settings.PREF_THEME_KEY_BORDERS, Settings.PREF_THEME_DAY_NIGHT,
     Settings.PREF_THEME_COLORS_NIGHT, SettingsWithoutKey.FONTS,
-    SettingsWithoutKey.HIDE_ALL_SYMBOLS,
     // the emoji size (with its fit) and skin tone (the emoji font from a file: advanced)
     Settings.PREF_EMOJI_FONT_SCALE, Settings.PREF_EMOJI_KEY_FIT, Settings.PREF_EMOJI_SKIN_TONE,
 )
@@ -924,7 +920,6 @@ private fun tileChanged(tile: String, keys: Set<String>, files: Set<String>): Bo
     fun prefix(vararg p: String) = keys.any { key -> p.any { key.startsWith(it) } }
     return when (tile) {
         SettingsWithoutKey.APPEARANCE_LOOKS -> false
-        SettingsWithoutKey.HIDE_ALL_SYMBOLS -> symbolHintPrefs.any { it.first in keys }
         SettingsWithoutKey.FONTS -> any(Settings.PREF_SUGGESTION_TEXT_COLOR, Settings.PREF_KEY_FONT, Settings.PREF_FONT_SCALE, Settings.PREF_KEY_TEXT_BOLD,
             Settings.PREF_KEY_TEXT_ITALIC, Settings.PREF_KEY_TEXT_UNDERLINE,
             Settings.PREF_HINT_FONT, Settings.PREF_HINT_FONT_SCALE, Settings.PREF_HINT_TEXT_BOLD, Settings.PREF_HINT_TEXT_ITALIC,

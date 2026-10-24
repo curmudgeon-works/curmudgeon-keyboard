@@ -36,10 +36,12 @@ class BuiltInThemesTest {
         assertEquals(null, dynamic.values[Settings.PREF_KEY_HORIZONTAL_GAP]) // the default gaps
     }
 
-    @Test fun `the Curmudgeon theme is black with the orange trail and suggestions, close together`() {
+    @Test fun `the Curmudgeon theme is black with the orange trail and suggestions`() {
         val curmudgeon = AppearanceLooks.builtIn(ctx).single { it.name == ctx.getString(R.string.theme_preset_curmudgeon) }
         assertEquals(KeyboardTheme.THEME_CURMUDGEON, curmudgeon.values[Settings.PREF_THEME_COLORS])
-        assertEquals(5, curmudgeon.values[Settings.PREF_SUGGESTION_WORD_PADDING])
+        // (the suggestions' spacing was its too, 5, until 2026-10-24: the Layout's now, not a theme key at all)
+        assertEquals(null, curmudgeon.values[Settings.PREF_SUGGESTION_WORD_PADDING])
+        assertEquals(false, AppearanceLooks.inScope(Settings.PREF_SUGGESTION_WORD_PADDING))
         assertEquals(null, curmudgeon.values[Settings.PREF_SUGGESTION_TEXT_COLOR]) // the suggestions follow the trail
         val prefs = ctx.getSharedPreferences("curmudgeon_colors_test", Context.MODE_PRIVATE)
         val colors = KeyboardTheme.getThemeColors(KeyboardTheme.THEME_CURMUDGEON, KeyboardTheme.STYLE_MATERIAL, ctx, prefs, false)

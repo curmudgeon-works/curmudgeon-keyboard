@@ -83,6 +83,7 @@ object LayoutPresets {
                 // the number row and the Curmudgeon symbol map (the pins' "" is HeliBoard's none), HeliBoard's main popups
                 Settings.PREF_SHOW_NUMBER_ROW to true, Settings.PREF_SYMBOL_POPUP_MAP to Defaults.CURMUDGEON_SYMBOL_POPUP_MAP,
                 MORE_POPUPS to "main",
+                Settings.PREF_SUGGESTION_WORD_PADDING to 10, // the roomy strip (the default before 2026-10-24; Dense packs it, 5)
                 // (HeliBoard has no undo history length: the Curmudgeon one before 2026-10-06; no emoji key, as upstream)
                 Settings.PREF_UNDO_HISTORY_LENGTH to 20, Settings.PREF_SHOW_EMOJI_KEY to false)), builtIn = true),
         )

@@ -70,6 +70,7 @@ fun checkVersionUpgrade(context: Context, restoring: Boolean = false) {
     pickedOnlyUpgrade(context.realPrefs(), freshInstall = oldVersion == 0)
     heliBoardLayoutPins(context, context.realPrefs(), freshInstall = oldVersion == 0)
     builtInLayoutRenames(context, context.realPrefs()) // (after it: it still knows the HeliBoard names)
+    layoutScopeMoves(context.realPrefs())
     ownSetUpgrades(context.realPrefs(), freshInstall = oldVersion == 0)
     keepUserPopupSetsSymbolMap(context.realPrefs())
     // (last: after the steps above changed saved items) saved items remember what their unpicked settings show today
@@ -228,6 +229,32 @@ internal fun builtInLayoutRenames(context: Context, real: SharedPreferences) {
         LayoutPresets.save(real, presets.map { p -> LayoutPresets.Preset(p.name, p.values.mapValues { (k, v) ->
             if (k in keys && v is String) builtInLayoutRenamed(context, v) ?: v else v }, p.builtIn, p.remembered) })
 }
+
+/** The two "show symbols" keys folded into PREF_SHOW_HINTS on 2026-10-24 (the number row's, the ellipsis's). */
+internal val oldHintKeys = setOf(Settings.PREF_SHOW_NUMBER_ROW_HINTS, Settings.PREF_SHOW_POPUP_HINTS)
+
+/** The keys that left the theme for the Layout on 2026-10-24, and the two that went: a saved theme drops them. */
+private val keysLeftThemes = oldHintKeys + setOf(Settings.PREF_SHOW_HINTS, Settings.PREF_SUGGESTION_WORD_PADDING)
+
+/**
+ * 2026-10-24: "Hide symbols on keys" is one stored value, PREF_SHOW_HINTS (hidden when it was hidden: the old switch
+ * wrote all three down together); the number row's and the ellipsis's own keys go from every set (plain, each keyboard's
+ * own, in use or not, their default marks too). The spacing between suggestions and the symbols are the Layout's now,
+ * not the theme's: saved themes drop them (keyboards keep their stored spacing). Checks its own state: cheap on every start.
+ */
+internal fun layoutScopeMoves(real: SharedPreferences) {
+    val stored = real.all.keys.filter { (KeyboardProfiles.splitOwnKey(it)?.second ?: it).removePrefix(KeyboardProfiles.TOMBSTONE) in oldHintKeys }
+    if (stored.isNotEmpty()) real.edit { stored.forEach { remove(it) } }
+    val looks = AppearanceLooks.load(real)
+    if (looks.any { look -> look.values.keys.any { it in keysLeftThemes } || look.remembered.keys.any { it in keysLeftThemes } })
+        AppearanceLooks.save(real, looks.map { AppearanceLooks.Look(it.name,
+            it.values.filterKeys { k -> k !in keysLeftThemes }, it.remembered.filterKeys { k -> k !in keysLeftThemes }) })
+}
+
+/** [values] (one keyboard's, plain keys, e.g. from a backup) without the two "show symbols" keys that went
+ *  ([layoutScopeMoves]), for a keyboard restored on its own; its PREF_SHOW_HINTS and spacing stay as stored. */
+internal fun withoutOldHintKeys(values: Map<String, Any?>): Map<String, Any?> =
+    if (values.keys.none { it in oldHintKeys }) values else values.filterKeys { it !in oldHintKeys }
 
 /** [values] (one keyboard's, plain keys, e.g. from a backup) with its built-in Layout choice and origin under today's
  *  names ([builtInLayoutRenamed]): what [builtInLayoutRenames] does on the device, for a keyboard restored on its own. */
