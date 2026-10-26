@@ -144,6 +144,8 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
                     var showWelcomeWizard by rememberSaveable { mutableStateOf(
                         !UncachedInputMethodManagerUtils.isThisImeEnabled(this, imm)
                     ) }
+                    // the settings opened from the setup's All settings tile: Back from their first screen returns there
+                    var setupBehindSettings by rememberSaveable { mutableStateOf(false) }
                     val selected by imeSelected.collectAsState()
                     // the screens' try-it field and preview keyboard follow it (TryItBar)
                     androidx.compose.runtime.CompositionLocalProvider(LocalImeSelected provides selected) {
@@ -171,11 +173,17 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
                                 .then(if (!selected && !showWelcomeWizard) androidx.compose.ui.Modifier.consumeWindowInsets(
                                     androidx.compose.foundation.layout.WindowInsets.statusBars) else androidx.compose.ui.Modifier),
                                 propagateMinConstraints = true) {
-                                SettingsNavHost(onClickBack = { this@SettingsActivity.finish() }, navController = navController)
+                                // Back out of the settings' first screen: the setup again when they were opened from
+                                // its All settings tile (owner 2026-10-25: "going back doesn't bring us back to the
+                                // setup -- I want this to happen"); otherwise the activity closes
+                                SettingsNavHost(onClickBack = {
+                                    if (setupBehindSettings) { setupBehindSettings = false; showWelcomeWizard = true }
+                                    else this@SettingsActivity.finish()
+                                }, navController = navController)
                             }
                         }
                         if (showWelcomeWizard) {
-                            WelcomeWizard(close = { showWelcomeWizard = false }, finish = this::finish)
+                            WelcomeWizard(close = { showWelcomeWizard = false; setupBehindSettings = true }, finish = this::finish)
                         } else if (crashReports.isNotEmpty()) {
                             ConfirmationDialog(
                                 cancelButtonText = "ignore",

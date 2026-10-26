@@ -232,6 +232,10 @@ private fun WelcomeWizardSteps(
                 val intent = Intent()
                 intent.action = Settings.ACTION_INPUT_METHOD_SETTINGS
                 intent.addCategory(Intent.CATEGORY_DEFAULT)
+                // Android's settings highlight the row named here (the blink an app link gets); our keyboard's row
+                // in its list (owner 2026-10-25: "highlight the curmudgeon rows after screen 1"). Other makers'
+                // settings may ignore it.
+                intent.putExtra(SETTINGS_HIGHLIGHT_EXTRA, android.content.ComponentName(ctx, helium314.keyboard.latin.LatinIME::class.java).flattenToString())
                 // (with a request code of our own, so the settings can be closed again: bringBack; the return is looked
                 // at on resume, above)
                 @Suppress("DEPRECATION")
@@ -278,6 +282,10 @@ private fun WelcomeWizardSteps(
         }
     }
 }
+
+/** The intent extra Android's settings read for the row to highlight (its preference key; a keyboard's row is keyed
+ *  by the keyboard's id). */
+internal const val SETTINGS_HIGHLIGHT_EXTRA = ":settings:fragment_args_key"
 
 /** The request code Android's keyboard settings are opened with from the setup. */
 private const val SETUP_ENABLE_REQUEST = 0x5e7
