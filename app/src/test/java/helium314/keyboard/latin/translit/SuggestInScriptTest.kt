@@ -124,6 +124,20 @@ class SuggestInScriptTest {
         assertEquals(listOf("मीटिंग"), table.lookup("meeting"))
     }
 
+    // the gold list of the dictionaries' translit/gold.tsv (owner 2026-10-25: "kya should give क्या and actually never
+    // give किया . nai should defo prioritize नहीं over नई / short forms should defo be included"). Fail before: the
+    // table's own answers (किया first, नई, ही, टीम)
+    @Test fun `the gold list - chat spellings answered as meant, kya never as किया`() {
+        assertEquals("क्या", table.lookup("kya").first())
+        assertFalse("किया" in table.lookup("kya"))
+        assertEquals(listOf("नहीं", "नई"), table.lookup("nai").take(2))
+        assertEquals("है", table.lookup("h").first())
+        assertEquals("तुम", table.lookup("tm").first())
+        assertEquals(listOf("हाँ", "हां"), table.lookup("han").take(2))
+        assertEquals("क्योंकि", table.lookup("kyuki").first())
+        assertEquals("कुछ", table.lookup("kch").first())
+    }
+
     @Test fun `at most three, capitals looked up in lowercase`() {
         assertEquals(3, table.lookup("hai").size) // the table has 23
         assertEquals(table.lookup("bohot"), table.lookup("Bohot"))
