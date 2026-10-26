@@ -2576,9 +2576,20 @@ public final class InputLogic {
                     word -> mDictionaryFacilitator.getMainDictionaryFrequency(word, locale));
             final SuggestedWordInfo typed = best == null ? typedWordInfo
                     : new TranslitWordInfo(typedWordString, best, SuggestedWords.MAX_SUGGESTIONS + 1, false, false);
-            doShowSuggestionsAndClearAutoCorrectionIndicator(new SuggestedWords(suggestions, null /* rawSuggestions */,
+            final SuggestedWords rebuilt = new SuggestedWords(suggestions, null /* rawSuggestions */,
                     typed, false /* typedWordValid */, false /* willAutoCorrect */, false /* isObsoleteSuggestions */,
-                    SuggestedWords.INPUT_STYLE_RECORRECTION, SuggestedWords.NOT_A_SEQUENCE_NUMBER));
+                    SuggestedWords.INPUT_STYLE_RECORRECTION, SuggestedWords.NOT_A_SEQUENCE_NUMBER);
+            doShowSuggestionsAndClearAutoCorrectionIndicator(rebuilt);
+            if (best != null) {
+                // from the fourth word on, the Latin strip of the spelling as typing it gives it (the dictionary's
+                // words for it), computed as a typed word's is, on the suggestions thread
+                final int[] latin = StringUtils.toCodePointArray(best);
+                final WordComposer spelled = new WordComposer();
+                spelled.setComposingWord(latin, mLatinIME.getCoordinatesForCurrentKeyboard(latin));
+                mInputLogicHandler.getSuggestedWords(() -> doShowSuggestionsAndClearAutoCorrectionIndicator(
+                        SuggestInScript.withLatinStrip(rebuilt, computeSuggestedWords(spelled,
+                                SuggestedWords.INPUT_STYLE_TYPING, SuggestedWords.NOT_A_SEQUENCE_NUMBER))));
+            }
             return best == null ? typedWordString : best;
         }
         if (suggestions.size() <= 1) {
@@ -3520,26 +3531,35 @@ public final class InputLogic {
             return;
         }
         final SettingsValues settingsValues = Settings.getValues();
-        mWordComposer.adviseCapitalizedModeBeforeFetchingSuggestions(
+        final SuggestedWords suggestedWords = computeSuggestedWords(mWordComposer, inputStyle, sequenceNumber);
+        callback.onGetSuggestedWords(suggestedWords.isEmpty() ? suggestedWords : withScript(suggestedWords, settingsValues));
+    }
+
+    /** The suggestions for [composer]'s word (the dictionaries' words for it, as typing it gives them), the keyboard
+     *  as it is; empty when there is no keyboard or they can't be had. Not on the main thread. */
+    private SuggestedWords computeSuggestedWords(final WordComposer composer, final int inputStyle, final int sequenceNumber) {
+        final Keyboard keyboard = KeyboardSwitcher.getInstance().getKeyboard();
+        if (keyboard == null) return SuggestedWords.getEmptyInstance();
+        final SettingsValues settingsValues = Settings.getValues();
+        composer.adviseCapitalizedModeBeforeFetchingSuggestions(
                 getActualCapsMode(settingsValues, KeyboardSwitcher.getInstance().getKeyboardShiftMode()));
         try {
-            final SuggestedWords suggestedWords = mSuggest.getSuggestedWords(mWordComposer,
+            return mSuggest.getSuggestedWords(composer,
                     getNgramContextFromNthPreviousWordForSuggestion(
                     settingsValues.mSpacingAndPunctuations,
                     // Get the word on which we should search the bigrams. If we are composing
                     // a word, it's whatever is *before* the half-committed word in the buffer,
                     // hence 2; if we aren't, we should just skip whitespace if any, so 1.
-                    mWordComposer.isComposingWord() ? 2 : 1),
+                    composer.isComposingWord() ? 2 : 1),
                     keyboard,
                     settingsValues.mSettingsValuesForSuggestion,
                     settingsValues.mAutoCorrectEnabled,
                     inputStyle, sequenceNumber);
-            callback.onGetSuggestedWords(withScript(suggestedWords, settingsValues));
         } catch (Exception e) {
             // better go without suggestions than have the keyboard crash
             Log.e(TAG, "Error fetching suggested words, using empty words instead", e);
-            callback.onGetSuggestedWords(SuggestedWords.getEmptyInstance());
             KeyboardSwitcher.getInstance().showToast("Error getting suggestions", true);
+            return SuggestedWords.getEmptyInstance();
         }
     }
 

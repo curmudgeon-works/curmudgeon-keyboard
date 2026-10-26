@@ -139,10 +139,12 @@ object SuggestInScript {
      * A word of the other script the cursor picked up again in a field that kept no suggestion span (Compose text
      * fields: Play Store's search, Reddit; owner 2026-10-25: "Let's go the reverse index apparch after all"): its strip
      * rebuilt from the reverse index. [spellings] are the Latin words the table lists it for ([TranslitTable.spellings]);
-     * they go into [restored] (the word alone so far) after it, as the span's words would be, the one the user most
-     * likely typed first: a learned word ([learnedCount] > 0), then the most frequent in the dictionary ([frequency]),
-     * then the one whose list ranks the word highest, then by spelling. Returns that first one, the Latin word the word
-     * stands for (what its commit learned); null when there are none ([restored] stays the word alone).
+     * the two the user most likely typed go into [restored] (the word alone so far) after it: a learned word
+     * ([learnedCount] > 0) first, then the most frequent in the dictionary ([frequency]), then the one whose list ranks
+     * the word highest, then by spelling. From the fourth word on the strip is the Latin strip of the first spelling
+     * ([withLatinStrip]; owner 2026-10-25: "this should be 4th+ word. So हां, haan, haa, and then onwards" the Latin
+     * word's strip). Returns the first spelling, the Latin word the word stands for (what its commit learned); null
+     * when there are none ([restored] stays the word alone).
      */
     @JvmStatic
     fun rebuilt(restored: MutableList<SuggestedWordInfo>, spellings: List<TranslitTable.Spelling>,
@@ -151,12 +153,30 @@ object SuggestInScript {
         class Keyed(val spelling: TranslitTable.Spelling, val learned: Boolean, val frequency: Int)
         val ordered = spellings.map { Keyed(it, learnedCount(it.latin) > 0, frequency(it.latin)) }
             .sortedWith(compareBy({ !it.learned }, { -it.frequency }, { it.spelling.rank }, { it.spelling.latin }))
-        ordered.forEachIndexed { i, keyed ->
+        ordered.take(REBUILT_SPELLINGS).forEachIndexed { i, keyed ->
             restored.add(SuggestedWordInfo(keyed.spelling.latin, "", SuggestedWords.MAX_SUGGESTIONS - 1 - i,
                 SuggestedWordInfo.KIND_RESUMED, Dictionary.DICTIONARY_RESUMED, SuggestedWordInfo.NOT_AN_INDEX,
                 SuggestedWordInfo.NOT_A_CONFIDENCE))
         }
         return ordered[0].spelling.latin
+    }
+
+    /** How many of a word's spellings [rebuilt] puts in the strip (the Latin strip of the first follows). */
+    const val REBUILT_SPELLINGS = 2
+
+    /** The strip [rebuilt] made, with the words of [latin] (the Latin strip of its first spelling, as typing it gives
+     *  it: the dictionary's words for it) after them, those it has already left out. */
+    @JvmStatic
+    fun withLatinStrip(rebuilt: SuggestedWords, latin: SuggestedWords): SuggestedWords {
+        val infos = ArrayList<SuggestedWordInfo>(rebuilt.size() + latin.size())
+        for (i in 0 until rebuilt.size()) infos.add(rebuilt.getInfo(i))
+        val have = infos.mapTo(HashSet()) { it.mWord }
+        for (i in 0 until latin.size()) {
+            val info = latin.getInfo(i)
+            if (have.add(info.mWord)) infos.add(info)
+        }
+        return SuggestedWords(infos, latin.mRawSuggestions, rebuilt.mTypedWordInfo, rebuilt.mTypedWordValid, false,
+            false, rebuilt.mInputStyle, rebuilt.mSequenceNumber)
     }
 
     /** [info] drawn on the tint (the Latin word one tap away under ALL). */

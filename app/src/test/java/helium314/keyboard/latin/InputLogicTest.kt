@@ -1889,8 +1889,10 @@ class InputLogicTest {
         dropSpans = true
         setCursorPosition(1)
         val back = inputLogic.mSuggestedWords.words()
-        assertEquals(listOf(d, "haan", "haa"), back.take(3), "$back")
-        assertTrue("han" in back && "ham" in back && "haam" in back, "$back")
+        // two spellings, then the Latin strip of haan (owner: "हां, haan, haa, and then onwards" the Latin word's
+        // strip): that part comes from the suggestions thread, which the rig never runs, so nothing after the three
+        // here (SuggestInScriptTest covers the merge)
+        assertEquals(listOf(d, "haan", "haa"), back, "$back")
     }
 
     // the word picked up again counts as the Latin word it was learned as: another word for it takes that word's use

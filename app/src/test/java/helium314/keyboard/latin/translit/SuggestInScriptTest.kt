@@ -86,16 +86,33 @@ class SuggestInScriptTest {
         val frequency = mapOf("haan" to 100, "haa" to 5)
         val best = SuggestInScript.rebuilt(restored, reverse.spellings("हां"), { learned[it] ?: -1 }, { frequency[it] ?: -1 })
         assertEquals("ham", best)
-        assertEquals(listOf("हां", "ham", "haan", "haa", "haam", "han"), restored.map { it.mWord })
+        // two spellings only (owner 2026-10-25: "this should be 4th+ word. So हां, haan, haa, and then onwards" the Latin strip)
+        assertEquals(listOf("हां", "ham", "haan"), restored.map { it.mWord })
         assertTrue(restored.drop(1).all { it.isKindOf(SuggestedWordInfo.KIND_RESUMED) })
         // nothing learned, nothing in the dictionary: the table's rank, then the spelling
         val plain = mutableListOf(typed("हां"))
         assertEquals("haa", SuggestInScript.rebuilt(plain, reverse.spellings("हां"), { -1 }, { -1 }))
-        assertEquals(listOf("हां", "haa", "haan", "haam", "han", "ham"), plain.map { it.mWord })
+        assertEquals(listOf("हां", "haa", "haan"), plain.map { it.mWord })
         // no spellings: nothing added, no Latin word
         val none = mutableListOf(typed("ज़्ज़्ज़"))
         assertNull(SuggestInScript.rebuilt(none, emptyList(), { -1 }, { -1 }))
         assertEquals(1, none.size)
+    }
+
+    @Test fun `the strip rebuilt from the index - from the fourth word on, the Latin strip of the first spelling`() {
+        val restored = mutableListOf(typed("हां"))
+        val frequency = mapOf("haan" to 100, "haa" to 5)
+        SuggestInScript.rebuilt(restored, reverse.spellings("हां"), { -1 }, { frequency[it] ?: -1 })
+        val rebuilt = SuggestedWords(ArrayList(restored), null, restored[0], false, false, false, SuggestedWords.INPUT_STYLE_RECORRECTION, 0)
+        // typing haan: haan, then the dictionary's words for it (haa and Haan among them: already there, or new)
+        val latin = typing(typed("haan"), suggestion("jaan"), suggestion("haa"), suggestion("vaan"), suggestion("Haan"), suggestion("naam"))
+        val strip = SuggestInScript.withLatinStrip(rebuilt, latin)
+        assertEquals(listOf("हां", "haan", "haa", "jaan", "vaan", "Haan", "naam"), strip.words())
+        assertEquals("हां", strip.mTypedWordInfo?.mWord)
+        assertEquals(SuggestedWords.INPUT_STYLE_RECORRECTION, strip.mInputStyle)
+        assertFalse(strip.mWillAutoCorrect)
+        // nothing from the dictionary: the strip as it was
+        assertEquals(listOf("हां", "haan", "haa"), SuggestInScript.withLatinStrip(rebuilt, SuggestedWords.getEmptyInstance()).words())
     }
 
     // ---- the table ----
