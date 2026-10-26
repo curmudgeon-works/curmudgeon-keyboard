@@ -5,8 +5,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.os.Looper
 import android.provider.Settings
-import android.view.inputmethod.InputMethodInfo
-import android.view.inputmethod.InputMethodManager
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -23,25 +21,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
-import org.robolectric.annotation.Implementation
-import org.robolectric.annotation.Implements
-import org.robolectric.shadows.ShadowInputMethodManager
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
-
-/** The keyboard as Android sees it in these tests: installed, and enabled when [enabled]. */
-@Implements(InputMethodManager::class)
-class ShadowSetupInputMethodManager : ShadowInputMethodManager() {
-    private fun ours(): InputMethodInfo {
-        val ctx: Context = ApplicationProvider.getApplicationContext()
-        return InputMethodInfo(ctx.packageName, LatinIME::class.java.name, "Curmudgeon Keyboard", null)
-    }
-    @Implementation override fun getInputMethodList() = listOf(ours())
-    @Implementation override fun getEnabledInputMethodList() = if (enabled) listOf(ours()) else emptyList()
-    @Implementation fun getShortcutInputMethodsAndSubtypes() = emptyMap<InputMethodInfo, List<android.view.inputmethod.InputMethodSubtype>>()
-    companion object { var enabled = false }
-}
 
 /**
  * Owner 2026-10-25: "(1) can you sort of highlight the curmudgeon rows after screen 1 and screen 2, you know how android
@@ -52,7 +34,7 @@ class ShadowSetupInputMethodManager : ShadowInputMethodManager() {
  * activity. Fail before: (1) no row named; (2) the activity finishing.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(qualifiers = "w400dp-h800dp", shadows = [ShadowSetupInputMethodManager::class])
+@Config(qualifiers = "w400dp-h800dp")
 class WelcomeWizardSetupTest {
     @get:Rule val compose = createEmptyComposeRule()
     private val ctx: Context = ApplicationProvider.getApplicationContext()
@@ -61,7 +43,7 @@ class WelcomeWizardSetupTest {
 
     @Before fun setUp() {
         helium314.keyboard.reviveComposeMainDispatcher()
-        ShadowSetupInputMethodManager.enabled = false
+        helium314.keyboard.ShadowInputMethodManager2.ownKeyboardEnabled = false
         Settings.Secure.putString(ctx.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD, "")
     }
     @After fun tearDown() {
@@ -96,7 +78,7 @@ class WelcomeWizardSetupTest {
         // on to 3 when the screen comes back (its resume look)
         val s = launch()
         compose.onNodeWithText(text(R.string.setup_welcome_title, appName)).assertExists()
-        ShadowSetupInputMethodManager.enabled = true
+        helium314.keyboard.ShadowInputMethodManager2.ownKeyboardEnabled = true
         Settings.Secure.putString(ctx.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD, ourId)
         s.moveToState(androidx.lifecycle.Lifecycle.State.STARTED)
         s.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)

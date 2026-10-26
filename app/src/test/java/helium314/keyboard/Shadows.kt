@@ -27,13 +27,27 @@ object ShadowLocaleManagerCompat {
 @Implements(InputMethodManager::class)
 class ShadowInputMethodManager2 : ShadowInputMethodManager() {
     @Implementation
-    override fun getInputMethodList() = listOf(
+    override fun getInputMethodList() = listOfNotNull(
         if (BuildConfig.BUILD_TYPE == "debug" || BuildConfig.BUILD_TYPE == "debugNoMinify")
             InputMethodInfo("helium314.keyboard.debug", "LatinIME", "HeliBoard debug", null)
         else InputMethodInfo("helium314.keyboard", "LatinIME", "HeliBoard", null),
+        ownKeyboard(),
     )
+    // our keyboard enabled in Android, as a test says (the setup's steps): the one shadow for every test, as
+    // robolectric.properties asks (a class with a shadow of its own trips on the leftovers of the class before)
+    @Implementation
+    override fun getEnabledInputMethodList() = listOfNotNull(ownKeyboard())
     @Implementation
     fun getShortcutInputMethodsAndSubtypes() = emptyMap<InputMethodInfo, List<InputMethodSubtype>>()
+    private fun ownKeyboard(): InputMethodInfo? {
+        if (!ownKeyboardEnabled) return null
+        val ctx: Context = androidx.test.core.app.ApplicationProvider.getApplicationContext()
+        return InputMethodInfo(ctx.packageName, helium314.keyboard.latin.LatinIME::class.java.name, "Curmudgeon Keyboard", null)
+    }
+    companion object {
+        /** Whether Android lists our keyboard as installed and enabled (false: not even installed, the setup's screen 1). */
+        var ownKeyboardEnabled = false
+    }
 }
 
 @Implements(BinaryDictionaryUtils::class)
