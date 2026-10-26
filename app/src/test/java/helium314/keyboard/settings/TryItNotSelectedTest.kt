@@ -106,8 +106,12 @@ class TryItNotSelectedTest {
         compose.onNodeWithText("ABC").assertExists()
         compose.runOnIdle { state.show(TryItMode.NUMBER) }
         compose.waitForIdle()
+        shadowOf(Looper.getMainLooper()).idle()
         assertEquals(TryItMode.NUMBER, state.mode)
-        compose.onNode(isFocused() and hasSetTextAction()).assertExists()
+        // (the field is a classic EditText since 2026-10-24, outside the Compose tree: its own focus says it)
+        var focusedEdit: android.widget.EditText? = null
+        scenario!!.onActivity { focusedEdit = it.window.decorView.findFocus() as? android.widget.EditText }
+        assertTrue(focusedEdit != null, "the try-it EditText has the focus")
         assertTrue(pickerOpened == 1)
     }
 }

@@ -11,9 +11,21 @@ import kotlinx.coroutines.delay
 import androidx.compose.runtime.LaunchedEffect
 
 import android.content.Context
-import android.content.SharedPreferences
 import android.text.InputType
+import android.util.TypedValue
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
+import android.widget.EditText
+import androidx.compose.foundation.interaction.FocusInteraction
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.widget.doAfterTextChanged
+import android.content.SharedPreferences
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -107,8 +119,6 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -746,6 +756,7 @@ class TryItState {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TryItBar(keyboard: SettingsSubtype, state: TryItState, onFocus: (Boolean) -> Unit = {}, onUsed: () -> Unit = {}) {
     // the emoji tab: a text field whose keyboard is switched to the emoji panel once it is up; leaving the tab
@@ -785,23 +796,82 @@ fun TryItBar(keyboard: SettingsSubtype, state: TryItState, onFocus: (Boolean) ->
                     modifier = Modifier.fillMaxWidth().focusProperties { canFocus = false },
                 )
                 androidx.compose.foundation.layout.Box(Modifier.matchParentSize().clickable { showKeyboardPicker(ctx) })
-            } else OutlinedTextField(
-                value = tryText, onValueChange = { tryText = it; onUsed() }, // typing in it: the preview is in use
-                label = { Text(stringResource(R.string.key_popups_try), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = when (state.mode) {
-                    TryItMode.NUMBER -> KeyboardType.Number
-                    TryItMode.PHONE -> KeyboardType.Phone
-                    else -> KeyboardType.Text
-                }, imeAction = androidx.compose.ui.text.input.ImeAction.Done),
-                // Enter is part of trying the keyboard (e.g. "back to ABC after enter"): it must not close it, which a
-                // one-line field does by default
-                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { }),
-                modifier = Modifier
-                    .weight(1f)
-                    .focusRequester(state.focusRequester)
-                    .onFocusChanged { onFocus(it.isFocused); if (it.isFocused) showKeyboardForPreview(keyboard) }
-            )
+            } else {
+                // a classic EditText in the outlined field's dress, not a Compose text field: Compose's fields hand the
+                // keyboard plain text, without the suggestion span a pick leaves in the word, so the cursor back in हां
+                // (picked from haan) got a strip computed from हां on a Latin keyboard. The EditText keeps the span, as
+                // the text boxes of most apps do, and the field shows the keyboard as those apps see it (owner
+                // 2026-10-24: "let's do edittext?")
+                val currentOnFocus by rememberUpdatedState(onFocus)
+                val currentOnUsed by rememberUpdatedState(onUsed)
+                val interaction = remember { MutableInteractionSource() }
+                val colors = OutlinedTextFieldDefaults.colors()
+                val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
+                val textSize = MaterialTheme.typography.bodyLarge.fontSize.value
+                val inputType = when (state.mode) {
+                    TryItMode.NUMBER -> InputType.TYPE_CLASS_NUMBER
+                    TryItMode.PHONE -> InputType.TYPE_CLASS_PHONE
+                    else -> InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_AUTO_CORRECT
+                }
+                var editText by remember { mutableStateOf<EditText?>(null) }
+                androidx.compose.foundation.layout.Box(
+                    Modifier
+                        .weight(1f)
+                        .defaultMinSize(minHeight = OutlinedTextFieldDefaults.MinHeight)
+                        // a summon (TryItState.show) asks the Compose side for the focus; it goes on to the view
+                        .focusRequester(state.focusRequester)
+                        .onFocusChanged { if (it.isFocused) editText?.requestFocus() }
+                ) {
+                    OutlinedTextFieldDefaults.DecorationBox(
+                        value = tryText,
+                        innerTextField = {
+                            AndroidView(
+                                factory = { context ->
+                                    EditText(context).apply {
+                                        background = null
+                                        setPadding(0, 0, 0, 0)
+                                        setSingleLine(true)
+                                        imeOptions = EditorInfo.IME_ACTION_DONE
+                                        setTextColor(textColor)
+                                        setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize)
+                                        // Enter is part of trying the keyboard (e.g. "back to ABC after enter"): it must
+                                        // not close it, which a one-line field does by default
+                                        setOnEditorActionListener { _, _, _ -> true }
+                                        doAfterTextChanged { tryText = it?.toString() ?: ""; currentOnUsed() } // typing in it: the preview is in use
+                                        var focus: FocusInteraction.Focus? = null
+                                        setOnFocusChangeListener { view, hasFocus ->
+                                            currentOnFocus(hasFocus)
+                                            if (hasFocus) {
+                                                showKeyboardForPreview(keyboard)
+                                                // the label floats as it does over a focused Compose field
+                                                focus = FocusInteraction.Focus().also { interaction.tryEmit(it) }
+                                                // a view focused by code shows no keyboard by itself (a tapped one does)
+                                                (view.context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(view, 0)
+                                            } else focus?.let { interaction.tryEmit(FocusInteraction.Unfocus(it)); focus = null }
+                                        }
+                                        editText = this
+                                    }
+                                },
+                                update = { view ->
+                                    if (view.inputType != inputType) {
+                                        view.inputType = inputType
+                                        // the keyboard follows the new type at once (the number pad on 123)
+                                        (view.context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).restartInput(view)
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        },
+                        enabled = true,
+                        singleLine = true,
+                        visualTransformation = VisualTransformation.None,
+                        interactionSource = interaction,
+                        label = { Text(stringResource(R.string.key_popups_try), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        colors = colors,
+                        container = { OutlinedTextFieldDefaults.Container(enabled = true, isError = false, interactionSource = interaction, colors = colors) }
+                    )
+                }
+            }
             // which keyboard the preview shows: letters, the number pad, the phone pad, the emoji panel, the clipboard;
             // no check mark on the selected one (its background shows it), tight padding and at most 48 dp each, so five
             // fit and still leave the field room on a 411 dp phone (Material's 58 dp minimum squeezed it to a column);
