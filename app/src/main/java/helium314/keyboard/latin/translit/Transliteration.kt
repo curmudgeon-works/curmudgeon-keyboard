@@ -3,7 +3,9 @@ package helium314.keyboard.latin.translit
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.SystemClock
 import helium314.keyboard.latin.settings.Defaults
+import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.ScriptUtils
 import helium314.keyboard.latin.utils.ExecutorUtils
@@ -26,6 +28,7 @@ class TranslitChoice(val spec: TranslitSpec, val locale: Locale, val mode: Int)
  * table and a line to have another one).
  */
 object Transliteration {
+    private const val TAG = "Transliteration"
     /** Nothing in the other script. */
     const val OFF = 0
     /** The other script's word one tap away, on a tint; space types the Latin word. */
@@ -95,7 +98,9 @@ object Transliteration {
         val table = TranslitTable.load(context, spec.asset)
         if (table != null) {
             tables[spec.asset] = table
+            val started = SystemClock.elapsedRealtime()
             TranslitTable.loadReverse(context, spec.asset, table)?.let { reverses[spec.asset] = it }
+            Log.i(TAG, "reverse index of ${spec.asset} ready in ${SystemClock.elapsedRealtime() - started} ms")
         }
         loading.remove(spec.asset)
         return table
