@@ -827,7 +827,12 @@ fun TryItBar(keyboard: SettingsSubtype, state: TryItState, onFocus: (Boolean) ->
                         innerTextField = {
                             AndroidView(
                                 factory = { context ->
-                                    EditText(context).apply {
+                                    // (no spell checker on it: its red underline and popup on a Devanagari word
+                                    // got in the way of the keyboard's own strip; owner 2026-10-24: "ew, popup is
+                                    // really bad here. Can disable spell check on try it")
+                                    object : EditText(context) {
+                                        override fun isSuggestionsEnabled() = false
+                                    }.apply {
                                         background = null
                                         setPadding(0, 0, 0, 0)
                                         setSingleLine(true)

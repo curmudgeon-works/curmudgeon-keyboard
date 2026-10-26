@@ -74,6 +74,9 @@ class TryItKeepsSpansTest {
         var edit: EditText? = null
         scenario!!.onActivity { edit = it.window.decorView.findEditText() }
         val field = assertNotNull(edit, "no EditText in the try-it bar: a Compose field, which drops suggestion spans")
+        // no spell checker on it (owner 2026-10-24: "ew, popup is really bad here. Can disable spell check on try it"):
+        // its underline and popup got in the keyboard's way. Fail before: enabled, as on any EditText
+        assertTrue(!field.isSuggestionsEnabled, "the spell checker stays off the try-it field")
         compose.runOnIdle { state.show(TryItMode.TEXT) }
         compose.waitForIdle()
         shadowOf(Looper.getMainLooper()).idle()
