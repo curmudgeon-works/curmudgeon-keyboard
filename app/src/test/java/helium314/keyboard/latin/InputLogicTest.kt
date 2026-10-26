@@ -1858,6 +1858,25 @@ class InputLogicTest {
         assertEquals(listOf("बहुत", "bahut"), inputLogic.mSuggestedWords.words().take(2))
     }
 
+    // DIAGNOSTIC 2026-10-24 b: haan with the real table, three ways back into the word
+    private fun haanPicked(): String {
+        reset(); suggestInScript(Transliteration.SOME); chainInput("haan")
+        val strip = showScript(typingStrip("haan", "han", "Haan"))
+        val deva = strip.words().first { it.any { c -> c in '\u0900'..'\u097F' } }
+        latinIME.pickSuggestionManually(strip.getInfo(strip.words().indexOf(deva)))
+        assertEquals(deva, text); return deva
+    }
+    @Test fun `DIAG haan - cursor inside`() { val d = haanPicked(); setCursorPosition(1); assertEquals(listOf(d, "haan"), inputLogic.mSuggestedWords.words().take(2)) }
+    @Test fun `DIAG haan - cursor at the end after a space`() {
+        val d = haanPicked(); chainInput(" "); setCursorPosition(d.length)
+        assertEquals(listOf(d, "haan"), inputLogic.mSuggestedWords.words().take(2)) }
+    @Test fun `DIAG haan - backspace over the space`() {
+        val d = haanPicked(); chainInput(" "); functionalKeyPress(KeyCode.DELETE)
+        assertEquals(listOf(d, "haan"), inputLogic.mSuggestedWords.words().take(2)) }
+    @Test fun `DIAG haan - tap elsewhere then back at the end`() {
+        val d = haanPicked(); chainInput(" test"); setCursorPosition(0); setCursorPosition(d.length)
+        assertEquals(listOf(d, "haan"), inputLogic.mSuggestedWords.words().take(2)) }
+
     // the word picked up again counts as the Latin word it was learned as: another word for it takes that word's use
     // back, not the Devanagari's (never learned)
     @Test fun `a Devanagari word picked up again and changed takes back its Latin word's use`() {
