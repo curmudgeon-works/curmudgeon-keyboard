@@ -1877,6 +1877,22 @@ class InputLogicTest {
         val d = haanPicked(); chainInput(" test"); setCursorPosition(0); setCursorPosition(d.length)
         assertEquals(listOf(d, "haan"), inputLogic.mSuggestedWords.words().take(2)) }
 
+    // a field that keeps no suggestion span (Compose text fields; owner 2026-10-24: "Play store and reddit do still have
+    // the old behaviour of weird h1b i140 etc suggestions with haan"; 2026-10-25: "Let's go the reverse index apparch
+    // after all"): the Devanagari word's strip comes from the table's reverse index, the spelling the dictionary knows
+    // best first, and the word counts as that spelling. Fail before: the strip recomputed from हां on the Latin
+    // keyboard, nothing of haan in it
+    @Test fun `Some - a field that drops the span brings back the strip from the reverse index`() {
+        val d = haanPicked()
+        helium314.keyboard.latin.ShadowFacilitator2.mainFrequencies["haan"] = 100
+        helium314.keyboard.latin.ShadowFacilitator2.mainFrequencies["haa"] = 5
+        dropSpans = true
+        setCursorPosition(1)
+        val back = inputLogic.mSuggestedWords.words()
+        assertEquals(listOf(d, "haan", "haa"), back.take(3), "$back")
+        assertTrue("han" in back && "ham" in back && "haam" in back, "$back")
+    }
+
     // the word picked up again counts as the Latin word it was learned as: another word for it takes that word's use
     // back, not the Devanagari's (never learned)
     @Test fun `a Devanagari word picked up again and changed takes back its Latin word's use`() {
@@ -1947,6 +1963,8 @@ class InputLogicTest {
         helium314.keyboard.latin.ShadowFacilitator2.addedUses.clear()
         laggyEditor = false
         staleText = null
+        dropSpans = false
+        helium314.keyboard.latin.ShadowFacilitator2.mainFrequencies.clear()
 
         // reset settings, the keyboard lists kept: a keyboard no list names has its writes dropped (2026-10-12, U9)
         val real = helium314.keyboard.latin.utils.DeviceProtectedUtils.getRealSharedPreferences(latinIME)
@@ -2211,6 +2229,8 @@ private val composingText get() = if (composingStart == -1 || composingEnd == -1
 // the suggestion spans of the text committed (start, the word, the span), as an editor keeps them; one counts while its
 // word is still there at its start
 private val suggestionSpans = mutableListOf<Triple<Int, String, SuggestionSpan>>()
+// a field that hands the keyboard plain text, the spans dropped (Compose text fields: Play Store's search, Reddit)
+private var dropSpans = false
 
 private fun parcelled(span: SuggestionSpan): SuggestionSpan {
     val parcel = android.os.Parcel.obtain()
@@ -2223,7 +2243,7 @@ private fun parcelled(span: SuggestionSpan): SuggestionSpan {
 
 /** [piece] (the text from [offset] on) with the suggestion spans on it, when [flags] ask for styles. */
 private fun withSuggestionSpans(piece: String, offset: Int, flags: Int): CharSequence {
-    if (flags and InputConnection.GET_TEXT_WITH_STYLES == 0) return piece
+    if (dropSpans || flags and InputConnection.GET_TEXT_WITH_STYLES == 0) return piece
     val out = SpannableString(piece)
     for ((start, word, span) in suggestionSpans) {
         if (!text.startsWith(word, start)) continue
@@ -2480,7 +2500,11 @@ class ShadowFacilitator2 {
     fun unlearnOneUse(word: String) {
         unlearnedWords.add(word)
     }
+    // the main dictionary's frequencies, as a test sets them (no dictionary is loaded in the rig: -1 for everything else)
+    @Implementation
+    fun getMainDictionaryFrequency(word: String, locale: Locale): Int = mainFrequencies[word] ?: -1
     companion object {
+        val mainFrequencies = mutableMapOf<String, Int>()
         var lastAddedWord = ""
         var lastAddedExtraUses = 0
         val unlearnedWords = mutableListOf<String>()

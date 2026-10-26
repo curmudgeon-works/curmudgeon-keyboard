@@ -81,6 +81,7 @@ import helium314.keyboard.latin.utils.WebEndings;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
@@ -2561,6 +2562,25 @@ public final class InputLogic {
         GestureCorpusRecorder.INSTANCE.onWordResumed(typedWordString);
         mConnection.setComposingRegion(expectedCursorPosition - numberOfCharsInWordBeforeCursor,
                 expectedCursorPosition + range.getNumberOfCharsInWordAfterCursor());
+        if (suggestions.size() <= 1 && translitTable != null
+                && SuggestInScript.isWordOfScript(typedWordString, translitChoice.getSpec().getScript())) {
+            // Suggest in हिंदी: a word of the other script in a field that kept no suggestion span (Compose text fields
+            // drop them: Play Store's search, Reddit): its strip from the table's reverse index, the Latin word the
+            // user most likely typed first; never recomputed from its letters on a Latin keyboard (nonsense: D1, h1b).
+            // No index yet (being built) or nothing in it for the word: the word alone.
+            final TranslitTable reverse = Transliteration.INSTANCE.reverse(translitChoice.getSpec());
+            final List<TranslitTable.Spelling> spellings = reverse == null ? new ArrayList<>() : reverse.spellings(typedWordString);
+            final Locale locale = translitChoice.getLocale();
+            final String best = SuggestInScript.rebuilt(suggestions, spellings,
+                    word -> mDictionaryFacilitator.getLearnedCount(word),
+                    word -> mDictionaryFacilitator.getMainDictionaryFrequency(word, locale));
+            final SuggestedWordInfo typed = best == null ? typedWordInfo
+                    : new TranslitWordInfo(typedWordString, best, SuggestedWords.MAX_SUGGESTIONS + 1, false, false);
+            doShowSuggestionsAndClearAutoCorrectionIndicator(new SuggestedWords(suggestions, null /* rawSuggestions */,
+                    typed, false /* typedWordValid */, false /* willAutoCorrect */, false /* isObsoleteSuggestions */,
+                    SuggestedWords.INPUT_STYLE_RECORRECTION, SuggestedWords.NOT_A_SEQUENCE_NUMBER));
+            return best == null ? typedWordString : best;
+        }
         if (suggestions.size() <= 1) {
             // If there weren't any suggestion spans on this word, suggestions#size() will be 1
             // if shouldIncludeResumedWordInSuggestions is true, 0 otherwise. In this case, we

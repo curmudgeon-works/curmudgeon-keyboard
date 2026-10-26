@@ -4,6 +4,7 @@ package helium314.keyboard.latin.translit
 import helium314.keyboard.latin.SuggestedWords
 import helium314.keyboard.latin.SuggestedWords.SuggestedWordInfo
 import helium314.keyboard.latin.dictionary.Dictionary
+import helium314.keyboard.latin.utils.ScriptUtils
 
 /**
  * A word in the other script (Suggest in …), from the table, for the Latin word [source] it was looked up for. A commit
@@ -127,6 +128,35 @@ object SuggestInScript {
             else restored[i] = TranslitWordInfo(word, from, restored[i].mScore, tinted = false)
         }
         return source
+    }
+
+    /** Whether [word] is written in [script] throughout (every letter of it one of the script's). */
+    @JvmStatic
+    fun isWordOfScript(word: String, script: String): Boolean =
+        word.isNotEmpty() && word.codePoints().allMatch { ScriptUtils.isLetterPartOfScript(it, script) }
+
+    /**
+     * A word of the other script the cursor picked up again in a field that kept no suggestion span (Compose text
+     * fields: Play Store's search, Reddit; owner 2026-10-25: "Let's go the reverse index apparch after all"): its strip
+     * rebuilt from the reverse index. [spellings] are the Latin words the table lists it for ([TranslitTable.spellings]);
+     * they go into [restored] (the word alone so far) after it, as the span's words would be, the one the user most
+     * likely typed first: a learned word ([learnedCount] > 0), then the most frequent in the dictionary ([frequency]),
+     * then the one whose list ranks the word highest, then by spelling. Returns that first one, the Latin word the word
+     * stands for (what its commit learned); null when there are none ([restored] stays the word alone).
+     */
+    @JvmStatic
+    fun rebuilt(restored: MutableList<SuggestedWordInfo>, spellings: List<TranslitTable.Spelling>,
+                learnedCount: (String) -> Int, frequency: (String) -> Int): String? {
+        if (spellings.isEmpty()) return null
+        class Keyed(val spelling: TranslitTable.Spelling, val learned: Boolean, val frequency: Int)
+        val ordered = spellings.map { Keyed(it, learnedCount(it.latin) > 0, frequency(it.latin)) }
+            .sortedWith(compareBy({ !it.learned }, { -it.frequency }, { it.spelling.rank }, { it.spelling.latin }))
+        ordered.forEachIndexed { i, keyed ->
+            restored.add(SuggestedWordInfo(keyed.spelling.latin, "", SuggestedWords.MAX_SUGGESTIONS - 1 - i,
+                SuggestedWordInfo.KIND_RESUMED, Dictionary.DICTIONARY_RESUMED, SuggestedWordInfo.NOT_AN_INDEX,
+                SuggestedWordInfo.NOT_A_CONFIDENCE))
+        }
+        return ordered[0].spelling.latin
     }
 
     /** [info] drawn on the tint (the Latin word one tap away under ALL). */

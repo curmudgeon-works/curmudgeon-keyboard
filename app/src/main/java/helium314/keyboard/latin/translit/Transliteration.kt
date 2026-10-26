@@ -69,10 +69,16 @@ object Transliteration {
 
     // the tables read so far, by asset: read once, kept (mapped from a file, see TranslitTable.load)
     private val tables = ConcurrentHashMap<String, TranslitTable>()
+    // their reverse indexes (built on the device the first time, see TranslitTable.loadReverse), by asset
+    private val reverses = ConcurrentHashMap<String, TranslitTable>()
     private val loading = Collections.synchronizedSet(HashSet<String>())
 
     /** [spec]'s table if it is read; null while it is still being read ([prepare]). */
     fun table(spec: TranslitSpec): TranslitTable? = tables[spec.asset]
+
+    /** [spec]'s reverse index (a word of the other script → the Latin words it is listed for) if it is ready; null
+     *  while the table is still being read or the index built (right after the table, see [load]). */
+    fun reverse(spec: TranslitSpec): TranslitTable? = reverses[spec.asset]
 
     /** Starts reading [spec]'s table in the background, unless it is read or being read. Only called while a keyboard
      *  has the setting on: with it off, nothing is read. */
@@ -82,11 +88,15 @@ object Transliteration {
         ExecutorUtils.getBackgroundExecutor(ExecutorUtils.KEYBOARD).execute { load(app, spec) }
     }
 
-    /** [spec]'s table, read now if it isn't yet (slow: not on the main thread). */
+    /** [spec]'s table, read now if it isn't yet, and then its reverse index, built now if the device has none yet for
+     *  this table (slow: not on the main thread). The table serves as soon as it is read; the index a moment later. */
     fun load(context: Context, spec: TranslitSpec): TranslitTable? {
         tables[spec.asset]?.let { return it }
         val table = TranslitTable.load(context, spec.asset)
-        if (table != null) tables[spec.asset] = table
+        if (table != null) {
+            tables[spec.asset] = table
+            TranslitTable.loadReverse(context, spec.asset, table)?.let { reverses[spec.asset] = it }
+        }
         loading.remove(spec.asset)
         return table
     }

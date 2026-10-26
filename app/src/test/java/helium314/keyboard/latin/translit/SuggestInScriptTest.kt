@@ -36,6 +36,68 @@ class SuggestInScriptTest {
     private fun SuggestedWords.chips() = (0 until size()).filter { getInfo(it).isOtherScript }.map { getWord(it) }
     private val noOtherLanguage: (String) -> Boolean = { false }
 
+    // ---- the reverse index (owner 2026-10-25: "Let's go the reverse index apparch after all, with one-time build
+    // instead of shipping. Agree that the natural place/time is when you first load it from apk") ----
+
+    private val spec get() = Transliteration.specFor("hi-Latn")!!
+    private val reverse: TranslitTable by lazy { table; assertNotNull(Transliteration.reverse(spec), "the index built right after the table") }
+    private fun reverseFile() = java.io.File(ctx.noBackupFilesDir, "translit/hi-Latn.bin.rev")
+    private fun headerInts(file: java.io.File) = java.nio.ByteBuffer.wrap(file.readBytes().copyOf(8)).let { it.getInt(0) to it.getInt(4) }
+
+    @Test fun `the reverse index - a Devanagari word's Latin spellings, each with the word's rank in its list`() {
+        // the table: haan [हां, हैं, हाँ], haa [हां, …], han [हैं, हां, है], haam [हैं, हां, हम], ham [हम, हैं, हां]
+        val spellings = reverse.spellings("हां").associate { it.latin to it.rank }
+        assertEquals(mapOf("haa" to 0, "haan" to 0, "haam" to 1, "han" to 1, "ham" to 2), spellings)
+        assertEquals(listOf(0, 0, 1, 1, 2), reverse.spellings("हां").map { it.rank }) // rank order
+        for (s in reverse.spellings("बहुत")) assertEquals("बहुत", table.lookup(s.latin)[s.rank], s.latin)
+        assertEquals(14, reverse.spellings("बहुत").size)
+    }
+
+    @Test fun `the reverse index - nothing for a Latin word, a word it has none for, or a word of another script`() {
+        assertEquals(emptyList(), reverse.spellings("haan"))
+        assertEquals(emptyList(), reverse.spellings("ज़्ज़्ज़"))
+        assertEquals(emptyList(), reverse.spellings(""))
+        assertEquals(emptyList(), reverse.spellings("हां!"))
+        assertEquals(emptyList(), reverse.lookup("haan")) // the index answers no Latin lookups
+        assertEquals(emptyList(), table.spellings("हां")) // the table no reverse ones
+    }
+
+    @Test fun `the reverse index - a file beside the table's copy, built again when the table changes`() {
+        // (the table is read once per JVM: an earlier test class may have built the index under its own files)
+        assertNotNull(TranslitTable.loadReverse(ctx, spec.asset, table))
+        val file = reverseFile()
+        assertTrue(file.isFile && file.length() > 1_000_000, "the index file: ${file.length()} bytes")
+        assertEquals(0x48545231 to table.crc, headerInts(file)) // "HTR1" + the table's checksum
+        // the file of another table (the checksum differs): built afresh
+        val stale = file.readBytes().also { java.nio.ByteBuffer.wrap(it).putInt(4, table.crc + 1) }
+        file.writeBytes(stale)
+        val rebuilt = assertNotNull(TranslitTable.loadReverse(ctx, spec.asset, table))
+        assertEquals(0x48545231 to table.crc, headerInts(file))
+        assertEquals(reverse.spellings("हां").map { it.latin }, rebuilt.spellings("हां").map { it.latin })
+        // the file as it is: read as it is (not built again: its bytes stay)
+        val before = file.lastModified()
+        assertNotNull(TranslitTable.loadReverse(ctx, spec.asset, table))
+        assertEquals(before, file.lastModified())
+    }
+
+    @Test fun `the strip rebuilt from the index - a learned spelling first, then the dictionary's most frequent, then the table's rank`() {
+        val restored = mutableListOf(typed("हां"))
+        val learned = mapOf("ham" to 1)
+        val frequency = mapOf("haan" to 100, "haa" to 5)
+        val best = SuggestInScript.rebuilt(restored, reverse.spellings("हां"), { learned[it] ?: -1 }, { frequency[it] ?: -1 })
+        assertEquals("ham", best)
+        assertEquals(listOf("हां", "ham", "haan", "haa", "haam", "han"), restored.map { it.mWord })
+        assertTrue(restored.drop(1).all { it.isKindOf(SuggestedWordInfo.KIND_RESUMED) })
+        // nothing learned, nothing in the dictionary: the table's rank, then the spelling
+        val plain = mutableListOf(typed("हां"))
+        assertEquals("haa", SuggestInScript.rebuilt(plain, reverse.spellings("हां"), { -1 }, { -1 }))
+        assertEquals(listOf("हां", "haa", "haan", "haam", "han", "ham"), plain.map { it.mWord })
+        // no spellings: nothing added, no Latin word
+        val none = mutableListOf(typed("ज़्ज़्ज़"))
+        assertNull(SuggestInScript.rebuilt(none, emptyList(), { -1 }, { -1 }))
+        assertEquals(1, none.size)
+    }
+
     // ---- the table ----
 
     @Test fun `a word's Devanagari come best first, in the table's score order`() {
