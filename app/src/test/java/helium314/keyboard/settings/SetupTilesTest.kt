@@ -10,6 +10,8 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
@@ -122,6 +124,24 @@ class SetupTilesTest {
         compose.onNodeWithTag(setupLayoutWordTag(SetupLayout.Pick.DENSE)).performClick()
         idle()
         assertEquals(before, real.all.toMap(), "Dense again")
+    }
+
+    /** Fail before: the tiles were measured inside rows already fixed to the first tile's height, so the layout tile's
+     *  words sat below its edge (owner 2026-10-26: "hides away the words minimal/classic/dense"). */
+    @Test fun `every tile is as tall as the tallest - the layout tile's words stay inside it`() {
+        open()
+        scrollTo(tiles.indexOf(SetupTile.LAYOUT))
+        val tile = compose.onNodeWithTag(setupTileTag(SetupTile.LAYOUT)).getBoundsInRoot()
+        for (pick in SetupLayout.Pick.entries) {
+            val word = compose.onNodeWithTag(setupLayoutWordTag(pick)).getBoundsInRoot()
+            // (squeezed to no height at the tile's bottom edge before the fix)
+            assertTrue(word.bottom - word.top >= 16.dp, "$pick is ${word.bottom - word.top} tall")
+            assertTrue(word.bottom <= tile.bottom, "$pick ends at ${word.bottom}, the tile at ${tile.bottom}")
+            assertTrue(word.top >= tile.top, "$pick")
+        }
+        // every tile as tall as that one (a tile off the screen has no bounds: measured each on its own page)
+        val heights = tiles.map { scrollTo(tiles.indexOf(it)); compose.onNodeWithTag(setupTileTag(it)).getBoundsInRoot().let { b -> b.bottom - b.top } }
+        assertEquals(1, heights.toSet().size, "all tiles the same height: $heights")
     }
 
     @Test fun `the All settings tile does what the Configure row did`() {

@@ -13,10 +13,12 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
@@ -368,27 +370,34 @@ internal fun SetupTiles(background: androidx.compose.ui.graphics.Color, close: (
         val rowHeight = if (tileHeight > 0) Modifier.height(with(density) { tileHeight.toDp() }) else Modifier.height(IntrinsicSize.Min)
         Row(Modifier.fillMaxWidth().then(rowHeight)) {
             Chevron(left = true, shown = index > 0, chevronColor)
-            val tileModifier = Modifier.weight(1f).fillMaxHeight().testTag(setupTileTag(tile))
+            // The tile fills the row; what is measured for the tallest is its content with no height limit. Measured
+            // inside the row, a tile could never report more than the first tile's height, so the layout tile (taller
+            // than the theme tile) lost its Minimal · Classic · Dense row below the edge (owner 2026-10-26).
+            val tileModifier = Modifier.weight(1f).fillMaxHeight().background(color = background).testTag(setupTileTag(tile))
+            val content = Modifier.fillMaxWidth().wrapContentHeight(Alignment.Top, unbounded = true)
                 .onSizeChanged { if (it.height > tileHeight) tileHeight = it.height }
-            when (tile) {
-                SetupTile.THEME -> ThemePick(background, curmudgeon, tileModifier,
-                    pickDynamic = { SetupTheme.pickDynamic(ctx, themeBefore); curmudgeon = false },
-                    pickCurmudgeon = {
-                        // (only the first time: a keyboard that came with Curmudgeon has nothing to go back to, see pickDynamic)
-                        if (themeBefore == null && !SetupTheme.isCurmudgeon(ctx)) themeBefore = SetupTheme.before(ctx)
-                        SetupTheme.pickCurmudgeon(ctx)
-                        curmudgeon = true
-                    })
-                SetupTile.LAYOUT -> LayoutPick(background, colors, layoutPick, tileModifier) { pick ->
-                    if (pick == SetupLayout.Pick.DENSE) SetupLayout.pickDense(ctx, layoutBefore)
-                    else {
-                        // (only the first time: a keyboard not on Dense when the setup opened has nothing to go back to)
-                        if (layoutBefore == null && SetupLayout.current(ctx) == SetupLayout.Pick.DENSE) layoutBefore = SetupLayout.before(ctx)
-                        SetupLayout.pick(ctx, pick)
+            Box(tileModifier) {
+                when (tile) {
+                    SetupTile.THEME -> ThemePick(background, curmudgeon, content,
+                        pickDynamic = { SetupTheme.pickDynamic(ctx, themeBefore); curmudgeon = false },
+                        pickCurmudgeon = {
+                            // (only the first time: a keyboard that came with Curmudgeon has nothing to go back to, see pickDynamic)
+                            if (themeBefore == null && !SetupTheme.isCurmudgeon(ctx)) themeBefore = SetupTheme.before(ctx)
+                            SetupTheme.pickCurmudgeon(ctx)
+                            curmudgeon = true
+                        })
+                    SetupTile.LAYOUT -> LayoutPick(background, colors, layoutPick, content) { pick ->
+                        if (pick == SetupLayout.Pick.DENSE) SetupLayout.pickDense(ctx, layoutBefore)
+                        else {
+                            // (only the first time: a keyboard not on Dense when the setup opened has nothing to go back to)
+                            if (layoutBefore == null && SetupLayout.current(ctx) == SetupLayout.Pick.DENSE) layoutBefore = SetupLayout.before(ctx)
+                            SetupLayout.pick(ctx, pick)
+                        }
+                        layoutPick = pick
                     }
-                    layoutPick = pick
+                    // (centered in the tile, never the tallest)
+                    SetupTile.SETTINGS -> AllSettingsTile(background, close, Modifier.fillMaxSize())
                 }
-                SetupTile.SETTINGS -> AllSettingsTile(background, close, tileModifier)
             }
             Chevron(left = false, shown = index < tiles.size - 1, chevronColor)
         }
@@ -463,14 +472,15 @@ private fun LayoutPick(background: androidx.compose.ui.graphics.Color, colors: C
 /** The sample words on the preview's strip (nothing is typed yet). */
 internal val SETUP_SAMPLE_WORDS = listOf("wor", "WOR", "work", "works", "worked", "wo")
 
-/** The symbols HeliBoard's layout puts on the letters when the number row is shown (Classic's and Dense's hints; read
- *  off the keyboard on 2026-10-24), by letter. */
-private val numberRowSymbolHints: Map<Char, String> = "q` w\\ e| r= t[ y] u< i> o{ p} a€ s§ d$ f– g— h- j+ k« l» z× x\" c' v: b; n÷ m?"
+/** The symbols HeliBoard's layout puts on the number row's digits and on the letters when the number row is shown
+ *  (Classic's and Dense's hints; read off the keyboard on 2026-10-24, the digits' on 2026-10-26), by key label. */
+private val numberRowSymbolHints: Map<Char, String> = "1! 2@ 3# 4$ 5% 6^ 7& 8* 9( 0) q` w\\ e| r= t[ y] u< i> o{ p} a€ s§ d$ f– g— h- j+ k« l» z× x\" c' v: b; n÷ m?"
     .split(' ').associate { it[0] to it.substring(1) }
 
 /**
- * The keyboard as [pick] lays it out, small, in [colors]: a suggestion strip with [SETUP_SAMPLE_WORDS] spaced
- * [wordPadding] dp (at the preview's scale: the keyboard is drawn as wide as the device's screen, shrunk), the number
+ * The keyboard as [pick] lays it out, small, in [colors]: a suggestion strip with [SETUP_SAMPLE_WORDS] from the left
+ * edge to past the right one, spaced [wordPadding] dp with a divider between (at the preview's scale: the keyboard is
+ * drawn as wide as the device's screen, shrunk), the number
  * row (not Minimal), the letters with their symbols at the top right (not Minimal: Classic the Curmudgeon map's, Dense
  * accents), shift and backspace, the bottom row. A drawing, not the keyboard view itself (2026-10-24).
  */
@@ -493,15 +503,25 @@ private fun LayoutPreview(colors: Colors, pick: SetupLayout.Pick, wordPadding: I
         // the strip
         val stripHeight = size.height * 0.17f
         drawRect(strip, size = Size(size.width, stripHeight))
+        // As the keyboard's strip: a list from the left edge, each word at its own width with the spacing on both
+        // sides, a thin divider between words, running past the right edge (the real strip scrolls; owner
+        // 2026-10-26: "strip should be end to end for sure"). Words wrap around while the edge is not reached.
         val padPx = wordPadding.dp.toPx() * scale
         val wordStyle = TextStyle(color = wordColor, fontSize = (stripHeight * 0.42f).toSp())
         val laidOut = SETUP_SAMPLE_WORDS.map { measurer.measure(it, wordStyle, maxLines = 1) }
-        val total = laidOut.sumOf { it.size.width } + padPx * 2 * laidOut.size
-        var x = ((size.width - total) / 2f).coerceAtLeast(0f)
-        for (word in laidOut) {
-            x += padPx
-            drawText(word, topLeft = Offset(x, (stripHeight - word.size.height) / 2f))
-            x += word.size.width + padPx
+        val dividerColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.15f) // (as suggestions_strip_divider)
+        val dividerSpan = stripHeight * 0.6f
+        clipRect(0f, 0f, size.width, stripHeight) {
+            var x = 0f
+            var i = 0
+            while (x < size.width) {
+                val word = laidOut[i % laidOut.size]
+                if (i > 0) drawRect(dividerColor, Offset(x, (stripHeight - dividerSpan) / 2f), Size(1.dp.toPx() * scale.coerceAtLeast(0.5f), dividerSpan))
+                x += padPx
+                drawText(word, topLeft = Offset(x, (stripHeight - word.size.height) / 2f))
+                x += word.size.width + padPx
+                i++
+            }
         }
         // the keys
         val letterRows = listOfNotNull(if (numberRow) "1234567890" else null, "qwertyuiop", "asdfghjkl", "zxcvbnm")
@@ -539,7 +559,16 @@ private fun LayoutPreview(colors: Colors, pick: SetupLayout.Pick, wordPadding: I
         val widths = listOf(1.5f, 1f, 5f, 1f, 1.5f)
         val bottomUnit = (size.width - 2 * pad - gap * 4) / widths.sum()
         var bx = pad
-        widths.forEachIndexed { i, w -> drawKey(bx, y, w * bottomUnit, if (i == 2) space else functional, null); bx += w * bottomUnit + gap }
+        widths.forEachIndexed { i, w ->
+            drawKey(bx, y, w * bottomUnit, if (i == 2) space else functional, null)
+            // the "…" of the keys with a long-press popup (comma, space, enter; not the period in English), with the
+            // symbols (not Minimal)
+            if (hints.isNotEmpty() && (i == 1 || i == 2 || i == 4)) {
+                val h = measurer.measure("…", hintStyle, maxLines = 1)
+                drawText(h, topLeft = Offset(bx + w * bottomUnit - h.size.width - rowHeight * 0.08f, y + rowHeight - h.size.height - rowHeight * 0.02f))
+            }
+            bx += w * bottomUnit + gap
+        }
     }
 }
 
