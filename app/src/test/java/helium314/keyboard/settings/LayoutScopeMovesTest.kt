@@ -40,7 +40,7 @@ import kotlin.test.assertTrue
 /**
  * 2026-10-24: the spacing between suggestions and "Hide symbols on keys" are the Layout's (Layout & Typing, in simple
  * mode: the spacing right under the numbers row, the symbols right under the voice key), not the theme's; the symbols
- * are one stored value (PREF_SHOW_HINTS), the number row's and the ellipsis's own keys go; the split keyboard rows are
+ * are one stored value (PREF_SHOW_HINTS) that the ellipsis follows too (2026-10-26), the number row's and the ellipsis's own keys go; the split keyboard rows are
  * advanced. Fail before: in the theme's scope, three keys, split in simple mode; no upgrade step (compile).
  */
 @RunWith(RobolectricTestRunner::class)
@@ -132,9 +132,10 @@ class LayoutScopeMovesTest {
         return Settings.getValues()
     }
 
-    @Test fun `one stored value - the letters' and the number row's symbols follow it, the ellipsis stays off`() {
+    /** Fail before (2026-10-26): the ellipsis was hard-wired off. */
+    @Test fun `one stored value - the letters' and the number row's symbols and the ellipsis follow it`() {
         var v = values()
-        assertTrue(v.mShowsHints); assertTrue(v.mShowNumberRowHints); assertFalse(v.mShowsPopupHints)
+        assertTrue(v.mShowsHints); assertTrue(v.mShowNumberRowHints); assertTrue(v.mShowsPopupHints)
         assertEquals(5, ctx.prefs().getInt(Settings.PREF_SUGGESTION_WORD_PADDING, Defaults.PREF_SUGGESTION_WORD_PADDING)) // the packed strip
         ctx.prefs().edit().putBoolean(Settings.PREF_SHOW_HINTS, false).commit()
         v = values()
@@ -143,7 +144,9 @@ class LayoutScopeMovesTest {
         ctx.prefs().edit().putBoolean(Settings.PREF_SHOW_HINTS, true).putBoolean(Settings.PREF_SHOW_NUMBER_ROW_HINTS, false)
             .putBoolean(Settings.PREF_SHOW_POPUP_HINTS, true).commit()
         v = values()
-        assertTrue(v.mShowNumberRowHints); assertFalse(v.mShowsPopupHints)
+        assertTrue(v.mShowNumberRowHints); assertTrue(v.mShowsPopupHints)
+        ctx.prefs().edit().putBoolean(Settings.PREF_SHOW_HINTS, false).putBoolean(Settings.PREF_SHOW_POPUP_HINTS, true).commit()
+        assertFalse(values().mShowsPopupHints)
     }
 
     @Test fun `the upgrade drops the old symbol keys from every set and the moved keys from saved themes, keeps the rest`() {

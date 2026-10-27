@@ -255,10 +255,11 @@ public class SettingsValues {
         mShowsNumberRowInSymbols = prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS, Defaults.PREF_SHOW_NUMBER_ROW_IN_SYMBOLS);
         mLocalizedNumberRow = SubtypeUtilsKt.getHasLocalizedNumberRow(selectedSubtype, prefs);
         // one "Hide symbols on keys" value (Layout & Typing, 2026-10-24): the letters' and the number row's symbols
-        // together; the bottom-right ellipsis never had a row that turned it on, it stays off
+        // and the bottom-right ellipsis of the keys with a long-press popup, all together (the one switch had set all
+        // three since 2026-10-06; the ellipsis was wrongly left off on 2026-10-24, owner 2026-10-26: "yes, add it")
         mShowsHints = prefs.getBoolean(Settings.PREF_SHOW_HINTS, Defaults.PREF_SHOW_HINTS);
         mShowNumberRowHints = mShowsHints;
-        mShowsPopupHints = false;
+        mShowsPopupHints = mShowsHints;
         mShowTldPopupKeys = prefs.getBoolean(Settings.PREF_SHOW_TLD_POPUP_KEYS, Defaults.PREF_SHOW_TLD_POPUP_KEYS);
         mRecordGestureCorpus = prefs.getBoolean(Settings.PREF_RECORD_GESTURE_CORPUS, Defaults.PREF_RECORD_GESTURE_CORPUS);
         mSwipeMetrics = prefs.getBoolean(Settings.PREF_SWIPE_METRICS, Defaults.PREF_SWIPE_METRICS);
