@@ -55,6 +55,8 @@ class BuiltInLayoutsTest {
         assertTrue(Defaults.PREF_BOTTOM_ROW_SCALE.all { it == 1.1f })
         assertEquals(50, Defaults.PREF_UNDO_HISTORY_LENGTH)
         assertEquals(true, Defaults.PREF_SHOW_EMOJI_KEY)
+        // the apostrophe swiped both ways (owner 2026-10-31: "on means both ways", on for the Curmudgeon layouts)
+        assertEquals(true, Defaults.PREF_GESTURE_APOSTROPHE_VIA_PERIOD)
     }
 
     @Test fun `Classic is HeliBoard's typing with the number row, the Curmudgeon symbol map and the main popups`() {

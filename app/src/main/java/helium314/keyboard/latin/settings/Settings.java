@@ -179,6 +179,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_GESTURE_FAST_COMMON_WORDS = "gesture_fast_common_words";
     public static final String PREF_GESTURE_CORNER_MISS = "gesture_corner_miss";
     public static final String PREF_GESTURE_FAST_SPEED = "gesture_fast_speed";
+    public static final String PREF_GESTURE_APOSTROPHE_SKIP_COST = "gesture_apostrophe_skip_cost";
     public static final String PREF_GESTURE_FAST_TYPING_COOLDOWN = "gesture_fast_typing_cooldown";
     public static final String PREF_GESTURE_TRAIL_FADEOUT_DURATION = "gesture_trail_fadeout_duration";
     public static final String PREF_GESTURE_TRAIL_THICKNESS = "gesture_trail_thickness"; // percent of the theme's width, 0: no trail

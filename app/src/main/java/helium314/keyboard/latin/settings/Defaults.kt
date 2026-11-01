@@ -151,7 +151,11 @@ object Defaults {
     const val BACKSPACE_DELAY_FOLLOWS = -1
     const val PREF_KEY_LONGPRESS_TIMEOUT = 150 // the Curmudgeon Layout's (2026-10-07; 300 before, as HeliBoard)
     const val PREF_GESTURE_CAPS_SWIPE = false // swiping up above the keyboard capitalizes the letter left from (own gesture decoder); off since 2026-10-18 (stray capitals: goIng, thOugh in 1% of real swipes)
-    const val PREF_GESTURE_APOSTROPHE_VIA_PERIOD = false // off = the apostrophe is skipped (swipe im for I'm); on = swiped through the period key (own gesture decoder)
+    // on = both ways: the apostrophe swiped through the period key (i . m for I'm) or skipped (im), the detour favoring the
+    // contraction over the same letters without it; off = skipped only (own gesture decoder). On since 2026-10-31 (owner: "on
+    // means both ways"; the Dense Layout follows the defaults); off 2026-10-18 to then, when on meant the detour only
+    const val PREF_GESTURE_APOSTROPHE_VIA_PERIOD = true
+    const val PREF_GESTURE_APOSTROPHE_SKIP_COST = 0.05f // with the above on: an apostrophe word matched without its detour ranks (1 + this) times worse
     const val PREF_GESTURE_CAPS_HEIGHT = 125 // percent of a key height the swipe must rise above the keyboard to capitalize (own gesture decoder); 75 until 2026-10-18
     // own gesture decoder tuning (see OwnGestureDecoder.Tuning): inflection confidences and the scorer blend
     const val PREF_GESTURE_TURN_WEIGHT = 1.0f // multiplier on the confidence of turn inflections

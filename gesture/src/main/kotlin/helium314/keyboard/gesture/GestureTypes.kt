@@ -22,10 +22,16 @@ data class KeyInfo(
 
 /**
  * Minimal keyboard-geometry holder with the lookups the decoder needs. With [apostropheViaPeriod] off, apostrophes
- * are not gestured at all: words skip over them ("dont" swipes "don't"), see [isSkippedWordChar].
+ * are not gestured at all: words skip over them ("dont" swipes "don't"), see [isSkippedWordChar]. With it on and
+ * [apostropheBothWays] too, both ways count: an apostrophe word is tried with its period-key detour and without it and
+ * keeps the better score (GestureDecoder, 2026-10-31; owner: "on means both ways"), see [apostropheSkipView].
  */
-class KeyboardGeometry(val keys: List<KeyInfo>, val apostropheViaPeriod: Boolean = true) {
+class KeyboardGeometry(val keys: List<KeyInfo>, val apostropheViaPeriod: Boolean = true, val apostropheBothWays: Boolean = false) {
     private val byChar: Map<Char, KeyInfo> = keys.associateBy { it.char }
+
+    /** The same keys with apostrophes skipped, the second way of [apostropheBothWays]; null when only one way counts. */
+    val apostropheSkipView: KeyboardGeometry? =
+        if (apostropheViaPeriod && apostropheBothWays) KeyboardGeometry(keys, apostropheViaPeriod = false) else null
 
     /** Typical key width/height, used as the natural distance unit of the decoder. */
     val keyWidth: Float = if (keys.isEmpty()) 1f else keys.map { it.width }.average().toFloat()

@@ -89,15 +89,23 @@ class DecoderConfig(
     val missedLetterShare: Float = 0f,
     /** Capitalize the letter a swipe leaves the keyboard upwards from (the excursion is stripped from the path either way). */
     val capsExcursions: Boolean = true,
+    /**
+     * Both ways for apostrophes ([KeyboardGeometry.apostropheBothWays]): an apostrophe word matched without its period-key
+     * detour has its rank multiplied by (1 + this), so a swipe that dips to the period key favors "it's" over "its" and
+     * one that doesn't still offers "it's", a little behind the same letters without it. 0 = off. The app's "apostrophe
+     * skip cost" tuning weight (2026-10-31).
+     */
+    val apostropheSkipPenalty: Float = 0.05f,
 )
 
 /**
  * Bumped whenever the decoder's behaviour changes, so logged swipe results can be told apart by the decoder that
  * produced them. 1 = the 0.2.000 decoder (Swype-style picking, hybrid scorer); 2 = a corner after a long reach may
  * stop short of its key (2026-09-30); 3 = fast swipes lean on word frequency and get relaxed corner matching
- * (2026-10-01, Play 3000); 4 = the relaxation no longer lets forbidden alignments survive on fast swipes (Play 3001).
+ * (2026-10-01, Play 3000); 4 = the relaxation no longer lets forbidden alignments survive on fast swipes (Play 3001);
+ * 5 = with the apostrophe setting on, apostrophe words are scored with and without the period-key detour (2026-10-31).
  */
-const val DECODER_VERSION = 4
+const val DECODER_VERSION = 5
 
 class GestureDecoder(
     private val scorer: Scorer,
@@ -148,8 +156,10 @@ class GestureDecoder(
 
         val maxFreq = vocabulary.maxWeight(config.learnedBoost, config.learnedWords).toFloat()
         val frequencyWeight = 1f + config.frequencyEmphasisPerKeyPerSecond * (keysPerSecond - config.frequencyEmphasisFromKeysPerSecond).coerceAtLeast(0f)
+        val bothWays = geometry.apostropheSkipView != null
         for (s in scorers) {
             val scored = ArrayList<ScoredWord>(candidates.size)
+            val listedAt = if (bothWays) HashMap<String, Int>() else null // where an apostrophe word already is in scored
             for ((i, candidate) in candidates.withIndex()) {
                 val raw = s.score(gesture, candidate.sokgraph, geometry)
                 if (raw == Float.MAX_VALUE) continue
@@ -165,7 +175,16 @@ class GestureDecoder(
                             (dEnd - config.endpointFreeKeyWidths).coerceAtLeast(0f)
                     rank *= 1f + config.endpointPenaltyPerKeyWidth * over
                 }
-                scored.add(ScoredWord(displayWords[i], rank, raw, candidate.frequency))
+                if (candidate.apostropheSkipped) rank *= 1f + config.apostropheSkipPenalty
+                val scoredWord = ScoredWord(displayWords[i], rank, raw, candidate.frequency)
+                // both ways: an apostrophe word scored with and without its detour is listed once, at its better score
+                if (listedAt != null && hasApostrophe(candidate.sokgraph.word)) {
+                    val at = listedAt[candidate.sokgraph.word]
+                    if (at == null) { listedAt[candidate.sokgraph.word] = scored.size; scored.add(scoredWord) }
+                    else if (rank < scored[at].score) scored[at] = scoredWord
+                    continue
+                }
+                scored.add(scoredWord)
             }
             scored.sortBy { it.score }
             out[s.name] = if (scored.size > maxResults) scored.subList(0, maxResults) else scored
@@ -204,7 +223,11 @@ class GestureDecoder(
         val frequency: Int,
         /** matched arc position along the drawn path per word character */
         val letterArcs: FloatArray,
+        /** an apostrophe word matched without its period-key detour, the second way of both ways */
+        val apostropheSkipped: Boolean = false,
     )
+
+    private fun hasApostrophe(word: String) = word.indexOf('\'') >= 0 || word.indexOf('’') >= 0
 
     /** [widen] multiplies the endpoint radii and the corridor (1 = the normal search). */
     private fun collectCandidates(
@@ -232,7 +255,7 @@ class GestureDecoder(
         val lasts = vocabulary.lastChars().filter { onKeys(it, endKeys) }
 
         // distance from each key to the path, once per character
-        // (apostrophes map to the period key via keyForWordChar, so they cache separately)
+        // (apostrophes map to the period key via keyForWordChar, so they cache separately; the skip view never asks for them)
         val distCache = HashMap<Char, Float>()
         fun distToPath(c: Char): Float = distCache.getOrPut(c) {
             val k = geometry.keyForWordChar(c) ?: return@getOrPut Float.MAX_VALUE
@@ -241,21 +264,22 @@ class GestureDecoder(
 
         /**
          * prune 3: each letter's key near the path, in order: at or after (with slack) the previous letter's
-         * position. Returns the matched arc position per character, or null if the word doesn't fit.
+         * position. Returns the matched arc position per character, or null if the word doesn't fit. [view] is
+         * [geometry] or its [KeyboardGeometry.apostropheSkipView]: whether an apostrophe is a key on the path.
          */
-        fun matchAlongPath(word: String): FloatArray? {
+        fun matchAlongPath(word: String, view: KeyboardGeometry): FloatArray? {
             val arcs = FloatArray(word.length)
             var arcPos = 0f
             var previous: KeyInfo? = null
             var missesLeft = if (config.missedLetterShare <= 0f) 0
-                else (word.count { !geometry.isSkippedWordChar(it.lowercaseChar()) } * config.missedLetterShare).toInt()
+                else (word.count { !view.isSkippedWordChar(it.lowercaseChar()) } * config.missedLetterShare).toInt()
             for (i in word.indices) {
                 val c = word[i].lowercaseChar()
-                if (geometry.isSkippedWordChar(c)) { // not on the path: holds the previous letter's position
+                if (view.isSkippedWordChar(c)) { // not on the path: holds the previous letter's position
                     arcs[i] = arcPos
                     continue
                 }
-                val key = geometry.keyForWordChar(c) ?: return null
+                val key = view.keyForWordChar(c) ?: return null
                 val from = (arcPos - progressSlack).coerceAtLeast(0f)
                 var (d, newArc) = if (distToPath(c) > corridorRadius) Pair(Float.MAX_VALUE, from)
                     else gesture.nearestArcPositionFrom(key.centerX, key.centerY, from, corridorRadius)
@@ -292,15 +316,21 @@ class GestureDecoder(
         }
 
         val out = ArrayList<Candidate>()
+        val skipView = geometry.apostropheSkipView
+        fun add(word: String, weight: Int, view: KeyboardGeometry, apostropheSkipped: Boolean) {
+            val arcs = matchAlongPath(word, view) ?: return
+            // prune 2: sokgraph length within ratio band of drawn length
+            val sok = SokgraphBuilder.build(word, view) ?: return
+            if (lengthBandOk(sok, drawnLength, kw)) out.add(Candidate(sok, weight, arcs, apostropheSkipped))
+        }
         for (f in firsts) for (l in lasts) for (node in vocabulary.wordsByEnds(f, l)) {
             if (out.size >= config.maxCandidates) return out
             val word = node.wordFor(config.learnedBoost, config.learnedWords) ?: continue // (learned only, learned words off)
             val weight = node.weight(config.learnedBoost, config.learnedWords)
             if (word.length < minLetters) continue
-            val arcs = matchAlongPath(word) ?: continue
-            // prune 2: sokgraph length within ratio band of drawn length
-            val sok = SokgraphBuilder.build(word, geometry) ?: continue
-            if (lengthBandOk(sok, drawnLength, kw)) out.add(Candidate(sok, weight, arcs))
+            add(word, weight, geometry, false)
+            // both ways: an apostrophe word is tried without its detour too; the better of the two scores is kept
+            if (skipView != null && hasApostrophe(word)) add(word, weight, skipView, true)
         }
         return out
     }

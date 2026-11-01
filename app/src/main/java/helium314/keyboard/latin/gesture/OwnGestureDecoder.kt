@@ -50,16 +50,21 @@ object OwnGestureDecoder {
     class Tuning(val turn: Float, val slowdown: Float, val kushler: Float, val historyBoost: Int,
                  val fastCommon: Float = Defaults.PREF_GESTURE_FAST_COMMON_WORDS, val cornerMiss: Float = Defaults.PREF_GESTURE_CORNER_MISS,
                  /** key widths per second above which a swipe counts as fast (the two fast-swipe settings start there) */
-                 val fastFrom: Float = Defaults.PREF_GESTURE_FAST_SPEED) {
-        /** One decimal each (two for the fast-swipe pair); the label the statistics are kept under. The fast-swipe pair
-         *  is only in it when not at its default, so the results counted before it existed stay under their label. */
+                 val fastFrom: Float = Defaults.PREF_GESTURE_FAST_SPEED,
+                 /** with the apostrophe setting on (both ways): how much worse an apostrophe word ranks when swiped without
+                  *  its period-key detour (DecoderConfig.apostropheSkipPenalty; no slider, 2026-10-31) */
+                 val apostropheSkip: Float = Defaults.PREF_GESTURE_APOSTROPHE_SKIP_COST) {
+        /** One decimal each (two for the fast-swipe pair and the apostrophe cost); the label the statistics are kept under.
+         *  The fast-swipe pair and the apostrophe cost are only in it when not at their default, so the results counted
+         *  before they existed stay under their label. */
         val key: String = String.format(Locale.ROOT, "T%.1f S%.1f K%.1f H%d", turn, slowdown, kushler, historyBoost) +
             (if (round2(fastCommon) != Defaults.PREF_GESTURE_FAST_COMMON_WORDS) String.format(Locale.ROOT, " F%.2f", fastCommon) else "") +
             (if (round2(cornerMiss) != Defaults.PREF_GESTURE_CORNER_MISS) String.format(Locale.ROOT, " C%.2f", cornerMiss) else "") +
-            (if (Math.round(fastFrom * 10) / 10f != Defaults.PREF_GESTURE_FAST_SPEED) String.format(Locale.ROOT, " V%.1f", fastFrom) else "")
+            (if (Math.round(fastFrom * 10) / 10f != Defaults.PREF_GESTURE_FAST_SPEED) String.format(Locale.ROOT, " V%.1f", fastFrom) else "") +
+            (if (round2(apostropheSkip) != Defaults.PREF_GESTURE_APOSTROPHE_SKIP_COST) String.format(Locale.ROOT, " A%.2f", apostropheSkip) else "")
 
         /** The tuning as the sliders show it: each value 0 to 1 over its slider's range ([RANGES] order). */
-        val shown: List<Float> get() = listOf(turn, slowdown, kushler, historyBoost.toFloat(), fastCommon, cornerMiss, fastFrom)
+        val shown: List<Float> get() = listOf(turn, slowdown, kushler, historyBoost.toFloat(), fastCommon, cornerMiss, fastFrom, apostropheSkip)
             .zip(RANGES) { v, top -> v / top }
         override fun equals(other: Any?) = other is Tuning && other.key == key
         override fun hashCode() = key.hashCode()
@@ -67,8 +72,8 @@ object OwnGestureDecoder {
         companion object {
             /** Each slider's top (its bottom is 0), in slider order: turns, slowdowns, blend, learned-word boost, fast
              *  swipes and common words, fast swipes and corners, fast swipe threshold (key widths per second, the 7th
-             *  parameter). Shown 0 to 1 over these. */
-            val RANGES = listOf(1.5f, 1f, 1f, 128f, 0.2f, 0.2f, 40f)
+             *  parameter), then the apostrophe skip cost (the 8th; no slider yet). Shown 0 to 1 over these. */
+            val RANGES = listOf(1.5f, 1f, 1f, 128f, 0.2f, 0.2f, 40f, 0.2f)
 
             val DEFAULT = Tuning(Defaults.PREF_GESTURE_TURN_WEIGHT,
                 Defaults.PREF_GESTURE_SLOWDOWN_WEIGHT, Defaults.PREF_GESTURE_KUSHLER_WEIGHT, Defaults.PREF_GESTURE_HISTORY_BOOST)
@@ -81,16 +86,18 @@ object OwnGestureDecoder {
                 prefs.getFloat(Settings.PREF_GESTURE_FAST_COMMON_WORDS, Defaults.PREF_GESTURE_FAST_COMMON_WORDS),
                 prefs.getFloat(Settings.PREF_GESTURE_CORNER_MISS, Defaults.PREF_GESTURE_CORNER_MISS),
                 prefs.getFloat(Settings.PREF_GESTURE_FAST_SPEED, Defaults.PREF_GESTURE_FAST_SPEED),
+                prefs.getFloat(Settings.PREF_GESTURE_APOSTROPHE_SKIP_COST, Defaults.PREF_GESTURE_APOSTROPHE_SKIP_COST),
             )
 
             /** The tuning a [key] stands for, or null if it isn't one; keys from before pauses were dropped carry a P, ignored. */
             fun parse(key: String): Tuning? {
-                val m = Regex("T([\\d.]+)(?: P[\\d.]+)? S([\\d.]+) K([\\d.]+) H(\\d+)(?: F([\\d.]+))?(?: C([\\d.]+))?(?: V([\\d.]+))?").matchEntire(key) ?: return null
+                val m = Regex("T([\\d.]+)(?: P[\\d.]+)? S([\\d.]+) K([\\d.]+) H(\\d+)(?: F([\\d.]+))?(?: C([\\d.]+))?(?: V([\\d.]+))?(?: A([\\d.]+))?").matchEntire(key) ?: return null
                 val v = m.groupValues.drop(1).take(4).map { it.toFloatOrNull() ?: return null }
                 val f = m.groupValues[5].toFloatOrNull() ?: Defaults.PREF_GESTURE_FAST_COMMON_WORDS
                 val c = m.groupValues[6].toFloatOrNull() ?: Defaults.PREF_GESTURE_CORNER_MISS
                 val speed = m.groupValues[7].toFloatOrNull() ?: Defaults.PREF_GESTURE_FAST_SPEED
-                return Tuning(v[0], v[1], v[2], v[3].toInt(), f, c, speed)
+                val apostrophe = m.groupValues[8].toFloatOrNull() ?: Defaults.PREF_GESTURE_APOSTROPHE_SKIP_COST
+                return Tuning(v[0], v[1], v[2], v[3].toInt(), f, c, speed, apostrophe)
             }
 
             fun write(prefs: SharedPreferences, tuning: Tuning) = prefs.edit()
@@ -101,6 +108,7 @@ object OwnGestureDecoder {
                 .putFloat(Settings.PREF_GESTURE_FAST_COMMON_WORDS, tuning.fastCommon)
                 .putFloat(Settings.PREF_GESTURE_CORNER_MISS, tuning.cornerMiss)
                 .putFloat(Settings.PREF_GESTURE_FAST_SPEED, tuning.fastFrom)
+                .putFloat(Settings.PREF_GESTURE_APOSTROPHE_SKIP_COST, tuning.apostropheSkip)
                 .apply()
         }
     }
@@ -122,7 +130,8 @@ object OwnGestureDecoder {
 
     /**
      * What of the user's settings the last swipe was decoded with: all the decoder is built and asked from, so a replay
-     * can build the same one (the corpus records it with each swipe, 2026-10-23). [scorer] the active scorer, [wanted] the
+     * can build the same one (the corpus records it with each swipe, 2026-10-23). [apostropheViaPeriod] on means both ways
+     * since 2026-10-31 (recorded true before then: the detour only). [scorer] the active scorer, [wanted] the
      * results asked for (the strip's fill target; the decoder makes at least [MAX_RESULTS]), [suggestionCount] the
      * "number of suggestions" setting (0: as many as fill the strip), [languages] the word lists' keys (language and
      * priority factor), [tuning] the parameter set's key.
@@ -150,7 +159,8 @@ object OwnGestureDecoder {
             scorers = listOf(hybrid, kushler, location)
             // (the learned-word boost and "suggest learned words" are applied at scoring, like the other settings here)
             decoder = GestureDecoder(hybrid, DecoderConfig(capsExcursions = capsSwipe, frequencyEmphasisPerKeyPerSecond = tuning.fastCommon,
-                frequencyEmphasisFromKeysPerSecond = tuning.fastFrom, learnedBoost = tuning.historyBoost, learnedWords = learnedWords),
+                frequencyEmphasisFromKeysPerSecond = tuning.fastFrom, learnedBoost = tuning.historyBoost, learnedWords = learnedWords,
+                apostropheSkipPenalty = tuning.apostropheSkip),
                 preprocessor = GesturePreprocessor(PreprocessorConfig(excursionMinHeightKeyHeights = capsHeight,
                     turnConfidenceScale = tuning.turn, stopDtFactor = 2.5f)))
             decoderCapsHeight = capsHeight
@@ -278,7 +288,8 @@ object OwnGestureDecoder {
                 key.width.toFloat(), key.height.toFloat()))
         }
         if (keys.size < 5) return null // not a letter keyboard
-        val geometry = KeyboardGeometry(keys, apostropheViaPeriod)
+        // the setting on means both ways (2026-10-31): the detour and the skipped apostrophe; off, skipped only
+        val geometry = KeyboardGeometry(keys, apostropheViaPeriod, apostropheBothWays = apostropheViaPeriod)
         cachedKeyboardRef = WeakReference(keyboard)
         cachedGeometry = geometry
         cachedApostropheViaPeriod = apostropheViaPeriod

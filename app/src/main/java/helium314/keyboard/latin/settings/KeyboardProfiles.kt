@@ -169,6 +169,7 @@ object KeyboardProfiles {
     private val learningSwipingKeys: Set<String> get() = setOf(
         Settings.PREF_GESTURE_TURN_WEIGHT, Settings.PREF_GESTURE_SLOWDOWN_WEIGHT, Settings.PREF_GESTURE_KUSHLER_WEIGHT,
         Settings.PREF_GESTURE_HISTORY_BOOST, Settings.PREF_GESTURE_FAST_COMMON_WORDS, Settings.PREF_GESTURE_CORNER_MISS, Settings.PREF_GESTURE_FAST_SPEED,
+        Settings.PREF_GESTURE_APOSTROPHE_SKIP_COST, // (a decoder weight without a slider, 2026-10-31: with its siblings)
         Settings.PREF_SUGGESTION_COUNT, Settings.PREF_SUGGESTION_RULES, // Customize suggestions (from Text correction, 2026-10-06)
         Settings.PREF_AUTOCORRECT_FREQUENT_WORDS, Settings.PREF_TRUST_TYPED_COUNT,
     )

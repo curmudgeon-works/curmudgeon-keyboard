@@ -317,8 +317,8 @@
     <!-- Title of the setting for how far a swipe has to leave the keyboard upwards to capitalize a letter -->
     <string name="gesture_caps_swipe">Swipe above keyboard to capitalize</string>
     <string name="gesture_caps_swipe_summary">While swiping a word, go up above the keyboard to capitalize the letter you left from</string>
-    <string name="gesture_apostrophe_via_period">Swipe through period for in-word apostrophe</string>
-    <string name="gesture_apostrophe_via_period_summary">Swipe through the period key for the apostrophe (i . m for I\'m). Off: skip it, swipe im for I\'m</string>
+    <string name="gesture_apostrophe_via_period">Swipe through period for an apostrophe</string>
+    <string name="gesture_apostrophe_via_period_summary">On: i . m or im both give I\'m, and going through the period favors it\'s over its. Off: skip the apostrophe, im for I\'m</string>
     <string name="gesture_caps_height">Swipe-up capitalization strictness</string>
     <string name="gesture_caps_height_summary">How far above the keyboard a swipe has to go to capitalize the letter it left from</string>
     <!-- Value of the swipe-up capitalization strictness setting, %s is a number like 0.75 -->

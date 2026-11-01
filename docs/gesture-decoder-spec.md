@@ -103,7 +103,13 @@ All three share the ranking formula and the frequency/user-history integration.
   pruning and all scorers treat the apostrophe waypoint like any other letter
   position. A skipped apostrophe waypoint costs extra in the location channel so
   a straight i→m never surfaces "I'm" above plain candidates. Hyphenated words
-  remain excluded from the gesture vocabulary for now.
+  remain excluded from the gesture vocabulary for now. The app's apostrophe
+  setting off skips apostrophes instead (`KeyboardGeometry.apostropheViaPeriod`
+  false: "im" swipes "I'm"); on means both ways since 2026-10-31
+  (`apostropheBothWays`): every apostrophe word is scored with its detour and
+  without it and keeps the better score, the skipped way multiplied by
+  1 + `DecoderConfig.apostropheSkipPenalty` (0.05) so the detour still favors
+  "it's" over "its".
 
 ## Architecture
 
