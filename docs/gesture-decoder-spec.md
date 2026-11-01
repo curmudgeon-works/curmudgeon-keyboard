@@ -121,6 +121,17 @@ All three share the ranking formula and the frequency/user-history integration.
     implementations (see "Decoder variants"). Pure functions of
     (preprocessed path, candidate sokgraph) → score, so all three are
     unit-testable and benchmarkable on the same corpus.
+  - `PhoneDecoderFactory`: the one place the device's decoder is built from the
+    user's settings (the eight tuning weights, the caps settings, "suggest
+    learned words"; `stopDtFactor` 2.5), and the home of those settings'
+    defaults, which the app's `Defaults.kt` takes from it. The app
+    (`OwnGestureDecoder.decoderFor`) and the replay's "phone" variant
+    (`ReplayTest`, through `ReplaySpec`) both call it, so a replay at its
+    defaults is the device at its defaults (2026-10-31, review L4; before, the
+    replay carried a copy of the values that had drifted: it still
+    capitalized excursions). The four configs are data classes, so a replay
+    variant is the device's configs with named fields copied over, and a test
+    can assert two decoders are built the same.
   - `Vocabulary`: trie of (word, frequency) with a first-and-last-letter index, built per-locale at dictionary load.
     Source: iterate the binary dictionary via existing word-property/dump APIs
     (same mechanism the personal-dict export uses); merge user history.

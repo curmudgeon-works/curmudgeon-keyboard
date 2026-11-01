@@ -5,7 +5,7 @@
 // key is a soft bonus for words with that letter, not a point to match.
 package helium314.keyboard.gesture
 
-class KushlerConfig(
+data class KushlerConfig(
     /** x-distance weight inside the weighted distance (column position is less reliable). */
     val weightX: Float = 0.5f,
     /** y-distance weight — heavier, row position is more reliable (spec). */

@@ -3,17 +3,11 @@ package helium314.keyboard.latin.gesture
 
 import android.content.SharedPreferences
 import android.os.SystemClock
-import helium314.keyboard.gesture.DecoderConfig
 import helium314.keyboard.gesture.GestureDecoder
 import helium314.keyboard.gesture.GesturePoint
-import helium314.keyboard.gesture.GesturePreprocessor
-import helium314.keyboard.gesture.HybridScorer
 import helium314.keyboard.gesture.KeyInfo
 import helium314.keyboard.gesture.KeyboardGeometry
-import helium314.keyboard.gesture.KushlerConfig
-import helium314.keyboard.gesture.KushlerScorer
-import helium314.keyboard.gesture.LocationScorer
-import helium314.keyboard.gesture.PreprocessorConfig
+import helium314.keyboard.gesture.PhoneDecoderFactory
 import helium314.keyboard.gesture.Scorer
 import helium314.keyboard.keyboard.Keyboard
 import helium314.keyboard.latin.NgramContext
@@ -68,6 +62,12 @@ object OwnGestureDecoder {
             .zip(RANGES) { v, top -> v / top }
         override fun equals(other: Any?) = other is Tuning && other.key == key
         override fun hashCode() = key.hashCode()
+
+        /** What the decoder is built from for this tuning and the device's other swipe settings ([PhoneDecoderFactory]). */
+        fun decoderSettings(capsHeight: Float, capsSwipe: Boolean, learnedWords: Boolean) = PhoneDecoderFactory.Settings(
+            turn = turn, slowdown = slowdown, kushler = kushler, historyBoost = historyBoost, fastCommon = fastCommon,
+            cornerMiss = cornerMiss, fastFrom = fastFrom, apostropheSkip = apostropheSkip,
+            capsHeight = capsHeight, capsSwipe = capsSwipe, learnedWords = learnedWords)
 
         companion object {
             /** Each slider's top (its bottom is 0), in slider order: turns, slowdowns, blend, learned-word boost, fast
@@ -143,34 +143,20 @@ object OwnGestureDecoder {
     @Volatile var lastSettings: DecodeSettings? = null
         private set
 
-    private var scorers: List<Scorer> = listOf(HybridScorer(), KushlerScorer(), LocationScorer())
-    // the caps settings and the tuning are part of the immutable configs, so the decoder is rebuilt when they change
-    private var decoderCapsHeight = Float.NaN
-    private var decoderCapsSwipe = true
-    private var decoderTuning: Tuning? = null
-    private var decoderLearnedWords = true
-    private var decoder = GestureDecoder(HybridScorer()) // ctor scorer unused by decodeWithScorers
+    // the caps settings and the tuning are part of the immutable configs, so the decoder is rebuilt when they change;
+    // built by PhoneDecoderFactory, the same one the replay's "phone" variant uses (review 2026-10-21 L4)
+    private var decoderSettings: PhoneDecoderFactory.Settings? = null
+    private var built: PhoneDecoderFactory.Built = PhoneDecoderFactory.build()
+    private val scorers: List<Scorer> get() = built.scorers
 
     @Synchronized
     private fun decoderFor(capsHeight: Float, capsSwipe: Boolean, tuning: Tuning, learnedWords: Boolean): GestureDecoder {
-        if (capsHeight != decoderCapsHeight || capsSwipe != decoderCapsSwipe || tuning != decoderTuning || learnedWords != decoderLearnedWords) {
-            val kushler = KushlerScorer(KushlerConfig(slowEmphasis = tuning.slowdown, matchRelaxPerKeyPerSecond = tuning.cornerMiss,
-                speedFromKeysPerSecond = tuning.fastFrom))
-            val location = LocationScorer()
-            val hybrid = HybridScorer(kushler, location, kushlerWeight = tuning.kushler, locationWeight = 1f - tuning.kushler)
-            scorers = listOf(hybrid, kushler, location)
-            // (the learned-word boost and "suggest learned words" are applied at scoring, like the other settings here)
-            decoder = GestureDecoder(hybrid, DecoderConfig(capsExcursions = capsSwipe, frequencyEmphasisPerKeyPerSecond = tuning.fastCommon,
-                frequencyEmphasisFromKeysPerSecond = tuning.fastFrom, learnedBoost = tuning.historyBoost, learnedWords = learnedWords,
-                apostropheSkipPenalty = tuning.apostropheSkip),
-                preprocessor = GesturePreprocessor(PreprocessorConfig(excursionMinHeightKeyHeights = capsHeight,
-                    turnConfidenceScale = tuning.turn, stopDtFactor = 2.5f)))
-            decoderCapsHeight = capsHeight
-            decoderCapsSwipe = capsSwipe
-            decoderTuning = tuning
-            decoderLearnedWords = learnedWords
+        val settings = tuning.decoderSettings(capsHeight, capsSwipe, learnedWords)
+        if (settings != decoderSettings) {
+            built = PhoneDecoderFactory.build(settings)
+            decoderSettings = settings
         }
-        return decoder
+        return built.decoder
     }
 
     // keyboard geometry cache — keyboards change with layout/rotation, so cache per instance

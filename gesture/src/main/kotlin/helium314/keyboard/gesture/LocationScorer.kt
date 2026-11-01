@@ -7,7 +7,7 @@ package helium314.keyboard.gesture
 
 import kotlin.math.sqrt
 
-class LocationConfig(
+data class LocationConfig(
     /** Number of resampled points for both the path and the template. */
     val sampleCount: Int = 40,
     /** Weight of the first/last sample relative to the middle; the ends are where people land where they mean to. */

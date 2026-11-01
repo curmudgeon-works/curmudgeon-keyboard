@@ -18,8 +18,8 @@ class ReplayCorpusTest {
     private val vocab = Vocabulary(TestVocabulary.entries + listOf("what's" to 150, "whats" to 10))
     private val skip = KeyboardGeometry(keys, apostropheViaPeriod = false)
 
-    /** The "phone" variant's decoder, as ReplayTest builds it (its defaults). */
-    private fun phone() = GestureDecoder(HybridScorer(), DecoderConfig(), GesturePreprocessor(PreprocessorConfig(stopDtFactor = 2.5f)))
+    /** The "phone" variant's decoder, as ReplayTest builds it: the device's. */
+    private fun phone() = ReplaySpec.decoder("phone")
 
     private fun rank(s: ReplayCorpus.Swipe) = phone().decode(s.points, s.geometry, vocab, 50).indexOfFirst { it.word.equals(s.label, ignoreCase = true) }
 

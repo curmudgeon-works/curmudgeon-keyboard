@@ -110,6 +110,38 @@ class AccuracyHarnessTest {
             assertTrue(r.clean.top4Pct >= 98.0, "${r.name} clean top4 ${r.clean.top4Pct}")
             assertTrue(r.noisy.top1Pct >= 72.0, "${r.name} noisy top1 ${r.noisy.top1Pct}")
             assertTrue(r.noisy.top4Pct >= 95.0, "${r.name} noisy top4 ${r.noisy.top4Pct}")
+            // and per category, so a change that trades one kind of word for another shows (review 2026-10-21 L4)
+            for (category in categories.keys) {
+                val (clean1, noisy1) = categoryFloors.getValue(r.name).getValue(category)
+                val c = r.cleanByCategory.getValue(category)
+                val n = r.noisyByCategory.getValue(category)
+                assertTrue(c.top1Pct >= clean1, "${r.name} $category clean top1 ${c.top1Pct} < $clean1")
+                assertTrue(n.top1Pct >= noisy1, "${r.name} $category noisy top1 ${n.top1Pct} < $noisy1")
+                assertTrue(c.top4Pct >= CATEGORY_TOP4_FLOOR, "${r.name} $category clean top4 ${c.top4Pct}")
+                assertTrue(n.top4Pct >= CATEGORY_TOP4_FLOOR, "${r.name} $category noisy top4 ${n.top4Pct}")
+            }
         }
+    }
+
+    private companion object {
+        /** Every category's top-4 was 98.5% or better (2026-10-24). */
+        const val CATEGORY_TOP4_FLOOR = 93.0
+
+        /**
+         * Per scorer and category: the clean top-1 floor, then the noisy top-1 floor, each 5 points under the value
+         * achieved by the public branch on 2026-10-31 (100 -> 95; the double-letter row was first set from the private build's 2026-10-24 report, which scores 100 there). The categories are small (14 to 26 words, three noisy seeds each), so one
+         * more clean miss in "short" is a 7-point fall: these are meant to catch a change, not to leave room for one.
+         *   kushler:  short 100.0/85.7, double 92.3/80.8, long 100.0/100.0, adjacent 81.8/62.1, normal 84.6/71.8
+         *   location: short 100.0/100.0, double 88.5/91.0, long 100.0/100.0, adjacent 90.9/84.8, normal 100.0/100.0
+         *   hybrid:   short 100.0/100.0, double 92.3/91.0, long 100.0/100.0, adjacent 95.5/86.4, normal 100.0/94.9
+         */
+        val categoryFloors: Map<String, Map<String, Pair<Double, Double>>> = mapOf(
+            "kushler" to mapOf("short" to (95.0 to 80.0), "double" to (87.0 to 78.0), "long" to (95.0 to 95.0),
+                "adjacent" to (76.0 to 57.0), "normal" to (79.0 to 66.0)),
+            "location" to mapOf("short" to (95.0 to 95.0), "double" to (83.0 to 86.0), "long" to (95.0 to 95.0),
+                "adjacent" to (85.0 to 79.0), "normal" to (95.0 to 95.0)),
+            "hybrid" to mapOf("short" to (95.0 to 95.0), "double" to (87.0 to 89.0), "long" to (95.0 to 95.0),
+                "adjacent" to (90.0 to 81.0), "normal" to (95.0 to 89.0)),
+        )
     }
 }

@@ -9,7 +9,7 @@ package helium314.keyboard.gesture
 
 import kotlin.math.ln
 
-class DecoderConfig(
+data class DecoderConfig(
     /** First/last letter must be within this many key widths of PEN_DOWN / PEN_UP. */
     val endpointRadiusKeyWidths: Float = 1.6f,
     /** Mid letters must be within this many key widths of the drawn path (the corridor). */

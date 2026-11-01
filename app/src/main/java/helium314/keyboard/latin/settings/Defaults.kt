@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.util.TypedValue
 import android.view.Gravity
+import helium314.keyboard.gesture.PhoneDecoderFactory
 import helium314.keyboard.keyboard.KeyboardActionListener
 import helium314.keyboard.keyboard.KeyboardTheme
 import helium314.keyboard.latin.BuildConfig
@@ -150,23 +151,27 @@ object Defaults {
     /** Stored as the backspace delay: the key long press delay, whatever it is (the HeliBoard Layouts, as before 2026-10-07). */
     const val BACKSPACE_DELAY_FOLLOWS = -1
     const val PREF_KEY_LONGPRESS_TIMEOUT = 150 // the Curmudgeon Layout's (2026-10-07; 300 before, as HeliBoard)
-    const val PREF_GESTURE_CAPS_SWIPE = false // swiping up above the keyboard capitalizes the letter left from (own gesture decoder); off since 2026-10-18 (stray capitals: goIng, thOugh in 1% of real swipes)
+    // The swipe decoder's settings take their defaults from PhoneDecoderFactory (the :gesture module), which builds the
+    // decoder on the device and in the replay, so the replay at its defaults is the device at its defaults (2026-10-31).
+    // Swiping up above the keyboard capitalizes the letter left from (own gesture decoder); off since 2026-10-18 (stray
+    // capitals: goIng, thOugh in 1% of real swipes)
+    const val PREF_GESTURE_CAPS_SWIPE = PhoneDecoderFactory.DEFAULT_CAPS_SWIPE
     // on = both ways: the apostrophe swiped through the period key (i . m for I'm) or skipped (im), the detour favoring the
     // contraction over the same letters without it; off = skipped only (own gesture decoder). On since 2026-10-31 (owner: "on
     // means both ways"; the Dense Layout follows the defaults); off 2026-10-18 to then, when on meant the detour only
     const val PREF_GESTURE_APOSTROPHE_VIA_PERIOD = true
-    const val PREF_GESTURE_APOSTROPHE_SKIP_COST = 0.05f // with the above on: an apostrophe word matched without its detour ranks (1 + this) times worse
-    const val PREF_GESTURE_CAPS_HEIGHT = 125 // percent of a key height the swipe must rise above the keyboard to capitalize (own gesture decoder); 75 until 2026-10-18
+    const val PREF_GESTURE_APOSTROPHE_SKIP_COST = PhoneDecoderFactory.DEFAULT_APOSTROPHE_SKIP_COST // with the above on: an apostrophe word matched without its detour ranks (1 + this) times worse
+    const val PREF_GESTURE_CAPS_HEIGHT = PhoneDecoderFactory.DEFAULT_CAPS_HEIGHT_PERCENT // percent of a key height the swipe must rise above the keyboard to capitalize (own gesture decoder); 75 until 2026-10-18
     // own gesture decoder tuning (see OwnGestureDecoder.Tuning): inflection confidences and the scorer blend
-    const val PREF_GESTURE_TURN_WEIGHT = 1.0f // multiplier on the confidence of turn inflections
-    const val PREF_GESTURE_SLOWDOWN_WEIGHT = 0.5f // how much slowing down over a key favours words with that letter (soft weight); 0 = off
-    const val PREF_GESTURE_KUSHLER_WEIGHT = 0.4f // share of the inflection scorer in the blend; the rest is the whole-path location scorer (replay 2026-09-28: 0.4 beat 0.5)
+    const val PREF_GESTURE_TURN_WEIGHT = PhoneDecoderFactory.DEFAULT_TURN_WEIGHT // multiplier on the confidence of turn inflections
+    const val PREF_GESTURE_SLOWDOWN_WEIGHT = PhoneDecoderFactory.DEFAULT_SLOWDOWN_WEIGHT // how much slowing down over a key favors words with that letter (soft weight); 0 = off
+    const val PREF_GESTURE_KUSHLER_WEIGHT = PhoneDecoderFactory.DEFAULT_KUSHLER_WEIGHT // share of the inflection scorer in the blend; the rest is the whole-path location scorer (replay 2026-09-28: 0.4 beat 0.5)
     // fast swipes (over 12 key widths per second): per key width per second faster, the word frequency weighs this much
     // more in the ranking / the corner match costs are divided down by this much (replay 2026-10-01: 0.05 each)
-    const val PREF_GESTURE_FAST_COMMON_WORDS = 0.05f
-    const val PREF_GESTURE_CORNER_MISS = 0.05f
-    const val PREF_GESTURE_FAST_SPEED = 12f // key widths per second: above it a swipe counts as fast
-    const val PREF_GESTURE_HISTORY_BOOST = 64 // added to a learned word's frequency (0..255 scale) in the swipe vocabulary
+    const val PREF_GESTURE_FAST_COMMON_WORDS = PhoneDecoderFactory.DEFAULT_FAST_COMMON_WORDS
+    const val PREF_GESTURE_CORNER_MISS = PhoneDecoderFactory.DEFAULT_CORNER_MISS
+    const val PREF_GESTURE_FAST_SPEED = PhoneDecoderFactory.DEFAULT_FAST_SPEED // key widths per second: above it a swipe counts as fast
+    const val PREF_GESTURE_HISTORY_BOOST = PhoneDecoderFactory.DEFAULT_HISTORY_BOOST // added to a learned word's frequency (0..255 scale) in the swipe vocabulary
     const val PREF_GESTURE_FAST_TYPING_COOLDOWN = 500
     const val PREF_GESTURE_TRAIL_FADEOUT_DURATION = 800
     const val PREF_GESTURE_TRAIL_THICKNESS = 60 // percent; owner 2026-10-14: "starting trail thickness should be thinner, 60%" (100 before)

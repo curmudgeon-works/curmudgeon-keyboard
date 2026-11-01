@@ -5,7 +5,7 @@ package helium314.keyboard.gesture
 
 import kotlin.math.sqrt
 
-class PreprocessorConfig(
+data class PreprocessorConfig(
     /** Resample spacing as a fraction of key width. */
     val resampleSpacingKeyWidths: Float = 0.25f,
     /** Moving-average smoothing half-window (points on each side), applied to raw input. */

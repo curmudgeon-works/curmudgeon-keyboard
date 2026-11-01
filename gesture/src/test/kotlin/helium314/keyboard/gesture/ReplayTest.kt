@@ -4,6 +4,7 @@ package helium314.keyboard.gesture
 import helium314.keyboard.gesture.ReplayCorpus.Swipe
 import java.io.File
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 /**
  * Replays swipes recorded on a phone (the keyboard's gesture_corpus.jsonl, flattened to corpus.tsv) against the
@@ -103,39 +104,28 @@ class ReplayTest {
     private fun corpus(dir: File): List<Swipe> = File(dir, "corpus.tsv").readLines().map { ReplayCorpus.parse(it, apostropheOverride) }
 
     /**
-     * A decoder from a spec like "k=0.4 slow=1": the phone's defaults with the named settings changed.
-     * k = inflection scorer's share of the blend (the rest is the location scorer), slow = slowdown soft weight,
-     * turn = turn confidence scale, ends = location scorer's end emphasis, samples = its resampled points,
-     * endR = start/end key radius, corridor = how far off the path a letter may be, stop = stop detection (dt factor),
-     * skip = penalty for an inflection no letter uses, cap = candidates scored, reach / shortR / shortL = the long-reach
-     * corner rule (reach length, allowed shortfall reaching right / left), prog = letter-order slack, band / slack =
-     * the path-length band (ratio, additive key widths), exc = how far above the keys (key heights) a swipe is cut,
-     * apos = the cost of an apostrophe word matched without its period-key detour (the setting on, both ways).
+     * A decoder from a spec like "k=0.4 slow=1": the device's decoder ([PhoneDecoderFactory], the one the app builds)
+     * with the named settings changed; the keys are listed at [ReplaySpec]. "phone" is the device's decoder itself:
+     * since 2026-10-31 built by the same factory as on the device, not from a copy of its values (review L4).
      */
-    private fun decoder(spec: String): GestureDecoder {
-        val v = spec.split(' ').filter { '=' in it }.associate { it.substringBefore('=') to it.substringAfter('=').toFloat() }
-        fun f(key: String, default: Float) = v[key] ?: default
-        val k = f("k", 0.4f)
-        return GestureDecoder(
-            HybridScorer(
-                KushlerScorer(KushlerConfig(slowEmphasis = f("slow", 0.5f), skipInflectionPenalty = f("skip", 0.9f),
-                    speedFromKeysPerSecond = f("spdFrom", 12f), matchRelaxPerKeyPerSecond = f("matchRelax", 0.05f))),
-                LocationScorer(LocationConfig(sampleCount = f("samples", 40f).toInt(), endpointEmphasis = f("ends", 2f),
-                    speedFromKeysPerSecond = f("spdFrom", 12f), endsRelaxPerKeyPerSecond = f("endsRelax", 0f),
-                    saturationKeyWidths = f("sat", 0f), saturationPerKeyPerSecond = f("satRate", 0f))),
-                kushlerWeight = k, locationWeight = 1f - k,
-            ),
-            DecoderConfig(endpointRadiusKeyWidths = f("endR", 1.6f), corridorRadiusKeyWidths = f("corridor", 1.4f),
-                progressSlackKeyWidths = f("prog", 1.2f), lengthRatioBand = f("band", 2f), lengthSlackKeyWidths = f("slack", 2f),
-                missedLetterShare = f("miss", 0f),
-                speedWidenFromKeysPerSecond = f("spdFrom", 12f), speedWidenPerKeyPerSecond = f("spdRate", 0f),
-                frequencyEmphasisFromKeysPerSecond = f("fqFrom", 12f), frequencyEmphasisPerKeyPerSecond = f("fqRate", 0.05f),
-                maxCandidates = f("cap", 4096f).toInt(), longReachKeyWidths = f("reach", 4f),
-                reachShortfallRightKeyWidths = f("shortR", 0.6f), reachShortfallLeftKeyWidths = f("shortL", 0.4f),
-                apostropheSkipPenalty = f("apos", 0.05f)),
-            GesturePreprocessor(PreprocessorConfig(turnConfidenceScale = f("turn", 1f), stopDtFactor = f("stop", 2.5f),
-                excursionMinHeightKeyHeights = f("exc", 1.25f) /* the phone cuts swipes this far above the keys (Defaults 125; the replay cut at 0.5 until 2026-10-18) */)),
-        )
+    private fun decoder(spec: String): GestureDecoder = ReplaySpec.decoder(spec)
+
+    /** The device's decoder with its three scorers, for the diagnostics below. */
+    private val phone: PhoneDecoderFactory.Built by lazy { ReplaySpec.build("phone") }
+
+    /**
+     * The "phone" variant is the device's decoder: an excursion above the keyboard is cut from the path but does not
+     * capitalize, as on the device since 2026-10-18 (the caps swipe setting off by default). Fail before: the replay's
+     * own copy of the device's values kept the class default (capitalize), so "Hello" came back for this swipe while
+     * the device said "hello".
+     */
+    @Test
+    fun `the phone variant is the device's decoder, no capitals from an excursion`() {
+        val geometry = QwertyFixture.geometry
+        // two key heights up: well above the device's 1.25 cut, so it is an excursion under either reading
+        val path = SyntheticPathGenerator.withExcursion(SyntheticPathGenerator.idealPath("hello", geometry), geometry, 0, heightKeyHeights = 2f)
+        val top = decoder("phone").decode(path, geometry, TestVocabulary.vocabulary, 10).firstOrNull()?.word
+        assertEquals("hello", top)
     }
 
     // the phone's settings, then one setting at a time
@@ -165,29 +155,22 @@ class ReplayTest {
      * with its rank, the final score, each scorer's own score (all lower = better) and the frequency factor.
      */
     private fun breakdown(s: Swipe, vocab: Vocabulary): List<String> {
-        val kushler = KushlerScorer(KushlerConfig(slowEmphasis = 0.5f, skipInflectionPenalty = 0.9f))
-        val location = LocationScorer(LocationConfig(sampleCount = 40, endpointEmphasis = 2f))
-        val hybrid = HybridScorer(kushler, location, kushlerWeight = 0.4f, locationWeight = 0.6f)
-        val all = GestureDecoder(hybrid, preprocessor = GesturePreprocessor(PreprocessorConfig(stopDtFactor = 2.5f)))
-            .decodeWithScorers(s.points, s.geometry, vocab, listOf(hybrid, kushler, location), 5000)
+        val kushler = phone.kushler
+        val location = phone.location
+        val hybrid = phone.hybrid
+        val all = phone.decoder.decodeWithScorers(s.points, s.geometry, vocab, phone.scorers, 5000)
         val ranked = all[hybrid.name].orEmpty()
         if (ranked.isEmpty() || ranked[0].word.equals(s.label, ignoreCase = true)) return emptyList()
         fun row(word: String): String {
             val rank = ranked.indexOfFirst { it.word.equals(word, ignoreCase = true) }
             if (rank < 0) {
                 // which filter threw it out: loosen one at a time and see which lets the word in
-                val loosened = listOf(
-                    "start/end radius" to DecoderConfig(endpointRadiusKeyWidths = 4f),
-                    "corridor" to DecoderConfig(corridorRadiusKeyWidths = 3f),
-                    "letter order along the path" to DecoderConfig(progressSlackKeyWidths = 20f),
-                    "length band" to DecoderConfig(lengthRatioBand = 10f),
-                    "minimum letters" to DecoderConfig(minLetterSlack = 50),
-                ).filter { (_, config) ->
-                    GestureDecoder(hybrid, config, GesturePreprocessor(PreprocessorConfig(stopDtFactor = 2.5f)))
+                val loosened = loosenings.filter { (_, config) ->
+                    GestureDecoder(hybrid, config, GesturePreprocessor(phone.configs.preprocessor))
                         .decode(s.points, s.geometry, vocab, 5000).any { it.word.equals(word, ignoreCase = true) }
                 }.map { it.first }
                 // the decoder's own letter-by-letter match on its preprocessed path (same rule as matchAlongPath)
-                val gesture = GesturePreprocessor(PreprocessorConfig(stopDtFactor = 2.5f)).preprocess(s.points, s.geometry)
+                val gesture = GesturePreprocessor(phone.configs.preprocessor).preprocess(s.points, s.geometry)
                 val kw = s.geometry.keyWidth
                 val trace = StringBuilder()
                 var arc = 0f
@@ -216,20 +199,21 @@ class ReplayTest {
      * filter, loosened on its own, lets it in (or that the word is not in the vocabulary, or that no single filter
      * suffices). Printed as a histogram, overall and per session group when sessions are known.
      */
-    private val loosenings = listOf(
-        "start/end radius" to DecoderConfig(endpointRadiusKeyWidths = 4f),
-        "corridor" to DecoderConfig(corridorRadiusKeyWidths = 3f),
-        "letter order along the path" to DecoderConfig(progressSlackKeyWidths = 20f),
-        "length band" to DecoderConfig(lengthRatioBand = 10f),
-        "minimum letters" to DecoderConfig(minLetterSlack = 50),
-    )
+    private val loosenings: List<Pair<String, DecoderConfig>> by lazy {
+        val d = phone.configs.decoder // the device's decoder with one filter loosened
+        listOf(
+            "start/end radius" to d.copy(endpointRadiusKeyWidths = 4f),
+            "corridor" to d.copy(corridorRadiusKeyWidths = 3f),
+            "letter order along the path" to d.copy(progressSlackKeyWidths = 20f),
+            "length band" to d.copy(lengthRatioBand = 10f),
+            "minimum letters" to d.copy(minLetterSlack = 50),
+        )
+    }
 
     private fun rejectedBy(s: Swipe, vocab: Vocabulary): String {
         if (!vocab.contains(s.label)) return "word not in the vocabulary"
-        val hybrid = HybridScorer(KushlerScorer(KushlerConfig(slowEmphasis = 0.5f, skipInflectionPenalty = 0.9f)),
-            LocationScorer(LocationConfig(sampleCount = 40, endpointEmphasis = 2f)), kushlerWeight = 0.4f, locationWeight = 0.6f)
         val admits = loosenings.filter { (_, config) ->
-            GestureDecoder(hybrid, config, GesturePreprocessor(PreprocessorConfig(stopDtFactor = 2.5f)))
+            GestureDecoder(phone.hybrid, config, GesturePreprocessor(phone.configs.preprocessor))
                 .decode(s.points, s.geometry, vocab, 5000).any { it.word.equals(s.label, ignoreCase = true) }
         }.map { it.first }
         return if (admits.isEmpty()) "no single filter (two or more at once)" else admits.joinToString(" or ")
@@ -248,9 +232,9 @@ class ReplayTest {
         println("\n=== Replay: ${swipes.size} labelled swipes, vocabulary ${vocab.size} words, scales normalized by rank: $normalizeScales, Hinglish factor $hiFactor, apostrophe $apostrophe ===")
 
         // what the phone itself got (whatever build recorded it), for reference
-        val phone = Tally()
-        for (s in swipes) phone.add(if (s.phoneGot == s.label) 0 else -1)
-        println(String.format("%-42s %s", "phone at recording time (top1 only)", phone))
+        val recorded = Tally()
+        for (s in swipes) recorded.add(if (s.phoneGot == s.label) 0 else -1)
+        println(String.format("%-42s %s", "phone at recording time (top1 only)", recorded))
 
         val watch = (System.getenv("GESTURE_REPLAY_WORDS") ?: "").split(',').filter { it.isNotBlank() }.toSet()
         val details = mutableListOf<String>()
@@ -294,8 +278,7 @@ class ReplayTest {
                         results.take(6).joinToString(", ") { it.word }))
                 val rank = results.indexOfFirst { it.word.equals(s.label, ignoreCase = true) }
                 if (rank < 0 && v === firstVariant && attributeRejected) {
-                    val pruned = GestureDecoder(HybridScorer(), DecoderConfig(), GesturePreprocessor(PreprocessorConfig(stopDtFactor = 2.5f)))
-                        .decode(s.points, s.geometry, vocabForVariant, 5000).none { it.word.equals(s.label, ignoreCase = true) }
+                    val pruned = phone.decoder.decode(s.points, s.geometry, vocabForVariant, 5000).none { it.word.equals(s.label, ignoreCase = true) }
                     if (pruned) rejectedHistogram.add(rejectedBy(s, vocabForVariant) + "\t" + s.session + "\t" + s.id)
                 }
                 hits[index] = rank == 0
