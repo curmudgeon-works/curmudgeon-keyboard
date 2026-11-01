@@ -129,7 +129,7 @@ class ReReviewMedium2Test {
         // the decoder's first word is a removed one; Suggest drops it and shows "hallo" first
         val cands = listOf("hello", "hallo").map { SuggestedWordInfo(it, "", 100, SuggestedWordInfo.KIND_CORRECTION, null, 0, 0) }
         GestureCorpusRecorder.onSwipe(ComposedData(pointers, true, "hello"), Mockito.mock(Keyboard::class.java), cands, "en")
-        GestureCorpusRecorder.onShown("hallo")
+        GestureCorpusRecorder.onShown(listOf("hallo"))
         GestureCorpusRecorder.onWordCommitted("hallo")
         Thread.sleep(300)
         val line = results.readText()

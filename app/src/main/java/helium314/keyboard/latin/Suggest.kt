@@ -423,9 +423,6 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
                     Dictionary.DICTIONARY_USER_TYPED, SuggestedWordInfo.NOT_AN_INDEX, SuggestedWordInfo.NOT_A_CONFIDENCE)
             )
         }
-        // the recorder follows what's put first (inserted), not the decoder's raw first word
-        if (inputStyle == SuggestedWords.INPUT_STYLE_TAIL_BATCH) GestureCorpusRecorder.onShown(suggestionsContainer.firstOrNull()?.mWord)
-
         useDefaultEmojiSkinTone(suggestionsContainer)
 
         // In the batch input mode, the most relevant suggested word should act as a "typed word"
@@ -450,7 +447,13 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
                 suggestionsContainer[i] = useDefaultEmojiSkinTone(suggestionsContainer[i])
         }
         // the rules look words up, so they wait for the finished swipe, like the fillers above
+        val beforeCut = suggestionsContainer.map { it.mWord }
         applyUserStripSettings(suggestionsContainer, applyRules = inputStyle == SuggestedWords.INPUT_STYLE_TAIL_BATCH)
+        // the recorder follows what's put first (inserted), not the decoder's raw first word, and counts the final
+        // word's position in the strip's final order, then the words the strip had no room for (2026-10-31, 20261021_L1:
+        // noted before the next-word move, the fillers and the rules, the first word could be another than the one shown)
+        if (inputStyle == SuggestedWords.INPUT_STYLE_TAIL_BATCH)
+            GestureCorpusRecorder.onShown((suggestionsContainer.map { it.mWord } + beforeCut).distinct())
         val suggestionsList = if (SuggestionStripView.DEBUG_SUGGESTIONS && suggestionsContainer.isNotEmpty()) {
             // firstOrNull: own-decoder results can be empty while its vocabulary is still building
             getSuggestionsInfoListWithDebugInfo(suggestionResults.firstOrNull()?.mWord ?: "", suggestionsContainer)

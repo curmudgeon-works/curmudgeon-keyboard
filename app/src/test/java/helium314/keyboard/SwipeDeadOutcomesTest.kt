@@ -60,7 +60,7 @@ class SwipeDeadOutcomesTest {
         assertTrue(decoded.isEmpty())
         GestureCorpusRecorder.onSwipe(ComposedData(pointers, true, ""), keyboard, decoded.toList(), "en")
         Thread.sleep(300)
-        val lines = results.readLines()
+        val lines = results.readLines().filterNot { it.startsWith("#") } // (the header line is not an outcome)
         assertEquals(1, lines.size, "logged: $lines")
         val p = lines.single().split('\t')
         assertEquals("0", p[6], "decode time: $p") // (not decoded)
@@ -85,7 +85,7 @@ class SwipeDeadOutcomesTest {
         // (the recorder itself does not log a one-point swipe: nothing to follow)
         GestureCorpusRecorder.onSwipe(ComposedData(one, true, ""), keyboard, emptyList(), "en")
         Thread.sleep(300)
-        assertTrue(!results.isFile || results.readLines().isEmpty(), "logged: ${results.takeIf { it.isFile }?.readLines()}")
+        assertTrue(!results.isFile || results.readLines().none { !it.startsWith("#") }, "logged: ${results.takeIf { it.isFile }?.readLines()}")
         // the next swipe's own gate, not the last one's
         val three = InputPointers(4).apply { addPointer(10, 10, 0, 0); addPointer(50, 20, 0, 30); addPointer(90, 30, 0, 60) }
         assertEquals(SwipeMetrics.OUTCOME_NO_GEOMETRY, swipe(three, keyboard))

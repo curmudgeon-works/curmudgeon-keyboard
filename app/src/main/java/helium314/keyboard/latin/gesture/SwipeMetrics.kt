@@ -13,8 +13,12 @@ import java.util.concurrent.Executors
  * retyped or edited into another word). One tab-separated line per outcome in `swipe_results.tsv` in the app's
  * external files dir: time, swipe id, outcome, rank, swiped word, final word, decode ms, speed (key widths per
  * second), tuning key, decoder version ([helium314.keyboard.gesture.DECODER_VERSION]), app version, keyboard start
- * ([START]: swipe ids begin again at every start). Nothing leaves the phone. A swipe whose word is edited again later gets a second line with the
- * same id; the summary keeps the last.
+ * ([START]: swipe ids begin again at every start), and since 2026-10-31 (20261021_L1) where the final word sat on the
+ * strip (position: 1 to 10, missed = a word the keyboard knew, new = one it didn't, deleted; empty for a dead swipe)
+ * and the row's format ([FORMAT_VERSION]). A new file begins with one `#` header line naming the columns ([HEADER]);
+ * [read] skips it like any line whose first field is not a number. Rows from before have 9 to 13 columns; every
+ * reader takes a column by its index and allows for a short row. Nothing leaves the device. A swipe whose word is
+ * edited again later gets a second line with the same id; the summary keeps the last.
  *
  * Fed by [GestureCorpusRecorder], which follows each swiped word until it is settled, whether or not the corpus
  * itself is being recorded.
@@ -38,6 +42,11 @@ object SwipeMetrics {
     /** This start of the keyboard, on every line: with the id it names one swipe (lines from before 2026-10-06 have none). */
     private val START = System.currentTimeMillis().toString(36)
 
+    /** The format of a row, its last column (2026-10-31): v2 = the 14 columns of [HEADER]. Rows without it are older. */
+    const val FORMAT_VERSION = "v2"
+    /** The header a new file begins with: `#` and the column names, tab-separated, in the order the rows have them. */
+    const val HEADER = "#time\tid\toutcome\trank\tswiped\tfinal\tdecodeMs\tkeysPerSecond\ttuningKey\tdecoderVersion\tappVersion\tstart\tposition\tformat"
+
     private val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "swipe-metrics").apply { isDaemon = true } }
     @Volatile private var file: File? = null
 
@@ -53,19 +62,38 @@ object SwipeMetrics {
     // (whether a swipe is private is decided when it's made, by GestureCorpusRecorder, not here when it's written)
     fun isEnabled(): Boolean = metricsOn() && file != null
 
-    /** A swipe ended: [outcome] is one of the OUTCOME_ constants, [rank] the 0-based strip rank of a pick (else -1). */
-    fun onOutcome(id: Long, swiped: String, outcome: String, rank: Int, finalWord: String?, decodeMs: Long, keysPerSecond: Float, tuningKey: String) {
+    /** A swipe ended: [outcome] is one of the OUTCOME_ constants, [rank] the 0-based strip rank of a pick (else -1),
+     *  [position] where the final word sat on the strip as [GestureCorpusRecorder.positionName] says it ("" when
+     *  nothing was shown: a dead swipe). */
+    fun onOutcome(id: Long, swiped: String, outcome: String, rank: Int, finalWord: String?, decodeMs: Long, keysPerSecond: Float, tuningKey: String,
+                  position: String = "") {
         if (!isEnabled()) return
         val time = System.currentTimeMillis()
         executor.execute {
             try {
-                file?.appendText(listOf(time, id, outcome, rank, swiped, finalWord ?: "", decodeMs,
-                    String.format(java.util.Locale.ROOT, "%.1f", keysPerSecond), tuningKey,
-                    helium314.keyboard.gesture.DECODER_VERSION, helium314.keyboard.latin.BuildConfig.VERSION_NAME, START).joinToString("\t") + "\n")
+                file?.let { f ->
+                    headerIfNew(f)
+                    f.appendText(listOf(time, id, outcome, rank, swiped, finalWord ?: "", decodeMs,
+                        String.format(java.util.Locale.ROOT, "%.1f", keysPerSecond), tuningKey,
+                        helium314.keyboard.gesture.DECODER_VERSION, helium314.keyboard.latin.BuildConfig.VERSION_NAME, START,
+                        position, FORMAT_VERSION).joinToString("\t") + "\n")
+                }
             } catch (e: Exception) {
                 Log.w(TAG, "could not log a swipe outcome", e)
             }
         }
+    }
+
+    /** A file that is new (or empty) begins with [HEADER]; a file with rows already in it is left as it is. (On the
+     *  log's own thread, so the header comes once, before the first row.) */
+    private fun headerIfNew(f: File) {
+        if (f.isFile && f.length() > 0L) return
+        f.appendText(HEADER + "\n")
+    }
+
+    /** For tests: waits for every line queued so far to be written. */
+    internal fun awaitWrites() {
+        executor.submit { }.get(2, java.util.concurrent.TimeUnit.SECONDS)
     }
 
     class Summary(val swipes: Int, val firstChoice: Int, val fromStrip: Int, val neverOffered: Int, val decodeMs: List<Int>) {
@@ -106,6 +134,8 @@ object SwipeMetrics {
         try {
             f.forEachLine { line ->
                 val p = line.split('\t')
+                // (the `#` header and anything else that is not a row: skipped; columns 13 and 14, position and format,
+                // are not read here)
                 val time = p[0].toLongOrNull() ?: return@forEachLine
                 if (p.size >= 3 && p[2] == MARK_RESTART) { restarts.add(time); return@forEachLine }
                 if (p.size < 7) return@forEachLine
@@ -187,7 +217,7 @@ object SwipeMetrics {
     /** Restarts the tracking from now: a marker line; nothing is deleted. Waits, so a read right after it sees it. */
     fun restartTracking() {
         try {
-            executor.submit { file?.appendText("${System.currentTimeMillis()}\t-1\t$MARK_RESTART\n") }
+            executor.submit { file?.let { headerIfNew(it); it.appendText("${System.currentTimeMillis()}\t-1\t$MARK_RESTART\n") } }
                 .get(2, java.util.concurrent.TimeUnit.SECONDS)
         } catch (e: Exception) {
             Log.w(TAG, "could not restart the swipe results tracking", e)

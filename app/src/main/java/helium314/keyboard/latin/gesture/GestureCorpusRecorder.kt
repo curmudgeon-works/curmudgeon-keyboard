@@ -39,6 +39,12 @@ object GestureCorpusRecorder {
     private const val TAG = "GestureCorpusRecorder"
     private const val FILE_NAME = "gesture_corpus.jsonl"
     private const val MAX_CANDIDATES = 5
+    // where a swipe's final word sat on the strip, for the swipe results log (2026-10-31, 20261021_L1): one of the
+    // first POSITIONS words (0-based), or missed (a word the keyboard knew), a new word, or deleted
+    internal const val POSITIONS = 10
+    internal const val BUCKET_MISSED = POSITIONS
+    internal const val BUCKET_NEW_WORD = POSITIONS + 1
+    internal const val BUCKET_DELETED = POSITIONS + 2
     // "Swipes kept": the slider's range, its far end keeping all
     const val KEPT_MIN = 1_000
     const val KEPT_MAX = 20_000
@@ -70,6 +76,9 @@ object GestureCorpusRecorder {
     // never deleted (deleting all and typing the same first letter again leaves 0), and how many letters were typed in
     @Volatile private var editKept = 0
     @Volatile private var editTyped = 0
+    // the words shown for the last swipe, first first (the decoder's until the strip is built, then the strip's): where
+    // the word it ends as sat in them is the position the swipe results log writes
+    @Volatile private var lastCandidates: List<String> = emptyList()
     /** Whether the keyboard knows a word (dictionaries, learned words): set by Suggest with each swipe. */
     @Volatile var isKnown: (String) -> Boolean = { false }
 
@@ -144,7 +153,9 @@ object GestureCorpusRecorder {
         if (pendingId >= 0) finish(SwipeMetrics.OUTCOME_KEPT, -1, null)
         lastPrivate = SwipeMetrics.privateNow()
         // the native decoder reports the same word once per dictionary it was found in; keep the best-ranked
-        val cands = candidates.distinctBy { it.mWord }.take(MAX_CANDIDATES).map { it.mWord to it.mScore }
+        val distinct = candidates.distinctBy { it.mWord }
+        val cands = distinct.take(MAX_CANDIDATES).map { it.mWord to it.mScore }
+        lastCandidates = distinct.take(POSITIONS).map { it.mWord } // (replaced by the strip's words in onShown)
         if (cands.isEmpty()) { // nothing to follow: a dead swipe or a decode failure, logged so "never offered" stays honest
             // (which gate closed, when one did: no points, no geometry, no vocabulary; "none" = decoded, fit nothing)
             val outcome = OwnGestureDecoder.lastEarlyReturn ?: SwipeMetrics.OUTCOME_NONE
@@ -214,14 +225,41 @@ object GestureCorpusRecorder {
         }
     }
 
-    /** The word Suggest put first on the strip for the pending swipe, which is what gets inserted: the decoder's first
-     *  word was noted at the swipe, but Suggest drops removed words and reorders (re-review 2026-10-07: a kept word was
-     *  logged as edited into itself). */
-    fun onShown(word: String?) {
-        if (pendingId < 0 || word.isNullOrEmpty()) return
-        lastWord = word
-        editKept = word.length // (shown before any edit)
+    /** The words Suggest put on the strip for the pending swipe, first first (then the ones it had no room for): the
+     *  first is what gets inserted (the decoder's first word was noted at the swipe, but Suggest drops removed words and
+     *  reorders; re-review 2026-10-07: a kept word was logged as edited into itself), and the order is where the final
+     *  word's position is counted. Exact words: "US" and "us" are two places; an empty strip leaves nothing to count
+     *  against, not the decoder's words with the removed ones. */
+    fun onShown(words: List<String>) {
+        if (pendingId < 0) return
+        lastCandidates = words.distinct().take(POSITIONS)
+        words.firstOrNull()?.takeIf { it.isNotEmpty() }?.let { lastWord = it; editKept = it.length } // (shown before any edit)
     }
+
+    /** Where the word the swipe ended as sat among the words shown (0-based), else [BUCKET_MISSED] (a word the keyboard
+     *  knew) or [BUCKET_NEW_WORD]; [BUCKET_DELETED] when it was deleted. */
+    internal fun bucketOf(outcome: String, finalWord: String?): Int {
+        if (outcome == SwipeMetrics.OUTCOME_DELETED || finalWord.isNullOrEmpty()) return BUCKET_DELETED
+        // the exact word first ("us" after "US" is the second place), then any case (the strip capitalizes)
+        val at = lastCandidates.indexOf(finalWord).takeIf { it >= 0 }
+            ?: lastCandidates.indexOfFirst { it.equals(finalWord, ignoreCase = true) }
+        return when {
+            at in 0 until POSITIONS -> at
+            runCatching { isKnown(finalWord) }.getOrDefault(false) -> BUCKET_MISSED
+            else -> BUCKET_NEW_WORD
+        }
+    }
+
+    /** The bucket as the swipe results log writes it: 1..10, missed, new, deleted. */
+    internal fun positionName(bucket: Int) = when (bucket) {
+        in 0 until POSITIONS -> (bucket + 1).toString()
+        BUCKET_MISSED -> "missed"
+        BUCKET_NEW_WORD -> "new"
+        else -> "deleted"
+    }
+
+    /** For tests: the last swipe's words as shown. */
+    internal fun setCandidatesForTest(words: List<String>) { lastCandidates = words }
 
     /** A swiped word's id: its time [now] in ms, one more than the last id if that is not later (unique across keyboard
      *  starts unless the clock goes back; internal for tests). */
@@ -280,7 +318,9 @@ object GestureCorpusRecorder {
         deletedAt = if (outcome == SwipeMetrics.OUTCOME_DELETED) System.currentTimeMillis() else 0L
         // (made while typing privately, or settled while typing privately: nothing of it is written; 2026-10-10)
         if (lastPrivate || SwipeMetrics.privateNow()) return
-        SwipeMetrics.onOutcome(id, lastWord, outcome, rank, word, lastDecodeMs, lastSpeed, lastTuning)
+        // where the word it ends as sat on the strip (a kept word is the one shown first)
+        val position = positionName(bucketOf(outcome, if (outcome == SwipeMetrics.OUTCOME_KEPT) lastWord else word))
+        SwipeMetrics.onOutcome(id, lastWord, outcome, rank, word, lastDecodeMs, lastSpeed, lastTuning, position)
         when (outcome) {
             // (a pick at rank 0 is the swiped word itself, unless letters were typed: then the strip's first word is
             // another word, and it was a correction too; 2026-10-23)
