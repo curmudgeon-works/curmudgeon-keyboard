@@ -121,8 +121,10 @@ object OwnGestureDecoder {
     /** How long the last decode took on this phone, for the swipe statistics. */
     @Volatile var lastDecodeMs: Long = 0
         private set
-    /** The last swipe found no vocabulary at all (still building after a start): a dead swipe, logged as such. */
-    @Volatile var lastVocabularyMissing = false
+    /** Why the last swipe was not decoded at all, null when it was: a SwipeMetrics OUTCOME_ constant naming the gate
+     *  that closed (fewer than two points, no letter geometry, no vocabulary yet after a start), so the results log
+     *  says which (2026-10-31; "none" is a decoded swipe that fit no word). */
+    @Volatile var lastEarlyReturn: String? = null
         private set
     /** The last swipe's speed as the decoder measured it (key widths per second), for the swipe results log. */
     @Volatile var lastSpeedKeysPerSecond: Float = 0f
@@ -195,13 +197,17 @@ object OwnGestureDecoder {
         val results = SuggestionResults(SuggestedWords.MAX_SUGGESTIONS, false, false)
         // this swipe's own facts from here on: an early return must not leave the last swipe's behind (review 2026-10-06:
         // a stale "no vocabulary" mislabeled the next dead swipe in the results log)
-        lastVocabularyMissing = false
+        lastEarlyReturn = null
         lastDecodeMs = 0
         lastSpeedKeysPerSecond = 0f
         lastSettings = null
         val locale = locales.first()
         val points = adaptPointers(composedData)
-        if (points.size < 2) return results
+        if (points.size < 2) {
+            lastEarlyReturn = SwipeMetrics.OUTCOME_NO_POINTS
+            Log.w(TAG, "no gesture results: ${points.size} point(s)")
+            return results
+        }
         val prefs = Settings.getCurrentContext()?.prefs()
         val apostropheViaPeriod = prefs?.getBoolean(Settings.PREF_GESTURE_APOSTROPHE_VIA_PERIOD, Defaults.PREF_GESTURE_APOSTROPHE_VIA_PERIOD)
             ?: Defaults.PREF_GESTURE_APOSTROPHE_VIA_PERIOD
@@ -214,11 +220,15 @@ object OwnGestureDecoder {
         lastSettings = DecodeSettings(apostropheViaPeriod, capsSwipe, capsHeight, learnedWords,
             activeScorerPref ?: Defaults.PREF_GESTURE_DECODER_SCORER, wanted, Settings.getValues()?.mSuggestionCount ?: 0,
             specs.map { it.key }, tuning.key)
-        val geometry = geometryFor(keyboard, apostropheViaPeriod) ?: return results
+        val geometry = geometryFor(keyboard, apostropheViaPeriod)
+        if (geometry == null) {
+            lastEarlyReturn = SwipeMetrics.OUTCOME_NO_GEOMETRY
+            return results
+        }
         currentTuning = tuning
         val vocabulary = GestureDecoderVocabulary.getOrBuildAsync(specs)
-        lastVocabularyMissing = vocabulary == null
         if (vocabulary == null) {
+            lastEarlyReturn = SwipeMetrics.OUTCOME_NO_VOCABULARY
             Log.d(TAG, "vocabulary for $locales not ready yet, no gesture results")
             return results
         }
@@ -287,7 +297,10 @@ object OwnGestureDecoder {
                 key.x + key.width / 2f, key.y + key.height / 2f,
                 key.width.toFloat(), key.height.toFloat()))
         }
-        if (keys.size < 5) return null // not a letter keyboard
+        if (keys.size < 5) { // not a letter keyboard
+            Log.w(TAG, "no gesture results: ${keys.size} letter keys on keyboard ${keyboard.mId}, no geometry")
+            return null
+        }
         // the setting on means both ways (2026-10-31): the detour and the skipped apostrophe; off, skipped only
         val geometry = KeyboardGeometry(keys, apostropheViaPeriod, apostropheBothWays = apostropheViaPeriod)
         cachedKeyboardRef = WeakReference(keyboard)

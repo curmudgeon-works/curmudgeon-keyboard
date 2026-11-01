@@ -26,10 +26,14 @@ object SwipeMetrics {
     const val OUTCOME_PICKED = "picked"
     const val OUTCOME_DELETED = "deleted"
     const val OUTCOME_EDITED = "edited"
-    /** the decoder found no word at all */
+    /** the decoder ran and found no word at all: the swipe fit nothing (until 2026-10-31 also every dead swipe below but novocab) */
     const val OUTCOME_NONE = "none"
     /** the swipe came before the vocabulary was built (right after a start): a dead swipe, nothing written */
     const val OUTCOME_NO_VOCABULARY = "novocab"
+    /** fewer than two points reached the decoder: nothing to decode (2026-10-31; the recorder itself skips such a swipe today) */
+    const val OUTCOME_NO_POINTS = "nopoints"
+    /** the keyboard had fewer than five letter keys to lay words out on (not a letter keyboard): nothing decoded (2026-10-31) */
+    const val OUTCOME_NO_GEOMETRY = "nogeometry"
 
     /** This start of the keyboard, on every line: with the id it names one swipe (lines from before 2026-10-06 have none). */
     private val START = System.currentTimeMillis().toString(36)

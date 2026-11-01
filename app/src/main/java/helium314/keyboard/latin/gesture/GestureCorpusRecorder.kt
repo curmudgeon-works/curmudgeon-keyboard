@@ -146,7 +146,8 @@ object GestureCorpusRecorder {
         // the native decoder reports the same word once per dictionary it was found in; keep the best-ranked
         val cands = candidates.distinctBy { it.mWord }.take(MAX_CANDIDATES).map { it.mWord to it.mScore }
         if (cands.isEmpty()) { // nothing to follow: a dead swipe or a decode failure, logged so "never offered" stays honest
-            val outcome = if (OwnGestureDecoder.lastVocabularyMissing) SwipeMetrics.OUTCOME_NO_VOCABULARY else SwipeMetrics.OUTCOME_NONE
+            // (which gate closed, when one did: no points, no geometry, no vocabulary; "none" = decoded, fit nothing)
+            val outcome = OwnGestureDecoder.lastEarlyReturn ?: SwipeMetrics.OUTCOME_NONE
             if (!lastPrivate) SwipeMetrics.onOutcome(nextId(System.currentTimeMillis()), "", outcome, -1, null,
                 OwnGestureDecoder.lastDecodeMs, OwnGestureDecoder.lastSpeedKeysPerSecond, OwnGestureDecoder.currentTuning.key)
             return
