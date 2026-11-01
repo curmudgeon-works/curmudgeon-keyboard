@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.gesture
 
+import helium314.keyboard.gesture.ReplayCorpus.Swipe
 import java.io.File
 import kotlin.test.Test
 
@@ -19,13 +20,6 @@ class ReplayTest {
         /** [Variant.learnedFreq] for the phone's learned-word model. */
         const val LEARNED_PHONE = -1
     }
-
-    private class Swipe(
-        val id: Int, val locale: String, val labelSource: String, val label: String, val phoneGot: String,
-        val geometry: KeyboardGeometry, val points: List<GesturePoint>,
-        /** who swiped it, where the corpus says (a 9th column: the FUTO import's sessions); else empty */
-        val session: String = "",
-    )
 
     /**
      * [decode] returns the ranked words a variant would put on the strip. With [learnedFreq] the swipes run in
@@ -100,19 +94,13 @@ class ReplayTest {
     private val normalizeScales = System.getenv("GESTURE_REPLAY_NORMALIZE") != "0"
     private val tieAware = System.getenv("GESTURE_REPLAY_NORMALIZE") == "ties"
     private val hiFactor = System.getenv("GESTURE_REPLAY_HI_FACTOR")?.toFloatOrNull() ?: 0.85f
-    // the phone's default since 7b5f8f75e: the apostrophe is skipped (swipe im for I'm); GESTURE_REPLAY_APOSTROPHE=period
-    // swipes it through the period key, as the replay did before 2026-10-18 (review MM1 / S5)
-    private val apostropheViaPeriod = System.getenv("GESTURE_REPLAY_APOSTROPHE") == "period"
+    // apostrophe words are scored as the device scored each swipe: with the setting the corpus recorded for it (since
+    // 2026-10-23; on = both ways), else skipped, the device's default before that (ReplayCorpus.geometry). Until
+    // 2026-10-31 one setting applied to every swipe: skipped, or through the period key with GESTURE_REPLAY_APOSTROPHE=period
+    // (as the replay did before 2026-10-18, review MM1 / S5). The variable still forces one setting on all: period, skip or both
+    private val apostropheOverride = System.getenv("GESTURE_REPLAY_APOSTROPHE")?.takeIf { it.isNotEmpty() }
 
-    private fun corpus(dir: File): List<Swipe> = File(dir, "corpus.tsv").readLines().map { line ->
-        val f = line.split('\t')
-        val keys = f[6].split(';').map { k ->
-            val p = k.split(':')
-            KeyInfo(p[0][0], p[1].toFloat(), p[2].toFloat(), p[3].toFloat(), p[4].toFloat())
-        }
-        val points = f[7].split(';').map { p -> val v = p.split(','); GesturePoint(v[0].toFloat(), v[1].toFloat(), v[2].toLong()) }
-        Swipe(f[0].toInt(), f[1], f[2], f[3], f[4], KeyboardGeometry(keys, apostropheViaPeriod), points, f.getOrElse(8) { "" })
-    }
+    private fun corpus(dir: File): List<Swipe> = File(dir, "corpus.tsv").readLines().map { ReplayCorpus.parse(it, apostropheOverride) }
 
     /**
      * A decoder from a spec like "k=0.4 slow=1": the phone's defaults with the named settings changed.
@@ -121,7 +109,8 @@ class ReplayTest {
      * endR = start/end key radius, corridor = how far off the path a letter may be, stop = stop detection (dt factor),
      * skip = penalty for an inflection no letter uses, cap = candidates scored, reach / shortR / shortL = the long-reach
      * corner rule (reach length, allowed shortfall reaching right / left), prog = letter-order slack, band / slack =
-     * the path-length band (ratio, additive key widths), exc = how far above the keys (key heights) a swipe is cut.
+     * the path-length band (ratio, additive key widths), exc = how far above the keys (key heights) a swipe is cut,
+     * apos = the cost of an apostrophe word matched without its period-key detour (the setting on, both ways).
      */
     private fun decoder(spec: String): GestureDecoder {
         val v = spec.split(' ').filter { '=' in it }.associate { it.substringBefore('=') to it.substringAfter('=').toFloat() }
@@ -142,7 +131,8 @@ class ReplayTest {
                 speedWidenFromKeysPerSecond = f("spdFrom", 12f), speedWidenPerKeyPerSecond = f("spdRate", 0f),
                 frequencyEmphasisFromKeysPerSecond = f("fqFrom", 12f), frequencyEmphasisPerKeyPerSecond = f("fqRate", 0.05f),
                 maxCandidates = f("cap", 4096f).toInt(), longReachKeyWidths = f("reach", 4f),
-                reachShortfallRightKeyWidths = f("shortR", 0.6f), reachShortfallLeftKeyWidths = f("shortL", 0.4f)),
+                reachShortfallRightKeyWidths = f("shortR", 0.6f), reachShortfallLeftKeyWidths = f("shortL", 0.4f),
+                apostropheSkipPenalty = f("apos", 0.05f)),
             GesturePreprocessor(PreprocessorConfig(turnConfidenceScale = f("turn", 1f), stopDtFactor = f("stop", 2.5f),
                 excursionMinHeightKeyHeights = f("exc", 1.25f) /* the phone cuts swipes this far above the keys (Defaults 125; the replay cut at 0.5 until 2026-10-18) */)),
         )
@@ -253,7 +243,9 @@ class ReplayTest {
         val dir = dataDir() ?: run { println("ReplayTest: no replay data, skipped"); return }
         val vocab = vocabulary(dir, mapOf("en-US" to 1f, "hi-Latn" to hiFactor))
         val swipes = corpus(dir)
-        println("\n=== Replay: ${swipes.size} labelled swipes, vocabulary ${vocab.size} words, scales normalized by rank: $normalizeScales, Hinglish factor $hiFactor, apostrophe ${if (apostropheViaPeriod) "via the period key" else "skipped"} ===")
+        val apostrophe = apostropheOverride?.let { "$it for all" }
+            ?: "as recorded (${swipes.count { it.apostrophe == ReplayCorpus.PERIOD }} on, both ways; ${swipes.count { it.apostrophe == ReplayCorpus.SKIP }} off; ${swipes.count { it.apostrophe.isEmpty() }} not recorded, skipped)"
+        println("\n=== Replay: ${swipes.size} labelled swipes, vocabulary ${vocab.size} words, scales normalized by rank: $normalizeScales, Hinglish factor $hiFactor, apostrophe $apostrophe ===")
 
         // what the phone itself got (whatever build recorded it), for reference
         val phone = Tally()
